@@ -15637,8 +15637,9 @@ which renders it into every node's <code>/etc/sf/config</code>:</p>
 Shaken Fist (see <a href="#the-kerbside-credential">The Kerbside credential</a>).</p>
 <p>To have the collection deploy Kerbside as well, put hosts in the optional
 <code>kerbside</code> inventory group and set the further variables described in
-<a href="../installation/">Installation</a>; the manual Kerbside setup described later on
-this page is then only for a Kerbside you deploy some other way.</p>
+<a href="../installation/">Installation</a>. For a Kerbside you deploy some other way, see
+<a href="../kerbside/#bring-your-own">Running Kerbside beside a cluster</a> and Kerbside's
+<a href="/components/kerbside/console-sources/#shaken-fist">console sources page</a>.</p>
 <p>For a cluster not deployed with the collection, use <code>sf-ctl</code> instead (a
 <code>cluster_config</code> value overrides the rendered file at process start):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sf-ctl<span class="w"> </span>set-config<span class="w"> </span>KERBSIDE_URL<span class="w"> </span>https://kerbside.example.com
@@ -15766,7 +15767,7 @@ appears in the process table or shell history:</p>
 </code></pre></div>
 <h2 id="publishing-the-public-keys">Publishing the public keys<a class="headerlink" href="#publishing-the-public-keys" title="Permanent link">&para;</a></h2>
 <p>Kerbside verifies tokens with the <strong>public</strong> half of the signing key, which
-Shaken Fist serves to admin callers at
+Shaken Fist serves to any authenticated caller at
 <a href="https://openapi.shakenfist.com/#/admin/get_admin_vditokenpubkey"><code>GET /admin/vditokenpubkey</code></a>.
 The response is the active key id and every currently published public key:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
@@ -15857,6 +15858,8 @@ node logs <code>empty subject</code>.</p>
   proxied console.</li>
 <li><a href="../installation/">Installation</a> — where <code>extra_config</code> and cluster
   variables are set.</li>
+<li><a href="../kerbside/">Running Kerbside beside a cluster</a> — where to place Kerbside,
+  the network it needs, and load balancing.</li>
 <li><a href="/components/kerbside/">Kerbside component documentation</a> — the proxy,
   its console sources, and its own configuration.</li>
 <li><a href="https://openapi.shakenfist.com/#/admin/get_admin_vditokenpubkey"><code>GET /admin/vditokenpubkey</code></a>

@@ -16077,13 +16077,13 @@ every phase has been completed, abandoned or superseded.</p>
 <tr>
 <td>5. The <code>kerbside</code> role moves into Kerbside, and Kerbside's sf-e2e lane deploys through it</td>
 <td><a href="../PLAN-kerbside-deployer-phase-05-role-to-kerbside/">PLAN-kerbside-deployer-phase-05-role-to-kerbside.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>48849831c</code> (#4591); kerbside <code>2093f2ed5</code> (#580), <code>89f199456</code> (#587); actions <code>17ea1889e</code> (#181), <code>31139125c</code> (#195)</td>
 </tr>
 <tr>
 <td>6. Documentation and close-out</td>
-<td>PLAN-kerbside-deployer-phase-06-docs.md</td>
-<td>Proposed</td>
+<td><a href="../PLAN-kerbside-deployer-phase-06-docs/">PLAN-kerbside-deployer-phase-06-docs.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -16406,29 +16406,37 @@ was failing nightly. <a class="magiclink magiclink-github magiclink-issue" href=
 The phase confirms the lane's state before moving it, so the move
 is not blamed for an old failure.</p>
 <h3 id="phase-6-documentation-and-close-out">Phase 6 -- Documentation and close-out<a class="headerlink" href="#phase-6-documentation-and-close-out" title="Permanent link">&para;</a></h3>
+<p>Phases 3 to 5 already did much of what this section first asked
+for. <code>vdi_console_tokens.md</code> lost its "manual step" note and gained
+the variables, the group and the bring-your-own path.
+<code>installation.md</code> documents the group, the variables and the
+database. The release note has its Kerbside bullets. What remains:</p>
 <ul>
-<li><code>docs/operator_guide/vdi_console_tokens.md</code> loses its "manual
-  step" section and gains the variables, the group, and the
-  bring-your-own-Kerbside path. The "admin callers" error is
-  fixed.</li>
-<li><code>docs/operator_guide/installation.md</code> documents the group and
-  variables.</li>
 <li>A new <code>docs/operator_guide/kerbside.md</code> covers:</li>
 <li>the topology choices;</li>
-<li>the database to create;</li>
-<li>the load-balancer shape for the API (with an nginx example,
-    following <code>examples/nginx-loadbalancer.conf</code>) and for the
-    TCP passthrough of 5900/5901;</li>
-<li>certificate overrides;</li>
+<li>the network each needs;</li>
+<li>the load-balancer shape for the API (with an nginx example)
+    and for the TCP passthrough of 5900/5901, marked untested;</li>
+<li>certificates and their overrides;</li>
 <li>what being Keystone-less costs (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/300" title="GitHub Issue: shakenfist/kerbside #300">kerbside#300</a>);</li>
 <li>the private-CA SF API caveat (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/136" title="GitHub Issue: shakenfist/kerbside #136">kerbside#136</a>).</li>
-<li>Release notes.</li>
-<li>In the Kerbside repository, <code>docs/use-cases/shakenfist.md</code>
-  points at the collection as the supported path, and the
-  co-location claim in <code>installation.md</code> is corrected (or filed,
-  if the operator prefers). Both are edited there, never in
-  <code>docs/components/kerbside/</code> here (<code>AGENTS.md</code>).</li>
 </ul>
+<p>It links to the existing variable tables rather than repeating
+  them.
+- <code>vdi_console_tokens.md</code>'s "admin callers" error is fixed (now at
+  <code>:240</code>), along with a stale cross-reference. The page, and the
+  new one, join the site navigation, which has never listed
+  <code>vdi_console_tokens.md</code>.
+- <code>ARCHITECTURE.md</code> names Kerbside as an optional component.
+- In the Kerbside repository, <code>docs/use-cases/shakenfist.md</code> points
+  at the collection as the supported path. The co-location claim is
+  corrected in all five places it appears: <code>installation.md</code>
+  twice, <code>network-ports.md</code>, <code>demo/README.md</code> and
+  <code>demo/entrypoint.sh</code>, the last found by <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/592" title="GitHub Issue: shakenfist/kerbside #592">kerbside#592</a>'s review
+  rather than the survey. Both are edited
+  there, never in <code>docs/components/kerbside/</code> here (<code>AGENTS.md</code>).
+- <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/579" title="GitHub Issue: shakenfist/kerbside #579">kerbside#579</a> is closed, since the nightly has been green since
+  2026-10-19.</p>
 <p>Planned at medium effort.</p>
 <h3 id="phase-7-push-audit">Phase 7 -- Push audit<a class="headerlink" href="#phase-7-push-audit" title="Permanent link">&para;</a></h3>
 <p>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in
@@ -16753,8 +16761,10 @@ chosen to defer to here, so that we do not forget them.</p>
   plan's Future work also points at convergence with SF's
   OIDC and auth-federation work.</li>
 <li><strong>A least-privilege credential for the scrape.</strong> It needs an
-  <code>sf-ctl</code> option to mint a scoped <code>system</code> key, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/444" title="GitHub Issue: shakenfist/kerbside #444">kerbside#444</a>,
-  and a verified scope set. The set is probably <code>cluster-admin</code>,
+  <code>sf-ctl</code> option to mint a scoped <code>system</code> key, and a verified
+  scope set. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/444" title="GitHub Issue: shakenfist/kerbside #444">kerbside#444</a>, on non-<code>system</code> namespaces, was closed on
+  2026-10-17 by a documentation change (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/569" title="GitHub Issue: shakenfist/kerbside #569">kerbside#569</a>). The
+  limitation it described still holds. The set is probably <code>cluster-admin</code>,
   <code>node.read</code>, <code>instance.read</code> and <code>admin.read</code>, but that is
   unverified.</li>
 <li><strong>Kerbside's SF API client pins no CA</strong> (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/136" title="GitHub Issue: shakenfist/kerbside #136">kerbside#136</a>). An SF
@@ -16787,7 +16797,7 @@ where one exists, for directly related issues that we should
 either resolve as part of this master plan or at least be aware of
 while planning it.</p>
 <ul>
-<li><strong>#4415</strong> (open): SPICE certificate renewal never fires, and
+<li><strong>#4415</strong> (closed): SPICE certificate renewal never fires, and
   certificates expire after 365 days (found while planning; see
   Situation). Phase 1 fixes it and closes the issue.</li>
 <li><strong>#4416</strong> (fixed outside this plan): the SPICE private key was
@@ -16797,12 +16807,12 @@ while planning it.</p>
 <li><strong>#4004</strong> (closed by #4024) delivered the first increment
   only. This plan is the remainder; phase 2 comments on #4004
   with a link here.</li>
-<li><strong>#4093</strong> (open): the mint test never runs in SF CI. Phase 4
+<li><strong>#4093</strong> (closed): the mint test never runs in SF CI. Phase 4
   closes it.</li>
 <li><strong>#4099</strong> (merged): keeps the signing key out of daemon environments.
   #4097's 2026-09-06 comment asks for a live check of that, which phase
   4 adds.</li>
-<li><strong>#4459</strong> (open): restart-on-change in the node role has never
+<li><strong>#4459</strong> (closed): restart-on-change in the node role has never
   been tested (found while planning phase 3). Phase 4 adds the
   second-deploy check.</li>
 <li><strong>#4460</strong> (open): <code>examples/cluster</code> pairs a load-balancer
@@ -16822,8 +16832,9 @@ while planning it.</p>
 <li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/482" title="GitHub Issue: shakenfist/kerbside #482">kerbside#482</a></strong> (closed 2026-10-17): the nightly sf-e2e lane was
   failing. Phase 4's survey found it stale. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/579" title="GitHub Issue: shakenfist/kerbside #579">kerbside#579</a> (open)
   reports a new nightly failure, building the proxy wheel, on
-  2026-10-18. Phase 5 confirms the lane's state before it moves it.</li>
-<li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/131" title="GitHub Issue: shakenfist/kerbside #131">kerbside#131</a>, #313, #465</strong> (open): a forgeable default seed,
+  2026-10-18. Every nightly from 2026-10-19 passed, which meets its
+  own close condition. Phase 6 closes it.</li>
+<li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/131" title="GitHub Issue: shakenfist/kerbside #131">kerbside#131</a>, #313, #465</strong> (closed): a forgeable default seed,
   a malformed INI that exits 0, and a malformed <code>sources.yaml</code>
   that crash-loops the daemon. Phase 3 guards each at deploy
   time: assert the seed, validate the rendered INI and YAML

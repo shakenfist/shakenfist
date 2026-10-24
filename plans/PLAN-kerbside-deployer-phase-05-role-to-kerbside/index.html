@@ -17370,14 +17370,70 @@ passed every job:
   <code>kerbside-*</code> included;
 * 147 tests passed and 0 failed, the Kerbside exchange and console
   tests among them. None of the 4 skipped tests is a Kerbside test.</p>
-<p><strong>Steps 8 and 9 have not started.</strong> Step 8 needs C merged, and step 9
-needs D merged and one nightly pass (back-brief gate 3).</p>
+<p><strong>C merged</strong> as <code>48849831c</code> (#4591).</p>
+<p><strong>Step 8: pull request D, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/587" title="GitHub Issue: shakenfist/kerbside #587">kerbside#587</a>.</strong> The operator
+approved pushing and opening D, with its own run as the first trial.
+Committed as <code>0778191</code>.
+<a href="https://github.com/shakenfist/kerbside/actions/runs/39680016813">Pull request run 39680016813</a>
+passed. The redeploy check covered the <code>sf-*</code> and <code>kerbside-*</code> units.
+The collection deployed from the checkout reports version <code>0.0.0</code>, and
+<code>site.yml</code> accepts it with its warning about an unreleased collection.</p>
+<p>One automated review round followed, at 1 fix and 7 consider. The
+next round found 0 fix and 5 consider. <code>0d75081</code> took the fix and five
+of the consider items:
+* <strong>The fix.</strong> <code>drive-adversarial.py</code> called the source password the
+  CI system key. It is the dedicated <code>kerbside</code> key the deploy mints.
+* <strong>A real leak, raised as a consider item.</strong> The artifact redaction
+  caught <code>KEY = value</code> secrets, but not a password in a URL's
+  userinfo, such as <code>kerbside_sql_url</code>'s in a traceback. So the old
+  pipeline uploaded it, as mutation M4 of four shows.
+  <code>gather-artifacts.sh</code> now redacts <code>scheme://user:password@</code>, and its
+  leak check looks for that shape.
+* The journal names <code>kerbside-api</code> and <code>kerbside-daemon</code> beside the
+  glob, so a unit that failed to load is still collected.
+* The checkout is staged with <code>tar</code>, excluding <code>.git</code>, <code>target</code> and
+  <code>kerbside/dist</code>.
+* The deploy profile pins <code>kerbside_venv</code> and <code>kerbside_config_dir</code>,
+  which the drivers read. The drivers' comments say they run as root.</p>
+<p>The artifact bundle gains only the redacted <code>kerbside-*</code> journals.
+Configuration and credential files are never gathered.
+<a href="https://github.com/shakenfist/kerbside/actions/runs/39687744662">Dispatch run 39687744662</a>,
+which matches the nightly trigger, passed on <code>0d75081</code>. Its artifacts
+were clean: the only <code>REDACTED</code> was Shaken Fist's own
+<code>MARIADB_PASSWORD</code>. D merged as Kerbside <code>89f199456</code>. The first nightly
+to include it,
+<a href="https://github.com/shakenfist/kerbside/actions/runs/39743016396">run 39743016396</a>
+(2026-10-22 07:47 UTC), passed, which met gate 3.</p>
+<p><strong>Step 9: pull request E, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/195" title="GitHub Issue: shakenfist/actions #195">actions#195</a>.</strong> Committed as
+<code>0ae201c</code>. It deletes <code>deploy-kerbside-on-shakenfist/</code> and removes the
+action from <code>README.md</code>, <code>ARCHITECTURE.md</code>, <code>docs/actions.md</code> and
+<code>docs/ci.md</code>. Its review's one fix item asked for proof that no
+caller remained. No code changed, and the reply showed no caller
+remained:
+* Kerbside's only branch, <code>develop</code>, stopped using the action at
+  <code>89f199456</code>;
+* none of kerbside-patches' six branches uses it;
+* code search across the organisation finds only plan files.</p>
+<p>The <code>REVIEWS.md</code> and <code>.vscode</code> review marks that still name the file
+are generated, so they were left to their tooling. E merged as actions
+<code>31139125c</code>.</p>
+<p><strong>Issues and plans.</strong>
+* #4097 gained
+  <a href="https://github.com/shakenfist/shakenfist/issues/4097#issuecomment-6349025513">a comment</a>
+  closing item 4's Kerbside side.
+* #4367 gained
+  <a href="https://github.com/shakenfist/shakenfist/issues/4367#issuecomment-6349026043">a comment</a>
+  saying why the lane stays on <code>build-smoke-cluster</code>.
+* <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/589" title="GitHub Issue: shakenfist/kerbside #589">kerbside#589</a>, merged as <code>829c636b2</code>, tells Kerbside's
+  deployment options plan which commits landed the move, which
+  unblocks its phase 5.</p>
+<p>Every pull request in this phase has merged, and its worktrees and
+branches are deleted.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Publish <code>shakenfist.shakenfist</code> to Galaxy.</strong> <code>release.yml</code>'s
   publish job has never run (S3). Once it does, D2 can add a name
-  dependency if that ever becomes wanted. File an issue when this phase
-  merges.</li>
+  dependency if that ever becomes wanted. Filed as #4613.</li>
 <li><strong>A second live source in CI</strong>, for example a static source beside
   Shaken Fist. This belongs to Kerbside's deployment options plan,
   whose gaps already note it.</li>
