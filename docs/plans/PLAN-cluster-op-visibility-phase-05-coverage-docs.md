@@ -430,4 +430,16 @@ wording is agreed, and that wording is in this plan for review.
 
 ## Execution notes
 
-None yet.
+* **2026-10-25 (AEDT), back brief.** Mikal confirmed decision 3 (no
+  fallback for servers without `object-pending-operations`) and decision
+  4 (the classification test, bounded at eight minutes), and gave this
+  session permission to push the branch, dispatch `Functional tests` on
+  it, and open the PR.
+* **Step 5a.** As planned. In review, the stub client's
+  `TimeoutException` moved into `test_ci_capacity_wait.py`'s shared
+  `_client_stubs()`, as a plain `Exception` subclass like the real one,
+  instead of being monkeypatched onto that module when the new test
+  imports it. The three mutations were re-run on a copy of the tree and
+  each was killed by the test it names (`mutation-check`, 3 of 3). None
+  of the eight callers waits on an object it has just deleted, so the
+  client's `ResourceNotFoundException` does not arise.

@@ -98,6 +98,10 @@ def _client_stubs():
                  'AgentAwaitTimeout'):
         setattr(apiclient, name, type(name, (APIException,), {}))
 
+    # The client's timeout is not an API error, and the operations wait
+    # catches it by name.
+    apiclient.TimeoutException = type('TimeoutException', (Exception,), {})
+
     apiclient.ASYNC_PAUSE = 'pause'
     apiclient.Client = type('Client', (), {'__init__': lambda self, *a, **kw: None})
 
