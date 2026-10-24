@@ -110,8 +110,13 @@ class NetOp(BaseClusterOperation):
         # Version 3 added node_uuid, which records the node a per-node
         # operation was targeted at. An operation written before the
         # bump predates the per-node coalescing key, so there is
-        # nothing to recover the value from; None is both the model
-        # default and the correct answer.
+        # nothing to recover the value from. None is the model default
+        # but not the right answer for a per-node network_ensure_mesh,
+        # which targeted a node the row does not record. No released
+        # Shaken Fist wrote version-2 rows (NetOp is absent from v0.7.2
+        # and v0.8.0-rc4), so only a develop deployment from before the
+        # multi-column key can hold one, and a cluster-wide survivor
+        # could fold such a row across nodes.
         static_values['node_uuid'] = None
 
     # Static values
