@@ -95,7 +95,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
         try:
             max_versions = validated_max_versions(max_versions)
         except InvalidMaxVersions as e:
-            return sf_api.error(400, str(e))
+            return sf_api.error(400, str(e), suppress_traceback=True)
 
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'snapshot request from REST API')

@@ -138,6 +138,34 @@ class InstancePowerOffEndpointTestCase(InstancePowerEndpointTestCase):
             suppress_event_logging=False, log_as_error=False)
 
 
+class InstanceRebootEndpointTestCase(InstancePowerEndpointTestCase):
+    """A 409 for an invalid lifecycle state is an ordinary client
+    refusal, not a bug, so it must not log a traceback (#4523). The
+    error mining which treats a traceback through
+    shakenfist_utilities.api as a defect was swamped by this one, and a
+    real traceback through that logger would have been masked by it.
+    """
+
+    def test_reboot_of_powered_off_instance_answers_409_without_traceback(self):
+        with mock.patch.object(
+                Instance, 'reboot',
+                side_effect=exceptions.InvalidLifecycleState(
+                    'you cannot reboot a powered off instance')):
+            with self.assertLogs(
+                    'shakenfist_utilities.api', level='INFO') as logged:
+                resp = self.client.post(
+                    '/instances/%s/reboothard' % self.instance_uuid,
+                    headers=self.auth, data=json.dumps({}))
+
+        self.assertEqual(409, resp.status_code)
+        self.assertIn('you cannot reboot a powered off instance',
+                      resp.get_json()['error'])
+
+        output = '\n'.join(logged.output)
+        self.assertIn('traceback suppressed by caller', output)
+        self.assertNotIn('Traceback (most recent call last)', output)
+
+
 class InstancePauseUnpauseEndpointTestCase(InstancePowerEndpointTestCase):
     """Pausing or unpausing a powered off instance answers 409, not the
     generic 500 a leaked libvirtError would give.

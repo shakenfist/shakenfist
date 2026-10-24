@@ -1220,7 +1220,7 @@ class AuthNamespaceRulesEndpoint(api_base.Resource):
         try:
             rule = MappingRule.new(namespace, name, **kwargs)
         except RuleValidationError as e:
-            return sf_api.error(400, str(e))
+            return sf_api.error(400, str(e), suppress_traceback=True)
 
         if not rule:
             return sf_api.error(409, 'rule already exists')
@@ -1297,7 +1297,7 @@ class AuthNamespaceRuleEndpoint(api_base.Resource):
         try:
             rule.update(**kwargs)
         except RuleValidationError as e:
-            return sf_api.error(400, str(e))
+            return sf_api.error(400, str(e), suppress_traceback=True)
 
         return rule.external_view()
 
@@ -1932,7 +1932,8 @@ class AuthFederatedEndpoint(api_base.Resource):
             LOG.with_fields({
                 'namespace': namespace, 'source': source
             }).info(f'Federated exchange rate limited: {e}')
-            return sf_api.error(429, 'too many federated exchange attempts')
+            return sf_api.error(429, 'too many federated exchange attempts',
+                                suppress_traceback=True)
 
         # 3. Resolve the issuer from the unverified iss. No network yet:
         #    a made-up issuer must not be able to make us dial out.
@@ -1955,7 +1956,8 @@ class AuthFederatedEndpoint(api_base.Resource):
             LOG.with_fields({'namespace': namespace}).error(
                 f'Federated exchange misconfigured: {e}')
             return sf_api.error(
-                503, 'federated exchange is unavailable, please retry')
+                503, 'federated exchange is unavailable, please retry',
+                suppress_traceback=True)
         except exceptions.TokenValidationFailed as e:
             return _federated_refusal(
                 None, 'token rejected', str(e), namespace=namespace)
