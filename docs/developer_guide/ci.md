@@ -380,6 +380,17 @@ The CI uses a two-stage merge queue pattern (see [this blog post](https://boinko
 in branch protection. `Can merge` is evaluated by the merge queue itself, not as
 a required check.
 
+`Can merge` needs every job that runs in the queue, `Sanity checks`
+included: lint, unit tests and mypy run again on the merge group, because
+the code they check is the pull request rebased onto a `develop` that may
+have moved since `Can enqueue` passed. The two gates also read a skipped
+job differently. `Can enqueue` accepts any skip, because some of its jobs
+skip for reasons that are not failures (`Smoke tests (collection)` on a
+pull request from a fork, `Issue links` on a manual dispatch). `Can merge`
+accepts a skip only when `Check paths` found no code change, so a queue
+job that skipped for any other reason, such as a broken `if:`, fails the
+merge instead of landing an untested commit.
+
 A failed `Can merge` ejects the pull request from the queue, and
 [merge failure triage](#merge-failure-triage) then classifies the failure
 automatically.

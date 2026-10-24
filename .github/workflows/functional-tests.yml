@@ -7,9 +7,11 @@ permissions:
 # https://boinkor.net/2023/11/neat-github-actions-patterns-for-github-merge-queues/
 #
 # Docs-only changes are detected by the check_paths job and skip the
-# heavy test jobs. The can_enqueue / can_merge gates treat skipped
-# dependencies as success, so docs-only PRs and merge queue entries
-# pass through quickly.
+# heavy test jobs, so docs-only PRs and merge queue entries pass
+# through quickly. can_enqueue treats any skipped dependency as
+# success, since some of its jobs also skip on fork PRs and manual
+# dispatches. can_merge accepts a skip only when check_paths found no
+# code change.
 
 on:
   workflow_dispatch:
@@ -967,6 +969,7 @@ jobs:
       - schema_enum_widening
       - check_paths
       - credential_scan
+      - sanity_checks
     if: always() && github.event_name == 'merge_group'
     permissions:
       actions: read
@@ -974,10 +977,16 @@ jobs:
     # A jq expression over the needs context.
     timeout-minutes: 5
     steps:
+      # This run is the one release.yml's CI gate counts, so a job that
+      # skipped here for any reason but a docs-only change would let an
+      # untested commit reach develop and a release. Only check_paths
+      # finding no code change excuses a skip; check_paths itself must
+      # succeed.
       - env:
           NEEDS_JSON: "${{toJSON(needs)}}"
+          CODE_CHANGED: ${{ needs.check_paths.outputs.code_changed }}
         name: Transform outcomes
         run: |
-          echo "ALL_SUCCESS=$(echo "$NEEDS_JSON" | jq '. | to_entries | map([.value.result == "success", .value.result == "skipped"] | any) | all')" >>$GITHUB_ENV
+          echo "ALL_SUCCESS=$(echo "$NEEDS_JSON" | jq --arg code_changed "$CODE_CHANGED" 'to_entries | map(.value.result == "success" or (.key != "check_paths" and $code_changed == "false" and .value.result == "skipped")) | all')" >>$GITHUB_ENV
       - name: Check outcomes
         run: "[ $ALL_SUCCESS == true ]"
