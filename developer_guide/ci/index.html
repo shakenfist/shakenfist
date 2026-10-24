@@ -16277,6 +16277,16 @@ rather than a deployed cluster.</p>
 <p><strong>Important</strong>: Only <code>Can see status</code> and <code>Can enqueue</code> are required status checks
 in branch protection. <code>Can merge</code> is evaluated by the merge queue itself, not as
 a required check.</p>
+<p><code>Can merge</code> needs every job that runs in the queue, <code>Sanity checks</code>
+included: lint, unit tests and mypy run again on the merge group, because
+the code they check is the pull request rebased onto a <code>develop</code> that may
+have moved since <code>Can enqueue</code> passed. The two gates also read a skipped
+job differently. <code>Can enqueue</code> accepts any skip, because some of its jobs
+skip for reasons that are not failures (<code>Smoke tests (collection)</code> on a
+pull request from a fork, <code>Issue links</code> on a manual dispatch). <code>Can merge</code>
+accepts a skip only when <code>Check paths</code> found no code change, so a queue
+job that skipped for any other reason, such as a broken <code>if:</code>, fails the
+merge instead of landing an untested commit.</p>
 <p>A failed <code>Can merge</code> ejects the pull request from the queue, and
 <a href="#merge-failure-triage">merge failure triage</a> then classifies the failure
 automatically.</p>
