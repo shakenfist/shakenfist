@@ -16470,8 +16470,9 @@ application-level SPICE firewall, on by default.</p>
    <code>shakenfist-spice-protocol</code> name tables unioned with the SPICE
    common-base opcodes (server <code>SPICE_MSG_*</code> 1..=7, client <code>SPICE_MSGC_*</code>
    1..=6, valid on every channel). Main, display, inputs, cursor, and
-   playback have their own tables; usbredir/port/webdav ride the spicevmc
-   table. <strong>Record, smartcard, and tunnel have no modeled grammar</strong> — they
+   playback have their own tables; usbredir rides the spicevmc table, and
+   port/webdav ride the port table (the spicevmc set plus <code>PORT_INIT</code> and
+   <code>PORT_EVENT</code>). <strong>Record, smartcard, and tunnel have no modeled grammar</strong> — they
    classify as <code>ChannelUnmodeled</code> and get L0-only enforcement plus
    observe-only handling for their message types (never a type-based
    terminate), rather than treating every type on those channels as a
