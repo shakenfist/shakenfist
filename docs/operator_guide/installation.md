@@ -249,6 +249,8 @@ playbook builds this cluster's console source for Kerbside itself, and
 other Kerbside variable (its ports, packages and certificate, for example) is
 documented in the
 [collection's README](https://github.com/shakenfist/kerbside/tree/develop/ansible).
+For where to place Kerbside, the network it needs and load balancing, see
+[Running Kerbside beside a cluster](kerbside.md).
 
 Kerbside needs a MySQL or MariaDB database of its own (it does not support
 sqlite), which you create before deploying: a `kerbside` database and a user
