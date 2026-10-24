@@ -199,12 +199,16 @@ corrected inline.
   in-flight ops plus recently terminal ones, not a full
   history. *(Corrected in phase 4.)* "About thirty seconds after
   going terminal" is when an op becomes eligible. The sweep that
-  deletes it runs every fifteen minutes, so a finished op
-  normally lingers for up to about fifteen minutes. Errored ops
+  deletes it ran every fifteen minutes then. *(Corrected in phase
+  5.)* Since #4595 it runs every minute, so a finished op normally
+  goes within a minute or two, longer while the sweep has a
+  backlog. Errored ops
   are never hard deleted (#3922), and their target rows go only
   when the seven-day `CLUSTER_OPERATION_TARGET_RETENTION` prune
   removes them. See survey finding 6 of
-  [the phase 4 plan](PLAN-cluster-op-visibility-phase-04-api-surface.md).
+  [the phase 4 plan](PLAN-cluster-op-visibility-phase-04-api-surface.md)
+  and survey finding 5 of
+  [the phase 5 plan](PLAN-cluster-op-visibility-phase-05-coverage-docs.md).
 * The pending query joins `object_states` and filters on
   `_ACTIVE_OPERATION_STATES` (`mariadb.py:3682`); it fails
   closed (returns True) on DB errors.
@@ -259,11 +263,11 @@ every consumer, so that:
   family, advertising both the field and the truthful
   per-object listings. See decision 2 of the phase 4 plan.
 * **`all=true` semantics.** *Resolved by the phase 2
-  survey, and corrected by the phase 4 survey.* Since #3864,
+  survey, and corrected by the phase 4 and 5 surveys.* Since #3864,
   terminal ops are hard-deleted, so `/clusteroperations?all=true`
-  returns in-flight ops, finished ops from about the last fifteen
-  minutes (the deleted-object sweep's cadence, not thirty
-  seconds), and errored ops for up to the seven-day target-row
+  returns in-flight ops, finished ops the deleted-object sweep has
+  not yet reached (it runs every minute since #4595, so normally a
+  minute or two of them), and errored ops for up to the seven-day target-row
   retention (#3922). It is not a full history and is bounded by
   that retention. No limit parameter is needed, and phase 4
   documents it as what it is.
@@ -283,7 +287,7 @@ every consumer, so that:
 | 2. Observational flag: schema and query layer | [PLAN-cluster-op-visibility-phase-02-observational-schema.md](PLAN-cluster-op-visibility-phase-02-observational-schema.md) | Complete | `9b098c6ac` (#4574) |
 | 3. Classify and mark observational tasks | [PLAN-cluster-op-visibility-phase-03-mark-observational.md](PLAN-cluster-op-visibility-phase-03-mark-observational.md) | Complete | `27ea18202` (#4588) |
 | 4. API surface: has_pending_operations and truthful outstanding ops | [PLAN-cluster-op-visibility-phase-04-api-surface.md](PLAN-cluster-op-visibility-phase-04-api-surface.md) | Complete | `3642e7a75` (#4606), `bdc91db78` (#4617) |
-| 5. CI helper simplification, functional coverage, documentation | PLAN-cluster-op-visibility-phase-05-coverage-docs.md | Not started | — |
+| 5. CI helper simplification, functional coverage, documentation | [PLAN-cluster-op-visibility-phase-05-coverage-docs.md](PLAN-cluster-op-visibility-phase-05-coverage-docs.md) | In progress | — |
 | 6. Push audit | PLAN-cluster-op-visibility-phase-06-push-audit.md | Not started | — |
 
 The `Merged` column records what put each phase on `develop`.
@@ -444,7 +448,10 @@ survey corrected this section in five places, marked inline: the endpoints are
 current listing is not newest-first; the delete walk also
 aborts other objects' ops it reaches through dependencies; the
 client has no per-object accessors at all; and finished ops
-live for up to about fifteen minutes, not thirty seconds. It
+live for up to about fifteen minutes, not thirty seconds. *(That
+last was already untrue when phase 4 merged: #4595 had moved the
+sweep to every minute. Phase 5 corrects it; see its survey finding
+5.)* It
 also adds a `pending_only` request field, so the default
 listing filters on state in SQL. The original outline follows.
 
@@ -503,6 +510,22 @@ listing filters on state in SQL. The original outline follows.
 
 ### Phase 5: CI helper simplification, functional coverage, documentation (plan at medium effort)
 
+See [the phase 5
+plan](PLAN-cluster-op-visibility-phase-05-coverage-docs.md). Its
+survey changed this section in four places. The pending field is a
+boolean, so the helpers keep a listing for the error check, read
+before and after the wait (decision 2). No CI job runs this suite
+against an older server, so the fallback is dropped and a missing
+capability fails the test (decision 3). A sweep cannot be made to
+land inside a given await, so the functional test checks that real
+sweep ops are stored as observational and never become the pointer
+(decision 4). The deleted-object sweep has run every minute since
+#4595, so the phase also absorbs #4603 and corrects phase 4's
+"fifteen minutes" (decision 6). `ARCHITECTURE.md`, `AGENTS.md` and
+`README.md` describe none of the affected storage, so they do not
+change, and this repository has no `CLAUDE.md` (decision 7). The
+original outline follows.
+
 * Switch the phase-1 CI helpers to poll
   `has_pending_operations` (cheaper, single GET) once the
   deployed server advertises the capability; keep the
@@ -516,7 +539,9 @@ listing filters on state in SQL. The original outline follows.
   (`cluster_ci_tests/test_api.py`) can use the new
   `get_network_clusteroperations()` wrapper instead of
   `_request_url`, though it must keep one raw call, because the
-  raw body path is what it tests.
+  raw body path is what it tests. *(Corrected in phase 5: the
+  wrapper sends `all` in the body, so it is the body path. The
+  call that stays raw is the query-string one.)*
 * *(Added by the phase 3 survey.)* `_await_object_operations_complete()`
   (`deploy/shakenfist_ci/base.py`) fails a test when any op it
   watched go in flight ends in `error`, and its by-target listing
@@ -731,9 +756,11 @@ because the following statements will be true:
   #4608, which does exactly that.
 * #4603: pages and code comments outside this plan's API
   reference say terminal ops are removed after about thirty
-  seconds, when that is only eligibility and the sweep runs
-  every fifteen minutes. Several of those sentences were
-  written by phases 2 and 3. Found by the phase 4 survey.
+  seconds, when that is only eligibility. Several of those
+  sentences were written by phases 2 and 3. Found by the phase 4
+  survey. Phase 5 absorbs it, re-scoped for the one-minute sweep,
+  together with phase 4's own "fifteen minutes" text (decision 6
+  of the phase 5 plan).
 * An agent operation's preflight (`node_aop_op`) targets only the
   agent operation, not its instance, so an instance delete never
   cancels a pending one. Found in phase 4; it predates this plan.
@@ -744,7 +771,10 @@ because the following statements will be true:
   the snapshot guarantee hold. Found by the automated review of
   phase 4; the pointer walk it replaced failed the same way.
 * Issue #3278 (CI and test coverage backlog) may want a note
-  about the deflaked helper pattern.
+  about the deflaked helper pattern. *(Declined in phase 5: the
+  pattern is documented in `docs/developer_guide/ci.md`, where a
+  test author looks, and the tracking issue would only restate
+  it.)*
 
 ### Bugs fixed during this work
 
