@@ -1554,9 +1554,21 @@ class Instance(dbowo):
                 if cached_image_path:
                     pathlib.Path(cached_image_path).touch(exist_ok=True)
 
+        # A domain which power_off() could not stop is still running on
+        # these disks, so its failure ends the delete here: the disks and
+        # the domain definition stay, and delete() skips the global half,
+        # so placement is not released for a guest which still holds its
+        # memory and CPU. The cleaner escalates a delete-wait instance's
+        # running domain and enqueues the delete again once it has stopped.
         try:
             self.power_off()
+        except exceptions.InstancePowerOffFailed:
+            raise
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'instance delete power off {self}', e)
 
+        try:
             nvram_path = os.path.join(self.instance_path, 'nvram')
             if os.path.exists(nvram_path):
                 os.unlink(nvram_path)
@@ -1612,6 +1624,9 @@ class Instance(dbowo):
         cluster-wide bookkeeping. Callers pass it when the hosting node is
         gone, so the local paths on the node running this code belong to a
         different machine and must not be touched.
+
+        Raises InstancePowerOffFailed if the domain could not be stopped,
+        before removing its disks or releasing its placement.
         """
         if not global_only:
             self._delete_on_hypervisor()

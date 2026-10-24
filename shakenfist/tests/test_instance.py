@@ -248,6 +248,52 @@ class InstanceTestCase(base.ShakenFistTestCase):
         mock_hyp.assert_not_called()
         mock_glob.assert_called_once_with()
 
+    def _delete_with_power_off_raising(self, error):
+        """Delete an instance whose power_off() raises error, and return
+        the mocks for disk removal, libvirt and the global half."""
+        instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance('cirros', instance_uuid)
+        i = instance.Instance.from_db(instance_uuid)
+
+        with mock.patch.object(i, 'power_off', side_effect=error), \
+                mock.patch.object(i, 'archive_console_log'), \
+                mock.patch('shakenfist.instance.os.path.exists',
+                           return_value=True), \
+                mock.patch('shakenfist.instance.os.unlink'), \
+                mock.patch('shakenfist.instance.shutil.rmtree') as rmtree, \
+                mock.patch('shakenfist.instance.util_libvirt.'
+                           'LibvirtConnection') as lc, \
+                mock.patch.object(i, '_delete_globally') as glob:
+            try:
+                i.delete()
+            except exceptions.InstancePowerOffFailed as e:
+                return rmtree, lc, glob, e
+        return rmtree, lc, glob, None
+
+    def test_delete_keeps_the_disks_of_a_domain_which_would_not_stop(self):
+        # Removing the disks under a running domain, and releasing the
+        # placement of a guest which still holds its memory and CPU, is
+        # issue #4486. A domain which power_off() could not stop keeps
+        # both, and its definition, and the failure reaches the caller.
+        rmtree, lc, glob, raised = self._delete_with_power_off_raising(
+            exceptions.InstancePowerOffFailed('domain is still running'))
+
+        self.assertIsNotNone(raised)
+        rmtree.assert_not_called()
+        lc.assert_not_called()
+        glob.assert_not_called()
+
+    def test_delete_carries_on_past_other_power_off_errors(self):
+        # Anything other than a domain known not to have stopped is
+        # ignored, as before.
+        rmtree, lc, glob, raised = self._delete_with_power_off_raising(
+            RuntimeError('something else entirely'))
+
+        self.assertIsNone(raised)
+        rmtree.assert_called_once()
+        lc.assert_called_once_with()
+        glob.assert_called_once_with()
+
     def test_nvme_bus_disk_stops_on_io_error(self):
         # NVME-bus disks are attached via raw qemu -drive args rather than a
         # libvirt <disk>, so they must carry werror/rerror=stop themselves to
