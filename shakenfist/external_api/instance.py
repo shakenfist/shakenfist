@@ -2543,9 +2543,9 @@ class InstanceOutstandingOperationsEndpoint(api_base.Resource):
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
          ('all', 'query', 'boolean',
           'Also include finished operations which have not yet been removed. '
-          'Finished operations are normally removed within about fifteen '
-          'minutes, and errored ones are kept for up to seven days, so this '
-          'is not a history.', False)],
+          'Finished operations become eligible for removal thirty seconds '
+          'after they finish, and errored ones are kept for up to seven '
+          'days, so this is not a history.', False)],
         [(
             200,
             'The cluster operations targeting this instance, newest first.',

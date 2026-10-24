@@ -100,9 +100,9 @@ class NetOp(BaseClusterOperation):
         # AttributeError rather than the UpgradeException the branch
         # below that getattr is written to raise. Until this method
         # existed, loading a version-1 NetOp row crashed instead of
-        # upgrading -- narrow, because cluster operations are hard
-        # deleted thirty seconds after going terminal, but real during
-        # a rolling upgrade.
+        # upgrading -- narrow, because cluster operations are
+        # eligible for hard delete thirty seconds after going terminal,
+        # but real during a rolling upgrade.
         pass
 
     @classmethod

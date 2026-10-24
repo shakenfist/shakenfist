@@ -174,8 +174,8 @@ class Monitor(daemon.Daemon):
             LOG.info(f'Deleted {deleted} stale blob transfers')
 
         # Prune the cluster_operation_targets table. Rows normally go when
-        # their operation is hard-deleted, about thirty seconds after it
-        # goes terminal; this is a backstop for rows which outlive their
+        # their operation is hard-deleted (eligible thirty seconds after it
+        # goes terminal); this is a backstop for rows which outlive their
         # operation, removing those older than
         # CLUSTER_OPERATION_TARGET_RETENTION. Operations still in flight
         # (queued/preflight/executing) are never pruned regardless of age.

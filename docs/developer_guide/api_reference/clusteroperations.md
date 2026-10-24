@@ -37,10 +37,12 @@ the instance's, and `GET /clusteroperations/{op_uuid}/chain` traces what an
 operation waits on. Every entry carries an `observational` boolean, as
 described below. By default only operations which are queued, in preflight or
 executing are listed. With `all=true` the list also includes finished
-operations which have not yet been removed. Finished operations are normally
-removed within about fifteen minutes, and errored operations are kept for up
-to `CLUSTER_OPERATION_TARGET_RETENTION`, seven days by default, so `all=true`
-is a bounded window onto recent work and not a history.
+operations which have not yet been removed. Finished operations are
+eligible thirty seconds after finishing and removed by the
+[deleted-object sweep](../../operator_guide/database.md#the-deleted-object-sweep),
+and errored operations are kept for up to
+`CLUSTER_OPERATION_TARGET_RETENTION`, seven days by default, so `all=true` is
+a bounded window onto recent work and not a history.
 
 ???+ tip "REST API calls"
 

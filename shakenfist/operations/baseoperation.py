@@ -208,9 +208,9 @@ class BaseClusterOperation(BaseOperation):
 
         Only the *first* key column is used, deliberately. The event
         this reference is for has to outlive the operation -- which is
-        hard deleted thirty seconds after going terminal (#3864) -- and
-        the object an operator queries afterwards is the network, not
-        the node the work happened to run on.
+        eligible for hard delete thirty seconds after going terminal
+        (#3864) -- and the object an operator queries afterwards is the
+        network, not the node the work happened to run on.
 
         The object type is resolved through the schema model's
         ``target_fields`` map -- the same declaration
@@ -753,10 +753,10 @@ class BaseClusterOperation(BaseOperation):
         The give-up event is mirrored onto every object this operation
         targets (via the schema model's ``target_fields``, the same
         declaration ``enqueue_cluster_operation`` writes
-        ``cluster_operation_targets`` rows from). The operation is hard
-        deleted thirty seconds after going terminal and takes its events
-        with it (#3864), so an event recorded only here would be
-        unreadable within a minute -- and it is the target (the instance
+        ``cluster_operation_targets`` rows from). The operation is
+        eligible for hard delete thirty seconds after going terminal and
+        takes its events with it (#3864), so an event recorded only here
+        would soon be unreadable -- and it is the target (the instance
         a client is awaiting) that an operator will actually look at.
         """
         references: list[Any] = [(str(self.object_type), str(self.uuid))]
