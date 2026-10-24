@@ -15747,7 +15747,9 @@ version contains entries.</p>
   <code>cascading_delete</code> removes references a deleted blob holds, and only
   <code>TRANSCODE</code> and <code>DEPENDS_ON</code> (<code>blob.py:657-665</code>). The per-blob task and the
   expiry path set <code>STATE_DELETED</code> directly, and <code>hard_delete</code> removes nothing
-  (<a href="https://github.com/shakenfist/shakenfist/issues/4558">#4558</a>).</li>
+  (<a href="https://github.com/shakenfist/shakenfist/issues/4558">#4558</a>). Since
+  fixed: the transition to <code>STATE_DELETED</code> and <code>hard_delete</code> now both remove
+  everything a blob holds, through <code>Blob._remove_references_held()</code>.</li>
 <li><strong>A failed reference count reads as "unreferenced".</strong> <code>count_references_to</code>
   returns 0 on error (<code>mariadb.py:9254-9277</code>). Artifact-backed blobs survive
   that, because the cluster pass refreshes their <code>last_used</code> every time
@@ -15851,11 +15853,12 @@ decisions pass confirms or overturns them.</p>
    OVA before its owner does, because it can only claim it in its own
    view. The member blob itself may be shared between namespaces, since
    identical ranges give identical bytes.</li>
-<li><strong>Every deletion path clears entries.</strong> <code>cascading_delete</code>, the per-blob
-   <code>STATE_DELETED</code> path, the expiry path and <code>hard_delete</code> all remove the
-   entries a deleted container holds. The fix for
+<li><strong>Every deletion path clears entries.</strong> Every path that deletes a
+   blob, and <code>hard_delete</code>, removes the entries a deleted container holds.
+   The fix for
    <a href="https://github.com/shakenfist/shakenfist/issues/4558">#4558</a> is the
-   natural home for that. Deleting a namespace removes that namespace's
+   natural home for that: clearing entries in
+   <code>Blob._remove_references_held()</code> covers every path. Deleting a namespace removes that namespace's
    entries too. Otherwise a deleted namespace's entries would keep
    members, and their storage, alive for as long as somebody else's
    container lives.</li>

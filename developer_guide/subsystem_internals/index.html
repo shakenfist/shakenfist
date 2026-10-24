@@ -16267,6 +16267,16 @@ track any object-to-object relationship.</p>
 queryable, auditable reference system. Blob reference counts are computed
 dynamically from this table via <code>mariadb.count_references_to()</code>. Blob locations
 are queried via <code>mariadb.get_references_to()</code> filtered by <code>BLOB_LOCATION</code>.</p>
+<p>Because a reference counts against its target for as long as the row exists,
+a deleted object must not hold any. Each type removes the references it
+holds when it is deleted: <code>Instance._delete_globally()</code>, <code>Artifact.delete()</code>
+and the agent operation delete paths call
+<code>mariadb.remove_all_references_from()</code>. A blob does it in its state
+transition (<code>Blob._state_update()</code>), because several paths delete a blob by
+assigning <code>STATE_DELETED</code> directly. <code>Blob.hard_delete()</code> repeats the removal
+as a backstop for blobs deleted before that was the case. Anything new a
+blob comes to hold (container members, chunks) has to be cleared in
+<code>Blob._remove_references_held()</code> too.</p>
 <p><code>INSTANCE_LOCATION</code> references similarly replace the legacy <code>instances</code>
 JSON list on <code>node_attributes</code>: the list was maintained by read-modify-write
 of the whole attributes row, so concurrent full-row writers (for example the
