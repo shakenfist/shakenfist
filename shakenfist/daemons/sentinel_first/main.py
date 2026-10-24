@@ -31,6 +31,32 @@ def exit_gracefully(sig, _frame):
 signal.signal(signal.SIGTERM, exit_gracefully)
 
 
+def record_stop(n):
+    """Record this daemon stopping, and the node stopped if it is.
+
+    The handshake is that a whole-node stop (sf.target, a reboot) stops
+    sentinel-last first, which marks the node stopping, and this daemon last,
+    which completes it to stopped. A deploy does not stop sf.target: it
+    restarts each unit on its own, in start order, so this daemon stops while
+    sentinel-last is still running and the node is not stopping. Marking it
+    stopped then would be false, and is refused anyway -- recording this
+    daemon stopped has just reconciled the node to degraded, and degraded to
+    stopped is not a valid transition -- which used to raise out of main()
+    and fail the unit on every hypervisor on every deploy (#4507). So the
+    lifecycle is only completed when sentinel-last has started it, and a
+    restart of this daemon alone leaves it for sentinel-last's restart to
+    return to created. Returns True if the node was marked stopped.
+    """
+    n.set_daemon_state('sentinel-first', Node.DAEMON_STATE_STOPPED)
+    current = n.state.value
+    if current != Node.STATE_STOPPING:
+        LOG.info('Node is %s rather than stopping, so this is a restart of '
+                 'sentinel-first alone; leaving the node lifecycle unchanged'
+                 % current)
+        return False
+    return n.set_lifecycle_state(Node.STATE_STOPPED)
+
+
 def main():
     util_exceptions.install_exception_tracking()
     daemon.clear_abort_path(ABORT_PATH)
@@ -52,8 +78,7 @@ def main():
     LOG.info('Stopping')
     send_systemd_stopping()
 
-    n.set_daemon_state('sentinel-first', Node.DAEMON_STATE_STOPPED)
-    n.set_lifecycle_state(Node.STATE_STOPPED)
+    record_stop(n)
     LOG.info('Stopped')
 
     daemon.force_clean_exit()

@@ -465,7 +465,11 @@ under `sf.target`, and the ordering there is load bearing:
 
 Stop runs in reverse: sentinel-last stops first and marks the node as
 stopping, the control plane stops, and sentinel-first stops last and
-records a graceful stop. A daemon started ahead of `sf-database` hangs
+records a graceful stop. That is the whole-node path (`sf.target`, a
+reboot). A deploy instead restarts each unit on its own, so sentinel-first
+stops while sentinel-last is still running: it then records only its own
+daemon state and leaves the node's lifecycle for sentinel-last's restart to
+return to created, because the node was never stopping. A daemon started ahead of `sf-database` hangs
 on its first database call -- `sf-api` in particular -- so a new unit
 must keep the `After=sf-database.service` ordering.
 
