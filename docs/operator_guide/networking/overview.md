@@ -639,9 +639,10 @@ and can be removed with `sudo ip netns delete <uuid>`.
 ## Dispatcher diagnostic events
 
 Operators reading the event log for a cluster operation will see two
-events emitted directly by the queue dispatcher (in addition to the
-operation-specific audit and mutate events emitted by the operation
-itself):
+events emitted directly by the queue dispatcher and one emitted at
+enqueue time (in addition to the operation-specific audit and mutate
+events emitted by the operation itself). The enqueue-side dedup event
+is emitted by the enqueuing process, not by the dispatcher:
 
 * **`execution duration`** (`EVENT_TYPE_USAGE`). Emitted when the
   dispatcher finishes running an op. Carries four fields in `extra`:
@@ -691,12 +692,21 @@ itself):
       multi-column), `type_not_coalescible` (this
       operation type declares no coalescing at all, which is every
       cluster operation that is not a `net_op` and so most of them)
-      or `no_coalescible_tasks` (a type which could have coalesced,
-      carrying nothing coalescible this time). The last two are
-      separate outcomes on purpose: merged, the boring case buries
-      the interesting one.
+      `key_column_missing` (the coalescing key names a column the
+      operation does not have; the fold is skipped, an error is
+      logged, and this is a mis-declaration rather than a runtime
+      condition), `coalescing_unavailable` (the fold was attempted but
+      the `sf-database` on the other end predates the coalescing RPCs;
+      this is what you see during a rolling upgrade, the op still
+      runs and only the optimisation is lost until the upgrade
+      finishes) or `no_coalescible_tasks` (a type which could have
+      coalesced, carrying nothing coalescible this time).
+      `type_not_coalescible` and `no_coalescible_tasks` are separate
+      outcomes on purpose: merged, the boring case buries the
+      interesting one.
     * `coalesce_seconds` — cost of the `claim_coalescible_siblings`
-      call, present only when the fold ran. Measured with a monotonic
+      call, present when the call was attempted: outcomes `ran` and
+      `coalescing_unavailable`. Measured with a monotonic
       clock, so it is an interval rather than a difference of two wall
       clock readings.
     * `coalesce_folded` — how many siblings that call folded away,
@@ -804,8 +814,7 @@ itself):
   carries both columns, is *not* coalescible: it is drained by
   `sf-queues`, where the per-worker-partitioning guarantee the
   argument rests on does not hold. See
-  [PLAN-queue-performance-phase-11-multi-column-key.md](../../plans/PLAN-queue-performance-phase-11-multi-column-key.md)
-  and #3884.
+  #3884.
 
 ### Reading these events back
 
