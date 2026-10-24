@@ -1657,6 +1657,274 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
         self.mock_delete_files.assert_called_once_with(inst_uuid)
 
 
+class CleanerRunningDeleteTestCase(CleanerBaseTestCase):
+    """The cleaner's first loop, for running domains whose instance is
+    being deleted: deleted instances ("Deleting stray instance"), and
+    delete-wait ones whose delete could not stop the domain (issue #4486).
+
+    Not a CleanerTestCase subclass, so these run once rather than once per
+    subclass.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        st = 'shakenfist.daemons.cleaner.scheduled_tasks.'
+        for name, target, kwargs in [
+                ('exists', 'os.path.exists', {'return_value': True}),
+                ('time', 'time.time', {'return_value': 7}),
+                ('listdir', 'os.listdir', {'return_value': []}),
+                ('unlink', 'os.unlink', {}),
+                ('execute', st + 'util_concurrency.execute', {}),
+                ('delete_files', st + '_delete_instance_files', {}),
+                ('kill_qemu', st + '_kill_qemu', {'return_value': 1}),
+                ('delete_with_virsh', st + '_delete_with_virsh', {}),
+                ('delete_with_kill', st + '_delete_with_kill', {})]:
+            patcher = mock.patch(target, **kwargs)
+            setattr(self, f'mock_{name}', patcher.start())
+            self.addCleanup(patcher.stop)
+
+        for name in ['power_off', 'enqueue_delete', 'delete', 'add_event']:
+            patcher = mock.patch.object(instance.Instance, name)
+            setattr(self, f'mock_{name}', patcher.start())
+            self.addCleanup(patcher.stop)
+
+    def _running_instance(self, state):
+        inst = self.mock_mariadb.create_instance('running', set_state=state)
+        inst.update_power_state('on')
+        domain = FakeLibvirtDomain(
+            f'sf:{inst.uuid}', FakeLibvirt.VIR_DOMAIN_RUNNING)
+        _test_extra_domains.append(domain)
+        return str(inst.uuid), domain
+
+    def _after_grace(self):
+        """Move time past the five minute grace given a delete in flight."""
+        self.mock_time.return_value = 7 + 301
+
+    def _attempts(self, inst_uuid):
+        return instance.Instance.from_db(
+            inst_uuid).enforced_deletes.get('count', 0)
+
+    def _state(self, inst_uuid):
+        return self.mock_mariadb.get_mariadb_state(
+            ObjectType.INSTANCE, inst_uuid)['value']
+
+    def _events(self, message):
+        return [c for c in self.mock_add_event.call_args_list
+                if c[0][1] == message]
+
+    def _virsh_destroys(self):
+        return [c for c in self.mock_execute.call_args_list
+                if c[0][0].startswith('virsh destroy')]
+
+    def _reset_mocks(self):
+        for m in [self.mock_power_off, self.mock_execute, self.mock_kill_qemu,
+                  self.mock_enqueue_delete, self.mock_delete,
+                  self.mock_delete_with_virsh, self.mock_delete_with_kill,
+                  self.mock_add_event]:
+            m.reset_mock()
+
+    def test_deleted_escalation_schedule(self):
+        """A deleted instance's running domain is deleted again on the
+        first two passes, with virsh on the next two, by SIGKILL on the two
+        after, and then left alone."""
+        self._running_instance(instance.Instance.STATE_DELETED)
+        self._after_grace()
+
+        methods = []
+        for _ in range(8):
+            self._reset_mocks()
+            cleaner_st.update_power_states()
+            methods.append(
+                'delete' if self.mock_delete.called else
+                'virsh' if self.mock_delete_with_virsh.called else
+                'kill' if self.mock_delete_with_kill.called else None)
+
+        self.assertEqual(
+            ['delete', 'delete', 'virsh', 'virsh', 'kill', 'kill', None, None],
+            methods)
+
+    def test_deleted_within_grace_is_left_alone(self):
+        inst_uuid, _ = self._running_instance(instance.Instance.STATE_DELETED)
+
+        cleaner_st.update_power_states()
+
+        self.assertFalse(self.mock_delete.called)
+        self.assertEqual(0, self._attempts(inst_uuid))
+
+    def test_deleted_power_off_failure_does_not_end_the_pass(self):
+        """delete() raises when it cannot stop the domain. That is the next
+        pass's to escalate, not an error ending this one."""
+        self._running_instance(instance.Instance.STATE_DELETED)
+        self._after_grace()
+        self.mock_delete.side_effect = exceptions.InstancePowerOffFailed(
+            'domain is still running')
+
+        following = self.mock_mariadb.create_instance(
+            'following', set_state=instance.Instance.STATE_CREATED)
+        following.update_power_state('paused')
+        _test_extra_domains.append(FakeLibvirtDomain(
+            f'sf:{following.uuid}', FakeLibvirt.VIR_DOMAIN_RUNNING))
+
+        cleaner_st.update_power_states()
+
+        self.mock_delete.assert_called_once_with()
+        self.assertEqual('on', self._power_state(str(following.uuid)))
+
+    def test_delete_wait_within_grace_is_left_alone(self):
+        inst_uuid, _ = self._running_instance(
+            instance.Instance.STATE_DELETE_WAIT)
+
+        cleaner_st.update_power_states()
+
+        self.assertFalse(self.mock_power_off.called)
+        self.assertFalse(self.mock_enqueue_delete.called)
+        self.assertEqual(0, self._attempts(inst_uuid))
+
+    def test_delete_wait_escalation_schedule(self):
+        """A delete-wait instance's running domain is powered off on the
+        first two passes, virsh destroyed on the next two, and SIGKILLed on
+        the two after; the seventh pass gives up, once. Nothing is undefined
+        or removed, and no delete is enqueued while the domain runs."""
+        inst_uuid, _ = self._running_instance(
+            instance.Instance.STATE_DELETE_WAIT)
+        self._after_grace()
+        self.mock_power_off.side_effect = exceptions.InstancePowerOffFailed(
+            'domain is still running')
+        self.mock_execute.side_effect = exceptions.ProcessExecutionError(
+            exit_code=1, stderr='virsh failed')
+        self.mock_kill_qemu.return_value = 0
+
+        methods = []
+        abandoned = []
+        for attempt in range(1, 10):
+            self._reset_mocks()
+            cleaner_st.update_power_states()
+            methods.append(
+                'power_off' if self.mock_power_off.called else
+                'virsh' if self._virsh_destroys() else
+                'kill' if self.mock_kill_qemu.called else None)
+            if self._events('running delete-wait instance stop abandoned'):
+                abandoned.append(attempt)
+            self.assertFalse(self.mock_enqueue_delete.called)
+            self.assertFalse(self.mock_delete.called)
+
+        self.assertEqual(
+            ['power_off', 'power_off', 'virsh', 'virsh', 'kill', 'kill',
+             None, None, None],
+            methods)
+        self.assertEqual([7], abandoned)
+        self.assertEqual(
+            [], [c for c in self.mock_execute.call_args_list
+                 if 'undefine' in c[0][0]])
+        self.assertFalse(self.mock_delete_files.called)
+        self.assertEqual([], _test_undefined_domains)
+        self.assertEqual(
+            instance.Instance.STATE_DELETE_WAIT, self._state(inst_uuid))
+
+    def test_delete_wait_power_off_then_delete_enqueued(self):
+        """Once the domain stops, the delete is enqueued again, holding the
+        instance lock, so that the queued delete removes the disks,
+        interfaces and placement the deferred one left."""
+        inst_uuid, _ = self._running_instance(
+            instance.Instance.STATE_DELETE_WAIT)
+        self._after_grace()
+
+        held = []
+        self.mock_enqueue_delete.side_effect = \
+            lambda: held.append(list(self.locks.events))
+
+        cleaner_st.update_power_states()
+
+        self.mock_power_off.assert_called_once_with()
+        self.mock_enqueue_delete.assert_called_once_with()
+        self.assertEqual([[('lock', inst_uuid)]], held)
+        self.assertEqual(
+            [mock.call(EVENT_TYPE_AUDIT,
+                       'running delete-wait instance delete enqueued',
+                       extra={'attempt': 1})],
+            self._events('running delete-wait instance delete enqueued'))
+        self.assertEqual(
+            instance.Instance.STATE_DELETE_WAIT, self._state(inst_uuid))
+
+    def test_delete_wait_virsh_destroy_then_delete_enqueued(self):
+        inst_uuid, _ = self._running_instance(
+            instance.Instance.STATE_DELETE_WAIT)
+        self._after_grace()
+        inst = instance.Instance.from_db(inst_uuid)
+        inst.enforced_deletes_increment()
+        inst.enforced_deletes_increment()
+
+        cleaner_st.update_power_states()
+
+        self.assertFalse(self.mock_power_off.called)
+        self.assertEqual(
+            [mock.call(f'virsh destroy "sf:{inst_uuid}"')],
+            self.mock_execute.call_args_list)
+        self.mock_enqueue_delete.assert_called_once_with()
+        self.assertEqual(
+            1, len(self._events(
+                'running delete-wait instance stopped via virsh destroy')))
+
+    def test_delete_wait_sigkill_then_delete_enqueued(self):
+        inst_uuid, _ = self._running_instance(
+            instance.Instance.STATE_DELETE_WAIT)
+        self._after_grace()
+        inst = instance.Instance.from_db(inst_uuid)
+        for _ in range(4):
+            inst.enforced_deletes_increment()
+
+        cleaner_st.update_power_states()
+
+        self.mock_kill_qemu.assert_called_once_with(inst_uuid)
+        self.assertEqual([], self.mock_execute.call_args_list)
+        self.mock_enqueue_delete.assert_called_once_with()
+        self.assertEqual(
+            1, len(self._events(
+                'running delete-wait instance stopped via SIGKILL')))
+
+    def test_delete_wait_lock_timeout_is_skipped(self):
+        inst_uuid, _ = self._running_instance(
+            instance.Instance.STATE_DELETE_WAIT)
+        self._after_grace()
+        self.locks.timeout = True
+
+        cleaner_st.update_power_states()
+
+        self.assertFalse(self.mock_power_off.called)
+        self.assertEqual(0, self._attempts(inst_uuid))
+
+    def test_delete_wait_state_changed_inside_lock_is_skipped(self):
+        inst_uuid, _ = self._running_instance(
+            instance.Instance.STATE_DELETE_WAIT)
+        self._after_grace()
+
+        def finish_delete(u):
+            instance.Instance.from_db(u).state = \
+                instance.Instance.STATE_DELETED
+        self.locks.on_lock = finish_delete
+
+        cleaner_st.update_power_states()
+
+        self.assertFalse(self.mock_power_off.called)
+        self.assertEqual(0, self._attempts(inst_uuid))
+
+    def test_delete_wait_domain_stopped_inside_lock_is_skipped(self):
+        inst_uuid, domain = self._running_instance(
+            instance.Instance.STATE_DELETE_WAIT)
+        self._after_grace()
+
+        def stop_domain(u):
+            domain._state = FakeLibvirt.VIR_DOMAIN_SHUTOFF
+        self.locks.on_lock = stop_domain
+
+        cleaner_st.update_power_states()
+
+        self.assertFalse(self.mock_power_off.called)
+        self.assertFalse(self.mock_enqueue_delete.called)
+        self.assertEqual(0, self._attempts(inst_uuid))
+
+
 class MaintainBlobsSentinelTestCase(base.ShakenFistTestCase):
     """_maintain_blobs must neither delete nor crash on the resource
     health _heartbeat sentinel, even one that has gone stale because its

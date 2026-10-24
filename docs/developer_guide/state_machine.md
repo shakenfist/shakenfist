@@ -146,6 +146,7 @@ stateDiagram-v2
   fetching of images from outside the cluster) also occurs.
 * `creating`: the instance is being created on the `node`.
 * `created`: the instance is now running.
+* `delete-wait`: the instance is being deleted on its `node`.
 * `deleted`: the instance is now deleted.
 * `error`: the instance is unable to be used.
 
@@ -171,6 +172,18 @@ to `error`, and any of the `*-error` transition states to move on to `delete-wai
 or `deleted` as well as to `error`. An instance in `error` (or one of the
 transition states) may likewise be sent to `delete-wait` or `deleted` when the
 caller deletes it.
+
+A delete which cannot stop the instance's domain stops there, and the instance
+stays in `delete-wait`, keeping its disks, interfaces and placement: removing
+the disks of a running guest, or releasing the memory and CPU it still holds,
+would be worse than a slow delete. An instance deleted from an error state is
+moved to `delete-wait` too. Five minutes later the cleaner starts stopping the
+domain, one attempt a pass: a power off for two passes, then `virsh destroy` for
+two, then SIGKILL for two, after which it gives up with an error event. Once
+the domain stops it enqueues the delete again, which finishes as any delete of a
+stopped instance does, ending in `deleted`. An instance in `delete-wait-error`
+has no transition to `delete-wait`, so it stays errored, with its disks and
+placement, until it is deleted again.
 
 The following transitions are possible (note that hyphens have been replaced with
 underscores in some state names due to limitations in the diagram renderer):

@@ -66,16 +66,25 @@ def _delete_with_virsh(instance_uuid, inst):
         return False
 
 
+def _kill_qemu(instance_uuid):
+    """SIGKILL the qemu processes confined to this instance's apparmor
+    profile, and return how many there were."""
+    stdout, _ = util_concurrency.execute('aa-status --json')
+    status = json.loads(stdout)
+    profile = f'libvirt-{instance_uuid}'
+    killed = 0
+    for proc in status['processes']['/usr/bin/qemu-system-x86_64']:
+        if proc['profile'] == profile:
+            os.kill(int(proc['pid']), signal.SIGKILL)
+            killed += 1
+    return killed
+
+
 def _delete_with_kill(instance_uuid, inst):
     log_ctx = LOG.with_fields({'instance': instance_uuid})
     try:
         log_ctx.warning('Destroying instance using SIGKILL')
-        stdout, _ = util_concurrency.execute('aa-status --json')
-        status = json.loads(stdout)
-        profile = f'libvirt-{instance_uuid}'
-        for proc in status['processes']['/usr/bin/qemu-system-x86_64']:
-            if proc['profile'] == profile:
-                os.kill(int(proc['pid']), signal.SIGKILL)
+        _kill_qemu(instance_uuid)
 
         try:
             util_concurrency.execute(
@@ -286,6 +295,15 @@ _BUILDING_STATES = {
 _STRAY_DELETE_ENQUEUE_ATTEMPTS = (1, 6, 11)
 _STRAY_DELETE_ABANDON_ATTEMPT = 16
 
+# A delete-wait instance whose domain is still running had its delete
+# deferred, because power_off() could not stop the domain. The same
+# counter picks how hard each pass tries to stop it: power_off() up to
+# this count, virsh destroy up to the next, then SIGKILL, and nothing once
+# it passes the last.
+_RUNNING_DELETE_POWER_OFF_ATTEMPTS = 2
+_RUNNING_DELETE_VIRSH_ATTEMPTS = 4
+_RUNNING_DELETE_KILL_ATTEMPTS = 6
+
 
 def _undefine_domain(lc, domain, instance_uuid):
     try:
@@ -334,6 +352,83 @@ def _enqueue_stray_delete(inst, log_ctx):
         inst.add_event(
             EVENT_TYPE_AUDIT, 'stray powered off instance delete abandoned',
             extra={'attempt': attempts}, log_as_error=True)
+
+
+def _stop_domain(inst, instance_uuid, attempts, log_ctx):
+    """Try to stop a running domain without undefining it or touching its
+    files, and return whether it stopped. Which method is used depends on
+    how many passes have tried already."""
+    if attempts <= _RUNNING_DELETE_POWER_OFF_ATTEMPTS:
+        try:
+            inst.power_off()
+            return True
+        except exceptions.InstancePowerOffFailed as e:
+            log_ctx.warning(f'Power off failed: {e}')
+            return False
+
+    try:
+        if attempts <= _RUNNING_DELETE_VIRSH_ATTEMPTS:
+            util_concurrency.execute(f'virsh destroy "sf:{instance_uuid}"')
+            method = 'virsh destroy'
+        else:
+            if not _kill_qemu(instance_uuid):
+                log_ctx.warning('Found no qemu process to kill')
+                return False
+            method = 'SIGKILL'
+    except ProcessExecutionError as e:
+        log_ctx.warning(f'Stopping domain failed: {e}')
+        return False
+
+    inst.add_event(
+        EVENT_TYPE_AUDIT, f'running delete-wait instance stopped via {method}',
+        extra={'attempt': attempts})
+    return True
+
+
+def _stop_running_delete_wait(lc, inst, instance_uuid, pet, log_ctx):
+    """Stop the running domain of a delete-wait instance, then enqueue its
+    delete again.
+
+    The delete stopped short because power_off() could not stop the domain
+    (see NodeInstOp._instance_delete()), so the disks, interfaces and
+    placement are all still there. Stopping the domain here only stops it:
+    the queued delete then does the rest, as a delete of a stopped instance
+    always does. Everything happens holding the instance lock, from a state
+    and a domain read again inside it.
+    """
+    with _instance_lock(inst, pet) as locked:
+        if not locked:
+            return
+        if inst.state.value != dbo.STATE_DELETE_WAIT:
+            log_ctx.debug('Instance state changed, skipping it this pass')
+            return
+        domain = lc.get_domain_from_sf_uuid(instance_uuid)
+        if not domain or not domain.isActive():
+            # The inactive loop's next pass owns a stopped domain.
+            log_ctx.debug(
+                'Domain is no longer active, skipping it this pass')
+            return
+
+        attempts = inst.enforced_deletes_increment()
+        log_ctx = log_ctx.with_fields({'attempt': attempts})
+        if attempts > _RUNNING_DELETE_KILL_ATTEMPTS:
+            if attempts == _RUNNING_DELETE_KILL_ATTEMPTS + 1:
+                log_ctx.error(
+                    'Giving up on stopping running delete-wait instance')
+                inst.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'running delete-wait instance stop abandoned',
+                    extra={'attempt': attempts}, log_as_error=True)
+            return
+
+        log_ctx.warning('Stopping running delete-wait instance')
+        if not _stop_domain(inst, instance_uuid, attempts, log_ctx):
+            return
+
+        inst.enqueue_delete()
+        inst.add_event(
+            EVENT_TYPE_AUDIT, 'running delete-wait instance delete enqueued',
+            extra={'attempt': attempts})
 
 
 def _clear_autostart_of_powered_off(lc, domain, inst, instance_uuid, pet, log_ctx):
@@ -564,10 +659,24 @@ def _update_listed_active_domain(lc, domain, instance_uuid, pet, seen):
             _delete_with_virsh(instance_uuid, inst)
 
         else:
-            inst.delete()
+            # delete() leaves the disks in place when it cannot stop the
+            # domain, and the next pass escalates.
+            try:
+                inst.delete()
+            except exceptions.InstancePowerOffFailed as e:
+                log_ctx.warning(f'Power off of stray instance failed: {e}')
 
         log_ctx.with_fields({'attempt': attempts}).warning(
             'Deleting stray instance')
+        return
+
+    # Only a running delete sets delete-wait, and it holds the instance
+    # lock while it runs, so a domain still running five minutes later is
+    # one the delete could not stop, or one whose delete died part way.
+    # Before that, it is left to the delete.
+    if (db_state.value == dbo.STATE_DELETE_WAIT and
+            time.time() - db_state.update_time >= 300):
+        _stop_running_delete_wait(lc, inst, instance_uuid, pet, log_ctx)
         return
 
     # When the database already agrees with libvirt there is
