@@ -157,8 +157,8 @@ class TestNodes(base.BaseNamespacedTestCase):
 
         There is one reading it does not apply to, and it is not a
         cluster. cluster-ci.conf is not run only against cluster
-        topologies: scheduled-tests.yml's "develop branch on debian 12
-        single machine" entry runs it against localhost, on purpose, to
+        topologies: the weekly "Debian 13 single machine" lane runs it
+        against localhost, on purpose, to
         find whatever in this suite breaks on one node. Every minimum
         here is unmeetable there, so sizing.is_single_machine() carves
         that case out and this test skips on it -- the one skip it

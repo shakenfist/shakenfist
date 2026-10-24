@@ -1,88 +1,75 @@
 name: Scheduled tests
 
+# The functional cluster lanes which do not gate a merge, run weekly against
+# develop. What each lane deploys and runs is defined in functional-lanes.yml,
+# shared with the merge queue's lanes in functional-tests.yml, so a lane moves
+# between the two by moving its name between the two 'lanes' lists.
+#
+# These lanes are here to take their nested clusters off every merge's share
+# of the sfcbr under-cloud. That trade is only honest if a red run reaches a
+# person, so report_failures files an issue per failed lane (labelled
+# ci-failure, one open issue per lane, later failures as comments) naming the
+# commit tested and the last one the lane passed on. See
+# tools/ci_report_scheduled_failures.py.
+#
+# The cron is a stopgap. GitHub's schedule: has run hours late, and some
+# days not at all, across both orgs since 2026-08-26
+# (shakenfist/private-ci docs/nightly-report-dispatch.md), and private-ci's
+# PLAN-periodic-ci.md will have the conductor dispatch this workflow into
+# gaps in sfcbr's load instead. workflow_dispatch therefore takes no inputs:
+# the conductor dispatches workflows without them. When that lands, the
+# schedule below goes.
+
 permissions:
   contents: read
 
-# NOTE(mikal): git repos are checked out to /srv/github/_work/{repo}/{repo}
-# which is available as GITHUB_WORKSPACE. You can find other environment
-# variables at https://docs.github.com/en/actions/learn-github-actions/environment-variables
-
 on:
   workflow_dispatch:
-  # schedule:
-  #   - cron: '00 13 * * *'        # utc
-  # pull_request:
-  #   branches:
-  #     - develop
-  #   paths:
-  #     - '.github/workflows/scheduled-tests.yml'
-
-
-env:
-  http_proxy: http://192.168.1.15:3128
-  https_proxy: http://192.168.1.15:3128
-  PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
-  # Fall back to pypi so a devpi cold-cache miss (empty index on a
-  # first-touch package) cannot hard-fail the job.
-  PIP_EXTRA_INDEX_URL: https://pypi.org/simple/
+  schedule:
+    # 02:00 on Saturday in Canberra (01:00 outside daylight saving), which
+    # is when sfcbr has the most headroom: PLAN-periodic-ci's phase 0 survey
+    # found almost all of it overnight and at weekends.
+    - cron: '00 15 * * 5'        # utc, fridays
 
 jobs:
-  # Scheduled multi-OS functional coverage. Each matrix entry deploys via the
-  # shakenfist.shakenfist ansible collection (the reusable smoke-cluster
-  # workflow), with the topology's inventory groups driving node roles.
-  functional_matrix_collection:
-    name: "${{ matrix.os.description }} (collection)"
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [
-          {
-            description: 'develop branch on debian 12 single machine',
-            job_name: 'develop-debian-12-localhost',
-            base_image: 'sf://label/ci-images/debian-13',
-            base_image_user: 'debian',
-            topology: 'localhost',
-            tier: 'smoke',
-            concurrency: 3,
-            stestr_config: 'cluster-ci.conf'
-          },
-          {
-            description: 'develop branch on debian 12 cluster',
-            job_name: 'develop-debian-12-slim-primary',
-            base_image: 'sf://label/ci-images/debian-13',
-            base_image_user: 'debian',
-            topology: 'slim-primary',
-            tier: 'full',
-            concurrency: 5,
-            stestr_config: 'cluster-ci.conf'
-          },
-          {
-            description: 'develop branch on ubuntu 24.04 cluster',
-            job_name: 'develop-ubuntu-2404-slim-primary',
-            base_image: 'sf://label/ci-images/ubuntu-2404',
-            base_image_user: 'ubuntu',
-            topology: 'slim-primary',
-            tier: 'full',
-            concurrency: 5,
-            stestr_config: 'cluster-ci.conf'
-          }
-        ]
-    uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
+  weekly_lanes:
+    # tools/ci_report_scheduled_failures.py identifies a lane by this name,
+    # and report_failures passes it as --caller; change them together.
+    name: "Weekly lanes"
+    uses: ./.github/workflows/functional-lanes.yml
     with:
-      component: shakenfist
-      component_ref: ${{ github.sha }}
-      # Not gated on the headroom band: the gate is armed only on job shapes
-      # a warn window measured, and the single machine entry of this matrix
-      # has never been harvested. Passed explicitly rather than left to the
-      # reusable workflow's default, which lives in another repository at
-      # @main; see docs/developer_guide/ci.md and
-      # test_headroom_gate_workflow_seams.py.
-      headroom_gate: false
-      tier: ${{ matrix.os.tier }}
-      topology: ${{ matrix.os.topology }}
-      base_image: ${{ matrix.os.base_image }}
-      base_image_user: ${{ matrix.os.base_image_user }}
-      stestr_config: ${{ matrix.os.stestr_config }}
-      test_concurrency: ${{ matrix.os.concurrency }}
-      concurrency_key: ${{ matrix.os.job_name }}
+      lanes: >-
+        ["ubuntu-2404-slim-primary", "debian-13-slim-tier", "debian-13-localhost"]
 
+  report_failures:
+    name: "Report failures"
+    needs: [weekly_lanes]
+    # Not on cancelled: a cancelled run tested nothing and has nothing to
+    # report.
+    if: always() && needs.weekly_lanes.result == 'failure'
+    runs-on: [self-hosted, static]
+    # A handful of GitHub API calls.
+    timeout-minutes: 10
+    # actions: read lists this run's jobs and earlier runs'; issues: write
+    # files the report. Naming any scope sets every unnamed one to none, so
+    # contents: read is restated for the checkout.
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: File or update an issue per failed lane
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python3 tools/ci_report_scheduled_failures.py
+          --repo "${{ github.repository }}"
+          --run-id "${{ github.run_id }}"
+          --run-attempt "${{ github.run_attempt }}"
+          --workflow scheduled-tests.yml
+          --caller "Weekly lanes"

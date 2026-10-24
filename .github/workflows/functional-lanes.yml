@@ -1,0 +1,156 @@
+name: Functional lanes
+
+# Every functional cluster lane, defined once. Each lane deploys a topology
+# via the shakenfist.shakenfist collection (the reusable smoke-cluster
+# workflow in shakenfist/actions) and runs a stestr suite against it.
+#
+# This workflow decides what a lane *is*; its callers decide when it runs.
+# functional-tests.yml selects the lanes which gate a merge, and
+# scheduled-tests.yml selects the lanes which run weekly and file an issue
+# when they fail. Moving a lane between the two is an edit to the callers'
+# 'lanes' lists and nothing here. test_functional_lanes_workflow_seams.py
+# checks every lane is selected by exactly one caller, and that every name a
+# caller passes is a lane defined here. That second check is load bearing:
+# a lane which is not selected skips, a called workflow whose jobs all skip
+# succeeds, and "Can merge" would then go green having tested nothing.
+#
+# Each lane is its own job rather than an entry of one matrix, because a job
+# level 'if' cannot read the matrix context, and because
+# test_headroom_gate_workflow_seams.py derives each call site's job shape
+# from literal inputs. Every shape input is therefore spelled out per lane.
+#
+# A lane's job name is reported by the jobs API as '<caller job> / <lane> /
+# Smoke tests (collection)'. tools/ci_headroom_harvest.py finds a lane's
+# bundle by the lane segment of that name, so renaming a lane here needs a
+# new row in its BUNDLE_TOPOLOGIES table.
+#
+# The headroom band gate: a lane passes either the CI_HEADROOM_GATE
+# repository variable's off switch (set it to 'false' to stop a band
+# violation failing these jobs without a commit; unset, or anything else,
+# leaves the gate on), or a literal false. The switch may only be armed on a
+# job shape a warn window measured, which test_headroom_gate_workflow_seams.py
+# enforces. See docs/developer_guide/ci_cloud_sizing.md.
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      lanes:
+        description: >-
+          A JSON array of the lanes to run, named by their concurrency_key,
+          for example '["debian-13-slim-primary", "guests"]'.
+        type: string
+        required: true
+
+jobs:
+  debian_13_cluster:
+    name: "Debian 13 cluster (collection)"
+    if: contains(fromJSON(inputs.lanes), 'debian-13-slim-primary')
+    uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
+    with:
+      component: shakenfist
+      component_ref: ${{ github.sha }}
+      headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
+      test_kind: functional
+      tier: full
+      topology: slim-primary
+      base_image: 'sf://label/ci-images/debian-13'
+      base_image_user: debian
+      stestr_config: cluster-ci.conf
+      test_concurrency: 5
+      test_timeout_minutes: 60
+      concurrency_key: debian-13-slim-primary
+
+  ubuntu_2404_cluster:
+    name: "Ubuntu 24.04 cluster (collection)"
+    if: contains(fromJSON(inputs.lanes), 'ubuntu-2404-slim-primary')
+    uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
+    with:
+      component: shakenfist
+      component_ref: ${{ github.sha }}
+      headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
+      test_kind: functional
+      tier: full
+      topology: slim-primary
+      base_image: 'sf://label/ci-images/ubuntu-2404'
+      base_image_user: ubuntu
+      stestr_config: cluster-ci.conf
+      test_concurrency: 5
+      test_timeout_minutes: 60
+      concurrency_key: ubuntu-2404-slim-primary
+
+  guests:
+    name: "Guests (collection)"
+    if: contains(fromJSON(inputs.lanes), 'guests')
+    uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
+    with:
+      component: shakenfist
+      component_ref: ${{ github.sha }}
+      headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
+      test_kind: functional
+      tier: full
+      topology: slim-primary
+      base_image: 'sf://label/ci-images/debian-13'
+      base_image_user: debian
+      stestr_config: guest-ci.conf
+      test_concurrency: 5
+      test_timeout_minutes: 60
+      concurrency_key: guests
+
+  # slim-tier runs the same cluster suite on three nodes rather than
+  # slim-primary's five, so it is still the slower of the two, but its nodes
+  # are no longer allocation-starved: the 6 vCPU reshape took its cluster
+  # ledger from 12 to 24. Six merge runs on that shape took 27 to 42 minutes,
+  # so 60 carries the same headroom the other lanes have.
+  #
+  # This is also the lane with Kerbside on. Its deploy profile deploys
+  # Kerbside on sf2, scraping the primary's sf-api, with its database on the
+  # primary's MariaDB; deploys the cluster a second time and fails if any
+  # sf-* or kerbside-* unit restarted; and tells the suite to expect a VDI
+  # console proxy. It adds processes, not instances, so the headroom gate's
+  # shape is unchanged. The second deploy costs time inside the build step,
+  # not this timeout. See docs/plans/PLAN-kerbside-deployer-phase-04-ci.md
+  # (D5, D6).
+  debian_13_tier:
+    name: "Debian 13 tier (collection)"
+    if: contains(fromJSON(inputs.lanes), 'debian-13-slim-tier')
+    uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
+    with:
+      component: shakenfist
+      component_ref: ${{ github.sha }}
+      headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
+      test_kind: functional
+      tier: full
+      topology: slim-tier
+      base_image: 'sf://label/ci-images/debian-13'
+      base_image_user: debian
+      stestr_config: cluster-ci.conf
+      test_concurrency: 5
+      test_timeout_minutes: 60
+      concurrency_key: debian-13-slim-tier
+      deploy_profile: shakenfist/tools/ci-deploy-profiles/kerbside-slim-tier.yml.j2
+
+  # The cluster suite on one node, deliberately, to find whatever in it
+  # breaks when every role shares a machine. sizing.is_single_machine() and
+  # cluster_ci_tests/test_nodes.py carve this deployment out of the
+  # structural minimum, which no single node can meet. Not gated on the
+  # headroom band: no warn window has measured the localhost shape.
+  debian_13_single_machine:
+    name: "Debian 13 single machine (collection)"
+    if: contains(fromJSON(inputs.lanes), 'debian-13-localhost')
+    uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
+    with:
+      component: shakenfist
+      component_ref: ${{ github.sha }}
+      headroom_gate: false
+      test_kind: functional
+      tier: full
+      topology: localhost
+      base_image: 'sf://label/ci-images/debian-13'
+      base_image_user: debian
+      stestr_config: cluster-ci.conf
+      test_concurrency: 3
+      test_timeout_minutes: 60
+      concurrency_key: debian-13-localhost

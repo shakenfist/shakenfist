@@ -514,103 +514,28 @@ jobs:
     # repository for no benefit.
     uses: shakenfist/actions/.github/workflows/pr-auto-review.yml@main
 
-  # Multi-node merge-queue functional coverage: each matrix entry deploys a
-  # topology (slim-primary / slim-tier) via the shakenfist.shakenfist collection
-  # (the reusable smoke-cluster workflow) and runs its stestr suite. Gated by
-  # can_merge.
-  functional_matrix_merge_collection:
-    name: "${{ matrix.merge.name }} (collection)"
+  # The merge-queue functional cluster lanes. What each lane deploys and
+  # runs is defined once, in functional-lanes.yml; this job only chooses
+  # which lanes gate a merge. The rest run weekly from scheduled-tests.yml,
+  # which files an issue when one fails. Gated by can_merge.
+  #
+  # Ubuntu 24.04 cluster and Debian 13 tier (the Kerbside lane) moved to the
+  # weekly run to take two nested clusters off every merge's share of the
+  # sfcbr under-cloud. Debian 13 cluster runs the same suite on the same
+  # topology as the Ubuntu lane, and Debian 13 tier the same suite on a
+  # smaller one; what a weekly run gives up is noticing a base image or a
+  # Kerbside regression on the merge which caused it rather than within a
+  # week of it.
+  functional_lanes:
+    name: "Functional lanes"
     if: >-
       (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
       && needs.check_paths.outputs.code_changed != 'false'
     needs: [check_paths]
-    strategy:
-      fail-fast: false
-      matrix:
-        merge: [
-          {
-            name: 'Debian 13 cluster',
-            job_name: 'debian-13-slim-primary',
-            base_image: 'sf://label/ci-images/debian-13',
-            base_image_user: 'debian',
-            topology: 'slim-primary',
-            concurrency: 5,
-            stestr_config: 'cluster-ci.conf',
-            timeout_minutes: 60
-          },
-          {
-            name: 'Ubuntu 24.04 cluster',
-            job_name: 'ubuntu-2404-slim-primary',
-            base_image: 'sf://label/ci-images/ubuntu-2404',
-            base_image_user: 'ubuntu',
-            topology: 'slim-primary',
-            concurrency: 5,
-            stestr_config: 'cluster-ci.conf',
-            timeout_minutes: 60
-          },
-          {
-            name: 'Guests',
-            job_name: 'guests',
-            base_image: 'sf://label/ci-images/debian-13',
-            base_image_user: 'debian',
-            topology: 'slim-primary',
-            concurrency: 5,
-            stestr_config: 'guest-ci.conf',
-            timeout_minutes: 60
-          },
-          {
-            # slim-tier runs the same cluster suite on three nodes rather
-            # than slim-primary's five, so it is still the slower of the
-            # two, but its nodes are no longer allocation-starved: the
-            # 6 vCPU reshape took its cluster ledger from 12 to 24.
-            # Six merge runs on that shape took 27 to 42 minutes, so 60
-            # carries the same headroom the other entries have.
-            #
-            # This is also the lane with Kerbside on. Its deploy profile
-            # deploys Kerbside on sf2, scraping the primary's sf-api, with
-            # its database on the primary's MariaDB; deploys the cluster a
-            # second time and fails if any sf-* or kerbside-* unit
-            # restarted; and tells the suite to expect a VDI console proxy.
-            # It adds processes, not instances, so the headroom gate's
-            # shape is unchanged. The second deploy costs time inside the
-            # build step, not this timeout. See
-            # docs/plans/PLAN-kerbside-deployer-phase-04-ci.md (D5, D6).
-            name: 'Debian 13 tier',
-            job_name: 'debian-13-slim-tier',
-            base_image: 'sf://label/ci-images/debian-13',
-            base_image_user: 'debian',
-            topology: 'slim-tier',
-            concurrency: 5,
-            stestr_config: 'cluster-ci.conf',
-            timeout_minutes: 60,
-            deploy_profile: 'shakenfist/tools/ci-deploy-profiles/kerbside-slim-tier.yml.j2'
-          }
-        ]
-    uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
+    uses: ./.github/workflows/functional-lanes.yml
     with:
-      component: shakenfist
-      component_ref: ${{ github.sha }}
-      # The headroom band gate's off switch. Set the CI_HEADROOM_GATE
-      # repository variable to 'false' to stop a band violation failing these
-      # jobs without a commit; unset, or anything else, leaves the gate on.
-      # Every entry of this matrix was in the warn window the gate was armed
-      # against, which is what arming it requires.
-      headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
-      # An armed call site states every shape input rather than leaning on
-      # smoke-cluster.yml's defaults; test_headroom_gate_workflow_seams.py
-      # checks the shape against the ones the window measured.
-      test_kind: functional
-      tier: full
-      topology: ${{ matrix.merge.topology }}
-      base_image: ${{ matrix.merge.base_image }}
-      base_image_user: ${{ matrix.merge.base_image_user }}
-      stestr_config: ${{ matrix.merge.stestr_config }}
-      test_concurrency: ${{ matrix.merge.concurrency }}
-      test_timeout_minutes: ${{ matrix.merge.timeout_minutes }}
-      concurrency_key: ${{ matrix.merge.job_name }}
-      # Only the slim-tier entry names one; the rest pass '', which changes
-      # nothing.
-      deploy_profile: ${{ matrix.merge.deploy_profile || '' }}
+      lanes: >-
+        ["debian-13-slim-primary", "guests"]
 
   # Native-module lifecycle CI: deploys via the reusable smoke-cluster workflow
   # (slim-primary) and runs ansiblemoduletests.sh against the installed
@@ -963,7 +888,7 @@ jobs:
   can_merge:
     name: "Can merge"
     needs:
-      - functional_matrix_merge_collection
+      - functional_lanes
       - ansible_modules_collection
       - node_lifecycle_collection
       - schema_enum_widening

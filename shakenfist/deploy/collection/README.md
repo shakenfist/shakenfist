@@ -302,7 +302,7 @@ Without a `kerbside` group, ansible prints `Could not match supplied host
 pattern, ignoring: kerbside`. This is harmless; defining an empty `kerbside:`
 group in your inventory silences it.
 
-The `debian-13-slim-tier` merge row deploys Kerbside on a hypervisor against a
+Shaken Fist's weekly `debian-13-slim-tier` CI lane deploys Kerbside on a hypervisor against a
 real cluster, installing the collection from Galaxy as an operator would, and
 proves the deploy, the migrations, restart-on-change across a no-op redeploy,
 readiness, the token exchange and the proxy's TLS endpoint.

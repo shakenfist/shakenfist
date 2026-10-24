@@ -370,6 +370,26 @@ class ClassificationTestCase(HarvestTestCase):
             (None, None),
             harvest.find_job([('Ansible modules (collection)-extra', 'success')], prefix))
 
+    def test_a_lane_is_found_under_the_shared_lanes_workflow(self):
+        # Since the lanes moved into functional-lanes.yml, the API reports a
+        # lane one level deeper. The same table entry has to find both, since
+        # a window can straddle the move.
+        _, kind = harvest.classify_artifact(PRIMARY_BUNDLE)
+        prefix = kind.job_prefix
+        for name in (prefix + ' / Smoke tests (collection)',
+                     'Functional lanes / ' + prefix + ' / Smoke tests (collection)'):
+            jobs = [('Functional lanes / Guests (collection) / Smoke tests (collection)', 'failure'),
+                    (name, 'success')]
+            self.assertEqual((name, 'success'), harvest.find_job(jobs, prefix))
+
+    def test_a_lane_prefix_matches_only_the_lane_segment(self):
+        # Matching the prefix anywhere in a name would let a lane named
+        # inside another job's name claim that job's conclusion.
+        jobs = [('Functional lanes / Other / Debian 13 cluster (collection)', 'failure'),
+                ('Debian 13 cluster (collection) extra / Smoke tests (collection)', 'failure')]
+        self.assertEqual(
+            (None, None), harvest.find_job(jobs, 'Debian 13 cluster (collection)'))
+
 
 class BundleReadingTestCase(HarvestTestCase):
     def test_the_traces_are_found_inside_the_nested_zip(self):

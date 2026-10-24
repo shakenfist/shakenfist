@@ -343,10 +343,14 @@ every call site has to remember to set.
 
 ## Cluster CI tests only run in the merge queue
 
-The `(collection)` matrix in `Functional tests` -- everything under
-`deploy/shakenfist_ci/cluster_ci_tests/` -- is skipped on `pull_request` and
-runs on `merge_group`. A green PR therefore says nothing about whether those
-tests pass, or whether they can even reach their first assertion.
+The functional cluster lanes in `Functional tests` -- everything under
+`deploy/shakenfist_ci/cluster_ci_tests/` -- are skipped on `pull_request` and
+run on `merge_group`. A green PR therefore says nothing about whether those
+tests pass, or whether they can even reach their first assertion. Some lanes
+do not run in the merge queue at all, only weekly: the Ubuntu base image, the
+`slim-tier` topology with Kerbside, and a single machine (see
+[Merge lanes and weekly lanes](ci.md#merge-lanes-and-weekly-lanes)). To run
+those against a branch, dispatch `scheduled-tests.yml` on it.
 
 `cluster_ci_tests/test_federation.py` sat through four commits registering a
 trusted issuer with an `http://` `jwks_uri` while the API had refused
