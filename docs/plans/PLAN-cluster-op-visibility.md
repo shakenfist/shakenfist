@@ -200,9 +200,10 @@ corrected inline.
   history. *(Corrected in phase 4.)* "About thirty seconds after
   going terminal" is when an op becomes eligible. The sweep that
   deletes it ran every fifteen minutes then. *(Corrected in phase
-  5.)* Since #4595 it runs every minute, so a finished op normally
-  goes within a minute or two, longer while the sweep has a
-  backlog. Errored ops
+  5.)* Since #4595 it runs every minute, but it walks a type
+  again only five minutes after its last walk reached the end, so
+  a finished op normally goes within about six minutes, longer
+  while the sweep has a backlog. Errored ops
   are never hard deleted (#3922), and their target rows go only
   when the seven-day `CLUSTER_OPERATION_TARGET_RETENTION` prune
   removes them. See survey finding 6 of
@@ -266,8 +267,8 @@ every consumer, so that:
   survey, and corrected by the phase 4 and 5 surveys.* Since #3864,
   terminal ops are hard-deleted, so `/clusteroperations?all=true`
   returns in-flight ops, finished ops the deleted-object sweep has
-  not yet reached (it runs every minute since #4595, so normally a
-  minute or two of them), and errored ops for up to the seven-day target-row
+  not yet reached (normally up to about six minutes of them since
+  #4595), and errored ops for up to the seven-day target-row
   retention (#3922). It is not a full history and is bounded by
   that retention. No limit parameter is needed, and phase 4
   documents it as what it is.
