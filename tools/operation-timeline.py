@@ -12,7 +12,7 @@ with ``defer_count == 1`` it is:
     (created -> first dequeue) + (the defer delay) + (redelivery -> start)
 
 and nothing on that event says which of those terms holds the time. A
-measurement for ``docs/plans/PLAN-queue-performance.md`` observed roughly 400
+queue-performance measurement observed roughly 400
 of 823 first deferrals sitting at 15-17 seconds and could not explain them,
 because the #3916 back-off ladder means a first deferral now costs 0.1
 seconds -- so the time is somewhere else. This tool finds out where, by
@@ -30,7 +30,7 @@ finds nothing).
 
 * ``Execution deferred`` from ``BaseClusterOperation.defer()``, whose
   ``extra`` carries ``waiting_on``, ``defer_count`` and, on newer builds
-  (PLAN-queue-performance-phase-10-defer-latency.md), ``delay``. Builds
+  (those which record the delay), ``delay``. Builds
   predating that field are still readable: the delay is interpolated into the
   message, and the parser falls back to it. That fallback is not optional
   garnish -- the retained history this tool was written to measure predates
@@ -162,7 +162,7 @@ EXECUTION_MESSAGE = 'execution duration'
 
 # The delay as it appears in the defer event's message. Only used when
 # extra['delay'] is absent, which is every event emitted by a build predating
-# that field (PLAN-queue-performance-phase-10-defer-latency.md) -- that is,
+# that field -- that is,
 # all of the retained history this tool was written to measure.
 DEFER_DELAY_RE = re.compile(r'deferred for ([0-9]+(?:\.[0-9]+)?) seconds')
 

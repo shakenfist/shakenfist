@@ -361,7 +361,7 @@ class EnqueueTimeCoalescibleGuardTestCase(base.ShakenFistTestCase):
         )
 
     def test_coalescible_task_per_node_network_family_is_allowed(self):
-        # The case this phase exists to allow: family='network' reaches
+        # The case the guard exists to allow: family='network' reaches
         # sf-net, which partitions its workers by target.
         u1 = str(uuid4())
         node = str(uuid4())

@@ -168,7 +168,7 @@ class BaseClusterOperation(BaseOperation):
         dispatchers can see all of it here and a second event would
         double the eventlog cost on the critical path -- which
         profiling identified as the largest per-op overhead the
-        queue-performance plan added.
+        queue-performance work added.
 
         This lives on the operation rather than in either dispatcher
         because both of them emit it and
@@ -425,9 +425,8 @@ class BaseClusterOperation(BaseOperation):
         #
         # 1. Within-job: if our own task list repeats a coalescible task,
         #    drop the duplicates. Today's enqueue sites mostly send a
-        #    unique task per op so this is defensive, but step 6 of the
-        #    plan may surface call sites that legitimately send
-        #    ``[update_dnsmasq, update_dnsmasq, ...]``.
+        #    unique task per op so this is defensive, but a call site may
+        #    legitimately send ``[update_dnsmasq, update_dnsmasq, ...]``.
         # 2. Cross-op: ask MariaDB to fold any *other* pending ops on
         #    the same target whose entire task list is a single
         #    coalescible task we're about to run. Their state gets
@@ -466,8 +465,7 @@ class BaseClusterOperation(BaseOperation):
         # maximum -- the old figure was measured while #3878 made every one
         # of those queries unmatchable, so it was timing the wrong thing.
         # Keep the guard for tidiness; do not justify anything else with
-        # the cost of this call without measuring it again. The measurement
-        # is written up in docs/plans/PLAN-queue-performance.md.
+        # the cost of this call without measuring it again.
         #
         # A ``None`` value (e.g. op loaded outside the queue path) is
         # treated as "we don't know, be conservative" and the fold runs.

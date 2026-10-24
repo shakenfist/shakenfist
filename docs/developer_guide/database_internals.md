@@ -593,12 +593,10 @@ they fold only each other; `network_ensure_mesh`, enqueued per
 participating hypervisor, carries its own node's uuid and folds only
 that node's own siblings. Both are strictly narrower than the
 network-alone key this replaced, which is the property the whole
-widening rests on. Binding `None` as `IS NULL` was a correction made
-mid-phase: an earlier version of the preflight refused a `None` key
-value outright, which would have silently switched off the only
-coalescing the cluster does the moment the key grew a second column
--- see decision 8 in
-`docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md`.
+widening rests on. `None` is bound as `IS NULL` rather than
+refused: refusing a `None` key value would have silently switched off
+the only coalescing the cluster does the moment the key grew a second
+column.
 
 The fold runs at two layers, both controlled by this metadata:
 

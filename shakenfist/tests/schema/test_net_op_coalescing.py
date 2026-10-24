@@ -80,7 +80,7 @@ class NetOpCoalescingGuardTestCase(base.ShakenFistTestCase):
                 target=str(uuid4()))
 
     def test_a_coalescible_task_may_be_enqueued_per_node_on_sf_net(self):
-        # The case this whole phase exists to allow: a per-node target
+        # The case the guard exists to allow: a per-node target
         # on the network family, with a key which names node_uuid.
         for task in sorted(COALESCIBLE_TASKS, key=lambda t: t.name):
             self.mock_enqueue.reset_mock()

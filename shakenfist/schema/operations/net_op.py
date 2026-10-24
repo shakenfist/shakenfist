@@ -49,8 +49,8 @@ class model_tasks(Enum):
 
 
 # Tasks for which N pending ops sharing a coalescing key can be
-# folded into a single execution by the worker (step 4) or skipped at
-# enqueue time (step 5):
+# folded into a single execution by the worker or skipped at
+# enqueue time:
 #
 # * ``network_apply_update_dnsmasq`` regenerates the dnsmasq config
 #   from current DB state. Six instance starts on the same network
@@ -251,7 +251,7 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
     # intentionally distinct from a bare reconciliation enqueue, and
     # collapsing them would erase the ordering constraint the caller
     # encoded. See ``BaseClusterOperation.execute``'s cross-op fold
-    # (worker-side dedup, step 4) for the safety net that catches the
+    # (the worker-side dedup) for the safety net that catches the
     # race where two callers both miss the lookup.
     #
     # Neither the enqueue-side dedup below nor the worker-side fold in

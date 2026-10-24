@@ -25,7 +25,7 @@ FOLD_EVENT = 'coalesced sibling ops'
 # enqueue during instance start, and all of them land on the single
 # cluster-wide networknode queue which one elected worker drains. Six
 # is the number from the original report which motivated the
-# queue-performance plan -- six instance starts on one network, each
+# queue-performance work -- six instance starts on one network, each
 # enqueueing one update_dnsmasq, serviced strictly serially -- and it
 # is deliberately not larger: this test has to buy overlap on a loaded
 # CI cluster without adding a materially longer instance-create burst
@@ -39,8 +39,7 @@ BURST = 6
 # two column ``(network_uuid, node_uuid)`` coalescing key before it can
 # be coalesced at all -- with the network alone, one hypervisor's mesh
 # op and another's are indistinguishable to both dedup paths while
-# doing different work on different hosts. See
-# docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
+# doing different work on different hosts.
 # How much longer to keep polling for a worker-side fold once a
 # per-node dedup event has been seen. The dedup proves the eventlog
 # drainer has already shipped this burst's coalescing events, so a fold
@@ -379,8 +378,7 @@ class TestCoalescing(base.BaseNamespacedTestCase):
             'entries for other participants: %s. That is the failure a '
             'coalescing fold causes when running the survivor does not '
             'cover the work of the siblings it marked complete -- see the '
-            'fourth risk in '
-            'docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md. '
+            'risk that a per-node survivor does not cover its siblings. '
             'The mesh_flood_entries detail has the desired and discovered '
             'sets per node and mesh_fdb_raw has the unparsed bridge output, '
             'which is where a device that is missing entirely shows up. '
