@@ -471,7 +471,10 @@ class ClaimCoalescibleSiblingsReply(_message.Message):
     FOLDED_OP_UUIDS_FIELD_NUMBER: _builtins.int
     @_builtins.property
     def folded_op_uuids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
-        """Op uuids whose state was transitioned to ``complete``."""
+        """Op uuids whose state was transitioned: to ``complete`` for the two
+        ClaimCoalescibleSiblings RPCs, to ``executing`` for
+        FoldCoalescibleSiblings.
+        """
 
     def __init__(
         self,

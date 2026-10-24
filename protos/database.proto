@@ -25,6 +25,14 @@ service DatabaseService {
   // the new names exist to prevent.
   rpc ClaimCoalescibleSiblingsV2 (ClaimCoalescibleSiblingsV2Request) returns (ClaimCoalescibleSiblingsReply) {}
   rpc FindExistingCoalescibleOpV2 (FindExistingCoalescibleOpV2Request) returns (FindExistingCoalescibleOpReply) {}
+  // As ClaimCoalescibleSiblingsV2, but each folded sibling is moved to
+  // ``executing`` rather than ``complete``, with a state message naming
+  // the survivor. The survivor completes its siblings only once its own
+  // tasks have succeeded, so nothing waiting on a sibling is released
+  // before the work is done (#4638). A new client never falls back to
+  // V2: that would bring back the premature completion this RPC exists
+  // to remove, so an old server's UNIMPLEMENTED means "skip the fold".
+  rpc FoldCoalescibleSiblings (ClaimCoalescibleSiblingsV2Request) returns (ClaimCoalescibleSiblingsReply) {}
 
   // Lock Operations
   rpc AcquireLock (ClusterLockRequest) returns (ClusterLockReply) {}
@@ -552,7 +560,9 @@ message ClaimCoalescibleSiblingsRequest {
 }
 
 message ClaimCoalescibleSiblingsReply {
-  // Op uuids whose state was transitioned to ``complete``.
+  // Op uuids whose state was transitioned: to ``complete`` for the two
+  // ClaimCoalescibleSiblings RPCs, to ``executing`` for
+  // FoldCoalescibleSiblings.
   repeated string folded_op_uuids = 1;
 }
 

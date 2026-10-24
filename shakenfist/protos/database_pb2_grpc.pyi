@@ -52,6 +52,15 @@ class DatabaseServiceStub:
     the new names exist to prevent.
     """
     FindExistingCoalescibleOpV2: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpV2Request, _database_pb2.FindExistingCoalescibleOpReply]
+    FoldCoalescibleSiblings: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsV2Request, _database_pb2.ClaimCoalescibleSiblingsReply]
+    """As ClaimCoalescibleSiblingsV2, but each folded sibling is moved to
+    ``executing`` rather than ``complete``, with a state message naming
+    the survivor. The survivor completes its siblings only once its own
+    tasks have succeeded, so nothing waiting on a sibling is released
+    before the work is done (#4638). A new client never falls back to
+    V2: that would bring back the premature completion this RPC exists
+    to remove, so an old server's UNIMPLEMENTED means "skip the fold".
+    """
     AcquireLock: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterLockRequest, _database_pb2.ClusterLockReply]
     """Lock Operations"""
     ReleaseLock: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterReleaseLockRequest, _database_pb2.StatusReply]
@@ -471,6 +480,15 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     the new names exist to prevent.
     """
     FindExistingCoalescibleOpV2: _aio.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpV2Request, _database_pb2.FindExistingCoalescibleOpReply]  # type: ignore[assignment]
+    FoldCoalescibleSiblings: _aio.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsV2Request, _database_pb2.ClaimCoalescibleSiblingsReply]  # type: ignore[assignment]
+    """As ClaimCoalescibleSiblingsV2, but each folded sibling is moved to
+    ``executing`` rather than ``complete``, with a state message naming
+    the survivor. The survivor completes its siblings only once its own
+    tasks have succeeded, so nothing waiting on a sibling is released
+    before the work is done (#4638). A new client never falls back to
+    V2: that would bring back the premature completion this RPC exists
+    to remove, so an old server's UNIMPLEMENTED means "skip the fold".
+    """
     AcquireLock: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterLockRequest, _database_pb2.ClusterLockReply]  # type: ignore[assignment]
     """Lock Operations"""
     ReleaseLock: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterReleaseLockRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
@@ -965,6 +983,21 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.FindExistingCoalescibleOpV2Request,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.FindExistingCoalescibleOpReply, _abc.Awaitable[_database_pb2.FindExistingCoalescibleOpReply]]: ...
+
+    @_abc_1.abstractmethod
+    def FoldCoalescibleSiblings(
+        self,
+        request: _database_pb2.ClaimCoalescibleSiblingsV2Request,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.ClaimCoalescibleSiblingsReply, _abc.Awaitable[_database_pb2.ClaimCoalescibleSiblingsReply]]:
+        """As ClaimCoalescibleSiblingsV2, but each folded sibling is moved to
+        ``executing`` rather than ``complete``, with a state message naming
+        the survivor. The survivor completes its siblings only once its own
+        tasks have succeeded, so nothing waiting on a sibling is released
+        before the work is done (#4638). A new client never falls back to
+        V2: that would bring back the premature completion this RPC exists
+        to remove, so an old server's UNIMPLEMENTED means "skip the fold".
+        """
 
     @_abc_1.abstractmethod
     def AcquireLock(

@@ -261,6 +261,28 @@ class TerminalStateCancellationTest(base.ShakenFistTestCase):
         for c in mock_op.add_event.call_args_list:
             self.assertNotIn('skipping op already in terminal state', str(c))
 
+    def test_network_dispatcher_reruns_executing_op(self):
+        """#4638: a coalescing survivor folds its siblings to executing and
+        completes them only if its own tasks succeed. One it left
+        executing -- because it failed, deferred or died -- has to run
+        itself when its own work item is dequeued. Treated as terminal
+        here, it would be dropped and sit in executing until the orphan
+        reaper errored it."""
+        mock_op = mock.MagicMock()
+        mock_op.state.value = BaseClusterOperation.STATE_EXECUTING
+        mock_op.uuid = OP_UUID
+        mock_op.depends_on = []
+        mock_op.runs_after = []
+
+        from shakenfist.daemons.network.workitem import Job
+        job = Job.__new__(Job)
+        job.log = mock.MagicMock()
+        job._cluster_operation_execute(QUEUE_NAME, mock_op, 1, {})
+
+        mock_op.execute.assert_called_once()
+        for c in mock_op.add_event.call_args_list:
+            self.assertNotIn('skipping op already in terminal state', str(c))
+
 
 class ExponentialBackoffMapTest(base.ShakenFistTestCase):
     """Unit tests for the per-worker exponential back-off map.

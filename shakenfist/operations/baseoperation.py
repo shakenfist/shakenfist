@@ -328,7 +328,7 @@ class BaseClusterOperation(BaseOperation):
         # the same batch as this op. ``None`` means the op was loaded
         # outside the queue dispatch path (e.g. from a unit test or a REST
         # endpoint). The cross-op coalescing branch in ``execute()`` reads
-        # this to skip the ``claim_coalescible_siblings`` SQL when the
+        # this to skip the ``fold_coalescible_siblings`` SQL when the
         # dispatcher just observed an empty queue (``batch == 1`` -- this
         # op is the only ready item), since no sibling could possibly be
         # ready to fold. A new sibling enqueued after our dequeue will be
@@ -344,7 +344,7 @@ class BaseClusterOperation(BaseOperation):
         # nothing" from "the fold never ran" is how #3878 stayed
         # invisible for three months: zero looked exactly like
         # disabled. ``coalesce_seconds`` is the cost of the
-        # claim_coalescible_siblings call, which baseoperation asserted
+        # fold_coalescible_siblings call, which baseoperation asserted
         # to be ~200 ms under load until it was measured at a 3.7 ms
         # median over 42 hours of sfcbr.
         # It is measured with a monotonic clock: it is a pure interval,
@@ -429,12 +429,16 @@ class BaseClusterOperation(BaseOperation):
         #    legitimately send ``[update_dnsmasq, update_dnsmasq, ...]``.
         # 2. Cross-op: ask MariaDB to fold any *other* pending ops on
         #    the same target whose entire task list is a single
-        #    coalescible task we're about to run. Their state gets
-        #    transitioned to ``complete``; when their work_queue row
-        #    eventually surfaces the dispatcher's terminal-state branch
-        #    drops it cleanly. Logged as a single "coalesced sibling
-        #    ops" status event on the survivor and on its coalescing
-        #    target.
+        #    coalescible task we're about to run. Their state moves to
+        #    ``executing``, which is what they are: their work is being
+        #    done, here. Only once every one of our own tasks has
+        #    succeeded do we move them on to ``complete``, so nothing
+        #    waiting on a sibling is released before the work is done,
+        #    or released at all if it fails (#4638). On any other
+        #    outcome they are left ``executing``, and each one runs
+        #    itself when its work_queue row is dequeued. Logged as a
+        #    single "coalesced sibling ops" status event on the
+        #    survivor and on its coalescing target.
         coalescible = type(self).coalescible_tasks
         key_columns = type(self).coalescible_key_columns
 
@@ -455,7 +459,7 @@ class BaseClusterOperation(BaseOperation):
             unique_tasks = list(self.tasks)
 
         # Skip the cross-op fold when the dispatcher just dequeued only us
-        # (``dispatcher_batch_size == 1``). The ``claim_coalescible_siblings``
+        # (``dispatcher_batch_size == 1``). The ``fold_coalescible_siblings``
         # call almost always returns empty in the uncontended case, so
         # skipping a query which cannot help is free.
         #
@@ -489,9 +493,9 @@ class BaseClusterOperation(BaseOperation):
         #     ``sf-queues``, is the PARTITIONED-WORKER SAFETY INVARIANT
         #     comment in ``shakenfist/daemons/network/workitem.py``.
         #
-        # Without one of those, folding marks a sibling on a *different*
-        # node's queue complete and leaves that node's apply work undone.
-        # That is the bug which broke
+        # Without one of those, a fold claims a sibling on a *different*
+        # node's queue, and a successful survivor then marks it complete
+        # with that node's apply work undone. That is the bug which broke
         # ``test_single_virtual_networks_work`` on the network-facade
         # branch: with ``Network.ensure_mesh`` fanned out to every
         # participating hypervisor, hypervisor A's worker folded away
@@ -559,6 +563,7 @@ class BaseClusterOperation(BaseOperation):
         # in the by-queue-class table, and the point of recording an
         # outcome at all is that "coalescing is doing nothing" stays
         # answerable.
+        folded: list[str] = []
         if not coalescible or not key_columns:
             self.coalesce_outcome = 'type_not_coalescible'
         elif skip_due_to_empty_queue:
@@ -599,7 +604,7 @@ class BaseClusterOperation(BaseOperation):
                         (column, None if value is None else str(value)))
 
                 # Recorded before the call, not after it. If
-                # claim_coalescible_siblings raises, a caller which
+                # fold_coalescible_siblings raises, a caller which
                 # catches and continues would otherwise emit an event
                 # with no outcome at all, which the report reads as
                 # "from a build predating the instrumentation" rather
@@ -607,7 +612,7 @@ class BaseClusterOperation(BaseOperation):
                 self.coalesce_outcome = 'ran'
                 coalesce_start = time.monotonic()
                 try:
-                    folded = mariadb.claim_coalescible_siblings(
+                    folded = mariadb.fold_coalescible_siblings(
                         operation_type=self.object_type,
                         keys=keys,
                         task_names=[
@@ -615,7 +620,7 @@ class BaseClusterOperation(BaseOperation):
                         exclude_op_uuid=str(self.uuid))
                 except exceptions.CoalescingUnavailable:
                     # A rolling upgrade against an sf-database which
-                    # predates the V2 RPCs. Overwrite the optimistic
+                    # predates the fold RPC. Overwrite the optimistic
                     # 'ran' rather than leaving it: a fold that never
                     # happened reported as 'ran' with zero siblings is
                     # indistinguishable in queue-wait-report.py from a
@@ -667,6 +672,46 @@ class BaseClusterOperation(BaseOperation):
                                     BaseClusterOperation.STATE_QUEUED]:
                 return
         self.state = BaseClusterOperation.STATE_COMPLETE  # type: ignore[misc]
+        self._complete_folded_siblings(folded)
+
+    def _complete_folded_siblings(self, folded: list[str]) -> None:
+        """Move the siblings this operation folded on to ``complete``.
+
+        Called only once this operation itself is ``complete``, because
+        that is the only outcome which did the siblings' work. Each goes
+        through the normal validated state transition from ``executing``.
+
+        A sibling which is no longer ``executing`` -- deleted while this
+        operation ran, say -- has ended some other way and is left alone.
+        A failure to complete one is logged and swallowed rather than
+        raised: this operation's work is done and its work item must
+        still resolve. The sibling is then still ``executing`` with its
+        own work_queue row, so it runs itself when that row is dequeued,
+        exactly as it would had this operation failed.
+        """
+        for sibling_uuid in folded:
+            try:
+                sibling = type(self).from_db(
+                    sibling_uuid, suppress_failure_audit=True)
+                if sibling is None:
+                    self.log.with_fields({
+                        'sibling_uuid': sibling_uuid,
+                    }).info('Folded sibling no longer exists, not completing it')
+                    continue
+                if sibling.state.value != BaseClusterOperation.STATE_EXECUTING:
+                    continue
+                sibling._state_update(
+                    BaseClusterOperation.STATE_COMPLETE,
+                    message=f'coalesced into {self.uuid}')
+            except (exceptions.DatabaseUnavailable,
+                    exceptions.StateWriteFailed,
+                    exceptions.InvalidStateException) as e:
+                self.log.with_fields({
+                    'sibling_uuid': sibling_uuid,
+                    'error': str(e),
+                }).warning(
+                    'Failed to complete a folded sibling, it will run '
+                    'itself instead')
 
     def defer(
             self,

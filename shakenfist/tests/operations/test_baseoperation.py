@@ -503,7 +503,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
 
         # State writes hit MariaDB; the test only cares about the
         # behavioural surface (tasks dispatched, events emitted,
-        # claim_coalescible_siblings called with the right shape).
+        # fold_coalescible_siblings called with the right shape).
         self.state_patcher = mock.patch.object(
             BaseClusterOperation, '_state_update')
         self.state_patcher.start()
@@ -533,12 +533,21 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.mock_add_event_multi = self.add_event_multi_patcher.start()
         self.addCleanup(self.add_event_multi_patcher.stop)
 
-        self.claim_patcher = mock.patch(
+        self.fold_patcher = mock.patch(
             'shakenfist.operations.baseoperation.mariadb.'
-            'claim_coalescible_siblings')
-        self.mock_claim = self.claim_patcher.start()
-        self.mock_claim.return_value = []
-        self.addCleanup(self.claim_patcher.stop)
+            'fold_coalescible_siblings')
+        self.mock_fold = self.fold_patcher.start()
+        self.mock_fold.return_value = []
+        self.addCleanup(self.fold_patcher.stop)
+
+        # A successful survivor loads each sibling it folded to complete
+        # it. These tests fold made-up uuids with no row behind them, so
+        # the load finds nothing; test_mariadb_coalescing.py drives the
+        # completion against real rows.
+        self.from_db_patcher = mock.patch.object(
+            NetOp, 'from_db', return_value=None)
+        self.mock_from_db = self.from_db_patcher.start()
+        self.addCleanup(self.from_db_patcher.stop)
 
     def _make_net_op(self, task_names, queue_name=None, node_uuid=None):
         op = NetOp(_make_net_op_static_values(task_names, node_uuid=node_uuid))
@@ -588,8 +597,8 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op = self._make_net_op(['network_apply_update_dnsmasq'])
         op.execute()
 
-        self.mock_claim.assert_called_once()
-        kwargs = self.mock_claim.call_args.kwargs
+        self.mock_fold.assert_called_once()
+        kwargs = self.mock_fold.call_args.kwargs
         self.assertEqual(ObjectType.NET_OP, kwargs['operation_type'])
         # The key is every declared column, including the ones unset on
         # this operation: a cluster-wide NetOp has no node_uuid, and
@@ -609,7 +618,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
 
     def test_cross_op_coalescing_records_sibling_uuids(self):
         sibling = '33333333-3333-4333-8333-333333333333'
-        self.mock_claim.return_value = [sibling]
+        self.mock_fold.return_value = [sibling]
 
         op = self._make_net_op(['network_apply_update_dnsmasq'])
         op.execute()
@@ -627,7 +636,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         # operation is unreadable soon after -- which is how #3878 hid.
         # The network outlives the operation, so the event has to land
         # there too for anything to be able to assert on it.
-        self.mock_claim.return_value = [
+        self.mock_fold.return_value = [
             '33333333-3333-4333-8333-333333333333']
 
         op = self._make_net_op(['network_apply_update_dnsmasq'])
@@ -677,7 +686,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
             self.assertIsNone(op._coalescible_target_reference())
 
     def test_no_fold_event_when_nothing_was_folded(self):
-        self.mock_claim.return_value = []
+        self.mock_fold.return_value = []
 
         op = self._make_net_op(['network_apply_update_dnsmasq'])
         op.execute()
@@ -690,7 +699,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op = self._make_net_op(['network_remove_dnsmasq'])
         op.execute()
 
-        self.mock_claim.assert_not_called()
+        self.mock_fold.assert_not_called()
 
     def test_no_coalescing_call_when_dispatcher_batch_was_one(self):
         # Dispatcher hint says we were the only item in the batch, so
@@ -699,7 +708,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op.dispatcher_batch_size = 1
         op.execute()
 
-        self.mock_claim.assert_not_called()
+        self.mock_fold.assert_not_called()
 
     def test_coalescing_runs_when_dispatcher_batch_was_multiple(self):
         # Dispatcher hint says >1 ready items, so contention is
@@ -708,7 +717,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op.dispatcher_batch_size = 5
         op.execute()
 
-        self.mock_claim.assert_called_once()
+        self.mock_fold.assert_called_once()
 
     def test_coalescing_runs_when_dispatcher_batch_unknown(self):
         # ``None`` means the op was loaded outside the queue path
@@ -718,7 +727,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op.dispatcher_batch_size = None
         op.execute()
 
-        self.mock_claim.assert_called_once()
+        self.mock_fold.assert_called_once()
 
     def test_no_coalescing_call_when_queue_is_per_node(self):
         # A per-node queue (``<node_uuid>-network-*`` and
@@ -741,7 +750,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
                 '-network-user_facing'))
         op.execute()
 
-        self.mock_claim.assert_not_called()
+        self.mock_fold.assert_not_called()
 
     def test_no_coalescing_call_when_queue_name_unset(self):
         # An op loaded outside the dispatch path (e.g. by a unit test
@@ -755,14 +764,14 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op.queue_name = None
         op.execute()
 
-        self.mock_claim.assert_not_called()
+        self.mock_fold.assert_not_called()
 
     def test_outcome_records_that_the_fold_ran(self):
         # "The fold ran and found nothing" has to be distinguishable
         # from "the fold never ran". While the join was broken (#3878)
         # those two looked identical from outside, which is why the
         # defect survived three months and a green test suite.
-        self.mock_claim.return_value = []
+        self.mock_fold.return_value = []
 
         op = self._make_net_op(['network_apply_update_dnsmasq'])
         op.execute()
@@ -772,7 +781,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.assertIsNotNone(op.coalesce_seconds)
 
     def test_outcome_records_how_many_siblings_were_folded(self):
-        self.mock_claim.return_value = [
+        self.mock_fold.return_value = [
             '33333333-3333-4333-8333-333333333333',
             '44444444-4444-4444-8444-444444444444',
         ]
@@ -804,14 +813,14 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.assertIsNone(op.coalesce_seconds)
 
     def test_outcome_records_that_coalescing_was_unavailable(self):
-        # A rolling upgrade against an sf-database predating the V2
-        # coalescing RPCs raises CoalescingUnavailable. The optimistic
+        # A rolling upgrade against an sf-database predating the fold
+        # RPC raises CoalescingUnavailable. The optimistic
         # 'ran' has to be overwritten: a fold which never happened,
         # reported as 'ran' with zero siblings folded, reads in
         # queue-wait-report.py exactly like a fold which ran and
         # matched nothing -- the ambiguity #3878 hid behind. The task
         # itself must still be dispatched.
-        self.mock_claim.side_effect = exceptions.CoalescingUnavailable(
+        self.mock_fold.side_effect = exceptions.CoalescingUnavailable(
             'not implemented by this database service')
 
         op = self._make_net_op(['network_apply_update_dnsmasq'])
@@ -851,7 +860,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
             op.execute()
 
         self.assertEqual('key_column_missing', op.coalesce_outcome)
-        self.mock_claim.assert_not_called()
+        self.mock_fold.assert_not_called()
         self.assertIsNone(op.coalesce_seconds)
         op.dispatch_task.assert_called_once()
 
@@ -866,10 +875,10 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op.execute()
 
         self.assertEqual('ran', op.coalesce_outcome)
-        self.mock_claim.assert_called_once()
+        self.mock_fold.assert_called_once()
         self.assertEqual(
             [('network_uuid', NETWORK_UUID), ('node_uuid', None)],
-            self.mock_claim.call_args.kwargs['keys'])
+            self.mock_fold.call_args.kwargs['keys'])
 
     # -- The per-node fold guard ---------------------------------------
     #
@@ -892,8 +901,8 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
             node_uuid=NODE_UUID)
         op.execute()
 
-        self.mock_claim.assert_called_once()
-        kwargs = self.mock_claim.call_args.kwargs
+        self.mock_fold.assert_called_once()
+        kwargs = self.mock_fold.call_args.kwargs
         self.assertEqual(
             [('network_uuid', NETWORK_UUID), ('node_uuid', NODE_UUID)],
             kwargs['keys'])
@@ -913,7 +922,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
             node_uuid=NODE_UUID)
         op.execute()
 
-        self.mock_claim.assert_not_called()
+        self.mock_fold.assert_not_called()
         self.assertEqual(
             'key_cannot_distinguish_queue', op.coalesce_outcome)
 
@@ -928,7 +937,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
             node_uuid=NODE_UUID)
         op.execute()
 
-        self.mock_claim.assert_not_called()
+        self.mock_fold.assert_not_called()
         self.assertEqual(
             'key_cannot_distinguish_queue', op.coalesce_outcome)
 
@@ -942,7 +951,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op.queue_name = None
         op.execute()
 
-        self.mock_claim.assert_not_called()
+        self.mock_fold.assert_not_called()
         self.assertEqual(
             'key_cannot_distinguish_queue', op.coalesce_outcome)
 
@@ -954,8 +963,8 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op = self._make_net_op(['network_apply_update_dnsmasq'])
         op.execute()
 
-        self.mock_claim.assert_called_once()
-        kwargs = self.mock_claim.call_args.kwargs
+        self.mock_fold.assert_called_once()
+        kwargs = self.mock_fold.call_args.kwargs
         self.assertEqual(
             [('network_uuid', NETWORK_UUID), ('node_uuid', None)],
             kwargs['keys'])
@@ -975,7 +984,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
                 node_uuid=NODE_UUID)
             op.execute()
 
-        self.mock_claim.assert_not_called()
+        self.mock_fold.assert_not_called()
         self.assertEqual(
             'key_cannot_distinguish_queue', op.coalesce_outcome)
 
@@ -998,7 +1007,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op.dispatcher_batch_size = 4
         op.execute()
 
-        self.mock_claim.assert_not_called()
+        self.mock_fold.assert_not_called()
         self.assertEqual('type_not_coalescible', op.coalesce_outcome)
         self.assertIsNone(op.coalesce_seconds)
 
@@ -1007,7 +1016,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         # catches and continues would otherwise emit an event with no
         # outcome, which the report classifies as an uninstrumented
         # build rather than as a fold which was attempted and failed.
-        self.mock_claim.side_effect = Exception('database unavailable')
+        self.mock_fold.side_effect = Exception('database unavailable')
 
         op = self._make_net_op(['network_apply_update_dnsmasq'])
         self.assertRaises(Exception, op.execute)
@@ -1024,14 +1033,14 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         # asserting on that event must fail. Proving it here means the
         # calibration does not depend on someone remembering to try it by
         # hand against a real cluster.
-        self.mock_claim.return_value = [
+        self.mock_fold.return_value = [
             '33333333-3333-4333-8333-333333333333']
 
         with mock.patch.object(NetOp, 'coalescible_tasks', frozenset()):
             op = self._make_net_op(['network_apply_update_dnsmasq'])
             op.execute()
 
-        self.mock_claim.assert_not_called()
+        self.mock_fold.assert_not_called()
         self.assertEqual([], self._coalesced_events())
         self.assertEqual('type_not_coalescible', op.coalesce_outcome)
 

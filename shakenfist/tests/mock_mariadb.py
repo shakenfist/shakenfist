@@ -1180,6 +1180,13 @@ class MockMariaDB():
         self.test_obj.addCleanup(
             self.mariadb_claim_coalescible_siblings.stop)
 
+        self.mariadb_fold_coalescible_siblings = mock.patch(
+            'shakenfist.mariadb.fold_coalescible_siblings',
+            side_effect=self._mariadb_fold_coalescible_siblings)
+        self.mariadb_fold_coalescible_siblings.start()
+        self.test_obj.addCleanup(
+            self.mariadb_fold_coalescible_siblings.stop)
+
         self.mariadb_find_existing_coalescible_op = mock.patch(
             'shakenfist.mariadb.find_existing_coalescible_op',
             side_effect=self._mariadb_find_existing_coalescible_op)
@@ -4105,8 +4112,21 @@ class MockMariaDB():
             f'{task_name}): reusing {chosen_uuid}')
         return chosen_uuid
 
-    def _mariadb_claim_coalescible_siblings(
+    def _mariadb_fold_coalescible_siblings(
             self, operation_type, keys, task_names, exclude_op_uuid):
+        """Mock implementation of mariadb.fold_coalescible_siblings().
+
+        As ``_mariadb_claim_coalescible_siblings``, but the matched ops
+        move to ``executing`` with a message naming the survivor, as
+        ``mariadb._direct_fold_coalescible_siblings`` does.
+        """
+        return self._mariadb_claim_coalescible_siblings(
+            operation_type, keys, task_names, exclude_op_uuid,
+            folded_state='executing')
+
+    def _mariadb_claim_coalescible_siblings(
+            self, operation_type, keys, task_names, exclude_op_uuid,
+            folded_state='complete'):
         """Mock implementation of mariadb.claim_coalescible_siblings().
 
         Mirrors the SQL safety guards in
@@ -4114,10 +4134,14 @@ class MockMariaDB():
         task ops in state ``queued`` matching one of ``task_names``
         and every ``(column, uuid)`` pair of ``keys`` are folded; the
         excluded op is never affected. Transitions the matched ops to
-        ``complete`` in ``mariadb_states`` and returns their uuids.
+        ``folded_state`` in ``mariadb_states`` and returns their uuids.
         """
         if not task_names or not self._coalescible_keys_valid(keys):
             return []
+        if folded_state == 'executing':
+            message = f'coalesced into {exclude_op_uuid}'
+        else:
+            message = 'coalesced into sibling op'
 
         key_description = ','.join(f'{c}={v}' for c, v in keys)
         folded: list[str] = []
@@ -4138,14 +4162,14 @@ class MockMariaDB():
             state_row = self.mariadb_states.get(state_key)
             if not state_row or state_row.get('state_value') != 'queued':
                 continue
-            state_row['state_value'] = 'complete'
+            state_row['state_value'] = folded_state
             state_row['update_time'] = time.time()
-            state_row['message'] = 'coalesced into sibling op'
+            state_row['message'] = message
             folded.append(op_uuid)
         self._trace(
             f'MockMariaDB.claim_coalescible_siblings('
             f'{operation_type}, {key_description}): '
-            f'folded {len(folded)} ops')
+            f'folded {len(folded)} ops to {folded_state}')
         return folded
 
     #

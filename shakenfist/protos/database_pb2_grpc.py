@@ -99,6 +99,11 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.FindExistingCoalescibleOpV2Request.SerializeToString,
                 response_deserializer=database__pb2.FindExistingCoalescibleOpReply.FromString,
                 _registered_method=True)
+        self.FoldCoalescibleSiblings = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/FoldCoalescibleSiblings',
+                request_serializer=database__pb2.ClaimCoalescibleSiblingsV2Request.SerializeToString,
+                response_deserializer=database__pb2.ClaimCoalescibleSiblingsReply.FromString,
+                _registered_method=True)
         self.AcquireLock = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/AcquireLock',
                 request_serializer=database__pb2.ClusterLockRequest.SerializeToString,
@@ -1300,6 +1305,19 @@ class DatabaseServiceServicer:
 
     def FindExistingCoalescibleOpV2(self, request, context):
         """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FoldCoalescibleSiblings(self, request, context):
+        """As ClaimCoalescibleSiblingsV2, but each folded sibling is moved to
+        ``executing`` rather than ``complete``, with a state message naming
+        the survivor. The survivor completes its siblings only once its own
+        tasks have succeeded, so nothing waiting on a sibling is released
+        before the work is done (#4638). A new client never falls back to
+        V2: that would bring back the premature completion this RPC exists
+        to remove, so an old server's UNIMPLEMENTED means "skip the fold".
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -2846,6 +2864,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.FindExistingCoalescibleOpV2Request.FromString,
                     response_serializer=database__pb2.FindExistingCoalescibleOpReply.SerializeToString,
             ),
+            'FoldCoalescibleSiblings': grpc.unary_unary_rpc_method_handler(
+                    servicer.FoldCoalescibleSiblings,
+                    request_deserializer=database__pb2.ClaimCoalescibleSiblingsV2Request.FromString,
+                    response_serializer=database__pb2.ClaimCoalescibleSiblingsReply.SerializeToString,
+            ),
             'AcquireLock': grpc.unary_unary_rpc_method_handler(
                     servicer.AcquireLock,
                     request_deserializer=database__pb2.ClusterLockRequest.FromString,
@@ -4313,6 +4336,33 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/FindExistingCoalescibleOpV2',
             database__pb2.FindExistingCoalescibleOpV2Request.SerializeToString,
             database__pb2.FindExistingCoalescibleOpReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FoldCoalescibleSiblings(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/FoldCoalescibleSiblings',
+            database__pb2.ClaimCoalescibleSiblingsV2Request.SerializeToString,
+            database__pb2.ClaimCoalescibleSiblingsReply.FromString,
             options,
             channel_credentials,
             insecure,

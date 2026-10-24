@@ -704,7 +704,7 @@ is emitted by the enqueuing process, not by the dispatcher:
       `type_not_coalescible` and `no_coalescible_tasks` are separate
       outcomes on purpose: merged, the boring case buries the
       interesting one.
-    * `coalesce_seconds` — cost of the `claim_coalescible_siblings`
+    * `coalesce_seconds` — cost of the `fold_coalescible_siblings`
       call, present when the call was attempted: outcomes `ran` and
       `coalescing_unavailable`. Measured with a monotonic
       clock, so it is an interval rather than a difference of two wall
@@ -731,8 +731,14 @@ is emitted by the enqueuing process, not by the dispatcher:
   fields in `extra`:
     * `sibling_count` — how many siblings were folded.
     * `sibling_uuids` — their op uuids. Looking up any of those
-      will show their state as `complete` with the message
-      `coalesced into sibling op`.
+      while the survivor runs shows it `executing`, with the message
+      `coalesced into <survivor uuid>`. It moves to `complete`, with
+      the same message, only once the survivor's tasks have all
+      succeeded. If the survivor errored or deferred instead, the
+      sibling stays `executing` until its own work item comes up and
+      it runs itself, so its final state is always its own outcome.
+      A sibling sitting in `executing` behind a failed survivor is
+      therefore waiting its turn on the queue, not stuck.
     * `tasks` — which coalescible task(s) drove the fold.
 
   A burst of these on `network_apply_update_dnsmasq` is the
@@ -741,7 +747,7 @@ is emitted by the enqueuing process, not by the dispatcher:
   during a CI run that's known to be enqueueing duplicate work
   would point at a bug in either the enqueue-side dedup
   (`mariadb.find_existing_coalescible_op`) or the worker-side fold
-  (`mariadb.claim_coalescible_siblings`).
+  (`mariadb.fold_coalescible_siblings`).
 
   Note that the worker-side fold also skips itself when the
   dispatcher just observed an empty queue

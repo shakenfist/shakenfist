@@ -5,7 +5,7 @@
 #
 # These execute the queries against a real database rather than a mocked
 # engine. That distinction is the whole point of the module: the existing
-# coalescing tests mock either ``mariadb.claim_coalescible_siblings`` (in
+# coalescing tests mock either ``mariadb.fold_coalescible_siblings`` (in
 # shakenfist/tests/operations/test_baseoperation.py) or ``_get_engine``
 # (in shakenfist/tests/test_mariadb_work_queue.py), so between them they
 # assert that the dispatcher decides to call the primitive and that the
@@ -36,11 +36,27 @@
 #   is tested in shakenfist/tests/schema/test_net_op_coalescing.py.
 
 import uuid
+from typing import Any, Optional
 from unittest import mock
 
+import grpc
 import sqlalchemy as sa
 
+from shakenfist.daemons.database import main as database_main
+from shakenfist.daemons.network import maintain as network_maintain
+from shakenfist.daemons.network import workitem as network_workitem
+from shakenfist.daemons.queues import workitem as queues_workitem
+from shakenfist import constants
+from shakenfist import exceptions
 from shakenfist import mariadb
+from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.error_report import ErrorReport
+from shakenfist.operations.net_op import NetOp
+from shakenfist.operations.net_op import NoSuchNetwork
+from shakenfist.protos import database_pb2
+from shakenfist.schema.object_state import State
+from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.operations import net_op as net_op_schema
 from shakenfist.tests import base
 from shakenfist.tests import dbfixture
 
@@ -59,9 +75,12 @@ NODE_A_UUID = 'c0000000-0000-4000-8000-000000000001'
 NODE_B_UUID = 'c0000000-0000-4000-8000-000000000002'
 
 
-class CoalescingSQLTestCase(
-        dbfixture.MariaDBTableFixture, base.ShakenFistTestCase):
-    """The coalescing queries, run against a real database."""
+class CoalescingTables(dbfixture.MariaDBTableFixture):
+    """The tables the coalescing queries read, and a way to fill them.
+
+    A mixin rather than a test case, so a test case built on it does not
+    inherit, and run again, every test in ``CoalescingSQLTestCase``.
+    """
 
     def _build_engine(self):
         return self.build_engine(
@@ -121,6 +140,10 @@ class CoalescingSQLTestCase(
                     'operation_uuid': op_uuid,
                 },
                 created_at=created_at))
+
+
+class CoalescingSQLTestCase(CoalescingTables, base.ShakenFistTestCase):
+    """The coalescing queries, run against a real database."""
 
     def test_the_two_tables_really_do_store_uuids_differently(self):
         # The premise every other test here rests on. If this ever stops
@@ -731,3 +754,658 @@ class CoalescingSQLTestCase(
             mariadb._direct_find_existing_coalescible_op(
                 'net_op', [('network_uuid', NETWORK_UUID)], TASK,
                 ['user_waiting', 'user_facing']))
+
+
+MESH_TASK = 'network_ensure_mesh'
+CREATE_TASK = 'network_apply_create_network_node'
+NODE_A_QUEUE_BACKGROUND = f'{NODE_A_UUID}-network-background'
+NODE_A_QUEUE_USER_FACING = f'{NODE_A_UUID}-network-user_facing'
+CLUSTER_WIDE_QUEUE = 'networknode-clusteroperation-user_facing'
+DEPENDENT_UUID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+
+
+class FakeRpcError(grpc.RpcError):
+    def __init__(self, code: grpc.StatusCode) -> None:
+        self._code = code
+
+    def code(self) -> grpc.StatusCode:
+        return self._code
+
+
+class _Crash(BaseException):
+    """Stands in for the process dying, which no except clause catches."""
+
+
+class FoldHarness(CoalescingTables, base.ShakenFistTestCase):
+    """The fold and what follows it, through a real ``NetOp.execute()``.
+
+    Issue #4638: the fold used to set its siblings ``complete`` before the
+    survivor had run a single task, so a dependent of a sibling was
+    released as soon as the survivor started and went ahead even if the
+    survivor then failed. These tests run the production fold statement,
+    the real state machine and the real dispatchers against one sqlite
+    database, so every state a waiter reads is the state the code wrote.
+
+    Only the edges are faked: ``_direct_set_state`` (its upsert is MySQL
+    only), the persisted error reports, work item re-enqueue, events, and
+    the network the tasks act on.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.engine = self._build_engine()
+        self.errors: dict[str, ErrorReport] = {}
+        self.enqueued: list[tuple[str, dict[str, Any]]] = []
+        self.failing_state_writes: set[str] = set()
+
+        self.mock_get_engine = self._patch(
+            'shakenfist.mariadb._get_engine', return_value=self.engine)
+        self._patch('shakenfist.mariadb._use_database_service',
+                    return_value=False)
+        self._patch('shakenfist.mariadb._direct_set_state',
+                    side_effect=self._set_state)
+        self._patch('shakenfist.mariadb.set_cluster_operation_error',
+                    side_effect=self._set_error)
+        self._patch('shakenfist.mariadb.get_cluster_operation_error',
+                    side_effect=lambda op_uuid: self.errors.get(str(op_uuid)))
+        self._patch('shakenfist.mariadb.enqueue_work_item',
+                    side_effect=self._enqueue_work_item)
+        self._patch(
+            'shakenfist.operations.baseoperation.eventlog.add_event_multi')
+        self._patch('shakenfist.operations.net_op.add_event_multi')
+        p = mock.patch.object(BaseClusterOperation, 'add_event')
+        p.start()
+        self.addCleanup(p.stop)
+
+        network = mock.MagicMock()
+        network.uuid = NETWORK_UUID
+        network.state.value = 'created'
+        network.ACTIVE_STATES = {'created'}
+        self.mock_network_class = self._patch(
+            'shakenfist.operations.net_op.Network')
+        self.mock_network_class.from_db.return_value = network
+        self.vxlan = self._patch(
+            'shakenfist.operations.net_op.BridgedVXLanNetwork').return_value
+
+    def _patch(self, target: str, **kwargs: Any) -> Any:
+        p = mock.patch(target, **kwargs)
+        started = p.start()
+        self.addCleanup(p.stop)
+        return started
+
+    # -- the faked edges ------------------------------------------------
+
+    def _set_state(self, object_type: ObjectType, object_uuid: str,
+                   state: State) -> bool:
+        if object_uuid in self.failing_state_writes:
+            return False
+        states = mariadb._get_object_states_table()
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                sa.update(states)
+                .where(states.c.object_type == object_type)
+                .where(states.c.object_uuid == object_uuid)
+                .values(state_value=state.value,
+                        update_time=state.update_time,
+                        message=state.message))
+            if result.rowcount == 0:
+                conn.execute(sa.insert(states).values(
+                    object_uuid=object_uuid, object_type=object_type,
+                    state_value=state.value, update_time=state.update_time,
+                    message=state.message))
+            conn.commit()
+        return True
+
+    def _set_error(self, op_uuid: str, report: ErrorReport) -> bool:
+        self.errors[str(op_uuid)] = report
+        return True
+
+    def _enqueue_work_item(self, queue_name: str, work_item: dict[str, Any],
+                           delay: float = 0) -> None:
+        self.enqueued.append((queue_name, work_item))
+
+    # -- building and reading operations -------------------------------
+
+    def _insert_net_op(self, op_uuid: str, tasks: tuple[str, ...],
+                       node_uuid: Optional[str], priority: str,
+                       created_at: float = 100.0,
+                       depends_on: Optional[list[dict[str, str]]] = None
+                       ) -> None:
+        """A NetOp row complete enough for ``NetOp.from_db()`` to load."""
+        ops = mariadb._get_cluster_operations_table()
+        with self.engine.connect() as conn:
+            self._insert_op(conn, op_uuid, tasks=tasks, node_uuid=node_uuid,
+                            priority=priority, created_at=created_at)
+            conn.execute(
+                sa.update(ops)
+                .where(ops.c.uuid == uuid.UUID(op_uuid))
+                .values(metadata_json={
+                    'tasks': list(tasks),
+                    'network_uuid': NETWORK_UUID,
+                    'node_uuid': node_uuid,
+                    'priority': priority,
+                    'request_id': None,
+                    'depends_on': depends_on,
+                    'runs_after': None,
+                    'version': net_op_schema.current_version,
+                }))
+            conn.commit()
+
+    def _load(self, op_uuid: str, queue_name: Optional[str] = None,
+              batch_size: Optional[int] = None) -> NetOp:
+        op = NetOp.from_db(op_uuid)
+        self.assertIsNotNone(op)
+        if queue_name is not None:
+            op.queue_name = queue_name
+        op.dispatcher_batch_size = batch_size
+        return op
+
+    def _state_row(self, op_uuid: str) -> Any:
+        states = mariadb._get_object_states_table()
+        with self.engine.connect() as conn:
+            return conn.execute(
+                sa.select(states.c.state_value, states.c.message)
+                .where(states.c.object_uuid == op_uuid)).fetchone()
+
+    def _state_of(self, op_uuid: str) -> str:
+        return self._state_row(op_uuid).state_value
+
+    def _has_work_queue_row(self, op_uuid: str) -> bool:
+        work_queue = mariadb._get_work_queue_table()
+        with self.engine.connect() as conn:
+            payloads = conn.execute(
+                sa.select(work_queue.c.payload)).scalars().all()
+        return any(p.get('operation_uuid') == op_uuid for p in payloads)
+
+    def _per_node_pair(self) -> NetOp:
+        """Proof [4]'s shape: the maintainer's background mesh repair is
+        the survivor, and a user_facing ensure_mesh for the same network
+        and node -- the one an instance create names in depends_on -- is
+        the sibling it folds. #4033 is what lets the two coexist."""
+        self._insert_net_op(SURVIVOR_UUID, (MESH_TASK,), NODE_A_UUID,
+                            'background', created_at=100.0)
+        self._insert_net_op(SIBLING_UUID, (MESH_TASK,), NODE_A_UUID,
+                            'user_facing', created_at=150.0)
+        return self._load(SURVIVOR_UUID, NODE_A_QUEUE_BACKGROUND, 2)
+
+    def _run_through_network_dispatcher(self, op: Any, queue_name: str
+                                        ) -> None:
+        job = network_workitem.Job.__new__(network_workitem.Job)
+        job.log = mock.MagicMock()
+        job._cluster_operation_execute(queue_name, op, 1, {})
+
+    def _dependent(self) -> mock.MagicMock:
+        """An operation which, like instance_create, names the sibling in
+        depends_on."""
+        dependent = mock.MagicMock()
+        dependent.uuid = DEPENDENT_UUID
+        dependent.state.value = BaseClusterOperation.STATE_QUEUED
+        dependent.is_outstanding.return_value = True
+        dependent.depends_on = [
+            {'op_type': 'net_op', 'op_uuid': SIBLING_UUID}]
+        dependent.runs_after = []
+        dependent.current_defer_count = 0
+        return dependent
+
+
+class FoldLifecycleTestCase(FoldHarness):
+    """What a folded sibling, and everything waiting on it, sees."""
+
+    # -- what a sibling reads while the survivor works -----------------
+
+    def test_fold_leaves_sibling_executing_at_survivor_dispatch(self):
+        # The regression for proof [4] of the issue: at the moment the
+        # survivor's task runs, the sibling used to read complete.
+        survivor = self._per_node_pair()
+        seen: dict[str, Any] = {}
+        self.vxlan._apply_ensure_mesh.side_effect = (
+            lambda: seen.setdefault('row', self._state_row(SIBLING_UUID)))
+
+        survivor.execute()
+
+        self.assertEqual('ran', survivor.coalesce_outcome)
+        self.assertEqual(1, survivor.coalesce_folded)
+        self.assertEqual('executing', seen['row'].state_value)
+        self.assertEqual(
+            f'coalesced into {SURVIVOR_UUID}', seen['row'].message)
+
+    def test_survivor_success_completes_folded_siblings(self):
+        survivor = self._per_node_pair()
+
+        survivor.execute()
+
+        self.assertEqual('complete', self._state_of(SURVIVOR_UUID))
+        row = self._state_row(SIBLING_UUID)
+        self.assertEqual('complete', row.state_value)
+        # The terminal row still says which operation did the work.
+        self.assertEqual(f'coalesced into {SURVIVOR_UUID}', row.message)
+        self.vxlan._apply_ensure_mesh.assert_called_once()
+        # A waiter is released, without an error, only now.
+        self.assertIsNone(
+            self._load(SIBLING_UUID).raise_for_error(timeout=0))
+
+    # -- every other survivor outcome leaves the sibling alone ---------
+
+    def test_survivor_error_leaves_sibling_executing_with_row(self):
+        survivor = self._per_node_pair()
+        self.vxlan._apply_ensure_mesh.side_effect = Exception('fdb write')
+
+        survivor.execute()
+
+        self.assertEqual('error', self._state_of(SURVIVOR_UUID))
+        self.assertEqual('executing', self._state_of(SIBLING_UUID))
+        # The survivor's failure is the survivor's: nothing is written
+        # against the sibling, which has not run yet.
+        self.assertIn(SURVIVOR_UUID, self.errors)
+        self.assertNotIn(SIBLING_UUID, self.errors)
+        # The fold never touches work_queue, so the sibling can still run.
+        self.assertTrue(self._has_work_queue_row(SIBLING_UUID))
+
+    def test_survivor_defer_leaves_sibling_executing(self):
+        # The benign interface race: EnsureMeshFailed on an active network
+        # defers the survivor back to queued.
+        survivor = self._per_node_pair()
+        self.vxlan._apply_ensure_mesh.side_effect = (
+            exceptions.EnsureMeshFailed('Cannot find device'))
+
+        survivor.execute()
+
+        self.assertEqual('queued', self._state_of(SURVIVOR_UUID))
+        self.assertEqual(
+            [NODE_A_QUEUE_BACKGROUND], [q for q, _ in self.enqueued])
+        self.assertEqual('executing', self._state_of(SIBLING_UUID))
+        self.assertTrue(self._has_work_queue_row(SIBLING_UUID))
+
+    def test_survivor_raise_leaves_sibling_executing(self):
+        survivor = self._per_node_pair()
+        self.mock_network_class.from_db.return_value = None
+
+        self.assertRaises(NoSuchNetwork, survivor.execute)
+
+        self.assertEqual('executing', self._state_of(SIBLING_UUID))
+        self.assertTrue(self._has_work_queue_row(SIBLING_UUID))
+
+    def test_multi_task_survivor_failing_first_task_does_not_complete_sibling(
+            self):
+        # Network creation enqueues [create_network_node, ensure_mesh] on
+        # the cluster-wide queue, and folds a cluster-wide ensure_mesh. If
+        # the first task fails the mesh task never runs, so neither does
+        # the sibling's work.
+        self._insert_net_op(SURVIVOR_UUID, (CREATE_TASK, MESH_TASK), None,
+                            'user_facing')
+        self._insert_net_op(SIBLING_UUID, (MESH_TASK,), None, 'user_facing',
+                            created_at=150.0)
+        survivor = self._load(SURVIVOR_UUID, CLUSTER_WIDE_QUEUE, 2)
+        self.vxlan._apply_create_on_network_node.side_effect = (
+            Exception('dnsmasq'))
+
+        survivor.execute()
+
+        self.assertEqual(1, survivor.coalesce_folded)
+        self.vxlan._apply_ensure_mesh.assert_not_called()
+        self.assertEqual('error', self._state_of(SURVIVOR_UUID))
+        self.assertEqual('executing', self._state_of(SIBLING_UUID))
+
+    # -- waiters follow the sibling's own outcome ----------------------
+
+    def test_dependent_defers_on_folded_dependency(self):
+        # Both dispatchers, asked to run a dependent while the survivor is
+        # mid-task, must wait rather than proceed.
+        survivor = self._per_node_pair()
+        outcomes: dict[str, mock.MagicMock] = {}
+
+        def run_dependents() -> None:
+            dependent = self._dependent()
+            self._run_through_network_dispatcher(
+                dependent, NODE_A_QUEUE_USER_FACING)
+            outcomes['sf-net'] = dependent
+
+            dependent = self._dependent()
+            job = queues_workitem.Job.__new__(queues_workitem.Job)
+            job.queue_name = f'{NODE_A_UUID}-clusteroperation-user_facing'
+            job.batch_size = None
+            job.log = mock.MagicMock()
+            job.workitem = {'operation_type': 'node_inst_netdesc_op',
+                            'operation_uuid': DEPENDENT_UUID,
+                            'defer_count': 0}
+            dependent_class = mock.MagicMock()
+            dependent_class.from_db.return_value = dependent
+            with mock.patch(
+                    'shakenfist.daemons.queues.workitem.get_object_class',
+                    side_effect=lambda t: (
+                        dependent_class if t == 'node_inst_netdesc_op'
+                        else constants.get_object_class(t))):
+                job._cluster_operation_execute()
+            outcomes['sf-queues'] = dependent
+
+        self.vxlan._apply_ensure_mesh.side_effect = run_dependents
+        survivor.execute()
+
+        for dispatcher, dependent in outcomes.items():
+            with self.subTest(dispatcher=dispatcher):
+                dependent.defer.assert_called_once()
+                (waited_on,) = dependent.defer.call_args.kwargs['waiting_on']
+                self.assertEqual(SIBLING_UUID, str(waited_on.uuid))
+                dependent.execute.assert_not_called()
+                dependent.abort_for_unsuitable_dependency.assert_not_called()
+        self.assertEqual({'sf-net', 'sf-queues'}, set(outcomes))
+
+    def test_dependent_aborts_when_self_run_sibling_errors(self):
+        survivor = self._per_node_pair()
+        self.vxlan._apply_ensure_mesh.side_effect = Exception('fdb write')
+        survivor.execute()
+
+        dependent = self._dependent()
+        self._run_through_network_dispatcher(
+            dependent, NODE_A_QUEUE_USER_FACING)
+        dependent.defer.assert_called_once()
+        dependent.abort_for_unsuitable_dependency.assert_not_called()
+
+        # The sibling's own work item comes up and it runs, and fails, by
+        # itself.
+        self._run_through_network_dispatcher(
+            self._load(SIBLING_UUID), NODE_A_QUEUE_USER_FACING)
+        self.assertEqual('error', self._state_of(SIBLING_UUID))
+
+        dependent = self._dependent()
+        self._run_through_network_dispatcher(
+            dependent, NODE_A_QUEUE_USER_FACING)
+        dependent.abort_for_unsuitable_dependency.assert_called_once()
+        (dep_op,) = dependent.abort_for_unsuitable_dependency.call_args.args
+        self.assertEqual(SIBLING_UUID, str(dep_op.uuid))
+        dependent.execute.assert_not_called()
+
+    def test_raise_for_error_on_sibling_follows_real_outcome(self):
+        survivor = self._per_node_pair()
+        self.vxlan._apply_ensure_mesh.side_effect = Exception('fdb write')
+        survivor.execute()
+
+        # Not done, so a waiter keeps waiting rather than returning.
+        self.assertRaises(
+            exceptions.OperationTimeout,
+            self._load(SIBLING_UUID).raise_for_error, timeout=0)
+
+        self._run_through_network_dispatcher(
+            self._load(SIBLING_UUID), NODE_A_QUEUE_USER_FACING)
+
+        with self.assertRaises(exceptions.NetworkOperationFailed) as ctx:
+            self._load(SIBLING_UUID).raise_for_error(timeout=0)
+        # The report is the sibling's own, from its own run.
+        self.assertIs(self.errors[SIBLING_UUID], ctx.exception.error_report)
+        self.assertEqual(2, self.vxlan._apply_ensure_mesh.call_count)
+
+    # -- completing the siblings ---------------------------------------
+
+    def test_propagation_skips_sibling_no_longer_executing(self):
+        survivor = self._per_node_pair()
+
+        def delete_sibling() -> None:
+            self._load(SIBLING_UUID).state = 'deleted'
+
+        self.vxlan._apply_ensure_mesh.side_effect = delete_sibling
+        survivor.log = mock.MagicMock()
+        survivor.execute()
+
+        self.assertEqual('complete', self._state_of(SURVIVOR_UUID))
+        self.assertEqual('deleted', self._state_of(SIBLING_UUID))
+        # A sibling which ended some other way is skipped, not reported
+        # as a failure to complete it: deletion mid-run is ordinary.
+        survivor.log.with_fields.return_value.warning.assert_not_called()
+
+    def test_propagation_failure_does_not_fail_survivor(self):
+        real_get = mariadb._direct_get_cluster_operation
+
+        def unreadable_sibling(op_uuid: Any) -> Any:
+            if str(op_uuid) == SIBLING_UUID:
+                raise exceptions.DatabaseUnavailable('gone')
+            return real_get(op_uuid)
+
+        for failure in ('state write', 'database unavailable'):
+            with self.subTest(failure=failure):
+                self.engine = self._build_engine()
+                self.mock_get_engine.return_value = self.engine
+                survivor = self._per_node_pair()
+
+                if failure == 'state write':
+                    self.failing_state_writes = {SIBLING_UUID}
+                    survivor.execute()
+                    self.failing_state_writes = set()
+                else:
+                    with mock.patch(
+                            'shakenfist.mariadb._direct_get_cluster_operation',
+                            side_effect=unreadable_sibling):
+                        survivor.execute()
+
+                self.assertEqual('complete', self._state_of(SURVIVOR_UUID))
+                # Left to run itself, exactly as after a survivor failure.
+                self.assertEqual('executing', self._state_of(SIBLING_UUID))
+                self.assertTrue(self._has_work_queue_row(SIBLING_UUID))
+
+    def test_crash_between_fold_and_propagation_self_heals(self):
+        survivor = self._per_node_pair()
+        with mock.patch.object(BaseClusterOperation,
+                               '_complete_folded_siblings',
+                               side_effect=_Crash):
+            self.assertRaises(_Crash, survivor.execute)
+        self.assertEqual('complete', self._state_of(SURVIVOR_UUID))
+        self.assertEqual('executing', self._state_of(SIBLING_UUID))
+
+        self._run_through_network_dispatcher(
+            self._load(SIBLING_UUID), NODE_A_QUEUE_USER_FACING)
+
+        self.assertEqual('complete', self._state_of(SIBLING_UUID))
+        self.assertEqual(2, self.vxlan._apply_ensure_mesh.call_count)
+
+    # -- an old sf-database -------------------------------------------
+
+    def test_fold_rpc_unimplemented_skips_fold(self):
+        real_grpc_fold = mariadb._grpc_fold_coalescible_siblings
+        survivor = self._per_node_pair()
+        seen: dict[str, str] = {}
+        self.vxlan._apply_ensure_mesh.side_effect = (
+            lambda: seen.setdefault('state', self._state_of(SIBLING_UUID)))
+
+        with mock.patch('shakenfist.mariadb.fold_coalescible_siblings',
+                        side_effect=real_grpc_fold), \
+                mock.patch('shakenfist.mariadb._get_database_stub') as stub, \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           side_effect=FakeRpcError(
+                               grpc.StatusCode.UNIMPLEMENTED)) as call:
+            survivor.execute()
+
+        self.assertEqual('coalescing_unavailable', survivor.coalesce_outcome)
+        # One call, to the fold: no fallback to an RPC which would mark
+        # the sibling complete up front.
+        call.assert_called_once()
+        self.assertIs(
+            stub.return_value.FoldCoalescibleSiblings, call.call_args.args[0])
+        self.assertEqual('queued', seen['state'])
+        self.assertEqual('queued', self._state_of(SIBLING_UUID))
+        self.assertEqual('complete', self._state_of(SURVIVOR_UUID))
+
+    # -- the #4303 orphan pass ----------------------------------------
+
+    def test_orphan_stmt_ignores_executing_sibling_with_row(self):
+        # A sibling left executing by a failed survivor still has its
+        # work_queue row, so it is not an orphan however long it waits.
+        survivor = self._per_node_pair()
+        self.vxlan._apply_ensure_mesh.side_effect = Exception('fdb write')
+        survivor.execute()
+
+        states = mariadb._get_object_states_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(states)
+                         .where(states.c.object_uuid == SIBLING_UUID)
+                         .values(update_time=100.0))
+            conn.commit()
+        self.assertEqual('executing', self._state_of(SIBLING_UUID))
+
+        orphans = mariadb._direct_list_orphaned_cluster_operations(1800.0)
+        self.assertNotIn(SIBLING_UUID, [o['uuid'] for o in orphans])
+
+        # The control: it is the row, not the state, that protects it.
+        work_queue = mariadb._get_work_queue_table()
+        with self.engine.connect() as conn:
+            for row in conn.execute(sa.select(work_queue)).fetchall():
+                if row.payload.get('operation_uuid') == SIBLING_UUID:
+                    conn.execute(sa.delete(work_queue)
+                                 .where(work_queue.c.id == row.id))
+            conn.commit()
+        orphans = mariadb._direct_list_orphaned_cluster_operations(1800.0)
+        self.assertIn(SIBLING_UUID, [o['uuid'] for o in orphans])
+
+
+class FoldCircuitBreakerTestCase(FoldHarness):
+    """The network maintainer's circuit breaker reads terminal NetOp states
+    on the network. A sibling marked complete at fold time reads as a
+    success there even when the survivor failed, and so resets a streak
+    of failed repairs."""
+
+    CIRCUIT_K = 5
+
+    def _build_engine(self) -> sa.Engine:
+        return self.build_engine(
+            [mariadb._get_object_states_table,
+             mariadb._get_cluster_operations_table,
+             mariadb._get_work_queue_table,
+             mariadb._get_cluster_operation_targets_table],
+            json_shims=True, autoincrement_bigint_keys=True)
+
+    def _target(self, op_uuid: str) -> None:
+        targets = mariadb._get_cluster_operation_targets_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.insert(targets).values(
+                operation_uuid=op_uuid, operation_type='net_op',
+                target_object_type=ObjectType.NETWORK,
+                target_uuid=NETWORK_UUID, created_at=100.0))
+            conn.commit()
+
+    def _guard_fires_after_a_failed_survivor(self) -> bool:
+        states = mariadb._get_object_states_table()
+        for i in range(self.CIRCUIT_K - 1):
+            failed = f'eeeeeeee-eeee-4eee-8eee-{i:012d}'
+            self._insert_net_op(failed, (MESH_TASK,), NODE_A_UUID,
+                                'background', created_at=10.0 + i)
+            with self.engine.connect() as conn:
+                conn.execute(sa.update(states)
+                             .where(states.c.object_uuid == failed)
+                             .values(state_value='error',
+                                     update_time=10.0 + i))
+                conn.commit()
+            self._target(failed)
+
+        survivor = self._per_node_pair()
+        self._target(SURVIVOR_UUID)
+        self._target(SIBLING_UUID)
+        self.vxlan._apply_ensure_mesh.side_effect = Exception('fdb write')
+        survivor.execute()
+        self.assertEqual('error', self._state_of(SURVIVOR_UUID))
+
+        n = mock.MagicMock()
+        n.uuid = NETWORK_UUID
+        job = network_maintain.Job.__new__(network_maintain.Job)
+        with mock.patch(
+                'shakenfist.daemons.network.maintain.config') as mock_config:
+            # No cooldown, so only the circuit breaker can fire.
+            mock_config.MAINTAIN_RECONCILE_COOLDOWN_SECONDS = 0
+            mock_config.MAINTAIN_RECONCILE_CIRCUIT_K = self.CIRCUIT_K
+            return job._reconciliation_guard_fired(n, 'net_op')
+
+    def test_folded_sibling_does_not_break_circuit_breaker_streak(self):
+        self.assertTrue(self._guard_fires_after_a_failed_survivor())
+        self.assertEqual('executing', self._state_of(SIBLING_UUID))
+
+    def test_completing_at_fold_time_would_break_the_streak(self):
+        # The control, run with the fold the V2 RPC still does.
+        with mock.patch(
+                'shakenfist.mariadb.fold_coalescible_siblings',
+                side_effect=mariadb._direct_claim_coalescible_siblings):
+            self.assertFalse(self._guard_fires_after_a_failed_survivor())
+        self.assertEqual('complete', self._state_of(SIBLING_UUID))
+
+
+class FoldServicerTestCase(CoalescingTables, base.ShakenFistTestCase):
+    """The two servicers which fold, against the same rows."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.engine = self._build_engine()
+        p = mock.patch('shakenfist.mariadb._get_engine',
+                       return_value=self.engine)
+        p.start()
+        self.addCleanup(p.stop)
+
+        with self.engine.connect() as conn:
+            self._insert_op(conn, SURVIVOR_UUID, node_uuid=NODE_A_UUID)
+            self._insert_op(conn, SIBLING_UUID, node_uuid=NODE_A_UUID)
+            conn.commit()
+
+        self.monitor = mock.MagicMock()
+        self.monitor.counters = {
+            'fold_coalescible_siblings': mock.MagicMock(),
+            'claim_coalescible_siblings_v2': mock.MagicMock(),
+        }
+        self.servicer = database_main.DatabaseService(self.monitor)
+        self.request = database_pb2.ClaimCoalescibleSiblingsV2Request(
+            operation_type='net_op',
+            keys=[database_pb2.CoalescibleKeyPair(
+                      column='network_uuid', uuid=NETWORK_UUID),
+                  database_pb2.CoalescibleKeyPair(
+                      column='node_uuid', uuid=NODE_A_UUID)],
+            task_names=[TASK],
+            exclude_op_uuid=SURVIVOR_UUID)
+
+    def _rows(self) -> dict[str, Any]:
+        states = mariadb._get_object_states_table()
+        with self.engine.connect() as conn:
+            return {
+                r.object_uuid: r for r in conn.execute(sa.select(
+                    states.c.object_uuid, states.c.state_value,
+                    states.c.message)).fetchall()}
+
+    def test_fold_servicer_sets_executing_with_survivor_message(self):
+        reply = self.servicer.FoldCoalescibleSiblings(
+            self.request, mock.MagicMock())
+
+        self.assertEqual([SIBLING_UUID], list(reply.folded_op_uuids))
+        rows = self._rows()
+        self.assertEqual('executing', rows[SIBLING_UUID].state_value)
+        self.assertEqual(
+            f'coalesced into {SURVIVOR_UUID}', rows[SIBLING_UUID].message)
+        self.assertEqual('queued', rows[SURVIVOR_UUID].state_value)
+        self.monitor.counters['fold_coalescible_siblings'].inc.\
+            assert_called_once()
+        self.monitor.counters['claim_coalescible_siblings_v2'].inc.\
+            assert_not_called()
+
+        # And the counter is one the Monitor actually registers, because
+        # its list is hand maintained.
+        with mock.patch.object(database_main.daemon.WorkerPoolDaemon,
+                               '__init__', return_value=None), \
+                mock.patch.object(database_main, 'start_http_server'), \
+                mock.patch.object(database_main, 'Gauge'), \
+                mock.patch.object(database_main, 'Counter'):
+            monitor = database_main.Monitor('test')
+        self.assertIn('fold_coalescible_siblings', monitor.counters)
+
+    def test_v2_servicer_still_completes(self):
+        # A client from before the fold RPC keeps the contract it was
+        # built against until V2 is retired (#4639).
+        reply = self.servicer.ClaimCoalescibleSiblingsV2(
+            self.request, mock.MagicMock())
+
+        self.assertEqual([SIBLING_UUID], list(reply.folded_op_uuids))
+        rows = self._rows()
+        self.assertEqual('complete', rows[SIBLING_UUID].state_value)
+        self.assertEqual('coalesced into sibling op',
+                         rows[SIBLING_UUID].message)
+        self.monitor.counters['claim_coalescible_siblings_v2'].inc.\
+            assert_called_once()
+        self.monitor.counters['fold_coalescible_siblings'].inc.\
+            assert_not_called()
+
+    def test_an_unknown_folded_state_is_refused(self):
+        self.assertRaises(
+            ValueError, mariadb._direct_claim_coalescible_siblings,
+            'net_op', [('network_uuid', NETWORK_UUID)], [TASK],
+            SURVIVOR_UUID, folded_state='queued')
