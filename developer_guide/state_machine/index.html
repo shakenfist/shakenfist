@@ -15928,6 +15928,7 @@ the operation's own deadline, and is never taken by <code>execute</code> operati
   fetching of images from outside the cluster) also occurs.</li>
 <li><code>creating</code>: the instance is being created on the <code>node</code>.</li>
 <li><code>created</code>: the instance is now running.</li>
+<li><code>delete-wait</code>: the instance is being deleted on its <code>node</code>.</li>
 <li><code>deleted</code>: the instance is now deleted.</li>
 <li><code>error</code>: the instance is unable to be used.</li>
 </ul>
@@ -15951,6 +15952,17 @@ to <code>error</code>, and any of the <code>*-error</code> transition states to 
 or <code>deleted</code> as well as to <code>error</code>. An instance in <code>error</code> (or one of the
 transition states) may likewise be sent to <code>delete-wait</code> or <code>deleted</code> when the
 caller deletes it.</p>
+<p>A delete which cannot stop the instance's domain stops there, and the instance
+stays in <code>delete-wait</code>, keeping its disks, interfaces and placement: removing
+the disks of a running guest, or releasing the memory and CPU it still holds,
+would be worse than a slow delete. An instance deleted from an error state is
+moved to <code>delete-wait</code> too. Five minutes later the cleaner starts stopping the
+domain, one attempt a pass: a power off for two passes, then <code>virsh destroy</code> for
+two, then SIGKILL for two, after which it gives up with an error event. Once
+the domain stops it enqueues the delete again, which finishes as any delete of a
+stopped instance does, ending in <code>deleted</code>. An instance in <code>delete-wait-error</code>
+has no transition to <code>delete-wait</code>, so it stays errored, with its disks and
+placement, until it is deleted again.</p>
 <p>The following transitions are possible (note that hyphens have been replaced with
 underscores in some state names due to limitations in the diagram renderer):</p>
 <pre class="mermaid"><code>stateDiagram-v2
