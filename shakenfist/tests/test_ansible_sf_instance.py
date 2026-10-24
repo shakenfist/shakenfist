@@ -1168,12 +1168,12 @@ class SfInstanceAwaitRecordGoneTestCase(base.ShakenFistTestCase):
 class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
     """capacity_wait replays a create refused for capacity, and only that.
 
-    Phase 0 of the placeable claims plan found that every in-job capacity
-    refusal failed its build outright, although most would have been
-    placed within half an hour. The module now waits, when asked to, for a
-    507 the server marked transient and for a preflight abort for capacity
-    -- and with capacity_wait at its default of 0 behaves exactly as it
-    did before the option existed.
+    A week of CI under-cloud refusals measured in October 2026 found that
+    every in-job capacity refusal failed its build outright, although most
+    would have been placed within half an hour. The module now waits, when
+    asked to, for a 507 the server marked transient and for a preflight
+    abort for capacity -- and with capacity_wait at its default of 0
+    behaves exactly as it did before the option existed.
     """
 
     PARAMS = dict(SfInstanceCreateBudgetTestCase.PARAMS)

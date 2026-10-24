@@ -158,7 +158,13 @@ class ClusterOperationTablesFixture(dbfixture.MariaDBTableFixture):
 
 class ObservationalCurrentStateTestCase(
         ClusterOperationTablesFixture, base.ShakenFistTestCase):
-    """Decision 8's behaviour test, against real SQL."""
+    """Observational ops hide from the current-state readers, in real SQL.
+
+    An all-observational op enqueued after a mutating one changes neither
+    which op get_latest names nor what has_pending reports, while an op
+    mixing the two kinds of task counts as mutating. The listings, which
+    are not current-state readers, still report every op with its flag.
+    """
 
     def _enqueue(self, op_uuid, tasks, model_class=_ObservingModel,
                  op_type='NODE_INST_OP', target_field='instance_uuid',
