@@ -23844,14 +23844,16 @@ def _direct_claim_coalescible_siblings(
     do: a key whose ``node_uuid`` is NULL matches only the cluster-wide
     operations, which one elected worker drains, and a key naming a node
     matches only that node's operations, which that node's own
-    dispatcher drains. A key which names neither -- the network alone,
-    for an operation doing node-local work -- would let a survivor on
-    one host fold away another host's genuinely different work.
+    dispatcher drains -- but only on the ``network`` family, because the
+    queue family decides which dispatcher that is. A key which names
+    neither -- the network alone, for an operation doing node-local
+    work -- would let a survivor on one host fold away another host's
+    genuinely different work.
 
-    Two guards keep that from happening, and both are key-aware rather
-    than queue-aware: ``InvalidCoalescibleEnqueue`` in
+    Two guards keep that from happening, and both are key-aware and
+    family-aware: ``InvalidCoalescibleEnqueue`` in
     ``schema/operations/net_op.py`` refuses to enqueue a coalescible
-    task where its key cannot distinguish the target, and
+    task where its key and queue family cannot distinguish the target, and
     ``BaseClusterOperation.execute`` records
     ``key_cannot_distinguish_queue`` and skips the fold rather than
     issuing this statement. The full four-link argument is written out

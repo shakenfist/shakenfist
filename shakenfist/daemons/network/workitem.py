@@ -102,12 +102,15 @@ class Job(util_concurrency.Job):
         #           anywhere, because the only thread which could be
         #           executing it is the one doing the folding.
         #
-        #      Both guards enforcing this are key-aware, not queue-aware:
+        #      Both guards enforcing this are key-aware and family-aware:
         #      InvalidCoalescibleEnqueue in schema/operations/net_op.py
-        #      refuses the enqueue, and BaseClusterOperation.execute()
-        #      records key_cannot_distinguish_queue and skips the fold.
-        #      Weaken either only by strengthening the key, never by
-        #      arguing from this invariant alone -- link (iv) is this
+        #      refuses the enqueue unless the key names node_uuid and the
+        #      family is 'network', and BaseClusterOperation.execute()
+        #      records key_cannot_distinguish_queue and skips the fold
+        #      unless the queue is {node_uuid}-network-*. A key naming
+        #      node_uuid is necessary but not sufficient: the queue family
+        #      decides which dispatcher drains the work. Weaken neither
+        #      by arguing from this invariant alone -- link (iv) is this
         #      invariant, and it is one link of four.
         #
         #      The argument does NOT extend to sf-queues, and that is a
@@ -123,8 +126,8 @@ class Job(util_concurrency.Job):
         #      for which state_targets has no edge. That is why
         #      NodeNetOp.network_apply_create_hypervisor is not
         #      coalescible even though its model already carries both key
-        #      columns. The design record is in
-        #      docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
+        #      columns. Revisiting that is tracked in
+        #      issue #4017.
         #
         # Additionally each queue is drained by exactly ONE dispatcher
         # process: per-node {node_uuid}-network-* queues only by that node's

@@ -673,9 +673,10 @@ class InvalidCoalescibleEnqueue(Exception):
     queue column -- so the coalescing key has to do that job instead. It
     does on the cluster-wide network-node queue, where one elected
     worker drains everything, and on a per-node queue when the key names
-    ``node_uuid`` and the operation carries one. A coalescible task
-    enqueued anywhere else is folded across nodes and one host's work is
-    silently never applied. This is a programming error in the
+    ``node_uuid``, the operation carries one and the family is
+    ``network`` (the queue family decides which dispatcher drains it).
+    A coalescible task enqueued anywhere else is folded across nodes and
+    one host's work is silently never applied. This is a programming error in the
     declaration or the call site, not a runtime condition, and it is
     raised rather than logged because the damage it prevents (a stale
     FDB on one hypervisor) is invisible until something else fails much
