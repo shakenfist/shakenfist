@@ -10,6 +10,13 @@
 # ever removed, in-use copies are never removed, and a blob with no
 # copies left anywhere is recorded as errored instead of being listed as
 # under replicated forever.
+#
+# Issue 4626: blob locations are node names but instance placements are
+# node UUIDs, and the pruner compared the two directly, so no copy was
+# ever seen as in use and copies backing running instances were removed.
+# The in-use tests below therefore use those two real shapes: a test
+# which places an instance on a node name passes whether or not the
+# pruner resolves placements, which is how the bug went unnoticed.
 
 import threading
 from unittest import mock
@@ -20,6 +27,24 @@ from shakenfist.tests import base
 
 
 BLOB_UUID_1 = '11111111-1111-4111-8111-111111111111'
+
+# Node UUID to node name, as Node.from_db() would resolve them.
+NODES = {
+    'aaaaaaaa-aaaa-4aaa-8aaa-000000000001': 'sf-1',
+    'aaaaaaaa-aaaa-4aaa-8aaa-000000000002': 'sf-2',
+    'aaaaaaaa-aaaa-4aaa-8aaa-000000000003': 'sf-3',
+}
+NODE_UUIDS = {name: node_uuid for node_uuid, name in NODES.items()}
+
+
+def _fake_node_from_db(identifier, suppress_failure_audit=False):
+    name = NODES.get(identifier)
+    if not name:
+        return None
+    n = mock.MagicMock()
+    n.uuid = identifier
+    n.fqdn = name
+    return n
 
 
 def _pass_mocks(func):
@@ -53,8 +78,7 @@ class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
 
     def _run_pass(self, mock_mariadb, mock_ipam, mock_network, mock_artifact,
                   mock_instance, mock_blob, mock_low_disk, mock_nodes,
-                  the_blob, low_disk_nodes, blob_usage=None,
-                  instance_node=None):
+                  the_blob, low_disk_nodes, instance_nodes=None):
         # The orphan artifact sweep lists namespaces once per pass and
         # treats an empty list as an unreadable one, skipping the rest
         # of the cleanup. A bare MagicMock iterates empty, so this has
@@ -65,11 +89,18 @@ class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
         mock_ipam.IPAMs.return_value = []
         mock_network.floating_network.return_value = None
         mock_artifact.Artifacts.return_value = []
-        mock_instance.instance_blob_usage.return_value = blob_usage or {}
-        if instance_node:
+        # instance_nodes maps the uuid of each instance using the blob to
+        # the node its placement records.
+        instance_nodes = instance_nodes or {}
+        mock_instance.instance_blob_usage.return_value = (
+            {BLOB_UUID_1: list(instance_nodes)} if instance_nodes else {})
+
+        def fake_instance_from_db(instance_uuid):
             i = mock.MagicMock()
-            i.placement = {'node': instance_node}
-            mock_instance.Instance.from_db.return_value = i
+            i.placement = {'node': instance_nodes[instance_uuid]}
+            return i
+
+        mock_instance.Instance.from_db.side_effect = fake_instance_from_db
         mock_low_disk.return_value = low_disk_nodes
         mock_nodes.return_value = []
 
@@ -79,7 +110,9 @@ class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
         mock_blob.from_db.return_value = the_blob
 
         m = self._make_monitor()
-        m._cluster_wide_cleanup(last_loop_run=0)
+        with mock.patch('shakenfist.daemons.cluster.main.Node.from_db',
+                        side_effect=_fake_node_from_db):
+            m._cluster_wide_cleanup(last_loop_run=0)
 
     def _make_blob(self, locations, incomplete_nodes, state=dbo.STATE_CREATED):
         b = mock.MagicMock()
@@ -135,9 +168,30 @@ class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
             mock_mariadb, mock_ipam, mock_network, mock_artifact,
             mock_instance, mock_blob, mock_low_disk, mock_nodes, b,
             low_disk_nodes=['sf-2', 'sf-1', 'sf-3'],
-            blob_usage={BLOB_UUID_1: ['fake-instance-uuid']},
-            instance_node='sf-2')
+            instance_nodes={'fake-instance-uuid': NODE_UUIDS['sf-2']})
         b.drop_node_location.assert_called_once_with('sf-1')
+
+    @_pass_mocks
+    def test_copies_in_use_everywhere_are_never_pruned(
+            self, mock_mariadb, mock_ipam, mock_network,
+            mock_remove_uploads, mock_artifact, mock_instance, mock_blob,
+            mock_low_disk, mock_nodes):
+        # The issue 4626 incident: three copies against a factor of two,
+        # every node low on disk, and instances using the blob on all
+        # three. Every copy is a running instance's backing file, so
+        # none of them may be removed however over replicated the blob
+        # looks.
+        b = self._make_blob(['sf-1', 'sf-2', 'sf-3'], [])
+        self._run_pass(
+            mock_mariadb, mock_ipam, mock_network, mock_artifact,
+            mock_instance, mock_blob, mock_low_disk, mock_nodes, b,
+            low_disk_nodes=['sf-1', 'sf-2', 'sf-3'],
+            instance_nodes={
+                'fake-instance-1': NODE_UUIDS['sf-1'],
+                'fake-instance-2': NODE_UUIDS['sf-2'],
+                'fake-instance-3': NODE_UUIDS['sf-3'],
+            })
+        b.drop_node_location.assert_not_called()
 
     @_pass_mocks
     def test_lost_blob_is_errored_and_not_retried(
