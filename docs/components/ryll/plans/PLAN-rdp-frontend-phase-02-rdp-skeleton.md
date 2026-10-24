@@ -1271,6 +1271,17 @@ window 1024x768, which is the guest's resolution.
   items are recorded above. `origin/develop` had moved on by
   five commits (#587, #599); the merge preview shows no
   conflicting hunks, so the branch was not rebased.
+- **Landed in two pull requests.** #605 merged as `7b389b1` on
+  2026-10-22 with the automated review's first round still
+  open, because it was already in the merge queue; that round
+  landed as #607 (`c314094`, 2026-10-22). #607 releases the
+  keys and buttons a vanished client left held (including a
+  release the full input queue dropped), resets the pointer
+  for each new client of the same session, leaves a wildcard
+  bind address out of the self-signed certificate's names,
+  and warns once about Advanced Input wheel values that are
+  not in FreeRDP's encoding. Both merge commits are recorded
+  in the master plan's `Merged` cell for the push audit.
 
 ## Future work
 
@@ -1300,6 +1311,18 @@ window 1024x768, which is the guest's resolution.
 - **`--web` and `--headless` exclusivity** (#601).
 - **Headless audio** and the `ryll/Cargo.toml` pruning carried
   over from phase 1's *Future work*.
+- **Releases the input queue is still too full to take at
+  disconnect** are counted as dropped and logged, not retried.
+  If that shows up in practice, send them from a short-lived
+  task with `send().await` under a timeout, holding its own
+  clone of the session's handles (#607's review, declined
+  there as a new delivery mechanism).
+- **Wheel clicks split by a full input queue.** `wheel()`
+  sends each notch as a button 4 or 5 press and release; if
+  the queue takes the press and drops the release, nothing
+  releases it at disconnect, unlike the other buttons. Send
+  the pair one event at a time and record a press whose
+  release was dropped in the held record (#607's review).
 
 ## Back brief
 

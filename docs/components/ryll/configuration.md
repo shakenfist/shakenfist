@@ -82,6 +82,17 @@ binary must be built with the `rdp` feature (see
 a clear message. An operator guide is to come; this table is the flag
 reference.
 
+The RDP client sees the guest's display and can send keyboard and mouse
+input. It also gets the guest's cursor shape, which is sent as an RDP
+pointer (scaled down to fit 96x96 when larger) and hidden and shown with the
+guest's; the guest's cursor position is not sent, because the client draws
+the pointer where its own mouse is. ryll asks the guest to use the RDP
+client's desktop size: the size the client connects with, and the size its
+window changes to (FreeRDP needs `/dynamic-resolution` to send window
+changes). The guest only adopts a requested size if it runs vdagent. A
+connection whose size differs from the guest's sees a blank desktop for up to
+about 2 seconds at connect, before the client is resized to the guest's size.
+
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--rdp` | false | Run as a SPICE → RDP server. A reachability fallback for users with no SPICE client: it loses SPICE features such as USB redirection and folder sharing. Serves one client at a time; a second client waits until the first disconnects. Prints the address, username, password and certificate fingerprint at launch. Mutually exclusive with `--web` and `--headless`; `--control-socket` works with it |

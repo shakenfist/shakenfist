@@ -257,14 +257,60 @@ a blanket exclude is worse than none.
 
 The check applies only where a rewriting hook (`end-of-file-fixer`,
 `trailing-whitespace`, `mixed-line-ending`, `pretty-format-json`,
-`file-contents-sorter`) is configured. It tries each `exclude:` value
-as the regex pre-commit would apply and passes if any one matches both
-`.vscode/<user>.weaudit` and `.vscode/<user>.weaudit-shas.json`, so a
-top-level exclude still counts. A value that does not compile, or
-whose search does not finish within a few seconds, counts as no
-exclude: pre-commit would fail or hang on it too. Repositories without the tooling,
-without a `.pre-commit-config.yaml`, or running no rewriting hook are
-not applicable.
+`file-contents-sorter`) is configured, and requires every such hook
+to be protected: by an `exclude:` on its own entry or by the top-level
+`exclude:`, since an exclude on any other hook (gitleaks, say) does
+nothing for it. An exclude protects the hook if, tried as the regex
+pre-commit would apply, it matches both `.vscode/<user>.weaudit` and
+`.vscode/<user>.weaudit-shas.json`. A YAML block scalar
+(`exclude: |`) is read as the text it holds, not its indicator. A
+value that does not compile, or whose search does not finish within a
+few seconds, counts as no exclude: pre-commit would fail or hang on it
+too. Repositories without the tooling, without a
+`.pre-commit-config.yaml`, or running no rewriting hook are not
+applicable.
+
+### Review scope changes are reviewed
+
+**Measured** by `review-scope-ci`. In repositories with human review
+tracking deployed, a pull request that changes only
+`.vscode/review-scope.toml` must still reach the automated reviewer.
+The review state (`REVIEWS.md`, `.vscode/*.weaudit` and
+`.vscode/*.weaudit-shas.json`) may skip CI, as step 8 of
+[adopting a repository](/components/development/code-review-tracking/#adopting-a-repository)
+describes. The scope config may not. It is policy: it decides which
+files are subject to review at all, so a pull request that narrows it
+needs the same lint and review as one that changes code.
+
+The check reads every workflow that runs the automated reviewer on
+`pull_request`, or that calls a reusable reviewer workflow by a local
+path. That is also where the fleet runs lint. A workflow run only by
+the merge queue reviews nothing before it, and does not count. A
+workflow fails if a pull request changing only the scope config would
+skip it, in any of three ways:
+
+* the `pull_request` trigger's `paths-ignore` names it;
+* the trigger's `paths` does not name it;
+* a `dorny/paths-filter` job in the workflow excludes it with a `!`
+  pattern.
+
+Both lists are read as GitHub reads them: the last pattern that
+matches wins, and a `!` pattern takes back what an earlier one named.
+
+Patterns are matched with `**` crossing directories and `*` not.
+Every `!` list item in a workflow that uses `dorny/paths-filter` counts
+as a filter exclusion. So an inclusion-style filter (one that lists
+`src/**` and excludes nothing) is not seen, and a `!` re-inclusion in
+that workflow's trigger `paths-ignore` is misread as an exclusion. No
+repository in the fleet has either shape. Repositories without review
+tracking, or with no automated reviewer workflow, are not applicable.
+
+**Reviewed, not measured:** the other workflows. The adoption
+procedure drops the scope config from every pull request filter except
+the CodeQL template's, which skips it along with `docs/**` because
+CodeQL analyses neither. A workflow that runs only after a merge, such
+as a canary on push to the default branch, may still skip it: by then
+the change has been linted and reviewed.
 
 ### PyPI caching
 

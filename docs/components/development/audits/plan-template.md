@@ -45,7 +45,18 @@ version of each of:
   where the Execution phases are a table, added last so a row which
   omits it still reaches `Status`, or a `Merged:` line where they are
   prose sections. It never goes in the `Status` cell, which
-  `plan-status-vocabulary` reserves for a single term; and
+  `plan-status-vocabulary` reserves for a single term. Since v3 the
+  rule that a plan already in a terminal status is not reopened to
+  acquire the phase names all three terminal statuses (`Complete`,
+  `Abandoned` and `Superseded`), not `Complete` alone. Since v4 a
+  repository with no `PUSH-AUDIT.md` is no longer left to invent its
+  own checklist: the phase requires a floor of five items, applied to
+  the recorded landings -- that each landing takes one of the
+  recorded forms, that unattended work reports its own failure, that
+  no secret or token entered a repository and no private hostname or
+  address entered a more public one, that nothing removed has a
+  consumer left, and that publishing fails closed -- each with a
+  verdict or a reason it does not apply; and
 * **`plan-phase-landing`** -- that a phase is closed out in the first
   commit of the next phase rather than in a pull request of its own,
   so that the merge commit the `Merged` cell records is known by the
@@ -63,6 +74,11 @@ Repositories with no `PLAN-TEMPLATE.md` are N/A. Whether every project
 should have one is a separate decision, not smuggled in here: a
 template's project-specific half has to be written with real knowledge
 of the project, and an empty one is worse than none.
+
+A `PLAN-TEMPLATE.md` that is there but cannot be read -- over the 2 MB
+read limit, or a symlink out of the repository -- fails rather than
+being treated as absent: standing down would close an open issue about
+a file nobody could check.
 
 The roster is its own block because it changes on a different cadence
 -- models ship and retire while the effort ladder sits still. That is
@@ -84,6 +100,11 @@ written from them, which publish through mkdocs-material, so it renders
 as a proper callout -- whereas a repeated `### In this project` heading
 would mint duplicate anchor IDs and duplicate table-of-contents entries
 in every one of those plans.
+
+That justification applies to repositories whose plans publish through
+mkdocs. A repository that publishes nothing (one with no `mkdocs.yml`)
+may mark its project-specific runs with any non-heading marker, such as
+a bold lead-in paragraph. The check tests for neither form.
 
 Only the short runs trailing a shared block need the admonition. Whole
 sections that are project-specific in their entirety -- `## Prompt`,
@@ -107,8 +128,17 @@ Shared blocks are canonical wording embedded verbatim across
 repositories between `<!-- shared-block: <name> v<N> -->` and
 `<!-- shared-block-end -->` markers; the canonical copies live in
 `templates/shared-blocks/`, whose `README.md` describes the
-mechanism. The check fails when a required block is missing, stale,
-drifted from the canonical wording, unknown, or missing its end marker.
+mechanism. The check fails when a required block is missing, and
+when any embedded block is stale, has drifted from the canonical
+wording, is unknown, is embedded more than once, or has no end marker
+of its own. Each begin marker pairs with the first end marker after
+it, so a block left open when the next one begins -- never closed, or
+with another block nested inside it -- is reported as having no end
+marker rather than being measured against the next block's. Each
+problem names the one block it is about, and a stale, drifted or
+missing block's names the canonical file to copy. A version of more
+than six digits is not read as a marker, so a block carrying one is
+reported missing.
 
 ### Recently enforced
 

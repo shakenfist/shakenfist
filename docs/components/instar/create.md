@@ -8,7 +8,8 @@ image, modulo a documented divergence whitelist (filename, actual-size,
 vmdk per-invocation CIDs, vhdx log-size).
 
 Raw output is host-only — `open(O_CREAT|O_TRUNC) + ftruncate` plus
-optional preallocation — so it does not require KVM. Every other target
+optional preallocation — so it does not require KVM. A monolithicFlat
+VMDK is written on the host too (see [below](#monolithicflat)). Every other target
 format runs the `create.bin` guest in the KVM sandbox and writes the
 metadata via virtio-block.
 
@@ -45,7 +46,8 @@ Per-target option flags (alternatives to `-o`):
 
 `SIZE` accepts a suffix from `{b,K,M,G,T}` (e.g. `1G`, `512M`). It is
 required unless `-b BACKING` is given, in which case it defaults to the
-backing file's virtual size.
+backing file's virtual size. A monolithicFlat VMDK cannot have a backing
+file, so it always needs `SIZE`.
 
 The full flag surface is reported by `instar create --help`.
 
@@ -55,7 +57,7 @@ The full flag surface is reported by `instar create --help`.
 |--------|------------------------|----------|---------------------------|
 | raw    | (host-only)            | No       | byte-equivalent (file size + zero-fill) |
 | qcow2  | n/a                    | Yes      | info-equivalent (modulo refcount_bits, compat, zstd) |
-| vmdk   | monolithicSparse, streamOptimized | Yes | info-equivalent |
+| vmdk   | monolithicSparse, streamOptimized, monolithicFlat | Yes (not monolithicFlat) | info-equivalent |
 | vpc    | dynamic, fixed         | Yes (dynamic only) | info-equivalent (modulo CHS virtual_size rounding) |
 | vhdx   | dynamic                | Yes      | info-equivalent (modulo default block_size when unspecified) |
 
@@ -125,14 +127,67 @@ Rejected (future work):
 ### vmdk
 
 Honoured:
-- `size`, `subformat` (monolithicSparse|streamOptimized)
-- `backing_file`, `backing_fmt`
+- `size`, `subformat` (monolithicSparse|streamOptimized|monolithicFlat)
+- `backing_file`, `backing_fmt` (not with monolithicFlat)
+- `preallocation` (off|falloc|full; `falloc` and `full` are no-ops, `metadata` is refused)
+- `zeroed_grain` (ignored for the sparse subformats; `on` is refused for
+  monolithicFlat, as qemu-img refuses it)
+
+Accepted and ignored: `adapter_type`, `hwversion`, `toolsversion`.
 
 Rejected (instar doesn't emit these subformats):
-- `subformat=monolithicFlat`, `subformat=twoGbMaxExtent*`
+- `subformat=twoGbMaxExtent*`
 
 Note: qemu-img doesn't accept an `-o grain_size=` key — grain is set by
-the subformat. instar exposes `--grain-size` as an independent flag.
+the subformat. instar exposes `--grain-size` as an independent flag, and
+also accepts `-o grain_size`. Neither is valid for monolithicFlat.
+
+#### monolithicFlat
+
+`-o subformat=monolithicFlat` and `--subformat monolithicFlat` are the
+same request. The image is two files, written on the host with no guest:
+
+- a raw extent, sized with `ftruncate` to `SIZE` rounded up to a whole
+  512-byte sector (a 1000-byte request gives a 1024-byte extent, and a
+  virtual size of 1024), and
+- the text descriptor at `FILENAME`, naming the extent.
+
+The extent is named the way qemu-img names it: the basename of
+`FILENAME` is split at its last `.` and the extent is
+`<prefix>-flat<postfix>` in the same directory (`out.vmdk` gives
+`out-flat.vmdk`, `out.img` gives `out-flat.img`, `out` gives `out-flat`).
+`instar convert` uses the same rule. Both files are replaced if they
+exist.
+
+The extent is sparse under every preallocation mode. qemu-img only
+truncates it too, so `falloc` and `full` write what `off` writes. The
+descriptor is the one `instar convert` writes, without qemu's DDB lines
+and with a constant CID (see [quirks.md](/components/instar/quirks/#vmdk-descriptors-omit-qemus-ddb-lines)).
+
+Refused, before either file is opened:
+
+| Request | Message |
+|---|---|
+| `-b` or `-o backing_file` | `create: vmdk monolithicFlat cannot have a backing file` |
+| no `SIZE` | `create: vmdk monolithicFlat requires SIZE` |
+| `-o zeroed_grain=on` | `create: vmdk monolithicFlat cannot enable zeroed_grain` |
+| `--grain-size` or `-o grain_size` | `create: vmdk monolithicFlat has no grains, so it takes no grain size (got N)` |
+| `preallocation=metadata` | `create: preallocation=metadata is not supported for vmdk` |
+| an extent name holding `"`, CR or LF | `create: vmdk monolithicFlat cannot record the extent name "..." in its descriptor (it must be UTF-8 without '"', CR or LF)` |
+
+qemu-img refuses the first, third and last too ("Flat image can't have
+backing file", "Flat image can't enable zeroed grain", "Unsupported
+preallocation mode: metadata"); it has no grain size option at all. It
+writes any extent name verbatim (see
+[quirks.md](/components/instar/quirks/#vmdk-flat-extent-names-must-fit-the-descriptor)). On
+the metadata refusal qemu-img leaves a zero-byte descriptor behind;
+instar leaves nothing. If a failure happens after a file has been opened
+(the extent's name is taken by a directory, or the extent cannot be
+sized), instar removes every file it opened.
+
+On success, `--output json` reports the descriptor as `filename`, its
+length as both `metadata_bytes_written` and `file_size_after`, and
+`resolved_unit_size` 0.
 
 ### vpc (VHD)
 
@@ -155,6 +210,8 @@ Honoured:
   See [Backing-file semantics](#backing-file-semantics) below and the
   "VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/).
 
+- `preallocation` (off|falloc|full; `falloc` and `full` are no-ops, `metadata` is refused)
+
 Accepted but no size effect:
 - `force_size`
 
@@ -162,6 +219,7 @@ Accepted but no size effect:
 
 Honoured:
 - `size`, `block_size` (1 MiB..256 MiB power of two)
+- `preallocation` (off|falloc|full; `falloc` and `full` are no-ops, `metadata` is refused)
 - `backing_file`, `backing_fmt` — a VHDX child with a parent sets the
   `HasParent` file-parameter bit and writes a populated parent
   locator metadata item carrying the parent's active-header
@@ -330,16 +388,30 @@ of [quirks.md](/components/instar/quirks/).
 
 | Mode      | raw                   | qcow2                                                | vmdk / vpc / vhdx |
 |-----------|-----------------------|------------------------------------------------------|-------------------|
-| `off`     | `ftruncate` only      | header + L1 + refcount only                          | header + BAT only |
-| `metadata`| rejected              | L1 + L2 + refcount populated; data region as a hole  | rejected (future work) |
-| `falloc`  | `posix_fallocate`     | metadata mode + `posix_fallocate` on data region     | rejected (future work) |
-| `full`    | `fallocate(ZERO_RANGE)` with `pwrite` fallback | metadata mode + zero-fill data region   | rejected (future work) |
+| `off`     | `ftruncate` only      | header + L1 + refcount only                          | header + BAT only (monolithicFlat: a sparse extent) |
+| `metadata`| rejected              | L1 + L2 + refcount populated; data region as a hole  | rejected |
+| `falloc`  | `posix_fallocate`     | metadata mode + `posix_fallocate` on data region     | accepted, same as `off` |
+| `full`    | `fallocate(ZERO_RANGE)` with `pwrite` fallback | metadata mode + zero-fill data region   | accepted, same as `off` |
 
 For qcow2 metadata mode the L2 tables can total well over the guest's
 8 MiB scratch limit at large virtual sizes, so the guest streams them
 through a reusable single-cluster slot rather than packaging them into
 the `MetadataPlan`. The host's `apply_preallocation` helper handles
 `falloc` and `full` post-emission.
+
+`falloc` and `full` on vmdk, vpc and vhdx are accepted and change nothing: the
+image is the one `off` writes. That is qemu-img's behaviour, not a shortcut.
+None of the three drivers lists a `preallocation` create option
+(`block/vpc.c:1194`, qemu 7.0.0); the key is consumed by the file protocol
+that creates the image file (`block/file-posix.c:2614`), which preallocates
+the empty file before the driver writes anything. The committed
+`tests/golden/qemu-create-pins.json` records, for all 80 qemu-img builds from
+6.0.0, that `falloc` and `full` images equal the `off` image in content and
+in allocated blocks. `metadata` is refused ("Unsupported preallocation mode:
+metadata", `block/file-posix.c:2024-2026`), and instar refuses it too, with
+`create: preallocation=metadata is not supported for FORMAT`. By contrast,
+`instar resize --preallocation falloc|full` on these formats does allocate
+the newly appended region (see [format-coverage.md](/components/instar/format-coverage/)).
 
 ## Known divergences from `qemu-img create`
 
@@ -386,12 +458,11 @@ through `instar check` and match `qemu-img` (instar #365).
   header bit).
 - vhdx default `block_size` matching qemu's 32 MiB at all virtual
   sizes.
-- Preallocation for vmdk / vpc / vhdx (each format needs its own
-  BAT-population pattern plus the same host `apply_preallocation`
-  post-pass that qcow2 already uses).
-- Multi-file VMDK subformats (`monolithicFlat`, `twoGbMaxExtentSparse`,
-  `twoGbMaxExtentFlat`) — needs multi-output-device support in the
-  call table.
+- The split VMDK subformats (`twoGbMaxExtentSparse`,
+  `twoGbMaxExtentFlat`).
+- qemu's DDB lines (`ddb.virtualHWVersion`, `ddb.geometry.*`,
+  `ddb.adapterType`, `ddb.toolsVersion`) in VMDK descriptors, honouring
+  `adapter_type`, `hwversion` and `toolsversion`.
 - VHDX `subformat=fixed`. instar refuses it today, but qemu-img does emit it:
   `qemu-img create -f vhdx -o subformat=fixed` sets the `LeaveBlocksAllocated`
   file parameter, writes a BAT entry for every payload block

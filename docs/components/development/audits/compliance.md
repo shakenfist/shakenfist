@@ -26,7 +26,7 @@ many manual runs came before it. See
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-10-11T21:20:15.489528+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-10-24T05:09:57.242550+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -35,10 +35,11 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#145 |
+| agent-python | compliant | - |
 | andris | compliant | - |
 | client-python | non-compliant | shakenfist/client-python#408 |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#121 |
 | cloudgood | non-compliant | shakenfist/cloudgood#1 |
 | development | compliant | - |
@@ -48,8 +49,8 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#5 |
-| kerbside-patches | compliant | - |
-| library-utilities | non-compliant | shakenfist/library-utilities#62 |
+| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1977 |
+| library-utilities | compliant | - |
 | occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
@@ -60,15 +61,14 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): pr-re-review.yml: the confirm step is conditional (if: steps.ref.outputs.merged == 'true'), so at least one checkout path goes unconfirmed; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
 - **client-python** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
 - **clingwrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **cloudgood** (Status): Missing workflows: pr-re-review.yml
 - **divergulent** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
-- **kerbside-client** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
-- **library-utilities** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
+- **kerbside-client** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No automated reviewer: no workflow other than pr-re-review.yml or pr-retest.yml calls shakenfist/actions/.github/workflows/pr-auto-review.yml@main or uses shared action review-pr-with-claude@main
+- **kerbside-patches** (Status): No automated reviewer: no workflow other than pr-re-review.yml or pr-retest.yml calls shakenfist/actions/.github/workflows/pr-auto-review.yml@main or uses shared action review-pr-with-claude@main
 - **sfui** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py); it is unused, and its workflow holds contents: write on the pull request branch
-- **uncalibrated-sextant** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
+- **uncalibrated-sextant** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No automated reviewer: no workflow other than pr-re-review.yml or pr-retest.yml calls shakenfist/actions/.github/workflows/pr-auto-review.yml@main or uses shared action review-pr-with-claude@main
 
 ## console-logging
 
@@ -81,6 +81,7 @@ Criterion: [console-logging.md](/components/development/audits/console-logging/)
 | andris | N/A | - |
 | client-python | compliant | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -111,6 +112,7 @@ Criterion: [default-branch-naming.md](/components/development/audits/default-bra
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -141,6 +143,7 @@ Criterion: [delete-branch-on-merge.md](/components/development/audits/delete-bra
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | compliant | - |
 | development | compliant | - |
@@ -176,6 +179,7 @@ Criterion: [dependency-name-normalization.md](/components/development/audits/dep
 | andris | N/A | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -206,6 +210,7 @@ Criterion: [diagram-format.md](/components/development/audits/diagram-format/)
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#126 |
 | cloudgood | non-compliant | shakenfist/cloudgood#9 |
 | development | compliant | - |
@@ -241,20 +246,21 @@ Criterion: [docs-external-links.md](/components/development/audits/docs-external
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | non-compliant | shakenfist/cloudgood#7 |
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
 | images | N/A | - |
-| instar | compliant | - |
+| instar | non-compliant | shakenfist/instar#826 |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
 | private-ci | N/A | - |
-| ryll | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#616 |
 | sfui | compliant | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#7 |
@@ -263,6 +269,8 @@ Criterion: [docs-external-links.md](/components/development/audits/docs-external
 Details for non-compliant projects:
 
 - **cloudgood** (Status): 2 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/index.md -> more-fundamentals.md, docs/virtualization-history.md -> more-fundamentals.md
+- **instar** (Status): 2 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/plans/PLAN-differencing-phase-17-compose-docs.md -> docs/plans/PLAN-differencing.md, docs/plans/PLAN-differencing-phase-17-compose-docs.md -> plans/PLAN-differencing.md
+- **ryll** (Status): 1 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/plans/completed/PLAN-stream-caps-and-flap-phase-05-auto-snapshot.md -> PLAN-stream-caps-and-flap.md
 - **uncalibrated-sextant** (Status): 67 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/plans/PLAN-audit-cleanup-phase-02-structural.md -> ../../src/bootloader.rs, docs/plans/PLAN-audit-cleanup-phase-02-structural.md -> ../../src/renderer/mod.rs, docs/plans/PLAN-audit-cleanup-phase-02-structural.md -> ../../src/scene.rs, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../Makefile, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../scripts/screenshot.sh, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../scripts/verify-release.sh, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../src/scene.rs, docs/plans/PLAN-audit-cleanup.md -> ../../AGENTS.md, docs/plans/PLAN-audit-cleanup.md -> ../../ARCHITECTURE.md, docs/plans/PLAN-audit-cleanup.md -> ../../PUSH-AUDIT.md (+57 more)
 
 ## docs-line-references
@@ -276,16 +284,17 @@ Criterion: [docs-line-references.md](/components/development/audits/docs-line-re
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | compliant | - |
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
 | images | N/A | - |
-| instar | compliant | - |
+| instar | non-compliant | shakenfist/instar#827 |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
-| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1839 |
+| kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
 | private-ci | N/A | - |
@@ -297,7 +306,7 @@ Criterion: [docs-line-references.md](/components/development/audits/docs-line-re
 
 Details for non-compliant projects:
 
-- **kerbside-patches** (Status): 1 line(s) in the documentation cite code by line number, which goes stale on the next edit to that code (name the function or class instead, or use a GitHub permalink pinned to a commit sha): docs/kolla-ansible-tempest-jobs.md:71
+- **instar** (Status): 6 line(s) in the documentation cite code by line number, which goes stale on the next edit to that code (name the function or class instead, or use a GitHub permalink pinned to a commit sha): docs/create.md:405, docs/create.md:406, docs/create.md:411, docs/measure.md:105, docs/quirks.md:1118, docs/quirks.md:1123
 
 ## eol-distro
 
@@ -310,6 +319,7 @@ Criterion: [eol-distro.md](/components/development/audits/eol-distro/)
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -340,6 +350,7 @@ Criterion: [eol-producers.md](/components/development/audits/eol-producers/)
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -370,11 +381,12 @@ Criterion: [expensive-lane-path-filter.md](/components/development/audits/expens
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#118 |
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | compliant | - |
-| hunkydory | compliant | - |
+| hunkydory | non-compliant | shakenfist/hunkydory#115 |
 | images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
@@ -392,6 +404,7 @@ Criterion: [expensive-lane-path-filter.md](/components/development/audits/expens
 Details for non-compliant projects:
 
 - **clingwrap** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
+- **hunkydory** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: ci.yml (filter does not exclude docs/). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 - **sfui** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (filter does not exclude docs/). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 
 ## export-repo-config
@@ -405,6 +418,7 @@ Criterion: [export-repo-config.md](/components/development/audits/export-repo-co
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | non-compliant | shakenfist/cloudgood#3 |
 | development | compliant | - |
@@ -441,6 +455,7 @@ Criterion: [fuzz-nightly-reporting.md](/components/development/audits/fuzz-night
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -471,6 +486,7 @@ Criterion: [github-security.md](/components/development/audits/github-security/)
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | non-compliant | shakenfist/cloudgood#5 |
 | development | compliant | - |
@@ -507,6 +523,7 @@ Criterion: [llm-context-lint-ci.md](/components/development/audits/llm-context-l
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#120 |
 | cloudgood | non-compliant | shakenfist/cloudgood#8 |
 | development | compliant | - |
@@ -544,6 +561,7 @@ Criterion: [llm-context-lint.md](/components/development/audits/llm-context-lint
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | compliant | - |
 | development | compliant | - |
@@ -574,6 +592,7 @@ Criterion: [llm-doc-naming.md](/components/development/audits/llm-doc-naming/)
 | andris | compliant | - |
 | client-python | non-compliant | shakenfist/client-python#406 |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | compliant | - |
 | development | compliant | - |
@@ -608,11 +627,12 @@ Criterion: [llm-doc-structure.md](/components/development/audits/llm-doc-structu
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | compliant | - |
 | development | compliant | - |
 | divergulent | compliant | - |
-| hunkydory | compliant | - |
+| hunkydory | non-compliant | shakenfist/hunkydory#113 |
 | images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
@@ -627,6 +647,10 @@ Criterion: [llm-doc-structure.md](/components/development/audits/llm-doc-structu
 | uncalibrated-sextant | compliant | - |
 | visual-digest-rust | compliant | - |
 
+Details for non-compliant projects:
+
+- **hunkydory** (Status): AGENTS.md has headings restating a docs/ page: "Testing" (docs/testing.md); summarise and link instead
+
 ## llm-tooling
 
 Criterion: [llm-tooling.md](/components/development/audits/llm-tooling/)
@@ -638,6 +662,7 @@ Criterion: [llm-tooling.md](/components/development/audits/llm-tooling/)
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | compliant | - |
 | development | compliant | - |
@@ -668,21 +693,22 @@ Criterion: [merge-group-cancellation.md](/components/development/audits/merge-gr
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | compliant | - |
-| agent-python | N/A | - |
+| agent-python | compliant | - |
 | andris | compliant | - |
-| client-python | N/A | - |
+| client-python | compliant | - |
 | client-python-k3s | compliant | - |
-| clingwrap | N/A | - |
+| client-python-ova | compliant | - |
+| clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
-| divergulent | N/A | - |
-| hunkydory | N/A | - |
+| divergulent | compliant | - |
+| hunkydory | compliant | - |
 | images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
-| kerbside-patches | N/A | - |
-| library-utilities | N/A | - |
+| kerbside-patches | compliant | - |
+| library-utilities | compliant | - |
 | occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
@@ -698,22 +724,23 @@ Criterion: [merge-queue-config.md](/components/development/audits/merge-queue-co
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | N/A | - |
-| agent-python | N/A | - |
+| agent-python | compliant | - |
 | andris | compliant | - |
-| client-python | N/A | - |
+| client-python | compliant | - |
 | client-python-k3s | compliant | - |
-| clingwrap | N/A | - |
+| client-python-ova | compliant | - |
+| clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
-| divergulent | N/A | - |
-| hunkydory | N/A | - |
+| divergulent | compliant | - |
+| hunkydory | compliant | - |
 | images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
-| kerbside-patches | N/A | - |
-| library-utilities | N/A | - |
-| occystrap | N/A | - |
+| kerbside-patches | compliant | - |
+| library-utilities | compliant | - |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | N/A | - |
@@ -732,11 +759,12 @@ Criterion: [mermaid-lint-ci.md](/components/development/audits/mermaid-lint-ci/)
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | N/A | - |
-| hunkydory | N/A | - |
+| hunkydory | non-compliant | shakenfist/hunkydory#114 |
 | images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
@@ -751,6 +779,10 @@ Criterion: [mermaid-lint-ci.md](/components/development/audits/mermaid-lint-ci/)
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
 
+Details for non-compliant projects:
+
+- **hunkydory** (Status): mermaid diagrams are not linted: missing tools/mermaid-lint.sh and a CI workflow that runs it (copy templates/mermaid-lint/ from the development repository)
+
 ## npm-pin-indirect-dependencies
 
 Criterion: [npm-pin-indirect-dependencies.md](/components/development/audits/npm-pin-indirect-dependencies/)
@@ -762,6 +794,7 @@ Criterion: [npm-pin-indirect-dependencies.md](/components/development/audits/npm
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -792,6 +825,7 @@ Criterion: [npm-undeclared-direct-dependency.md](/components/development/audits/
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -822,6 +856,7 @@ Criterion: [npm-unused-declared-dependency.md](/components/development/audits/np
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -852,6 +887,7 @@ Criterion: [pin-indirect-dependencies.md](/components/development/audits/pin-ind
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -882,6 +918,7 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -911,44 +948,39 @@ Criterion: [plan-history-in-source.md](/components/development/audits/plan-histo
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | non-compliant | shakenfist/actions#153 |
+| actions | compliant | - |
 | agent-python | compliant | - |
 | andris | compliant | - |
 | client-python | non-compliant | shakenfist/client-python#425 |
 | client-python-k3s | non-compliant | shakenfist/client-python-k3s#139 |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | compliant | - |
 | development | compliant | - |
 | divergulent | non-compliant | shakenfist/divergulent#129 |
-| hunkydory | non-compliant | shakenfist/hunkydory#72 |
+| hunkydory | compliant | - |
 | images | N/A | - |
-| instar | non-compliant | shakenfist/instar#655 |
+| instar | compliant | - |
 | kerbside | non-compliant | shakenfist/kerbside#558 |
 | kerbside-client | compliant | - |
-| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1877 |
+| kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
 | private-ci | N/A | - |
-| ryll | non-compliant | shakenfist/ryll#515 |
+| ryll | compliant | - |
 | sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#4512 |
+| shakenfist | non-compliant | shakenfist/shakenfist#4630 |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#22 |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#42 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
-- **actions** (Status): 9 plan history reference(s) in source, in 4 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
-- **client-python** (Status): 20 plan history reference(s) in source, in 4 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
+- **client-python** (Status): 19 plan history reference(s) in source, in 3 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
 - **client-python-k3s** (Status): 63 plan history reference(s) in source, in 14 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
 - **divergulent** (Status): 251 plan history reference(s) in source, in 47 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
-- **hunkydory** (Status): 4 plan history reference(s) in source, in 4 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
-- **instar** (Status): 1078 plan history reference(s) in source, in 124 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
 - **kerbside** (Status): 19 plan history reference(s) in source, in 10 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
-- **kerbside-patches** (Status): 7 plan history reference(s) in source, in 4 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
-- **ryll** (Status): 9 plan history reference(s) in source, in 8 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
-- **shakenfist** (Status): 626 plan history reference(s) in source, in 159 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
+- **shakenfist** (Status): 3 plan history reference(s) in source, in 3 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
 - **uncalibrated-sextant** (Status): 21 plan history reference(s) in source, in 5 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
-- **visual-digest-rust** (Status): 9 plan history reference(s) in source, in 6 file(s) (write the reason the code is this way instead of citing the plan step that produced it)
 
 ## plan-index
 
@@ -961,13 +993,14 @@ Criterion: [plan-index.md](/components/development/audits/plan-index/)
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | N/A | - |
 | images | N/A | - |
-| instar | compliant | - |
+| instar | non-compliant | shakenfist/instar#828 |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | compliant | - |
@@ -982,6 +1015,7 @@ Criterion: [plan-index.md](/components/development/audits/plan-index/)
 
 Details for non-compliant projects:
 
+- **instar** (Status): 1 status cell(s) outside the shared vocabulary (Proposed, Not started, In progress, Blocked, Complete, Abandoned, Superseded): Populated BAT output: fixed VHDX and non-qcow2 preallocation ("full on vmdk / vpc / vhdx as the no-o...")
 - **sfui** (Status): docs/plans/index.md is missing, so none of the 3 plan(s) in docs/plans/ are registered
 - **uncalibrated-sextant** (Status): 7 status cell(s) outside the shared vocabulary (Proposed, Not started, In progress, Blocked, Complete, Abandoned, Superseded): Locked bootloader ("Complete (commits a7b261d through thi..."), Display-mode keystrokes ("Complete (commits 455d2b5 through thi..."), Audit cleanup ("Complete (commits 1482eb0 through thi..."), Visual on-screen digest ("Complete (commits 55844a5 through thi..."), Continuous multi-channel visual digest ("Complete (commits 8814fab through thi...") (+2 more)
 
@@ -996,6 +1030,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | andris | compliant | - |
 | client-python | non-compliant | shakenfist/client-python#382 |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | compliant | - |
 | development | compliant | - |
@@ -1005,10 +1040,10 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
-| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1826 |
+| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1975 |
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
-| private-ci | non-compliant | shakenfist/private-ci#64 |
+| private-ci | compliant | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
 | shakenfist | compliant | - |
@@ -1018,8 +1053,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 Details for non-compliant projects:
 
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
-- **kerbside-patches** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:67
-- **private-ci** (Status): 64 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/capacity-claims.md:114, docs/capacity-claims.md:117, docs/capacity-claims.md:129, docs/dashboard-freshness.md:84, docs/dashboard-freshness.md:132, docs/dashboard-freshness.md:133, docs/dashboard-freshness.md:197, docs/dashboard-freshness.md:241, docs/dashboard-freshness.md:272 (+54 more)
+- **kerbside-patches** (Status): 29 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/containerised-deployer.md:117, docs/containerised-deployer.md:118, docs/containerised-deployer.md:127, docs/containerised-deployer.md:220, docs/containerised-deployer.md:270, docs/containerised-deployer.md:276, docs/containerised-deployer.md:291, docs/containerised-deployer.md:297, docs/containerised-deployer.md:299, docs/containerised-deployer.md:317 (+19 more)
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 
 ## plan-source-references
@@ -1028,11 +1062,12 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | N/A | - |
+| actions | non-compliant | shakenfist/actions#197 |
 | agent-python | N/A | - |
 | andris | N/A | - |
 | client-python | non-compliant | shakenfist/client-python#403 |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -1045,7 +1080,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
-| private-ci | non-compliant | shakenfist/private-ci#139 |
+| private-ci | compliant | - |
 | ryll | compliant | - |
 | sfui | N/A | - |
 | shakenfist | compliant | - |
@@ -1054,8 +1089,8 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 
 Details for non-compliant projects:
 
+- **actions** (Status): 1 of 1 plan reference(s) in source or configuration do not resolve, in 1 file(s) (update the path, or use an absolute https://github.com/... URL for a plan in another repository)
 - **client-python** (Status): 2 of 4 plan reference(s) in source or configuration do not resolve, in 2 file(s) (update the path, or use an absolute https://github.com/... URL for a plan in another repository)
-- **private-ci** (Status): 5 of 95 plan reference(s) in source or configuration do not resolve, in 2 file(s) (update the path, or use an absolute https://github.com/... URL for a plan in another repository)
 
 ## plan-template
 
@@ -1067,21 +1102,22 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 | agent-python | N/A | - |
 | andris | compliant | - |
 | client-python | N/A | - |
-| client-python-k3s | compliant | - |
+| client-python-k3s | non-compliant | shakenfist/client-python-k3s#157 |
+| client-python-ova | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | non-compliant | shakenfist/divergulent#127 |
 | hunkydory | N/A | - |
 | images | N/A | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
+| instar | non-compliant | shakenfist/instar#829 |
+| kerbside | non-compliant | shakenfist/kerbside#594 |
 | kerbside-client | N/A | - |
-| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1840 |
+| kerbside-patches | compliant | - |
 | library-utilities | N/A | - |
-| occystrap | non-compliant | shakenfist/occystrap#157 |
-| private-ci | non-compliant | shakenfist/private-ci#76 |
-| ryll | compliant | - |
+| occystrap | compliant | - |
+| private-ci | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#617 |
 | sfui | N/A | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#12 |
@@ -1089,10 +1125,11 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 
 Details for non-compliant projects:
 
-- **divergulent** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)
-- **kerbside-patches** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)
-- **occystrap** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)
-- **private-ci** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current); missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
+- **client-python-k3s** (Status): shared block plan-push-audit-phase is stale (v3 embedded, v4 current)
+- **divergulent** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current); shared block plan-push-audit-phase is stale (v3 embedded, v4 current)
+- **instar** (Status): shared block plan-push-audit-phase is stale (v3 embedded, v4 current)
+- **kerbside** (Status): shared block plan-push-audit-phase is stale (v3 embedded, v4 current)
+- **ryll** (Status): shared block plan-push-audit-phase is stale (v3 embedded, v4 current)
 - **uncalibrated-sextant** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current); missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository); missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
 
 ## push-audit
@@ -1106,6 +1143,7 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 | andris | compliant | - |
 | client-python | N/A | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -1141,6 +1179,7 @@ Criterion: [pyproject-usage.md](/components/development/audits/pyproject-usage/)
 | andris | N/A | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -1175,6 +1214,7 @@ Criterion: [python-version.md](/components/development/audits/python-version/)
 | andris | N/A | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -1205,6 +1245,7 @@ Criterion: [readme-absolute-links.md](/components/development/audits/readme-abso
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#108 |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -1239,6 +1280,7 @@ Criterion: [readme-structure.md](/components/development/audits/readme-structure
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -1269,6 +1311,7 @@ Criterion: [release-artifacts-exclude-plans.md](/components/development/audits/r
 | andris | N/A | - |
 | client-python | non-compliant | shakenfist/client-python#426 |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -1279,12 +1322,12 @@ Criterion: [release-artifacts-exclude-plans.md](/components/development/audits/r
 | kerbside | non-compliant | shakenfist/kerbside#559 |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
-| library-utilities | non-compliant | shakenfist/library-utilities#70 |
-| occystrap | non-compliant | shakenfist/occystrap#159 |
+| library-utilities | compliant | - |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | N/A | - |
 | sfui | N/A | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#4513 |
+| shakenfist | compliant | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
 
@@ -1293,9 +1336,37 @@ Details for non-compliant projects:
 - **client-python** (Status): 1 release artifact(s) would ship docs/plans/, which is working history rather than source; exclude it with the mechanism each finding names
 - **divergulent** (Status): 1 release artifact(s) would ship docs/plans/, which is working history rather than source; exclude it with the mechanism each finding names
 - **kerbside** (Status): 1 release artifact(s) would ship docs/plans/, which is working history rather than source; exclude it with the mechanism each finding names
-- **library-utilities** (Status): 1 release artifact(s) would ship docs/plans/, which is working history rather than source; exclude it with the mechanism each finding names
-- **occystrap** (Status): 1 release artifact(s) would ship docs/plans/, which is working history rather than source; exclude it with the mechanism each finding names
-- **shakenfist** (Status): 1 release artifact(s) would ship docs/plans/, which is working history rather than source; exclude it with the mechanism each finding names
+
+## release-environment-protection
+
+Criterion: [release-environment-protection.md](/components/development/audits/release-environment-protection/)
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | N/A | - |
+| agent-python | compliant | - |
+| andris | compliant | - |
+| client-python | compliant | - |
+| client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
+| clingwrap | compliant | - |
+| cloudgood | N/A | - |
+| development | N/A | - |
+| divergulent | compliant | - |
+| hunkydory | compliant | - |
+| images | N/A | - |
+| instar | compliant | - |
+| kerbside | compliant | - |
+| kerbside-client | N/A | - |
+| kerbside-patches | N/A | - |
+| library-utilities | compliant | - |
+| occystrap | compliant | - |
+| private-ci | N/A | - |
+| ryll | compliant | - |
+| sfui | N/A | - |
+| shakenfist | compliant | - |
+| uncalibrated-sextant | N/A | - |
+| visual-digest-rust | N/A | - |
 
 ## release-process
 
@@ -1308,6 +1379,7 @@ Criterion: [release-process.md](/components/development/audits/release-process/)
 | andris | N/A | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -1338,6 +1410,7 @@ Criterion: [renovate-lockstep-groups.md](/components/development/audits/renovate
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -1363,35 +1436,48 @@ Criterion: [renovate.md](/components/development/audits/renovate/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | compliant | - |
-| agent-python | compliant | - |
+| actions | non-compliant | shakenfist/actions#198 |
+| agent-python | non-compliant | shakenfist/agent-python#159 |
 | andris | compliant | - |
-| client-python | compliant | - |
-| client-python-k3s | compliant | - |
+| client-python | non-compliant | shakenfist/client-python#437 |
+| client-python-k3s | non-compliant | shakenfist/client-python-k3s#158 |
+| client-python-ova | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#117 |
 | cloudgood | non-compliant | shakenfist/cloudgood#2 |
 | development | compliant | - |
-| divergulent | compliant | - |
+| divergulent | non-compliant | shakenfist/divergulent#136 |
 | hunkydory | compliant | - |
 | images | N/A | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
+| instar | non-compliant | shakenfist/instar#830 |
+| kerbside | non-compliant | shakenfist/kerbside#595 |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#2 |
-| kerbside-patches | compliant | - |
-| library-utilities | compliant | - |
-| occystrap | compliant | - |
+| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1976 |
+| library-utilities | non-compliant | shakenfist/library-utilities#78 |
+| occystrap | non-compliant | shakenfist/occystrap#167 |
 | private-ci | N/A | - |
-| ryll | compliant | - |
-| sfui | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#618 |
+| sfui | non-compliant | shakenfist/sfui#49 |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#13 |
 | visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
-- **clingwrap** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
+- **actions** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped
+- **agent-python** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped
+- **client-python** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped
+- **client-python-k3s** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped
+- **clingwrap** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped; renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **cloudgood** (Status): Missing: .github/workflows/renovate.yml, renovate.json
+- **divergulent** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped
+- **instar** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped
+- **kerbside** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped
 - **kerbside-client** (Status): Missing: .github/workflows/renovate.yml, renovate.json
+- **kerbside-patches** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped
+- **library-utilities** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped
+- **occystrap** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped
+- **ryll** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped
+- **sfui** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped
 - **uncalibrated-sextant** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 
 ## reusable-workflow-secrets
@@ -1405,6 +1491,7 @@ Criterion: [reusable-workflow-secrets.md](/components/development/audits/reusabl
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -1430,11 +1517,12 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | compliant | - |
+| actions | non-compliant | shakenfist/actions#200 |
 | agent-python | N/A | - |
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | non-compliant | shakenfist/development#247 |
@@ -1456,10 +1544,11 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **development** (Status): 180 of 207 in-scope files reviewed at HEAD; 27 need review (threshold 5)
-- **kerbside** (Status): 128 of 258 in-scope files reviewed at HEAD (5 imported from shakenfist/development); 130 need review (threshold 5)
+- **actions** (Status): 156 of 163 in-scope files reviewed at HEAD; 7 need review (threshold 5)
+- **development** (Status): 213 of 224 in-scope files reviewed at HEAD; 11 need review (threshold 5)
+- **kerbside** (Status): 113 of 284 in-scope files reviewed at HEAD (5 imported from shakenfist/development); 171 need review (threshold 5)
 - **kerbside-client** (Status): 3 of 15 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 12 need review (threshold 5)
-- **ryll** (Status): 155 of 238 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 83 need review (threshold 5)
+- **ryll** (Status): 162 of 272 in-scope files reviewed at HEAD (1 imported from shakenfist/development); 110 need review (threshold 5)
 - **sfui** (Status): 3 of 52 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 49 need review (threshold 5)
 
 ## review-scope-completeness
@@ -1473,6 +1562,7 @@ Criterion: [review-scope-completeness.md](/components/development/audits/review-
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -1480,17 +1570,22 @@ Criterion: [review-scope-completeness.md](/components/development/audits/review-
 | hunkydory | compliant | - |
 | images | N/A | - |
 | instar | N/A | - |
-| kerbside | compliant | - |
+| kerbside | non-compliant | shakenfist/kerbside#596 |
 | kerbside-client | compliant | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
 | private-ci | N/A | - |
-| ryll | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#619 |
 | sfui | compliant | - |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
+
+Details for non-compliant projects:
+
+- **kerbside** (Status): 4 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
+- **ryll** (Status): 1 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
 
 ## rust-unwrap-lint
 
@@ -1503,6 +1598,7 @@ Criterion: [rust-unwrap-lint.md](/components/development/audits/rust-unwrap-lint
 | andris | compliant | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -1537,13 +1633,14 @@ Criterion: [scheduled-workflow-health.md](/components/development/audits/schedul
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
 | images | N/A | - |
-| instar | compliant | - |
+| instar | non-compliant | shakenfist/instar#831 |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
 | kerbside-patches | compliant | - |
@@ -1556,6 +1653,10 @@ Criterion: [scheduled-workflow-health.md](/components/development/audits/schedul
 | uncalibrated-sextant | compliant | - |
 | visual-digest-rust | compliant | - |
 
+Details for non-compliant projects:
+
+- **instar** (Status): 1 workflow(s) that fire unattended have failed on develop at least 3 times and never once succeeded, so whatever they are meant to do has never happened. The usual cause is an installation that was not finished -- a missing secret, or an organisation secret not granted to this repository -- and the reason is in the log of the linked run
+
 ## scope-coverage
 
 Criterion: [scope-coverage.md](/components/development/audits/scope-coverage/)
@@ -1567,6 +1668,7 @@ Criterion: [scope-coverage.md](/components/development/audits/scope-coverage/)
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -1597,6 +1699,7 @@ Criterion: [secret-handling.md](/components/development/audits/secret-handling/)
 | andris | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#111 |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -1628,11 +1731,12 @@ Criterion: [security-sanitization.md](/components/development/audits/security-sa
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | N/A | - |
+| actions | non-compliant | shakenfist/actions#199 |
 | agent-python | N/A | - |
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -1652,6 +1756,10 @@ Criterion: [security-sanitization.md](/components/development/audits/security-sa
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
 
+Details for non-compliant projects:
+
+- **actions** (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: tests/test_cache_action_archives.py:64 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
+
 ## sfui-vendor
 
 Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
@@ -1663,6 +1771,7 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -1675,8 +1784,8 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
-| private-ci | non-compliant | shakenfist/private-ci#58 |
-| ryll | compliant | - |
+| private-ci | non-compliant | shakenfist/private-ci#219 |
+| ryll | non-compliant | shakenfist/ryll#620 |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
@@ -1684,8 +1793,9 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): kerbside/api/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
-- **private-ci** (Status): conductor/static/sfui: 14 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **kerbside** (Status): kerbside/api/static/sfui: 6 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **private-ci** (Status): conductor/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **ryll** (Status): ryll/src/web/assets/sfui: 4 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## undeclared-direct-dependency
 
@@ -1698,6 +1808,7 @@ Criterion: [undeclared-direct-dependency.md](/components/development/audits/unde
 | andris | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -1728,6 +1839,7 @@ Criterion: [unused-declared-dependency.md](/components/development/audits/unused
 | andris | N/A | - |
 | client-python | non-compliant | shakenfist/client-python#383 |
 | client-python-k3s | compliant | - |
+| client-python-ova | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -1762,6 +1874,7 @@ Criterion: [version-file-gitignore.md](/components/development/audits/version-fi
 | andris | N/A | - |
 | client-python | compliant | - |
 | client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#106 |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -1796,6 +1909,7 @@ Criterion: [workflow-standards.md](/components/development/audits/workflow-stand
 | andris | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | client-python | compliant | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/client-python#378 |
 | client-python-k3s | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
+| client-python-ova | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | clingwrap | compliant | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/clingwrap#125 |
 | cloudgood | N/A | N/A | N/A | N/A | N/A | compliant | N/A | N/A | N/A | - |
 | development | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
@@ -1817,8 +1931,8 @@ Criterion: [workflow-standards.md](/components/development/audits/workflow-stand
 
 Details for non-compliant projects:
 
-- **client-python** (VM size): 3 "vm" runner job(s) naming no size: code-formatting.yml:19 (self-hosted, vm), functional-tests.yml:23 (self-hosted, vm), supply-chain.yml:81 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl; m-bigdisk/xl-bigdisk when the job needs the disk; s-cloud/s-cluster when it builds a nested cloud or cluster); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
-- **clingwrap** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:22 (self-hosted, vm, debian-13). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl; m-bigdisk/xl-bigdisk when the job needs the disk; s-cloud/s-cluster when it builds a nested cloud or cluster); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
+- **client-python** (VM size): 3 "vm" runner job(s) naming no size: code-formatting.yml:19 (self-hosted, vm), functional-tests.yml:95 (self-hosted, vm), supply-chain.yml:81 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl; m-bigdisk/xl-bigdisk when the job needs the disk; s-cloud/s-cluster when it builds a nested cloud or cluster); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
+- **clingwrap** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:29 (self-hosted, vm, debian-13). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl; m-bigdisk/xl-bigdisk when the job needs the disk; s-cloud/s-cluster when it builds a nested cloud or cluster); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **kerbside-client** (flake8wrap): Missing shellcheck disable=SC2086 directive
 - **kerbside-client** (Linting): Missing .pre-commit-config.yaml
 - **uncalibrated-sextant** (Runners): 1 unmarked GitHub-hosted runner reference(s): pre-commit.yml:10 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
