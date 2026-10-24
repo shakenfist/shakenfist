@@ -10,8 +10,11 @@ for phases 1 to 8 by phase 8 and by nothing at all for the three
 phases that reopened the plan afterwards. See "Phase 12" below for
 why phase 8 is not moved to the end of the table to cover them.
 
-Phase 11 merged to `develop` as PR #4007 on 2026-09-02, and its
-measurement write-up as PR #4033 on 2026-09-05. What the plan
+Phase 11 merged to `develop` as PR #4007 on 2026-09-02, and the
+response to #4007's review as PR #4033 on 2026-09-05. #4033 carried
+code as well as step 11h's measurement: a priority-aware enqueue
+dedup (`_reusable_priorities`), the `missing_key_columns` fold guard
+and tests for the schema upgrade steps. What the plan
 deliberately did not build is carried by issues rather than by this
 document: #4017 (the `sf-queues` half of the multi-column key), #3974
 (the two timestamps which would separate database queue sit from time
@@ -87,7 +90,7 @@ Two things this plan changed are deliberately still unproven:
 | 9. Prove coalescing works | [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md) | Complete | `30168f0dd` (#3905), `9e41f07c6` (#3951) |
 | 10. Where the pre-execution time goes | [PLAN-queue-performance-phase-10-defer-latency.md](PLAN-queue-performance-phase-10-defer-latency.md) | Complete | `fea4af7bd` (#3973) |
 | 11. Multi-column coalescing key | [PLAN-queue-performance-phase-11-multi-column-key.md](PLAN-queue-performance-phase-11-multi-column-key.md) | Complete | `9aab98d94` (#4007), `ff65c622a` (#4033) |
-| 12. Push audit of phases 9 to 11 | PLAN-queue-performance-phase-12-push-audit.md | Not started | — |
+| 12. Push audit of phases 9 to 11 | [PLAN-queue-performance-phase-12-push-audit.md](PLAN-queue-performance-phase-12-push-audit.md) | In progress | — |
 
 The `Merged` column records what put each phase on `develop`. These
 entries were reconstructed after the fact, because the plan did not
@@ -335,22 +338,31 @@ cites phase 8 as the prior coverage of everything before them. The
 baseline is the `Merged` column in the Execution table above and not
 `develop...HEAD`, which is empty: `30168f0dd` and `9e41f07c6` for
 phase 9, `fea4af7bd` for phase 10, and `9aab98d94` and `ff65c622a`
-for phase 11. The accumulated diff of those five merges is one body
-of work, audited as one, because the interesting defects in this plan
-have all been ones the phases did to each other -- phase 8 found a
-join that phases 4 and 5 had each written correctly on their own
-terms, and phase 11's own review found a fold that phase 8's fix
-would have activated across nodes.
+for phase 11. Git cannot express those five merges as one range, so
+the mechanical checks run once per merge and pool their output. The
+judgment reviews read all five diffs together, because the
+interesting defects in this plan have all been ones the phases did
+to each other. Phase 8 found a join that phases 4 and 5 had each
+written correctly on their own terms, and review of phase 8's fix
+(PR #3880) found a fold that the fix would have activated across
+nodes. Read each range with `git diff <sha>^1 <sha>`, not `git log`:
+#4033's branch merged `develop` into itself, so its log lists about
+forty commits that belong to other plans.
 
-Two areas are worth naming for whoever runs it. The coalescing key
-and its three guards were rewritten twice within phase 11, so the
-question is whether the enqueue-time check, the `queue_is_cluster_wide`
-skip and `COALESCIBLE_TASKS` are now three expressions of one rule or
-three copies that can drift apart. And phases 9 and 10 added
-measurement tooling and event fields whose consumers --
-`tools/queue-wait-report.py` among them -- are the kind of
-code that gets no test coverage and no documentation unless
-an audit asks.
+Two areas are worth naming for whoever runs it. The first is the
+coalescing key and its guards, which were rewritten twice within
+phase 11 and again in #4033. The question is whether the rule's
+expressions are one rule or copies that can drift apart. There are
+more of them than the enqueue-time check, the `queue_is_cluster_wide`
+skip and `COALESCIBLE_TASKS`: the phase plan lists eleven. The
+second is the measurement tooling and event fields that phases 9
+and 10 added. `tools/queue-wait-report.py` and
+`tools/operation-timeline.py` do have tests and documentation, so
+the question is not whether coverage exists but whether the tests'
+fixtures still match what the code emits.
+
+The phase plan is
+[PLAN-queue-performance-phase-12-push-audit.md](PLAN-queue-performance-phase-12-push-audit.md).
 
 Findings land as their own pull request, and the plan is not complete
 until each is resolved or declined in writing here. If the audit
