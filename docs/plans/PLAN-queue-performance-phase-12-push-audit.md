@@ -375,6 +375,304 @@ claims against the file itself.
   `Merged` cell is left empty, as the `plan-phase-landing` block
   requires.
 
+## Findings
+
+### Wave 1
+
+Suite commands (each under `timeout 2400`):
+
+* `pre-commit run --all-files`: exit 0.
+* `tox`: exit 0. Ran: 6075 tests in 96.48 sec; Passed: 5924,
+  Skipped: 151, Failed: 0. py3, flake8 and cover envs all OK.
+* `tools/mermaid-lint.sh`: exit 0.
+* `tox -e genprotos && git diff --exit-code shakenfist/protos`:
+  exit 0 and 0. genprotos modified no files.
+
+In the sweeps below, `$R` is `<sha>^1 <sha>`. Over-120-character
+hits in generated protos are counted, not listed.
+
+#### 30168f0dd (#3905)
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].{120,}'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+
+All 15 lines are in `tools/queue-wait-report.py`.
+
+```
+1087:+    print()
+1088:+    print(title)
+1089:+    print('-' * len(title))
+1097:+        print('  (every row fell below --min-samples)')
+1099:+            print('  ' + footnote)
+1110:+    print('  ' + ' '.join(header))
+1116:+        print('  ' + ' '.join(line))
+1119:+        print('  ' + footnote)
+1145:+        print()
+1146:+        print('Coalescing')
+1147:+        print('----------')
+1148:+        print('  (no samples carrying coalescing instrumentation -- every '
+1163:+        print()
+1164:+        print(f'  {uninstrumented} of {len(samples)} samples carry no '
+1167:+        print('  Those events come from a build predating it; they are not '
+```
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+
+no output
+
+`git diff $R --stat | tail -1`
+
+```
+ 11 files changed, 1579 insertions(+), 56 deletions(-)
+```
+
+`git diff $R -- '*.py' | grep -cE '^\+\s*def test_'`
+
+```
+30
+```
+
+`git diff $R --name-only -- 'docs/*' '*.md'`
+
+```
+docs/operator_guide/networking/overview.md
+docs/plans/PLAN-queue-performance-phase-09-prove-coalescing.md
+docs/plans/PLAN-queue-performance.md
+docs/plans/index.md
+```
+
+`git diff $R -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+
+no output
+
+#### 9e41f07c6 (#3951)
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].{120,}'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+
+no output
+
+`git diff $R --stat | tail -1`
+
+```
+ 6 files changed, 353 insertions(+), 43 deletions(-)
+```
+
+`git diff $R -- '*.py' | grep -cE '^\+\s*def test_'`
+
+```
+0
+```
+
+`git diff $R --name-only -- 'docs/*' '*.md'`
+
+```
+docs/operator_guide/networking/overview.md
+docs/plans/PLAN-queue-performance-phase-09-prove-coalescing.md
+docs/plans/PLAN-queue-performance.md
+docs/plans/index.md
+```
+
+`git diff $R -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+
+no output
+
+#### fea4af7bd (#3973)
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].{120,}'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+
+84 added lines, all in `tools/operation-timeline.py`. Reproduce
+with:
+
+```
+git diff fea4af7bd^1 fea4af7bd -- '*.py' | grep -nE '^\+[^+].*\bprint\('
+```
+
+This is a command-line report tool whose output channel is stdout.
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+
+no output
+
+`git diff $R --stat | tail -1`
+
+```
+ 11 files changed, 3203 insertions(+), 57 deletions(-)
+```
+
+`git diff $R -- '*.py' | grep -cE '^\+\s*def test_'`
+
+```
+33
+```
+
+`git diff $R --name-only -- 'docs/*' '*.md'`
+
+```
+docs/developer_guide/database_internals.md
+docs/operator_guide/networking/overview.md
+docs/plans/PLAN-queue-performance-phase-10-defer-latency.md
+docs/plans/PLAN-queue-performance.md
+docs/plans/index.md
+```
+
+`git diff $R -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+
+no output
+
+#### 9aab98d94 (#4007)
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].{120,}'`
+
+1 hit(s), all generated (`shakenfist/protos/database_pb2.py`).
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+
+no output
+
+`git diff $R --stat | tail -1`
+
+```
+ 34 files changed, 4058 insertions(+), 1126 deletions(-)
+```
+
+`git diff $R -- '*.py' | grep -cE '^\+\s*def test_'`
+
+```
+37
+```
+
+`git diff $R --name-only -- 'docs/*' '*.md'`
+
+```
+docs/developer_guide/database_internals.md
+docs/operator_guide/networking/overview.md
+docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
+docs/plans/PLAN-queue-performance.md
+docs/plans/index.md
+```
+
+`git diff $R -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+
+no output
+
+#### ff65c622a (#4033)
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].{120,}'`
+
+1 hit(s), all generated (`shakenfist/protos/database_pb2.py`).
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+
+no output
+
+`git diff $R -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+
+no output
+
+`git diff $R --stat | tail -1`
+
+```
+ 20 files changed, 1778 insertions(+), 847 deletions(-)
+```
+
+`git diff $R -- '*.py' | grep -cE '^\+\s*def test_'`
+
+```
+20
+```
+
+`git diff $R --name-only -- 'docs/*' '*.md'`
+
+```
+docs/developer_guide/database_internals.md
+docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
+docs/plans/PLAN-queue-performance.md
+docs/plans/index.md
+```
+
+`git diff $R -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+
+no output
+
 ## Back brief
 
 Before executing any step of this plan, back brief the operator on
