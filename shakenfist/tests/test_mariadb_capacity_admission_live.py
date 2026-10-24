@@ -430,7 +430,7 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
 
     def test_the_demand_clause_refuses_on_measured_load(self):
         # cpu_schedulable 64 x target load 0.75 = 48. Publish a load
-        # already past that budget: since phase 4a the clause tests the
+        # already past that budget: the clause tests the
         # node's existing state, so what refuses is the node being over
         # target, not the size of the placement asking.
         metrics_t = mariadb._get_node_metrics_table()
@@ -836,7 +836,7 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertEqual(0, self._capacity(self.node_b).used_cpus)
 
     # ------------------------------------------------------------------
-    # The used_* high-water mark (claim coverage and sizing phase 2b)
+    # The used_* high-water mark
     # ------------------------------------------------------------------
 
     def test_a_drawdown_raises_the_high_water_mark(self):

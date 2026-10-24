@@ -12,10 +12,9 @@ they link to the master plan in docs/plans/. This is the fleet-wide
 plan-phase-references consistency audit, enforced here at commit time
 rather than by a report the morning after it lands.
 
-The pattern is deliberately looser than the audit's `phase <number>`: a
-lettered sub-phase such as "phase 4a" slips past the audit's trailing
-word boundary but is exactly the same defect, and one lived in the
-operator guide for that reason.
+The pattern has no trailing word boundary, so that a lettered
+sub-phase such as `phase 4a` matches: it is exactly the same defect,
+and one lived in the operator guide.
 
 Skipped, matching the audit spec: any file under a `plans/` directory
 at any depth (plan documents legitimately discuss their own phases),

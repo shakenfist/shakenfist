@@ -27,8 +27,8 @@ was precisely those two call sites not doing so).
 
 The same AST harness carries one further guard, which is here because
 this is where the harness lives rather than because it is about
-headroom. Phase 4b moved the claims suite off ``_request_url()`` and
-onto the client verbs, so the suite now names five ``apiclient``
+headroom. The claims suite calls the client verbs rather than
+``_request_url()``, so it names five ``apiclient``
 methods that nothing in this repository can import. A typo in one of
 those names, or a verb renamed next door, otherwise surfaces only in a
 merge-queue run -- the ``(collection)`` matrix is skipped on
@@ -229,7 +229,7 @@ class ClaimsSuiteDispatchTestCase(ClaimsSourceTestCase):
         self.assertEqual(
             set(CLAIM_VERBS), self._claim_api_client_attributes(),
             'The claims suite dispatches to a different set of client '
-            'methods than the five phase 4b added to apiclient. A name '
+            'methods than the five claim verbs in apiclient. A name '
             'which is not a verb fails with AttributeError, which '
             '_claim_api() does not catch, and only in a merge-queue run.')
 

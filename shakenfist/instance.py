@@ -889,9 +889,10 @@ class Instance(dbowo):
         """Currently-attached NetworkInterface objects.
 
         Queried live from the network_interfaces table
-        (instance_uuid is an indexed column). Previously
-        cached as a list of UUID strings on
-        instance_attributes; that column is dropped in phase 7e.
+        (instance_uuid is an indexed column), rather than kept
+        as a cached list of UUID strings on instance_attributes,
+        which was a hand-maintained copy of what the table already
+        holds.
         """
         criteria = ObjectFilterCriteria(
             states=list(interface.NetworkInterface.ACTIVE_STATES),

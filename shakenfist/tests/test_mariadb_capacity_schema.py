@@ -198,8 +198,8 @@ class CapacitySchemaVersionsTestCase(base.ShakenFistTestCase):
         # Pinned rather than derived, so a version bump has to be a
         # deliberate edit here as well as in mariadb.py -- which is the
         # only thing that makes the migration branch tests below mean
-        # anything. namespace_claims is at 2 because claim coverage and
-        # sizing phase 2b added the used_* high-water mark.
+        # anything. namespace_claims is at 2 because v2 added the used_*
+        # high-water mark.
         self.assertEqual(1, mariadb.SCHEDULER_NODE_CAPACITY_VERSION)
         self.assertEqual(2, mariadb.NAMESPACE_CLAIMS_VERSION)
         self.assertEqual(1, mariadb.CLUSTER_CAPACITY_VERSION)
@@ -275,7 +275,7 @@ class EnsureCapacitySchemaTestCase(base.ShakenFistTestCase):
 
 
 class NamespaceClaimsPeakMigrationTestCase(base.ShakenFistTestCase):
-    """The v1-to-2 high-water mark migration (claim sizing phase 2b, D2).
+    """The v1-to-2 high-water mark migration.
 
     The DDL itself runs against a real server in
     test_mariadb_capacity_claims_live.py, which is also where the

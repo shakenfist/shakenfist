@@ -1418,8 +1418,9 @@ def reconcile_scheduler_capacity() -> None:
     # carries the per-node before/after difference, so summarise it here
     # -- without this the pass logs membership and timing only, and a
     # correction of a used_* counter leaves no trace at all. That made
-    # "the reconciler reports zero drift" unverifiable from logs during
-    # the phase 4a soak, which is why this exists.
+    # "the reconciler reports zero drift" unverifiable from logs, which
+    # is exactly what a soak of a change to the admit/release path needs
+    # to check.
     drifted_nodes = 0
     drift_magnitude = {resource: 0 for resource in CAPACITY_RESOURCES}
 

@@ -860,8 +860,8 @@ class ExternalApiCreateAdmissionWalkTestCase(ExternalApiTestCase):
         # completely idle must admit an 8-vCPU create on the *first*
         # walk, with no waiver. The clause compares the node's existing
         # demand against that budget and ignores the size of the
-        # placement asking; before phase 4a the placement's charge
-        # (8 x 0.6 = 4.8) went on the left-hand side, so this refused
+        # placement asking; when the placement's charge (8 x 0.6 =
+        # 4.8) went on the left-hand side, this refused
         # and only the P9 waiver rescued it -- a second walk, and a
         # spreader that never spread, for a node that was never busy.
         self.mock_mariadb.set_node_capacity(
@@ -1215,8 +1215,7 @@ class ExternalApiExceptionRecordingTestCase(ExternalApiTestCase):
 class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
     """Tests for the disk-loop artifact-fetch logic in InstancesEndpoint.post.
 
-    Phase 3b refactored the disk loop to resolve the artifact eagerly and
-    pass artifact_uuid into afo_create_and_enqueue, and to build
+    The disk loop resolves the artifact eagerly and passes artifact_uuid into afo_create_and_enqueue, and to build
     instance_start_dependencies passed as depends_on to
     nino_create_and_enqueue.  These tests verify that contract.
 

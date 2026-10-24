@@ -77,7 +77,7 @@ What this file deliberately does not assert
   agreement means waiting out a period, which belongs in a soak rather
   than in the suite.
 * **Anything about the command line.** ``sf-client namespace claim``
-  exists as of phase 4b, but its argument parsing and output formatting
+  exists, but its argument parsing and output formatting
   are covered by unit tests in ``client-python``. What this file defends
   is the API surface those commands sit on.
 """

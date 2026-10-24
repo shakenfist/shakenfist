@@ -1,7 +1,8 @@
 # Copyright 2026 Michael Still and contributors
 """Unit tests for the eventlog drainer thread.
 
-After the phase 2b RPC swap the interesting bits are the
+The database write is one ``mariadb.record_event_batch`` call, so
+the interesting bits are the
 batch-building (translates spool payload dicts into
 ``EventRecord`` instances) and the failure-handling branches
 (``mariadb.record_event_batch`` failure, backoff, poison-row
