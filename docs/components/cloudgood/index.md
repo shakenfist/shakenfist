@@ -70,10 +70,10 @@ because some of the tooling we use today dates back to the heady days of
 full system emulation, and understanding the history can help build a mental
 model for how things work and why.
 
-[More fundamentals](/components/cloudgood/more-fundamentals/) then circles back to talking
-through some more fundamental things you would have learned in a university
-level operating systems class, but without taking six months of your life.
-There is also no exam, you're welcome.
+[More fundamentals](/components/cloudgood/userspace-initialization/) then circles back to
+talking through some more fundamental things you would have learned in a
+university level operating systems class, but without taking six months of
+your life. There is also no exam, you're welcome.
 
 [Instance video](/components/cloudgood/instance-video/) is an exploration of how video inside
 instances works, why you would even want video from inside an instance,

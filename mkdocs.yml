@@ -566,9 +566,12 @@ nav:
        - "Agent Operations": operator_guide/agent_operations.md
        - "Artifacts": operator_guide/artifacts.md
        - "Authentication": operator_guide/authentication.md
+       - "Capacity Refusals": operator_guide/capacity_refusals.md
+       - "Credential Rotation": operator_guide/credential_rotation.md
        - "Database": operator_guide/database.md
        - "Events": operator_guide/events.md
        - "Exception Tracking": operator_guide/exception_tracking.md
+       - "Kerbside": operator_guide/kerbside.md
        - "Load Balancing": operator_guide/load_balancing.md
        - "Locks": operator_guide/locks.md
        - "Logging": operator_guide/logging.md
@@ -579,3 +582,4 @@ nav:
        - "Scheduler": operator_guide/scheduler.md
        - "Threads": operator_guide/threads.md
        - "Upgrades": "operator_guide/upgrades.md"
+       - "VDI Console Tokens": operator_guide/vdi_console_tokens.md

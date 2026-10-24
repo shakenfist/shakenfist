@@ -11,11 +11,15 @@ themselves run.
 | `ci.yml` | Pull requests, merge queue entries, dispatch | The build, unit tests and Biome; the pre-commit hooks; the editor tests; the automated reviewer on pull requests; and the "Can enqueue" and "Can merge" checks the merge queue requires. |
 | `secret-scan.yml` | Pull requests, merge queue entries, pushes to `develop`, dispatch | gitleaks over the history. |
 | `codeql-analysis.yml` | Pull requests, merge queue entries, pushes, weekly | CodeQL. |
+| `mermaid-lint.yml` | Pull requests and pushes to `develop` touching markdown, dispatch | Renders every mermaid diagram with `tools/mermaid-lint.sh`. Advisory; see below. |
 | `release.yml` | A `v*` tag, dispatch | The release, as below. |
 
 On a pull request, `ci.yml`'s jobs skip a change that touches only review
-marks, and skip a pull request from a fork altogether. A merge queue entry
-skips nothing.
+marks, and skip a pull request from a fork altogether. The editor tests,
+which run on an ephemeral VM rather than the static pool, also skip a change
+that touches only review marks and `docs/`; the other jobs still run for
+one, so that it gets its automated review. A merge queue entry skips
+nothing.
 
 ## Merging
 
@@ -45,6 +49,17 @@ one ahead of it, so revisit those groups first.
 
 A new job in `ci.yml` goes in the `needs:` of both "Can enqueue" and
 "Can merge", or the queue will merge without it.
+
+`mermaid-lint.yml` is the deliberate exception, and is neither in those
+`needs:` lists nor a required check. It runs only when markdown changes,
+and a path-filtered workflow made required never reports on the pull
+requests it filters out, so it would hold them in the queue forever. A red
+"Mermaid lint" on a pull request blocks nothing automatically; fix it
+before enqueueing anyway. `tools/mermaid-lint.sh` runs it by hand. Both
+files are copies of shakenfist/development's `templates/mermaid-lint/`, so
+change them there rather than here; the workflow keeps two local changes,
+named in its header -- like `ci.yml`, it skips a pull request from a fork,
+and its checkout keeps no token.
 
 Enqueueing a fork's pull request is the point at which its code first
 runs here. On the pull request itself `ci.yml` skips a fork, but a merge
