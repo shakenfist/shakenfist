@@ -25754,7 +25754,11 @@ HARD_DELETE_BATCH_FUNCTIONS: dict[ObjectType, tuple[str, ...]] = {
         'delete_network',
         'delete_cluster_operation_targets_for_object',
     ),
+    # The references a blob holds first: a blob removes them on its
+    # transition to deleted, and this is the backstop for one deleted
+    # before it did, or whose removal failed then (issue 4558).
     ObjectType.BLOB: (
+        'remove_all_references_from',
         'delete_blob_hashes',
         'delete_blob_transfers_for_blob',
         'delete_blob_attributes',

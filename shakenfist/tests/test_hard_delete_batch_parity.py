@@ -114,7 +114,9 @@ EXPECTED_DELETES = {
         'delete_network',
         'delete_cluster_operation_targets_for_object',
     ),
+    # The references-held backstop from issue 4558, then Blob's own rows.
     ObjectType.BLOB: (
+        'remove_all_references_from',
         'delete_blob_hashes',
         'delete_blob_transfers_for_blob',
         'delete_blob_attributes',

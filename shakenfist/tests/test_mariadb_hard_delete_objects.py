@@ -373,8 +373,8 @@ class DirectTransactionTestCase(base.ShakenFistTestCase):
         self.assertIn('object_states.update_time < ', first)
         self.assertIn('RETURNING object_states.object_uuid', first)
         self.assertEqual(
-            ['blob_hashes', 'blob_transfers', 'blob_attributes', 'blobs',
-             'object_metadata', 'event_objects'],
+            ['object_references', 'blob_hashes', 'blob_transfers',
+             'blob_attributes', 'blobs', 'object_metadata', 'event_objects'],
             [statement.table.name for statement in statements[1:]])
 
     def test_later_statements_key_on_what_the_guard_returned(self):
@@ -435,7 +435,7 @@ class DirectTransactionTestCase(base.ShakenFistTestCase):
         returning = self._returning(uuids)
         self.conn.execute.side_effect = [
             OperationalError('DELETE', {}, Exception(1213, 'Deadlock')),
-            returning, None, None, None, None, None, None]
+            returning, None, None, None, None, None, None, None]
 
         result = mariadb._direct_hard_delete_objects(
             ObjectType.BLOB, uuids, FINAL_STATES, 1000.0, False)

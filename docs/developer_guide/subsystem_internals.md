@@ -667,10 +667,12 @@ holds when it is deleted: `Instance._delete_globally()`, `Artifact.delete()`
 and the agent operation delete paths call
 `mariadb.remove_all_references_from()`. A blob does it in its state
 transition (`Blob._state_update()`), because several paths delete a blob by
-assigning `STATE_DELETED` directly. `Blob.hard_delete()` repeats the removal
-as a backstop for blobs deleted before that was the case. Anything new a
-blob comes to hold (container members, chunks) has to be cleared in
-`Blob._remove_references_held()` too.
+assigning `STATE_DELETED` directly. A blob's hard delete repeats the removal
+as a backstop for blobs deleted before that was the case: it is the first of
+the blob's entries in `mariadb.HARD_DELETE_BATCH_FUNCTIONS`, so the batch,
+its per-call fallback and the deleted-object sweep all make it. Anything new
+a blob comes to hold (container members, chunks) has to be cleared in
+`Blob._remove_references_held()` and in those batch entries too.
 
 `INSTANCE_LOCATION` references similarly replace the legacy `instances`
 JSON list on `node_attributes`: the list was maintained by read-modify-write
