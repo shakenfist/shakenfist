@@ -282,7 +282,7 @@ every consumer, so that:
 | 1b. Atomic target writes + by-target JOIN fix | (folded into phase 1 PR; see below) | Complete | `bc7c119bf` (#3465) |
 | 2. Observational flag: schema and query layer | [PLAN-cluster-op-visibility-phase-02-observational-schema.md](PLAN-cluster-op-visibility-phase-02-observational-schema.md) | Complete | `9b098c6ac` (#4574) |
 | 3. Classify and mark observational tasks | [PLAN-cluster-op-visibility-phase-03-mark-observational.md](PLAN-cluster-op-visibility-phase-03-mark-observational.md) | Complete | `27ea18202` (#4588) |
-| 4. API surface: has_pending_operations and truthful outstanding ops | [PLAN-cluster-op-visibility-phase-04-api-surface.md](PLAN-cluster-op-visibility-phase-04-api-surface.md) | In progress | — |
+| 4. API surface: has_pending_operations and truthful outstanding ops | [PLAN-cluster-op-visibility-phase-04-api-surface.md](PLAN-cluster-op-visibility-phase-04-api-surface.md) | Complete | `3642e7a75` (#4606), `bdc91db78` (#4617) |
 | 5. CI helper simplification, functional coverage, documentation | PLAN-cluster-op-visibility-phase-05-coverage-docs.md | Not started | — |
 | 6. Push audit | PLAN-cluster-op-visibility-phase-06-push-audit.md | Not started | — |
 
@@ -300,6 +300,12 @@ request put on `develop`. A phase which has not landed reads
 Phase 1b was folded into phase 1's pull request rather than
 landing separately, so both rows name the same merge and the
 audit reads that one range for both.
+
+Phase 4 landed in two pull requests: #4606, and the follow-up #4617,
+which removed a duplicate `runs_after` entry its automated review
+found after #4606 had entered the merge queue. The audit reads both
+ranges. Its client accessors landed separately, in
+shakenfist/client-python#436.
 
 ### Phase 1b: Atomic cluster_operation_targets writes (done, in the phase 1 PR)
 
