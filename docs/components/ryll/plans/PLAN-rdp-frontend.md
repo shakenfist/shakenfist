@@ -175,11 +175,14 @@ Kerbside spike* below).
    `primary_key()`, and the main channel's monitors config
    sends N identical side-by-side heads. Not needed for the
    MVP; recorded so nobody assumes multi-monitor is close.
-6. **Mono and 4-bit cursors are refused**, not decoded
-   (`channels/cursor.rs`). Guests that use them show no
-   cursor shape in any mode. RDP's `ColorPointer` carries
-   AND/XOR masks, so this is solvable, but it is a renderer
-   fix that benefits every mode.
+6. **Mono, 4-bit, 8-bit and 16-bit cursors are refused**, not
+   decoded (`channels/cursor.rs`), and `COLOR32` ignores the
+   AND mask that follows its pixels, so its transparent area
+   shows as an opaque block (phase 3's survey). Guests that use
+   them show no cursor shape in any mode. spice-gtk decodes all
+   but 8-bit into RGBA, approximating inverting pixels, so this
+   is a renderer fix that benefits every mode. Phase 3 made it,
+   decoding every format but 8-bit as spice-gtk does.
 
 ### The RDP side: IronRDP as of 2026-10-19
 
@@ -544,8 +547,8 @@ cursor, resize, text clipboard and audio playback. Specifically:
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Renderer prep: damage, pointer translation, slim build, device-free audio | [PLAN-rdp-frontend-phase-01-renderer-prep.md](/components/ryll/plans/PLAN-rdp-frontend-phase-01-renderer-prep/) | Complete | 4696a95 |
-| 2. RDP skeleton: `shakenfist-spice-rdp`, `--rdp`, display, keyboard, mouse, security | [PLAN-rdp-frontend-phase-02-rdp-skeleton.md](/components/ryll/plans/PLAN-rdp-frontend-phase-02-rdp-skeleton/) | In progress | |
-| 3. Cursor and resize | - | Not started | |
+| 2. RDP skeleton: `shakenfist-spice-rdp`, `--rdp`, display, keyboard, mouse, security | [PLAN-rdp-frontend-phase-02-rdp-skeleton.md](/components/ryll/plans/PLAN-rdp-frontend-phase-02-rdp-skeleton/) | Complete | 7b389b1, c314094 |
+| 3. Cursor and resize | [PLAN-rdp-frontend-phase-03-cursor-resize.md](/components/ryll/plans/PLAN-rdp-frontend-phase-03-cursor-resize/) | In progress | |
 | 4. Clipboard and audio | - | Not started | |
 | 5. Lifecycle and CI: reconnect, takeover, an `rdp-smoke` lane | - | Not started | |
 | 6. Documentation and parity | - | Not started | |
@@ -652,20 +655,27 @@ evidence-based answers in the plan.
 
 ### Phase 3: Cursor and resize
 
-- Cursor shapes as `RGBAPointer` (larger than 96x96 needs
-  `LargePointer` or scaling), hide as `HidePointer`. Leave
+- Cursor shapes as `RGBAPointer`, hide as `HidePointer`.
+  IronRDP 0.13.0 sends `RGBAPointer` as a 32 bpp pointer
+  (bottom-up BGRA) and never sends `LargePointer`, and a
+  pointer too big for the wire format drops the client, so
+  shapes larger than 96x96 are scaled down. Leave
   `PointerPosition` out unless testing shows a reason, per
   qemu-rdp's experience.
-- Decode mono and 4-bit SPICE cursors in the renderer (gap 6),
-  which also fixes them in the other modes.
-- Resize: the client's initial desktop size via
-  `request_initial_size`, then display-control layouts via
-  `request_layout`, both mapped to `DisplaySize::Requested`
-  (aligned as the GUI aligns them). The guest's answer, a
-  `SurfaceCreated` of a new size, already becomes
-  `DisplayUpdate::Resize` in phase 2, which needs it for
-  guest-driven changes. Without an agent, the client gets
-  the guest's fixed size.
+- Decode mono, 4-bit and 16-bit SPICE cursors in the renderer,
+  and honour `COLOR32`'s AND mask (gap 6), which also fixes
+  them in the other modes.
+- Resize: the client's initial desktop size, which only the
+  Client Core Data carries, so the server must set
+  `with_honor_client_desktop_size(true)` for
+  `request_initial_size` to see it, then display-control
+  layouts via `request_layout`, both mapped to
+  `DisplaySize::Requested` (aligned as the GUI aligns them).
+  The guest's answer, a `SurfaceCreated` of a new size,
+  already becomes `DisplayUpdate::Resize` in phase 2, which
+  needs it for guest-driven changes. Without an agent, the
+  client gets the guest's fixed size after one extra
+  reactivation.
 
 ### Phase 4: Clipboard and audio
 

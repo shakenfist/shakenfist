@@ -80,6 +80,27 @@ repository and passes through to the script.
   marked reviewed by import (see "Importing reviews from this
   repository" under "Steady state").
 
+Every one of these files must be a regular file inside the
+repository and no larger than 2 MiB (the audit's own read cap), and
+none may be a symlink when the tooling writes it. Anything else --
+a link out of the checkout, a link to a device, a directory, an
+oversized file -- stops the subcommand with exit status 2 and a
+`review-tracking: ERROR:` line naming the file, rather than being
+read, written through or treated as absent; the `review-coverage`
+and `review-scope-completeness` audits report that as an error.
+
+So does a state file that would put a line of its own in the
+generated `REVIEWS.md`, since `prune` commits that file. That covers
+every value which reaches one of its table cells: a state file whose
+name (the reviewer), marked path, or sidecar stamp date or sha
+contains a control or format character or a Unicode line or paragraph
+separator, a weAudit mark that is not an object with a path, and a
+partial mark whose line numbers are not integers. A reviewer can
+clear it by un-marking the file in weAudit. An entry in the imports
+file with such a value in any of its fields is not refused but
+dropped, with a warning, as that file treats every entry `import`
+did not write.
+
 ## Adopting a repository
 
 1. Ensure the review state files are committable. If `.gitignore`
@@ -304,6 +325,18 @@ repository and passes through to the script.
    bidi/zero-width check: review notes are prose, and prose is a
    place secrets or Unicode smuggling could land.
 
+   Skip the review state only: `REVIEWS.md` and the two weAudit
+   files. Leave `.vscode/review-scope.toml` out of every pull
+   request filter but CodeQL's. It is policy rather than review
+   state, since it decides which files are reviewed at all, so a pull
+   request that narrows it needs lint and the automated reviewer like
+   any other change. The `review-scope-ci` audit checks this for the
+   workflow that runs the automated reviewer. A scope-only pull
+   request therefore pays for a full CI run, which happens a few
+   times a year in a repository. A workflow that runs only after a
+   merge, such as a canary on push to the default branch, may still
+   skip it: by then the change has been linted and reviewed.
+
    For a workflow whose checks are **not** required, a trigger-level
    `paths-ignore` is the simple answer:
 
@@ -315,7 +348,6 @@ repository and passes through to the script.
          - 'REVIEWS.md'
          - '.vscode/*.weaudit'
          - '.vscode/*.weaudit-shas.json'
-         - '.vscode/review-scope.toml'
    ```
 
    That form is unsafe once a workflow backs a **required** status
@@ -340,10 +372,10 @@ repository and passes through to the script.
    `Analyze` is a required check on hunkydory's default branch, so
    pull requests skip it at the job level rather than with a
    trigger-level filter, while `push` carries no required check and
-   keeps `paths-ignore` directly. Besides the review paths it skips
-   `docs/**`, and it does not analyse fork pull requests at all
-   (trimmed; the template's comments say why each condition is
-   there):
+   keeps `paths-ignore` directly. Besides the review state it skips
+   the scope config and `docs/**`, since CodeQL analyses neither, and
+   it does not analyse fork pull requests at all (trimmed; the
+   template's comments say why each condition is there):
 
    ```yaml
    on:
@@ -1075,6 +1107,18 @@ for as long as the `include` list had no JSON pattern, because JSON
 had simply never come up. No issue could have been filed about it:
 from `review-coverage`'s perspective the repository was fully
 measured.
+
+**Deployment drift.** Two more checks cover the deployment rather
+than the review. `review-tracking-templates`
+(`docs/audits/review-tracking-templates.md`) fails a repository
+whose three CI copies are not byte-identical to
+`templates/review-tracking/`. A template change therefore shows up
+as one failure per adopter until each is re-synced. Without the
+check, two adopters had fallen eleven template commits behind and
+nobody noticed. `review-scope-ci` (in
+`docs/audits/workflow-standards.md`) fails a repository where a pull
+request changing only the scope config skips the automated
+reviewer, for the reason step 8 gives.
 
 `status` and `scope-orphans` are also useful interactively: run
 `./tools/review-tracking.sh status` in any clone to see effective

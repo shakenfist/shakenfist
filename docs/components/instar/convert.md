@@ -82,7 +82,15 @@ The default can also be set via `convert.sparse` in the config file.
 - **vmdk** - VMDK monolithicSparse output (default), streamOptimized
   with `-c`, or monolithicFlat with `--subformat monolithicFlat`.
   Configurable grain size (4KB-64KB, default 64KB via `--grain-size`)
-  for sparse/streamOptimized output
+  for sparse/streamOptimized output.
+  A monolithicFlat extent is named the way `qemu-img` names it: the output's
+  basename is split at its last `.` and the extent is `<prefix>-flat<postfix>`
+  in the same directory, and the descriptor records that name. `out.vmdk`
+  gives `out-flat.vmdk`, `out.img` gives `out-flat.img`, `out` gives
+  `out-flat`, `a.b.c` gives `a.b-flat.c`, and `.hid` gives `-flat.hid`.
+  An extent name that holds `"`, CR or LF is refused before anything is
+  written (see
+  [quirks.md](/components/instar/quirks/#vmdk-flat-extent-names-must-fit-the-descriptor)).
 - **vpc** - VHD dynamic output, configurable block size (512KB+,
   default 2MB via `--block-size`)
 - **vhdx** - VHDX dynamic output, configurable block size (1MB-256MB,

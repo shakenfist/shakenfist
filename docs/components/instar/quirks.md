@@ -1106,15 +1106,60 @@ recurse, matching qemu-img.
 | Mode | raw | qcow2 | vmdk / vpc / vhdx |
 |------|-----|-------|-------------------|
 | `off` | yes | yes | yes |
-| `metadata` | rejected | yes | rejected (future work) |
-| `falloc` | yes | yes | rejected (future work) |
-| `full` | yes | yes | rejected (future work) |
+| `metadata` | rejected | yes | rejected |
+| `falloc` | yes | yes | accepted, same as `off` |
+| `full` | yes | yes | accepted, same as `off` |
 
 `raw + metadata` is rejected because raw has no metadata to
-preallocate. Non-qcow2 sparse formats reject non-`off`
-preallocation with a "future work" pointer — each format needs
-its own BAT-population pattern plus the same host
-`apply_preallocation` post-pass qcow2 already uses.
+preallocate.
+
+For vmdk, vpc and vhdx, `falloc` and `full` are accepted and write
+exactly the image `off` writes, because qemu-img does: none of those
+drivers has a `preallocation` create option (`block/vpc.c:1194`, qemu
+7.0.0), and the file protocol that consumes the key preallocates the
+file while it is still empty. `tests/golden/qemu-create-pins.json`
+records that content and allocation match `off` on all 80 pinned
+builds. `metadata` is refused, as qemu refuses it ("Unsupported
+preallocation mode: metadata", `block/file-posix.c:2024-2026`), with
+`create: preallocation=metadata is not supported for FORMAT`. The host
+always tells the guest `off` for these formats, so the result does not
+depend on the guest ignoring the preallocation bits. `instar measure`
+takes the same modes and refuses `metadata` the same way. This is
+create only: `instar resize --preallocation falloc|full` on these
+formats does allocate the appended region (see
+[format-coverage.md](/components/instar/format-coverage/)).
+
+### VMDK descriptors omit qemu's DDB lines
+
+A VMDK descriptor written by `qemu-img create` ends with a Disk Data
+Base: `ddb.virtualHWVersion`, `ddb.geometry.cylinders`, `.heads` and
+`.sectors`, `ddb.adapterType`, and from qemu 6.2.0 `ddb.toolsVersion`
+(`tests/golden/qemu-create-pins.json` has the two groups either side of
+that boundary). instar's descriptors stop at the `#DDB` comment, for
+monolithicFlat (from `create` and `convert`) and for the sparse
+subformats alike. So `-o adapter_type`, `hwversion` and `toolsversion`
+are accepted and change nothing. `qemu-img info` reports the same image
+either way: the tests compare its JSON for instar's and qemu's
+monolithicFlat images, ignoring only the CID and allocation.
+
+Every instar VMDK also carries the constant `CID=fffffffe` where qemu
+writes a random one. That is the same missing identity source as the
+all-zero VHD unique id (#566).
+
+### VMDK flat extent names must fit the descriptor
+
+A monolithicFlat descriptor names its extent on a line of text, as
+`RW <sectors> FLAT "<name>" 0`. qemu-img writes the name verbatim
+(measured with qemu-img 10.0.13): a `"`, CR or LF in the output's
+basename ends the quoted string or the line, so the descriptor names a
+different file or gains lines of its own, and a non-UTF-8 name is
+written as raw bytes. instar refuses the quote, CR and LF in `create`
+and `convert`, before any file is opened, with `<op>: vmdk monolithicFlat
+cannot record the extent name "..." in its descriptor`. It never sees a
+non-UTF-8 name: its command line takes only UTF-8 arguments, and exits 2
+with `invalid UTF-8 was detected in one or more arguments`. Its
+descriptor reader requires UTF-8 too, so such an image could not be read
+back.
 
 ### VHD `virtual_size` diverges from qemu-img by CHS rounding
 

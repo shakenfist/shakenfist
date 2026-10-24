@@ -203,7 +203,7 @@ attached rather than quietly disappearing from the table.
 | [release-environment-protection.md](/components/development/audits/release-environment-protection/) | Every environment a release job names exists, has a required reviewer, and deploys only from tags |
 | [merge-group-cancellation.md](/components/development/audits/merge-group-cancellation/) | Superseded merge group runs are cancelled, not left building clouds |
 | [security-sanitization.md](/components/development/audits/security-sanitization/) | HTTP header and file path sanitization |
-| [workflow-standards.md](/components/development/audits/workflow-standards/) | Permissions, naming, self-hosted runners, static runner tags, vm runner size, devpi cache fallback, devpi cache address, linting, PIPESTATUS, flake8wrap |
+| [workflow-standards.md](/components/development/audits/workflow-standards/) | Permissions, naming, self-hosted runners, static runner tags, vm runner size, devpi cache fallback, devpi cache address, linting, review marks, review scope, PIPESTATUS, flake8wrap |
 | [expensive-lane-path-filter.md](/components/development/audits/expensive-lane-path-filter/) | Expensive PR lanes skip docs-only and review-marks-only changes |
 | [fuzz-nightly-reporting.md](/components/development/audits/fuzz-nightly-reporting/) | Fuzz targets run nightly and file issues for crashes, rather than gating the merge queue |
 | [scheduled-workflow-health.md](/components/development/audits/scheduled-workflow-health/) | No workflow that fires unattended has failed without ever succeeding |
@@ -231,6 +231,7 @@ attached rather than quietly disappearing from the table.
 | [secret-handling.md](/components/development/audits/secret-handling/) | Secret scanner in CI, credentials kept out of logs |
 | [review-coverage.md](/components/development/audits/review-coverage/) | Human review backlog stays under threshold in repos with review tracking |
 | [review-scope-completeness.md](/components/development/audits/review-scope-completeness/) | Nothing leaves the human review queue by omission from the scope config |
+| [review-tracking-templates.md](/components/development/audits/review-tracking-templates/) | The review tracking CI files are byte-identical to their templates |
 | [sfui-vendor.md](/components/development/audits/sfui-vendor/) | Vendored sfui copies are verbatim and current |
 | [scope-coverage.md](/components/development/audits/scope-coverage/) | Every repository in the organisation is audited or documented as excluded |
 | [eol-distro.md](/components/development/audits/eol-distro/) | Nothing runs on, or is built from, a distribution release that has reached end of life |

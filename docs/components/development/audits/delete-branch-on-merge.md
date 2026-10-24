@@ -7,11 +7,14 @@ branches" enabled (Settings > General > Pull Requests), so that a
 pull request's source branch is deleted automatically when the PR
 merges. This keeps repositories free of stale merged branches.
 
-The check queries the `delete_branch_on_merge` repository setting
-via the GitHub API. Note that the API only exposes this setting to
-tokens with push access to the repository: to any other it answers
-null, which the check reports as `error` rather than as a failure,
-because it says nothing about the setting.
+The check queries the repository's `deleteBranchOnMerge` setting
+through the GitHub GraphQL API. Not the REST API's
+`delete_branch_on_merge`: the REST repository answer leaves that
+field out for a fine-grained token with read-only Administration,
+which is what the audit runs with, while GraphQL answers it. A null
+answer, from a token that cannot see the repository's administration
+settings, is reported as `error` rather than as a failure, because it
+says nothing about the setting.
 
 ## Template
 
