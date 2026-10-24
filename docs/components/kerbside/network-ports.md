@@ -13,7 +13,7 @@ exists.
 | 5901/tcp | `VDI_INSECURE_PORT` | Rust proxy | SPICE clients | Plaintext SPICE, used only to redirect. It reads the client's link message, answers `NEED_SECURED` and closes the connection. No authentication happens here and no SPICE traffic is relayed. |
 | 13002/tcp | gunicorn `--bind` | gunicorn (REST API) | Brokers, users, admins | REST API, web UI, and the `.vv` exchange endpoints (`/sf-console.vv`, `/nova-console.vv`). |
 | 13003/tcp, loopback | `PROMETHEUS_METRICS_PORT`, `PROMETHEUS_METRICS_ADDRESS` | Rust proxy | Prometheus | Unauthenticated `/metrics`. Bound to `127.0.0.1` by default. Never expose it on the VDI interface. |
-| `/run/kerbside/api.sock` (unix) | `API_SOCKET_PATH` | daemon | Rust proxy only | Control-plane gRPC between the daemon and its proxy. It is not a TCP port, but it is listed because it is why the API, daemon and proxy must be co-located. |
+| `/run/kerbside/api.sock` (unix) | `API_SOCKET_PATH` | daemon | Rust proxy only | Control-plane gRPC between the daemon and its proxy. It is not a TCP port, but it is listed because it is why the daemon and its proxy must share a host. The API never dials it and may run elsewhere, since it reaches the daemon only through the database, though it reads the same `sources.yaml` and CA certificate from disk. |
 
 The API port is not a Kerbside setting: it is whatever address you
 give gunicorn. 13002 is the value used by the demo, the CI lanes and

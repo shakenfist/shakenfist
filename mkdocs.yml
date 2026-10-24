@@ -154,6 +154,7 @@ nav:
                 - "Audit: Release process": components/development/audits/release-process.md
                 - "Audit: Renovate for dependency bumps": components/development/audits/renovate.md
                 - "Audit: Renovate groups for lockstep dependency families": components/development/audits/renovate-lockstep-groups.md
+                - "Audit: Review tracking templates": components/development/audits/review-tracking-templates.md
                 - "Audit: Rust unwrap lint": components/development/audits/rust-unwrap-lint.md
                 - "Audit: Scheduled workflow health": components/development/audits/scheduled-workflow-health.md
                 - "Audit: Secrets passed to reusable workflows": components/development/audits/reusable-workflow-secrets.md

@@ -172,6 +172,17 @@ that is handled.
 
 ## How to set it up
 
+The supported path is Shaken Fist's own deploy. Add hosts to the
+`kerbside` group in the inventory and set the `kerbside_*` variables,
+and Shaken Fist's `site.yml` deploys Kerbside through the
+`shakenfist.kerbside` collection. It does each step below for you:
+it sets `KERBSIDE_URL`, creates the signing key and a dedicated
+`kerbside` system key, and writes Kerbside's `sources.yaml` with the
+cluster CA. Shaken Fist's
+[Kerbside guide](https://shakenfist.com/operator_guide/kerbside/)
+describes that path. The steps below are what the deploy does, and
+the path for a Kerbside deployed another way.
+
 ### Shaken Fist side
 
 **Cluster configuration.** Two cluster-wide settings turn the
@@ -187,7 +198,8 @@ the value.
 **Signing keys.** Shaken Fist signs console tokens with a VDI
 token signing key, and the cluster must have one before any
 token can be minted or verified; Kerbside caches only its public
-half. Creating the key is an explicit operator step, and
+half. Shaken Fist's deploy creates the key for you. Otherwise
+creating the key is an explicit operator step, and
 [console-sources.md](/components/kerbside/console-sources/#shaken-fist) has the
 command and describes exactly what Kerbside does when a cluster
 has no key yet.
@@ -355,7 +367,7 @@ Not covered, and worth knowing before you deploy:
 | Backend pinning depends on the cluster | Two conditions have to hold, and either can fail quietly. Pinning only happens on a leg that escalated to TLS, so a node whose qemu does not require a secure channel is relayed over its plaintext port with nothing to verify or pin. Where the escalation does happen, a node that publishes no `spice_server_cert_subject` leaves `host_subject` unset, and the proxy relays that backend without host-subject enforcement rather than refusing it. Whether your cluster publishes one depends on its version and node configuration. The optional knob for turning enforcement on anyway, and the PKI assumption it makes, are in [console-sources.md](/components/kerbside/console-sources/#shaken-fist). |
 | Off-box deployment untested in CI | The lane runs Kerbside on the Shaken Fist primary over loopback. The real topology — Kerbside on its own host, reaching the API by name and the nodes by address — is the shape the oVirt lane proves, not this one. |
 | Token exchange can be unavailable while scraping is fine | A cluster Kerbside scrapes happily is not necessarily one it can exchange tokens for; the two capabilities fail independently by design. The causes and the operator fix are in [console-sources.md](/components/kerbside/console-sources/#shaken-fist). |
-| Non-`system` namespaces | A source configured with any other namespace is untested and is not expected to work: only the instance listing uses the configured namespace, while the CA fetch, the signing-key fetch and the node listing are always made as `system` with the same key. The unit tests cover the branch with a namespace-to-mock map, which proves the branch and not that a non-`system` credential works against a real cluster. Tracked as #444. |
+| Non-`system` namespaces | A source configured with any other namespace is untested and is not expected to work: only the instance listing uses the configured namespace, while the CA fetch, the signing-key fetch and the node listing are always made as `system` with the same key. The unit tests cover the branch with a namespace-to-mock map, which proves the branch and not that a non-`system` credential works against a real cluster. |
 | Shaken Fist client version | The `shakenfist_client` library is imported by name rather than being a runtime dependency, so any version at all can be installed alongside Kerbside. Versions older than 0.8.3 cannot fetch signing keys, which leaves token exchange unavailable for every Shaken Fist source. |
 | Freshly created consoles | The inventory is a scrape, not a subscription, so a console can be up to a minute old. A token minted for an instance Kerbside has not yet scraped is rejected and must be retried once the scrape catches up. |
 | Live migration during a session | Not characterised. The console's node, address, ports, and certificate subject are captured at scrape time; an instance that moves between nodes mid-session has not been tested. |

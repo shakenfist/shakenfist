@@ -710,8 +710,8 @@ rather than merge requests.
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Pin qemu's behaviour across the 80 static builds, build the structural VHDX comparator, correct `docs/create.md` | [PLAN-bat-population-phase-01-pin.md](/components/instar/plans/PLAN-bat-population-phase-01-pin/) | Complete | `fef62417` (#809) |
-| 2. Fixed VHDX fixtures (instar-testdata + instar) | [PLAN-bat-population-phase-02-fixtures.md](/components/instar/plans/PLAN-bat-population-phase-02-fixtures/) | In progress | |
-| 3. Host-only create: non-qcow2 preallocation parity and monolithicFlat | PLAN-bat-population-phase-03-host-create.md | Not started | |
+| 2. Fixed VHDX fixtures (instar-testdata + instar) | [PLAN-bat-population-phase-02-fixtures.md](/components/instar/plans/PLAN-bat-population-phase-02-fixtures/) | Complete | instar-testdata `d2f9467719` (direct to `main`); instar `5c5bba75` (#819) |
+| 3. Host-only create: non-qcow2 preallocation parity and monolithicFlat | [PLAN-bat-population-phase-03-host-create.md](/components/instar/plans/PLAN-bat-population-phase-03-host-create/) | In progress | |
 | 4. Read side: BAT entry count (#626), partial last block, `LeaveBlocksAllocated` and `resize` | PLAN-bat-population-phase-04-read-side.md | Not started | |
 | 5. VHDX geometry: default block size (#645), 64 TiB ceiling, one shared layout | PLAN-bat-population-phase-05-geometry.md | Not started | |
 | 6. Streaming BAT emitter and the fixed `plan_vhdx` | PLAN-bat-population-phase-06-emitter.md | Not started | |
@@ -774,10 +774,18 @@ host-only, so it goes early as the cheapest closure of most of the
 preallocation leaf: accept `falloc` and `full` for vmdk, vpc and vhdx
 in both the `-o` parser and `validate_create_args`, produce the `off`
 image, refuse `metadata`, and do the same for `measure`'s `-o`
-parser; plus monolithicFlat create (open question 2). It must not touch the qcow2 or raw preallocation paths,
-which really allocate. Its tests are cross-version info baselines for
-the new cases (qemu's output is byte-stable here, Situation) and a
-`stat` assertion that the file is as sparse as `off`'s.
+parser; plus monolithicFlat create (open question 2). It must not
+touch the qcow2 or raw preallocation paths, which really allocate.
+Its oracle is the phase 1 pin: every mode's exit status, bytes and
+allocation must relate to `off` as qemu's do, with lengths taken from
+instar's own `off` image, because #645 and the VHD CHS rounding make
+instar's absolute lengths differ from qemu's. The cross-version info
+baselines for the new cases join phase 10's, for the reason phase 2
+moved the fixed VHDX ones there. Its survey found that convert names
+a monolithicFlat extent `<stem>-flat.vmdk` whatever the output's
+extension, where qemu keeps the extension (#820); the naming rule
+create shares with convert is qemu's, so the phase fixes #820 (see
+the phase 3 plan).
 
 **Phase 4** fixes what instar reads before instar writes anything
 new, for the reason `PLAN-differencing` phase 4 gave: the tree should
@@ -856,8 +864,8 @@ instar's mirror of it, which phase 2's survey moved here because
 adding them before instar can create fixed VHDX breaks
 `test_create_cases_match_baselines` and they cannot see fixed-ness),
 per-image cross-version baselines for phase 2's fixtures, the
-preallocation cases, and the derived-profile validation the
-Situation warns about. It is separate from the feature phases because
+preallocation and monolithicFlat create cases, and the
+derived-profile validation the Situation warns about. It is separate from the feature phases because
 regenerating baselines in instar-testdata and validating `profiles/`
 against `raw/` is its own procedure, and because each feature phase
 already carries the host-version tests that prove it works.
@@ -1487,6 +1495,12 @@ chosen to defer to here, so that we do not forget them.
   large dynamic BAT at a small block size is still refused with no
   message. Worth an issue of its own if phase 8's survey confirms the
   silent path is reachable from the CLI.
+* qemu's DDB lines in instar's VMDK descriptors. Both the sparse
+  writer and `build_flat_descriptor` omit `ddb.virtualHWVersion`,
+  `ddb.geometry.*`, `ddb.adapterType` and (from qemu 6.2.0)
+  `ddb.toolsVersion`, and accept-ignore `adapter_type`, `hwversion`
+  and `toolsversion`. No reader uses them, but a byte comparison
+  with qemu's descriptor sees the difference.
 * Four test modules carry their own partial VHDX parsers
   (`tests/test_create.py:111-176`, `tests/test_info_safe.py:360-415`,
   `tests/test_differencing.py:2384-2530`, and a CRC-32C in

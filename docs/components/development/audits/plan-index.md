@@ -35,6 +35,14 @@ like is documenting its own conventions rather than listing a plan, so
 the example's columns are not judged as a table and its links do not
 register the plans they name.
 
+A plan is listed when a link in the index names its filename. A link
+to a plan under a subdirectory, such as `completed/PLAN-a.md`, counts,
+because finished plans are filed there. A link carrying a URL scheme
+does not: it names a plan in another repository, whatever its
+filename. Links written with a title (`[a](PLAN-a.md "title")`) or with
+the destination in angle brackets (`[a](<PLAN-a.md>)`) are read like
+any other.
+
 ### The status vocabulary
 
 A status cell holds exactly one of `Proposed`, `Not started`,
@@ -70,9 +78,10 @@ does not police it.
 
 ## Template
 
-No template. `templates/shared-blocks/plan-status-vocabulary.md` holds
-the canonical status vocabulary; copy it verbatim, markers included,
-into the repository's `PLAN-TEMPLATE.md`.
+Every issue links `templates/shared-blocks/`, the directory of shared
+blocks. `templates/shared-blocks/plan-status-vocabulary.md` holds the
+canonical status vocabulary; copy it verbatim, markers included, into
+the repository's `PLAN-TEMPLATE.md`.
 
 To convert an index to the canonical layout, move the date to the first
 column, sort each table oldest first, and move everything that is not a
