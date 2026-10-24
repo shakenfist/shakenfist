@@ -1099,6 +1099,12 @@ Recorded here rather than absorbed, per the survey:
   behaviour that matters, but it is not the same as the data being
   there.
 
+  *Done (corrected 2026-10-25, by the phase 7a survey).* The filter
+  was widened on 2026-09-05 by `shakenfist/actions` `0c87e8d48`
+  ("Collect the capacity guard's refusals too"), without an issue.
+  `tools/ci_headroom_collect.sh` there now matches all three guard
+  messages beside the two stage forms.
+
 ## Back brief
 
 Before executing any step of this plan, please back brief the

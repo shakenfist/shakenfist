@@ -360,7 +360,7 @@ table entirely (decision D8).
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started | — |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
-| 7a. An operator-readable capacity surface | PLAN-scheduler-reservations-phase-07a-capacity-surface.md | Not started | — |
+| 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | In progress | — |
 | 7b. Capacity and claim views in sf-client | `PLAN-scheduler-reservations-phase-07b-client-views.md` (in shakenfist/client-python, branch `scheduler-reservations-phase-07b-client-views`; a relative link cannot cross repositories, so it is named rather than linked) | Not started | — |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started | — |
 | 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started | — |
@@ -836,6 +836,16 @@ quoted headroom weights for the nodes it called eliminated, and
 a node only has a weight if it is in the returned list, so its
 own evidence refutes it.
 
+*Input from phase 7a (2026-10-25):* D11's rewrite of `admin.py`'s
+capacity view onto the typed capacity columns has more to carry
+than this stub assumed. Phase 7a adds two top-level keys to
+`summarize_resources()`: `cluster_capacity` (the singleton's
+counters and `unallocated_*`) and `excluded` (why each active
+node is missing from `per_node`). The rewrite must keep both,
+and 7a's functional tests in `test_nodes.py` fail if it does not.
+7a deliberately left the endpoint's `Scheduler()` construction
+alone so that the migration stays this phase's (7a's H7).
+
 What survives for phase 6 is real but weaker: `cpu_load_1`
 measures activity rather than occupancy, so a node packed with
 idle CI runners *ranks ahead of* a busier node with more room.
@@ -1015,6 +1025,29 @@ server half: publish what the table above says nobody can read.
   designs these response shapes, and the reader of a surface is
   its best test. A server surface that nobody can read is the
   gap these two phases exist to close (7b's D7).
+
+*Corrected by the phase 7a survey (2026-10-25).* Three premises
+above were wrong.
+
+* Neither capacity guard *reads* the singleton. Both are guarded
+  `UPDATE`s (`mariadb.py:27577-27586` for an unclaimed placement,
+  `_claim_capacity_guard()` at `:28440` for a claim), and no RPC
+  reads the row on demand, so 7a adds one. Both guards test
+  against the same quantity, `total - claimed - unclaimed_used`,
+  so 7a publishes that as the one headroom figure and pins it to
+  both guards with a live-MariaDB test.
+* The queue-length exclusion is one of five ways a hypervisor
+  leaves `per_node`. The others are: not `active`, stale metrics,
+  no metrics, and a failed metrics read. In the stale and empty
+  cases the server reads `is_hypervisor` from the emptied metrics
+  dict, so it cannot tell such a hypervisor from a network node.
+* The `mariadb.py:28175` and `:29023` references above had
+  drifted. They are now `:27577` / `:28440` and `:29296`.
+
+The response shapes, the `/admin/claims` URL and the client pull
+request order are decided in
+[PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md),
+H1 to H9.
 
 **Phase 7b — capacity and claim views in sf-client.** This is the
 client half. It lands entirely in `client-python`, so the phase
