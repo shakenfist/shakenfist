@@ -364,6 +364,58 @@ fixtures still match what the code emits.
 The phase plan is
 [PLAN-queue-performance-phase-12-push-audit.md](PLAN-queue-performance-phase-12-push-audit.md).
 
+### Audit of phases 9 to 11
+
+Run on 2026-10-25. Wave 1 is clean across all five ranges: tox ran
+6075 tests with none failing, and the stubs are fresh. The
+three-layer pattern, SQL pushdown and SQL binding hold. The audit
+found one blocking defect, and phase 8's lesson predicted it: the
+fault is not in what the phases wrote, but in what their changes
+switched on.
+
+**A folded sibling reads `complete` before its survivor has done the
+work (#4638).** The fold has always marked its siblings complete
+before the survivor's tasks run. That was harmless while nothing
+waited on a folded operation. Phase 11 made `network_ensure_mesh`
+coalescible, and the mesh operation is what `instance_create` and
+`attach_instance_interface` name in `depends_on`. So those
+dependents are now released when the survivor *starts*. If the
+survivor fails, they go ahead anyway. #4033 made the overlap
+routine: a user's mesh enqueue stopped adopting the maintainer's
+background one, so the background op can fold the user's op. Three
+independent reviews reached this, and a sqlite harness driving the
+real `execute()` reproduces it. It is fixed in the follow-up pull
+request.
+
+One more cross-node fold was found and declined. Rows written
+before #4007 have a NULL `node_uuid`, so in a rolling upgrade a
+cluster-wide survivor would fold them on every hypervisor. That is
+phase 8's bug again, this time by data skew rather than version
+skew. No release has ever contained NetOp, and the one known
+`develop` deployment passed that window weeks ago, so only the
+upgrade step's wrong comment is corrected.
+
+The rest is advisory:
+
+* **Fixed in the follow-up pull request:**
+  * The safety argument is written as "key-aware, not queue-aware"
+    in two places that should say family-aware too. Phase 11's own
+    done-criterion was ticked without this being true.
+  * The operator page lists five of the seven fold outcomes.
+  * Fourteen plan references survive in code and docs.
+* **Filed as issues:**
+  * #4639: removing the never-released V1 RPCs.
+  * #4640: the timeline tool misreading budget-abandoned operations.
+  * #4641: no test of the V2 UNIMPLEMENTED path.
+  * #4642: tool fixtures not derived from the emitter.
+  * #4643: dedup adopting a backing-off operation.
+  * #4644: duplication and size.
+  * #4645: a dispatcher restart briefly breaking the
+    one-worker-per-network guarantee. This predates the plan.
+* **Recorded on #3929:** the functional coalescing tests' design.
+
+The full disposition is in the phase plan.
+
 Findings land as their own pull request, and the plan is not complete
 until each is resolved or declined in writing here. If the audit
 finds nothing, that is recorded in one sentence.
@@ -1074,3 +1126,9 @@ corrections found while landing it.
   whether to add bounded-staleness ordering
   (`ORDER BY CASE WHEN NOW() - created_at > N THEN top
   ELSE priority END, ...`) or a reserved-slot mechanism.
+
+* **Removing the V1 coalescing RPCs.** `protos/database.proto`
+  keeps `ClaimCoalescibleSiblings` and `FindExistingCoalescibleOp`
+  "for one release", but no release has ever contained them. The
+  server also does not check which tasks a V1 caller asks it to
+  fold. Tracked as #4639, found by phase 12.

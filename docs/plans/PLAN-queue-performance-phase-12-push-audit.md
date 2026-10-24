@@ -116,6 +116,13 @@ master plan's Status and Phase 12 sections and in the
    `2c08f1d2c4`, `b6f1f912f5`, `2b1c22ff4c`, `8c28e70651`,
    `fa642a1e0e`, `8eff2ce3b3` and `b7936e00bf`.
 
+   *Corrected during execution:* there are eleven, not ten.
+   `8420816261` (#4303, "Reap and never adopt rowless cluster
+   operations") changed `_direct_find_existing_coalescible_op` and
+   `daemons/database/main.py`. The survey missed it because its
+   `git log` was not scoped to `mariadb.py`. 12d and 12g both found
+   it, and it touches neither routing nor the fold.
+
 7. **One piece of deferred work was dropped rather than recorded.**
    `protos/database.proto:20-25` says the V1 coalescing RPCs
    (`ClaimCoalescibleSiblings`, `FindExistingCoalescibleOp`) are
@@ -672,6 +679,348 @@ docs/plans/index.md
 `git diff $R -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
 
 no output
+
+### Wave 2 mechanical sweep
+
+The sweep's five commands are recorded per range under "Wave 1"
+above. In every range they report no new TODO, FIXME, HACK, XXX,
+`# noqa`, `# type: ignore`, `pragma: no cover` or subprocess call.
+New test functions per range: 30, 0, 33, 37 and 20. There was
+nothing to triage.
+
+Line references below are to the tree at `9efbff1481`. Every finding
+was checked there, and is classified per decision 2. Each heading's
+review was run by the sub-agent its step names. The management
+session reproduced at least one claim from each before recording it,
+and the reproduction is named.
+
+### Style
+
+Step 12c. Most added plan references were fixed since by
+`70e9f2eeeb`; 12c re-grepped every added line of the five diffs for
+phase, decision and step shapes. The survivors are recorded under
+2c below, finding A3, because 12f's list is the complete one.
+Otherwise clean, by these checks:
+
+* Quoting, wrapping and import order are clean; no added line over
+  120 characters outside generated protos.
+* The V2 path keeps the three-layer pattern, and its Monitor
+  counters are registered (`daemons/database/main.py` ~6466).
+* No field changed units. `not_cluster_wide` survives as a mapped
+  retired name.
+
+Read: all five `.py` diffs excluding protos, and at the tip
+`baseoperation.py`, both workitems, `node_blob_op.py`, `mariadb.py`,
+`exceptions.py`, both `net_op.py` files and `network/network.py`.
+Reproduced: `schema/operations/net_op.py:52` ("step 4") and
+`tests/schema/operations/test_upgrade_step_sweep.py:14-15`.
+
+### 2a. Code quality
+
+Step 12d. Clean:
+
+* the three-layer pattern for both V2 functions, with `priorities`
+  threaded through proto, gRPC, direct and mock;
+* no new `get_all_*`, and no cached foreign-key list;
+* thin V1 and V2 handlers.
+
+Findings:
+
+* **R1, rolling-upgrade cross-node fold.** Also found by 12g and 12h.
+  Recorded under "Coalescing rule coherence" below.
+* **B1, fold before work.** 12d found it by asking what #4033's
+  `_reusable_priorities` switches on. It narrows enqueue dedup: a
+  `user_facing` enqueue stops adopting `background` and
+  `user_facing_high_io` ops, so a user op and the maintainer's
+  background op now routinely coexist, and the background survivor
+  can fold the user op. That is the phase 8 question answered: the
+  change was correct on its own terms, and what it switched on was
+  a premature completion. Recorded under coherence below.
+* **The `InvalidCoalescibleEnqueue` docstring omits the family
+  condition** (`exceptions.py:667-683`). Part of A1 below.
+* **A9, duplication, size and comment proportion.**
+  * Helpers are copied between the two tools.
+  * The two coalescing SELECTs (`mariadb.py` ~23711, ~23841) are
+    near-duplicates.
+  * `tools/operation-timeline.py` is 1,425 lines with clear seams.
+  * `execute()` carries 146 comment lines against 88 of code, and
+    repeats the invariant.
+  * The tools' new functions have no type hints.
+
+Read: every function the coalescing path touches in `mariadb.py`;
+`execute()`, `execution_duration_extra` and
+`_coalescible_target_reference` in `baseoperation.py`; both
+`net_op.py` files and `schema/operations/util.py`; the network
+workitem; `daemons/database/main.py:276-410`; and the enqueue sites
+in `network.py`, `maintain.py` and `external_api/instance.py`.
+
+### 2b. Test review
+
+Step 12e. The plan asked three questions.
+
+1. **Producer and consumer.** Only the `coalesce_outcome` value set
+   is derived from the emitter
+   (`test_every_outcome_the_code_records_is_reported`). Every other
+   fixture is hand-written in both tool suites, and the emitter's
+   test pins the key names independently: finding A6.
+   `3e18fe40b2`'s defer budget does create a terminal path the
+   timeline tool misreads. A budget-exhausted op emits 30 defer
+   events and then returns before `execution duration`
+   (`daemons/queues/workitem.py:145-147`). The tool reports it as
+   "ran after it, or not yet" (`tools/operation-timeline.py:1065-
+   1068`): finding A4. Reproduced at both lines.
+2. **The flake family.** Both functional coalescing tests assert
+   that an opportunistic optimisation fired. Neither guarantees the
+   queued sibling that dedup and fold both require: finding A7. The
+   mesh-correctness half of the per-node test is deterministic and
+   is the valuable part.
+3. **The new outcome branches.** `key_column_missing` and
+   `coalescing_unavailable` are both reached through a real
+   `execute()`. What has no test is the *producer* of
+   `CoalescingUnavailable`: nothing exercises the V2 gRPC wrappers'
+   UNIMPLEMENTED handling. That is finding A5; reproduced by `grep`
+   finding no test that names the V2 RPCs or the `_grpc_*`
+   coalescing wrappers.
+
+Four named unit tests were run under the tox venv and pass. Read:
+both tool suites, the defer, abandon, coalescing and execution-extra
+classes of `test_baseoperation.py`, `test_mariadb_coalescing.py`,
+the whole of `test_coalescing.py`, and #3928, #3929 and #4235.
+
+### 2c. Documentation review
+
+Step 12f. Every event field, outcome name and tool flag the two
+docs pages mention exists under that name at the tip. Neither
+`README.md`, `AGENTS.md` nor `ARCHITECTURE.md` needed changing, and
+no `state_targets` map moved. Findings:
+
+* **A1, the safety argument is stated inconsistently.**
+  * `daemons/network/workitem.py:105-108` says both guards are
+    "key-aware, not queue-aware". It tells a maintainer to weaken
+    either "only by strengthening the key".
+  * `_direct_claim_coalescible_siblings`'s docstring
+    (`mariadb.py:23809-23815`) says the same.
+  * The code is family-aware too (`schema/operations/net_op.py:297`,
+    and the `{node_uuid}-network-` prefix test in `execute()`), as
+    `database_internals.md` says.
+
+  The danger is concrete: the comment invites removing the family
+  check, which would let the #4017 race in. This is phase 11's
+  done-criterion "no statement about what makes the fold safe is
+  written differently" -- ticked, but not met. Reproduced at both
+  locations.
+* **A2, the operator page is incomplete.**
+  `docs/operator_guide/networking/overview.md` ~683-697 lists five
+  of the seven outcomes. It omits `key_column_missing` and
+  `coalescing_unavailable`, and the latter is the one an operator
+  sees during an upgrade. It also says `coalesce_seconds` is
+  present only when the fold ran, which `coalescing_unavailable`
+  events contradict, and its "two events" intro introduces three.
+  Reproduced: `grep` finds neither outcome on the page.
+* **A3, plan references.**
+  * 72 of the 83 added lines citing a plan were fixed since by
+    `70e9f2eeeb`. Eleven survive in code:
+    `daemons/network/workitem.py:126-127`;
+    `test_coalescing.py:28`, `:43` and `:383`;
+    `baseoperation.py:171`; `schema/operations/net_op.py:52`;
+    `test_net_op.py:364`; `test_net_op_coalescing.py:83`;
+    `test_upgrade_step_sweep.py:15`; and
+    `tools/operation-timeline.py:98-99`.
+  * Three survive in docs: `overview.md:807`, and
+    `database_internals.md:566` and `:568-570`.
+  * The `workitem.py` one points at a plan for deferred work. The
+    shared block asks for the issue link, which is #4017.
+  * None is listed by consistency issue #4630, whose automated
+    check does not match these shapes.
+* **The index row for this plan is about 650 words.** That is not
+  the one-line Intent the vocabulary block intends. Other rows are
+  longer still, so this is a pattern across plans; declined below.
+
+### 2d. Security review
+
+Step 12g, at high effort.
+
+* **The four-link argument.**
+  * (i) holds for v3 rows.
+  * (ii) holds: `node_uuid` is the target, and the guard requires
+    `family == 'network'`.
+  * (iii) holds: only the `sf-net` dispatcher dequeues
+    `{node}-network-*`.
+  * (iv) holds in steady state, but breaks transiently when the
+    dispatcher restarts: finding F3.
+  * None of the eleven later commits changed routing or dequeue.
+* **The V1 RPCs** are not reachable from any current client: both
+  wrappers raise `CoalescingUnavailable` on UNIMPLEMENTED, with no
+  fallback. The server does not validate their `task_names`, so the
+  proto comment's promise holds for Shaken Fist's own clients only.
+  That goes with S1.
+* **SQL.** `_coalescible_preflight` checks every key column against
+  `_COALESCIBLE_TARGET_COLUMNS` before any statement is built.
+  Columns resolve only through `table.c`, and uuids, task names and
+  priorities are all bound. Nothing is interpolated.
+* **Events.** They carry timings, counts and queue names, and no
+  secrets.
+* **Findings.**
+  * R1 and B1, medium. Recorded under coherence below.
+  * F3, low: the network dispatcher's `finally` sends its sentinel
+    with `put_nowait` and joins with `timeout=5`
+    (`daemons/network/workitem.py:353-361`). The monitor then
+    restarts the job beside the old workers
+    (`daemons/network/main.py:63-70`). Reproduced at both
+    locations. The code dates from 2024-25, so it predates this
+    plan, but the fold made it load-bearing.
+  * Informational: `NetOp.external_view` now shows `node_uuid` to
+    anyone who can see the operation. That is low sensitivity,
+    because instance views already show node names.
+
+Read: the network and queues workitems, `daemons/daemon.py`, the
+network maintainer, the database handlers, every coalescing function
+in `mariadb.py`, `_state_read` and `_state_update`, and every NetOp
+enqueue site and dependent.
+
+### Coalescing rule coherence
+
+Step 12h, at high effort. All eleven expressions were found at the
+lines the brief gave. They are consistent with each other on:
+
+* guard against static walk;
+* key construction on both sides, including `IS NULL` round-tripping
+  over gRPC;
+* queue against `node_uuid`;
+* `missing_key_columns` against present-but-`None`;
+* routing being coarser than the fold;
+* `sf-queues` never draining `networknode-*`.
+
+Divergent but unreachable: neither coalescing SELECT checks
+`depends_on` or `runs_after`, but no single-task coalescible enqueue
+passes either. A `networknode` target on the `network` family would
+pass both guards, but no site does it. The static walk skips
+non-literal task lists, but every site uses a literal.
+
+Divergent and reachable:
+
+* **B1. A folded sibling reads `complete` before its survivor has
+  done the work.**
+  * The fold sets siblings `complete`
+    (`mariadb.py:23873-23888`) before `execute()` reaches the
+    `dispatch_task` loop (`baseoperation.py:664`).
+  * Dedup is sound: the adopter waits on an operation that
+    completes only after the work. The fold is not.
+  * Since #4007 the sibling can be the mesh op that
+    `instance_create` and `attach_instance_interface` name in
+    `depends_on`. Those dependents are released when the survivor
+    starts. If the survivor errors or defers, they go ahead anyway.
+  * #4033 made it likelier, as 2a describes.
+  * Work is delayed or its error masked, not lost: the maintainer
+    repairs the mesh.
+  * The same property has held for `network_apply_update_dnsmasq`
+    since coalescing was first built.
+  * Proof [4] of the scratch harness shows a background survivor
+    folding a `user_facing` sibling which is already `complete` when
+    the survivor's task is dispatched.
+* **R1. Rows written before #4007 fold across nodes during a rolling
+  upgrade.**
+  * Before #4007, per-node `network_ensure_mesh` ops had no
+    `node_uuid` in their metadata. The insert takes the column from
+    metadata (`mariadb.py:21654`, `:21913`), so those rows hold
+    NULL.
+  * A current cluster-wide survivor with
+    `[create_network_node, ensure_mesh]` (`network/network.py:325`,
+    `external_api/instance.py:1431`) keys on `(network, NULL)` and
+    folds them on every hypervisor. That is phase 8's bug, by data
+    skew rather than version skew.
+  * `_upgrade_step_2_to_3`'s comment that `None` is "the correct
+    answer" is wrong for those rows.
+  * Proofs [1] to [3]: the fold happens; a control with `node_uuid`
+    set is left alone; and the same row, loaded as a survivor,
+    records the opposite verdict.
+  * **No release contains NetOp at all**: `net_op.py` is absent
+    from both `v0.7.2` and `v0.8.0-rc4`. Only a cluster that ran
+    `develop` from before 2026-09-03 and still holds queued rows
+    from it can reach this, and `sfcbr` passed that window weeks
+    ago.
+* **R3. Dedup can adopt an operation that is backing off.** It
+  inherits a 15 to 60 second delay. Delay only: finding A8.
+
+The priority question: dedup and fold cannot disagree on priority
+in a way that loses work. A survivor reads state after its own
+dequeue, so a less urgent survivor releases a more urgent sibling
+sooner, never later. The one harm is B1's.
+
+The management session re-ran
+`/tmp/claude-1000/-srv-kasm-profiles-mikal-vscode-src-shakenfist-shakenfist/feba9aa3-1fc4-4c7d-b001-32290ac28294/scratchpad/12h/test_12h_divergence.py`
+under the tox venv: 35 tests OK, with all four proofs printing as
+reported. It also confirmed the tag contents. The harness is a
+scratch file and is not committed; the follow-up pull request turns
+proofs [1] and [4] into real tests.
+
+### Disposition
+
+The operator approved these grades on 2026-10-25, before anything
+was filed (the second back-brief gate).
+
+| # | Finding | Grade | Disposition |
+|---|---------|-------|-------------|
+| B1 | A folded sibling reads complete before the work | Blocking | Filed as #4638, labelled `automated-fix-attempted`; fixed in the follow-up pull request |
+| R1 | Rolling-upgrade cross-node fold of rows written before #4007 | Advisory | Declined: no release contains NetOp, and the one known `develop` deployment is past the window. The wrong `_upgrade_step_2_to_3` comment is corrected in the follow-up pull request |
+| A1 | Safety argument stated as "not queue-aware" | Advisory | Fixed in the follow-up pull request |
+| A2 | Operator page omits two outcomes | Advisory | Fixed in the follow-up pull request |
+| A3 | Fourteen surviving plan references | Advisory | Fixed in the follow-up pull request |
+| S1 | V1 RPCs never released, untracked, unvalidated | Advisory | Filed as #4639 |
+| A4 | Timeline tool misreads budget-abandoned ops | Advisory | Filed as #4640 |
+| A5 | No test of the V2 UNIMPLEMENTED path | Advisory | Filed as #4641 |
+| A6 | Tool fixtures not derived from the emitter | Advisory | Filed as #4642 |
+| A7 | Functional coalescing tests assert an opportunistic event | Advisory | Recorded on #3929 (comment 6389874947), as decision 8 requires |
+| A8 | Dedup adopts a backing-off op | Advisory | Filed as #4643 |
+| A9 | Duplication, size, comment proportion, type hints | Advisory | Filed as #4644 |
+| F3 | Dispatcher restart breaks link (iv) | Advisory | Filed as #4645. It predates this plan |
+| -- | `node_uuid` in `NetOp.external_view` | Informational | Declined: instance views already show node names |
+| -- | The index row is a paragraph | Informational | Declined here: the same is true of most rows, so it is an index-wide clean-up rather than this plan's |
+
+Duplicate searches run before filing, with
+`gh issue list --state all --search`:
+
+* "coalesced sibling complete before"
+* "fold depends_on mesh"
+* "V1 coalescing RPC remove"
+* "ClaimCoalescibleSiblings"
+* "operation-timeline abandon"
+* "DEPENDENCY_DEFER_BUDGET timeline"
+* "CoalescingUnavailable test"
+* "UNIMPLEMENTED coalescing"
+* "queue-wait-report fixture"
+* "dedup adopts deferred"
+* "coalescing backoff adopt"
+* "operation-timeline duplicate queue-wait-report"
+* "net-worker restart worker threads"
+* "dispatcher sentinel put_nowait"
+* "network workitem join timeout"
+
+They matched only the known flake issues, closed issues and the
+#3772 umbrella. Sub-agents ran further searches of their own
+("coalesce complete before", "rolling upgrade coalescing",
+"coalesced into sibling" and others), with the same result.
+
+A blocking finding remains open, so phase 12 and the plan stay In
+progress. The follow-up pull request fixes B1, A1, A2, A3 and R1's
+comment, and carries the close-out (decision 7).
+
+### Execution notes
+
+* 2026-10-25 (AEDT). 12b ran alone. Then 12c to 12h ran in parallel,
+  after the operator passed the wave 1 gate.
+* Decision 4 was relaxed in one respect. The read-only agents could
+  run a single test with
+  `PYTHONDONTWRITEBYTECODE=1 timeout 600 python -m unittest <id>`
+  (in practice with `.tox/py3/bin/python`, since the system Python
+  lacks sqlalchemy). That writes nothing to `.stestr/`, and does not
+  touch pre-commit's stash, which were decision 4's two reasons.
+  The worktree was clean after every agent.
+* 12c to 12h are recorded in one commit rather than six. They all
+  edit this section of one file, and splitting them would have cost
+  six pre-commit runs to separate prose.
+* Survey finding 6 was corrected in place (eleven later commits, not
+  ten).
 
 ## Back brief
 
