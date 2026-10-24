@@ -565,8 +565,8 @@ spelling above is the one to write.
 | 2. Shaken Fist side: signing key, Kerbside credential, token duration, shadow guard | [PLAN-kerbside-deployer-phase-02-sf-side.md](PLAN-kerbside-deployer-phase-02-sf-side.md) | Complete | `80292df08` (#4442) |
 | 3. A `kerbside` role and the `kerbside` group in `site.yml` | [PLAN-kerbside-deployer-phase-03-kerbside-role.md](PLAN-kerbside-deployer-phase-03-kerbside-role.md) | Complete | `b85005f0e` (#4465) |
 | 4. A merge-queue lane with the feature on | [PLAN-kerbside-deployer-phase-04-ci.md](PLAN-kerbside-deployer-phase-04-ci.md) | Complete | `0016c5dad` (#4479) |
-| 5. The `kerbside` role moves into Kerbside, and Kerbside's sf-e2e lane deploys through it | [PLAN-kerbside-deployer-phase-05-role-to-kerbside.md](PLAN-kerbside-deployer-phase-05-role-to-kerbside.md) | In progress | — |
-| 6. Documentation and close-out | PLAN-kerbside-deployer-phase-06-docs.md | Proposed | — |
+| 5. The `kerbside` role moves into Kerbside, and Kerbside's sf-e2e lane deploys through it | [PLAN-kerbside-deployer-phase-05-role-to-kerbside.md](PLAN-kerbside-deployer-phase-05-role-to-kerbside.md) | Complete | `48849831c` (#4591); kerbside `2093f2ed5` (#580), `89f199456` (#587); actions `17ea1889e` (#181), `31139125c` (#195) |
+| 6. Documentation and close-out | [PLAN-kerbside-deployer-phase-06-docs.md](PLAN-kerbside-deployer-phase-06-docs.md) | In progress | — |
 | 7. Push audit | PLAN-kerbside-deployer-phase-07-push-audit.md | Proposed | — |
 
 The `Merged` column records what put each phase on `develop`: the
@@ -917,27 +917,37 @@ is not blamed for an old failure.
 
 ### Phase 6 -- Documentation and close-out
 
-- `docs/operator_guide/vdi_console_tokens.md` loses its "manual
-  step" section and gains the variables, the group, and the
-  bring-your-own-Kerbside path. The "admin callers" error is
-  fixed.
-- `docs/operator_guide/installation.md` documents the group and
-  variables.
+Phases 3 to 5 already did much of what this section first asked
+for. `vdi_console_tokens.md` lost its "manual step" note and gained
+the variables, the group and the bring-your-own path.
+`installation.md` documents the group, the variables and the
+database. The release note has its Kerbside bullets. What remains:
+
 - A new `docs/operator_guide/kerbside.md` covers:
   - the topology choices;
-  - the database to create;
-  - the load-balancer shape for the API (with an nginx example,
-    following `examples/nginx-loadbalancer.conf`) and for the
-    TCP passthrough of 5900/5901;
-  - certificate overrides;
+  - the network each needs;
+  - the load-balancer shape for the API (with an nginx example)
+    and for the TCP passthrough of 5900/5901, marked untested;
+  - certificates and their overrides;
   - what being Keystone-less costs (kerbside#300);
   - the private-CA SF API caveat (kerbside#136).
-- Release notes.
-- In the Kerbside repository, `docs/use-cases/shakenfist.md`
-  points at the collection as the supported path, and the
-  co-location claim in `installation.md` is corrected (or filed,
-  if the operator prefers). Both are edited there, never in
-  `docs/components/kerbside/` here (`AGENTS.md`).
+
+  It links to the existing variable tables rather than repeating
+  them.
+- `vdi_console_tokens.md`'s "admin callers" error is fixed (now at
+  `:240`), along with a stale cross-reference. The page, and the
+  new one, join the site navigation, which has never listed
+  `vdi_console_tokens.md`.
+- `ARCHITECTURE.md` names Kerbside as an optional component.
+- In the Kerbside repository, `docs/use-cases/shakenfist.md` points
+  at the collection as the supported path. The co-location claim is
+  corrected in all five places it appears: `installation.md`
+  twice, `network-ports.md`, `demo/README.md` and
+  `demo/entrypoint.sh`, the last found by kerbside#592's review
+  rather than the survey. Both are edited
+  there, never in `docs/components/kerbside/` here (`AGENTS.md`).
+- kerbside#579 is closed, since the nightly has been green since
+  2026-10-19.
 
 Planned at medium effort.
 
@@ -1266,8 +1276,10 @@ chosen to defer to here, so that we do not forget them.
   plan's Future work also points at convergence with SF's
   OIDC and auth-federation work.
 - **A least-privilege credential for the scrape.** It needs an
-  `sf-ctl` option to mint a scoped `system` key, kerbside#444,
-  and a verified scope set. The set is probably `cluster-admin`,
+  `sf-ctl` option to mint a scoped `system` key, and a verified
+  scope set. kerbside#444, on non-`system` namespaces, was closed on
+  2026-10-17 by a documentation change (kerbside#569). The
+  limitation it described still holds. The set is probably `cluster-admin`,
   `node.read`, `instance.read` and `admin.read`, but that is
   unverified.
 - **Kerbside's SF API client pins no CA** (kerbside#136). An SF
@@ -1301,7 +1313,7 @@ where one exists, for directly related issues that we should
 either resolve as part of this master plan or at least be aware of
 while planning it.
 
-- **#4415** (open): SPICE certificate renewal never fires, and
+- **#4415** (closed): SPICE certificate renewal never fires, and
   certificates expire after 365 days (found while planning; see
   Situation). Phase 1 fixes it and closes the issue.
 - **#4416** (fixed outside this plan): the SPICE private key was
@@ -1311,12 +1323,12 @@ while planning it.
 - **#4004** (closed by #4024) delivered the first increment
   only. This plan is the remainder; phase 2 comments on #4004
   with a link here.
-- **#4093** (open): the mint test never runs in SF CI. Phase 4
+- **#4093** (closed): the mint test never runs in SF CI. Phase 4
   closes it.
 - **#4099** (merged): keeps the signing key out of daemon environments.
   #4097's 2026-09-06 comment asks for a live check of that, which phase
   4 adds.
-- **#4459** (open): restart-on-change in the node role has never
+- **#4459** (closed): restart-on-change in the node role has never
   been tested (found while planning phase 3). Phase 4 adds the
   second-deploy check.
 - **#4460** (open): `examples/cluster` pairs a load-balancer
@@ -1336,8 +1348,9 @@ while planning it.
 - **kerbside#482** (closed 2026-10-17): the nightly sf-e2e lane was
   failing. Phase 4's survey found it stale. kerbside#579 (open)
   reports a new nightly failure, building the proxy wheel, on
-  2026-10-18. Phase 5 confirms the lane's state before it moves it.
-- **kerbside#131, #313, #465** (open): a forgeable default seed,
+  2026-10-18. Every nightly from 2026-10-19 passed, which meets its
+  own close condition. Phase 6 closes it.
+- **kerbside#131, #313, #465** (closed): a forgeable default seed,
   a malformed INI that exits 0, and a malformed `sources.yaml`
   that crash-loops the daemon. Phase 3 guards each at deploy
   time: assert the seed, validate the rendered INI and YAML
