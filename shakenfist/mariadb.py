@@ -3856,9 +3856,11 @@ def _get_cluster_capacity_table() -> sa.Table:
     limits, capacity claimed by active namespace claims, and usage by
     instances in namespaces without an active claim. The cluster-wide
     admission guards run against this row: an unclaimed create must fit
-    in ``total - claimed``, and a claim must fit in
-    ``total - unclaimed_used``, so claims can never oversubscribe the
-    cluster.
+    in ``total - claimed - unclaimed_used``, and so must a new claim,
+    less any unclaimed usage of its own namespace that the claim takes
+    over. See ``_cluster_unallocated()``, which publishes that figure,
+    and ``_claim_capacity_guard()`` for the migration term. Claims can
+    therefore never oversubscribe the cluster.
 
     ``updated_at`` follows the cluster_locks TIMESTAMP idiom: a
     server-side timestamp so comparisons happen against the database's

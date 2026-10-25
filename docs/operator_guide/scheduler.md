@@ -966,9 +966,14 @@ were the same quantity.
 when it fits in what is neither claimed nor already used by unclaimed
 namespaces, and a new claim must fit in the same space, so one number
 per dimension answers both questions: a request of exactly
-`unallocated_*` is admitted, and one more is refused. The server computes
-it once, beside the read, so a client does not have to repeat the
-arithmetic and risk getting it slightly different.
+`unallocated_*` is admitted, and one more is refused. For a claim, that
+is exact only when the namespace has no unclaimed instances of its own.
+A namespace that already runs unclaimed instances can claim up to
+`unallocated_*` plus that usage, because the claim takes the usage over:
+it leaves `unclaimed_used_*` as the claim enters `claimed_*`, so it is
+not counted twice. The server computes `unallocated_*` once, beside the
+read, so a client does not have to repeat the arithmetic and risk
+getting it slightly different.
 
 `unallocated_*` can be negative, and is published as it is. Admission
 cannot drive it below zero, but the reconciler rebuilds `claimed_*` from
