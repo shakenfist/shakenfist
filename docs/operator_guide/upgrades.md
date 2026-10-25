@@ -429,8 +429,15 @@ moving to the next.
 **1. Stop `sf-api` on the node.**
 
 ```bash
-sudo systemctl stop sf-api
+sudo systemctl stop sf-api.socket sf-api
 ```
+
+Stop the socket as well as the service. systemd, not gunicorn, holds
+`sf-api`'s listening socket (`sf-api.socket`), and a connection to a
+stopped `sf-api` -- including your load balancer's next `/readyz` probe --
+starts it again while its socket is open, which here would mean on a
+half-upgraded virtualenv. `sf-api` stops first and the socket closes
+after it.
 
 Systemd sends SIGTERM. On receipt, the `sf-api` worker immediately flips
 `/readyz` to return `503 Service Unavailable`. The load balancer detects this
@@ -470,6 +477,9 @@ sudo systemctl restart sf-database
 sudo systemctl restart sf-api sf-cleaner sf-cluster sf-net sf-nodelock \
     sf-privexec sf-queues sf-resources sf-sidechannel sf-transfers
 ```
+
+Restarting `sf-api` also starts `sf-api.socket` again, because `sf-api`
+requires it.
 
 !!! note
     If the `sf-cluster` elected leader is on the node you are rolling, its

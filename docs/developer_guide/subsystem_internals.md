@@ -577,6 +577,15 @@ immediately — and then keeps serving live requests for
 shutdown, giving the load balancer time to stop routing new
 connections before the process exits.
 
+The listening socket is not gunicorn's. The collection installs
+`sf-api.socket`, systemd passes the bound socket to gunicorn on each
+start (gunicorn reads `LISTEN_FDS` and ignores `--bind`; the unit's
+`ExecStart` must `exec` gunicorn so that `LISTEN_PID` is gunicorn's pid),
+and the socket outlives the restart. Connections that arrive between the
+old workers exiting and the new ones accepting queue on it instead of
+being reset with the backlog when gunicorn closed its own socket, which
+nginx surfaced as 502s (#3664).
+
 Operator-facing probe guidance is in
 [`load_balancing.md`](../operator_guide/load_balancing.md).
 

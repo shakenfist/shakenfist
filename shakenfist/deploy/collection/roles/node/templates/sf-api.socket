@@ -1,0 +1,21 @@
+[Unit]
+Description=Shaken Fist API daemon listening socket
+PartOf=sf.target
+
+# systemd, not gunicorn, owns sf-api's listening socket, and hands it to
+# gunicorn on every start (gunicorn reads LISTEN_FDS and ignores its --bind).
+# The socket therefore stays open while sf-api restarts. When gunicorn owned it,
+# the last worker to exit closed it, the kernel reset every connection still
+# queued in its accept backlog, and a load balancer which had already sent a
+# request on one of those connections -- nginx will not retry a non-idempotent
+# request it has sent -- returned 502 to its client (#3664). Now connections
+# made during the restart wait in this queue and are answered by the new
+# gunicorn. Connections which arrive while sf-api is stopped start it, so stop
+# sf-api.socket, not sf-api, to take the API down on a node.
+[Socket]
+ListenStream=0.0.0.0:13000
+# gunicorn's own default --backlog.
+Backlog=2048
+
+[Install]
+WantedBy=sf.target

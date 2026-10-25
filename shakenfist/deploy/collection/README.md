@@ -42,9 +42,14 @@ changed on its node:
   a change to it restarts every daemon on the node. The config is re-rendered
   every run and changes when a value moved or the node's role did (most
   importantly joining or leaving the database tier).
-* **A systemd unit file.** A rewritten `sf-*.service`/`sf.target`, or removal of
-  an obsolete unit, restarts the affected daemons. `systemctl daemon-reload`
-  runs in the same play that writes the units, before any restart.
+* **A systemd unit file.** A rewritten `sf-*.service`/`sf-api.socket`/`sf.target`,
+  or removal of an obsolete unit, restarts the affected daemons. `systemctl
+  daemon-reload` runs in the same play that writes the units, before any
+  restart. systemd, not gunicorn, holds sf-api's listening socket
+  (`sf-api.socket`), so restarting sf-api does not close port 13000: requests
+  which arrive mid-restart wait for the new gunicorn instead of failing. The
+  socket itself is restarted, with sf-api stopped first, only when it is not
+  yet running or its unit file changed.
 
 The decision is per node and is logged during `register` as a
 `restart_needed=… (code=… config=… units=…)` line. Granularity is
