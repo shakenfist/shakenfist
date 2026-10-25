@@ -412,8 +412,9 @@ run at planning time, and gave the "now" result noted.
 - [ ] `grep -n "^## Waiting for an object's cluster operations" docs/developer_guide/ci.md`
       prints one line, before the line `grep -n "^## Creating instances in the functional suite" docs/developer_guide/ci.md`
       prints.
-- [ ] `git diff --stat develop -- ARCHITECTURE.md AGENTS.md README.md`
-      prints nothing.
+- [ ] `git diff --stat develop... -- ARCHITECTURE.md AGENTS.md README.md`
+      prints nothing. (Three dots: against the merge base, because
+      `develop` moves while the branch is open.)
 - [ ] `tox -e py3 -- shakenfist.tests.test_ci_await_operations shakenfist.tests.test_ci_capacity_wait`
       passes.
 - [ ] Step 5a's three mutations each fail the test they name. This was
@@ -480,3 +481,40 @@ wording is agreed, and that wording is in this plan for review.
   Situation bullet and `all=true` open question. A Definition of done
   item guards the wrong wording. This makes `TestOutstandingOperationsBodyAll`
   less likely to flake, not more.
+* **Step 5d.** As planned. The canonical statement is the new heading
+  "The deleted-object sweep" in `docs/operator_guide/database.md`
+  (`#the-deleted-object-sweep`), which names the
+  `cluster_deleted_object_backlog` metric. Three comments relied on
+  the old timing ("within a minute", "almost immediately", "about
+  thirty seconds of terminal ones") and now say "soon" or "recently
+  finished"; each comment's own argument still holds. The management
+  session rewrapped several edited paragraphs and comments. Rewrapping
+  `net_op.py` once split "eligible" from "thirty seconds" and tripped
+  the line grep, which shows the grep catches false positives as well
+  as misses.
+* **Step 5e.** As planned. Every claim in the new `ci.md` section was
+  checked against the committed helper.
+* **Rebase.** Before pushing, the branch was rebased onto
+  `origin/develop`, 18 commits ahead, with no conflicts. Every
+  Definition of done grep, the two CI-helper test modules and
+  `pre-commit run --all-files` were re-run afterwards and pass. The
+  ARCHITECTURE/AGENTS/README check now diffs against the merge base,
+  because a two-dot diff against a moved `develop` showed that
+  branch's own `ARCHITECTURE.md` change.
+
+### Master plan success criteria
+
+Walked on 2026-10-25 against the rebased branch.
+
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| `pre-commit run --all-files` passes | Met | Run after the rebase, exit 0. |
+| New code follows existing patterns | Met | Storage went through the three-layer pattern in phases 1 to 4. This phase adds test helpers and docs only. |
+| Observational filter is in SQL, with index support | Met | `table.c.observational == sa.false()` in `_direct_get_latest_cluster_operation_target()` and `_direct_has_pending_cluster_operation_target()` (`mariadb.py`); `idx_cot_target` covers `(target_object_type, target_uuid, observational)`. |
+| Observational op changes neither pointer nor pending, proven by a unit test | Met | `test_observational_current_state.py`: `test_observational_op_does_not_shadow_or_count_as_pending`, `test_sweep_alone_leaves_no_pointer_and_nothing_pending`. On a real cluster: `test_observational_sweeps` (step 5c), result below. |
+| `/instances/<ref>/clusteroperations` returns a queued op behind a later terminal one, proven by a test | Met | `test_object_cluster_operations.py::test_success_criterion`. |
+| `test_interface_plug_and_exec_reboot` no longer races the hot-plug | Pending CI | The helper now waits on `has_pending_operations` (step 5a). Evidence will be the PR's smoke runs of the three `instance_hotplug.py` tests. |
+| Protos regenerated with `tox -e genprotos` | Met | Re-running `tox -e genprotos` on the branch leaves the tree clean. |
+| `database.md` documents the v3 schema; developer guide documents mutating/observational | Met | `docs/operator_guide/database.md` ("The table is at schema v3", the `observational` column); `docs/developer_guide/database_internals.md` (the `observational` flag and `is_observational()`). |
+| Top-level docs updated where they describe the affected storage or API | Met, no edit needed | None of `ARCHITECTURE.md`, `AGENTS.md` or `README.md` describes it (finding 10), and this repository has no `CLAUDE.md`. |
+| `index.md` and `order.yml` reference the plan with current status | Met | `order.yml:42`; the `index.md` row reads `In progress`, `5 of 7`. |
