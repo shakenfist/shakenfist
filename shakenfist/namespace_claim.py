@@ -337,7 +337,9 @@ class NamespaceClaim(dbo):
                    'limit_disk_gb': limit_disk_gb,
                    'expires_in_seconds': expires_in_seconds})
 
-    def external_view(self) -> dict[str, Any]:
+    def external_view(
+            self, row: Optional[mariadb.NamespaceClaimRow] = None
+    ) -> dict[str, Any]:
         """The operator visible view of a claim.
 
         ``state`` is the object's existence state, where every other
@@ -353,12 +355,16 @@ class NamespaceClaim(dbo):
         say once the instances are gone. It only ever goes up, so it
         can exceed ``used_*`` by any amount and reads as zero on a
         claim whose cluster has not yet raised it.
+
+        ``row`` is this claim's row when the caller has already read it,
+        as a listing has. Without it the row is read here.
         """
         retval = self._external_view()
 
         # One read rather than one per field; every field below comes
         # from the same row.
-        row = self._row()
+        if row is None:
+            row = self._row()
 
         retval.update({
             'namespace': self.namespace,
@@ -438,6 +444,20 @@ class NamespaceClaim(dbo):
 class NamespaceClaims(dbo_iter):
     base_object = NamespaceClaim
 
+    def __init__(self, filters=None, prefilter=None, namespace=None,
+                 suppress_failure_audit=False, coverage_state=''):
+        """An iterator over claims.
+
+        ``coverage_state`` is empty for every claim, or 'active' or
+        'expired', and is pushed down to SQL with the namespace rather
+        than applied here. Like the namespace, it does not consult object
+        state: see __iter__().
+        """
+        super().__init__(
+            filters=filters, prefilter=prefilter, namespace=namespace,
+            suppress_failure_audit=suppress_failure_audit)
+        self.coverage_state = coverage_state
+
     def get_iterator(self):
         # The base iterator already carries a namespace; honouring it
         # here pushes the restriction into SQL, where the claims table's
@@ -447,14 +467,21 @@ class NamespaceClaims(dbo_iter):
         #
         # With no namespace there is nothing to push down, and the
         # unfiltered listing is the cluster admin view.
+        for objuuid, static_values, _ in self._rows():
+            yield objuuid, static_values
+
+    def _rows(self):
+        """(uuid, static values, row) for every claim this listing covers."""
         if self.namespace is None:
-            rows = mariadb.get_namespace_claims()  # nopushdown: no namespace to filter on
+            rows = mariadb.get_namespace_claims(  # nopushdown: no namespace to filter on
+                coverage_state=self.coverage_state)
         else:
-            rows = mariadb.get_namespace_claims(self.namespace)
+            rows = mariadb.get_namespace_claims(
+                self.namespace, self.coverage_state)
 
         for row in rows:
             yield row['uuid'], NamespaceClaim._static_values_to_dict(
-                NamespaceClaim._static_data_from_row(row))
+                NamespaceClaim._static_data_from_row(row)), row
 
     def __iter__(self):
         """Every claim row, including any whose object state is deleted.
@@ -477,13 +504,24 @@ class NamespaceClaims(dbo_iter):
         not to offer actions. test_a_deleted_claim_is_still_listed pins
         this, so a later reader changes it deliberately or not at all.
         """
-        for _, static_values in self.get_iterator():
+        for c, _ in self.with_rows():
+            yield c
+
+    def with_rows(self):
+        """Each claim __iter__() yields, paired with the row it was built from.
+
+        A listing renders every claim it yields, and the row it already
+        read holds every figure the render needs, so passing it to
+        external_view(row=...) makes listing N claims one claims read
+        rather than N + 1.
+        """
+        for _, static_values, row in self._rows():
             c = NamespaceClaim(static_values)
             if not c:
                 continue
             out = self.apply_filters(c)
             if out:
-                yield out
+                yield out, row
 
 
 def claims_in_namespace(namespace: str) -> list[NamespaceClaim]:

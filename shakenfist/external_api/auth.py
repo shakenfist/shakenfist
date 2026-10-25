@@ -1342,6 +1342,8 @@ claim_example = """{
     "uuid": "0b2b4f76-0a1b-4d0f-8b3f-6f1a2c4d5e6f",
     "namespace": "ci",
     "state": "created",
+    "version": 1,
+    "metadata": {},
     "coverage_state": "active",
     "limit_cpus": 40,
     "limit_memory_mb": 81920,
@@ -1559,7 +1561,8 @@ class AuthNamespaceClaimsEndpoint(api_base.Resource):
         # hand, and is the only claim whose existence explains why a
         # namespace's placements stopped being charged to it -- so
         # hiding it would hide the one thing an operator can act on.
-        return [c.external_view() for c in NamespaceClaims(namespace=namespace)]
+        return [c.external_view(row=row)
+                for c, row in NamespaceClaims(namespace=namespace).with_rows()]
 
     @swag_from(api_base.swagger_helper(
         'auth', 'Claim aggregate cluster capacity for a namespace.',

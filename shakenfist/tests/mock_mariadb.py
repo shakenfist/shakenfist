@@ -2951,11 +2951,15 @@ class MockMariaDB():
         row = self._claim_by_uuid(claim_uuid)
         return self._claim_row(row) if row is not None else None
 
-    def _mariadb_get_namespace_claims(self, namespace=''):
+    def _mariadb_get_namespace_claims(self, namespace='', coverage_state=''):
         """Mock implementation of mariadb.get_namespace_claims()"""
+        # The real validation, so a caller that would raise there raises
+        # here too rather than quietly listing nothing.
+        mariadb._validate_claim_coverage_state(coverage_state)
         return [self._claim_row(row)
                 for _, row in sorted(self.namespace_claims.items())
-                if not namespace or row['namespace'] == str(namespace)]
+                if (not namespace or row['namespace'] == str(namespace))
+                and (not coverage_state or row['state'] == coverage_state)]
 
     def _mariadb_update_namespace_claim(
             self, claim_uuid, fields, limit_cpus=0, limit_memory_mb=0,

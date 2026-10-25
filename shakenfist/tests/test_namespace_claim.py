@@ -314,7 +314,19 @@ class NamespaceClaimIteratorTestCase(NamespaceClaimTestCase):
 
         # The restriction is the database's work, not a Python filter
         # over every claim in the cluster.
-        mariadb.get_namespace_claims.assert_called_once_with('ci')
+        mariadb.get_namespace_claims.assert_called_once_with('ci', '')
+
+    def test_a_coverage_state_is_pushed_into_sql_too(self):
+        Namespace.new('staging')
+        active = self._new()
+        self._row(self._new(namespace='staging'))['state'] = 'expired'
+
+        mariadb.get_namespace_claims.reset_mock()
+        listed = list(NamespaceClaims([], coverage_state='active'))
+
+        self.assertEqual([active.uuid], [c.uuid for c in listed])
+        mariadb.get_namespace_claims.assert_called_once_with(
+            coverage_state='active')
 
     def test_listing_without_a_namespace_returns_every_claim(self):
         Namespace.new('staging')

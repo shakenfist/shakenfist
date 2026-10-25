@@ -605,6 +605,126 @@ class ClaimRefusalStatusTestCase(ClaimEndpointTestCase):
         self.assertNotIn('memory_mb', error)
 
 
+class AdminClaimsTestCase(ClaimEndpointTestCase):
+    """The cluster-wide claims listing at /admin/claims.
+
+    It is the per-namespace listing without the namespace: every claim
+    in the cluster, whatever its coverage state unless the caller asks
+    for one, filtered by the database rather than here.
+    """
+
+    def _list(self, token=None, **body):
+        return self.client.get(
+            '/admin/claims', headers={'Authorization': token or self.admin},
+            data=json.dumps(body) if body else None)
+
+    def test_every_namespaces_claims_are_listed(self):
+        ci = self._created(namespace='ci')
+        other = self._created(namespace='other')
+
+        resp = self._list()
+        self.assertEqual(200, resp.status_code)
+        listed = {c['uuid']: c['namespace'] for c in resp.get_json()}
+        self.assertEqual({ci: 'ci', other: 'other'}, listed)
+
+    def test_coverage_state_filters_the_listing(self):
+        active = self._created(namespace='ci')
+        expired = self._created(namespace='other')
+        self._row(expired)['state'] = 'expired'
+
+        for coverage_state, expected in [
+                ('active', active), ('expired', expired)]:
+            resp = self._list(coverage_state=coverage_state)
+            self.assertEqual(200, resp.status_code)
+            body = resp.get_json()
+            self.assertEqual([expected], [c['uuid'] for c in body])
+            self.assertEqual(
+                [coverage_state], [c['coverage_state'] for c in body])
+            # The expired claim is still a created object.
+            self.assertEqual(['created'], [c['state'] for c in body])
+
+    def test_the_filter_reaches_the_database(self):
+        self._created(namespace='ci')
+        with mock.patch(
+                'shakenfist.mariadb.get_namespace_claims',
+                side_effect=self.mock_mariadb._mariadb_get_namespace_claims
+        ) as get_claims:
+            self.assertEqual(
+                200, self._list(coverage_state='expired').status_code)
+        get_claims.assert_called_once_with(coverage_state='expired')
+
+    def test_the_filter_may_arrive_in_the_query_string(self):
+        self._created(namespace='ci')
+        resp = self.client.get(
+            '/admin/claims?coverage_state=expired',
+            headers={'Authorization': self.admin})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual([], resp.get_json())
+
+    def test_an_unknown_coverage_state_is_refused(self):
+        self._created(namespace='ci')
+        for value in ['deleted', 'ACTIVE', 'created']:
+            resp = self._list(coverage_state=value)
+            self.assertEqual(400, resp.status_code, value)
+            self.assertIn('coverage_state', resp.get_json()['error'])
+
+    def test_the_handlers_own_guard_answers_in_warn_mode(self):
+        # The declared pattern refuses first when validation is
+        # enforced; this is the answer an operator who rolled back gets,
+        # rather than a 500 from the database layer's ValueError.
+        self.set_validation_mode('warn')
+        resp = self._list(coverage_state='deleted')
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('must be "active" or "expired"',
+                      resp.get_json()['error'])
+
+    def test_only_an_admin_may_list(self):
+        self._created(namespace='ci')
+        for token in [self.owner, self.stranger]:
+            self.assertEqual(401, self._list(token=token).status_code)
+
+    def test_an_unauthenticated_caller_is_refused(self):
+        self.assertEqual(401, self.client.get('/admin/claims').status_code)
+
+
+class ClaimListingReadsTestCase(ClaimEndpointTestCase):
+    """Both listings render each claim from the row they already read.
+
+    Without that, listing N claims costs the listing read plus one read
+    per claim.
+    """
+
+    def _assert_one_read(self, url, count):
+        with mock.patch(
+                'shakenfist.mariadb.get_namespace_claims',
+                side_effect=self.mock_mariadb._mariadb_get_namespace_claims
+        ) as get_claims, mock.patch(
+                'shakenfist.mariadb.get_namespace_claim',
+                side_effect=self.mock_mariadb._mariadb_get_namespace_claim
+        ) as get_claim:
+            resp = self.client.get(
+                url, headers={'Authorization': self.admin})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(count, len(resp.get_json()))
+        # And the rendered figures are the row's, not placeholders.
+        self.assertEqual([40] * count,
+                         [c['limit_cpus'] for c in resp.get_json()])
+        self.assertEqual(1, get_claims.call_count)
+        self.assertEqual(0, get_claim.call_count)
+
+    def test_the_admin_listing_reads_once(self):
+        for namespace in ['system', 'ci', 'other']:
+            self._created(namespace=namespace)
+        self._assert_one_read('/admin/claims', 3)
+
+    def test_the_namespace_listing_reads_once(self):
+        # A namespace holds one active claim at a time, so the earlier
+        # two are expired to make room, and are still listed.
+        for _ in range(3):
+            self._row(self._created(namespace='ci'))['state'] = 'expired'
+        self._assert_one_read('/auth/namespaces/ci/claims', 3)
+
+
 class ClaimObjectStateTestCase(ClaimEndpointTestCase):
     def test_a_claim_whose_object_was_deleted_is_not_found(self):
         # The zombie repair path writes a deleted object state directly
