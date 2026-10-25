@@ -408,7 +408,7 @@ cell names all three at the next phase's close-out.
 The "today" figures were measured against `9efbff1481` while this
 plan was written.
 
-- [ ] `grep -c "rpc GetClusterCapacity" protos/database.proto`
+- [x] `grep -c "rpc GetClusterCapacity" protos/database.proto`
       returns 1. It returns 0 today.
 - [ ] Step 1's live test passes against MariaDB in CI. It shows
       that a claim and an unclaimed placement of exactly
@@ -423,24 +423,24 @@ plan was written.
       reading the code.
 - [ ] On every cluster topology, every active hypervisor is in
       exactly one of `per_node` or `excluded`, asserted by step 6.
-- [ ] A hypervisor with a stale metrics row appears in `excluded`
+- [x] A hypervisor with a stale metrics row appears in `excluded`
       with reason `stale metrics`, asserted by step 3's unit test.
       Today it appears nowhere.
-- [ ] `GET /admin/claims?coverage_state=bogus` returns 400, and
+- [x] `GET /admin/claims?coverage_state=bogus` returns 400, and
       listing N claims through either claims endpoint calls
       `get_namespace_claim` zero times. Both are asserted by
       step 4's tests.
-- [ ] `EXPECTED_CAPABILITIES['admin']` in `test_root.py` contains
+- [x] `EXPECTED_CAPABILITIES['admin']` in `test_root.py` contains
       `cluster-capacity`, `cluster-resources-excluded` and
       `cluster-claims`.
-- [ ] `admin_resources_get_example` contains no `...`, and every
+- [x] `admin_resources_get_example` contains no `...`, and every
       top-level and per-node key `summarize_resources()` emits
       appears in it. The management session checks this by
       diffing the example's keys against a unit test's output,
       not by eye.
-- [ ] `docs/developer_guide/api_reference/admin.md` has `## Resources`
+- [x] `docs/developer_guide/api_reference/admin.md` has `## Resources`
       and `## Claims` headings. Today it has neither.
-- [ ] No guard outcome changed. The shakenfist diff touches no
+- [x] No guard outcome changed. The shakenfist diff touches no
       comparison in `_direct_admit_instance_placement()` or in
       `_claim_capacity_guard()`, does not touch
       `CLAIM_ENFORCEMENT_HARD`, and adds no line inside
@@ -450,7 +450,7 @@ plan was written.
       (step 5), and `sf-client node capacity` against an `excluded`
       fixture prints each node's reason instead of 7b's D4 sentence
       (step 8).
-- [ ] `pre-commit run --all-files` passes in both repositories,
+- [x] `pre-commit run --all-files` passes in both repositories,
       including `check-plan-status.py` and `check-doc-anchors.py`
       here.
 
@@ -508,9 +508,75 @@ review had no `fix` items. One `consider` item was taken:
 `coverage_state` is forwarded whenever it is supplied, so the
 server stays the only validator.
 
+**Close-out.** Step 9 was written by the management session rather
+than a sub-agent, because it records reviews and decisions held in
+that session.
+
 ## Outcome
 
-Not started.
+The server half is implemented. Steps 1 to 4, 6, 7 and 9 are on
+this branch. Step 5 is client-python#438, and step 8 is deferred.
+
+| Step | Commit | What it did |
+|------|--------|-------------|
+| 1 | `563eb39e87` | `GetClusterCapacity`, a bounded read of the singleton, with one `_cluster_unallocated()` helper pinned to both guards by live tests |
+| 2 | `f0157b2aa2` | `coverage_state` filter pushed into SQL. The servicer reports a bad value as `INVALID_ARGUMENT` |
+| 3 | `d0711981f6` | `cluster_capacity` and `excluded` in `summarize_resources()` |
+| gate | `ded7ebbdde` | `metrics_timestamp` in place of an age. `EXCLUSION_REASONS` as a closed set |
+| 4 | `5f4779a0c0` | `GET /admin/claims`, three tokens, a real example body, and both listings rendering from rows already read |
+| 5 | client-python#438 | `get_cluster_claims(coverage_state=None)` |
+| 6 | `ac0d1d7e61` | Functional coverage in `test_nodes.py` and `test_namespace_claims.py` |
+| 7 | `1b0ddd04f1` | API reference Resources and Claims sections, and three operator guide sections |
+
+**Placement is unchanged.** The management session read the
+cumulative diff. Every `scheduler.py` hunk falls outside
+`find_candidates()`. `get_active_node_metrics()` returns the same
+mapping with or without its new out-parameter, which a test asserts.
+`test_scheduler.py`'s 122 existing tests passed with the file
+byte-identical. In `mariadb.py`, neither
+`_direct_admit_instance_placement()`'s comparisons nor
+`_claim_capacity_guard()` changed, and `CLAIM_ENFORCEMENT_HARD` is
+untouched. The one change beside the new code is the reconciler's
+expiry `UPDATE`, whose `'active'` and `'expired'` literals became
+the named constants.
+
+**Corrections the review made to sub-agent output:**
+- Step 5 built a query string and validated `coverage_state`
+  client-side. Both were reversed: the client sends every GET
+  parameter as a JSON body, and the server owns validation.
+- Step 2's tuple of coverage states duplicated a literal. That led
+  to `CLAIM_STATE_EXPIRED`.
+- Step 4's pattern was a literal. It is now built from the
+  constants.
+- Step 6 left a docstring claiming no endpoint publishes the
+  ledger, and checked the exclusion reason only as a string. Both
+  were fixed.
+- Step 7 left an existing sentence, "a deleted claim has no row at
+  all", which contradicted the listing behaviour. It was corrected.
+
+**Load.** The new `(api, GetClusterCapacity)` pair is driven only by
+`/admin/resources`. Each such call also makes the existing
+unbudgeted `GetSchedulerNodeCapacity` read, which placement makes as
+well. So the new pair can never be faster than that one, and cannot
+trip the fixed-rate check unless that one trips first. The budget
+was not changed, and merge CI is the confirmation.
+
+**Deferred:**
+- Step 8 waits on 7b's step 4 (`sf-client node capacity`). It is
+  recorded as a `plan-blockers` note on this plan, and its own
+  floor audit belongs to its client pull request.
+- client-python#438's review asked for `docs/namespace-claims.md`
+  to cover cluster-wide listing. That page change is step 8's,
+  since there is no CLI behaviour to document yet.
+
+**Definition of done:** four items are open.
+- **Two need a cluster CI run:** the `cluster_capacity` and the
+  exactly-one-of assertions on every topology. Those tests are
+  written, but cluster CI has not run them yet.
+- **The live tests have not run in CI yet.** Locally, against
+  MariaDB 10.11, all 118 capacity live tests passed.
+- **The client item waits on two things:** client-python#438
+  merging, and step 8.
 
 ## Back brief
 

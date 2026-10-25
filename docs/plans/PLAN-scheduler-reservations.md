@@ -608,6 +608,22 @@ is here.
   phases sit ahead of them. Neither depends on phase 5, and 7b
   needs nothing from 7a, so the two can run in parallel.
 
+- **Phase 7a**'s server half was implemented on 2026-10-25.
+  - **What it adds:** a `GetClusterCapacity` read, `cluster_capacity`
+    and `excluded` in `/admin/resources`, the `GET /admin/claims`
+    listing with a SQL-side `coverage_state` filter, and three
+    capability tokens.
+  - **Client verb:** client-python#438. It must merge before the
+    shakenfist pull request's merge-queue run, because cluster CI
+    builds the client from `develop`.
+  - **Deferred:** step 8, the `sf-client` readers, waits on 7b's
+    `node capacity` command.
+  - **Phase 5 has two keys to carry:** its rewrite of the admin view
+    must keep `cluster_capacity` and `excluded` (see the phase 5
+    stub). The Execution notes in the phase plan record the two
+    gate decisions: an absolute `metrics_timestamp`, and the reason
+    strings as a closed set.
+
 ### Phase scope stubs
 
 Each stub is the seed for that phase's plan file; decisions
