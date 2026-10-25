@@ -5,7 +5,9 @@ post_worker_init installs a *real* process-wide SIGTERM handler, so each
 test captures and restores the original handler via addCleanup to avoid
 leaking a drain handler across the rest of the suite.
 """
+import logging
 import signal
+import threading
 from unittest import mock
 
 from gunicorn.config import Config
@@ -94,28 +96,49 @@ class SFGunicornLoggerTestCase(base.ShakenFistTestCase):
             gunicorn_config.logger_class)
 
 
-class _FakeTimer:
-    """Stand-in for threading.Timer that records its args and never runs.
+class _FakeThread:
+    """Stand-in for threading.Thread that records its args and never runs.
 
-    Captures the interval and target function so tests can assert how the
-    timer was armed and invoke the target deterministically, without
-    actually waiting for the grace period to elapse.
+    post_worker_init starts the drain thread itself; capturing it lets
+    tests run its target deterministically, after the signal handler,
+    without a real thread or a real grace period.
     """
     instances = []
 
-    def __init__(self, interval, function):
-        self.interval = interval
-        self.function = function
+    def __init__(self, target, args, name, daemon):
+        self.target = target
+        self.args = args
+        self.name = name
+        self.daemon = daemon
         self.started = False
-        self.daemon = False
-        _FakeTimer.instances.append(self)
+        _FakeThread.instances.append(self)
 
     def start(self):
         self.started = True
 
+    def run_target(self):
+        self.target(*self.args)
+
 
 class _FakeWorker:
     pid = 4242
+
+
+class _LockedLogHandler(logging.Handler):
+    """A log handler which needs a non-reentrant lock, as the logship spool's does."""
+
+    def __init__(self, lock):
+        super().__init__()
+        self.spool_lock = lock
+        self.blocked = []
+
+    def emit(self, record):
+        # A real spool would wait forever here; a bounded wait lets the test
+        # report the deadlock instead of hanging.
+        if not self.spool_lock.acquire(timeout=0.5):
+            self.blocked.append(record.getMessage())
+            return
+        self.spool_lock.release()
 
 
 class GunicornDrainTestCase(base.ShakenFistTestCase):
@@ -132,85 +155,94 @@ class GunicornDrainTestCase(base.ShakenFistTestCase):
         self._orig_sigterm = signal.getsignal(signal.SIGTERM)
         self.addCleanup(signal.signal, signal.SIGTERM, self._orig_sigterm)
 
-        # Reset the captured timers between tests.
-        _FakeTimer.instances = []
-        self.addCleanup(lambda: setattr(_FakeTimer, 'instances', []))
+        _FakeThread.instances = []
+        self.addCleanup(lambda: setattr(_FakeThread, 'instances', []))
 
-    def test_post_worker_init_installs_handler(self):
-        # A sentinel original handler so we can confirm it is captured and
-        # not invoked synchronously.
+    def _install(self, orig):
+        signal.signal(signal.SIGTERM, orig)
+        with mock.patch.object(gunicorn_config.threading, 'Thread', _FakeThread):
+            gunicorn_config.post_worker_init(_FakeWorker())
+        self.assertEqual(1, len(_FakeThread.instances))
+        return signal.getsignal(signal.SIGTERM), _FakeThread.instances[0]
+
+    def test_post_worker_init_installs_handler_and_starts_the_drainer(self):
         sentinel_orig = mock.Mock()
-        signal.signal(signal.SIGTERM, sentinel_orig)
-
-        gunicorn_config.post_worker_init(_FakeWorker())
-
-        installed = signal.getsignal(signal.SIGTERM)
+        installed, drainer = self._install(sentinel_orig)
         self.assertNotEqual(sentinel_orig, installed)
         self.assertTrue(callable(installed))
+        # Started before any SIGTERM: the handler must not create threads.
+        self.assertTrue(drainer.started)
+        self.assertTrue(drainer.daemon)
 
     def test_sigterm_begins_drain_and_defers(self):
         sentinel_orig = mock.Mock()
-        signal.signal(signal.SIGTERM, sentinel_orig)
-
-        gunicorn_config.post_worker_init(_FakeWorker())
-        handler = signal.getsignal(signal.SIGTERM)
-
+        handler, drainer = self._install(sentinel_orig)
         self.assertFalse(health.is_draining())
 
-        with mock.patch.object(
-                gunicorn_config.threading, 'Timer', _FakeTimer):
-            handler(signal.SIGTERM, None)
+        handler(signal.SIGTERM, None)
 
-        # Drain flag flipped, /readyz will now report 503.
+        # Drain flag flipped, /readyz will now report 503, and the original
+        # handler is NOT called synchronously.
         self.assertTrue(health.is_draining())
-
-        # The original handler is NOT called synchronously -- it is
-        # deferred onto the timer.
         sentinel_orig.assert_not_called()
 
-        # Exactly one timer armed, with the grace interval.
-        self.assertEqual(1, len(_FakeTimer.instances))
-        timer = _FakeTimer.instances[0]
-        self.assertEqual(config.API_DRAIN_GRACE, timer.interval)
-        self.assertTrue(timer.started)
-        self.assertTrue(timer.daemon)
-
-        # Invoking the timer's target chains to the original handler with
-        # the captured signum/frame.
-        timer.function()
+        # The drain thread sleeps the grace period, then chains to the
+        # original handler with the captured signum/frame.
+        with mock.patch.object(gunicorn_config.time, 'sleep') as mock_sleep:
+            drainer.run_target()
+        mock_sleep.assert_called_once_with(config.API_DRAIN_GRACE)
         sentinel_orig.assert_called_once_with(signal.SIGTERM, None)
+
+    def test_the_drainer_waits_for_sigterm(self):
+        sentinel_orig = mock.Mock()
+        _, drainer = self._install(sentinel_orig)
+        _worker, _orig, requested, _received = drainer.args
+        self.assertFalse(requested.is_set())
 
     def test_second_sigterm_is_idempotent(self):
         sentinel_orig = mock.Mock()
-        signal.signal(signal.SIGTERM, sentinel_orig)
+        handler, drainer = self._install(sentinel_orig)
 
-        gunicorn_config.post_worker_init(_FakeWorker())
-        handler = signal.getsignal(signal.SIGTERM)
-
-        with mock.patch.object(
-                gunicorn_config.threading, 'Timer', _FakeTimer):
-            handler(signal.SIGTERM, None)
-            # A second SIGTERM during drain must not arm another timer.
-            handler(signal.SIGTERM, None)
+        handler(signal.SIGTERM, None)
+        _worker, _orig, _requested, received = drainer.args
+        first = received['signal']
+        handler(signal.SIGTERM, object())
 
         self.assertTrue(health.is_draining())
-        self.assertEqual(1, len(_FakeTimer.instances))
+        self.assertIs(first, received['signal'])
+
+    def test_the_handler_does_not_log(self):
+        # The handler runs between two bytecodes of the worker's main
+        # thread, which logs on every request through a handler that holds
+        # a non-reentrant lock. Logging from the handler while that lock was
+        # held deadlocked the worker, which then served nothing until
+        # gunicorn SIGKILLed it (#3495).
+        handler, _ = self._install(mock.Mock())
+        lock = threading.Lock()
+        log_handler = _LockedLogHandler(lock)
+        root = logging.getLogger()
+        root.addHandler(log_handler)
+        self.addCleanup(root.removeHandler, log_handler)
+        loggers = [logging.getLogger(name) for name in
+                   ('shakenfist.external_api.gunicorn_config', 'shakenfist.external_api.health')]
+        for logger in loggers:
+            logger.addHandler(log_handler)
+            self.addCleanup(logger.removeHandler, log_handler)
+
+        with lock:
+            # As if the signal landed while the main thread was mid-log.
+            handler(signal.SIGTERM, None)
+
+        self.assertEqual([], log_handler.blocked)
+        self.assertTrue(health.is_draining())
 
     def test_non_callable_orig_falls_back_to_systemexit(self):
         # If gunicorn left SIG_DFL / SIG_IGN installed (not callable), the
-        # deferred target raises SystemExit to unwind the timer thread. This
-        # path is unreachable under normal gunicorn; it cannot itself stop the
+        # drain thread raises SystemExit to unwind itself. This path is
+        # unreachable under normal gunicorn; it cannot itself stop the
         # process from a non-main thread, so systemd's TimeoutStopSec is the
         # real backstop.
-        signal.signal(signal.SIGTERM, signal.SIG_DFL)
-
-        gunicorn_config.post_worker_init(_FakeWorker())
-        handler = signal.getsignal(signal.SIGTERM)
-
-        with mock.patch.object(
-                gunicorn_config.threading, 'Timer', _FakeTimer):
-            handler(signal.SIGTERM, None)
-
-        self.assertEqual(1, len(_FakeTimer.instances))
-        timer = _FakeTimer.instances[0]
-        self.assertRaises(SystemExit, timer.function)
+        handler, drainer = self._install(signal.SIG_DFL)
+        handler(signal.SIGTERM, None)
+        with mock.patch.object(gunicorn_config.time, 'sleep'):
+            self.assertRaises(SystemExit, drainer.run_target)

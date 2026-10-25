@@ -18,10 +18,23 @@ survive the ``--preload`` fork:
 ``post_worker_init`` installs a SIGTERM drain handler. On stop,
 systemd sends SIGTERM; rather than shutting down immediately we want
 the load balancer to drop this node first. The handler latches the
-draining flag (so ``/readyz`` reports 503 on its next probe), keeps
-the worker serving in-flight and new requests for
-``API_DRAIN_GRACE`` seconds, then chains to gunicorn's own SIGTERM
-handler (``handle_exit``) to perform the normal graceful shutdown.
+draining flag (so ``/readyz`` reports 503 on its next probe) and wakes
+a drain thread, which keeps the worker serving in-flight and new
+requests for ``API_DRAIN_GRACE`` seconds, then chains to gunicorn's own
+SIGTERM handler (``handle_exit``) to perform the normal graceful
+shutdown.
+
+The handler itself does nothing else, and in particular does not log.
+A signal handler runs in the worker's main thread between any two
+bytecodes of whatever that thread was doing, and the main thread logs
+on every request. Our Loki handler enqueues each line under the
+logship spool's non-reentrant lock, so a handler which logged while
+the interrupted thread held that lock waited for itself forever: the
+worker served nothing until gunicorn's graceful timeout SIGKILLed it,
+which is the merge CI drain check seeing no answer at all instead of
+a 503 (#3495). Creating a thread takes threading's own locks for the
+same reason, so the drain thread is started ahead of time and the
+handler only sets an Event nothing else touches.
 
 ``post_worker_init`` is the correct seam -- not ``post_fork`` --
 because gunicorn's sync worker installs its own SIGTERM handler in
@@ -34,6 +47,7 @@ SIGQUIT/SIGINT, which systemd does not send on stop.
 """
 import signal
 import threading
+import time
 
 import gunicorn.glogging
 from shakenfist_utilities import logs
@@ -156,55 +170,70 @@ def post_worker_init(worker):
     Called at the end of gunicorn's ``init_process`` -- after
     ``init_signals`` has installed the worker's own SIGTERM handler --
     so the handler we install here is not clobbered. See the module
-    docstring for why this is the only correct seam.
+    docstring for why this is the only correct seam, and why the handler
+    only flags the drain and leaves the rest to a thread.
     """
     # Capture gunicorn's currently-installed SIGTERM handler. In the
     # normal case this is the worker's bound ``handle_exit`` method,
     # which is callable. It could in principle be SIG_DFL / SIG_IGN
-    # (not callable) -- we guard against that below.
+    # (not callable) -- we guard against that in _drain_after_signal.
     orig = signal.getsignal(signal.SIGTERM)
+    requested = threading.Event()
+    received = {}
 
     def _drain_then_exit(signum, frame):
         # Idempotence: a second SIGTERM while we are already draining
-        # must not stack another timer. The drain flag is one-way, so
-        # this is safe -- the first timer is already counting down.
+        # must not restart the drain. The drain flag is one-way, so this
+        # is safe -- the drain thread is already counting down.
         if health.is_draining():
             return
 
+        # Plain assignments and an Event no other code waits on or sets:
+        # nothing here can need a lock the interrupted thread holds.
         health.begin_drain()
-        LOG.with_fields({
-            'grace_seconds': sf_config.API_DRAIN_GRACE,
-            'pid': worker.pid,
-        }).info(
-            'SIGTERM received, draining sf-api worker: /readyz now reports '
-            '503; will keep serving then shut down after grace period')
+        received['signal'] = (signum, frame)
+        requested.set()
 
-        def _invoke_orig():
-            # Chain to gunicorn's original handler to perform the normal
-            # graceful shutdown. The expected case is a callable bound
-            # method (handle_exit); SIG_DFL / SIG_IGN are not callable.
-            if callable(orig):
-                orig(signum, frame)
-            else:
-                # No usable original handler (SIG_DFL / SIG_IGN). This path is
-                # unreachable under normal gunicorn -- init_signals always
-                # installs a callable handle_exit before post_worker_init runs.
-                # We cannot cleanly terminate from this timer thread anyway
-                # (signal.signal is main-thread-only, and re-raising SIGTERM
-                # would just re-enter this guarded handler), so we raise
-                # SystemExit to unwind the timer thread and rely on systemd's
-                # TimeoutStopSec as the backstop that actually stops the worker.
-                LOG.with_fields({'pid': worker.pid}).warning(
-                    'No callable original SIGTERM handler captured; relying on '
-                    'systemd TimeoutStopSec to stop the worker')
-                raise SystemExit(0)
-
-        # Defer the actual shutdown so this handler returns immediately
-        # and the worker keeps serving during the grace period. A daemon
-        # timer thread does not block process exit if shutdown happens
-        # another way first.
-        timer = threading.Timer(sf_config.API_DRAIN_GRACE, _invoke_orig)
-        timer.daemon = True
-        timer.start()
-
+    drainer = threading.Thread(
+        target=_drain_after_signal,
+        args=(worker, orig, requested, received),
+        name='sf-api-drain', daemon=True)
+    drainer.start()
     signal.signal(signal.SIGTERM, _drain_then_exit)
+
+
+def _drain_after_signal(worker, orig, requested, received):
+    """Wait for SIGTERM, keep serving for the grace period, then exit.
+
+    Runs on its own thread, so unlike the signal handler it may log. A
+    daemon thread does not block process exit if shutdown happens
+    another way first.
+    """
+    requested.wait()
+    signum, frame = received['signal']
+    LOG.with_fields({
+        'grace_seconds': sf_config.API_DRAIN_GRACE,
+        'pid': worker.pid,
+    }).info(
+        'SIGTERM received, draining sf-api worker: /readyz now reports '
+        '503; will keep serving then shut down after grace period')
+    time.sleep(sf_config.API_DRAIN_GRACE)
+
+    # Chain to gunicorn's original handler to perform the normal graceful
+    # shutdown. The expected case is a callable bound method
+    # (handle_exit); SIG_DFL / SIG_IGN are not callable.
+    if callable(orig):
+        orig(signum, frame)
+    else:
+        # No usable original handler (SIG_DFL / SIG_IGN). This path is
+        # unreachable under normal gunicorn -- init_signals always installs
+        # a callable handle_exit before post_worker_init runs. We cannot
+        # cleanly terminate from this thread anyway (signal.signal is
+        # main-thread-only, and re-raising SIGTERM would just re-enter the
+        # guarded handler), so we raise SystemExit to unwind the thread and
+        # rely on systemd's TimeoutStopSec as the backstop that actually
+        # stops the worker.
+        LOG.with_fields({'pid': worker.pid}).warning(
+            'No callable original SIGTERM handler captured; relying on '
+            'systemd TimeoutStopSec to stop the worker')
+        raise SystemExit(0)

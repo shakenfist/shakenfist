@@ -155,10 +155,12 @@ def is_ready() -> bool:
 
 
 def begin_drain():
-    """Latch the one-way draining flag (logged once)."""
+    """Latch the one-way draining flag.
+
+    Called from the SIGTERM handler, so it only assigns: logging here could
+    deadlock the worker (see post_worker_init in gunicorn_config).
+    """
     global draining
-    if not draining:
-        LOG.info('sf-api worker beginning drain, readiness now reports 503')
     draining = True
 
 
