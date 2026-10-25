@@ -130,28 +130,33 @@ BundleKind = collections.namedtuple(
     'BundleKind', ['job', 'topology', 'job_prefix'])
 
 
-# The artifact-name table, sourced from the merge matrix at
-# .github/workflows/functional-tests.yml:440-495, plus the Ansible modules
-# entry, which the shakenfist/actions change widening the probe gate onto
-# that job has since made live (#4377). Four of the five jobs run
-# the *same* topology, which is the point: if slim-primary's four jobs
-# differ from each other in peak demand then the difference is the suite and
-# not the shape, and nobody may respond to it by resizing the cloud.
-# Pooling by topology would hide that, so the harvest records the job as well
-# as the topology, and the dataset carries both.
+# The artifact-name table, sourced from the lanes in
+# .github/workflows/functional-lanes.yml (the merge queue runs the ones
+# functional-tests.yml selects; until 2026-10-25 they were a matrix in
+# functional-tests.yml itself), plus the Ansible modules entry, which the
+# shakenfist/actions change widening the probe gate onto that job has since
+# made live (#4377). Every job the merge queue measures today runs the
+# *same* topology, which is the point: if slim-primary's jobs differ from
+# each other in peak demand then the difference is the suite and not the
+# shape, and nobody may respond to it by resizing the cloud. Pooling by
+# topology would hide that, so the harvest records the job as well as the
+# topology, and the dataset carries both.
 #
 # 'job_prefix' is the name GitHub gives the job in the runs/<id>/jobs
 # listing, which is *not* the matrix's 'name': the reusable smoke-cluster
 # workflow contributes its own job name, so what the API returns is
-# 'Debian 13 cluster (collection) / Smoke tests (collection)'. The prefix is
-# stored explicitly rather than derived, because the derivation ('name' plus
-# ' (collection)') is a fact about how functional-tests.yml happens to name
-# the calling job today and would break silently if that changed -- the
-# 'Ansible modules' entry below hit exactly that trap once already: its
-# prefix is read from two real runs (36343591915, where the API reported
-# 'Ansible modules (collection) / Smoke tests (collection)', and
-# 36316642104, where it reported just 'Ansible modules (collection)'), not
-# derived from the matrix's job name.
+# 'Debian 13 cluster (collection) / Smoke tests (collection)'. Since the
+# lanes moved into functional-lanes.yml a run reports one level more,
+# 'Functional lanes / Debian 13 cluster (collection) / Smoke tests
+# (collection)', and find_job() accepts the prefix in either position, so
+# one entry serves the bundles of both eras. The prefix is stored explicitly
+# rather than derived, because the derivation ('name' plus ' (collection)')
+# is a fact about how the calling job happens to be named today and would
+# break silently if that changed -- the 'Ansible modules' entry below hit
+# exactly that trap once already: its prefix is read from two real runs
+# (36343591915, where the API reported 'Ansible modules (collection) / Smoke
+# tests (collection)', and 36316642104, where it reported just 'Ansible
+# modules (collection)'), not derived from the matrix's job name.
 #
 # 'Ansible modules' was classified here before the shakenfist/actions change
 # that instruments it existed -- that change was tracked as #4377 and merged
@@ -236,9 +241,9 @@ class UnknownBundleError(HarvestError):
     on a real measurement in a dataset the cloud is sized from. Skipping
     quietly would drop a whole job out of the window without saying so, and the
     resulting baseline would be a smaller n than it claimed with no way for a
-    reader to tell. A new bundle name means the merge matrix in
-    .github/workflows/functional-tests.yml gained a row, and a human should
-    decide which topology it is.
+    reader to tell. A new bundle name means the merge queue gained a lane
+    (.github/workflows/functional-lanes.yml), and a human should decide
+    which topology it is.
     """
 
 
@@ -537,12 +542,21 @@ def find_job(jobs, prefix):
     reported as '<caller job> / <called job>'. An exact match is tried first
     so a hypothetical job named exactly like the prefix is not shadowed by
     its own children.
+
+    A lane called through functional-lanes.yml is one level deeper,
+    '<caller job> / <lane> / <called job>', so the prefix is also matched as
+    the second segment of a name. Only the second: matching it anywhere
+    would let a lane's name turn up inside another job's.
     """
     for name, conclusion in jobs:
         if name == prefix:
             return name, conclusion
     for name, conclusion in jobs:
         if name.startswith(prefix + ' /'):
+            return name, conclusion
+    for name, conclusion in jobs:
+        segments = name.split(' / ')
+        if len(segments) >= 2 and segments[1] == prefix:
             return name, conclusion
     return None, None
 
@@ -565,8 +579,8 @@ def classify_artifact(name):
         return 'harvest', BUNDLE_TOPOLOGIES[name]
     raise UnknownBundleError(
         'artifact %r is a cluster bundle this tool has no topology for. The '
-        'merge matrix in .github/workflows/functional-tests.yml has probably '
-        'gained a row; add it to BUNDLE_TOPOLOGIES with its topology, or to '
+        'merge queue has probably gained a lane (see '
+        '.github/workflows/functional-lanes.yml); add it to BUNDLE_TOPOLOGIES with its topology, or to '
         'UNINSTRUMENTED_BUNDLES with the reason it carries no probe. '
         'Guessing here would put a fabricated topology on a real '
         'measurement.' % name)

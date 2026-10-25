@@ -203,11 +203,16 @@ class MergeGroupCurrentWorkflowSeamsTestCase(base.ShakenFistTestCase):
         keyed = []
         for name, job in self.jobs.items():
             group = (job.get('concurrency') or {}).get('group', '')
-            if 'merge_group.base_ref' in group or job.get('uses', '').endswith(
-                    'smoke-cluster.yml@main'):
+            # The lanes call reaches smoke-cluster.yml through
+            # functional-lanes.yml, whose concurrency groups are keyed the
+            # same way.
+            uses = job.get('uses', '')
+            if ('merge_group.base_ref' in group
+                    or uses.endswith('smoke-cluster.yml@main')
+                    or uses == './.github/workflows/functional-lanes.yml'):
                 keyed.append(name)
         # Guards the scan itself: these are the jobs the issue names.
-        for name in ['functional_matrix_merge_collection',
+        for name in ['functional_lanes',
                      'ansible_modules_collection',
                      'node_lifecycle_collection', 'schema_enum_widening']:
             self.assertIn(name, keyed)

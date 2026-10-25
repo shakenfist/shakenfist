@@ -131,8 +131,8 @@
 # Shaken Fist daemon.
 #
 # The ports Shaken Fist's daemons listen on, by default, on every node they run
-# on, and the daemon behind each. sf-api binds 13000 in
-# roles/node/templates/sf-api.service:33; the others are the defaults of
+# on, and the daemon behind each. systemd binds 13000 for sf-api in
+# roles/node/templates/sf-api.socket; the others are the defaults of
 # RESOURCES_METRICS_PORT and CLUSTER_METRICS_PORT (shakenfist/config.py:537-544)
 # and of MARIADB_GATEWAY_PORT and MARIADB_GATEWAY_METRICS_PORT
 # (shakenfist/config.py:896-903). sf-database runs only on the database tier,

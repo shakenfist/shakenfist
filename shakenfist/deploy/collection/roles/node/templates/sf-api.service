@@ -4,6 +4,10 @@ After=sf-privexec.service
 After=sf-nodelock.service
 After=sf-database.service
 Before=sf-sentinel-last.service
+# The listening socket is sf-api.socket's (see the comment there). Requires
+# also means stopping or restarting the socket does the same to sf-api.
+Requires=sf-api.socket
+After=sf-api.socket
 PartOf=sf.target
 ReloadPropagatedFrom=sf.target
 
@@ -30,7 +34,10 @@ RuntimeDirectoryPreserve=yes
 EnvironmentFile=/etc/sf/config
 ExecStartPre=/bin/sh -c '/srv/shakenfist/venv/bin/sf-ctl verify-config'
 ExecStartPre=/bin/sh -c 'rm -f /run/sf/gunicorn.pid'
-ExecStart=/bin/sh -c '/srv/shakenfist/venv/bin/gunicorn --workers 5 --bind 0.0.0.0:13000 --timeout 300 --graceful-timeout 55 --name "sf-api" --pid /run/sf/gunicorn.pid --config python:shakenfist.external_api.gunicorn_config --preload shakenfist.external_api.app:app'
+# exec, so gunicorn keeps the pid systemd started: gunicorn uses the socket
+# systemd passes only when LISTEN_PID is its own pid, and otherwise falls back to
+# binding --bind itself, which fails while sf-api.socket holds the port.
+ExecStart=/bin/sh -c 'exec /srv/shakenfist/venv/bin/gunicorn --workers 5 --bind 0.0.0.0:13000 --timeout 300 --graceful-timeout 55 --name "sf-api" --pid /run/sf/gunicorn.pid --config python:shakenfist.external_api.gunicorn_config --preload shakenfist.external_api.app:app'
 
 Restart=on-failure
 RestartSec=5

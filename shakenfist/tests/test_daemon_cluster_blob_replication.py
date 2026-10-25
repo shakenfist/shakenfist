@@ -44,6 +44,7 @@ def _pass_mocks(func):
 class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
     def _make_monitor(self):
         m = cluster_main.Monitor.__new__(cluster_main.Monitor)
+        m.abort_path = '/nonexistent/sf-test-cluster-abort-path'
         m.lock = mock.MagicMock()
         m.lock.lost_event = threading.Event()
         m.is_elected = True

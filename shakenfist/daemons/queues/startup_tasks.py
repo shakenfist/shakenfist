@@ -17,9 +17,12 @@ from shakenfist.config import redacted_config_items
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
+from shakenfist.exceptions import InvalidStateException
 from shakenfist.network.interface import interfaces_for_instance
 from shakenfist.node import Node
-from shakenfist.operations.baseoperation import get_all_node_queues
+from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import get_node_background_node_queues
+from shakenfist.operations.baseoperation import get_node_user_facing_node_queues
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
@@ -300,6 +303,100 @@ def _resolve_node_uuid():
             'Resolved node UUID during startup tasks')
 
 
+def recover_interrupted_operations(node_uuid):
+    """Re-run the operations this node's previous sf-queues was executing.
+
+    A worker which was still running when its sf-queues stopped -- SIGKILLed
+    at the end of TimeoutStopSec, abandoned at the end of the worker pool's
+    stop grace, or killed in a crash -- left its operation executing and its
+    work item claimed. Clearing the claim alone recovers nothing: the next
+    worker to dequeue the item finds the operation executing, which only a
+    running worker should be, skips it and resolves the item. The operation
+    is then executing with no work item, invisible to everything but the
+    reaper's orphan pass, which errors it CLUSTER_OP_STUCK_THRESHOLD (30
+    minutes) later, long after anything waiting on it has given up (#4543).
+
+    Only this node's sf-queues takes work from this node's own queues, and it
+    has not started any workers yet, so an operation still executing behind a
+    claimed item there was being run by the process this one replaces, and is
+    certainly no longer running. Put it back to queued, which is how a task's
+    own defer_with_backoff() retries an operation, so the item re-runs it from
+    the top once the claims are cleared. An item already claimed
+    CLUSTER_OP_MAX_ATTEMPTS times is instead dropped and its operation errored,
+    as the reaper would, so an operation which kills sf-queues cannot keep
+    killing it.
+
+    The shared any-* queues are left alone: nothing reliably records which
+    node claimed an item there (over gRPC, claimed_by names the database
+    daemon's node, not the worker's), so an executing operation behind one
+    may be running on another node right now.
+
+    This is best effort, item by item: an item which cannot be recovered --
+    its operation type no longer exists, say, or the database fails part way
+    through -- is logged and left for the reaper, so it cannot stop the rest
+    of startup, which restores this node's instances. Failing to list the
+    claims at all raises DatabaseUnavailable (the listing is strict, so a
+    gRPC error is not read as "no claims"), because the caller must then
+    not clear them.
+    """
+    own_queues = set(get_node_user_facing_node_queues(node_uuid) +
+                     get_node_background_node_queues(node_uuid))
+    for row in mariadb.list_stuck_work_queue_rows(0, strict=True):
+        if row['queue_name'] not in own_queues:
+            continue
+        try:
+            _recover_interrupted_operation(row)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'recovering interrupted work item {row["id"]} on '
+                f'{row["queue_name"]}', e)
+
+
+def _recover_interrupted_operation(row):
+    payload = row['payload']
+    op_type = payload.get('operation_type')
+    op_uuid = payload.get('operation_uuid')
+    if not op_type or not op_uuid:
+        return
+    op = get_object_class(op_type).from_db(op_uuid)
+    if not op or op.state.value != BaseClusterOperation.STATE_EXECUTING:
+        return
+
+    details = {
+        'queue_name': row['queue_name'],
+        'attempts': row['attempts'],
+        'claimed_at': row['claimed_at'],
+    }
+    try:
+        if row['attempts'] >= config.CLUSTER_OP_MAX_ATTEMPTS:
+            if not mariadb.delete_work_queue_row(row['id']):
+                return
+            op.state = BaseClusterOperation.STATE_ERROR
+            op.add_event(
+                EVENT_TYPE_AUDIT,
+                f'errored at sf-queues startup: interrupted after '
+                f'{row["attempts"]} claim attempts', extra=details)
+        else:
+            op.state = BaseClusterOperation.STATE_QUEUED
+            op.add_event(
+                EVENT_TYPE_AUDIT,
+                're-queued at sf-queues startup: the previous sf-queues '
+                'stopped while executing it', extra=details)
+    except InvalidStateException as e:
+        # It went terminal between our read and the write.
+        LOG.with_fields({
+            'operation_type': op_type,
+            'operation_uuid': op_uuid,
+        }).warning(f'Cannot recover interrupted operation: {e}')
+        return
+    LOG.with_fields({
+        'operation_type': op_type,
+        'operation_uuid': op_uuid,
+        'state': op.state.value,
+        **details,
+    }).warning('Recovered an operation interrupted by sf-queues stopping')
+
+
 def startup_tasks():
     # Ensure NODE_UUID is resolved before we try to use it. This runs
     # before the daemon's run() method which would normally resolve it.
@@ -335,11 +432,34 @@ def startup_tasks():
     # Check in early and often
     locks.clear_stale_locks()
 
-    # Reset queues
-    for queue in get_all_node_queues(config.NODE_NAME):
+    # Reset this node's own queues. They are named by its uuid, not its
+    # name: looked up by name, they matched no queue, so a claim left by a
+    # stopped sf-queues was never cleared. Recovering interrupted operations
+    # reads those claims, so it goes first. The shared any-* queues are not
+    # reset: other nodes' workers hold live claims there, and clearing one
+    # hands work which is still running to a second worker. A claim a
+    # stopped sf-queues left on one is cleared by the cluster daemon's
+    # reaper once it is CLUSTER_OP_STUCK_THRESHOLD old.
+    if not config.NODE_UUID:
+        LOG.warning('NODE_UUID is not set, cannot recover interrupted '
+                    'operations or reset this node\'s own queues')
+        own_queues = []
+    else:
+        own_queues = (get_node_user_facing_node_queues(config.NODE_UUID) +
+                      get_node_background_node_queues(config.NODE_UUID))
+        try:
+            recover_interrupted_operations(config.NODE_UUID)
+        except Exception as e:
+            # The claims could not be read, so the operations behind them
+            # were not checked. Clearing them anyway strands any which were
+            # executing, exactly as #4543 did, so leave both to the reaper.
+            util_exceptions.ignore_exception(
+                'recovering interrupted operations; leaving this node\'s '
+                'claims to the reaper', e)
+            own_queues = []
+    for queue in own_queues:
         mariadb.restart_work_queue(queue)
-        processing, queued, deferred = mariadb.get_work_queue_length(
-            queue)
+        processing, queued, deferred = mariadb.get_work_queue_length(queue)
         LOG.with_fields({
             'processing': processing,
             'queued': queued,

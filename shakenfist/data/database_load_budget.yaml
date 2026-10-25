@@ -222,7 +222,11 @@ entries:
       mean_qps: 3.048
       r2: 0.732
     note: >-
-      Interface enumeration during network maintenance.
+      Interface enumeration during network maintenance. Fitted while the
+      stray interface reaper ran on every node, a nodes x networks / 30s
+      sweep the model has no term for (#4072); the reaper now runs on the
+      network node only, so these coefficients overstate the pair until
+      it is re-derived from a window after that change was deployed.
   - operation: GetNodeDaemonState
     caller_daemon: transfers
     per_node_base_qps: 0.498

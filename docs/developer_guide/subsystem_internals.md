@@ -465,9 +465,14 @@ under `sf.target`, and the ordering there is load bearing:
 
 Stop runs in reverse: sentinel-last stops first and marks the node as
 stopping, the control plane stops, and sentinel-first stops last and
-records a graceful stop. A daemon started ahead of `sf-database` hangs
-on its first database call -- `sf-api` in particular -- so a new unit
-must keep the `After=sf-database.service` ordering.
+records a graceful stop. That is the whole-node path (`sf.target`, a
+reboot). A deploy instead restarts each unit on its own, so sentinel-first
+stops while sentinel-last is still running: it then records only its own
+daemon state and leaves the node's lifecycle for sentinel-last's restart to
+return to created, because the node was never stopping. A daemon started
+ahead of `sf-database` hangs on its first database call -- `sf-api` in
+particular -- so a new unit must keep the `After=sf-database.service`
+ordering.
 
 ## Daemon liveness (systemd watchdog)
 
@@ -497,6 +502,35 @@ daemon is working normally. The existing explicit callers are:
   domain inside the lock; it skips the instance for that pass if the
   lock is busy. When libvirt and the database already agree on an
   instance's power state, no lock is taken at all.
+
+A long pass has to notice a stop as well as stay alive. systemd allows
+every Shaken Fist unit 30 seconds (`TimeoutStopSec`) between SIGTERM and
+SIGKILL, and a deploy restarts every unit, so a pass that only checks its
+abort path between passes is SIGKILLed whenever a deploy lands in the
+middle of a slow one. `sf-cluster`'s maintenance pass therefore calls
+`_maintenance_checkpoint()` rather than `pet_watchdog()` at its item
+boundaries and between its scheduled jobs: it pets, and abandons the rest
+of the pass when the abort path exists. Only use it where stopping before
+the next item leaves nothing half done; a loop which has already claimed
+its items, such as dequeued work, pets the watchdog directly.
+
+A signal handler must not wait for anything. Python runs it on the main
+thread between any two of that thread's bytecodes, so if it needs a lock
+the main thread already holds, it waits for itself forever. Logging needs
+one: the Loki handler enqueues every line under the logship spool's
+non-reentrant lock, and the main thread logs constantly. So does any
+database call, which can also simply be slow enough to outlast
+`TimeoutStopSec` by itself. sf-api's drain handler deadlocked on the
+first (#3495) and every daemon's `Daemon.exit_gracefully()` could do the
+same on either, which is how `sf-database` came to be SIGKILLed on a stop
+under a slow MariaDB (#4601). Handlers therefore only set flags and write
+the abort file, with `daemon.write_abort_file()`, which uses raw system
+calls; the main thread notices, and does the logging and any state
+writes itself. `tools/check-signal-handlers.py`, run by pre-commit,
+holds every `signal.signal()` handler to this: its docstring lists what
+a handler may call, how to mark a helper `@signal_safe`
+(`shakenfist/util/signals.py`), and how to exempt a single call with a
+reason.
 
 If you add a new long-running maintenance pass to any of the eight
 armed daemons — `sf-database`, `sf-net`, `sf-cleaner`, `sf-cluster`,
@@ -560,6 +594,15 @@ immediately — and then keeps serving live requests for
 `API_DRAIN_GRACE` seconds (default 25) before the normal worker
 shutdown, giving the load balancer time to stop routing new
 connections before the process exits.
+
+The listening socket is not gunicorn's. The collection installs
+`sf-api.socket`, systemd passes the bound socket to gunicorn on each
+start (gunicorn reads `LISTEN_FDS` and ignores `--bind`; the unit's
+`ExecStart` must `exec` gunicorn so that `LISTEN_PID` is gunicorn's pid),
+and the socket outlives the restart. Connections that arrive between the
+old workers exiting and the new ones accepting queue on it instead of
+being reset with the backlog when gunicorn closed its own socket, which
+nginx surfaced as 502s (#3664).
 
 Operator-facing probe guidance is in
 [`load_balancing.md`](../operator_guide/load_balancing.md).

@@ -83,6 +83,14 @@ ELECTION_POLL_MINIMUM_SECONDS = 2.5
 ELECTION_POLL_MAXIMUM_SECONDS = 7.5
 
 
+class MaintenancePassAbandoned(Exception):
+    """The daemon is stopping, so the rest of this maintenance pass is skipped.
+
+    Raised from _maintenance_checkpoint() at item boundaries in the pass, and
+    caught by the elected loop, which then sees the abort path and exits.
+    """
+
+
 class Monitor(daemon.Daemon):
     # Set by _run_inner() when the maintenance schedule is registered.
     # Declared here as well because the maintenance hook which forces a
@@ -147,6 +155,25 @@ class Monitor(daemon.Daemon):
                 self.is_elected = True
                 return
 
+    def _maintenance_checkpoint(self):
+        """Pet the watchdog, and abandon the pass if the daemon is stopping.
+
+        The elected loop used to look at its abort path only between
+        maintenance passes, so a SIGTERM during a pass waited for the rest
+        of it -- and a pass could even start the cluster-wide cleanup after
+        the abort file was set. A slow pass outlived systemd's 30 second
+        TimeoutStopSec and sf-cluster was SIGKILLed (#4576). Every caller
+        sits at an item boundary, before the next item's work starts, so
+        abandoning there leaves nothing half done: the cleanup is
+        idempotent and the next pass, or the next elected node, picks up
+        the rest. Loops whose items are already claimed when they pet --
+        the dead node's dequeue loop, and the errored-node cascade -- pet
+        the watchdog directly instead.
+        """
+        self.pet_watchdog()
+        if os.path.exists(self.abort_path):
+            raise MaintenancePassAbandoned()
+
     def _cluster_wide_cleanup(self, last_loop_run):
         # Bail out before doing anything destructive if our lease has
         # already lapsed -- another node may be running this same loop
@@ -160,7 +187,7 @@ class Monitor(daemon.Daemon):
 
         # Pet before the preamble below (stale-transfer cleanup + history
         # prune) which runs before the first per-item loop's pet.
-        self.pet_watchdog()
+        self._maintenance_checkpoint()
 
         # NOTE: The per-node blob cache is now maintained by each node's
         # cleaner daemon calling observe() on local blobs. The cleaner also
@@ -189,7 +216,7 @@ class Monitor(daemon.Daemon):
 
         # Cleanup IPAMs whose network is absent
         for ipm in ipam.IPAMs([], prefilter='active'):
-            self.pet_watchdog()
+            self._maintenance_checkpoint()
             if time.time() - ipm.state.update_time < 300:
                 continue
 
@@ -214,7 +241,7 @@ class Monitor(daemon.Daemon):
             # robustness for one round trip per pass.
             reservations = fn.ipam.get_all_reservations()
             for addr in fn.ipam.in_use:
-                self.pet_watchdog()
+                self._maintenance_checkpoint()
                 reservation = reservations.get(addr)
                 if not reservation:
                     continue
@@ -290,7 +317,7 @@ class Monitor(daemon.Daemon):
 
         in_use_blobs = defaultdict(int)
         for a in artifact.Artifacts([]):
-            self.pet_watchdog()
+            self._maintenance_checkpoint()
 
             # If the artifact's namespace is deleted then we should remove the
             # artifact
@@ -361,7 +388,7 @@ class Monitor(daemon.Daemon):
             blobs_readable = False
 
         for blob_uuid in active_blob_uuids:
-            self.pet_watchdog()
+            self._maintenance_checkpoint()
 
             b = Blob.from_db(blob_uuid)
             if not b:
@@ -469,14 +496,14 @@ class Monitor(daemon.Daemon):
 
         # Record blobs in use
         for blob_uuid in in_use_blobs:
-            self.pet_watchdog()
+            self._maintenance_checkpoint()
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 b.record_usage()
 
         # Find expired blobs (database-level filtering)
         for blob_uuid in mariadb.get_expired_blob_uuids():
-            self.pet_watchdog()
+            self._maintenance_checkpoint()
             b = Blob.from_db(blob_uuid)
             if b:
                 b.add_event(EVENT_TYPE_AUDIT, 'blob has expired')
@@ -484,7 +511,7 @@ class Monitor(daemon.Daemon):
 
         # Prune over replicated blobs
         for blob_uuid in overreplicated:
-            self.pet_watchdog()
+            self._maintenance_checkpoint()
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 for node in overreplicated[blob_uuid]:
@@ -497,7 +524,7 @@ class Monitor(daemon.Daemon):
         # Replicate under replicated blobs, but only if we don't have heaps of
         # queued replications already
         for blob_uuid, excess in underreplicated:
-            self.pet_watchdog()
+            self._maintenance_checkpoint()
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
             if b:
                 LOG.with_fields({
@@ -511,7 +538,7 @@ class Monitor(daemon.Daemon):
         if blobs_readable:
             for blob_uuid in mariadb.get_stale_transcoded_blob_uuids(
                     config.BLOB_TRANSCODE_MAXIMUM_IDLE_TIME):
-                self.pet_watchdog()
+                self._maintenance_checkpoint()
                 b = Blob.from_db(blob_uuid)
                 if b:
                     b.remove_transcodes()
@@ -521,7 +548,7 @@ class Monitor(daemon.Daemon):
 
         # Node management
         for n in Nodes([]):
-            self.pet_watchdog()
+            self._maintenance_checkpoint()
 
             age = round(time.time() - n.last_seen, 2)
 
@@ -1015,11 +1042,51 @@ class Monitor(daemon.Daemon):
         for job in sorted(schedule.jobs):
             if not job.should_run:
                 continue
-            self.pet_watchdog()
+            self._maintenance_checkpoint()
             ret = job.run()
             if isinstance(ret, schedule.CancelJob) or ret is schedule.CancelJob:
                 schedule.cancel_job(job)
         self.pet_watchdog()
+
+    def _maintenance_pass(self, last_loop_run):
+        """One elected maintenance pass, checking for a stop between phases.
+
+        Each phase still swallows its own errors, but not
+        MaintenancePassAbandoned, which ends the whole pass.
+        """
+        self._maintenance_checkpoint()
+        try:
+            self._force_capacity_reconcile_if_unguarded()
+        except MaintenancePassAbandoned:
+            raise
+        except Exception as e:
+            util_exceptions.ignore_exception('cluster', e)
+
+        self._maintenance_checkpoint()
+        try:
+            with util_general.RecordedOperation(
+                    'scheduled cluster operations',
+                    None, threshold=10):
+                self._run_due_scheduled_jobs()
+        except MaintenancePassAbandoned:
+            raise
+        except Exception as e:
+            util_exceptions.ignore_exception('cluster', e)
+
+        # _run_due_scheduled_jobs() above and the cleanup below are unbounded
+        # maintenance phases; check between them so a slow scheduled task
+        # does not eat the whole watchdog budget before the cleanup's own
+        # per-loop checkpoints start, and so a stop requested during the
+        # scheduled jobs does not start the cleanup.
+        self._maintenance_checkpoint()
+        try:
+            with util_general.RecordedOperation(
+                    'cluster wide cleanup', None, threshold=10):
+                self._cluster_wide_cleanup(last_loop_run)
+        except MaintenancePassAbandoned:
+            raise
+        except Exception as e:
+            util_exceptions.ignore_exception('cluster', e)
 
     def _run_inner(self):
         last_defer_message = 0
@@ -1164,30 +1231,11 @@ class Monitor(daemon.Daemon):
                         # reads no metric freshness at all, so it defers
                         # this check during a mixed-version upgrade.
                         try:
-                            self._force_capacity_reconcile_if_unguarded()
-                        except Exception as e:
-                            util_exceptions.ignore_exception('cluster', e)
-
-                        try:
-                            with util_general.RecordedOperation(
-                                    'scheduled cluster operations',
-                                    None, threshold=10):
-                                self._run_due_scheduled_jobs()
-                        except Exception as e:
-                            util_exceptions.ignore_exception('cluster', e)
-
-                        # _run_due_scheduled_jobs() above and the cleanup below are unbounded
-                        # maintenance phases; pet between them so a slow scheduled
-                        # task does not eat the whole watchdog budget before the
-                        # cleanup's own per-loop pets start.
-                        self.pet_watchdog()
-
-                        try:
-                            with util_general.RecordedOperation(
-                                    'cluster wide cleanup', None, threshold=10):
-                                self._cluster_wide_cleanup(last_loop_run)
-                        except Exception as e:
-                            util_exceptions.ignore_exception('cluster', e)
+                            self._maintenance_pass(last_loop_run)
+                        except MaintenancePassAbandoned:
+                            LOG.info('Stopping, so abandoning this maintenance '
+                                     'pass; the next pass picks up the rest')
+                            break
 
                         last_loop_run = now
 

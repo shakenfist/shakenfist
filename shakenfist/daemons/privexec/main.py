@@ -38,9 +38,10 @@ EXIT = threading.Event()
 
 
 def exit_gracefully(sig, _frame):
+    # No logging: see tools/check-signal-handlers.py. The main loop logs as it
+    # stops.
     if sig == signal.SIGTERM:
-        LOG.info('Received SIGTERM')
-        EXIT.set()
+        EXIT.set()  # signal-safe: the main loop only calls EXIT.is_set(), which takes no lock
 
 
 signal.signal(signal.SIGTERM, exit_gracefully)
@@ -156,11 +157,27 @@ def remove_netns_iptables_rule(netns, table, rule):
     return removed
 
 
+# How sf-privexec ends requests still running when it is asked to stop. It
+# waits STOP_GRACE seconds for them, then sends the commands they are running
+# SIGTERM, then SIGKILL TERM_GRACE seconds later, and gives up KILL_GRACE
+# seconds after that. A killed command still produces a reply, so its caller
+# hears an exit code rather than a truncated response (#4563). All of it has
+# to fit inside the unit's 30 second TimeoutStopSec, or systemd SIGKILLs the
+# daemon first and every in-flight caller is cut off.
+STOP_GRACE = 20
+TERM_GRACE = 5
+KILL_GRACE = 2
+STOP_POLL = 0.5
+
+
 class PrivExecJob:
     def __init__(self, conn):
         super().__init__()
         self.conn = conn
+        # What this job is doing, for the shutdown log, and the command it is
+        # running, so shutdown can end it. Both are None between requests.
         self.task_details = None
+        self.process = None
 
     def _execute(self, request):
         # Wrappers such as ionice and ip netns exec run an executable, not a
@@ -201,12 +218,21 @@ class PrivExecJob:
             command = shlex.join(wrappers + ['/bin/sh', '-c', command])
 
         start_time = time.time()
+        self.task_details = {'request': 'execute_request', 'command': command}
+        # Its own session, and so its own process group, so that shutdown can
+        # signal everything the command started: the shell does not always
+        # exec the command, and a child left running would hold the output
+        # pipes open, and communicate() with them, after the shell had died.
         obj = subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, close_fds=True,
+            stderr=subprocess.PIPE, close_fds=True, start_new_session=True,
             shell=True, cwd=working_directory, env=env_variables)
 
-        stdout, stderr = obj.communicate(None, timeout=None)
+        self.process = obj
+        try:
+            stdout, stderr = obj.communicate(None, timeout=None)
+        finally:
+            self.process = None
         obj.stdin.close()
         exit_code = obj.returncode
 
@@ -776,7 +802,11 @@ class PrivExecJob:
                 for request_field in request_map:
                     if request.HasField(request_field):
                         req = getattr(request, request_field)
-                        reply = request_map[request_field](req)
+                        self.task_details = {'request': request_field}
+                        try:
+                            reply = request_map[request_field](req)
+                        finally:
+                            self.task_details = None
                         self.conn.sendall(reply.SerializeToString())
                         command_found = True
                         break
@@ -788,6 +818,79 @@ class PrivExecJob:
                 ...
 
         self.conn.close()
+
+
+def _still_running(workers):
+    """The workers whose threads are alive, joining the rest."""
+    remaining = {}
+    for thread_name, worker in workers.items():
+        if worker['thread'].is_alive():
+            remaining[thread_name] = worker
+        else:
+            LOG.with_fields({
+                'thread_name': thread_name,
+                'thread_ident': worker['thread'].ident
+            }).info('Reaping thread')
+            worker['thread'].join(0.2)
+    return remaining
+
+
+def drain_workers(workers):
+    """Let in-flight requests finish, then end the commands still running.
+
+    See STOP_GRACE. Returns the workers abandoned at the end, which is empty
+    unless a request is stuck somewhere that killing its command cannot end
+    -- one of the handlers which runs its commands without recording them.
+    Worker threads are daemon threads, so they do not hold the process open.
+    """
+    start = time.monotonic()
+    signalled = {}
+    workers = _still_running(workers)
+    for thread_name, worker in workers.items():
+        LOG.with_fields({
+            'thread_name': thread_name,
+            'task': worker['object'].task_details
+        }).info('Waiting for thread to finish its request')
+
+    while workers:
+        elapsed = time.monotonic() - start
+        if elapsed >= STOP_GRACE + TERM_GRACE + KILL_GRACE:
+            LOG.with_fields({
+                'workers': {name: w['object'].task_details for name, w in workers.items()}
+            }).warning(f'Abandoning {len(workers)} requests which did not finish')
+            return workers
+
+        if elapsed >= STOP_GRACE + TERM_GRACE:
+            sig = signal.SIGKILL
+        elif elapsed >= STOP_GRACE:
+            sig = signal.SIGTERM
+        else:
+            sig = None
+
+        if sig:
+            for thread_name, worker in workers.items():
+                process = worker['object'].process
+                if not process or signalled.get(thread_name) == sig:
+                    continue
+                # The whole group, not just the shell. The job holds process
+                # until communicate() returns, which is only once nothing in
+                # the group holds the output pipes, and a group id cannot be
+                # reused while any member is alive. Not poll(): the shell can
+                # be dead and reaped while the command it started runs on.
+                try:
+                    os.killpg(process.pid, sig)
+                except ProcessLookupError:
+                    pass
+                signalled[thread_name] = sig
+                LOG.with_fields({
+                    'thread_name': thread_name,
+                    'task': worker['object'].task_details,
+                    'signal': sig.name
+                }).info('Sent signal to the command a request is running')
+
+        time.sleep(STOP_POLL)
+        workers = _still_running(workers)
+    return workers
 
 
 def write_pid_file():
@@ -839,45 +942,13 @@ def main():
             if workers[thread_name]['thread'].is_alive():
                 remaining_workers[thread_name] = workers[thread_name]
             else:
-                thread_ident = workers[thread_name]['thread'].ident
                 workers[thread_name]['thread'].join(0.2)
         workers = remaining_workers
 
     LOG.info('Stopping')
     send_systemd_stopping()
 
-    start_time = time.time()
-    while workers:
-        LOG.info(f'There are {len(workers)} remaining workers')
-
-        remaining_workers = {}
-        for thread_name in workers:
-            if workers[thread_name]['thread'].is_alive():
-                remaining_workers[thread_name] = workers[thread_name]
-                LOG.with_fields({
-                    'thread_name': thread_name,
-                    'task': workers[thread_name]['object'].task_info
-                }).info('Thread is still executing')
-
-                pid = workers[thread_name]['object'].pid
-                if time.time() - start_time > 30 and pid:
-                    os.kill(pid)
-                    LOG.with_fields({
-                        'thread_name': thread_name,
-                        'task': workers[thread_name]['object'].task_info
-                    }).info('Associated PID sent kill signal')
-            else:
-                thread_ident = workers[thread_name]['thread'].ident
-                LOG.with_fields({
-                    'thread_name': thread_name,
-                    'thread_ident': thread_ident
-                }).info('Reaping thread')
-                workers[thread_name]['thread'].join(0.2)
-
-        workers = remaining_workers
-        if workers:
-            time.sleep(5)
-
+    workers = drain_workers(workers)
     LOG.info(f'There are {len(workers)} remaining workers')
     LOG.info('Stopped')
 

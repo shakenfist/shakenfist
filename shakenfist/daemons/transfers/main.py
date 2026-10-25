@@ -18,6 +18,16 @@ from shakenfist.util import exceptions as util_exceptions
 LOG, _ = logs.setup(__name__)
 
 
+# How long a transfer waits for its requesting node to connect, and how often
+# it looks at its abort path while waiting. The wait used to be one blocking
+# accept() with a 30 second timeout, which could not see the abort path at
+# all, so a worker waiting for a peer outlived SIGTERM and systemd SIGKILLed
+# sf-transfers at its own 30 second TimeoutStopSec (#4524). A SIGKILL also
+# skips the finally below, leaving the transfer row behind.
+ACCEPT_TIMEOUT_SECONDS = 30
+ACCEPT_POLL_SECONDS = 1
+
+
 class TransferJob(util_concurrency.Job):
     def __init__(self, transfer: BlobTransfer):
         super().__init__()
@@ -30,7 +40,7 @@ class TransferJob(util_concurrency.Job):
         log = LOG.with_fields(self.transfer.external_view())
         try:
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            server.settimeout(30)
+            server.settimeout(ACCEPT_POLL_SECONDS)
             server.bind((config.NODE_MESH_IP, 0))
 
             # Listen before publishing the port: the requesting node connects
@@ -49,11 +59,10 @@ class TransferJob(util_concurrency.Job):
 
             log.info('Awaiting transfer connection')
 
-            try:
-                conn, addr = server.accept()
-            except socket.timeout:
-                log.info('No connection before timeout, aborting')
+            accepted = self._accept(server, log)
+            if not accepted:
                 return
+            conn, addr = accepted
 
             log = log.with_fields({'remote_ip': addr[0]})
             log.info('New transfer connection')
@@ -104,6 +113,21 @@ class TransferJob(util_concurrency.Job):
             mariadb.delete_blob_transfer(
                 self.transfer.source_node, self.transfer.transfer_name)
             log.info('Deleted transfer request')
+
+    def _accept(self, server, log):
+        """Wait for the peer's connection, or None on a timeout or an abort."""
+        deadline = time.monotonic() + ACCEPT_TIMEOUT_SECONDS
+        while True:
+            try:
+                return server.accept()
+            except socket.timeout:
+                pass
+            if os.path.exists(self.abort_path):
+                log.info('Aborted while awaiting a transfer connection')
+                return None
+            if time.monotonic() >= deadline:
+                log.info('No connection before timeout, aborting')
+                return None
 
 
 class Monitor(daemon.WorkerPoolDaemon):

@@ -13,6 +13,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.daemons.daemon import send_systemd_stopping
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.node import Node
 from shakenfist.util import exceptions as util_exceptions
 
@@ -22,13 +23,47 @@ ABORT_PATH = '/run/sf/sentinel-first.abort'
 
 
 def exit_gracefully(sig, _frame):
+    # No logging: see tools/check-signal-handlers.py. The main loop logs as it
+    # stops.
     if sig == signal.SIGTERM:
-        LOG.info('Received SIGTERM')
-        daemon.set_abort_path(
-            ABORT_PATH, 'from sentinel first exit_gracefully')
+        daemon.write_abort_file(ABORT_PATH)
 
 
 signal.signal(signal.SIGTERM, exit_gracefully)
+
+
+def record_stop(n):
+    """Record this daemon stopping, and the node stopped if it is.
+
+    The handshake is that a whole-node stop (sf.target, a reboot) stops
+    sentinel-last first, which marks the node stopping, and this daemon last,
+    which completes it to stopped. A deploy does not stop sf.target: it
+    restarts each unit on its own, in start order, so this daemon stops while
+    sentinel-last is still running and the node is not stopping. Marking it
+    stopped then would be false, and is refused anyway -- recording this
+    daemon stopped has just reconciled the node to degraded, and degraded to
+    stopped is not a valid transition -- which used to raise out of main()
+    and fail the unit on every hypervisor on every deploy (#4507). So the
+    lifecycle is only completed when sentinel-last has started it, and a
+    restart of this daemon alone leaves it for sentinel-last's restart to
+    return to created. Returns True if the node was marked stopped.
+
+    Best effort when the database is unreachable: at a whole-cluster shutdown
+    its hosts may already be down, and failing the unit then records nothing
+    either (#4628).
+    """
+    try:
+        n.set_daemon_state('sentinel-first', Node.DAEMON_STATE_STOPPED)
+        current = n.state.value
+        if current != Node.STATE_STOPPING:
+            LOG.with_fields({'state': current}).info(
+                'Node is not stopping, so this is a restart of sentinel-first '
+                'alone; leaving the node lifecycle unchanged')
+            return False
+        return n.set_lifecycle_state(Node.STATE_STOPPED)
+    except DatabaseUnavailable as e:
+        LOG.warning(f'Database unavailable, could not record this daemon or node stopping: {e}')
+        return False
 
 
 def main():
@@ -46,14 +81,13 @@ def main():
 
     while daemon.check_abort_path(ABORT_PATH):
         LOG.debug('Checking in')
-        Node.observe_this_node()
+        daemon.check_in_this_node()
         time.sleep(15)
 
     LOG.info('Stopping')
     send_systemd_stopping()
 
-    n.set_daemon_state('sentinel-first', Node.DAEMON_STATE_STOPPED)
-    n.set_lifecycle_state(Node.STATE_STOPPED)
+    record_stop(n)
     LOG.info('Stopped')
 
     daemon.force_clean_exit()

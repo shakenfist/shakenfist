@@ -6282,6 +6282,23 @@ def _direct_prune_orphan_events(deadline: Optional[float] = None) -> int:
     one full circle or when the deadline expires, persisting its
     position either way.
 
+    Each batch covers a fixed window of _PRUNE_BATCH_SIZE events keys
+    rather than a fixed number of orphans. Asking the anti-join for
+    "the next N orphans" made one statement walk as far as it took to
+    find them, and with orphans sparse that was most of the table: on
+    sfcbr single statements ran for 30 to 508 seconds, holding a read
+    view the whole time, overrunning the sweep's deadline, and slowing
+    every other statement in the database while they ran (issue 4428).
+    Now one query finds where the window ends, the anti-join looks only
+    inside it, and the cursor moves to the window's end whether it held
+    orphans or not, so no statement examines more than one window of
+    rows. The window-end query walks the primary key, which in InnoDB is
+    the clustered index and holds the rows themselves, and no secondary
+    index leads with event_uuid, so it reads the window's rows rather
+    than an index alone: a full circle reads the table about twice. That
+    is the same total as before, but in bounded statements, and a sweep
+    which runs out of deadline resumes from its persisted cursor.
+
     Args:
         deadline: Optional time.time() value after which no further
             batches are started.
@@ -6295,12 +6312,23 @@ def _direct_prune_orphan_events(deadline: Optional[float] = None) -> int:
     cursor = start
     wrapped = False
 
-    select_stmt = sa.text('''
+    window_end_stmt = sa.text('''
+        SELECT event_uuid FROM events
+        WHERE event_uuid > :cursor
+        ORDER BY event_uuid
+        LIMIT 1 OFFSET :offset
+    ''')
+    window_stmt = sa.text('''
+        SELECT e.event_uuid FROM events e
+        LEFT JOIN event_objects eo ON e.event_uuid = eo.event_uuid
+        WHERE e.event_uuid > :cursor AND e.event_uuid <= :window_end
+          AND eo.event_uuid IS NULL
+    ''')
+    # The last window, shorter than a full one, runs to the end of the PK.
+    tail_stmt = sa.text('''
         SELECT e.event_uuid FROM events e
         LEFT JOIN event_objects eo ON e.event_uuid = eo.event_uuid
         WHERE e.event_uuid > :cursor AND eo.event_uuid IS NULL
-        ORDER BY e.event_uuid
-        LIMIT :batch
     ''')
     delete_stmt = sa.text('''
         DELETE FROM events WHERE event_uuid IN :event_uuids
@@ -6311,29 +6339,38 @@ def _direct_prune_orphan_events(deadline: Optional[float] = None) -> int:
             if deadline is not None and time.time() >= deadline:
                 break
             with engine.connect() as conn:
-                rows = conn.execute(select_stmt, {
+                row = conn.execute(window_end_stmt, {
                     'cursor': cursor,
-                    'batch': _PRUNE_BATCH_SIZE,
-                }).fetchall()
-                if not rows:
-                    if wrapped or start == '':
-                        # A walk from the head reaching the end is a full
-                        # circle already; a wrapped pass reaching the end
-                        # means the region up to the start point held no
-                        # further orphans.
-                        break
-                    cursor = ''
-                    wrapped = True
-                    continue
-                cursor = rows[-1].event_uuid
-                result = conn.execute(delete_stmt, {
-                    'event_uuids': [row.event_uuid for row in rows],
-                })
-                conn.commit()
-            rowcount = result.rowcount or 0
+                    'offset': _PRUNE_BATCH_SIZE - 1,
+                }).fetchone()
+                window_end = row.event_uuid if row else None
+                if window_end is None:
+                    rows = conn.execute(tail_stmt, {'cursor': cursor}).fetchall()
+                else:
+                    rows = conn.execute(window_stmt, {
+                        'cursor': cursor,
+                        'window_end': window_end,
+                    }).fetchall()
+                rowcount = 0
+                if rows:
+                    result = conn.execute(delete_stmt, {
+                        'event_uuids': [r.event_uuid for r in rows],
+                    })
+                    conn.commit()
+                    rowcount = result.rowcount or 0
             if rowcount > 0:
                 ORPHAN_EVENTS_PRUNED.inc(rowcount)
                 total += rowcount
+
+            if window_end is None:
+                # The end of the PK. A walk which began at the head, or has
+                # already wrapped, has been all the way round.
+                cursor = ''
+                if wrapped or start == '':
+                    break
+                wrapped = True
+                continue
+            cursor = window_end
             if wrapped and cursor >= start:
                 break
     except OperationalError as e:
@@ -22600,7 +22637,8 @@ def _grpc_work_queue_restart(queue_name: str) -> None:
 
 
 def _grpc_work_queue_list_stuck(
-        threshold_seconds: float) -> list[dict[str, Any]]:
+        threshold_seconds: float,
+        strict: bool = False) -> list[dict[str, Any]]:
     """List stuck work_queue rows via the database microservice."""
     try:
         stub = _get_database_stub()
@@ -22621,6 +22659,9 @@ def _grpc_work_queue_list_stuck(
             for row in reply.rows
         ]
     except grpc.RpcError as e:
+        if strict:
+            raise exceptions.DatabaseUnavailable(
+                f'gRPC ListStuckWorkQueueRows failed: {e}') from e
         LOG.warning(
             f'gRPC ListStuckWorkQueueRows failed: {e}')
         return []
@@ -24876,16 +24917,23 @@ def restart_work_queue(queue_name: str) -> None:
 
 
 def list_stuck_work_queue_rows(
-        threshold_seconds: float) -> list[dict[str, Any]]:
+        threshold_seconds: float,
+        strict: bool = False) -> list[dict[str, Any]]:
     """Return rows whose claim is older than threshold_seconds.
 
     Used by the cluster daemon reaper to find work items stuck
     in flight. Each dict carries id, queue_name, claimed_at,
     claimed_by, attempts and payload. Rows are ordered oldest
     claim first.
+
+    Over gRPC a failed call is logged and returns no rows, which
+    suits the reaper: it runs again a minute later. strict=True
+    raises DatabaseUnavailable instead, for a caller which must
+    tell "could not list" from "nothing to list" -- sf-queues'
+    startup, which clears the claims it has listed.
     """
     if _use_database_service():
-        return _grpc_work_queue_list_stuck(threshold_seconds)
+        return _grpc_work_queue_list_stuck(threshold_seconds, strict=strict)
     return _direct_work_queue_list_stuck(threshold_seconds)
 
 

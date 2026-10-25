@@ -1,6 +1,10 @@
 # Copyright 2019 Michael Still and contributors
 
+import os
+import shutil
 import signal
+import tempfile
+import time
 from unittest import mock
 
 from shakenfist.daemons import daemon
@@ -78,41 +82,58 @@ class IdleRoundingTestCase(base.ShakenFistTestCase):
 
 
 class ExitGracefullyTestCase(base.ShakenFistTestCase):
+    """The SIGTERM handler only writes the abort file.
+
+    It runs on the main thread between any two bytecodes, so logging or
+    database access from it could wait on a lock the main thread holds
+    (#4601, #3495).
+    """
+
     def _make_daemon(self):
+        tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tempdir)
         d = daemon.Daemon.__new__(daemon.Daemon)
-        d.abort_path = '/run/sf/_test.abort'
+        d.abort_path = os.path.join(tempdir, '_test.abort')
         d.daemon_name = 'unittest'
         d.log = mock.MagicMock()
         return d
 
-    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.LOG')
     @mock.patch('shakenfist.daemons.daemon.Node')
-    def test_sigterm_marks_stopping_and_sets_abort(
-            self, mock_node, mock_set_abort):
+    def test_sigterm_writes_the_abort_file_and_nothing_else(self, mock_node, mock_log):
         d = self._make_daemon()
         d.exit_gracefully(signal.SIGTERM, None)
-        mock_node.this_node.return_value.set_daemon_state.\
-            assert_called_once_with(
-                'unittest', mock_node.DAEMON_STATE_STOPPING)
-        mock_set_abort.assert_called_once_with(
-            d.abort_path, 'from exit_gracefully')
+        self.assertFalse(daemon.check_abort_path(d.abort_path))
+        mock_node.assert_not_called()
+        mock_node.this_node.assert_not_called()
+        self.assertEqual([], d.log.mock_calls)
+        self.assertEqual([], mock_log.mock_calls)
 
-    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
     @mock.patch('shakenfist.daemons.daemon.Node')
-    def test_other_signals_are_ignored(self, mock_node, mock_set_abort):
+    def test_other_signals_are_ignored(self, mock_node):
         d = self._make_daemon()
         d.exit_gracefully(signal.SIGINT, None)
-        mock_set_abort.assert_not_called()
-        mock_node.this_node.assert_not_called()
+        self.assertTrue(daemon.check_abort_path(d.abort_path))
+        self.assertFalse(d.sigterm_unlogged)
 
-    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
-    @mock.patch('shakenfist.daemons.daemon.Node')
-    def test_grpc_shutdown_race_still_sets_abort(
-            self, mock_node, mock_set_abort):
-        # A ValueError from gRPC already shutting down must not stop the
-        # abort path from being set, or SIGTERM would be lost.
-        mock_node.this_node.side_effect = ValueError('channel closed')
+    def test_the_main_thread_logs_the_sigterm_once(self):
         d = self._make_daemon()
         d.exit_gracefully(signal.SIGTERM, None)
-        mock_set_abort.assert_called_once_with(
-            d.abort_path, 'from exit_gracefully')
+
+        # Rate limited, so check_daemon_state() returns before any read.
+        d._last_daemon_state_check = time.time()
+        d._daemon_state_poll_interval = 3600
+        d.check_daemon_state()
+        d.check_daemon_state()
+        d.log.info.assert_called_once_with('Caught SIGTERM, terminating')
+
+    @mock.patch('shakenfist.daemons.daemon.send_systemd_status')
+    @mock.patch('shakenfist.daemons.daemon.Node')
+    def test_an_exit_without_another_state_check_still_logs_the_sigterm(self, mock_node, mock_status):
+        # A loop which sees the abort file and exits never calls
+        # check_daemon_state() again; record_exit() is on every exit path.
+        d = self._make_daemon()
+        d.exit_gracefully(signal.SIGTERM, None)
+        d.record_exit()
+        d.record_exit()
+        d.log.info.assert_called_once_with('Caught SIGTERM, terminating')

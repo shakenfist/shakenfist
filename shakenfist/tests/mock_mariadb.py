@@ -3874,7 +3874,7 @@ class MockMariaDB():
             f'MockMariaDB.restart_work_queue({queue_name}): '
             f'cleared {cleared}')
 
-    def _mariadb_list_stuck_work_queue_rows(self, threshold_seconds):
+    def _mariadb_list_stuck_work_queue_rows(self, threshold_seconds, strict=False):
         """Mock implementation of mariadb.list_stuck_work_queue_rows().
 
         Returns rows whose claim age exceeds threshold_seconds,

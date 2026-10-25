@@ -1,14 +1,14 @@
 {#-
   CI ONLY. Every credential in this file is a throwaway value for a
-  disposable merge-queue cluster, committed on purpose, as shakenfist/actions'
+  disposable CI cluster, committed on purpose, as shakenfist/actions'
   own ci* defaults are. Never copy one into a real deployment.
 
-  A deploy profile for the debian-13-slim-tier row of the merge matrix
-  (.github/workflows/functional-tests.yml). shakenfist/actions'
-  tools/ci-apply-deploy-profile.py renders it against the topology facts file
-  with StrictUndefined and validates it; that script's docstring is the
-  schema, and docs/consuming.md in that repository is its guide. It turns the
-  row into a cluster with Kerbside on:
+  A deploy profile for the debian-13-slim-tier lane
+  (.github/workflows/functional-lanes.yml), which runs weekly.
+  shakenfist/actions' tools/ci-apply-deploy-profile.py renders it against the
+  topology facts file with StrictUndefined and validates it; that script's
+  docstring is the schema, and docs/consuming.md in that repository is its
+  guide. It turns the lane into a cluster with Kerbside on:
 
     * Kerbside is deployed on sf2, a hypervisor outside the database tier, so
       it shares a host with instances but not with the first database host.
@@ -25,7 +25,7 @@
     * The functional tests are told a VDI console proxy is expected.
     * shakenfist.kerbside, the collection with the kerbside role, is installed
       from Galaxy before the first deploy, in the range
-      examples/_shared/requirements.yml pins, so the row deploys the release
+      examples/_shared/requirements.yml pins, so the lane deploys the release
       an operator gets.
 
   kerbside_token_duration is left at its default.

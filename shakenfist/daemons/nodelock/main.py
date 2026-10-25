@@ -27,9 +27,10 @@ EXIT = threading.Event()
 
 
 def exit_gracefully(sig, _frame):
+    # No logging: see tools/check-signal-handlers.py. The main loop logs as it
+    # stops.
     if sig == signal.SIGTERM:
-        LOG.info('Received SIGTERM')
-        EXIT.set()
+        EXIT.set()  # signal-safe: the main loop only calls EXIT.is_set(), which takes no lock
 
 
 signal.signal(signal.SIGTERM, exit_gracefully)

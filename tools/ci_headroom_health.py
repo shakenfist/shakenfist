@@ -84,13 +84,16 @@ SERIES_PRESENT_FLOOR = 0.90
 # reach the primary -- leave nothing for a per-record check to find, so they
 # are only visible as a count.
 #
-# Scaled to the ten newest merge runs the scheduled job harvests. Four
-# instrumented jobs per run is 40 records; the baseline window yielded 217
-# over 66 runs, or 3.3 per run, the shortfall being runs whose functional
-# jobs were skipped because nothing relevant changed. This floor tolerates
-# four of ten runs contributing nothing and still fails a window where the
-# bundles stopped arriving.
-MIN_RECORDS = 20
+# Scaled to the ten newest merge runs the scheduled job harvests. The
+# baseline window yielded 217 records over 66 runs from four instrumented
+# jobs, or 3.3 per run, the shortfall being runs whose functional jobs were
+# skipped because nothing relevant changed. Since 2026-10-25 a merge run has
+# three instrumented jobs -- Debian 13 cluster, Guests and Ansible modules;
+# the Ubuntu 24.04 cluster and Debian 13 tier lanes run weekly from
+# scheduled-tests.yml, which this does not harvest -- so ten runs is at most
+# 30 records. This floor tolerates four of ten runs contributing nothing and
+# still fails a window where the bundles stopped arriving.
+MIN_RECORDS = 18
 
 # No sample may fail. A failed sample is an HTTP or parse error against a
 # cluster which was up enough to run the suite, and the banked datasets have

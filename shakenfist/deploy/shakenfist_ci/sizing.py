@@ -226,8 +226,8 @@ def is_single_machine(nodes):
     """Whether a reading is a single-machine deployment, not a shrunken cluster.
 
     ``cluster-ci.conf`` is not only run against cluster topologies.
-    ``.github/workflows/scheduled-tests.yml``'s "develop branch on debian
-    12 single machine" entry runs it against the ``localhost`` topology,
+    The weekly ``debian-13-localhost`` lane in ``functional-lanes.yml``
+    runs it against the ``localhost`` topology,
     deliberately, to find anything in the cluster suite which breaks on
     one node. Every structural minimum here is unmeetable there, so an
     assertion which fails on an unmet minimum has to know the difference

@@ -343,10 +343,14 @@ every call site has to remember to set.
 
 ## Cluster CI tests only run in the merge queue
 
-The `(collection)` matrix in `Functional tests` -- everything under
-`deploy/shakenfist_ci/cluster_ci_tests/` -- is skipped on `pull_request` and
-runs on `merge_group`. A green PR therefore says nothing about whether those
-tests pass, or whether they can even reach their first assertion.
+The functional cluster lanes in `Functional tests` -- everything under
+`deploy/shakenfist_ci/cluster_ci_tests/` -- are skipped on `pull_request` and
+run on `merge_group`. A green PR therefore says nothing about whether those
+tests pass, or whether they can even reach their first assertion. Some lanes
+do not run in the merge queue at all, only weekly: the Ubuntu base image, the
+`slim-tier` topology with Kerbside, and a single machine (see
+[Merge lanes and weekly lanes](ci.md#merge-lanes-and-weekly-lanes)). To run
+those against a branch, dispatch `scheduled-tests.yml` on it.
 
 `cluster_ci_tests/test_federation.py` sat through four commits registering a
 trusted issuer with an `http://` `jwks_uri` while the API had refused
@@ -440,6 +444,27 @@ one only as long as the comparison stays fixed --
 `smoke_ci_tests/test_ci_harness.py` is what holds it there. When a
 helper's failure mode is to succeed quietly, the guard has to assert the
 effect on the cluster rather than that the helper returned.
+
+## A signal handler only sets flags
+
+Python runs a signal handler on the main thread, between any two of that
+thread's bytecodes, so the handler shares every lock the main thread might be
+holding at that instant -- and a non-reentrant one it needs means waiting for
+itself forever. Logging takes one (the Loki handler enqueues under the logship
+spool's lock, and the main thread logs all the time), and so does the
+database client. sf-api's drain handler logged and deadlocked its worker until
+gunicorn SIGKILLed it (#3495). Every daemon's `exit_gracefully()` logged and
+wrote its state to the database, and sf-database, stopping under a slow
+MariaDB, never got as far as its drain (#4601). Neither looked wrong.
+
+A handler assigns, writes the abort file with `daemon.write_abort_file()`, or
+calls a function marked `@signal_safe` (`shakenfist/util/signals.py`); the
+main thread notices and does the real work. `tools/check-signal-handlers.py`
+enforces this in pre-commit for every `signal.signal()` handler and, through
+`@signal_safe`, every helper they call. When it cannot see that a call is
+safe -- `Event.set()` on an event only another thread waits on -- end the
+line with `# signal-safe: <why>`, and make the why something a reviewer can
+check.
 
 ## A column-to-column comparison has no bind processor
 

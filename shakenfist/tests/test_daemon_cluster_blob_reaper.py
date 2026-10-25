@@ -25,6 +25,7 @@ BLOB_UUID_1 = '11111111-1111-4111-8111-111111111111'
 class ClusterBlobReaperTestCase(base.ShakenFistTestCase):
     def _make_monitor(self):
         m = cluster_main.Monitor.__new__(cluster_main.Monitor)
+        m.abort_path = '/nonexistent/sf-test-cluster-abort-path'
         m.lock = mock.MagicMock()
         m.lock.lost_event = threading.Event()
         m.is_elected = True

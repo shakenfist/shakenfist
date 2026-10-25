@@ -212,6 +212,31 @@ A safe, conservative starting point is a **5 second interval with a 2-failure
 threshold**: the load balancer sees the `503` within ~10 s, well inside the
 25 s grace. The cheap, cached probe makes this frequency painless.
 
+### Restarts keep the port open
+
+systemd, not gunicorn, holds `sf-api`'s listening socket on `:13000`
+(`sf-api.socket`), so a restart of `sf-api` -- including the collection's
+restart-on-change redeploy -- never closes the port. Connections made after
+the old workers exit wait in the socket's queue and are answered by the new
+gunicorn once it has started, a few seconds later. Before this, the last
+worker to exit closed the socket, the kernel reset every connection still
+queued on it, and a load balancer which had already sent a request on one of
+those connections returned `502` (nginx, for one, does not retry a
+non-idempotent request it has sent). A load balancer's connect and read
+timeouts need only cover `sf-api`'s start time for these requests to succeed.
+
+The same socket starts a stopped `sf-api` when a connection arrives. To take
+the API down on a node, stop the socket, which stops `sf-api` too:
+`sudo systemctl stop sf-api.socket`.
+
+If `sf-api` fails often enough to hit systemd's start limit, systemd fails
+the socket as well (`systemctl status sf-api.socket` shows
+`service-start-limit-hit`), and the node stops accepting connections on
+`:13000` until both are reset. Once the cause is fixed, bring it back with
+`sudo systemctl reset-failed sf-api.service sf-api.socket` followed by
+`sudo systemctl start sf-api.socket`. Restarting `sf-api` alone is not
+enough.
+
 ### Route only to sf-api, and firewall the port
 
 The load balancer pool contains **only `sf-api` backends** on `:13000`.

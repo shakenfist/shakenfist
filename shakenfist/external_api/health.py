@@ -28,6 +28,7 @@ from shakenfist_utilities import logs
 
 from shakenfist.config import config
 from shakenfist.util.grpc_channel import make_database_channel
+from shakenfist.util.signals import signal_safe
 
 
 LOG, _ = logs.setup(__name__)
@@ -154,14 +155,18 @@ def is_ready() -> bool:
             and not draining)
 
 
+@signal_safe
 def begin_drain():
-    """Latch the one-way draining flag (logged once)."""
+    """Latch the one-way draining flag.
+
+    Called from the SIGTERM handler, so it only assigns: logging here could
+    deadlock the worker (see post_worker_init in gunicorn_config).
+    """
     global draining
-    if not draining:
-        LOG.info('sf-api worker beginning drain, readiness now reports 503')
     draining = True
 
 
+@signal_safe
 def is_draining() -> bool:
     """Return whether this worker has begun draining."""
     return draining

@@ -437,16 +437,24 @@ def stop(daemon: str) -> None:
     click.echo(
         f'Gracefully stopping Shaken Fist {daemon} daemon '
         f'on this node...')
-    n = Node.from_db(config.NODE_NAME)
-    if not n:
-        raise click.ClickException(
-            f'Node "{config.NODE_NAME}" not found.')
+    # This is every unit's ExecStop. Recording the stop is a courtesy: the
+    # daemon stops on the SIGTERM which follows either way. So when the
+    # database is unreachable -- at a whole-cluster shutdown its hosts may
+    # already be down -- say so and succeed, rather than failing the unit's
+    # stop over a write nobody could make (#4628).
+    try:
+        n = Node.from_db(config.NODE_NAME)
+        if not n:
+            raise click.ClickException(
+                f'Node "{config.NODE_NAME}" not found.')
 
-    # If we were missing, we're not any more
-    if n.state.value == Node.STATE_MISSING:
-        n.state = Node.STATE_DEGRADED  # type: ignore[misc]
+        # If we were missing, we're not any more
+        if n.state.value == Node.STATE_MISSING:
+            n.state = Node.STATE_DEGRADED  # type: ignore[misc]
 
-    n.set_daemon_state(daemon, Node.DAEMON_STATE_STOPPING)
+        n.set_daemon_state(daemon, Node.DAEMON_STATE_STOPPING)
+    except exceptions.DatabaseUnavailable as e:
+        click.echo(f'Database unavailable, not recording the {daemon} daemon as stopping: {e}', err=True)
 
 
 @click.command(name='gateway-health')

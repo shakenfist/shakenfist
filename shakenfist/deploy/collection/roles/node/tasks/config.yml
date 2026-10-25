@@ -135,6 +135,16 @@
   register: sf_api_unit_result
   notify: Reload systemd
 
+- name: Write systemd socket unit for API daemon
+  ansible.builtin.template:
+    src: sf-api.socket
+    dest: /etc/systemd/system/sf-api.socket
+    owner: root
+    group: root
+    mode: ugo+r
+  register: sf_api_socket_result
+  notify: Reload systemd
+
 - name: Write systemd unit for database daemon
   ansible.builtin.template:
     src: sf.service
@@ -204,13 +214,17 @@
 # non-database nodes rather than leaving the variable unset -- so no default
 # guards are needed. The database-teardown path (a node leaving the tier) does
 # not need to be captured here: that transition also rewrites /etc/sf/config, so
-# sf_config_changed already forces the restart.
+# sf_config_changed already forces the restart. sf_api_socket_changed is kept
+# separately as well, because register.yml must stop sf-api to restart its
+# socket.
 - name: Remember which configuration changes require a daemon restart
   ansible.builtin.set_fact:
     sf_config_changed: "{{ sf_config_result is changed }}"
+    sf_api_socket_changed: "{{ sf_api_socket_result is changed }}"
     sf_units_changed: >-
       {{ (sf_obsolete_units_result is changed)
          or (sf_target_unit_result is changed)
          or (sf_service_units_result is changed)
          or (sf_api_unit_result is changed)
+         or (sf_api_socket_result is changed)
          or (sf_db_unit_result is changed) }}

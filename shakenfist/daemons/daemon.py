@@ -30,6 +30,7 @@ from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_user_facing_node_queues
 from shakenfist.operations.baseoperation import get_all_background_node_queues
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util.signals import signal_safe
 from shakenfist.util.caller_identity import set_caller_identity
 from shakenfist.util import libvirt as util_libvirt
 
@@ -210,14 +211,46 @@ def clear_abort_path(abort_path):
         os.unlink(abort_path)
 
 
+@signal_safe
+def write_abort_file(abort_path):
+    """Create an abort file, safely from a signal handler.
+
+    Raw system calls only: no logging and no Python file object, so nothing
+    here can need a lock the interrupted thread holds. Use set_abort_path()
+    anywhere else, so that the abort is logged.
+    """
+    fd = os.open(abort_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
+    try:
+        os.write(fd, b'1')
+    finally:
+        os.close(fd)
+
+
 def set_abort_path(abort_path, source):
     LOG.info(f'Setting abort file: {abort_path} ({source})')
-    with open(abort_path, 'w') as f:
-        f.write('1')
+    write_abort_file(abort_path)
 
 
 def check_abort_path(abort_path):
     return not os.path.exists(abort_path)
+
+
+def check_in_this_node():
+    """Record that this node is alive, if the database lets us.
+
+    The sentinels check in every 15 seconds. When the database was
+    unreachable the exception escaped their loops and failed the unit, so a
+    database blip of more than about 30 seconds crash-looped them, and at a
+    whole-cluster reboot, with the database hosts already down, nothing
+    recorded the nodes stopping (#4628). A missed check-in costs nothing: the
+    next one catches up. Returns True if this one was recorded.
+    """
+    try:
+        Node.observe_this_node()
+        return True
+    except DatabaseUnavailable as e:
+        LOG.warning(f'Database unavailable, skipping this check-in: {e}')
+        return False
 
 
 def health_check_privexec():
@@ -430,20 +463,39 @@ class Daemon:
             self.last_stability = msg
         return True
 
-    def exit_gracefully(self, sig, _frame):
-        if sig == signal.SIGTERM:
-            self.log.info('Caught SIGTERM, terminating')
-            try:
-                n = Node.this_node()
-                n.set_daemon_state(
-                    self.daemon_name, Node.DAEMON_STATE_STOPPING)
-            except ValueError:
-                # This might fail if grpc has already started shutting down
-                ...
+    # Set by exit_gracefully(), logged and cleared by log_caught_sigterm()
+    # from check_daemon_state() or, for a loop which exits on the abort file
+    # without calling that again, record_exit().
+    sigterm_unlogged = False
 
-            set_abort_path(self.abort_path, 'from exit_gracefully')
+    def exit_gracefully(self, sig, _frame):
+        # This runs on the main thread, between any two of its bytecodes, so
+        # it must not need a lock the main thread could be holding. That rules
+        # out logging (the Loki handler enqueues under the logship spool's
+        # non-reentrant lock) and the database (connection pool and channel
+        # locks, and on a slow database a wait which outlasts TimeoutStopSec
+        # by itself). It used to do both: sf-database, stopping under a slow
+        # MariaDB, never got from here to its drain and was SIGKILLed (#4601),
+        # and sf-api deadlocked the same way (#3495). The abort file is all a
+        # stop needs: every loop polls it. The STOPPING state this used to
+        # write is written by the unit's ExecStop (sf-ctl stop) before systemd
+        # sends SIGTERM, and record_exit() writes STOPPED. A SIGTERM which
+        # bypasses ExecStop (kill -TERM, systemctl kill) therefore records no
+        # STOPPING: the daemon goes from running to STOPPED, or, if it is then
+        # SIGKILLed, keeps the last state it recorded. tools/
+        # check-signal-handlers.py holds every signal handler to this.
+        if sig == signal.SIGTERM:
+            self.sigterm_unlogged = True
+            write_abort_file(self.abort_path)
+
+    def log_caught_sigterm(self):
+        if self.sigterm_unlogged:
+            self.sigterm_unlogged = False
+            self.log.info('Caught SIGTERM, terminating')
 
     def check_daemon_state(self):
+        self.log_caught_sigterm()
+
         # Callers hit this on every 0.2s idle tick, but the database read only
         # needs to notice an externally written stop request (local SIGTERM is
         # handled by exit_gracefully() + the abort_path check in idle()), so we
@@ -516,6 +568,7 @@ class Daemon:
         send_systemd_ready()
 
     def record_exit(self):
+        self.log_caught_sigterm()
         n = Node.this_node()
         try:
             n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_STOPPED)
@@ -620,6 +673,18 @@ def send_systemd_watchdog():
     _send_systemd_notification(b'WATCHDOG=1')
 
 
+# How long a worker pool daemon waits for its workers once it has asked them
+# to stop, before it abandons those still running and exits anyway. It must
+# stay inside the units' TimeoutStopSec (30s, roles/node/templates/sf.service)
+# with room left for record_exit(). A worker which never looks at its abort
+# path -- an image fetch, or a long privexec command -- otherwise held the
+# daemon until systemd SIGKILLed it, so the daemon never recorded that it had
+# stopped (#4550). The work an abandoned worker was doing is lost either way;
+# sf-queues re-runs it when it next starts (see its startup_tasks).
+WORKER_STOP_GRACE = 20
+WORKER_STOP_POLL = 0.5
+
+
 class WorkerPoolDaemon(Daemon):
     def __init__(self, name):
         super().__init__(name)
@@ -647,20 +712,26 @@ class WorkerPoolDaemon(Daemon):
         finally:
             LOG.info('Stopping')
 
-            while len(self.workers) > 0:
-                for thread_name in self.workers:
-                    thread_ident = self.workers[thread_name]['thread'].ident
-                    set_abort_path(
-                        self.workers[thread_name]['object'].abort_path,
-                        'worker thread cleanup')
-                    LOG.info(f'Sent exit event to {thread_name} thread '
-                             f'with ident {thread_ident}')
+            for thread_name in self.workers:
+                thread_ident = self.workers[thread_name]['thread'].ident
+                set_abort_path(
+                    self.workers[thread_name]['object'].abort_path,
+                    'worker thread cleanup')
+                LOG.info(f'Sent exit event to {thread_name} thread '
+                         f'with ident {thread_ident}')
 
-                if len(self.workers) > 0:
-                    time.sleep(5)
-
+            deadline = time.monotonic() + WORKER_STOP_GRACE
+            self.reap_workers()
+            while self.workers and time.monotonic() < deadline:
+                time.sleep(WORKER_STOP_POLL)
                 self.reap_workers()
 
+            if self.workers:
+                # Worker threads are daemon threads, so they do not hold the
+                # process open once we return.
+                LOG.with_fields({'workers': sorted(self.workers)}).warning(
+                    f'Abandoning {len(self.workers)} workers which did not '
+                    f'stop within {WORKER_STOP_GRACE} seconds')
             LOG.info(f'There are {len(self.workers)} remaining workers')
             LOG.info('Stopped')
             self.record_exit()
