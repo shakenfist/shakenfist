@@ -27,19 +27,16 @@ four shapes:
 
 | Shape | Example |
 |-------|---------|
-| A phase and its number | `phase 3`, `phases 2 and 3` |
+| A phase and its number | `phase 3`, `phases 2 and 3`, `phase 3a` |
 | A hyphenated phase | `the phase-4 leaks pass` |
 | A decision and its number | `decision 3`, `decision 6.4` |
-| A step with a lettered number | `step 5f`, `steps 2a` |
+| A step with a lettered number | `step 5f`, `steps 2a`, `step 12ab` |
 
 The phase shape is `plan-phase-references`' pattern, shared rather
 than copied. A step with a bare number, such as `step 3`, is not
 matched: procedural comments write `step 1: open the file` in the
 ordinary sense, and only the lettered form is a plan's. A phase with
-no number (`two-phase commit`) is not matched either. Nor, for now, is
-a phase or step whose number carries letters after the first, such as
-`phase 3a` or `step 12ab`; that is a known gap rather than a judgment
-that they are not plan history.
+no number (`two-phase commit`) is not matched either.
 
 Before a line is matched, three things are removed from it:
 
@@ -118,10 +115,9 @@ Three criteria and a grep divide the rule between them:
   equivalent an adopting repository carries, catches the same shapes,
   plus plan filenames, on the lines a change adds, so that the backlog
   this audit reports stops growing while it is worked off. It matches
-  `decision 6.4` by its first number and misses `phase 3a` just as
-  this audit does, but it strips nothing and honours neither the
-  markers nor the mkdocs exemption, so a hit is a candidate for the
-  reviewer rather than a finding.
+  `decision 6.4` by its first number, strips nothing, and honours
+  neither the markers nor the mkdocs exemption, so a hit is a
+  candidate for the reviewer rather than a finding.
 
 ## Template
 

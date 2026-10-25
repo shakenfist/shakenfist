@@ -726,17 +726,17 @@ wrote to standard virtqueue structures, and got standard completion
 interrupts. But under the covers, the data moved via RDMA -- with all the
 latency and CPU overhead benefits that implies.
 
-```
-Guest sees:                    Backend implements:
-┌─────────────────┐           ┌─────────────────────────────────┐
-│ virtio-net      │           │ vhost-user backend              │
-│ driver          │           │                                 │
-│    ↓            │           │ 1. Read virtqueue descriptor    │
-│ virtqueue       │ ────────> │ 2. Access guest packet buffer   │
-│ doorbell write  │           │ 3. RDMA send to remote host     │
-│    ↓            │           │ 4. Wait for RDMA completion     │
-│ completion IRQ  │ <──────── │ 5. Signal guest via irqfd       │
-└─────────────────┘           └─────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant G as Guest virtio-net driver
+    participant B as vhost-user backend
+    participant R as Remote host
+    G->>B: Post descriptor to virtqueue, then doorbell write
+    B->>B: Read virtqueue descriptor
+    B->>B: Access guest packet buffer
+    B->>R: RDMA send
+    R-->>B: RDMA completion
+    B-->>G: Signal guest via irqfd (completion IRQ)
 ```
 
 This pattern appears in several production systems:

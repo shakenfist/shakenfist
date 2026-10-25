@@ -19,7 +19,8 @@ separate audit (`llm-doc-structure`).
 
 The check greps the top-level `README.md`, `AGENTS.md` and
 `ARCHITECTURE.md`, and every `.md` file under `docs/`, for
-`phase <number>` (case-insensitive), skipping:
+`phase <number>` (case-insensitive), where the number may carry
+letters as a sub-phase's does (`phase 3d`, `phase 12ab`), skipping:
 
 * any file under a `plans/` directory at any depth -- plan documents
   legitimately discuss their own phases;
