@@ -4166,8 +4166,9 @@ class MockMariaDB():
             state_row['update_time'] = time.time()
             state_row['message'] = message
             folded.append(op_uuid)
+        name = ('fold' if folded_state == 'executing' else 'claim')
         self._trace(
-            f'MockMariaDB.claim_coalescible_siblings('
+            f'MockMariaDB.{name}_coalescible_siblings('
             f'{operation_type}, {key_description}): '
             f'folded {len(folded)} ops to {folded_state}')
         return folded

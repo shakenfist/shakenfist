@@ -1017,6 +1017,25 @@ class FoldLifecycleTestCase(FoldHarness):
         self.assertEqual('executing', self._state_of(SIBLING_UUID))
         self.assertTrue(self._has_work_queue_row(SIBLING_UUID))
 
+        # The sibling's own row comes up first. Running itself, it folds
+        # the requeued survivor in turn, and its success completes both.
+        self.vxlan._apply_ensure_mesh.side_effect = None
+        job = network_workitem.Job.__new__(network_workitem.Job)
+        job.log = mock.MagicMock()
+        job._cluster_operation_execute(
+            NODE_A_QUEUE_USER_FACING, self._load(SIBLING_UUID), 2, {})
+
+        self.assertEqual('complete', self._state_of(SIBLING_UUID))
+        row = self._state_row(SURVIVOR_UUID)
+        self.assertEqual('complete', row.state_value)
+        self.assertEqual(f'coalesced into {SIBLING_UUID}', row.message)
+        self.assertEqual(2, self.vxlan._apply_ensure_mesh.call_count)
+
+        # The survivor's requeued work item is then skipped as terminal.
+        self._run_through_network_dispatcher(
+            self._load(SURVIVOR_UUID), NODE_A_QUEUE_BACKGROUND)
+        self.assertEqual(2, self.vxlan._apply_ensure_mesh.call_count)
+
     def test_survivor_raise_leaves_sibling_executing(self):
         survivor = self._per_node_pair()
         self.mock_network_class.from_db.return_value = None
@@ -1263,6 +1282,29 @@ class FoldLifecycleTestCase(FoldHarness):
         self.assertEqual('queued', seen['state'])
         self.assertEqual('queued', self._state_of(SIBLING_UUID))
         self.assertEqual('complete', self._state_of(SURVIVOR_UUID))
+
+    def test_fold_rpc_sends_key_and_returns_folded_uuids(self):
+        # A None key value travels as is_null, not as an empty uuid, so a
+        # cluster-wide op folds only other cluster-wide ops.
+        reply = database_pb2.ClaimCoalescibleSiblingsReply(
+            folded_op_uuids=[SIBLING_UUID])
+        with mock.patch('shakenfist.mariadb._get_database_stub') as stub, \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply) as call:
+            folded = mariadb._grpc_fold_coalescible_siblings(
+                'net_op',
+                [('network_uuid', NETWORK_UUID), ('node_uuid', None)],
+                [MESH_TASK], SURVIVOR_UUID)
+
+        self.assertEqual([SIBLING_UUID], folded)
+        rpc, request = call.call_args.args
+        self.assertIs(stub.return_value.FoldCoalescibleSiblings, rpc)
+        self.assertEqual('net_op', request.operation_type)
+        self.assertEqual([MESH_TASK], list(request.task_names))
+        self.assertEqual(SURVIVOR_UUID, request.exclude_op_uuid)
+        self.assertEqual(
+            [('network_uuid', NETWORK_UUID, False), ('node_uuid', '', True)],
+            [(k.column, k.uuid, k.is_null) for k in request.keys])
 
     def test_fold_rpc_transient_error_runs_without_folding(self):
         # Any other gRPC failure is transient: the fold is skipped for

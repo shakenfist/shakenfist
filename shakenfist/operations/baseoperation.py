@@ -689,6 +689,18 @@ class BaseClusterOperation(BaseOperation):
         must still be tried. The sibling is then still ``executing`` with
         its own work_queue row, so it runs itself when that row is
         dequeued, exactly as it would had this operation failed.
+
+        Reading ``executing`` and then completing is two steps rather
+        than one guarded write, and no state message could make it one:
+        a sibling running itself never rewrites its state, so its row
+        still names this operation. It is safe because of link (iv) of
+        the PARTITIONED-WORKER SAFETY INVARIANT in
+        ``daemons/network/workitem.py``: the only thread which could be
+        running the sibling is this one. While a dispatcher restart
+        breaks that link (#4645) a sibling could be running itself as it
+        is completed here. Its work has still been done, by this
+        operation, but an error from its own run would then be lost,
+        because ``complete`` has no transition to ``error``.
         """
         for sibling_uuid in folded:
             try:
