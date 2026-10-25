@@ -192,7 +192,7 @@ def post_worker_init(worker):
         # nothing here can need a lock the interrupted thread holds.
         health.begin_drain()
         received['signal'] = (signum, frame)
-        requested.set()
+        requested.set()  # signal-safe: only the drain thread uses this Event, by waiting
 
     drainer = threading.Thread(
         target=_drain_after_signal,

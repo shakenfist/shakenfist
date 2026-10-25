@@ -173,6 +173,21 @@ repos:
         files: ^(docs/.*\.md|AGENTS\.md|ARCHITECTURE\.md|README\.md)$
         pass_filenames: false
 
+      - id: check-signal-handlers
+        name: Check signal handlers only do signal-safe things
+        description: >-
+          A signal handler runs on the main thread between any two of its
+          bytecodes, so one which logs, touches the database or takes any
+          other lock can wait forever on the code it interrupted. That has
+          deadlocked sf-api (#3495) and got sf-database SIGKILLed (#4601),
+          and both looked like ordinary code. Every signal.signal() handler,
+          and every helper it calls, may only use plain statements, raw
+          os.open/os.write/os.close and functions marked @signal_safe.
+        entry: python3 tools/check-signal-handlers.py
+        language: system
+        files: ^(shakenfist/.*\.py|tools/check-signal-handlers\.py)$
+        pass_filenames: false
+
       - id: check-plan-status
         name: Check plan statuses and index arithmetic agree
         description: >-

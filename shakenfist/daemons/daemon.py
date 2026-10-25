@@ -30,6 +30,7 @@ from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_user_facing_node_queues
 from shakenfist.operations.baseoperation import get_all_background_node_queues
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util.signals import signal_safe
 from shakenfist.util.caller_identity import set_caller_identity
 from shakenfist.util import libvirt as util_libvirt
 
@@ -210,6 +211,7 @@ def clear_abort_path(abort_path):
         os.unlink(abort_path)
 
 
+@signal_safe
 def write_abort_file(abort_path):
     """Create an abort file, safely from a signal handler.
 
@@ -457,7 +459,8 @@ class Daemon:
         # and sf-api deadlocked the same way (#3495). The abort file is all a
         # stop needs: every loop polls it. The STOPPING state this used to
         # write is written by the unit's ExecStop (sf-ctl stop) before systemd
-        # sends SIGTERM, and record_exit() writes STOPPED.
+        # sends SIGTERM, and record_exit() writes STOPPED. tools/
+        # check-signal-handlers.py holds every signal handler to this.
         if sig == signal.SIGTERM:
             self.sigterm_unlogged = True
             write_abort_file(self.abort_path)

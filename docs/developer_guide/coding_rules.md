@@ -445,6 +445,27 @@ one only as long as the comparison stays fixed --
 helper's failure mode is to succeed quietly, the guard has to assert the
 effect on the cluster rather than that the helper returned.
 
+## A signal handler only sets flags
+
+Python runs a signal handler on the main thread, between any two of that
+thread's bytecodes, so the handler shares every lock the main thread might be
+holding at that instant -- and a non-reentrant one it needs means waiting for
+itself forever. Logging takes one (the Loki handler enqueues under the logship
+spool's lock, and the main thread logs all the time), and so does the
+database client. sf-api's drain handler logged and deadlocked its worker until
+gunicorn SIGKILLed it (#3495). Every daemon's `exit_gracefully()` logged and
+wrote its state to the database, and sf-database, stopping under a slow
+MariaDB, never got as far as its drain (#4601). Neither looked wrong.
+
+A handler assigns, writes the abort file with `daemon.write_abort_file()`, or
+calls a function marked `@signal_safe` (`shakenfist/util/signals.py`); the
+main thread notices and does the real work. `tools/check-signal-handlers.py`
+enforces this in pre-commit for every `signal.signal()` handler and, through
+`@signal_safe`, every helper they call. When it cannot see that a call is
+safe -- `Event.set()` on an event only another thread waits on -- end the
+line with `# signal-safe: <why>`, and make the why something a reviewer can
+check.
+
 ## A column-to-column comparison has no bind processor
 
 SQLAlchemy coerces a *bound* value through the column type on its way into

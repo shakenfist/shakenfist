@@ -56,6 +56,7 @@ metrics. The headlines:
 - Fail closed on a field, not on a formatting accident.
 - Credential-carrying routes are not logged, not redacted.
 - Cluster CI tests only run in the merge queue.
+- A signal handler only sets flags.
 
 ## Things that will bite you
 

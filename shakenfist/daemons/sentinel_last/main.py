@@ -20,9 +20,10 @@ ABORT_PATH = '/run/sf/sentinel-last.abort'
 
 
 def exit_gracefully(sig, _frame):
+    # No logging: see tools/check-signal-handlers.py. The main loop logs as it
+    # stops.
     if sig == signal.SIGTERM:
-        LOG.info('Received SIGTERM')
-        daemon.set_abort_path(ABORT_PATH, 'from sentinel last exit_gracefully')
+        daemon.write_abort_file(ABORT_PATH)
 
 
 signal.signal(signal.SIGTERM, exit_gracefully)

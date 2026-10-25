@@ -526,7 +526,11 @@ same on either, which is how `sf-database` came to be SIGKILLed on a stop
 under a slow MariaDB (#4601). Handlers therefore only set flags and write
 the abort file, with `daemon.write_abort_file()`, which uses raw system
 calls; the main thread notices, and does the logging and any state
-writes itself.
+writes itself. `tools/check-signal-handlers.py`, run by pre-commit,
+holds every `signal.signal()` handler to this: its docstring lists what
+a handler may call, how to mark a helper `@signal_safe`
+(`shakenfist/util/signals.py`), and how to exempt a single call with a
+reason.
 
 If you add a new long-running maintenance pass to any of the eight
 armed daemons — `sf-database`, `sf-net`, `sf-cleaner`, `sf-cluster`,
