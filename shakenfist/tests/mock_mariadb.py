@@ -141,6 +141,14 @@ class MockMariaDB():
         # mariadb._grpc_get_scheduler_node_capacity(), which returns no
         # rows and says so.
         self.node_capacity_read_degraded = False
+        # What a read of the cluster_capacity singleton returns. Absent
+        # and readable by default, which is the state of a cluster the
+        # reconciler has not reached yet, so a test which does not care
+        # about the cluster ledger never has to mention it. Tests which
+        # do assign a ClusterCapacityRead here. It is a canned reply, not
+        # a model: claims and placements in this mock never move it.
+        self.cluster_capacity_read = mariadb.ClusterCapacityRead(
+            row=None, degraded=False)
         # Mock namespace_claims rows, keyed by claim uuid, as the real
         # table is. Empty by default, which is the unclaimed namespace:
         # the claim stage is skipped entirely and nothing about it
@@ -905,6 +913,13 @@ class MockMariaDB():
         self.mariadb_get_scheduler_node_capacity.start()
         self.test_obj.addCleanup(
             self.mariadb_get_scheduler_node_capacity.stop)
+
+        self.mariadb_get_cluster_capacity = mock.patch(
+            'shakenfist.mariadb.get_cluster_capacity',
+            side_effect=self._mariadb_get_cluster_capacity)
+        self.mariadb_get_cluster_capacity.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_cluster_capacity.stop)
 
         # MariaDB namespace claim CRUD
         self.mariadb_create_namespace_claim = mock.patch(
@@ -3011,6 +3026,14 @@ class MockMariaDB():
             result['returned_memory_mb'] = row['used_memory_mb']
             result['returned_disk_gb'] = row['used_disk_gb']
         return result
+
+    def _mariadb_get_cluster_capacity(self):
+        """Mock implementation of mariadb.get_cluster_capacity()
+
+        Returns ``cluster_capacity_read`` unchanged, which is an absent,
+        readable singleton unless a test has set it.
+        """
+        return self.cluster_capacity_read
 
     def _mariadb_get_scheduler_node_capacity(self):
         """Mock implementation of mariadb.get_scheduler_node_capacity()
