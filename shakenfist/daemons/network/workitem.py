@@ -412,10 +412,11 @@ class Job(util_concurrency.Job):
             dbo.STATE_DELETED,
             dbo.STATE_ERROR,
         }
-        if op.state.value in terminal_states:
+        state = op.state
+        if state.value in terminal_states:
             op.add_event(
                 EVENT_TYPE_AUDIT,
-                f'skipping op already in terminal state {op.state.value}')
+                f'skipping op already in terminal state {state.value}')
             self._drop_defer_entry(str(op.uuid), defer_delays)
             return
 
@@ -506,6 +507,16 @@ class Job(util_concurrency.Job):
         # this op chained onto a different dep) starts back at the initial
         # delay rather than carrying over the previous chain's depth.
         self._drop_defer_entry(str(op.uuid), defer_delays)
+        if state.value == BaseClusterOperation.STATE_EXECUTING:
+            # Its state row still says "coalesced into <survivor>", and
+            # execute() cannot refresh that because an unchanged state is
+            # never rewritten. Say here that this run is the op's own.
+            op.add_event(
+                EVENT_TYPE_AUDIT,
+                'running an op which was already executing, because the '
+                'survivor which folded it, or an earlier run, did not '
+                'complete it',
+                extra={'previous_state_message': state.message})
         start_time = time.time()
         op.execute()
         # The op may have transitioned to a terminal state during execute();

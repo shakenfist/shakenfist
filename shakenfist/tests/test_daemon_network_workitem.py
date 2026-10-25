@@ -270,6 +270,7 @@ class TerminalStateCancellationTest(base.ShakenFistTestCase):
         reaper errored it."""
         mock_op = mock.MagicMock()
         mock_op.state.value = BaseClusterOperation.STATE_EXECUTING
+        mock_op.state.message = 'coalesced into a-failed-survivor'
         mock_op.uuid = OP_UUID
         mock_op.depends_on = []
         mock_op.runs_after = []
@@ -282,6 +283,31 @@ class TerminalStateCancellationTest(base.ShakenFistTestCase):
         mock_op.execute.assert_called_once()
         for c in mock_op.add_event.call_args_list:
             self.assertNotIn('skipping op already in terminal state', str(c))
+        # Its state row still names the survivor, so the start of its
+        # own run is recorded where an operator can see it.
+        mock_op.add_event.assert_any_call(
+            EVENT_TYPE_AUDIT,
+            'running an op which was already executing, because the '
+            'survivor which folded it, or an earlier run, did not '
+            'complete it',
+            extra={'previous_state_message':
+                   'coalesced into a-failed-survivor'})
+
+    def test_network_dispatcher_queued_op_records_no_rerun(self):
+        mock_op = mock.MagicMock()
+        mock_op.state.value = BaseClusterOperation.STATE_QUEUED
+        mock_op.uuid = OP_UUID
+        mock_op.depends_on = []
+        mock_op.runs_after = []
+
+        from shakenfist.daemons.network.workitem import Job
+        job = Job.__new__(Job)
+        job.log = mock.MagicMock()
+        job._cluster_operation_execute(QUEUE_NAME, mock_op, 1, {})
+
+        mock_op.execute.assert_called_once()
+        for c in mock_op.add_event.call_args_list:
+            self.assertNotIn('already executing', str(c))
 
 
 class ExponentialBackoffMapTest(base.ShakenFistTestCase):

@@ -738,7 +738,10 @@ is emitted by the enqueuing process, not by the dispatcher:
       sibling stays `executing` until its own work item comes up and
       it runs itself, so its final state is always its own outcome.
       A sibling sitting in `executing` behind a failed survivor is
-      therefore waiting its turn on the queue, not stuck.
+      therefore waiting its turn on the queue, not stuck. When its
+      turn comes its state message still names the survivor, so the
+      dispatcher records an audit event, "running an op which was
+      already executing", to mark the start of its own run.
     * `tasks` — which coalescible task(s) drove the fold.
 
   A burst of these on `network_apply_update_dnsmasq` is the

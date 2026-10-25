@@ -683,11 +683,12 @@ class BaseClusterOperation(BaseOperation):
 
         A sibling which is no longer ``executing`` -- deleted while this
         operation ran, say -- has ended some other way and is left alone.
-        A failure to complete one is logged and swallowed rather than
-        raised: this operation's work is done and its work item must
-        still resolve. The sibling is then still ``executing`` with its
-        own work_queue row, so it runs itself when that row is dequeued,
-        exactly as it would had this operation failed.
+        A failure to complete one, of any kind, is logged and swallowed
+        rather than raised: this operation's work is done and its work
+        item must still resolve, and the siblings after it in the list
+        must still be tried. The sibling is then still ``executing`` with
+        its own work_queue row, so it runs itself when that row is
+        dequeued, exactly as it would had this operation failed.
         """
         for sibling_uuid in folded:
             try:
@@ -703,9 +704,7 @@ class BaseClusterOperation(BaseOperation):
                 sibling._state_update(
                     BaseClusterOperation.STATE_COMPLETE,
                     message=f'coalesced into {self.uuid}')
-            except (exceptions.DatabaseUnavailable,
-                    exceptions.StateWriteFailed,
-                    exceptions.InvalidStateException) as e:
+            except Exception as e:
                 self.log.with_fields({
                     'sibling_uuid': sibling_uuid,
                     'error': str(e),

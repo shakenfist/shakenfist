@@ -762,6 +762,7 @@ NODE_A_QUEUE_BACKGROUND = f'{NODE_A_UUID}-network-background'
 NODE_A_QUEUE_USER_FACING = f'{NODE_A_UUID}-network-user_facing'
 CLUSTER_WIDE_QUEUE = 'networknode-clusteroperation-user_facing'
 DEPENDENT_UUID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+SECOND_SIBLING_UUID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 
 
 class FakeRpcError(grpc.RpcError):
@@ -1160,7 +1161,13 @@ class FoldLifecycleTestCase(FoldHarness):
                 raise exceptions.DatabaseUnavailable('gone')
             return real_get(op_uuid)
 
-        for failure in ('state write', 'database unavailable'):
+        def unexpected_error(op_uuid: Any) -> Any:
+            if str(op_uuid) == SIBLING_UUID:
+                raise ValueError('a row this code cannot parse')
+            return real_get(op_uuid)
+
+        for failure in ('state write', 'database unavailable',
+                        'unexpected error'):
             with self.subTest(failure=failure):
                 self.engine = self._build_engine()
                 self.mock_get_engine.return_value = self.engine
@@ -1173,13 +1180,47 @@ class FoldLifecycleTestCase(FoldHarness):
                 else:
                     with mock.patch(
                             'shakenfist.mariadb._direct_get_cluster_operation',
-                            side_effect=unreadable_sibling):
+                            side_effect=(unreadable_sibling
+                                         if failure == 'database unavailable'
+                                         else unexpected_error)):
                         survivor.execute()
 
                 self.assertEqual('complete', self._state_of(SURVIVOR_UUID))
                 # Left to run itself, exactly as after a survivor failure.
                 self.assertEqual('executing', self._state_of(SIBLING_UUID))
                 self.assertTrue(self._has_work_queue_row(SIBLING_UUID))
+
+    def test_propagation_failure_still_completes_other_siblings(self):
+        # Fail each sibling in turn, so that whichever order the fold
+        # returns them in, one run has the failure come first.
+        for failing in (SIBLING_UUID, SECOND_SIBLING_UUID):
+            with self.subTest(failing=failing):
+                self.engine = self._build_engine()
+                self.mock_get_engine.return_value = self.engine
+                self._per_node_pair()
+                self._insert_net_op(SECOND_SIBLING_UUID, (MESH_TASK,),
+                                    NODE_A_UUID, 'user_facing',
+                                    created_at=160.0)
+                survivor = self._load(SURVIVOR_UUID,
+                                      NODE_A_QUEUE_BACKGROUND, 3)
+                other = (SECOND_SIBLING_UUID if failing == SIBLING_UUID
+                         else SIBLING_UUID)
+                real_get = mariadb._direct_get_cluster_operation
+
+                def unexpected_error(op_uuid: Any) -> Any:
+                    if str(op_uuid) == failing:
+                        raise ValueError('a row this code cannot parse')
+                    return real_get(op_uuid)
+
+                with mock.patch(
+                        'shakenfist.mariadb._direct_get_cluster_operation',
+                        side_effect=unexpected_error):
+                    survivor.execute()
+
+                self.assertEqual(2, survivor.coalesce_folded)
+                self.assertEqual('complete', self._state_of(SURVIVOR_UUID))
+                self.assertEqual('executing', self._state_of(failing))
+                self.assertEqual('complete', self._state_of(other))
 
     def test_crash_between_fold_and_propagation_self_heals(self):
         survivor = self._per_node_pair()
@@ -1220,6 +1261,26 @@ class FoldLifecycleTestCase(FoldHarness):
         self.assertIs(
             stub.return_value.FoldCoalescibleSiblings, call.call_args.args[0])
         self.assertEqual('queued', seen['state'])
+        self.assertEqual('queued', self._state_of(SIBLING_UUID))
+        self.assertEqual('complete', self._state_of(SURVIVOR_UUID))
+
+    def test_fold_rpc_transient_error_runs_without_folding(self):
+        # Any other gRPC failure is transient: the fold is skipped for
+        # this run, but the database service does have the RPC, so it is
+        # not reported as unavailable.
+        real_grpc_fold = mariadb._grpc_fold_coalescible_siblings
+        survivor = self._per_node_pair()
+
+        with mock.patch('shakenfist.mariadb.fold_coalescible_siblings',
+                        side_effect=real_grpc_fold), \
+                mock.patch('shakenfist.mariadb._get_database_stub'), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           side_effect=FakeRpcError(
+                               grpc.StatusCode.UNAVAILABLE)):
+            survivor.execute()
+
+        self.assertEqual('ran', survivor.coalesce_outcome)
+        self.assertEqual(0, survivor.coalesce_folded)
         self.assertEqual('queued', self._state_of(SIBLING_UUID))
         self.assertEqual('complete', self._state_of(SURVIVOR_UUID))
 
