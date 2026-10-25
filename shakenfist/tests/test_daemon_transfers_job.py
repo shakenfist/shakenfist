@@ -3,6 +3,7 @@
 import socket
 from unittest import mock
 
+from shakenfist.daemons import daemon
 from shakenfist.daemons.transfers import main as transfers_main
 from shakenfist.tests import base
 
@@ -94,7 +95,8 @@ class TransferJobAcceptTestCase(base.ShakenFistTestCase):
         self.assertEqual(conn, result)
 
     def test_each_poll_is_short_enough_to_fit_the_stop_timeout(self):
-        # systemd's TimeoutStopSec is 30s and the pool daemon polls its
-        # workers every 5s, so a poll has to be a small fraction of that.
-        self.assertLessEqual(transfers_main.ACCEPT_POLL_SECONDS, 5)
+        # A waiting transfer only sees the stop between polls, and the pool
+        # daemon abandons workers which have not stopped WORKER_STOP_GRACE
+        # after it asked, so a poll has to be a small fraction of the grace.
+        self.assertLessEqual(transfers_main.ACCEPT_POLL_SECONDS * 4, daemon.WORKER_STOP_GRACE)
         self.assertLess(transfers_main.ACCEPT_POLL_SECONDS, transfers_main.ACCEPT_TIMEOUT_SECONDS)

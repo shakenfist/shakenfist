@@ -13,6 +13,8 @@ after the instance waiting on it had given up (#4543).
 import types
 from unittest import mock
 
+from shakenfist import exceptions
+from shakenfist.constants import NoSuchObject
 from shakenfist.daemons.queues import startup_tasks
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -72,10 +74,15 @@ class RecoverInterruptedOperationsTestCase(base.ShakenFistTestCase):
         op_class = mock.MagicMock()
         op_class.from_db.side_effect = lambda op_uuid: self.ops.get(op_uuid)
 
+        def get_object_class(op_type):
+            if op_type == 'retired_op':
+                raise NoSuchObject(op_type)
+            return op_class
+
         for p in [
                 mock.patch.object(startup_tasks, 'config', fake_config),
                 mock.patch.object(startup_tasks, 'mariadb', self.mariadb),
-                mock.patch.object(startup_tasks, 'get_object_class', return_value=op_class)]:
+                mock.patch.object(startup_tasks, 'get_object_class', side_effect=get_object_class)]:
             p.start()
             self.addCleanup(p.stop)
 
@@ -143,6 +150,28 @@ class RecoverInterruptedOperationsTestCase(base.ShakenFistTestCase):
         startup_tasks.recover_interrupted_operations(NODE_UUID)
         self.assertEqual(BaseClusterOperation.STATE_EXECUTING, op.state.value)
 
+    def test_an_item_which_cannot_be_recovered_does_not_stop_the_pass(self):
+        # An operation type which no longer exists, or the database failing
+        # part way through, is left for the reaper rather than escaping and
+        # stopping sf-queues' startup before it restores this node's instances.
+        retired = row(OWN_QUEUE, 'retired')
+        retired['payload']['operation_type'] = 'retired_op'
+        broken = self.ops['broken'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
+        broken.add_event = mock.MagicMock(side_effect=exceptions.DatabaseUnavailable('gone'))
+        later = self.ops['later'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
+        self.rows.extend([retired, row(OWN_QUEUE, 'broken', row_id=2), row(OWN_QUEUE, 'later', row_id=3)])
+        with mock.patch.object(startup_tasks.util_exceptions, 'ignore_exception') as ignored:
+            startup_tasks.recover_interrupted_operations(NODE_UUID)
+        self.assertEqual(BaseClusterOperation.STATE_QUEUED, later.state.value)
+        self.assertEqual([NoSuchObject, exceptions.DatabaseUnavailable],
+                         [type(c.args[1]) for c in ignored.call_args_list])
+
+    def test_failing_to_list_the_claims_is_raised(self):
+        # The caller must then not clear claims nobody has checked.
+        self.mariadb.list_stuck_work_queue_rows.side_effect = exceptions.DatabaseUnavailable('gone')
+        self.assertRaises(exceptions.DatabaseUnavailable,
+                          startup_tasks.recover_interrupted_operations, NODE_UUID)
+
     def test_op_gone_terminal_meanwhile_does_not_stop_the_pass(self):
         self.ops['refuses'] = FakeOp(BaseClusterOperation.STATE_EXECUTING, refuse=True)
         later = self.ops['later'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
@@ -208,3 +237,15 @@ class StartupResetTestCase(base.ShakenFistTestCase):
 
         self.mariadb.restart_work_queue.assert_not_called()
         self.calls.recover.assert_not_called()
+
+    def test_claims_which_could_not_be_checked_are_left_to_the_reaper(self):
+        # Clearing them unchecked strands any executing operation behind
+        # them, as #4543 did. The rest of startup still runs.
+        self.calls.recover.side_effect = exceptions.DatabaseUnavailable('gone')
+        with mock.patch.object(startup_tasks.util_exceptions, 'ignore_exception'):
+            restore = startup_tasks.startup_tasks()
+        restore.join(10)
+
+        self.mariadb.restart_work_queue.assert_not_called()
+        startup_tasks.upgrade_blob_datastore.assert_called_once()
+        startup_tasks.restore_instances.assert_called_once()

@@ -56,9 +56,9 @@ def record_stop(n):
         n.set_daemon_state('sentinel-first', Node.DAEMON_STATE_STOPPED)
         current = n.state.value
         if current != Node.STATE_STOPPING:
-            LOG.info('Node is %s rather than stopping, so this is a restart of '
-                     'sentinel-first alone; leaving the node lifecycle unchanged'
-                     % current)
+            LOG.with_fields({'state': current}).info(
+                'Node is not stopping, so this is a restart of sentinel-first '
+                'alone; leaving the node lifecycle unchanged')
             return False
         return n.set_lifecycle_state(Node.STATE_STOPPED)
     except DatabaseUnavailable as e:

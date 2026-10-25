@@ -450,6 +450,11 @@ the database daemon's node name, not the caller's. For the same reason
 startup clears the claims on its own queues only. A claim on an
 `any-*` queue may be another node's worker running that item right
 now, and clearing it would hand the item to a second worker.
+Recovery is best effort, one item at a time. An item it cannot recover,
+for example because its operation type no longer exists, is logged and
+left for the reaper. If the claims cannot be listed at all, startup
+clears none of them, because clearing a claim nobody has checked
+strands its operation just as before.
 
 The cluster daemon also runs two other reaping sweeps from
 `daemons/cluster/scheduled_tasks.py`. `per_deleted_object_checks()`

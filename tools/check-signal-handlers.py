@@ -50,6 +50,7 @@ Every call must be one of:
 """
 
 import ast
+import functools
 import os
 import re
 import sys
@@ -172,6 +173,7 @@ class Checker:
     def error(self, module, node, message):
         self.errors.append(f'{module.relpath}:{node.lineno}: {message}')
 
+    @functools.cached_property
     def class_index(self):
         """Class name -> [(module, ClassDef)] for every class in the package."""
         index = {}
@@ -182,7 +184,7 @@ class Checker:
 
     def class_family(self, cls):
         """cls, the classes it derives from and the classes deriving from it, matched by name."""
-        index = self.class_index()
+        index = self.class_index
         family = {cls.name}
         pending = [cls]
         while pending:
@@ -223,7 +225,7 @@ class Checker:
 
     def subclass_overrides(self, cls, name):
         """Methods called name in classes deriving, by name, from cls."""
-        index = self.class_index()
+        index = self.class_index
         derived = self.derived_names(cls, index)
         overrides = []
         for class_name in sorted(derived - {cls.name}):

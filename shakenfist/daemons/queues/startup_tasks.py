@@ -330,55 +330,72 @@ def recover_interrupted_operations(node_uuid):
     node claimed an item there (over gRPC, claimed_by names the database
     daemon's node, not the worker's), so an executing operation behind one
     may be running on another node right now.
+
+    This is best effort, item by item: an item which cannot be recovered --
+    its operation type no longer exists, say, or the database fails part way
+    through -- is logged and left for the reaper, so it cannot stop the rest
+    of startup, which restores this node's instances. Failing to list the
+    claims at all -- DatabaseUnavailable, once the database client has
+    exhausted its retries -- is raised, because the caller must then not
+    clear them. (A gRPC error the client does not retry is still logged by
+    mariadb and read here as no claims.)
     """
     own_queues = set(get_node_user_facing_node_queues(node_uuid) +
                      get_node_background_node_queues(node_uuid))
     for row in mariadb.list_stuck_work_queue_rows(0):
         if row['queue_name'] not in own_queues:
             continue
-
-        payload = row['payload']
-        op_type = payload.get('operation_type')
-        op_uuid = payload.get('operation_uuid')
-        if not op_type or not op_uuid:
-            continue
-        op = get_object_class(op_type).from_db(op_uuid)
-        if not op or op.state.value != BaseClusterOperation.STATE_EXECUTING:
-            continue
-
-        details = {
-            'queue_name': row['queue_name'],
-            'attempts': row['attempts'],
-            'claimed_at': row['claimed_at'],
-        }
         try:
-            if row['attempts'] >= config.CLUSTER_OP_MAX_ATTEMPTS:
-                if not mariadb.delete_work_queue_row(row['id']):
-                    continue
-                op.state = BaseClusterOperation.STATE_ERROR
-                op.add_event(
-                    EVENT_TYPE_AUDIT,
-                    f'errored at sf-queues startup: interrupted after '
-                    f'{row["attempts"]} claim attempts', extra=details)
-            else:
-                op.state = BaseClusterOperation.STATE_QUEUED
-                op.add_event(
-                    EVENT_TYPE_AUDIT,
-                    're-queued at sf-queues startup: the previous sf-queues '
-                    'stopped while executing it', extra=details)
-        except InvalidStateException as e:
-            # It went terminal between our read and the write.
-            LOG.with_fields({
-                'operation_type': op_type,
-                'operation_uuid': op_uuid,
-            }).warning(f'Cannot recover interrupted operation: {e}')
-            continue
+            _recover_interrupted_operation(row)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'recovering interrupted work item {row["id"]} on '
+                f'{row["queue_name"]}', e)
+
+
+def _recover_interrupted_operation(row):
+    payload = row['payload']
+    op_type = payload.get('operation_type')
+    op_uuid = payload.get('operation_uuid')
+    if not op_type or not op_uuid:
+        return
+    op = get_object_class(op_type).from_db(op_uuid)
+    if not op or op.state.value != BaseClusterOperation.STATE_EXECUTING:
+        return
+
+    details = {
+        'queue_name': row['queue_name'],
+        'attempts': row['attempts'],
+        'claimed_at': row['claimed_at'],
+    }
+    try:
+        if row['attempts'] >= config.CLUSTER_OP_MAX_ATTEMPTS:
+            if not mariadb.delete_work_queue_row(row['id']):
+                return
+            op.state = BaseClusterOperation.STATE_ERROR
+            op.add_event(
+                EVENT_TYPE_AUDIT,
+                f'errored at sf-queues startup: interrupted after '
+                f'{row["attempts"]} claim attempts', extra=details)
+        else:
+            op.state = BaseClusterOperation.STATE_QUEUED
+            op.add_event(
+                EVENT_TYPE_AUDIT,
+                're-queued at sf-queues startup: the previous sf-queues '
+                'stopped while executing it', extra=details)
+    except InvalidStateException as e:
+        # It went terminal between our read and the write.
         LOG.with_fields({
             'operation_type': op_type,
             'operation_uuid': op_uuid,
-            'state': op.state.value,
-            **details,
-        }).warning('Recovered an operation interrupted by sf-queues stopping')
+        }).warning(f'Cannot recover interrupted operation: {e}')
+        return
+    LOG.with_fields({
+        'operation_type': op_type,
+        'operation_uuid': op_uuid,
+        'state': op.state.value,
+        **details,
+    }).warning('Recovered an operation interrupted by sf-queues stopping')
 
 
 def startup_tasks():
@@ -427,19 +444,29 @@ def startup_tasks():
     if not config.NODE_UUID:
         LOG.warning('NODE_UUID is not set, cannot recover interrupted '
                     'operations or reset this node\'s own queues')
+        own_queues = []
     else:
-        recover_interrupted_operations(config.NODE_UUID)
-        for queue in (get_node_user_facing_node_queues(config.NODE_UUID) +
-                      get_node_background_node_queues(config.NODE_UUID)):
-            mariadb.restart_work_queue(queue)
-            processing, queued, deferred = mariadb.get_work_queue_length(
-                queue)
-            LOG.with_fields({
-                'processing': processing,
-                'queued': queued,
-                'deferred': deferred,
-                'queue': queue
-            }).debug('Queue length')
+        own_queues = (get_node_user_facing_node_queues(config.NODE_UUID) +
+                      get_node_background_node_queues(config.NODE_UUID))
+        try:
+            recover_interrupted_operations(config.NODE_UUID)
+        except Exception as e:
+            # The claims could not be read, so the operations behind them
+            # were not checked. Clearing them anyway strands any which were
+            # executing, exactly as #4543 did, so leave both to the reaper.
+            util_exceptions.ignore_exception(
+                'recovering interrupted operations; leaving this node\'s '
+                'claims to the reaper', e)
+            own_queues = []
+    for queue in own_queues:
+        mariadb.restart_work_queue(queue)
+        processing, queued, deferred = mariadb.get_work_queue_length(queue)
+        LOG.with_fields({
+            'processing': processing,
+            'queued': queued,
+            'deferred': deferred,
+            'queue': queue
+        }).debug('Queue length')
 
     # Ensure the blob data store is the most recent version
     upgrade_blob_datastore()
