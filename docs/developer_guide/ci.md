@@ -156,7 +156,8 @@ The helpers therefore also list the object's operations either side of the
 wait. A mutating operation which ends in `error` during the wait fails the
 test. One which was already in error beforehand does not, because that is
 history and would otherwise fail every later wait on the same object.
-Operations still pending after five minutes fail the test.
+Operations still pending after five minutes fail the test, and so does an
+object which is deleted while the helper waits on it.
 
 The suite always runs against a server built from its own revision, so the
 helpers do not skip on an old server: if it does not advertise the

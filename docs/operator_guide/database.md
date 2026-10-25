@@ -1157,11 +1157,11 @@ Cluster operation targets are stored separately because:
   and "all operations on this object in order"
 
 Target rows live only until their operation is hard-deleted. A finished
-operation is eligible thirty seconds after it goes terminal and is removed
-by the [deleted-object sweep](#the-deleted-object-sweep), so the table holds
-in-flight operations plus recently finished ones. As a
-backstop for rows that outlive their operation, the table is also bounded by
-a periodic prune in the cluster daemon (alongside the existing
+operation is eligible for removal thirty seconds after it goes terminal and
+is removed by the [deleted-object sweep](#the-deleted-object-sweep), so the
+table holds in-flight operations plus recently finished ones. As a backstop
+for rows that outlive their operation, the table is also bounded by a
+periodic prune in the cluster daemon (alongside the existing
 `delete_stale_transfers` cleanup).
 The cluster daemon runs cluster-wide cleanup under `ClusterLock` election,
 so the prune naturally runs from a single node at a time. The prune
@@ -1207,8 +1207,8 @@ Two query shapes are exposed to the rest of the system:
 
 Rows are written automatically by `enqueue_cluster_operation`; operators
 do not need to manage them. Normally a row is removed when its operation is
-hard-deleted: a finished operation is eligible thirty seconds after it goes
-terminal and is removed by the
+hard-deleted: a finished operation is eligible for removal thirty seconds
+after it goes terminal and is removed by the
 [deleted-object sweep](#the-deleted-object-sweep). The
 cluster daemon's prune, performed under `ClusterLock` election via
 `_direct_delete_stale_cluster_operation_targets`, is a backstop: rows older

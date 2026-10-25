@@ -32,10 +32,15 @@ class TestObservationalSweeps(base.BaseNamespacedTestCase):
         # The system client is used for both reads, as the await helpers
         # do: it can see every namespace, and the listing is the same
         # data whichever client asks for it.
-        return (
-            self.system_client.get_instance(instance_uuid),
-            self.system_client.list_cluster_operations_for_target(
-                'instance', instance_uuid))
+        #
+        # The listing is read first. A mutating op which finishes between
+        # the two reads then shows as active in the listing, so the
+        # has_pending_operations check is skipped rather than failing on a
+        # stale instance read. The reverse race needs a new mutating op to
+        # be queued on an instance this test has left idle.
+        ops = self.system_client.list_cluster_operations_for_target(
+            'instance', instance_uuid)
+        return self.system_client.get_instance(instance_uuid), ops
 
     def _check_pointer(self, instance, observational_uuids):
         pointer = instance.get('last_cluster_operation')

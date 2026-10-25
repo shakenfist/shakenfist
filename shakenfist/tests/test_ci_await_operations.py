@@ -82,6 +82,13 @@ class AwaitObjectOperationsTestCase(capacity_wait.test_base.ShakenFistTestCase):
         client = FakeClient([[], [op('o3', 'error', observational=True)]])
         self._run(client)
 
+    def test_mutating_error_is_named_past_an_observational_one(self):
+        client = FakeClient(
+            [[], [op('o3', 'error', observational=True), op('o4', 'error')]])
+        with self.assertRaises(AssertionError) as cm:
+            self._run(client)
+        self.assertIn('Cluster operation o4 for instance abc', str(cm.exception))
+
     def test_client_timeout_becomes_five_minute_failure(self):
         client = FakeClient(
             [[]], wait_error=ci_apiclient.TimeoutException('slow'))
@@ -89,6 +96,22 @@ class AwaitObjectOperationsTestCase(capacity_wait.test_base.ShakenFistTestCase):
             self._run(client, 'network', 5, 'network')
         self.assertEqual(
             'Network operations did not complete within 5 minutes for abc',
+            str(cm.exception))
+
+    def test_view_without_the_field_fails_naming_the_object(self):
+        client = FakeClient(
+            [[]], wait_error=ci_apiclient.IncapableException('no field'))
+        with self.assertRaises(AssertionError) as cm:
+            self._run(client)
+        self.assertIn('view of instance abc does not report has_pending_operations', str(cm.exception))
+
+    def test_object_vanishing_during_the_wait_fails(self):
+        client = FakeClient(
+            [[]], wait_error=ci_apiclient.ResourceNotFoundException('gone'))
+        with self.assertRaises(AssertionError) as cm:
+            self._run(client, 'network', 5, 'network')
+        self.assertEqual(
+            'Network abc disappeared while waiting for its operations to complete',
             str(cm.exception))
 
     def test_missing_capability_fails_before_listing_or_waiting(self):

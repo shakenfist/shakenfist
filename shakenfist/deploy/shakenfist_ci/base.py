@@ -1419,6 +1419,17 @@ class BaseTestCase(testtools.TestCase):
             self.fail(
                 f'{label.capitalize()} operations did not complete within 5 '
                 f'minutes for {object_uuid}')
+        except apiclient.IncapableException:
+            self.fail(
+                'The server advertises object-pending-operations, but the '
+                f'view of {label} {object_uuid} does not report '
+                f'has_pending_operations')
+        except apiclient.ResourceNotFoundException:
+            # No caller waits on an object it has just deleted, so a
+            # vanished object is a failure of the test, not a settled one.
+            self.fail(
+                f'{label.capitalize()} {object_uuid} disappeared while '
+                f'waiting for its operations to complete')
 
         for op_uuid, op in errored().items():
             if op_uuid in already_errored or op.get('observational', False):

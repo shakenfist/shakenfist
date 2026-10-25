@@ -345,8 +345,8 @@ they reach the table only through a gateway.
 
 The migration is online. Adding the column is an instant metadata change,
 and the index is rebuilt in place over a small table, because finished
-operations are eligible thirty seconds after going terminal and are removed,
-with their target rows, by the
+operations are eligible for removal thirty seconds after going terminal and
+are removed, with their target rows, by the
 [deleted-object sweep](database.md#the-deleted-object-sweep). It took
 under half a second for 50,000 rows in testing. The migration is a single
 `ALTER TABLE` and is safe to re-run if interrupted: the re-run just rebuilds

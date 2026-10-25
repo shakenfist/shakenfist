@@ -526,6 +526,15 @@ wording is agreed, and that wording is in this plan for review.
   `s-cloud` runner, never started: no `s-cloud` job in the repository
   has started since 2026-10-24 22:34 UTC, and the PR's own smoke run is
   queued behind the same pool.
+* **First review round, 2026-10-26.** The automated review raised no
+  `fix` items. In response, the helper now turns the client's
+  `IncapableException` and `ResourceNotFoundException` into named test
+  failures. Before this change a vanished object surfaced as a client
+  stack trace, and the old loop returned quietly. The sweep test now
+  reads the listing before the instance, so a mutating op finishing
+  between the two reads cannot fail it. The short form of the lifetime
+  statement now says "eligible for removal". `mutation-check` kills six
+  of six mutants, the original three plus one for each new branch.
 
 ### Master plan success criteria
 
@@ -538,7 +547,7 @@ Walked on 2026-10-25 against the rebased branch.
 | Observational filter is in SQL, with index support | Met | `table.c.observational == sa.false()` in `_direct_get_latest_cluster_operation_target()` and `_direct_has_pending_cluster_operation_target()` (`mariadb.py`); `idx_cot_target` covers `(target_object_type, target_uuid, observational)`. |
 | Observational op changes neither pointer nor pending, proven by a unit test | Met | `test_observational_current_state.py`: `test_observational_op_does_not_shadow_or_count_as_pending`, `test_sweep_alone_leaves_no_pointer_and_nothing_pending`. On a real cluster: `test_observational_sweeps` (step 5c) passed on all three cluster lanes of run 40145179909. |
 | `/instances/<ref>/clusteroperations` returns a queued op behind a later terminal one, proven by a test | Met | `test_object_cluster_operations.py::test_success_criterion`. |
-| `test_interface_plug_and_exec_reboot` no longer races the hot-plug | Pending CI | The helper now waits on `has_pending_operations` (step 5a). The three `instance_hotplug.py` tests run only in the Smoke lane, which had not started on 2026-10-25 because no `s-cloud` runner was taking jobs. The evidence is the PR's smoke run, or the merge queue's. |
+| `test_interface_plug_and_exec_reboot` no longer races the hot-plug | Met, on one run | The helper now waits on `has_pending_operations` (step 5a). The three `instance_hotplug.py` tests run only in the Smoke lane, which had not started on 2026-10-25 because no `s-cloud` runner was taking jobs. All three passed in the PR's smoke run at `5db1ab8357` ([run 40183572268](https://github.com/shakenfist/shakenfist/actions/runs/40183572268)). One pass cannot prove a race is gone, and the merge queue's runs are the longer test. |
 | Protos regenerated with `tox -e genprotos` | Met | Re-running `tox -e genprotos` on the branch leaves the tree clean. |
 | `database.md` documents the v3 schema; developer guide documents mutating/observational | Met | `docs/operator_guide/database.md` ("The table is at schema v3", the `observational` column); `docs/developer_guide/database_internals.md` (the `observational` flag and `is_observational()`). |
 | Top-level docs updated where they describe the affected storage or API | Met, no edit needed | None of `ARCHITECTURE.md`, `AGENTS.md` or `README.md` describes it (finding 10), and this repository has no `CLAUDE.md`. |

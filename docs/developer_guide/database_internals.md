@@ -382,8 +382,8 @@ Only these two readers ignore observational rows. The other by-target
 readers (for example `get_cluster_operation_targets_for_object()`, which the
 per-blob sweep uses to avoid queueing a duplicate checksum op, and the
 by-target listing) deliberately see everything. Rows normally disappear when
-their operation is hard-deleted (eligible thirty seconds after it goes
-terminal and removed by the
+their operation is hard-deleted (eligible for removal thirty seconds after
+it goes terminal and removed by the
 [deleted-object sweep](../operator_guide/database.md#the-deleted-object-sweep)),
 so the prune is a backstop.
 
