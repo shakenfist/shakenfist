@@ -12,6 +12,9 @@
 
 from unittest import mock
 
+import grpc
+
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.tests import base
 
@@ -158,8 +161,12 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
         grpc.return_value = [{'id': 1}]
         self.assertEqual(
             [{'id': 1}], mariadb.list_stuck_work_queue_rows(60.0))
-        grpc.assert_called_once_with(60.0)
+        grpc.assert_called_once_with(60.0, strict=False)
         direct.assert_not_called()
+
+        grpc.reset_mock()
+        mariadb.list_stuck_work_queue_rows(0, strict=True)
+        grpc.assert_called_once_with(0, strict=True)
 
     @mock.patch('shakenfist.mariadb._grpc_work_queue_list_stuck')
     @mock.patch('shakenfist.mariadb._direct_work_queue_list_stuck')
@@ -172,6 +179,16 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
         self.assertEqual([], mariadb.list_stuck_work_queue_rows(30.0))
         direct.assert_called_once_with(30.0)
         grpc.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._grpc_call', side_effect=grpc.RpcError())
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_list_stuck_grpc_failure_is_raised_only_when_strict(self, _stub, _call):
+        # The reaper reads a failure as nothing to do this minute. sf-queues'
+        # startup clears what it listed, so for it a failure must not read as
+        # "no claims".
+        self.assertEqual([], mariadb._grpc_work_queue_list_stuck(0))
+        self.assertRaises(exceptions.DatabaseUnavailable,
+                          mariadb._grpc_work_queue_list_stuck, 0, strict=True)
 
     @mock.patch(
         'shakenfist.mariadb._grpc_list_orphaned_cluster_operations')

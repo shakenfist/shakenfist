@@ -229,6 +229,14 @@ The same socket starts a stopped `sf-api` when a connection arrives. To take
 the API down on a node, stop the socket, which stops `sf-api` too:
 `sudo systemctl stop sf-api.socket`.
 
+If `sf-api` fails often enough to hit systemd's start limit, systemd fails
+the socket as well (`systemctl status sf-api.socket` shows
+`service-start-limit-hit`), and the node stops accepting connections on
+`:13000` until both are reset. Once the cause is fixed, bring it back with
+`sudo systemctl reset-failed sf-api.service sf-api.socket` followed by
+`sudo systemctl start sf-api.socket`. Restarting `sf-api` alone is not
+enough.
+
 ### Route only to sf-api, and firewall the port
 
 The load balancer pool contains **only `sf-api` backends** on `:13000`.

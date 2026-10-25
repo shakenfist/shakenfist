@@ -22637,7 +22637,8 @@ def _grpc_work_queue_restart(queue_name: str) -> None:
 
 
 def _grpc_work_queue_list_stuck(
-        threshold_seconds: float) -> list[dict[str, Any]]:
+        threshold_seconds: float,
+        strict: bool = False) -> list[dict[str, Any]]:
     """List stuck work_queue rows via the database microservice."""
     try:
         stub = _get_database_stub()
@@ -22658,6 +22659,9 @@ def _grpc_work_queue_list_stuck(
             for row in reply.rows
         ]
     except grpc.RpcError as e:
+        if strict:
+            raise exceptions.DatabaseUnavailable(
+                f'gRPC ListStuckWorkQueueRows failed: {e}') from e
         LOG.warning(
             f'gRPC ListStuckWorkQueueRows failed: {e}')
         return []
@@ -24913,16 +24917,23 @@ def restart_work_queue(queue_name: str) -> None:
 
 
 def list_stuck_work_queue_rows(
-        threshold_seconds: float) -> list[dict[str, Any]]:
+        threshold_seconds: float,
+        strict: bool = False) -> list[dict[str, Any]]:
     """Return rows whose claim is older than threshold_seconds.
 
     Used by the cluster daemon reaper to find work items stuck
     in flight. Each dict carries id, queue_name, claimed_at,
     claimed_by, attempts and payload. Rows are ordered oldest
     claim first.
+
+    Over gRPC a failed call is logged and returns no rows, which
+    suits the reaper: it runs again a minute later. strict=True
+    raises DatabaseUnavailable instead, for a caller which must
+    tell "could not list" from "nothing to list" -- sf-queues'
+    startup, which clears the claims it has listed.
     """
     if _use_database_service():
-        return _grpc_work_queue_list_stuck(threshold_seconds)
+        return _grpc_work_queue_list_stuck(threshold_seconds, strict=strict)
     return _direct_work_queue_list_stuck(threshold_seconds)
 
 

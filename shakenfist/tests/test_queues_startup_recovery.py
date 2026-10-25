@@ -69,7 +69,7 @@ class RecoverInterruptedOperationsTestCase(base.ShakenFistTestCase):
         fake_config = mock.MagicMock()
         fake_config.CLUSTER_OP_MAX_ATTEMPTS = 5
         self.mariadb = mock.MagicMock()
-        self.mariadb.list_stuck_work_queue_rows.side_effect = lambda threshold: self.rows
+        self.mariadb.list_stuck_work_queue_rows.side_effect = lambda threshold, strict=False: self.rows
         self.mariadb.delete_work_queue_row.return_value = True
         op_class = mock.MagicMock()
         op_class.from_db.side_effect = lambda op_uuid: self.ops.get(op_uuid)
@@ -88,7 +88,9 @@ class RecoverInterruptedOperationsTestCase(base.ShakenFistTestCase):
 
     def test_lists_every_claim(self):
         startup_tasks.recover_interrupted_operations(NODE_UUID)
-        self.mariadb.list_stuck_work_queue_rows.assert_called_once_with(0)
+        # Strictly: a listing which failed must not read as "no claims", or
+        # startup clears claims nobody checked.
+        self.mariadb.list_stuck_work_queue_rows.assert_called_once_with(0, strict=True)
 
     def test_executing_op_on_own_queue_is_requeued(self):
         op = self.ops['op'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)

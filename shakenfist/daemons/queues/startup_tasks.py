@@ -335,14 +335,13 @@ def recover_interrupted_operations(node_uuid):
     its operation type no longer exists, say, or the database fails part way
     through -- is logged and left for the reaper, so it cannot stop the rest
     of startup, which restores this node's instances. Failing to list the
-    claims at all -- DatabaseUnavailable, once the database client has
-    exhausted its retries -- is raised, because the caller must then not
-    clear them. (A gRPC error the client does not retry is still logged by
-    mariadb and read here as no claims.)
+    claims at all raises DatabaseUnavailable (the listing is strict, so a
+    gRPC error is not read as "no claims"), because the caller must then
+    not clear them.
     """
     own_queues = set(get_node_user_facing_node_queues(node_uuid) +
                      get_node_background_node_queues(node_uuid))
-    for row in mariadb.list_stuck_work_queue_rows(0):
+    for row in mariadb.list_stuck_work_queue_rows(0, strict=True):
         if row['queue_name'] not in own_queues:
             continue
         try:
