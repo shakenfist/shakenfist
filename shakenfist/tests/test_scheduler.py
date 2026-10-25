@@ -868,8 +868,10 @@ class SummaryExclusionsTestCase(SchedulerTestCase):
         self.mock_mariadb.set_node_metrics_same()
 
     def _make_stale(self, fqdn):
+        stale_at = time.time() - 400
         self.mock_mariadb.node_metrics_store[self._node_uuid(fqdn)][
-            'timestamp'] = time.time() - 400
+            'timestamp'] = stale_at
+        return stale_at
 
     def _summarize_with_unreadable(self, fqdn):
         """Summarize with one node's metrics read raising ReadException."""
@@ -886,20 +888,36 @@ class SummaryExclusionsTestCase(SchedulerTestCase):
             s = scheduler.Scheduler()
             return s, s.summarize_resources()
 
-    def test_stale_metrics_are_excluded_with_their_age(self):
+    def test_stale_metrics_are_excluded_with_their_timestamp(self):
         node2 = self._node_uuid('node2')
-        self._make_stale('node2')
+        stale_at = self._make_stale('node2')
 
         resources = scheduler.Scheduler().summarize_resources()
 
         self.assertNotIn(node2, resources['per_node'])
-        reason = resources['excluded'][node2]
-        self.assertEqual({'reason', 'metrics_age'}, set(reason))
-        self.assertEqual('stale metrics', reason['reason'])
-        self.assertGreaterEqual(reason['metrics_age'], 400)
-        self.assertLess(reason['metrics_age'], 430)
-        # Rounded as the decision's oldest-row bound is.
-        self.assertEqual(round(reason['metrics_age'], 2), reason['metrics_age'])
+        # The row's own timestamp, not an age, so the figure stays true
+        # however long the scheduler's metrics cache holds it.
+        self.assertEqual(
+            {'reason': 'stale metrics', 'metrics_timestamp': stale_at},
+            resources['excluded'][node2])
+
+    def test_every_reason_is_in_the_published_set(self):
+        # Four hypervisor-shaped nodes are needed for four reasons, and
+        # the metrics reasons apply to the network node too.
+        self._make_stale('node1_net')
+        self.mock_mariadb.update_node_metrics(
+            'node2', {'node_queue_waiting': scheduler.UNREASONABLE_QUEUE_LENGTH + 1})
+        del self.mock_mariadb.node_metrics_store[self._node_uuid('node3')]
+
+        _, resources = self._summarize_with_unreadable('node4')
+
+        reasons = {r['reason'] for r in resources['excluded'].values()}
+        # All four are emitted here, and none falls outside the set.
+        self.assertEqual(scheduler.EXCLUSION_REASONS, reasons)
+        self.assertEqual(
+            frozenset(('queue too long', 'stale metrics', 'no metrics',
+                       'metrics unreadable')),
+            scheduler.EXCLUSION_REASONS)
 
     def test_missing_metrics_are_excluded(self):
         node3 = self._node_uuid('node3')

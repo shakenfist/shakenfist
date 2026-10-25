@@ -470,6 +470,44 @@ plan was written.
   listings only. Other listings whose objects re-read a row the
   iterator already held have not been surveyed.
 
+## Execution notes
+
+Implementation started on 2026-10-25 (AEDT).
+
+**Back brief answers (Michael, 2026-10-25).**
+
+- Run steps 1 to 7 and 9 now. Step 8 waits on 7b's step 4 and is
+  recorded as a `plan-blockers` note on this plan.
+- Step 5 may be pushed and opened as its own client-python pull
+  request as soon as it is committed. It is client-python#438.
+- Keep the step 4 gate.
+- The live-MariaDB tests ran locally against a throwaway
+  `mariadb:10.11` container, which is removed at the end of the run.
+
+**Order.** Step 5 ran in parallel with step 1. The two touch
+different repositories. Every shakenfist step ran in sequence in
+the one worktree.
+
+**Step 4 gate (Michael, 2026-10-25).** The response bodies were
+approved as drafted, including H1's key, H5's URL and H8's tokens,
+with two refinements:
+
+- `excluded`'s stale-metrics entry carries an absolute
+  `metrics_timestamp` (the row's own epoch timestamp) rather than
+  a relative `metrics_age`. The age was computed when the metrics
+  were loaded, so a cached summary would serve a wrong figure.
+  This changed step 3's code, and it is committed on its own,
+  ahead of step 4.
+- The four exclusion reasons keep their spaced phrases. The scheduler
+  already publishes `queue too long` in that spelling in its stage
+  events. They are a closed set, `scheduler.EXCLUSION_REASONS`,
+  which a test pins and step 7 documents.
+
+**Client verb review.** client-python#438's first automated
+review had no `fix` items. One `consider` item was taken:
+`coverage_state` is forwarded whenever it is supplied, so the
+server stays the only validator.
+
 ## Outcome
 
 Not started.

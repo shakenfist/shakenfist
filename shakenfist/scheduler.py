@@ -30,6 +30,20 @@ CACHED_NETWORK_NODE = None
 
 UNREASONABLE_QUEUE_LENGTH = 20
 
+# Why an active node is missing from the resources summary's per_node,
+# as published in its `excluded` mapping. Clients match on these exact
+# strings, so they are a closed set: adding one is an API change.
+EXCLUSION_QUEUE_TOO_LONG = 'queue too long'
+EXCLUSION_STALE_METRICS = 'stale metrics'
+EXCLUSION_NO_METRICS = 'no metrics'
+EXCLUSION_METRICS_UNREADABLE = 'metrics unreadable'
+EXCLUSION_REASONS = frozenset((
+    EXCLUSION_QUEUE_TOO_LONG,
+    EXCLUSION_STALE_METRICS,
+    EXCLUSION_NO_METRICS,
+    EXCLUSION_METRICS_UNREADABLE,
+))
+
 # The figures summarize_resources() publishes from the cluster_capacity
 # singleton, in the order they are published: the row's last write, its
 # nine stored counters, and the headroom derived from them.
@@ -91,10 +105,14 @@ def get_active_node_metrics(unavailable=None):
                         'stale metrics from database '
                         'for node')
                     new_metrics = {}
+                    # The row's own timestamp rather than its age: the
+                    # caller may hold this for as long as its metrics
+                    # cache lives, and an age computed now would be wrong
+                    # by however long that was.
                     if unavailable is not None:
                         unavailable[node_uuid] = {
-                            'reason': 'stale metrics',
-                            'metrics_age': round(metrics_age, 2),
+                            'reason': EXCLUSION_STALE_METRICS,
+                            'metrics_timestamp': row_timestamp,
                         }
             else:
                 n.add_event(
@@ -103,7 +121,7 @@ def get_active_node_metrics(unavailable=None):
                     'for node')
                 new_metrics = {}
                 if unavailable is not None:
-                    unavailable[node_uuid] = {'reason': 'no metrics'}
+                    unavailable[node_uuid] = {'reason': EXCLUSION_NO_METRICS}
             metrics[node_uuid] = new_metrics
 
         except exceptions.ReadException:
@@ -112,7 +130,8 @@ def get_active_node_metrics(unavailable=None):
                 'refreshing metrics for node '
                 'failed')
             if unavailable is not None:
-                unavailable[str(n.uuid)] = {'reason': 'metrics unreadable'}
+                unavailable[str(n.uuid)] = {
+                    'reason': EXCLUSION_METRICS_UNREADABLE}
 
     return metrics
 
@@ -128,7 +147,7 @@ def _queue_exclusion_reason(node_metrics):
     waiting = node_metrics.get('node_queue_waiting', 0)
     if waiting > UNREASONABLE_QUEUE_LENGTH:
         return {
-            'reason': 'queue too long',
+            'reason': EXCLUSION_QUEUE_TOO_LONG,
             'node_queue_waiting': waiting,
             'unreasonable_threshold': UNREASONABLE_QUEUE_LENGTH,
         }
