@@ -21,18 +21,36 @@ from shakenfist.util import network as util_network
 LOG, _ = logs.setup(__name__)
 
 
+def node_job_classes():
+    """The long-running jobs this node's sf-net runs, by name.
+
+    The stray interface reaper runs on the network node only. It walks every
+    active network in the cluster, reading each one's interfaces and their
+    instances' state, and deletes the strays; nothing about it is local to
+    the node running it. Run by sf-net on every node, it repeated the same
+    cluster-wide sweep once per node every 30 seconds -- on sfcbr about 3
+    of the ~3.6 FindNetworkInterfaces calls a second it cost (#4072) -- and
+    the nodes raced each other to delete the same interfaces. The network
+    node already owns the cluster-wide network work, so a cluster without
+    one has no networks for strays to be left on.
+    """
+    classes = {
+        'fip-reaper': floating_ip_reaper.Job,
+        'maintain': maintain.Job,
+        'mtus': mtus.Job,
+        'net-worker': workitem.Job,
+    }
+    if config.NODE_IS_NETWORK_NODE:
+        classes['stray-nics'] = stray_nics.Job
+    return classes
+
+
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
         last_defer_message = 0
         last_length = 0
 
-        job_classes = {
-            'fip-reaper': floating_ip_reaper.Job,
-            'maintain': maintain.Job,
-            'mtus': mtus.Job,
-            'net-worker': workitem.Job,
-            'stray-nics': stray_nics.Job
-        }
+        job_classes = node_job_classes()
 
         while daemon.check_abort_path(self.abort_path):
             self.wait_for_nodelock()
