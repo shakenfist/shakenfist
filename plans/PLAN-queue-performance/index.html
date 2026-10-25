@@ -15525,84 +15525,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#what-step-7-measured" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What step 7 measured
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="What step 7 measured">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#the-tail-this-plan-set-out-to-remove-is-gone" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The tail this plan set out to remove is gone
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#explicit-fairness-is-not-needed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Explicit fairness is not needed
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-the-measurement-cost-us-to-build" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What the measurement cost us to build
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-step-10-measured" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What step 10 measured
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="What step 10 measured">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#step-9s-15-17-s-population-was-pre-3916-traffic" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 9's 15-17 s population was pre-#3916 traffic
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -15632,8 +15554,11 @@ audit of phases 9 to 11: the plan's audit obligation is discharged
 for phases 1 to 8 by phase 8 and by nothing at all for the three
 phases that reopened the plan afterwards. See "Phase 12" below for
 why phase 8 is not moved to the end of the table to cover them.</p>
-<p>Phase 11 merged to <code>develop</code> as PR #4007 on 2026-09-02, and its
-measurement write-up as PR #4033 on 2026-09-05. What the plan
+<p>Phase 11 merged to <code>develop</code> as PR #4007 on 2026-09-02, and the
+response to #4007's review as PR #4033 on 2026-09-05. #4033 carried
+code as well as step 11h's measurement: a priority-aware enqueue
+dedup (<code>_reusable_priorities</code>), the <code>missing_key_columns</code> fold guard
+and tests for the schema upgrade steps. What the plan
 deliberately did not build is carried by issues rather than by this
 document: #4017 (the <code>sf-queues</code> half of the multi-column key), #3974
 (the two timestamps which would separate database queue sit from time
@@ -15768,8 +15693,8 @@ multi-column key that would let per-node tasks coalesce properly.</p>
 </tr>
 <tr>
 <td>12. Push audit of phases 9 to 11</td>
-<td>PLAN-queue-performance-phase-12-push-audit.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-queue-performance-phase-12-push-audit/">PLAN-queue-performance-phase-12-push-audit.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 </tbody>
@@ -16018,21 +15943,90 @@ cites phase 8 as the prior coverage of everything before them. The
 baseline is the <code>Merged</code> column in the Execution table above and not
 <code>develop...HEAD</code>, which is empty: <code>30168f0dd</code> and <code>9e41f07c6</code> for
 phase 9, <code>fea4af7bd</code> for phase 10, and <code>9aab98d94</code> and <code>ff65c622a</code>
-for phase 11. The accumulated diff of those five merges is one body
-of work, audited as one, because the interesting defects in this plan
-have all been ones the phases did to each other -- phase 8 found a
-join that phases 4 and 5 had each written correctly on their own
-terms, and phase 11's own review found a fold that phase 8's fix
-would have activated across nodes.</p>
-<p>Two areas are worth naming for whoever runs it. The coalescing key
-and its three guards were rewritten twice within phase 11, so the
-question is whether the enqueue-time check, the <code>queue_is_cluster_wide</code>
-skip and <code>COALESCIBLE_TASKS</code> are now three expressions of one rule or
-three copies that can drift apart. And phases 9 and 10 added
-measurement tooling and event fields whose consumers --
-<code>tools/queue-wait-report.py</code> among them -- are the kind of
-code that gets no test coverage and no documentation unless
-an audit asks.</p>
+for phase 11. Git cannot express those five merges as one range, so
+the mechanical checks run once per merge and pool their output. The
+judgment reviews read all five diffs together, because the
+interesting defects in this plan have all been ones the phases did
+to each other. Phase 8 found a join that phases 4 and 5 had each
+written correctly on their own terms, and review of phase 8's fix
+(PR #3880) found a fold that the fix would have activated across
+nodes. Read each range with <code>git diff &lt;sha&gt;^1 &lt;sha&gt;</code>, not <code>git log</code>:</p>
+<h1 id="4033s-branch-merged-develop-into-itself-so-its-log-lists-about">4033's branch merged <code>develop</code> into itself, so its log lists about<a class="headerlink" href="#4033s-branch-merged-develop-into-itself-so-its-log-lists-about" title="Permanent link">&para;</a></h1>
+<p>forty commits that belong to other plans.</p>
+<p>Two areas are worth naming for whoever runs it. The first is the
+coalescing key and its guards, which were rewritten twice within
+phase 11 and again in #4033. The question is whether the rule's
+expressions are one rule or copies that can drift apart. There are
+more of them than the enqueue-time check, the <code>queue_is_cluster_wide</code>
+skip and <code>COALESCIBLE_TASKS</code>: the phase plan lists eleven. The
+second is the measurement tooling and event fields that phases 9
+and 10 added. <code>tools/queue-wait-report.py</code> and
+<code>tools/operation-timeline.py</code> do have tests and documentation, so
+the question is not whether coverage exists but whether the tests'
+fixtures still match what the code emits.</p>
+<p>The phase plan is
+<a href="../PLAN-queue-performance-phase-12-push-audit/">PLAN-queue-performance-phase-12-push-audit.md</a>.</p>
+<h3 id="audit-of-phases-9-to-11">Audit of phases 9 to 11<a class="headerlink" href="#audit-of-phases-9-to-11" title="Permanent link">&para;</a></h3>
+<p>Run on 2026-10-25. Wave 1 is clean across all five ranges: tox ran
+6075 tests with none failing, and the stubs are fresh. The
+three-layer pattern, SQL pushdown and SQL binding hold. The audit
+found one blocking defect, and phase 8's lesson predicted it: the
+fault is not in what the phases wrote, but in what their changes
+switched on.</p>
+<p><strong>A folded sibling reads <code>complete</code> before its survivor has done the
+work (#4638).</strong> The fold has always marked its siblings complete
+before the survivor's tasks run. That was harmless while nothing
+waited on a folded operation. Phase 11 made <code>network_ensure_mesh</code>
+coalescible, and the mesh operation is what <code>instance_create</code> and
+<code>attach_instance_interface</code> name in <code>depends_on</code>. So those
+dependents are now released when the survivor <em>starts</em>. If the
+survivor fails, they go ahead anyway. #4033 made the overlap
+routine: a user's mesh enqueue stopped adopting the maintainer's
+background one, so the background op can fold the user's op. Three
+independent reviews reached this, and a sqlite harness driving the
+real <code>execute()</code> reproduces it. It is fixed in the follow-up pull
+request.</p>
+<p>One more cross-node fold was found and declined. Rows written
+before #4007 have a NULL <code>node_uuid</code>, so in a rolling upgrade a
+cluster-wide survivor would fold them on every hypervisor. That is
+phase 8's bug again, this time by data skew rather than version
+skew. No release has ever contained NetOp, and the one known
+<code>develop</code> deployment passed that window weeks ago, so only the
+upgrade step's wrong comment is corrected.</p>
+<p>The rest is advisory:</p>
+<ul>
+<li><strong>Fixed in the follow-up pull request:</strong></li>
+<li>The safety argument is written as "key-aware, not queue-aware"
+    in two places that should say family-aware too. Phase 11's own
+    done-criterion was ticked without this being true.</li>
+<li>The operator page lists five of the seven fold outcomes.</li>
+<li>Fourteen plan references survive in code and docs.</li>
+<li><strong>Filed as issues:</strong></li>
+<li>
+<h1 id="4639-removing-the-never-released-v1-rpcs">4639: removing the never-released V1 RPCs.<a class="headerlink" href="#4639-removing-the-never-released-v1-rpcs" title="Permanent link">&para;</a></h1>
+</li>
+<li>
+<h1 id="4640-the-timeline-tool-misreading-budget-abandoned-operations">4640: the timeline tool misreading budget-abandoned operations.<a class="headerlink" href="#4640-the-timeline-tool-misreading-budget-abandoned-operations" title="Permanent link">&para;</a></h1>
+</li>
+<li>
+<h1 id="4641-no-test-of-the-v2-unimplemented-path">4641: no test of the V2 UNIMPLEMENTED path.<a class="headerlink" href="#4641-no-test-of-the-v2-unimplemented-path" title="Permanent link">&para;</a></h1>
+</li>
+<li>
+<h1 id="4642-tool-fixtures-not-derived-from-the-emitter">4642: tool fixtures not derived from the emitter.<a class="headerlink" href="#4642-tool-fixtures-not-derived-from-the-emitter" title="Permanent link">&para;</a></h1>
+</li>
+<li>
+<h1 id="4643-dedup-adopting-a-backing-off-operation">4643: dedup adopting a backing-off operation.<a class="headerlink" href="#4643-dedup-adopting-a-backing-off-operation" title="Permanent link">&para;</a></h1>
+</li>
+<li>
+<h1 id="4644-duplication-and-size">4644: duplication and size.<a class="headerlink" href="#4644-duplication-and-size" title="Permanent link">&para;</a></h1>
+</li>
+<li>
+<h1 id="4645-a-dispatcher-restart-briefly-breaking-the">4645: a dispatcher restart briefly breaking the<a class="headerlink" href="#4645-a-dispatcher-restart-briefly-breaking-the" title="Permanent link">&para;</a></h1>
+<p>one-worker-per-network guarantee. This predates the plan.</p>
+</li>
+<li><strong>Recorded on #3929:</strong> the functional coalescing tests' design.</li>
+</ul>
+<p>The full disposition is in the phase plan.</p>
 <p>Findings land as their own pull request, and the plan is not complete
 until each is resolved or declined in writing here. If the audit
 finds nothing, that is recorded in one sentence.</p>
@@ -17170,6 +17164,13 @@ corrections found while landing it.</p>
   whether to add bounded-staleness ordering
   (<code>ORDER BY CASE WHEN NOW() - created_at &gt; N THEN top
   ELSE priority END, ...</code>) or a reserved-slot mechanism.</p>
+</li>
+<li>
+<p><strong>Removing the V1 coalescing RPCs.</strong> <code>protos/database.proto</code>
+  keeps <code>ClaimCoalescibleSiblings</code> and <code>FindExistingCoalescibleOp</code>
+  "for one release", but no release has ever contained them. The
+  server also does not check which tasks a V1 caller asks it to
+  fold. Tracked as #4639, found by phase 12.</p>
 </li>
 </ul>
 
