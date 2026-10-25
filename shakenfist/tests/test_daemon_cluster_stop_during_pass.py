@@ -116,3 +116,28 @@ class StopDuringPassTestCase(base.ShakenFistTestCase):
         self.assertRaises(cluster_main.MaintenancePassAbandoned, m._cluster_wide_cleanup, 0)
         self.assertEqual(1, mock_network.Network.from_db.call_count)
         mock_network.floating_network.assert_not_called()
+
+    @mock.patch('shakenfist.daemons.cluster.main.scheduled_tasks')
+    @mock.patch('shakenfist.daemons.cluster.main.schedule')
+    @mock.patch('shakenfist.daemons.cluster.main.daemon.check_abort_path',
+                side_effect=[True, False])
+    def test_an_abandoned_pass_leaves_the_elected_loop(self, mock_abort, mock_schedule, mock_tasks):
+        # The break is what actually stops sf-cluster: without it the loop
+        # waits out ELECTED_LOOP_POLL_SECONDS and runs another pass.
+        m = cluster_main.Monitor.__new__(cluster_main.Monitor)
+        m.abort_path = self.abort_path
+        m.lock = mock.MagicMock()
+        m.lock.is_acquired.return_value = True
+        m.is_elected = True
+        m.pet_watchdog = mock.MagicMock()
+        m.check_daemon_state = mock.MagicMock()
+        m._await_election = mock.MagicMock()
+        m._anchor_scheduled_jobs = mock.MagicMock()
+        m.cluster_stable = mock.MagicMock(return_value=True)
+        m._maintenance_pass = mock.MagicMock(side_effect=cluster_main.MaintenancePassAbandoned())
+
+        m._run_inner()
+
+        m._maintenance_pass.assert_called_once()
+        m.lock.lost_event.wait.assert_not_called()
+        m.lock.release.assert_called_once()

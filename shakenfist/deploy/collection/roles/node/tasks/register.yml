@@ -153,6 +153,10 @@
 # already restarts sf-api for the changed unit; on every other deploy the
 # socket is left alone and the restart below no longer closes the port. A
 # fresh node has nothing to stop, so the stop is a no-op there.
+# sf_api_socket_changed defaults to true for the same reason the restart
+# decision's facts do: a run which lost the config play's facts restarts every
+# daemon anyway, and a socket whose unit file changed keeps listening as the old
+# one did until it is restarted, so the brief closed port is the safe failure.
 - name: Check whether systemd already holds sf-api's socket
   # noqa: command-instead-of-module -- systemd_service cannot only query a
   # unit (it requires state, enabled or the like), and service_facts does not

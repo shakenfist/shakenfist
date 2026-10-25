@@ -16,6 +16,8 @@ from unittest import mock
 from shakenfist.daemons.queues import startup_tasks
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import get_node_background_node_queues
+from shakenfist.operations.baseoperation import get_node_user_facing_node_queues
 from shakenfist.tests import base
 
 
@@ -155,7 +157,7 @@ class StartupResetTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
         self.calls = mock.MagicMock()
-        fake_config = mock.MagicMock()
+        self.config = fake_config = mock.MagicMock()
         fake_config.NODE_UUID = NODE_UUID
         fake_config.NODE_NAME = 'sf-6'
         self.mariadb = self.calls.mariadb
@@ -188,3 +190,21 @@ class StartupResetTestCase(base.ShakenFistTestCase):
         names = [c[0] for c in self.calls.mock_calls]
         self.assertLess(names.index('recover'), names.index('mariadb.restart_work_queue'))
         self.calls.recover.assert_called_once_with(NODE_UUID)
+
+    def test_leaves_the_shared_queues_to_the_reaper(self):
+        # Other nodes' workers hold live claims on the any-* queues; clearing
+        # one hands an item which is still running to a second worker.
+        startup_tasks.startup_tasks().join(10)
+
+        reset = [c.args[0] for c in self.mariadb.restart_work_queue.call_args_list]
+        self.assertNotIn(SHARED_QUEUE, reset)
+        self.assertCountEqual(
+            get_node_user_facing_node_queues(NODE_UUID) + get_node_background_node_queues(NODE_UUID), reset)
+
+    def test_resets_nothing_without_a_node_uuid(self):
+        # Not "None-clusteroperation-*", and not the shared queues either.
+        self.config.NODE_UUID = None
+        startup_tasks.startup_tasks().join(10)
+
+        self.mariadb.restart_work_queue.assert_not_called()
+        self.calls.recover.assert_not_called()

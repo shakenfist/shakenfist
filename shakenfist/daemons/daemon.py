@@ -477,7 +477,10 @@ class Daemon:
         # and sf-api deadlocked the same way (#3495). The abort file is all a
         # stop needs: every loop polls it. The STOPPING state this used to
         # write is written by the unit's ExecStop (sf-ctl stop) before systemd
-        # sends SIGTERM, and record_exit() writes STOPPED. tools/
+        # sends SIGTERM, and record_exit() writes STOPPED. A SIGTERM which
+        # bypasses ExecStop (kill -TERM, systemctl kill) therefore records no
+        # STOPPING: the daemon goes from running to STOPPED, or, if it is then
+        # SIGKILLed, keeps the last state it recorded. tools/
         # check-signal-handlers.py holds every signal handler to this.
         if sig == signal.SIGTERM:
             self.sigterm_unlogged = True

@@ -67,7 +67,17 @@ other way. When `weekly_lanes` fails, `report_failures` runs
 lane, labelled `ci-failure`, naming the commit tested, the last commit the
 lane passed on and a compare link between them. A lane which is still red
 the following week adds a comment to its open issue rather than filing
-another. Close the issue when the lane is fixed.
+another. Close the issue when the lane is fixed. The open issue is found
+by the lane's display name (its `name:` in `functional-lanes.yml`), so
+renaming a lane files a fresh issue and leaves the old one to be closed
+by hand.
+
+GitHub runs a `schedule:` trigger only from the copy of the workflow on
+the repository's default branch, and with that branch checked out. The
+default branch is `develop`, which is what makes the weekly run test
+`develop`. If the default branch ever changes, the weekly lanes test the
+new default branch, and a `scheduled-tests.yml` which exists only on
+`develop` would stop running at all.
 
 To move a lane, move its name from one caller's `lanes` list to the
 other's. `shakenfist/tests/test_functional_lanes_workflow_seams.py` fails

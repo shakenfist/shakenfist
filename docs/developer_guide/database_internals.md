@@ -446,7 +446,10 @@ cleared, or, if the row has been claimed `CLUSTER_OP_MAX_ATTEMPTS`
 times, deletes the row and errors the operation as the reaper would.
 Rows on the shared `any-*` queues are left to the reaper, because
 nothing records which node claimed them: over gRPC, `claimed_by` is
-the database daemon's node name, not the caller's.
+the database daemon's node name, not the caller's. For the same reason
+startup clears the claims on its own queues only. A claim on an
+`any-*` queue may be another node's worker running that item right
+now, and clearing it would hand the item to a second worker.
 
 The cluster daemon also runs two other reaping sweeps from
 `daemons/cluster/scheduled_tasks.py`. `per_deleted_object_checks()`

@@ -143,8 +143,6 @@ class StartupRestoreThreadTestCase(base.ShakenFistTestCase):
             mock.patch.object(startup_tasks, 'locks'),
             mock.patch.object(startup_tasks, 'util_general'),
             mock.patch.object(startup_tasks, 'util_concurrency'),
-            mock.patch.object(
-                startup_tasks, 'get_all_node_queues', return_value=[]),
             mock.patch.object(startup_tasks, 'upgrade_blob_datastore'),
         ]
         for p in self.patchers:

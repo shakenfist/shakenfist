@@ -25,8 +25,15 @@ checked, so it is an error.
 
 A handler, and every helper it calls, may contain only plain statements:
 assignments, expressions, if, return, pass, raise, try, global and
-nonlocal. Loops, with blocks and nested definitions are refused. Every
-call must be one of:
+nonlocal. Loops, with blocks and nested definitions are refused.
+
+An assignment may bind a name, an attribute of self, or an item of a plain
+name (FLAGS[key] = value). Anything else can run code the handler cannot
+see -- in this codebase obj.state = value is usually a property setter
+which writes to the database and adds events -- so it is refused unless
+its line carries a "# signal-safe: <reason>" waiver.
+
+Every call must be one of:
 
 * os.open, os.write or os.close: raw system calls, which take no Python
   lock. daemon.write_abort_file() uses these to create an abort file.
@@ -290,11 +297,36 @@ class Checker:
         for statement in func.body:
             self.check_statement(module, statement, func, context)
 
+    def check_target(self, module, target, context):
+        if isinstance(target, ast.Name):
+            return
+        if isinstance(target, (ast.Tuple, ast.List)):
+            for element in target.elts:
+                self.check_target(module, element, context)
+            return
+        if isinstance(target, ast.Starred):
+            self.check_target(module, target.value, context)
+            return
+        if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == 'self':
+            return
+        if isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name):
+            return
+        if WAIVER_RE.search(module.lines[target.lineno - 1]):
+            return
+        self.error(module, target, f'{context} assigns to {ast.unparse(target)}, which may run a property setter '
+                                   f'or __setitem__: assign to a name, self.<name> or <name>[key], or mark the '
+                                   f'line "# signal-safe: <reason>"')
+
     def check_statement(self, module, statement, func, context):
         if not isinstance(statement, ALLOWED_STATEMENTS):
             self.error(module, statement, f'{context} uses a {type(statement).__name__} statement, which a signal '
                                           f'handler may not')
             return
+        if isinstance(statement, ast.Assign):
+            for target in statement.targets:
+                self.check_target(module, target, context)
+        elif isinstance(statement, (ast.AugAssign, ast.AnnAssign)):
+            self.check_target(module, statement.target, context)
         for child in ast.iter_child_nodes(statement):
             if isinstance(child, ast.stmt):
                 self.check_statement(module, child, func, context)

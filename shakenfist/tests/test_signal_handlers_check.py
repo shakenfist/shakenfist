@@ -163,6 +163,52 @@ class SignalHandlerCheckTestCase(base.ShakenFistTestCase):
         ''', 'calls LOG.info()', relpath='shakenfist/external_api/gunicorn_config.py')
         self.assertTrue(error.startswith('shakenfist/external_api/health.py:9: '), error)
 
+    def test_assignments_which_may_run_code_are_refused(self):
+        # obj.state = value is usually a property setter which writes to the
+        # database, which is exactly what #4601 was about.
+        for target, shown in (('NODE.state', 'NODE.state'),
+                              ('self.node.state', 'self.node.state'),
+                              ('self.flags[sig]', 'self.flags[sig]'),
+                              ('done, NODE.state', 'NODE.state')):
+            with self.subTest(target=target):
+                self.assertRefuses(f'''\
+                    import signal
+                    NODE = None
+
+                    class Daemon:
+                        def handler(self, sig, frame):
+                            {target} = 1, 2
+
+                        def run(self):
+                            signal.signal(signal.SIGTERM, self.handler)
+                ''', f'assigns to {shown},')
+
+        self.assertRefuses('''\
+            import signal
+            NODE = None
+
+            def handler(sig, frame):
+                NODE.stopping += 1
+
+            signal.signal(signal.SIGTERM, handler)
+        ''', 'assigns to NODE.stopping,')
+
+    def test_self_attributes_and_waived_assignments_are_allowed(self):
+        _, errors = self.check('''\
+            import signal
+            NODE = None
+
+            class Daemon:
+                def handler(self, sig, frame):
+                    self.stopping = True
+                    self.count += 1
+                    NODE.flag = True  # signal-safe: a plain attribute, not a property
+
+                def run(self):
+                    signal.signal(signal.SIGTERM, self.handler)
+        ''')
+        self.assertEqual([], errors)
+
     def test_a_waiver_needs_a_reason(self):
         _, errors = self.check('''\
             import signal

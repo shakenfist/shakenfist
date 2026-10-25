@@ -22,7 +22,9 @@ name: Functional lanes
 # A lane's job name is reported by the jobs API as '<caller job> / <lane> /
 # Smoke tests (collection)'. tools/ci_headroom_harvest.py finds a lane's
 # bundle by the lane segment of that name, so renaming a lane here needs a
-# new row in its BUNDLE_TOPOLOGIES table.
+# new row in its BUNDLE_TOPOLOGIES table. tools/ci_report_scheduled_failures.py
+# finds a weekly lane's open ci-failure issue by the same segment, so a rename
+# also files a fresh issue and orphans the old one.
 #
 # The headroom band gate: a lane passes either the CI_HEADROOM_GATE
 # repository variable's off switch (set it to 'false' to stop a band
