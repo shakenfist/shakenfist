@@ -16166,9 +16166,14 @@ under <code>sf.target</code>, and the ordering there is load bearing:</p>
 </ol>
 <p>Stop runs in reverse: sentinel-last stops first and marks the node as
 stopping, the control plane stops, and sentinel-first stops last and
-records a graceful stop. A daemon started ahead of <code>sf-database</code> hangs
-on its first database call -- <code>sf-api</code> in particular -- so a new unit
-must keep the <code>After=sf-database.service</code> ordering.</p>
+records a graceful stop. That is the whole-node path (<code>sf.target</code>, a
+reboot). A deploy instead restarts each unit on its own, so sentinel-first
+stops while sentinel-last is still running: it then records only its own
+daemon state and leaves the node's lifecycle for sentinel-last's restart to
+return to created, because the node was never stopping. A daemon started
+ahead of <code>sf-database</code> hangs on its first database call -- <code>sf-api</code> in
+particular -- so a new unit must keep the <code>After=sf-database.service</code>
+ordering.</p>
 <h2 id="daemon-liveness-systemd-watchdog">Daemon liveness (systemd watchdog)<a class="headerlink" href="#daemon-liveness-systemd-watchdog" title="Permanent link">&para;</a></h2>
 <p><code>Daemon.pet_watchdog()</code> in <code>shakenfist/daemons/daemon.py</code> is the
 liveness seam for every non-trivial daemon. It writes
@@ -16196,6 +16201,33 @@ daemon is working normally. The existing explicit callers are:</p>
   lock is busy. When libvirt and the database already agree on an
   instance's power state, no lock is taken at all.</li>
 </ul>
+<p>A long pass has to notice a stop as well as stay alive. systemd allows
+every Shaken Fist unit 30 seconds (<code>TimeoutStopSec</code>) between SIGTERM and
+SIGKILL, and a deploy restarts every unit, so a pass that only checks its
+abort path between passes is SIGKILLed whenever a deploy lands in the
+middle of a slow one. <code>sf-cluster</code>'s maintenance pass therefore calls
+<code>_maintenance_checkpoint()</code> rather than <code>pet_watchdog()</code> at its item
+boundaries and between its scheduled jobs: it pets, and abandons the rest
+of the pass when the abort path exists. Only use it where stopping before
+the next item leaves nothing half done; a loop which has already claimed
+its items, such as dequeued work, pets the watchdog directly.</p>
+<p>A signal handler must not wait for anything. Python runs it on the main
+thread between any two of that thread's bytecodes, so if it needs a lock
+the main thread already holds, it waits for itself forever. Logging needs
+one: the Loki handler enqueues every line under the logship spool's
+non-reentrant lock, and the main thread logs constantly. So does any
+database call, which can also simply be slow enough to outlast
+<code>TimeoutStopSec</code> by itself. sf-api's drain handler deadlocked on the
+first (#3495) and every daemon's <code>Daemon.exit_gracefully()</code> could do the
+same on either, which is how <code>sf-database</code> came to be SIGKILLed on a stop
+under a slow MariaDB (#4601). Handlers therefore only set flags and write
+the abort file, with <code>daemon.write_abort_file()</code>, which uses raw system
+calls; the main thread notices, and does the logging and any state
+writes itself. <code>tools/check-signal-handlers.py</code>, run by pre-commit,
+holds every <code>signal.signal()</code> handler to this: its docstring lists what
+a handler may call, how to mark a helper <code>@signal_safe</code>
+(<code>shakenfist/util/signals.py</code>), and how to exempt a single call with a
+reason.</p>
 <p>If you add a new long-running maintenance pass to any of the eight
 armed daemons — <code>sf-database</code>, <code>sf-net</code>, <code>sf-cleaner</code>, <code>sf-cluster</code>,
 <code>sf-queues</code>, <code>sf-resources</code>, <code>sf-transfers</code>, <code>sf-sidechannel</code> — add
@@ -16268,6 +16300,14 @@ immediately — and then keeps serving live requests for
 <code>API_DRAIN_GRACE</code> seconds (default 25) before the normal worker
 shutdown, giving the load balancer time to stop routing new
 connections before the process exits.</p>
+<p>The listening socket is not gunicorn's. The collection installs
+<code>sf-api.socket</code>, systemd passes the bound socket to gunicorn on each
+start (gunicorn reads <code>LISTEN_FDS</code> and ignores <code>--bind</code>; the unit's
+<code>ExecStart</code> must <code>exec</code> gunicorn so that <code>LISTEN_PID</code> is gunicorn's pid),
+and the socket outlives the restart. Connections that arrive between the
+old workers exiting and the new ones accepting queue on it instead of
+being reset with the backlog when gunicorn closed its own socket, which
+nginx surfaced as 502s (#3664).</p>
 <p>Operator-facing probe guidance is in
 <a href="../../operator_guide/load_balancing/"><code>load_balancing.md</code></a>.</p>
 <h2 id="vdi-console-token-mint-path">VDI console token mint path<a class="headerlink" href="#vdi-console-token-mint-path" title="Permanent link">&para;</a></h2>

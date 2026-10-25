@@ -15583,6 +15583,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#merge-lanes-and-weekly-lanes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge lanes and weekly lanes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#where-the-functional-jobs-get-their-code" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16060,9 +16071,14 @@ commands available on a PR.</p>
 <td>workflow_run (a failed <code>Functional tests</code> merge group run), workflow_dispatch</td>
 </tr>
 <tr>
+<td><code>functional-lanes.yml</code></td>
+<td>Defines every functional cluster lane once; its callers choose which run where. See <a href="#merge-lanes-and-weekly-lanes">Merge lanes and weekly lanes</a></td>
+<td>workflow_call (from <code>functional-tests.yml</code> and <code>scheduled-tests.yml</code>)</td>
+</tr>
+<tr>
 <td><code>scheduled-tests.yml</code></td>
-<td>Longer-running test sweep (schedule currently disabled)</td>
-<td>workflow_dispatch</td>
+<td>The functional lanes which do not gate a merge, run weekly against <code>develop</code>, filing a <code>ci-failure</code> issue per failed lane (<code>tools/ci_report_scheduled_failures.py</code>)</td>
+<td>Weekly schedule (Fridays 15:00 UTC, early Saturday in Canberra), manual</td>
 </tr>
 <tr>
 <td><code>publish-website.yml</code></td>
@@ -16086,6 +16102,101 @@ commands available on a PR.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="merge-lanes-and-weekly-lanes">Merge lanes and weekly lanes<a class="headerlink" href="#merge-lanes-and-weekly-lanes" title="Permanent link">&para;</a></h2>
+<p>A <em>lane</em> is one functional cluster job: a topology deployed by the
+<code>shakenfist.shakenfist</code> collection through <code>shakenfist/actions</code>'s reusable
+<code>smoke-cluster.yml</code>, and a stestr suite run against it. Every lane is
+defined once, as a job in <code>.github/workflows/functional-lanes.yml</code>, and is
+named by its <code>concurrency_key</code>. Two workflows call it with a list of lane
+names, and that list is the only thing which decides when a lane runs:</p>
+<table>
+<thead>
+<tr>
+<th>Lane</th>
+<th>Runs</th>
+<th>Topology</th>
+<th>Suite</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>debian-13-slim-primary</code> (Debian 13 cluster)</td>
+<td>Every merge</td>
+<td><code>slim-primary</code></td>
+<td><code>cluster-ci.conf</code></td>
+</tr>
+<tr>
+<td><code>guests</code> (Guests)</td>
+<td>Every merge</td>
+<td><code>slim-primary</code></td>
+<td><code>guest-ci.conf</code></td>
+</tr>
+<tr>
+<td><code>ubuntu-2404-slim-primary</code> (Ubuntu 24.04 cluster)</td>
+<td>Weekly</td>
+<td><code>slim-primary</code></td>
+<td><code>cluster-ci.conf</code></td>
+</tr>
+<tr>
+<td><code>debian-13-slim-tier</code> (Debian 13 tier, with Kerbside)</td>
+<td>Weekly</td>
+<td><code>slim-tier</code></td>
+<td><code>cluster-ci.conf</code></td>
+</tr>
+<tr>
+<td><code>debian-13-localhost</code> (Debian 13 single machine)</td>
+<td>Weekly</td>
+<td><code>localhost</code></td>
+<td><code>cluster-ci.conf</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>functional-tests.yml</code>'s <code>functional_lanes</code> job selects the merge lanes,
+and <code>can_merge</code> needs it. <code>scheduled-tests.yml</code>'s <code>weekly_lanes</code> job
+selects the rest. Every merge lane deploys a nested cluster onto the sfcbr
+under-cloud that every Shaken Fist repository shares, so a lane earns a
+place in the merge queue by catching what the other merge lanes do not.
+The Ubuntu 24.04 and slim-tier lanes moved to the weekly run on
+2026-10-25: the Debian 13 cluster lane runs the same suite on the same
+topology, and what the weekly run gives up is catching a base image or
+Kerbside regression on the merge which caused it rather than within a
+week.</p>
+<p>A weekly lane blocks nothing, so its failures have to reach a person some
+other way. When <code>weekly_lanes</code> fails, <code>report_failures</code> runs
+<code>tools/ci_report_scheduled_failures.py</code>, which files one issue per failed
+lane, labelled <code>ci-failure</code>, naming the commit tested, the last commit the
+lane passed on and a compare link between them. A lane which is still red
+the following week adds a comment to its open issue rather than filing
+another. Close the issue when the lane is fixed. The open issue is found
+by the lane's display name (its <code>name:</code> in <code>functional-lanes.yml</code>), so
+renaming a lane files a fresh issue and leaves the old one to be closed
+by hand.</p>
+<p>GitHub runs a <code>schedule:</code> trigger only from the copy of the workflow on
+the repository's default branch, and with that branch checked out. The
+default branch is <code>develop</code>, which is what makes the weekly run test
+<code>develop</code>. If the default branch ever changes, the weekly lanes test the
+new default branch, and a <code>scheduled-tests.yml</code> which exists only on
+<code>develop</code> would stop running at all.</p>
+<p>To move a lane, move its name from one caller's <code>lanes</code> list to the
+other's. <code>shakenfist/tests/test_functional_lanes_workflow_seams.py</code> fails
+if a caller names a lane <code>functional-lanes.yml</code> does not define (a lane
+which does not exist skips, and a called workflow whose jobs all skip
+succeeds, so the merge gate would pass having tested nothing), or if a
+lane runs in both places or in neither. Moving a lane into the merge
+queue also needs a <code>BUNDLE_TOPOLOGIES</code> row in
+<code>tools/ci_headroom_harvest.py</code> if its bundle name is new there. A merge
+lane's job is reported as <code>Functional lanes / &lt;lane&gt; / Smoke tests
+(collection)</code>.</p>
+<p>The weekly schedule is GitHub's <code>schedule:</code>, which has run hours late and
+sometimes not at all since August 2026. It is a stopgap until
+<code>shakenfist/private-ci</code>'s periodic CI plan (<code>PLAN-periodic-ci.md</code>) has the
+conductor dispatch this workflow into gaps in sfcbr's load, which is why
+<code>scheduled-tests.yml</code>'s <code>workflow_dispatch</code> takes no inputs. To run the
+weekly lanes against a branch, dispatch it by hand:
+<code>gh workflow run scheduled-tests.yml --ref &lt;branch&gt;</code>. A failure there
+files nothing: <code>report_failures</code> prints the issue it would have filed
+to its log, because the failure is the branch's and not the lane's,
+and only runs of the default branch are reported.</p>
 <h2 id="where-the-functional-jobs-get-their-code">Where the functional jobs get their code<a class="headerlink" href="#where-the-functional-jobs-get-their-code" title="Permanent link">&para;</a></h2>
 <p>The functional jobs do not install released packages. <code>shakenfist/actions</code>'s
 <code>setup-test-environment</code> checks out three repositories --
@@ -16278,7 +16389,10 @@ Profiles live in <code>tools/ci-deploy-profiles/</code> and are named
 <code>&lt;purpose&gt;-&lt;topology&gt;.yml.j2</code>.</p>
 <h3 id="the-kerbside-profile">The Kerbside profile<a class="headerlink" href="#the-kerbside-profile" title="Permanent link">&para;</a></h3>
 <p><code>tools/ci-deploy-profiles/kerbside-slim-tier.yml.j2</code> is used by the
-<code>debian-13-slim-tier</code> merge row. It deploys Kerbside on <code>sf2</code>, a hypervisor
+<code>debian-13-slim-tier</code> lane, which runs weekly rather than in the merge
+queue (see <a href="#merge-lanes-and-weekly-lanes">Merge lanes and weekly lanes</a>),
+so a Kerbside regression is caught within a week rather than on the merge
+which caused it. It deploys Kerbside on <code>sf2</code>, a hypervisor
 outside the database tier, scraping the primary's <code>sf-api</code> across hosts. It
 creates Kerbside's database on the primary's MariaDB, sets throwaway CI
 credentials, and exports <code>SF_CI_EXPECT_VDI_CONSOLE_PROXY</code> into the test run.
@@ -16446,9 +16560,9 @@ check. Adding <code>edited</code> to the trigger is not the fix -- it would re-r
 entire functional matrix on every description tweak.</p>
 <h3 id="superseded-merge-groups-are-cancelled">Superseded merge groups are cancelled<a class="headerlink" href="#superseded-merge-groups-are-cancelled" title="Permanent link">&para;</a></h3>
 <p>Every job that can run in the queue and holds a scarce runner carries a
-<code>concurrency:</code> block whose key is merge-group aware — the four
-<code>functional_matrix_merge_collection</code> entries and <code>ansible_modules_collection</code>
-through the shared <code>smoke-cluster.yml</code>, and <code>node_lifecycle_collection</code>,
+<code>concurrency:</code> block whose key is merge-group aware — the merge lanes
+<code>functional_lanes</code> selects and <code>ansible_modules_collection</code> through the
+shared <code>smoke-cluster.yml</code>, and <code>node_lifecycle_collection</code>,
 <code>schema_enum_widening</code> and <code>automated_delinter</code> in this repository.
 <code>sanity_checks</code> holds only a static runner, but is keyed the same way so that
 a superseded queue run does not finish its lint and unit tests either.</p>
@@ -16817,7 +16931,7 @@ not a longer flag list.</p>
   pushing a new commit. <strong>This is the merge queue's lane, not the pull
   request's, and it is the most expensive thing a comment can start
   here.</strong> The dispatch arrives as a <code>workflow_dispatch</code> event, and
-  <code>functional_matrix_merge_collection</code>, <code>ansible_modules_collection</code>,
+  <code>functional_lanes</code>, <code>ansible_modules_collection</code>,
   <code>node_lifecycle_collection</code> and <code>schema_enum_widening</code> are each gated
   on <code>merge_group || workflow_dispatch</code> -- so a retest runs the
   multi-node nested-cluster jobs on top of the pull request set. Nor

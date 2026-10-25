@@ -15431,6 +15431,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#restarts-keep-the-port-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restarts keep the port open
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#route-only-to-sf-api-and-firewall-the-port" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15952,6 +15963,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#restarts-keep-the-port-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restarts keep the port open
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#route-only-to-sf-api-and-firewall-the-port" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16255,6 +16277,27 @@ marks it unhealthy, and in-flight requests will fail.</p>
 <p>A safe, conservative starting point is a <strong>5 second interval with a 2-failure
 threshold</strong>: the load balancer sees the <code>503</code> within ~10 s, well inside the
 25 s grace. The cheap, cached probe makes this frequency painless.</p>
+<h3 id="restarts-keep-the-port-open">Restarts keep the port open<a class="headerlink" href="#restarts-keep-the-port-open" title="Permanent link">&para;</a></h3>
+<p>systemd, not gunicorn, holds <code>sf-api</code>'s listening socket on <code>:13000</code>
+(<code>sf-api.socket</code>), so a restart of <code>sf-api</code> -- including the collection's
+restart-on-change redeploy -- never closes the port. Connections made after
+the old workers exit wait in the socket's queue and are answered by the new
+gunicorn once it has started, a few seconds later. Before this, the last
+worker to exit closed the socket, the kernel reset every connection still
+queued on it, and a load balancer which had already sent a request on one of
+those connections returned <code>502</code> (nginx, for one, does not retry a
+non-idempotent request it has sent). A load balancer's connect and read
+timeouts need only cover <code>sf-api</code>'s start time for these requests to succeed.</p>
+<p>The same socket starts a stopped <code>sf-api</code> when a connection arrives. To take
+the API down on a node, stop the socket, which stops <code>sf-api</code> too:
+<code>sudo systemctl stop sf-api.socket</code>.</p>
+<p>If <code>sf-api</code> fails often enough to hit systemd's start limit, systemd fails
+the socket as well (<code>systemctl status sf-api.socket</code> shows
+<code>service-start-limit-hit</code>), and the node stops accepting connections on
+<code>:13000</code> until both are reset. Once the cause is fixed, bring it back with
+<code>sudo systemctl reset-failed sf-api.service sf-api.socket</code> followed by
+<code>sudo systemctl start sf-api.socket</code>. Restarting <code>sf-api</code> alone is not
+enough.</p>
 <h3 id="route-only-to-sf-api-and-firewall-the-port">Route only to sf-api, and firewall the port<a class="headerlink" href="#route-only-to-sf-api-and-firewall-the-port" title="Permanent link">&para;</a></h3>
 <p>The load balancer pool contains <strong>only <code>sf-api</code> backends</strong> on <code>:13000</code>.
 <code>sf-database</code> is a separate, internal service; it is health-checked separately

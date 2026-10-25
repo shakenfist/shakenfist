@@ -15699,6 +15699,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-signal-handler-only-sets-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A signal handler only sets flags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-column-to-column-comparison-has-no-bind-processor" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16066,10 +16077,14 @@ own raising accessor, <code>get_node_blob_uuids()</code>, built on the truthful 
 callers may assume, beats one accessor with a <code>raise_on_failure</code> flag that
 every call site has to remember to set.</p>
 <h2 id="cluster-ci-tests-only-run-in-the-merge-queue">Cluster CI tests only run in the merge queue<a class="headerlink" href="#cluster-ci-tests-only-run-in-the-merge-queue" title="Permanent link">&para;</a></h2>
-<p>The <code>(collection)</code> matrix in <code>Functional tests</code> -- everything under
-<code>deploy/shakenfist_ci/cluster_ci_tests/</code> -- is skipped on <code>pull_request</code> and
-runs on <code>merge_group</code>. A green PR therefore says nothing about whether those
-tests pass, or whether they can even reach their first assertion.</p>
+<p>The functional cluster lanes in <code>Functional tests</code> -- everything under
+<code>deploy/shakenfist_ci/cluster_ci_tests/</code> -- are skipped on <code>pull_request</code> and
+run on <code>merge_group</code>. A green PR therefore says nothing about whether those
+tests pass, or whether they can even reach their first assertion. Some lanes
+do not run in the merge queue at all, only weekly: the Ubuntu base image, the
+<code>slim-tier</code> topology with Kerbside, and a single machine (see
+<a href="../ci/#merge-lanes-and-weekly-lanes">Merge lanes and weekly lanes</a>). To run
+those against a branch, dispatch <code>scheduled-tests.yml</code> on it.</p>
 <p><code>cluster_ci_tests/test_federation.py</code> sat through four commits registering a
 trusted issuer with an <code>http://</code> <code>jwks_uri</code> while the API had refused
 non-HTTPS <code>jwks_uri</code> since the object was added. Every test in the class died
@@ -16149,6 +16164,24 @@ one only as long as the comparison stays fixed --
 <code>smoke_ci_tests/test_ci_harness.py</code> is what holds it there. When a
 helper's failure mode is to succeed quietly, the guard has to assert the
 effect on the cluster rather than that the helper returned.</p>
+<h2 id="a-signal-handler-only-sets-flags">A signal handler only sets flags<a class="headerlink" href="#a-signal-handler-only-sets-flags" title="Permanent link">&para;</a></h2>
+<p>Python runs a signal handler on the main thread, between any two of that
+thread's bytecodes, so the handler shares every lock the main thread might be
+holding at that instant -- and a non-reentrant one it needs means waiting for
+itself forever. Logging takes one (the Loki handler enqueues under the logship
+spool's lock, and the main thread logs all the time), and so does the
+database client. sf-api's drain handler logged and deadlocked its worker until
+gunicorn SIGKILLed it (#3495). Every daemon's <code>exit_gracefully()</code> logged and
+wrote its state to the database, and sf-database, stopping under a slow
+MariaDB, never got as far as its drain (#4601). Neither looked wrong.</p>
+<p>A handler assigns, writes the abort file with <code>daemon.write_abort_file()</code>, or
+calls a function marked <code>@signal_safe</code> (<code>shakenfist/util/signals.py</code>); the
+main thread notices and does the real work. <code>tools/check-signal-handlers.py</code>
+enforces this in pre-commit for every <code>signal.signal()</code> handler and, through
+<code>@signal_safe</code>, every helper they call. When it cannot see that a call is
+safe -- <code>Event.set()</code> on an event only another thread waits on -- end the
+line with <code># signal-safe: &lt;why&gt;</code>, and make the why something a reviewer can
+check.</p>
 <h2 id="a-column-to-column-comparison-has-no-bind-processor">A column-to-column comparison has no bind processor<a class="headerlink" href="#a-column-to-column-comparison-has-no-bind-processor" title="Permanent link">&para;</a></h2>
 <p>SQLAlchemy coerces a <em>bound</em> value through the column type on its way into
 the statement. It cannot do that for a comparison between two columns,

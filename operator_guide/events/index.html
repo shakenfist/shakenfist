@@ -16075,7 +16075,10 @@ The prune runs in three stages:</p>
    request history much more aggressively than the per-type caps.</li>
 <li><strong>Orphan events sweep.</strong> Removes any <code>events</code> rows that are
    no longer referenced by any <code>event_objects</code> row. This is the
-   step that actually deletes the event content.</li>
+   step that actually deletes the event content. It walks the
+   <code>events</code> table in windows of 10,000 rows, so no single
+   statement examines more than that however few orphans there
+   are, and the rest of the database is not held up behind it.</li>
 </ol>
 <p>The whole sweep runs under a 25 minute wall-clock budget so
 that its reply always reaches the cluster maintainer before the

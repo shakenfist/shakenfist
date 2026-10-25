@@ -16415,8 +16415,14 @@ See <a href="#mariadb-schema-migrations">MariaDB schema migrations</a> above and
 <p>Upgrade <strong>one node at a time</strong>. Confirm that each node is healthy before
 moving to the next.</p>
 <p><strong>1. Stop <code>sf-api</code> on the node.</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>stop<span class="w"> </span>sf-api
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>stop<span class="w"> </span>sf-api.socket<span class="w"> </span>sf-api
 </code></pre></div>
+<p>Stop the socket as well as the service. systemd, not gunicorn, holds
+<code>sf-api</code>'s listening socket (<code>sf-api.socket</code>), and a connection to a
+stopped <code>sf-api</code> -- including your load balancer's next <code>/readyz</code> probe --
+starts it again while its socket is open, which here would mean on a
+half-upgraded virtualenv. <code>sf-api</code> stops first and the socket closes
+after it.</p>
 <p>Systemd sends SIGTERM. On receipt, the <code>sf-api</code> worker immediately flips
 <code>/readyz</code> to return <code>503 Service Unavailable</code>. The load balancer detects this
 on its next health-check probe and stops sending new requests to this node.
@@ -16444,6 +16450,8 @@ the grace period.</p>
 <a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>sf-api<span class="w"> </span>sf-cleaner<span class="w"> </span>sf-cluster<span class="w"> </span>sf-net<span class="w"> </span>sf-nodelock<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span>sf-privexec<span class="w"> </span>sf-queues<span class="w"> </span>sf-resources<span class="w"> </span>sf-sidechannel<span class="w"> </span>sf-transfers
 </code></pre></div>
+<p>Restarting <code>sf-api</code> also starts <code>sf-api.socket</code> again, because <code>sf-api</code>
+requires it.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>If the <code>sf-cluster</code> elected leader is on the node you are rolling, its

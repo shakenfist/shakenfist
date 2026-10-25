@@ -16190,8 +16190,12 @@ an unbounded harvest downloads the whole ninety day retention window;
 bundles are cached by artifact id under <code>~/.cache/shakenfist-ci-headroom</code>
 by default, outside any checkout, and an already-cached bundle is never
 re-fetched. Two things about it are deliberate and worth knowing before
-changing it. A merge run builds six cluster bundles, five are
-classified for harvest, and all five carry the probe. <code>Ansible modules</code>
+changing it. A merge run builds four cluster bundles, three are
+classified for harvest, and all three carry the probe. (Before
+2026-10-25 it built six, of which five were classified: the Ubuntu
+24.04 cluster and Debian 13 tier lanes then moved to the weekly
+<code>scheduled-tests.yml</code>, whose runs the harvest does not read. Their
+table entries stay, for the windows that still hold their bundles.) <code>Ansible modules</code>
 was classified ahead of the <code>shakenfist/actions</code> change that instruments
 it (<a href="https://github.com/shakenfist/shakenfist/issues/4377">#4377</a>); that
 change merged on 2026-10-01, and the bundle has recorded a real series
@@ -16202,8 +16206,8 @@ lifecycle</code>, is skipped <em>by name</em> with the reason recorded in the so
 so it never appears as missing data; and a
 bundle whose artifact name the tool has no entry for raises
 <code>UnknownBundleError</code> rather than being guessed at or skipped, so adding
-a job to the merge matrix stops the harvest until someone says what the
-new job is. A bundle with no series is written out with a reason
+a lane to the merge queue stops the harvest until someone says what the
+new lane is. A bundle with no series is written out with a reason
 instead of being dropped, because a harvest that silently shrinks its
 own window is the failure mode that looks most like success.</p>
 <p>That last principle has been tested once. <code>--since</code> and <code>--until</code> are
@@ -16447,25 +16451,28 @@ undeclared input rather than ungate it. The rollbacks are the variable,
 or removing the input from these call sites before the actions-side
 revert.</p>
 <p>The gate is armed only on job shapes a warn window has measured, which
-today means the merge matrix in <code>functional-tests.yml</code> -- the four jobs
-the warn window read. That call site passes
-<code>headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}</code>, so the variable
-being unset leaves the gate on. The other three call sites of
+today means the four cluster lanes in <code>functional-lanes.yml</code> the warn
+window read: Debian 13 cluster, Ubuntu 24.04 cluster, Guests and Debian
+13 tier. They are armed wherever they run, so the two which moved to the
+weekly <code>scheduled-tests.yml</code> are gated there too, and a band violation
+reds the weekly run and files an issue rather than blocking a merge.
+Each passes <code>headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}</code>, so
+the variable being unset leaves the gate on. The other call sites of
 <code>smoke-cluster.yml</code> pass <code>headroom_gate: false</code>: the smoke tier job (pull
 requests only, a single node, never harvested because the harvest reads
 <code>merge_group</code> runs), the Ansible modules job (measured since
 <a href="https://github.com/shakenfist/shakenfist/issues/4377">#4377</a>, but never
 fitted to the band, and the reusable workflow resolves the gate to false
 for any <code>test_kind</code> but <code>functional</code> whatever the caller passes), and the
-dispatch-only matrix in <code>scheduled-tests.yml</code> (whose
-single machine entry has never been harvested). Every call site has to
+Debian 13 single machine lane (whose shape has never been harvested). Every call site has to
 pass one of those two values explicitly. The reusable workflow leaves
 the gate off when nothing is passed (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/102" title="GitHub Issue: shakenfist/actions #102">actions#102</a>; before it,
 the default gated), but that default lives in another repository at
 <code>@main</code>, so a call site's policy is stated here where a change to it
 shows up in review. <code>shakenfist/tests/test_headroom_gate_workflow_seams.py</code> enforces
-both rules: it derives each call site's shape per matrix entry (topology,
-tier, <code>test_kind</code>, <code>stestr_config</code>) and fails if an armed one is not in
+both rules: it derives each call site's shape -- topology, tier,
+<code>test_kind</code> and <code>stestr_config</code>, per matrix entry where there is a
+matrix -- and fails if an armed one is not in
 its <code>MEASURED_SHAPES</code>. An armed call site must pass all four inputs
 itself, since the defaults live in shakenfist/actions at <code>@main</code> and a
 shape derived from one could drift without anything here changing. The
@@ -16553,7 +16560,7 @@ hand:</p>
 </tr>
 <tr>
 <td>records harvested</td>
-<td>fewer than 20 records, so bundles stopped arriving at all</td>
+<td>fewer than 18 records -- three instrumented jobs in each of six of the ten merge runs -- so bundles stopped arriving at all</td>
 </tr>
 <tr>
 <td>series present rate</td>
@@ -16662,7 +16669,8 @@ reports as a pass, so a topology edit that removed capacity would stop
 proving scheduler affinity and network teardown while every job stayed
 green. The single exception is a single-machine deployment -- one node
 holding every role, which is what the <code>localhost</code> topology deploys and
-what <code>scheduled-tests.yml</code> runs <code>cluster-ci.conf</code> against on purpose --
+what the weekly Debian 13 single machine lane runs <code>cluster-ci.conf</code>
+against on purpose --
 where it skips, because none of those minimums means anything on one
 node.</p>
 <p>Neither gate is the same thing as the instrumentation being invisible to
