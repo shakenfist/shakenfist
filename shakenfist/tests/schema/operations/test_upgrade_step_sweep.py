@@ -10,8 +10,8 @@
 # step raises ``AttributeError`` rather than the documented
 # ``UpgradeException`` -- unreachable code below that getattr was
 # written to raise it. The window is narrow (cluster operations are
-# hard deleted thirty seconds after going terminal, so only a rolling
-# upgrade can present an old row) but real: survey finding 8 of
+# eligible for hard delete thirty seconds after going terminal, so only a
+# rolling upgrade can present an old row) but real: survey finding 8 of
 # docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md found
 # exactly one gap this way, NetOp's missing ``_upgrade_step_1_to_2``,
 # by running the sweep below.

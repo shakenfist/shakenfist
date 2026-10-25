@@ -14,9 +14,9 @@ from shakenfist_ci import base
 # enqueue-side dedup found a pending sibling and reused it; the
 # worker-side fold found pending siblings and marked them complete.
 # Both are emitted against the network as well as the operation,
-# because an operation is hard deleted thirty seconds after it
-# completes and takes its events with it (#3864), and the network
-# outlives it.
+# because an operation is eligible for hard delete thirty seconds
+# after it completes and takes its events with it (#3864), and the
+# network outlives it.
 DEDUP_EVENT = 'enqueue-side dedup: reused pending op'
 FOLD_EVENT = 'coalesced sibling ops'
 

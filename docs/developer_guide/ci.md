@@ -200,6 +200,38 @@ that connects and then stops responding; without this the job would stall
 until the CI runner's own timeout killed it, with no indication of which test
 was to blame.
 
+## Waiting for an object's cluster operations
+
+A test that mutates an instance or a network and then asserts on the result
+waits with `self._await_instance_operations_complete()` or
+`self._await_network_operations_complete()` (both in
+`shakenfist/deploy/shakenfist_ci/base.py`). Mutating API calls often return
+once the database is updated and leave the real work to a cluster operation
+which runs later, so an assertion made straight after the call can race it.
+
+Do not wait by polling `last_cluster_operation`. It names only the newest
+operation, so a later background operation reaching a final state masks an
+earlier one which is still queued, and the wait returns before the operation
+under test has run. The helpers instead wait on `has_pending_operations`,
+through the client's `await_no_pending_operations()`. That field covers every
+mutating operation, and leaves out observational work such as the billing and
+health sweep, so that work neither holds a wait open nor fails it. See
+[Waiting for an object to settle](api_reference/clusteroperations.md#waiting-for-an-object-to-settle)
+for what the field means.
+
+The field is a boolean, and an operation in error is not pending, so waiting
+on it alone would return happily after the operation under test had failed.
+The helpers therefore also list the object's operations either side of the
+wait. A mutating operation which ends in `error` during the wait fails the
+test. One which was already in error beforehand does not, because that is
+history and would otherwise fail every later wait on the same object.
+Operations still pending after five minutes fail the test, and so does an
+object which is deleted while the helper waits on it.
+
+The suite always runs against a server built from its own revision, so the
+helpers do not skip on an old server: if it does not advertise the
+`object-pending-operations` capability, the test fails.
+
 ## Creating instances in the functional suite
 
 Every functional test creates instances through `self.create_instance()` on

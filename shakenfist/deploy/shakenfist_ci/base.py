@@ -1381,48 +1381,62 @@ class BaseTestCase(testtools.TestCase):
 
     def _await_object_operations_complete(
             self, object_type, object_uuid, poll_interval, label):
-        # Enumerate *every* cluster operation targeting the object rather
-        # than following its ``last_cluster_operation`` pointer. That
-        # single pointer is racy: a later terminal op (a routine
-        # billing/health sweep, say) reaching a terminal state between
-        # polls masks an earlier still-queued op, so a pointer-following
-        # helper returns before the operation under test has run. This
-        # bit test_interface_plug_and_exec_reboot -- see
-        # docs/plans/PLAN-cluster-op-visibility.md.
-        terminal_states = ['complete', 'deleted', 'abort']
+        # last_cluster_operation names only the newest operation, so a
+        # later background op reaching a final state can mask an earlier
+        # one which is still queued, and a helper following the pointer
+        # returns before the operation under test has run.
+        # has_pending_operations covers every mutating operation, and
+        # leaves out observational work such as the billing and health
+        # sweep, which must neither hold a wait open nor fail it.
+        #
+        # The field is a boolean and an operation in error is not
+        # pending, so a wait on it alone would return happily after the
+        # operation under test had failed. Errors therefore come from
+        # listings taken either side of the wait.
+        if not self.system_client.check_capability(
+                'object-pending-operations'):
+            self.fail(
+                'The functional suite expects a server at its own revision '
+                'which advertises object-pending-operations, and this one '
+                'does not')
 
-        # Only operations we have actually watched go in-flight during
-        # this wait may fail the test on error. A stale error op from
-        # earlier in the object's history must not poison every
-        # subsequent await.
-        observed_outstanding = set()
+        def errored():
+            return {
+                op['uuid']: op for op in
+                self.system_client.list_cluster_operations_for_target(
+                    object_type, object_uuid)
+                if op['state'] == 'error'}
 
-        start_time = time.time()
-        while time.time() - start_time < 5 * 60:
-            ops = self.system_client.list_cluster_operations_for_target(
-                object_type, object_uuid)
+        # An operation which was already in error before the wait began
+        # is history, and must not poison every subsequent await.
+        already_errored = set(errored())
 
-            outstanding = False
-            for op in ops:
-                state = op['state']
-                if state == 'error':
-                    if op['uuid'] in observed_outstanding:
-                        self.fail(
-                            f'Cluster operation {op["uuid"]} for {label} '
-                            f'{object_uuid} ended in error state')
-                    continue
-                if state not in terminal_states:
-                    observed_outstanding.add(op['uuid'])
-                    outstanding = True
+        try:
+            self.system_client.await_no_pending_operations(
+                object_type, object_uuid, timeout=5 * 60,
+                interval=poll_interval)
+        except apiclient.TimeoutException:
+            self.fail(
+                f'{label.capitalize()} operations did not complete within 5 '
+                f'minutes for {object_uuid}')
+        except apiclient.IncapableException:
+            self.fail(
+                'The server advertises object-pending-operations, but the '
+                f'view of {label} {object_uuid} does not report '
+                f'has_pending_operations')
+        except apiclient.ResourceNotFoundException:
+            # No caller waits on an object it has just deleted, so a
+            # vanished object is a failure of the test, not a settled one.
+            self.fail(
+                f'{label.capitalize()} {object_uuid} disappeared while '
+                f'waiting for its operations to complete')
 
-            if not outstanding:
-                return
-
-            time.sleep(poll_interval)
-
-        self.fail(
-            f'{label.capitalize()} operations did not complete within 5 '
-            f'minutes for {object_uuid}')
+        for op_uuid, op in errored().items():
+            if op_uuid in already_errored or op.get('observational', False):
+                continue
+            self.fail(
+                f'Cluster operation {op_uuid} for {label} '
+                f'{object_uuid} ended in error state')
 
     def _await_instance_operations_complete(self, instance_uuid):
         self._await_object_operations_complete(

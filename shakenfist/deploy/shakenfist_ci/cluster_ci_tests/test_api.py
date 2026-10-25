@@ -21,9 +21,10 @@ class TestOutstandingOperationsBodyAll(base.BaseNamespacedTestCase):
     but the shipped client serialises every request -- including GETs --
     to a JSON body, so ``all=True`` sent the only way the client can
     send it was silently dropped and completed operations never appeared
-    in the response. The requests here go through ``_request_url``
-    directly because the client has no wrapper for these endpoints yet,
-    and its ``data`` argument is exactly the body path that was broken.
+    in the response. The client's wrapper for the network endpoint sends
+    ``all`` in a JSON body, which is exactly the path that was broken, so
+    reading through the wrapper is the test. The query-string form stays
+    a raw ``_request_url`` because the client never sends it.
     """
 
     def __init__(self, *args, **kwargs):
@@ -42,14 +43,16 @@ class TestOutstandingOperationsBodyAll(base.BaseNamespacedTestCase):
         # and every one of them has completed, so a body-supplied
         # all=True must reveal completed operations. Before the fix the
         # body value was dropped and this answered outstanding-only.
-        every = self.test_client._request_url(
-            'GET', url, data={'all': True}).json()
+        every = self.test_client.get_network_clusteroperations(
+            net['uuid'], all=True)
         completed = [op['uuid'] for op in every
                      if op['state'] in ('complete', 'deleted', 'abort')]
         self.assertNotEqual(
             [], completed,
             'all=True in the request body did not reveal any completed '
             'operations: %s' % every)
+        for op in every:
+            self.assertIn('observational', op)
 
         # The query string form must keep working too.
         every_by_query = self.test_client._request_url(
@@ -61,6 +64,7 @@ class TestOutstandingOperationsBodyAll(base.BaseNamespacedTestCase):
         # And without all, terminal operations stay hidden. A fresh
         # operation from a background sweep may legitimately appear
         # here, so assert only that the completed ones are absent.
-        outstanding = self.test_client._request_url('GET', url).json()
+        outstanding = self.test_client.get_network_clusteroperations(
+            net['uuid'])
         for op in outstanding:
             self.assertNotIn(op['uuid'], completed)

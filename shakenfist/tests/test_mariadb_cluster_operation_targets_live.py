@@ -265,7 +265,7 @@ class ClusterOperationTargetsMigrationLiveTestCase(base.ShakenFistTestCase):
     def test_migration_time_on_a_seeded_table(self):
         # Informational: the reviewer wants to know how long the ALTER
         # holds the table on a deployment. Production holds in-flight
-        # ops plus about thirty seconds of terminal ones, so 50,000 rows
+        # ops plus recently finished ones awaiting removal, so 50,000 rows
         # is well beyond a real table. The bound is a sanity check, not
         # a performance target.
         rows = 50_000

@@ -621,11 +621,11 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.assertEqual([sibling], extra['sibling_uuids'])
 
     def test_fold_event_lands_on_the_target_as_well(self):
-        # The survivor operation is hard deleted thirty seconds after
-        # it completes and takes its event_objects rows with it
-        # (#3864), so an event recorded only against the operation is
-        # unreadable almost immediately -- which is how #3878 hid. The
-        # network outlives the operation, so the event has to land
+        # The survivor operation is eligible for hard delete thirty
+        # seconds after it completes and takes its event_objects rows
+        # with it (#3864), so an event recorded only against the
+        # operation is unreadable soon after -- which is how #3878 hid.
+        # The network outlives the operation, so the event has to land
         # there too for anything to be able to assert on it.
         self.mock_claim.return_value = [
             '33333333-3333-4333-8333-333333333333']

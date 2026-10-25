@@ -699,7 +699,7 @@ constraints. These get dedicated tables optimized for their access patterns:
 | `ipam_reservations` | IP address allocations with uniqueness constraints |
 | `cluster_operations` | Full cluster operation metadata with indexed `node_uuid`, `instance_uuid`, `network_uuid` and `priority` columns extracted from JSON for dispatch-time filtering |
 | `work_queue` | Per-job queue row with `queue_name`, `scheduled_at`, `claimed_at`, `claimed_by`, `attempts` and `payload`. Dequeue uses `SELECT ... FOR UPDATE SKIP LOCKED` |
-| `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering, plus an `observational` flag per row (schema v3). Holds in-flight operations and the last ~30 seconds of terminal ones, not a full history |
+| `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering, plus an `observational` flag per row (schema v3). Holds in-flight operations and finished ones until the [deleted-object sweep](#the-deleted-object-sweep) removes them, not a full history |
 | `cluster_operation_errors` | One row per failed cluster operation, keyed by `op_uuid`. Stores the structured `ErrorReport` (code, message, details, origin_class, traceback) JSON. Cleaned up alongside the `cluster_operations` row by `BaseClusterOperation.hard_delete()` when the cluster cleaner reaps a terminal-state op |
 | `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload, plus typed nullable columns projecting the capacity-relevant fields and the node's hypervisor role |
 | `node_daemon_states` | Per-`(node, daemon)` state rows; atomic upsert per daemon, no Python-side coarse lock |
@@ -965,10 +965,25 @@ schedule. It re-queues or rejects rows whose claim has gone stale:
   `cluster_op_reaper_requeued_total` and
   `cluster_op_reaper_rejected_total` record reaper activity.
 
+#### The deleted-object sweep
+
 The cluster daemon also runs a deleted-object sweep, every minute, which
 hard deletes objects that have been in a final state (`deleted`,
 `complete`, `abort`) for longer than their grace period (`CLEANER_DELAY`
-for most objects, 30 seconds for completed operations):
+for most objects, 30 seconds for completed operations).
+
+A finished cluster operation is therefore eligible for hard delete thirty
+seconds after it reaches a final state. The sweep then removes it, along
+with its `cluster_operation_targets` rows. Because the sweep walks a type
+again only five minutes after its last walk reached the end (see below),
+removal normally comes within about six minutes of the operation
+finishing, and later while the sweep is working through a backlog (the
+`cluster_deleted_object_backlog` metric, described under
+[Watching for sweeps that silently do nothing](#watching-for-sweeps-that-silently-do-nothing),
+shows how far behind it is). Operations which finished in `error` are
+never hard deleted (#3922), so their target rows stay until the
+`CLUSTER_OPERATION_TARGET_RETENTION` prune removes them, seven days by
+default.
 
 - **`DELETED_OBJECT_SWEEP_SECONDS`** — the time budget of each pass
   (default `20`). Reading the sweep's work counts against it: no read
@@ -1141,11 +1156,12 @@ Cluster operation targets are stored separately because:
 - **Indexed queries**: Efficient lookups for "latest operation on this instance"
   and "all operations on this object in order"
 
-Target rows live only until their operation is hard-deleted, which happens
-about thirty seconds after the operation goes terminal, so the table holds
-in-flight operations plus the last half minute of finished ones. As a
-backstop for rows that outlive their operation, the table is also bounded by
-a periodic prune in the cluster daemon (alongside the existing
+Target rows live only until their operation is hard-deleted. A finished
+operation is eligible for removal thirty seconds after it goes terminal and
+is removed by the [deleted-object sweep](#the-deleted-object-sweep), so the
+table holds in-flight operations plus recently finished ones. As a backstop
+for rows that outlive their operation, the table is also bounded by a
+periodic prune in the cluster daemon (alongside the existing
 `delete_stale_transfers` cleanup).
 The cluster daemon runs cluster-wide cleanup under `ClusterLock` election,
 so the prune naturally runs from a single node at a time. The prune
@@ -1191,7 +1207,9 @@ Two query shapes are exposed to the rest of the system:
 
 Rows are written automatically by `enqueue_cluster_operation`; operators
 do not need to manage them. Normally a row is removed when its operation is
-hard-deleted, about thirty seconds after the operation goes terminal. The
+hard-deleted: a finished operation is eligible for removal thirty seconds
+after it goes terminal and is removed by the
+[deleted-object sweep](#the-deleted-object-sweep). The
 cluster daemon's prune, performed under `ClusterLock` election via
 `_direct_delete_stale_cluster_operation_targets`, is a backstop: rows older
 than `CLUSTER_OPERATION_TARGET_RETENTION` (7 days by default) whose

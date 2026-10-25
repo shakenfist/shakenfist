@@ -6,10 +6,11 @@
 # object (Instance, Artifact, Network), a row is inserted into the
 # cluster_operation_targets table. This replaces the single-pointer
 # last_cluster_operation column in object_metadata with a per-target record of
-# operations. Rows are removed when their operation is hard-deleted, about
-# thirty seconds after it goes terminal (BaseClusterOperation.hard_delete()),
-# and a periodic prune in the cluster daemon is a backstop. So the table holds
-# in-flight operations and recently terminal ones, not a full history.
+# operations. Rows are removed when their operation is hard-deleted (it is
+# eligible thirty seconds after it goes terminal; see
+# BaseClusterOperation.hard_delete()), and a periodic prune in the cluster
+# daemon is a backstop. So the table holds in-flight operations and recently
+# terminal ones, not a full history.
 #
 # The table uses AUTO_INCREMENT sequence_number for efficient ordering
 # and supports queries like:

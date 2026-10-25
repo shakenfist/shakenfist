@@ -812,13 +812,14 @@ itself):
 Neither event survives its operation for long, so plan to read them
 from the log stream rather than from the database.
 
-A cluster operation is hard deleted 30 seconds after it reaches a
-final state, and hard deleting an object removes the rows which join
-its events to it. Roughly half a minute after an operation completes
-there is nothing left to query: the operation is gone, and its events
-are orphaned rows which the daily prune sweep then deletes. The
-`MAX_USAGE_EVENT_AGE` and `MAX_STATUS_EVENT_AGE` retention settings
-never come into it -- they bound how long an event may live, not how
+A cluster operation is eligible for hard delete thirty seconds after it
+reaches a final state and is removed by the
+[deleted-object sweep](../database.md#the-deleted-object-sweep), and hard
+deleting an object removes the rows which join its events to it. Soon
+after an operation completes there is nothing left to query: the operation
+is gone, and its events are orphaned rows which the daily prune sweep then
+deletes. The `MAX_USAGE_EVENT_AGE` and `MAX_STATUS_EVENT_AGE` retention
+settings never come into it -- they bound how long an event may live, not how
 long the object it describes does. This is issue #3864.
 
 What does persist is the log stream. Every event is echoed as a log
