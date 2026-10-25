@@ -10218,15 +10218,21 @@ class GetNamespaceClaimsRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
+    COVERAGE_STATE_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
+    coverage_state: _builtins.str
+    """Empty means no filter. Otherwise 'active' or 'expired', matched
+    against the claims table's state column.
+    """
     def __init__(
         self,
         *,
         namespace: _builtins.str = ...,
+        coverage_state: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["coverage_state", b"coverage_state", "namespace", b"namespace"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

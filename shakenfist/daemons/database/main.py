@@ -3047,14 +3047,22 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.GetNamespaceClaimsRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.GetNamespaceClaimsReply:
-        """List claim rows, optionally restricted to one namespace."""
+        """List claim rows, optionally restricted to one namespace and state."""
         try:
             self.monitor.counters['get_namespace_claims'].inc()
             reply = database_pb2.GetNamespaceClaimsReply()
             for claim in mariadb._direct_get_namespace_claims(
-                    request.namespace):
+                    request.namespace, request.coverage_state):
                 reply.claims.append(self._claim_message(claim))
             return reply
+        except ValueError as e:
+            # A coverage_state the public layer would have refused. This
+            # is the caller's mistake, not a database fault, but it is
+            # still an error status rather than an empty list, for the
+            # reason given below.
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(str(e))
+            return database_pb2.GetNamespaceClaimsReply()
         except Exception as e:
             # An empty reply is indistinguishable from "this namespace
             # holds no claims", and Namespace.hard_delete() acts on that

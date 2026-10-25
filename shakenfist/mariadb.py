@@ -25933,9 +25933,9 @@ def _direct_reconcile_scheduler_capacity(
             # NOW() comparison, matching the cluster_locks idiom.
             claims_expired = int(conn.execute(
                 sa.update(claims).where(sa.and_(
-                    claims.c.state == 'active',
+                    claims.c.state == CLAIM_STATE_ACTIVE,
                     claims.c.expires_at < sa.func.now()
-                )).values(state='expired', updated_at=sa.func.now())
+                )).values(state=CLAIM_STATE_EXPIRED, updated_at=sa.func.now())
             ).rowcount)
 
             # Snapshot the previous capacity rows for delta reporting,
@@ -28493,6 +28493,7 @@ def get_cluster_capacity() -> ClusterCapacityRead:
 # state -- that lives in object_states like every other object's -- and
 # the two must never encode each other.
 CLAIM_STATE_ACTIVE = 'active'
+CLAIM_STATE_EXPIRED = 'expired'
 
 # The claim fields an update request may name in its field mask. The mask
 # is what tells a deliberate zero from an unset proto3 int, exactly as
@@ -29482,15 +29483,29 @@ def _direct_get_namespace_claim(
             f'namespace claim {claim_uuid} could not be read: {e}') from e
 
 
+CLAIM_COVERAGE_STATES = (CLAIM_STATE_ACTIVE, CLAIM_STATE_EXPIRED)
+
+
+def _validate_claim_coverage_state(coverage_state: str) -> None:
+    """Raise ValueError unless this is a coverage state a listing can filter on."""
+    if coverage_state and coverage_state not in CLAIM_COVERAGE_STATES:
+        raise ValueError(
+            f'coverage_state must be empty, "active" or "expired", not '
+            f'{coverage_state!r}')
+
+
 def _direct_get_namespace_claims(
-        namespace: str) -> list[NamespaceClaimRow]:
-    """Read claim rows, optionally restricted to one namespace.
+        namespace: str, coverage_state: str = '') -> list[NamespaceClaimRow]:
+    """Read claim rows, optionally restricted to one namespace and state.
 
     The namespace restriction is a WHERE clause on the table's own
     ``idx_namespace_claims_namespace`` index rather than a Python filter
     over every row, which is what the project's filter-pushdown rule
     asks for. An empty namespace lists everything, which is what a
-    cluster-wide operator view wants.
+    cluster-wide operator view wants. The coverage state filter is
+    pushed down the same way, as a WHERE clause on the ``state`` column.
+    Raises ValueError for a coverage state other than '', 'active' or
+    'expired'.
 
     An empty list means the namespace holds no claims. It never means
     the read failed, because one caller cannot tell the difference and
@@ -29505,6 +29520,7 @@ def _direct_get_namespace_claims(
     namespace keeps its state row and the reaper retries the whole
     delete on its next pass.
     """
+    _validate_claim_coverage_state(coverage_state)
     claims = _get_namespace_claims_table()
 
     try:
@@ -29512,6 +29528,8 @@ def _direct_get_namespace_claims(
         statement = _claim_select()
         if namespace:
             statement = statement.where(claims.c.namespace == namespace)
+        if coverage_state:
+            statement = statement.where(claims.c.state == coverage_state)
         with engine.connect() as conn:
             rows = conn.execute(
                 statement.order_by(claims.c.uuid)).fetchall()
@@ -29668,14 +29686,15 @@ def _grpc_get_namespace_claim(
 
 
 def _grpc_get_namespace_claims(
-        namespace: str) -> list[NamespaceClaimRow]:
+        namespace: str, coverage_state: str = '') -> list[NamespaceClaimRow]:
     """List namespace claims via the database microservice.
 
     An unreachable database raises rather than returning an empty list,
     for the reason _grpc_get_namespace_claim() records.
     """
     stub = _get_database_stub()
-    request = database_pb2.GetNamespaceClaimsRequest(namespace=namespace)
+    request = database_pb2.GetNamespaceClaimsRequest(
+        namespace=namespace, coverage_state=coverage_state)
     try:
         reply = _grpc_call(stub.GetNamespaceClaims, request)
     except grpc.RpcError as e:
@@ -29778,12 +29797,16 @@ def get_namespace_claim(claim_uuid: str) -> Optional[NamespaceClaimRow]:
     return _direct_get_namespace_claim(claim_uuid)
 
 
-def get_namespace_claims(namespace: str = '') -> list[NamespaceClaimRow]:
-    """Every claim, or every claim in one namespace.
+def get_namespace_claims(
+        namespace: str = '', coverage_state: str = '') -> list[NamespaceClaimRow]:
+    """Every claim, or every claim in one namespace and/or coverage state.
 
     The namespace restriction is pushed down to SQL and served by the
-    claims table's namespace index.
+    claims table's namespace index. ``coverage_state`` is empty for no
+    filter, or 'active' or 'expired', and is pushed down as well. Any other
+    value raises ValueError before any I/O.
     """
+    _validate_claim_coverage_state(coverage_state)
     if _use_database_service():
-        return _grpc_get_namespace_claims(namespace)
-    return _direct_get_namespace_claims(namespace)
+        return _grpc_get_namespace_claims(namespace, coverage_state)
+    return _direct_get_namespace_claims(namespace, coverage_state)

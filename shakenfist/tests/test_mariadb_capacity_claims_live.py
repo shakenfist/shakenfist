@@ -657,6 +657,28 @@ class NamespaceClaimCrudLiveTestCase(_LiveClaimFixture):
         self.assertEqual(
             [], mariadb._direct_get_namespace_claims('no-such-namespace'))
 
+    def test_claims_filter_by_coverage_state(self):
+        active = self._create(namespace='ci-1')['claim']
+        expired = self._create(namespace='ci-2', limit_cpus=8)['claim']
+        table = mariadb._get_namespace_claims_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(table).where(
+                table.c.uuid == UUID(expired['uuid'])).values(state='expired'))
+            conn.commit()
+
+        def uuids(namespace, state):
+            return [c['uuid'] for c in
+                    mariadb._direct_get_namespace_claims(namespace, state)]
+
+        self.assertEqual([active['uuid']], uuids('', 'active'))
+        self.assertEqual([expired['uuid']], uuids('', 'expired'))
+        self.assertEqual({active['uuid'], expired['uuid']}, set(uuids('', '')))
+        # Combined with the namespace restriction.
+        self.assertEqual([], uuids('ci-1', 'expired'))
+        self.assertEqual([expired['uuid']], uuids('ci-2', 'expired'))
+        self.assertRaises(
+            ValueError, mariadb._direct_get_namespace_claims, '', 'deleted')
+
     # ------------------------------------------------------------------
     # Update (D8)
     # ------------------------------------------------------------------

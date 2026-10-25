@@ -3132,6 +3132,9 @@ message GetNamespaceClaimReply {
 // to the namespace index rather than filtered in Python.
 message GetNamespaceClaimsRequest {
   string namespace = 1;
+  // Empty means no filter. Otherwise 'active' or 'expired', matched
+  // against the claims table's state column.
+  string coverage_state = 2;
 }
 
 message GetNamespaceClaimsReply {

@@ -60,7 +60,7 @@ LOG, _ = logs.setup(__name__)
 # not have to reach into the database layer to name one. mariadb owns the
 # values; these are the object-side spelling of the same strings.
 COVERAGE_ACTIVE = mariadb.CLAIM_STATE_ACTIVE
-COVERAGE_EXPIRED = 'expired'
+COVERAGE_EXPIRED = mariadb.CLAIM_STATE_EXPIRED
 
 
 class ClaimRefused(Exception):
