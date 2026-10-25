@@ -501,6 +501,31 @@ wording is agreed, and that wording is in this plan for review.
   ARCHITECTURE/AGENTS/README check now diffs against the merge base,
   because a two-dot diff against a moved `develop` showed that
   branch's own `ARCHITECTURE.md` change.
+* **Real-cluster run, 2026-10-25.** A `workflow_dispatch` of
+  `Functional tests` on the branch,
+  [run 40145179909](https://github.com/shakenfist/shakenfist/actions/runs/40145179909),
+  waited three hours for cluster runners. The three cluster lanes that
+  carry `cluster_ci_tests` (Debian 13 cluster, Ubuntu 24.04 cluster,
+  Debian 13 tier) passed both new tests:
+
+  | Lane | `TestOutstandingOperationsBodyAll` | `test_observational_sweeps` |
+  |------|------------------------------------|-----------------------------|
+  | Debian 13 cluster | ok, 8.5s | ok, 258s |
+  | Ubuntu 24.04 cluster | ok, 9.3s | ok, 241s |
+  | Debian 13 tier | ok, 7.8s | ok, 282s |
+
+  The sweep test's `sweep_wait_seconds` detail is printed only when
+  the test fails, so the measured wait is bounded by the test's
+  duration: between four and five minutes on each lane, inside the
+  eight-minute `SWEEP_WAIT`, so the bound stands. Node lifecycle and
+  Ansible modules passed. Guests failed one test,
+  `test_state_changes.TestStateChanges.test_lifecycle_power_cycle`:
+  after power-on the guest's `ssh.service` failed to start and the ping
+  saw 100% loss. That is the signature of #4407, and the test does not
+  reach the changed wait helper. The plain Smoke lane, which needs an
+  `s-cloud` runner, never started: no `s-cloud` job in the repository
+  has started since 2026-10-24 22:34 UTC, and the PR's own smoke run is
+  queued behind the same pool.
 
 ### Master plan success criteria
 
@@ -511,9 +536,9 @@ Walked on 2026-10-25 against the rebased branch.
 | `pre-commit run --all-files` passes | Met | Run after the rebase, exit 0. |
 | New code follows existing patterns | Met | Storage went through the three-layer pattern in phases 1 to 4. This phase adds test helpers and docs only. |
 | Observational filter is in SQL, with index support | Met | `table.c.observational == sa.false()` in `_direct_get_latest_cluster_operation_target()` and `_direct_has_pending_cluster_operation_target()` (`mariadb.py`); `idx_cot_target` covers `(target_object_type, target_uuid, observational)`. |
-| Observational op changes neither pointer nor pending, proven by a unit test | Met | `test_observational_current_state.py`: `test_observational_op_does_not_shadow_or_count_as_pending`, `test_sweep_alone_leaves_no_pointer_and_nothing_pending`. On a real cluster: `test_observational_sweeps` (step 5c), result below. |
+| Observational op changes neither pointer nor pending, proven by a unit test | Met | `test_observational_current_state.py`: `test_observational_op_does_not_shadow_or_count_as_pending`, `test_sweep_alone_leaves_no_pointer_and_nothing_pending`. On a real cluster: `test_observational_sweeps` (step 5c) passed on all three cluster lanes of run 40145179909. |
 | `/instances/<ref>/clusteroperations` returns a queued op behind a later terminal one, proven by a test | Met | `test_object_cluster_operations.py::test_success_criterion`. |
-| `test_interface_plug_and_exec_reboot` no longer races the hot-plug | Pending CI | The helper now waits on `has_pending_operations` (step 5a). Evidence will be the PR's smoke runs of the three `instance_hotplug.py` tests. |
+| `test_interface_plug_and_exec_reboot` no longer races the hot-plug | Pending CI | The helper now waits on `has_pending_operations` (step 5a). The three `instance_hotplug.py` tests run only in the Smoke lane, which had not started on 2026-10-25 because no `s-cloud` runner was taking jobs. The evidence is the PR's smoke run, or the merge queue's. |
 | Protos regenerated with `tox -e genprotos` | Met | Re-running `tox -e genprotos` on the branch leaves the tree clean. |
 | `database.md` documents the v3 schema; developer guide documents mutating/observational | Met | `docs/operator_guide/database.md` ("The table is at schema v3", the `observational` column); `docs/developer_guide/database_internals.md` (the `observational` flag and `is_observational()`). |
 | Top-level docs updated where they describe the affected storage or API | Met, no edit needed | None of `ARCHITECTURE.md`, `AGENTS.md` or `README.md` describes it (finding 10), and this repository has no `CLAUDE.md`. |
