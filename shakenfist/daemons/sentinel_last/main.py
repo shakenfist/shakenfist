@@ -11,6 +11,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.daemons.daemon import send_systemd_stopping
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.node import Node
 from shakenfist.util import exceptions as util_exceptions
 
@@ -27,6 +28,22 @@ def exit_gracefully(sig, _frame):
 
 
 signal.signal(signal.SIGTERM, exit_gracefully)
+
+
+def record_stop(n):
+    """Record this daemon stopped and the node stopping, if the database lets us.
+
+    Best effort: at a whole-cluster shutdown the database hosts may already be
+    down, and failing the unit then records nothing either (#4628). Returns
+    True if both were recorded.
+    """
+    try:
+        n.set_daemon_state('sentinel-last', Node.DAEMON_STATE_STOPPED)
+        n.set_lifecycle_state(Node.STATE_STOPPING)
+        return True
+    except DatabaseUnavailable as e:
+        LOG.warning(f'Database unavailable, could not record this daemon or node stopping: {e}')
+        return False
 
 
 def main():
@@ -55,13 +72,12 @@ def main():
 
     while daemon.check_abort_path(ABORT_PATH):
         LOG.debug('Checking in')
-        Node.observe_this_node()
+        daemon.check_in_this_node()
         time.sleep(15)
 
     LOG.info('Stopping')
     send_systemd_stopping()
-    n.set_daemon_state('sentinel-last', Node.DAEMON_STATE_STOPPED)
-    n.set_lifecycle_state(Node.STATE_STOPPING)
+    record_stop(n)
     LOG.info('Stopped')
 
     daemon.force_clean_exit()

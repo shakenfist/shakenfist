@@ -13,6 +13,7 @@ from shakenfist.config import config
 from shakenfist.daemons import daemon
 from shakenfist.daemons.daemon import send_systemd_ready
 from shakenfist.daemons.daemon import send_systemd_stopping
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.node import Node
 from shakenfist.util import exceptions as util_exceptions
 
@@ -46,15 +47,23 @@ def record_stop(n):
     lifecycle is only completed when sentinel-last has started it, and a
     restart of this daemon alone leaves it for sentinel-last's restart to
     return to created. Returns True if the node was marked stopped.
+
+    Best effort when the database is unreachable: at a whole-cluster shutdown
+    its hosts may already be down, and failing the unit then records nothing
+    either (#4628).
     """
-    n.set_daemon_state('sentinel-first', Node.DAEMON_STATE_STOPPED)
-    current = n.state.value
-    if current != Node.STATE_STOPPING:
-        LOG.info('Node is %s rather than stopping, so this is a restart of '
-                 'sentinel-first alone; leaving the node lifecycle unchanged'
-                 % current)
+    try:
+        n.set_daemon_state('sentinel-first', Node.DAEMON_STATE_STOPPED)
+        current = n.state.value
+        if current != Node.STATE_STOPPING:
+            LOG.info('Node is %s rather than stopping, so this is a restart of '
+                     'sentinel-first alone; leaving the node lifecycle unchanged'
+                     % current)
+            return False
+        return n.set_lifecycle_state(Node.STATE_STOPPED)
+    except DatabaseUnavailable as e:
+        LOG.warning(f'Database unavailable, could not record this daemon or node stopping: {e}')
         return False
-    return n.set_lifecycle_state(Node.STATE_STOPPED)
 
 
 def main():
@@ -72,7 +81,7 @@ def main():
 
     while daemon.check_abort_path(ABORT_PATH):
         LOG.debug('Checking in')
-        Node.observe_this_node()
+        daemon.check_in_this_node()
         time.sleep(15)
 
     LOG.info('Stopping')

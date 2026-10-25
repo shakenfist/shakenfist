@@ -235,6 +235,24 @@ def check_abort_path(abort_path):
     return not os.path.exists(abort_path)
 
 
+def check_in_this_node():
+    """Record that this node is alive, if the database lets us.
+
+    The sentinels check in every 15 seconds. When the database was
+    unreachable the exception escaped their loops and failed the unit, so a
+    database blip of more than about 30 seconds crash-looped them, and at a
+    whole-cluster reboot, with the database hosts already down, nothing
+    recorded the nodes stopping (#4628). A missed check-in costs nothing: the
+    next one catches up. Returns True if this one was recorded.
+    """
+    try:
+        Node.observe_this_node()
+        return True
+    except DatabaseUnavailable as e:
+        LOG.warning(f'Database unavailable, skipping this check-in: {e}')
+        return False
+
+
 def health_check_privexec():
     try:
         util_concurrency.execute('whoami')
