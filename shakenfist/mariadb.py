@@ -6282,6 +6282,18 @@ def _direct_prune_orphan_events(deadline: Optional[float] = None) -> int:
     one full circle or when the deadline expires, persisting its
     position either way.
 
+    Each batch covers a fixed window of _PRUNE_BATCH_SIZE events keys
+    rather than a fixed number of orphans. Asking the anti-join for
+    "the next N orphans" made one statement walk as far as it took to
+    find them, and with orphans sparse that was most of the table: on
+    sfcbr single statements ran for 30 to 508 seconds, holding a read
+    view the whole time, overrunning the sweep's deadline, and slowing
+    every other statement in the database while they ran (issue 4428).
+    Now an index-only query finds where the window ends, the anti-join
+    looks only inside it, and the cursor moves to the window's end
+    whether it held orphans or not, so no statement examines more than
+    one window of rows.
+
     Args:
         deadline: Optional time.time() value after which no further
             batches are started.
@@ -6295,12 +6307,23 @@ def _direct_prune_orphan_events(deadline: Optional[float] = None) -> int:
     cursor = start
     wrapped = False
 
-    select_stmt = sa.text('''
+    window_end_stmt = sa.text('''
+        SELECT event_uuid FROM events
+        WHERE event_uuid > :cursor
+        ORDER BY event_uuid
+        LIMIT 1 OFFSET :offset
+    ''')
+    window_stmt = sa.text('''
+        SELECT e.event_uuid FROM events e
+        LEFT JOIN event_objects eo ON e.event_uuid = eo.event_uuid
+        WHERE e.event_uuid > :cursor AND e.event_uuid <= :window_end
+          AND eo.event_uuid IS NULL
+    ''')
+    # The last window, shorter than a full one, runs to the end of the PK.
+    tail_stmt = sa.text('''
         SELECT e.event_uuid FROM events e
         LEFT JOIN event_objects eo ON e.event_uuid = eo.event_uuid
         WHERE e.event_uuid > :cursor AND eo.event_uuid IS NULL
-        ORDER BY e.event_uuid
-        LIMIT :batch
     ''')
     delete_stmt = sa.text('''
         DELETE FROM events WHERE event_uuid IN :event_uuids
@@ -6311,29 +6334,38 @@ def _direct_prune_orphan_events(deadline: Optional[float] = None) -> int:
             if deadline is not None and time.time() >= deadline:
                 break
             with engine.connect() as conn:
-                rows = conn.execute(select_stmt, {
+                row = conn.execute(window_end_stmt, {
                     'cursor': cursor,
-                    'batch': _PRUNE_BATCH_SIZE,
-                }).fetchall()
-                if not rows:
-                    if wrapped or start == '':
-                        # A walk from the head reaching the end is a full
-                        # circle already; a wrapped pass reaching the end
-                        # means the region up to the start point held no
-                        # further orphans.
-                        break
-                    cursor = ''
-                    wrapped = True
-                    continue
-                cursor = rows[-1].event_uuid
-                result = conn.execute(delete_stmt, {
-                    'event_uuids': [row.event_uuid for row in rows],
-                })
-                conn.commit()
-            rowcount = result.rowcount or 0
+                    'offset': _PRUNE_BATCH_SIZE - 1,
+                }).fetchone()
+                window_end = row.event_uuid if row else None
+                if window_end is None:
+                    rows = conn.execute(tail_stmt, {'cursor': cursor}).fetchall()
+                else:
+                    rows = conn.execute(window_stmt, {
+                        'cursor': cursor,
+                        'window_end': window_end,
+                    }).fetchall()
+                rowcount = 0
+                if rows:
+                    result = conn.execute(delete_stmt, {
+                        'event_uuids': [r.event_uuid for r in rows],
+                    })
+                    conn.commit()
+                    rowcount = result.rowcount or 0
             if rowcount > 0:
                 ORPHAN_EVENTS_PRUNED.inc(rowcount)
                 total += rowcount
+
+            if window_end is None:
+                # The end of the PK. A walk which began at the head, or has
+                # already wrapped, has been all the way round.
+                cursor = ''
+                if wrapped or start == '':
+                    break
+                wrapped = True
+                continue
+            cursor = window_end
             if wrapped and cursor >= start:
                 break
     except OperationalError as e:

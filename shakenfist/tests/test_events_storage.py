@@ -916,153 +916,175 @@ class DirectPruneApiRequestEventsTestCase(base.ShakenFistTestCase):
 # _direct_prune_orphan_events tests  (Stage C)
 # ---------------------------------------------------------------------------
 
+class _OrphanSweepDatabase:
+    """Just enough of MariaDB to run the stage C sweep against.
+
+    It answers the sweep's three statement shapes from an in-memory events
+    table and set of referenced event uuids, and records how many events
+    rows each statement had to examine -- the number issue 4428 is about.
+    """
+
+    def __init__(self, events, referenced):
+        self.events = sorted(events)
+        self.referenced = set(referenced)
+        self.examined = []
+        self.statements = []
+        self.fail_after = None
+
+    def connect(self):
+        return _OrphanSweepConnection(self)
+
+
+class _OrphanSweepRowResult:
+    def __init__(self, row):
+        self.row = row
+
+    def fetchone(self):
+        return self.row
+
+
+class _OrphanSweepConnection:
+    def __init__(self, db):
+        self.db = db
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def commit(self):
+        pass
+
+    def execute(self, stmt, params):
+        db = self.db
+        text = str(stmt)
+        db.statements.append(text)
+        if db.fail_after is not None and len(db.statements) > db.fail_after:
+            raise OperationalError('SELECT', {}, Exception('lost connection'))
+        after = [e for e in db.events if e > params.get('cursor', '')]
+        if 'DELETE' in text:
+            doomed = set(params['event_uuids'])
+            db.events = [e for e in db.events if e not in doomed]
+            return _MockResult(rowcount=len(doomed))
+        if 'OFFSET' in text:
+            db.examined.append(min(len(after), params['offset'] + 1))
+            rows = after[params['offset']:params['offset'] + 1]
+            return _OrphanSweepRowResult(_MockRow(event_uuid=rows[0]) if rows else None)
+        if 'window_end' in params:
+            after = [e for e in after if e <= params['window_end']]
+        db.examined.append(len(after))
+        return _select_result(*[_MockRow(event_uuid=e) for e in after if e not in db.referenced])
+
+
+def _uuid(n):
+    return f'{n:08x}-0000-0000-0000-000000000000'
+
+
+@mock.patch('shakenfist.mariadb._PRUNE_BATCH_SIZE', 10)
 @mock.patch('shakenfist.mariadb._save_orphan_prune_cursor')
 @mock.patch('shakenfist.mariadb._load_orphan_prune_cursor', return_value='')
+@mock.patch('shakenfist.mariadb._get_engine')
 class DirectPruneOrphanEventsTestCase(base.ShakenFistTestCase):
-    """Tests for _direct_prune_orphan_events()."""
+    """Tests for _direct_prune_orphan_events(), against a simulated database."""
 
-    def _orphan_counter_value(self) -> float:
-        return mariadb.ORPHAN_EVENTS_PRUNED._value.get()
+    def sweep(self, mock_get_engine, events, orphans, deadline=None):
+        db = _OrphanSweepDatabase(events, set(events) - set(orphans))
+        mock_get_engine.return_value = db
+        total = mariadb._direct_prune_orphan_events(deadline=deadline)
+        return db, total
 
-    @mock.patch('shakenfist.mariadb._get_engine')
-    def test_increments_orphan_counter(
+    def test_deletes_every_orphan_and_nothing_else(self, mock_get_engine, mock_load, mock_save):
+        events = [_uuid(n) for n in range(95)]
+        # Either side of window boundaries, the first and the last.
+        orphans = [_uuid(n) for n in (0, 9, 10, 11, 47, 89, 90, 94)]
+        db, total = self.sweep(mock_get_engine, events, orphans)
+
+        self.assertEqual(len(orphans), total)
+        self.assertEqual(sorted(set(events) - set(orphans)), db.events)
+        # A walk from the head which reaches the end has been all the way
+        # round; the next sweep starts from the head again.
+        mock_save.assert_called_once_with('')
+
+    def test_no_statement_examines_more_than_one_window(self, mock_get_engine, mock_load, mock_save):
+        # Issue 4428: with orphans sparse, asking for the next batch of
+        # orphans made one statement walk most of the table to find them.
+        events = [_uuid(n) for n in range(1000)]
+        orphans = [_uuid(997)]
+        db, total = self.sweep(mock_get_engine, events, orphans)
+
+        self.assertEqual(1, total)
+        self.assertLessEqual(max(db.examined), 10)
+        self.assertGreater(len(db.examined), 100)
+
+    def test_a_resumed_walk_wraps_once_and_stops_at_its_start(self, mock_get_engine, mock_load, mock_save):
+        events = [_uuid(n) for n in range(60)]
+        orphans = [_uuid(n) for n in (2, 25, 31, 58)]
+        start = _uuid(30)
+        mock_load.return_value = start
+        db, total = self.sweep(mock_get_engine, events, orphans)
+
+        self.assertEqual(4, total)
+        self.assertEqual(sorted(set(events) - set(orphans)), db.events)
+        saved = mock_save.call_args.args[0]
+        self.assertGreaterEqual(saved, start)
+        # Round once: the head pass stops within a window of the start.
+        self.assertLessEqual(saved, _uuid(30 + 10))
+
+    def test_a_deadline_stops_between_windows_and_the_next_sweep_resumes(
             self, mock_get_engine, mock_load, mock_save):
-        """ORPHAN_EVENTS_PRUNED increments by the rowcount of each batch."""
-        conn = _MockConnection()
-        conn.execute = mock.Mock(side_effect=[
-            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
-            _MockResult(rowcount=15),
-            _select_result(),
-        ])
-        mock_get_engine.return_value = _MockEngine(conn)
+        events = [_uuid(n) for n in range(100)]
+        orphans = [_uuid(n) for n in (5, 55, 95)]
+        clock = iter([0, 0, 0, 0, 0, 100, 100])
+        with mock.patch('shakenfist.mariadb.time.time', side_effect=lambda: next(clock)):
+            db, total = self.sweep(mock_get_engine, events, orphans, deadline=50)
+        saved = mock_save.call_args.args[0]
+        self.assertEqual(1, total)
+        self.assertEqual(_uuid(49), saved)
 
-        before = self._orphan_counter_value()
-        mariadb._direct_prune_orphan_events()
-        after = self._orphan_counter_value()
+        mock_load.return_value = saved
+        mock_save.reset_mock()
+        mock_get_engine.return_value = db
+        self.assertEqual(2, mariadb._direct_prune_orphan_events())
+        self.assertEqual([], [o for o in orphans if o in db.events])
 
-        self.assertAlmostEqual(15.0, after - before, places=9)
-
-    @mock.patch('shakenfist.mariadb._get_engine')
-    def test_loops_until_select_empty_and_advances_cursor(
+    def test_an_expired_deadline_issues_no_queries_and_keeps_the_cursor(
             self, mock_get_engine, mock_load, mock_save):
-        """Two batches then an empty select: totals sum, uuid cursor advances."""
-        conn = _MockConnection()
-        conn.execute = mock.Mock(side_effect=[
-            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
-            _MockResult(rowcount=10000),
-            _select_result(_MockRow(event_uuid=EVENT_UUID_2)),
-            _MockResult(rowcount=999),
-            _select_result(),
-        ])
-        mock_get_engine.return_value = _MockEngine(conn)
-
-        total = mariadb._direct_prune_orphan_events()
-
-        self.assertEqual(10999, total)
-        self.assertEqual(5, conn.execute.call_count)
-        # The select walks the events PK from a uuid cursor so the sweep is
-        # a single pass rather than a rescan from the table start per batch.
-        self.assertEqual('', conn.execute.call_args_list[0][0][1]['cursor'])
-        self.assertEqual(
-            EVENT_UUID_1, conn.execute.call_args_list[2][0][1]['cursor'])
-        self.assertEqual(
-            EVENT_UUID_2, conn.execute.call_args_list[4][0][1]['cursor'])
-        # The final position is persisted for the next sweep to resume from.
-        mock_save.assert_called_once_with(EVENT_UUID_2)
-
-    @mock.patch('shakenfist.mariadb._get_engine')
-    def test_orphan_antijoin_is_select_only_delete_is_by_pk(
-            self, mock_get_engine, mock_load, mock_save):
-        """The anti-join lives in the non-locking SELECT; the DELETE is by PK.
-
-        Issue 3982: a DELETE ... LEFT JOIN ... LIMIT next-key-locks every
-        row the anti-join examines (measured at 15.8M rows per batch), so
-        the DELETE must not contain the join or a LIMIT.
-        """
-        conn = _MockConnection()
-        conn.execute = mock.Mock(side_effect=[
-            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
-            _MockResult(rowcount=1),
-            _select_result(),
-        ])
-        mock_get_engine.return_value = _MockEngine(conn)
-
-        mariadb._direct_prune_orphan_events()
-
-        select_text = str(conn.execute.call_args_list[0][0][0])
-        self.assertIn('SELECT', select_text)
-        self.assertIn('LEFT JOIN', select_text)
-        self.assertIn('IS NULL', select_text)
-        delete_text = str(conn.execute.call_args_list[1][0][0])
-        self.assertIn('DELETE FROM events', delete_text)
-        self.assertNotIn('JOIN', delete_text)
-        self.assertNotIn('LIMIT', delete_text)
-        self.assertEqual(
-            [EVENT_UUID_1],
-            conn.execute.call_args_list[1][0][1]['event_uuids'])
-
-    @mock.patch('shakenfist.mariadb._get_engine')
-    def test_expired_deadline_stops_before_any_batch(
-            self, mock_get_engine, mock_load, mock_save):
-        """An already-expired deadline issues no queries and keeps the cursor.
-
-        Issue 4034: the sweep must stop cleanly between batches once its
-        time budget is spent, persisting its position so the next daily
-        sweep resumes rather than restarting from the table head.
-        """
         mock_load.return_value = EVENT_UUID_1
-        conn = _MockConnection()
-        conn.execute = mock.Mock(side_effect=AssertionError('no queries'))
-        mock_get_engine.return_value = _MockEngine(conn)
-
-        total = mariadb._direct_prune_orphan_events(
-            deadline=time.time() - 1.0)
-
+        db, total = self.sweep(mock_get_engine, [EVENT_UUID_1, EVENT_UUID_2], [EVENT_UUID_2],
+                               deadline=time.time() - 1.0)
         self.assertEqual(0, total)
-        self.assertEqual(0, conn.execute.call_count)
+        self.assertEqual([], db.statements)
         mock_save.assert_called_once_with(EVENT_UUID_1)
 
-    @mock.patch('shakenfist.mariadb._get_engine')
-    def test_resumed_walk_wraps_once_and_stops_at_start(
-            self, mock_get_engine, mock_load, mock_save):
-        """A walk resumed mid-table wraps to the head and stops at its start.
+    def test_the_antijoin_is_a_select_and_the_delete_is_by_pk(self, mock_get_engine, mock_load, mock_save):
+        # Issue 3982: a DELETE ... LEFT JOIN ... LIMIT next-key-locks every row
+        # the anti-join examines, so the join belongs in the non-locking SELECT.
+        events = [_uuid(n) for n in range(25)]
+        db, _ = self.sweep(mock_get_engine, events, [_uuid(3), _uuid(22)])
+        deletes = [s for s in db.statements if 'DELETE' in s]
+        self.assertEqual(2, len(deletes))
+        for statement in deletes:
+            self.assertNotIn('JOIN', statement)
+            self.assertNotIn('LIMIT', statement)
+        joins = [s for s in db.statements if 'LEFT JOIN' in s]
+        for statement in joins:
+            self.assertTrue(statement.lstrip().startswith('SELECT'), statement)
+            self.assertNotIn('LIMIT', statement)
 
-        Issue 4034: resuming from the persisted cursor covers the tail
-        first, then wraps to '' to cover the head that resuming skipped,
-        and finishes once it reaches the start position again rather
-        than re-walking the tail a second time.
-        """
-        start = 'cccccccc-0000-0000-0000-000000000000'
-        head = 'aaaaaaaa-0000-0000-0000-000000000000'
-        tail = 'eeeeeeee-0000-0000-0000-000000000000'
-        past_start = 'dddddddd-0000-0000-0000-000000000000'
-        mock_load.return_value = start
-        conn = _MockConnection()
-        conn.execute = mock.Mock(side_effect=[
-            # Tail batch from the resumed cursor, then the end of the PK.
-            _select_result(_MockRow(event_uuid=tail)),
-            _MockResult(rowcount=3),
-            _select_result(),
-            # Wrapped pass from the head; the second batch reaches a uuid
-            # at or beyond the start position, so the walk is complete.
-            _select_result(_MockRow(event_uuid=head)),
-            _MockResult(rowcount=2),
-            _select_result(_MockRow(event_uuid=past_start)),
-            _MockResult(rowcount=1),
-        ])
-        mock_get_engine.return_value = _MockEngine(conn)
+    def test_increments_the_orphan_counter(self, mock_get_engine, mock_load, mock_save):
+        before = mariadb.ORPHAN_EVENTS_PRUNED._value.get()
+        self.sweep(mock_get_engine, [_uuid(n) for n in range(30)], [_uuid(n) for n in (1, 2, 29)])
+        self.assertAlmostEqual(3.0, mariadb.ORPHAN_EVENTS_PRUNED._value.get() - before, places=9)
 
-        total = mariadb._direct_prune_orphan_events()
-
-        self.assertEqual(6, total)
-        self.assertEqual(7, conn.execute.call_count)
-        self.assertEqual(
-            start, conn.execute.call_args_list[0][0][1]['cursor'])
-        self.assertEqual(
-            '', conn.execute.call_args_list[3][0][1]['cursor'])
-        self.assertEqual(
-            head, conn.execute.call_args_list[5][0][1]['cursor'])
-        mock_save.assert_called_once_with(past_start)
+    def test_a_database_error_keeps_the_progress_made(self, mock_get_engine, mock_load, mock_save):
+        events = [_uuid(n) for n in range(40)]
+        db = _OrphanSweepDatabase(events, set(events) - {_uuid(1), _uuid(35)})
+        # The first window's three statements succeed, then the database goes.
+        db.fail_after = 3
+        mock_get_engine.return_value = db
+        self.assertEqual(1, mariadb._direct_prune_orphan_events())
+        mock_save.assert_called_once_with(_uuid(9))
 
 
 # ---------------------------------------------------------------------------
