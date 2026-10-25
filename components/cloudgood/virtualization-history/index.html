@@ -15689,6 +15689,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../operator_guide/capacity_refusals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Refusals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/credential_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../operator_guide/database/" class="md-nav__link">
         
   
@@ -15753,6 +15809,34 @@
     
   
     Exception Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/kerbside/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside
   
 
     
@@ -16033,6 +16117,34 @@
     
   
     Upgrades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI Console Tokens
   
 
     
@@ -16846,7 +16958,7 @@
 <p>I guess I should also note that we could have created this virtual disk first, made a filesystem on it, mounted it, and then run debootstrap inside that new filesystem. This would have the same effect but provides a slightly less clear story as to why we are doing these things. Another issue I had while preparing this demo is that <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> dates back to those simpler days of init scripts, and I cannot find any prior art of getting systemd working well. I am sure it's possible, but it was a tangent from what I am trying to talk about here that I did not follow. Therefore, we're just going to set init to being a shell to prove that the kernel boots and starts user space. I should note this was a common technique back in the day. Similarly, containers today often run a single application process directly as <abbr title="Process ID -- a unique number identifying a running process.">PID</abbr> 1 rather than using a traditional init system.</p>
 <details class="info" open="open">
 <summary>Info</summary>
-<p><abbr title="Process ID -- a unique number identifying a running process.">PID</abbr> 1? What's <abbr title="Process ID -- a unique number identifying a running process.">PID</abbr> 1? We'll talk more about that in <a href="/components/cloudgood/more-fundamentals/">the next chapter</a>.</p>
+<p><abbr title="Process ID -- a unique number identifying a running process.">PID</abbr> 1? What's <abbr title="Process ID -- a unique number identifying a running process.">PID</abbr> 1? We'll talk more about that in <a href="/components/cloudgood/userspace-initialization/">the next chapter</a>.</p>
 </details>
 <p>Regardless, we can now boot a working <abbr title="User Mode Linux -- Linux running as a user space process on another Linux kernel.">UML</abbr> virtual machine:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a># linux.uml mem=128M ubda=debian_unstable.raw init=/bin/bash

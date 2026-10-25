@@ -15187,6 +15187,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../../operator_guide/capacity_refusals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Refusals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/credential_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../../operator_guide/database/" class="md-nav__link">
         
   
@@ -15251,6 +15307,34 @@
     
   
     Exception Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/kerbside/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside
   
 
     
@@ -15544,6 +15628,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI Console Tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15691,7 +15803,7 @@ four shapes:</p>
 <tbody>
 <tr>
 <td>A phase and its number</td>
-<td><code>phase 3</code>, <code>phases 2 and 3</code></td>
+<td><code>phase 3</code>, <code>phases 2 and 3</code>, <code>phase 3a</code></td>
 </tr>
 <tr>
 <td>A hyphenated phase</td>
@@ -15703,7 +15815,7 @@ four shapes:</p>
 </tr>
 <tr>
 <td>A step with a lettered number</td>
-<td><code>step 5f</code>, <code>steps 2a</code></td>
+<td><code>step 5f</code>, <code>steps 2a</code>, <code>step 12ab</code></td>
 </tr>
 </tbody>
 </table>
@@ -15711,10 +15823,7 @@ four shapes:</p>
 than copied. A step with a bare number, such as <code>step 3</code>, is not
 matched: procedural comments write <code>step 1: open the file</code> in the
 ordinary sense, and only the lettered form is a plan's. A phase with
-no number (<code>two-phase commit</code>) is not matched either. Nor, for now, is
-a phase or step whose number carries letters after the first, such as
-<code>phase 3a</code> or <code>step 12ab</code>; that is a known gap rather than a judgment
-that they are not plan history.</p>
+no number (<code>two-phase commit</code>) is not matched either.</p>
 <p>Before a line is matched, three things are removed from it:</p>
 <ul>
 <li><strong>Inline code spans</strong>, as <code>plan-phase-references</code> removes them, so a
@@ -15788,10 +15897,9 @@ and plans directories is N/A.</p>
   equivalent an adopting repository carries, catches the same shapes,
   plus plan filenames, on the lines a change adds, so that the backlog
   this audit reports stops growing while it is worked off. It matches
-  <code>decision 6.4</code> by its first number and misses <code>phase 3a</code> just as
-  this audit does, but it strips nothing and honours neither the
-  markers nor the mkdocs exemption, so a hit is a candidate for the
-  reviewer rather than a finding.</li>
+  <code>decision 6.4</code> by its first number, strips nothing, and honours
+  neither the markers nor the mkdocs exemption, so a hit is a
+  candidate for the reviewer rather than a finding.</li>
 </ul>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template. Fix each reference at its source, by writing the reason

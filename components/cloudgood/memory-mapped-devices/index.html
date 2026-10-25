@@ -15600,6 +15600,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../operator_guide/capacity_refusals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Refusals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/credential_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../operator_guide/database/" class="md-nav__link">
         
   
@@ -15664,6 +15720,34 @@
     
   
     Exception Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/kerbside/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside
   
 
     
@@ -15944,6 +16028,34 @@
     
   
     Upgrades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI Console Tokens
   
 
     
@@ -17271,17 +17383,16 @@ doorbell. From the guest's perspective, this is ordinary DMA-style I/O.</p>
 wrote to standard virtqueue structures, and got standard completion
 interrupts. But under the covers, the data moved via RDMA -- with all the
 latency and CPU overhead benefits that implies.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Guest sees:                    Backend implements:
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>┌─────────────────┐           ┌─────────────────────────────────┐
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>│ virtio-net      │           │ vhost-user backend              │
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>│ driver          │           │                                 │
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>│    ↓            │           │ 1. Read virtqueue descriptor    │
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>│ virtqueue       │ ────────&gt; │ 2. Access guest packet buffer   │
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>│ doorbell write  │           │ 3. RDMA send to remote host     │
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>│    ↓            │           │ 4. Wait for RDMA completion     │
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>│ completion IRQ  │ &lt;──────── │ 5. Signal guest via irqfd       │
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>└─────────────────┘           └─────────────────────────────────┘
-</code></pre></div>
+<pre class="mermaid"><code>sequenceDiagram
+    participant G as Guest virtio-net driver
+    participant B as vhost-user backend
+    participant R as Remote host
+    G-&gt;&gt;B: Post descriptor to virtqueue, then doorbell write
+    B-&gt;&gt;B: Read virtqueue descriptor
+    B-&gt;&gt;B: Access guest packet buffer
+    B-&gt;&gt;R: RDMA send
+    R--&gt;&gt;B: RDMA completion
+    B--&gt;&gt;G: Signal guest via irqfd (completion IRQ)</code></pre>
 <p>This pattern appears in several production systems:</p>
 <p><strong>vhost-user with RDMA backends</strong>: Research projects and commercial systems
 have demonstrated vhost-user backends that use RDMA for the actual data

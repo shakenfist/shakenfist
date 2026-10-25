@@ -15157,6 +15157,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../operator_guide/capacity_refusals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Refusals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/credential_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../operator_guide/database/" class="md-nav__link">
         
   
@@ -15221,6 +15277,34 @@
     
   
     Exception Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/kerbside/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside
   
 
     
@@ -15514,6 +15598,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI Console Tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15631,6 +15743,11 @@ themselves run.</p>
 <td>CodeQL.</td>
 </tr>
 <tr>
+<td><code>mermaid-lint.yml</code></td>
+<td>Pull requests and pushes to <code>develop</code> touching markdown, dispatch</td>
+<td>Renders every mermaid diagram with <code>tools/mermaid-lint.sh</code>. Advisory; see below.</td>
+</tr>
+<tr>
 <td><code>release.yml</code></td>
 <td>A <code>v*</code> tag, dispatch</td>
 <td>The release, as below.</td>
@@ -15638,8 +15755,11 @@ themselves run.</p>
 </tbody>
 </table>
 <p>On a pull request, <code>ci.yml</code>'s jobs skip a change that touches only review
-marks, and skip a pull request from a fork altogether. A merge queue entry
-skips nothing.</p>
+marks, and skip a pull request from a fork altogether. The editor tests,
+which run on an ephemeral VM rather than the static pool, also skip a change
+that touches only review marks and <code>docs/</code>; the other jobs still run for
+one, so that it gets its automated review. A merge queue entry skips
+nothing.</p>
 <h2 id="merging">Merging<a class="headerlink" href="#merging" title="Permanent link">&para;</a></h2>
 <p>Pull requests merge through a merge queue on <code>develop</code>, not with the
 merge button directly. A pull request can be queued once its "Can
@@ -15664,6 +15784,16 @@ run is cancelled. Raising the setting would make each entry cancel the
 one ahead of it, so revisit those groups first.</p>
 <p>A new job in <code>ci.yml</code> goes in the <code>needs:</code> of both "Can enqueue" and
 "Can merge", or the queue will merge without it.</p>
+<p><code>mermaid-lint.yml</code> is the deliberate exception, and is neither in those
+<code>needs:</code> lists nor a required check. It runs only when markdown changes,
+and a path-filtered workflow made required never reports on the pull
+requests it filters out, so it would hold them in the queue forever. A red
+"Mermaid lint" on a pull request blocks nothing automatically; fix it
+before enqueueing anyway. <code>tools/mermaid-lint.sh</code> runs it by hand. Both
+files are copies of shakenfist/development's <code>templates/mermaid-lint/</code>, so
+change them there rather than here; the workflow keeps two local changes,
+named in its header -- like <code>ci.yml</code>, it skips a pull request from a fork,
+and its checkout keeps no token.</p>
 <p>Enqueueing a fork's pull request is the point at which its code first
 runs here. On the pull request itself <code>ci.yml</code> skips a fork, but a merge
 queue entry is not a pull request event: the queue builds the commit on a

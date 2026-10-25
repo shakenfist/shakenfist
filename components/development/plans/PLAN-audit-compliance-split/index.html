@@ -15347,6 +15347,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../../operator_guide/capacity_refusals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Refusals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/credential_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../../operator_guide/database/" class="md-nav__link">
         
   
@@ -15411,6 +15467,34 @@
     
   
     Exception Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/kerbside/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside
   
 
     
@@ -15691,6 +15775,34 @@
     
   
     Upgrades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../operator_guide/vdi_console_tokens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VDI Console Tokens
   
 
     
@@ -16641,6 +16753,25 @@ in D5, corrected above.</p>
   one specification.</li>
 <li>Phase 4's findings are resolved or declined in writing.</li>
 </ul>
+<p><strong>Outcome, checked on 2026-10-24 (UTC) when the plan was closed out.</strong> The
+first scheduled run after the merge was the one queued for 06:00 UTC
+on 2026-08-27, which GitHub started late at 17:24 UTC; its commit,
+<code>2f0f0e5</code>, touched only <code>docs/audits/compliance.md</code>. So has every bot
+commit that regenerated the page since, which
+<code>git log --name-only --grep='Regenerate the audit compliance page'</code>
+shows. On shakenfist.com, the published <code>export-repo-config</code>
+specification links to
+<code>/components/development/audits/compliance/#export-repo-config</code>, and
+the published compliance page carries an element with that <code>id</code>.
+The published page was then the one generated at 2026-10-11T21:20
+UTC, about two weeks behind this repository's copy. That lag is in the
+website deploy, not in anything this plan changed.</p>
+<p>The schedule has changed since this plan was written. <code>33def50</code>
+(2026-10-02) moved the audit from 06:00 UTC daily to 18:00 UTC every
+Sunday, so the "every morning" and "06:00 UTC" wording above
+describes the schedule at the time of the change, not the current one.
+<code>docs/audits/compliance.md</code> states the current schedule in its
+preamble.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
