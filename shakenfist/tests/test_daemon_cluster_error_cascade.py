@@ -47,6 +47,7 @@ class _FakeNode:
 
 def _make_monitor():
     m = cluster_main.Monitor.__new__(cluster_main.Monitor)
+    m.abort_path = '/nonexistent/sf-test-cluster-abort-path'
     m.lock = None
     m.pet_watchdog = mock.MagicMock()
     m._cascaded_error_nodes = set()

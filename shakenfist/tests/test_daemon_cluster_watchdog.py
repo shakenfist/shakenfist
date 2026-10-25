@@ -29,6 +29,7 @@ class FakeIPAM:
 class ClusterWatchdogTestCase(base.ShakenFistTestCase):
     def _make_monitor(self):
         m = cluster_main.Monitor.__new__(cluster_main.Monitor)
+        m.abort_path = '/nonexistent/sf-test-cluster-abort-path'
         m.lock = mock.MagicMock()
         # A held lease so the early lost_event gate does not short-circuit.
         m.lock.lost_event = threading.Event()
@@ -79,6 +80,7 @@ class ScheduledJobWatchdogTestCase(base.ShakenFistTestCase):
 
     def _make_monitor(self):
         m = cluster_main.Monitor.__new__(cluster_main.Monitor)
+        m.abort_path = '/nonexistent/sf-test-cluster-abort-path'
         m.pet_watchdog = mock.MagicMock()
         return m
 

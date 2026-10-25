@@ -469,9 +469,10 @@ records a graceful stop. That is the whole-node path (`sf.target`, a
 reboot). A deploy instead restarts each unit on its own, so sentinel-first
 stops while sentinel-last is still running: it then records only its own
 daemon state and leaves the node's lifecycle for sentinel-last's restart to
-return to created, because the node was never stopping. A daemon started ahead of `sf-database` hangs
-on its first database call -- `sf-api` in particular -- so a new unit
-must keep the `After=sf-database.service` ordering.
+return to created, because the node was never stopping. A daemon started
+ahead of `sf-database` hangs on its first database call -- `sf-api` in
+particular -- so a new unit must keep the `After=sf-database.service`
+ordering.
 
 ## Daemon liveness (systemd watchdog)
 
@@ -501,6 +502,17 @@ daemon is working normally. The existing explicit callers are:
   domain inside the lock; it skips the instance for that pass if the
   lock is busy. When libvirt and the database already agree on an
   instance's power state, no lock is taken at all.
+
+A long pass has to notice a stop as well as stay alive. systemd allows
+every Shaken Fist unit 30 seconds (`TimeoutStopSec`) between SIGTERM and
+SIGKILL, and a deploy restarts every unit, so a pass that only checks its
+abort path between passes is SIGKILLed whenever a deploy lands in the
+middle of a slow one. `sf-cluster`'s maintenance pass therefore calls
+`_maintenance_checkpoint()` rather than `pet_watchdog()` at its item
+boundaries and between its scheduled jobs: it pets, and abandons the rest
+of the pass when the abort path exists. Only use it where stopping before
+the next item leaves nothing half done; a loop which has already claimed
+its items, such as dequeued work, pets the watchdog directly.
 
 If you add a new long-running maintenance pass to any of the eight
 armed daemons — `sf-database`, `sf-net`, `sf-cleaner`, `sf-cluster`,
