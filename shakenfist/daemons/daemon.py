@@ -620,6 +620,18 @@ def send_systemd_watchdog():
     _send_systemd_notification(b'WATCHDOG=1')
 
 
+# How long a worker pool daemon waits for its workers once it has asked them
+# to stop, before it abandons those still running and exits anyway. It must
+# stay inside the units' TimeoutStopSec (30s, roles/node/templates/sf.service)
+# with room left for record_exit(). A worker which never looks at its abort
+# path -- an image fetch, or a long privexec command -- otherwise held the
+# daemon until systemd SIGKILLed it, so the daemon never recorded that it had
+# stopped (#4550). The work an abandoned worker was doing is lost either way;
+# sf-queues re-runs it when it next starts (see its startup_tasks).
+WORKER_STOP_GRACE = 20
+WORKER_STOP_POLL = 0.5
+
+
 class WorkerPoolDaemon(Daemon):
     def __init__(self, name):
         super().__init__(name)
@@ -647,20 +659,26 @@ class WorkerPoolDaemon(Daemon):
         finally:
             LOG.info('Stopping')
 
-            while len(self.workers) > 0:
-                for thread_name in self.workers:
-                    thread_ident = self.workers[thread_name]['thread'].ident
-                    set_abort_path(
-                        self.workers[thread_name]['object'].abort_path,
-                        'worker thread cleanup')
-                    LOG.info(f'Sent exit event to {thread_name} thread '
-                             f'with ident {thread_ident}')
+            for thread_name in self.workers:
+                thread_ident = self.workers[thread_name]['thread'].ident
+                set_abort_path(
+                    self.workers[thread_name]['object'].abort_path,
+                    'worker thread cleanup')
+                LOG.info(f'Sent exit event to {thread_name} thread '
+                         f'with ident {thread_ident}')
 
-                if len(self.workers) > 0:
-                    time.sleep(5)
-
+            deadline = time.monotonic() + WORKER_STOP_GRACE
+            self.reap_workers()
+            while self.workers and time.monotonic() < deadline:
+                time.sleep(WORKER_STOP_POLL)
                 self.reap_workers()
 
+            if self.workers:
+                # Worker threads are daemon threads, so they do not hold the
+                # process open once we return.
+                LOG.with_fields({'workers': sorted(self.workers)}).warning(
+                    f'Abandoning {len(self.workers)} workers which did not '
+                    f'stop within {WORKER_STOP_GRACE} seconds')
             LOG.info(f'There are {len(self.workers)} remaining workers')
             LOG.info('Stopped')
             self.record_exit()

@@ -427,6 +427,27 @@ dedup independently refuses to return a rowless op, so a caller's
 `cluster_op_reaper_orphaned_total`, scraped from
 `CLUSTER_METRICS_PORT` on the cluster daemon.
 
+The reaper is the slow path. A worker which is still running when its
+sf-queues stops -- SIGKILLed at the end of `TimeoutStopSec`, abandoned
+when the worker pool's 20 second stop grace (`WORKER_STOP_GRACE` in
+`daemons/daemon.py`) runs out, or lost in a crash -- leaves its
+operation `executing` and its row claimed. Clearing the claim alone
+does not recover it: the next worker to dequeue the row finds the
+operation `executing`, skips it and resolves the row, which produces
+exactly the rowless shape the orphan pass sweeps, 30 minutes later
+(issue 4543). So the restarted sf-queues, in `startup_tasks`, first
+looks at the claimed rows on its own node's queues (named by node
+uuid): nothing else consumes those queues and it has started no
+workers yet, so an operation still `executing` behind one was being
+run by the process it replaces. It moves the operation back to
+`queued` -- the same transition a task's `defer_with_backoff()`
+makes -- so the row re-runs it from the first task once the claims are
+cleared, or, if the row has been claimed `CLUSTER_OP_MAX_ATTEMPTS`
+times, deletes the row and errors the operation as the reaper would.
+Rows on the shared `any-*` queues are left to the reaper, because
+nothing records which node claimed them: over gRPC, `claimed_by` is
+the database daemon's node name, not the caller's.
+
 The cluster daemon also runs two other reaping sweeps from
 `daemons/cluster/scheduled_tasks.py`. `per_deleted_object_checks()`
 (every minute, within `DELETED_OBJECT_SWEEP_SECONDS`) hard deletes
