@@ -210,10 +210,23 @@ def clear_abort_path(abort_path):
         os.unlink(abort_path)
 
 
+def write_abort_file(abort_path):
+    """Create an abort file, safely from a signal handler.
+
+    Raw system calls only: no logging and no Python file object, so nothing
+    here can need a lock the interrupted thread holds. Use set_abort_path()
+    anywhere else, so that the abort is logged.
+    """
+    fd = os.open(abort_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
+    try:
+        os.write(fd, b'1')
+    finally:
+        os.close(fd)
+
+
 def set_abort_path(abort_path, source):
     LOG.info(f'Setting abort file: {abort_path} ({source})')
-    with open(abort_path, 'w') as f:
-        f.write('1')
+    write_abort_file(abort_path)
 
 
 def check_abort_path(abort_path):
@@ -430,20 +443,30 @@ class Daemon:
             self.last_stability = msg
         return True
 
-    def exit_gracefully(self, sig, _frame):
-        if sig == signal.SIGTERM:
-            self.log.info('Caught SIGTERM, terminating')
-            try:
-                n = Node.this_node()
-                n.set_daemon_state(
-                    self.daemon_name, Node.DAEMON_STATE_STOPPING)
-            except ValueError:
-                # This might fail if grpc has already started shutting down
-                ...
+    # Set by exit_gracefully(), logged and cleared by check_daemon_state().
+    sigterm_unlogged = False
 
-            set_abort_path(self.abort_path, 'from exit_gracefully')
+    def exit_gracefully(self, sig, _frame):
+        # This runs on the main thread, between any two of its bytecodes, so
+        # it must not need a lock the main thread could be holding. That rules
+        # out logging (the Loki handler enqueues under the logship spool's
+        # non-reentrant lock) and the database (connection pool and channel
+        # locks, and on a slow database a wait which outlasts TimeoutStopSec
+        # by itself). It used to do both: sf-database, stopping under a slow
+        # MariaDB, never got from here to its drain and was SIGKILLed (#4601),
+        # and sf-api deadlocked the same way (#3495). The abort file is all a
+        # stop needs: every loop polls it. The STOPPING state this used to
+        # write is written by the unit's ExecStop (sf-ctl stop) before systemd
+        # sends SIGTERM, and record_exit() writes STOPPED.
+        if sig == signal.SIGTERM:
+            self.sigterm_unlogged = True
+            write_abort_file(self.abort_path)
 
     def check_daemon_state(self):
+        if self.sigterm_unlogged:
+            self.sigterm_unlogged = False
+            self.log.info('Caught SIGTERM, terminating')
+
         # Callers hit this on every 0.2s idle tick, but the database read only
         # needs to notice an externally written stop request (local SIGTERM is
         # handled by exit_gracefully() + the abort_path check in idle()), so we

@@ -6793,7 +6793,12 @@ def drain_and_stop(server: Any, health_servicer: Any) -> None:
     # noise #3430 is about. The grace is a cap, not a fixed delay: stop()
     # returns as soon as the last in-flight call ends, and it stays below
     # the unit's TimeoutStopSec (30s) so systemd never SIGKILLs mid-drain.
+    # Logged either side so a stop which overruns TimeoutStopSec shows
+    # whether it got here and whether the drain itself is what stalled
+    # (#4601).
+    LOG.info(f'Draining in-flight RPCs for up to {config.DATABASE_DRAIN_GRACE} seconds')
     server.stop(config.DATABASE_DRAIN_GRACE).wait()
+    LOG.info('gRPC server stopped')
 
 
 def main() -> None:

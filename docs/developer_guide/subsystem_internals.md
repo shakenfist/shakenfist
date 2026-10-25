@@ -514,6 +514,20 @@ of the pass when the abort path exists. Only use it where stopping before
 the next item leaves nothing half done; a loop which has already claimed
 its items, such as dequeued work, pets the watchdog directly.
 
+A signal handler must not wait for anything. Python runs it on the main
+thread between any two of that thread's bytecodes, so if it needs a lock
+the main thread already holds, it waits for itself forever. Logging needs
+one: the Loki handler enqueues every line under the logship spool's
+non-reentrant lock, and the main thread logs constantly. So does any
+database call, which can also simply be slow enough to outlast
+`TimeoutStopSec` by itself. sf-api's drain handler deadlocked on the
+first (#3495) and every daemon's `Daemon.exit_gracefully()` could do the
+same on either, which is how `sf-database` came to be SIGKILLed on a stop
+under a slow MariaDB (#4601). Handlers therefore only set flags and write
+the abort file, with `daemon.write_abort_file()`, which uses raw system
+calls; the main thread notices, and does the logging and any state
+writes itself.
+
 If you add a new long-running maintenance pass to any of the eight
 armed daemons — `sf-database`, `sf-net`, `sf-cleaner`, `sf-cluster`,
 `sf-queues`, `sf-resources`, `sf-transfers`, `sf-sidechannel` — add
