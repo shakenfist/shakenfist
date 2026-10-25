@@ -463,7 +463,9 @@ class Daemon:
             self.last_stability = msg
         return True
 
-    # Set by exit_gracefully(), logged and cleared by check_daemon_state().
+    # Set by exit_gracefully(), logged and cleared by log_caught_sigterm()
+    # from check_daemon_state() or, for a loop which exits on the abort file
+    # without calling that again, record_exit().
     sigterm_unlogged = False
 
     def exit_gracefully(self, sig, _frame):
@@ -486,10 +488,13 @@ class Daemon:
             self.sigterm_unlogged = True
             write_abort_file(self.abort_path)
 
-    def check_daemon_state(self):
+    def log_caught_sigterm(self):
         if self.sigterm_unlogged:
             self.sigterm_unlogged = False
             self.log.info('Caught SIGTERM, terminating')
+
+    def check_daemon_state(self):
+        self.log_caught_sigterm()
 
         # Callers hit this on every 0.2s idle tick, but the database read only
         # needs to notice an externally written stop request (local SIGTERM is
@@ -563,6 +568,7 @@ class Daemon:
         send_systemd_ready()
 
     def record_exit(self):
+        self.log_caught_sigterm()
         n = Node.this_node()
         try:
             n.set_daemon_state(self.daemon_name, Node.DAEMON_STATE_STOPPED)

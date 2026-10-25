@@ -31,7 +31,9 @@ An assignment may bind a name, an attribute of self, or an item of a plain
 name (FLAGS[key] = value). Anything else can run code the handler cannot
 see -- in this codebase obj.state = value is usually a property setter
 which writes to the database and adds events -- so it is refused unless
-its line carries a "# signal-safe: <reason>" waiver.
+its line carries a "# signal-safe: <reason>" waiver. An attribute of self
+is refused the same way when the calling class, a base of it or a class
+deriving from it defines that name as a property.
 
 Every call must be one of:
 
@@ -170,12 +172,29 @@ class Checker:
     def error(self, module, node, message):
         self.errors.append(f'{module.relpath}:{node.lineno}: {message}')
 
-    def subclass_overrides(self, cls, name):
-        """Methods called name in classes deriving, by name, from cls."""
+    def class_index(self):
+        """Class name -> [(module, ClassDef)] for every class in the package."""
         index = {}
         for module in list(self.all_modules()):
             for c in module.classes():
                 index.setdefault(c.name, []).append((module, c))
+        return index
+
+    def class_family(self, cls):
+        """cls, the classes it derives from and the classes deriving from it, matched by name."""
+        index = self.class_index()
+        family = {cls.name}
+        pending = [cls]
+        while pending:
+            for base in pending.pop().bases:
+                name = dotted(base)
+                if name and name[-1] not in family:
+                    family.add(name[-1])
+                    pending.extend(c for _, c in index.get(name[-1], []))
+        family |= self.derived_names(cls, index)
+        return [c for name in sorted(family) for _, c in index.get(name, [])]
+
+    def derived_names(self, cls, index):
         derived = {cls.name}
         changed = True
         while changed:
@@ -186,6 +205,26 @@ class Checker:
                     if c.name not in derived and bases & derived:
                         derived.add(c.name)
                         changed = True
+        return derived
+
+    def is_property(self, module, func, name):
+        """Whether self.name, assigned in func, may be a property of self."""
+        cls = module.enclosing(func, ast.ClassDef)
+        if cls is None:
+            return False
+        for c in self.class_family(cls):
+            for node in c.body:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+                    for decorator in node.decorator_list:
+                        d = dotted(decorator)
+                        if d and d[-1] in ('property', 'cached_property', 'setter', 'deleter'):
+                            return True
+        return False
+
+    def subclass_overrides(self, cls, name):
+        """Methods called name in classes deriving, by name, from cls."""
+        index = self.class_index()
+        derived = self.derived_names(cls, index)
         overrides = []
         for class_name in sorted(derived - {cls.name}):
             for module, c in index[class_name]:
@@ -297,17 +336,18 @@ class Checker:
         for statement in func.body:
             self.check_statement(module, statement, func, context)
 
-    def check_target(self, module, target, context):
+    def check_target(self, module, target, func, context):
         if isinstance(target, ast.Name):
             return
         if isinstance(target, (ast.Tuple, ast.List)):
             for element in target.elts:
-                self.check_target(module, element, context)
+                self.check_target(module, element, func, context)
             return
         if isinstance(target, ast.Starred):
-            self.check_target(module, target.value, context)
+            self.check_target(module, target.value, func, context)
             return
-        if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == 'self':
+        if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == 'self' \
+                and not self.is_property(module, func, target.attr):
             return
         if isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name):
             return
@@ -324,9 +364,9 @@ class Checker:
             return
         if isinstance(statement, ast.Assign):
             for target in statement.targets:
-                self.check_target(module, target, context)
+                self.check_target(module, target, func, context)
         elif isinstance(statement, (ast.AugAssign, ast.AnnAssign)):
-            self.check_target(module, statement.target, context)
+            self.check_target(module, statement.target, func, context)
         for child in ast.iter_child_nodes(statement):
             if isinstance(child, ast.stmt):
                 self.check_statement(module, child, func, context)

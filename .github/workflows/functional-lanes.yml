@@ -134,10 +134,12 @@ jobs:
       concurrency_key: debian-13-slim-tier
       deploy_profile: shakenfist/tools/ci-deploy-profiles/kerbside-slim-tier.yml.j2
 
-  # The cluster suite on one node, deliberately, to find whatever in it
-  # breaks when every role shares a machine. sizing.is_single_machine() and
-  # cluster_ci_tests/test_nodes.py carve this deployment out of the
-  # structural minimum, which no single node can meet. Not gated on the
+  # The cluster suite's smoke tier on one node, deliberately, to find
+  # whatever in it breaks when every role shares a machine. sizing.
+  # is_single_machine() and cluster_ci_tests/test_nodes.py carve this
+  # deployment out of the structural minimum, which no single node can meet.
+  # Smoke, not full, and smoke-cluster.yml's default 45 minute budget, as
+  # the scheduled matrix this lane came from ran it. Not gated on the
   # headroom band: no warn window has measured the localhost shape.
   debian_13_single_machine:
     name: "Debian 13 single machine (collection)"
@@ -148,11 +150,11 @@ jobs:
       component_ref: ${{ github.sha }}
       headroom_gate: false
       test_kind: functional
-      tier: full
+      tier: smoke
       topology: localhost
       base_image: 'sf://label/ci-images/debian-13'
       base_image_user: debian
       stestr_config: cluster-ci.conf
       test_concurrency: 3
-      test_timeout_minutes: 60
+      test_timeout_minutes: 45
       concurrency_key: debian-13-localhost

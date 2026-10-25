@@ -96,7 +96,10 @@ sometimes not at all since August 2026. It is a stopgap until
 conductor dispatch this workflow into gaps in sfcbr's load, which is why
 `scheduled-tests.yml`'s `workflow_dispatch` takes no inputs. To run the
 weekly lanes against a branch, dispatch it by hand:
-`gh workflow run scheduled-tests.yml --ref <branch>`.
+`gh workflow run scheduled-tests.yml --ref <branch>`. A failure there
+files nothing: `report_failures` prints the issue it would have filed
+to its log, because the failure is the branch's and not the lane's,
+and only runs of the default branch are reported.
 
 ## Where the functional jobs get their code
 

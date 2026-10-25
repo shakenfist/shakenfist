@@ -126,3 +126,14 @@ class ExitGracefullyTestCase(base.ShakenFistTestCase):
         d.check_daemon_state()
         d.check_daemon_state()
         d.log.info.assert_called_once_with('Caught SIGTERM, terminating')
+
+    @mock.patch('shakenfist.daemons.daemon.send_systemd_status')
+    @mock.patch('shakenfist.daemons.daemon.Node')
+    def test_an_exit_without_another_state_check_still_logs_the_sigterm(self, mock_node, mock_status):
+        # A loop which sees the abort file and exits never calls
+        # check_daemon_state() again; record_exit() is on every exit path.
+        d = self._make_daemon()
+        d.exit_gracefully(signal.SIGTERM, None)
+        d.record_exit()
+        d.record_exit()
+        d.log.info.assert_called_once_with('Caught SIGTERM, terminating')

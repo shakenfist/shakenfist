@@ -6289,10 +6289,15 @@ def _direct_prune_orphan_events(deadline: Optional[float] = None) -> int:
     sfcbr single statements ran for 30 to 508 seconds, holding a read
     view the whole time, overrunning the sweep's deadline, and slowing
     every other statement in the database while they ran (issue 4428).
-    Now an index-only query finds where the window ends, the anti-join
-    looks only inside it, and the cursor moves to the window's end
-    whether it held orphans or not, so no statement examines more than
-    one window of rows.
+    Now one query finds where the window ends, the anti-join looks only
+    inside it, and the cursor moves to the window's end whether it held
+    orphans or not, so no statement examines more than one window of
+    rows. The window-end query walks the primary key, which in InnoDB is
+    the clustered index and holds the rows themselves, and no secondary
+    index leads with event_uuid, so it reads the window's rows rather
+    than an index alone: a full circle reads the table about twice. That
+    is the same total as before, but in bounded statements, and a sweep
+    which runs out of deadline resumes from its persisted cursor.
 
     Args:
         deadline: Optional time.time() value after which no further

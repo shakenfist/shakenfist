@@ -49,7 +49,8 @@ def _job(lane, conclusion, steps=None):
 class FakeGitHub:
     repo = 'shakenfist/shakenfist'
 
-    def __init__(self, jobs, earlier=None, issues=None):
+    def __init__(self, jobs, earlier=None, issues=None, branch='develop'):
+        self._branch = branch
         self._jobs = {100: jobs}
         self._earlier = []
         for run_id, sha, run_jobs in earlier or []:
@@ -60,8 +61,11 @@ class FakeGitHub:
         self.created = []
 
     def run(self, run_id):
-        return {'id': 100, 'head_sha': SHA, 'head_branch': 'develop',
+        return {'id': 100, 'head_sha': SHA, 'head_branch': self._branch,
                 'html_url': 'https://example.com/run/100'}
+
+    def default_branch(self):
+        return 'develop'
 
     def jobs(self, run_id, attempt=None):
         return self._jobs[int(run_id)]
@@ -156,6 +160,20 @@ class ReportTestCase(base.ShakenFistTestCase):
         out = io.StringIO()
         report_tool.report(github, 'scheduled-tests.yml', '100', '1', CALLER, dry_run=True, out=out)
         self.assertEqual([], github.created)
+        self.assertIn('new issue', out.getvalue())
+
+    def test_a_run_on_another_branch_files_nothing(self):
+        # ci.md suggests dispatching the weekly lanes on a branch to try them.
+        # A failure there is the branch's, and must not land on develop's
+        # issue for the lane, new or open.
+        issues = [{'number': 7, 'body': 'x\n%s\n' % report_tool.dedup_key(UBUNTU)}]
+        github = FakeGitHub([_job(UBUNTU, 'failure'), _job(TIER, 'failure')], issues=issues,
+                            branch='my-feature')
+        out = io.StringIO()
+        report_tool.report(github, 'scheduled-tests.yml', '100', '1', CALLER, out=out)
+        self.assertEqual([], github.created)
+        self.assertEqual([], github.comments)
+        self.assertIn('tested my-feature, not the default branch develop', out.getvalue())
         self.assertIn('new issue', out.getvalue())
 
 

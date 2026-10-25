@@ -193,6 +193,33 @@ class SignalHandlerCheckTestCase(base.ShakenFistTestCase):
             signal.signal(signal.SIGTERM, handler)
         ''', 'assigns to NODE.stopping,')
 
+    def test_a_property_of_self_is_refused(self):
+        # Defined on the class itself, on a base, or on a class deriving from
+        # it: a handler bound to a subclass instance runs that setter.
+        for where in ('Daemon', 'Base', 'Sub'):
+            with self.subTest(where=where):
+                classes = {'Base': '', 'Daemon': '', 'Sub': ''}
+                classes[where] = textwrap.indent(textwrap.dedent('''\
+                    @property
+                    def state(self):
+                        return None
+
+                    @state.setter
+                    def state(self, value):
+                        pass
+                '''), '    ')
+                source = (
+                    'import signal\n\n'
+                    'class Base:\n    x = 1\n%s\n'
+                    'class Daemon(Base):\n%s'
+                    '    def handler(self, sig, frame):\n'
+                    '        self.state = 1\n\n'
+                    '    def run(self):\n'
+                    '        signal.signal(signal.SIGTERM, self.handler)\n\n'
+                    'class Sub(Daemon):\n    y = 1\n%s'
+                    % (classes['Base'], classes['Daemon'], classes['Sub']))
+                self.assertRefuses(source, 'assigns to self.state,')
+
     def test_self_attributes_and_waived_assignments_are_allowed(self):
         _, errors = self.check('''\
             import signal

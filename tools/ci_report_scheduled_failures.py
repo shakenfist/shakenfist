@@ -29,7 +29,10 @@ Usage:
         [--dry-run]
 
 --dry-run reads the run from GitHub but prints the issues it would file or
-comment on instead of writing anything.
+comment on instead of writing anything. A run of any branch but the default
+branch is always reported that way: the docs suggest dispatching the weekly
+lanes on a branch to try them, and that branch's failures are its own, not
+the lane's, so they must not land on the issue which tracks develop.
 """
 
 import argparse
@@ -71,6 +74,9 @@ class GitHubCLI:
 
     def run(self, run_id):
         return self.api('actions/runs/%s' % run_id)
+
+    def default_branch(self):
+        return json.loads(self._run(['api', 'repos/%s' % self.repo]))['default_branch']
 
     def jobs(self, run_id, attempt=None):
         if attempt:
@@ -213,6 +219,13 @@ def existing_issue(issues, lane):
 def report(github, workflow, run_id, run_attempt, caller, dry_run=False, out=sys.stdout):
     """File or comment on one issue per failed lane. Returns how many it reported."""
     run = github.run(run_id)
+    default_branch = github.default_branch()
+    if run['head_branch'] != default_branch and not dry_run:
+        out.write('This run tested %s, not the default branch %s. Its failures are the branch\'s own, so '
+                  'this prints what it would have filed instead of filing it.\n'
+                  % (run['head_branch'], default_branch))
+        dry_run = True
+
     failed = failed_lanes(github.jobs(run_id, run_attempt), caller)
     if not failed:
         # The caller only runs this when the lanes job failed, so a run with
