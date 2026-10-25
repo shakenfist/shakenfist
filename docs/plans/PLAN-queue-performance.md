@@ -2,13 +2,20 @@
 
 ## Status
 
-In progress, 11 of 12 phases.
+Complete, 12 of 12 phases.
 
-Phases 1 to 11 are done. Phase 12, added on 2026-09-10, is the push
-audit of phases 9 to 11: the plan's audit obligation is discharged
-for phases 1 to 8 by phase 8 and by nothing at all for the three
-phases that reopened the plan afterwards. See "Phase 12" below for
-why phase 8 is not moved to the end of the table to cover them.
+Phases 1 to 11 are done, and phase 12 has audited phases 9 to 11.
+Phase 12 was added on 2026-09-10: the plan's audit obligation was
+discharged for phases 1 to 8 by phase 8 and by nothing at all for the
+three phases that reopened the plan afterwards. See "Phase 12" below
+for why phase 8 is not moved to the end of the table to cover them.
+
+Phase 12's audit merged as PR #4646 on 2026-10-25. It found one
+blocking defect, a folded sibling reading `complete` before its
+survivor had done the work (#4638). That defect, and the advisory
+findings the audit chose to fix rather than file, were fixed in the
+pull request that closed this plan. The remaining findings are
+carried by issues, listed under "Audit of phases 9 to 11" below.
 
 Phase 11 merged to `develop` as PR #4007 on 2026-09-02, and the
 response to #4007's review as PR #4033 on 2026-09-05. #4033 carried
@@ -90,7 +97,7 @@ Two things this plan changed are deliberately still unproven:
 | 9. Prove coalescing works | [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md) | Complete | `30168f0dd` (#3905), `9e41f07c6` (#3951) |
 | 10. Where the pre-execution time goes | [PLAN-queue-performance-phase-10-defer-latency.md](PLAN-queue-performance-phase-10-defer-latency.md) | Complete | `fea4af7bd` (#3973) |
 | 11. Multi-column coalescing key | [PLAN-queue-performance-phase-11-multi-column-key.md](PLAN-queue-performance-phase-11-multi-column-key.md) | Complete | `9aab98d94` (#4007), `ff65c622a` (#4033) |
-| 12. Push audit of phases 9 to 11 | [PLAN-queue-performance-phase-12-push-audit.md](PLAN-queue-performance-phase-12-push-audit.md) | In progress | — |
+| 12. Push audit of phases 9 to 11 | [PLAN-queue-performance-phase-12-push-audit.md](PLAN-queue-performance-phase-12-push-audit.md) | Complete | `1e15a3bfd` (#4646) |
 
 The `Merged` column records what put each phase on `develop`. These
 entries were reconstructed after the fact, because the plan did not
@@ -385,7 +392,7 @@ routine: a user's mesh enqueue stopped adopting the maintainer's
 background one, so the background op can fold the user's op. Three
 independent reviews reached this, and a sqlite harness driving the
 real `execute()` reproduces it. It is fixed in the follow-up pull
-request.
+request that closed this plan.
 
 One more cross-node fold was found and declined. Rows written
 before #4007 have a NULL `node_uuid`, so in a rolling upgrade a
@@ -397,7 +404,7 @@ upgrade step's wrong comment is corrected.
 
 The rest is advisory:
 
-* **Fixed in the follow-up pull request:**
+* **Fixed in the pull request that closed this plan:**
   * The safety argument is written as "key-aware, not queue-aware"
     in two places that should say family-aware too. Phase 11's own
     done-criterion was ticked without this being true.
