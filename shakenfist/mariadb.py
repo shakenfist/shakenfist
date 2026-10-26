@@ -5469,11 +5469,11 @@ def _direct_get_recent_terminal_op_states_for_target(
     states_table = _get_object_states_table()
 
     # Deliberately not filtered on observational: both callers (the
-    # reconciliation guards in daemons/network/maintain.py) ask about
-    # network operation types, net_op and net_ip_op, which are never
+    # reconciliation guards in shakenfist/daemons/network/maintain.py) ask
+    # about network operation types, net_op and net_ip_op, which are never
     # observational (the classification table in
-    # tests/schema/operations/test_observational_tasks.py enforces it), and
-    # a circuit breaker wants every failure anyway.
+    # shakenfist/tests/schema/operations/test_observational_tasks.py
+    # enforces it), and a circuit breaker wants every failure anyway.
     conditions = [
         table.c.target_object_type == target_object_type,
         table.c.target_uuid == target_uuid,
@@ -5898,8 +5898,9 @@ def get_recent_terminal_op_states_for_target(
     are additionally narrowed to that operation type (e.g. ``'net_op'``).
 
     This is a generic helper -- it targets any object type. The
-    maintain pass uses ``target_object_type='network'`` and
-    ``op_type='net_op'`` to power its cooldown and circuit-breaker
+    maintain pass's reconciliation guards use
+    ``target_object_type='network'`` with ``op_type`` set to ``'net_op'``
+    or ``'net_ip_op'`` to power their cooldown and circuit-breaker
     queries.
 
     Returns a list of ``(op_uuid, state_value, update_time)`` tuples,

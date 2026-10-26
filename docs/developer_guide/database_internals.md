@@ -382,10 +382,10 @@ gating is required.
 Only these two readers ignore observational rows. The other by-target
 readers deliberately see everything:
 
-* `get_cluster_operation_targets_for_object()`, which the per-blob sweep
-  uses to avoid queueing a duplicate checksum op;
+* `get_cluster_operation_targets_for_object()`, which both the per-blob
+  sweep (to avoid queueing a duplicate checksum op) and
+  `get_cluster_operations()` (the per-object listings) use;
 * the by-target listing;
-* the per-object listings behind `get_cluster_operations()`;
 * `get_recent_terminal_op_states_for_target()`, a circuit breaker which
   wants every failure of a network operation, none of which is
   observational.

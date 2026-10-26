@@ -1,11 +1,13 @@
 # Copyright 2026 Michael Still and contributors
 """Tests for ``NodeInstOp._collect_billing_statistics``.
 
-The per-instance sweep queues this task for created instances, but a queued
-sweep is not cancelled when the instance is later deleted, and a task that
-raises errors its instance. These tests pin down that the task leaves an
-instance which is no longer created alone, and that a disk or console log
-removed while it runs is measured as absent rather than raising.
+The per-instance sweep queues this task for created instances, but the
+instance may have moved on: enqueue_delete() aborts the queued operations it
+finds, but a sweep enqueued after that walk, or one already executing, still
+runs. These tests pin down that the task leaves an instance which is no longer
+created alone, and that a disk or console log removed while it runs is
+measured as absent rather than raising, since a task that raises errors its
+operation.
 """
 import os
 import tempfile
