@@ -15959,6 +15959,11 @@ you are fond of.</p>
 as well. This protects against machine or disk failures causing data loss. The
 default number of replicas is 2, but this is not configurable per-blob. It is
 configured with the <code>BLOB_REPLICATION_FACTOR</code> configuration variable.</p>
+<p>The replication factor is a target, not a limit. A blob ends up with more
+copies than the target whenever an instance on another node needs it, and the
+extra copies are only removed from nodes which are running low on disk. A copy
+on a node where an instance uses the blob as its disk's backing file is never
+removed, because that instance could not start again without it.</p>
 <h2 id="artifact-uploads-and-downloads">Artifact uploads and downloads<a class="headerlink" href="#artifact-uploads-and-downloads" title="Permanent link">&para;</a></h2>
 <p>Artifacts may also be uploaded and downloaded. This means you can extract a
 snapshot from your cluster for offline backup (or movement to another cloud),
