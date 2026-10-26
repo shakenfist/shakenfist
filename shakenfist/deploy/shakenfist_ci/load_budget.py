@@ -406,6 +406,48 @@ HARNESS_DRIVEN_PAIRS = frozenset([
     ('RecordEventBatch', 'sidechannel'),
 ])
 
+# Callers whose database traffic is always somebody else's request, so that
+# an unbudgeted pair from one of them cannot be the new server side poll the
+# unbudgeted assertion exists to catch, however metronomic it looks.
+#
+# sf-api is gunicorn over external_api, and it runs no timer loop which
+# reaches the counter. Its one long lived thread is the readiness checker in
+# external_api/health.py, which calls the gRPC health service, and the
+# tier's interceptor skips /grpc.health.v1.Health/ (see
+# _CallerMetricsInterceptor in shakenfist/daemons/database/main.py), so that
+# poll is never counted. Every other api row is an inbound HTTP request
+# being served. A fixed rate in one of them therefore means some client is
+# calling the API at a fixed rate, and in CI the only client is this suite.
+#
+# HARNESS_DRIVEN_PAIRS above already made that argument one pair at a time,
+# each after a merge queue failure. Issue 4021 is why it is now made for the
+# caller: the share of the tier's traffic that independent_of_activity()
+# compares against is set by whichever test spiked in one window, so a
+# workload pair driven by any other test reads as independent of it. That
+# certified (SetObjectState, api) -- object creates and deletes, counted
+# from the sf-api logs of one failing run -- as a poll in most of that
+# issue's twenty failures, and (FindNetworks, api) or (FindArtifacts, api)
+# in most of the rest. Exempting each pair as it came up would have gone on
+# until every api operation was listed.
+#
+# The api entries in HARNESS_DRIVEN_PAIRS are subsumed by this and kept
+# deliberately. They are checked first and name the harness loop which
+# produced the traffic, which is worth more in a run's detail than "a
+# client", and the tests which hold them up still say when that loop has
+# gone.
+#
+# What it costs, said plainly: this check can no longer see an api pair at
+# all, so a background thread added to sf-api which polled the database
+# would pass it. test_sf_api_starts_only_the_threads_it_is_known_to_start
+# watches external_api for exactly that, though not the shared modules
+# sf-api imports; the one of those which starts a thread is the lock
+# refresher in shakenfist/locks.py, which lives as long as a lock held by
+# a request does. Real clusters keep watching every api pair at the
+# unbudgeted ceiling, because ShakenFistUnbudgetedDatabasePolling takes its
+# exclusions from the budget file and not from here. Pairs from these
+# callers are still reported, under request_driven in the run's detail.
+REQUEST_DRIVEN_CALLERS = frozenset(['api'])
+
 
 def load_budget():
     """The shipped database load budget, as plain dicts.
@@ -491,6 +533,16 @@ def harness_driven(key):
     HARNESS_DRIVEN_PAIRS for why the answer is not simply a budget entry.
     """
     return tuple(key) in HARNESS_DRIVEN_PAIRS
+
+
+def request_driven(key):
+    """Whether a pair's caller only ever serves somebody else's requests.
+
+    Asked after harness_driven(), whose answer names the loop responsible
+    and so is the more useful of the two when both are true. See
+    REQUEST_DRIVEN_CALLERS for why the caller alone settles it.
+    """
+    return tuple(key)[1] in REQUEST_DRIVEN_CALLERS
 
 
 def enforced(entry):
