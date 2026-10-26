@@ -498,8 +498,7 @@ OBJECT_METADATA_VERSION = 3
 # v3: adds observational BOOLEAN NOT NULL DEFAULT 0, and widens
 # idx_cot_target to (target_object_type, target_uuid, observational) so
 # the "current state" readers can skip observational ops (background
-# sweeps that do not change the object) without a row lookup. See
-# docs/plans/PLAN-cluster-op-visibility.md.
+# sweeps that do not change the object) without a row lookup.
 CLUSTER_OPERATION_TARGETS_VERSION = 3
 # v1: schema creation. v2: etcd data-import marker (historical).
 # v3: adds 15 typed nullable capacity columns projected from
@@ -1814,8 +1813,7 @@ def _get_cluster_operation_targets_table() -> sa.Table:
             # rolling upgrade) counts as mutating. observational is the
             # last column of idx_cot_target so the filtered readers are
             # served by the index, while its two-column prefix still
-            # serves the unfiltered ones. See
-            # docs/plans/PLAN-cluster-op-visibility.md.
+            # serves the unfiltered ones.
             _cluster_operation_targets_table = sa.Table(
                 'cluster_operation_targets',
                 metadata,
@@ -1912,11 +1910,10 @@ def _ensure_cluster_operation_targets_schema(
         _set_table_version(engine, table_name, current_ver)
 
     if current_ver < 3:
-        # Add the observational flag (see
-        # docs/plans/PLAN-cluster-op-visibility.md): true when every
-        # task of the operation only observes its targets, so the
-        # "current state" readers can skip it. The default is the
-        # conservative value. Existing rows, and any row an older
+        # Add the observational flag: true when every task of the
+        # operation only observes its targets, so the "current state"
+        # readers can skip it. The default is the conservative value.
+        # Existing rows, and any row an older
         # daemon writes during a rolling upgrade (it does not know the
         # column), read as mutating, which is exactly how they were
         # treated before this column existed.
@@ -5371,8 +5368,7 @@ def _direct_get_latest_cluster_operation_target(
                     table.c.target_object_type == target_object_type,
                     table.c.target_uuid == target_uuid,
                     # An observational op (a checksum sweep, a health
-                    # probe) must not become last_cluster_operation. See
-                    # docs/plans/PLAN-cluster-op-visibility.md.
+                    # probe) must not become last_cluster_operation.
                     table.c.observational == sa.false()
                 )
             ).order_by(table.c.sequence_number.desc()).limit(1)
@@ -5429,7 +5425,6 @@ def _direct_has_pending_cluster_operation_target(
                     table.c.target_uuid == target_uuid,
                     # An observational op must not count as pending, or a
                     # background sweep would defer the work gated on this.
-                    # See docs/plans/PLAN-cluster-op-visibility.md.
                     table.c.observational == sa.false(),
                     states_table.c.state_value.in_(_ACTIVE_OPERATION_STATES)
                 )
@@ -5473,9 +5468,12 @@ def _direct_get_recent_terminal_op_states_for_target(
     table = _get_cluster_operation_targets_table()
     states_table = _get_object_states_table()
 
-    # Deliberately not filtered on observational: the only callers ask
-    # about net_op on networks, which is never observational, and a circuit
-    # breaker wants every failure anyway.
+    # Deliberately not filtered on observational: both callers (the
+    # reconciliation guards in daemons/network/maintain.py) ask about
+    # network operation types, net_op and net_ip_op, which are never
+    # observational (the classification table in
+    # tests/schema/operations/test_observational_tasks.py enforces it), and
+    # a circuit breaker wants every failure anyway.
     conditions = [
         table.c.target_object_type == target_object_type,
         table.c.target_uuid == target_uuid,
@@ -5851,7 +5849,6 @@ def get_latest_cluster_operation_target(
 
     Observational operations (every task only observes the target) are
     excluded, so a background sweep cannot shadow last_cluster_operation.
-    See docs/plans/PLAN-cluster-op-visibility.md.
 
     Returns:
         The most recent mutating target data, or None if there is none.
@@ -5877,7 +5874,7 @@ def has_pending_cluster_operation_target(
 
     Observational operations (every task only observes the target) are
     excluded, so an in-flight background sweep does not make the object
-    busy. See docs/plans/PLAN-cluster-op-visibility.md.
+    busy.
     """
     if _use_database_service():
         return _grpc_has_pending_cluster_operation_target(
@@ -21897,7 +21894,7 @@ def _direct_create_and_enqueue_cluster_operation(
        row is stamped with the same ``observational`` flag: an
        operation has one classification, copied onto each of its
        target rows so the by-target filters need no JOIN back to
-       cluster_operations (see docs/plans/PLAN-cluster-op-visibility.md).
+       cluster_operations.
 
     This is the only function in mariadb.py that writes to more
     than one table in a single transaction. The existing

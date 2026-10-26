@@ -6,7 +6,7 @@
 # and has_pending_cluster_operation_target() skip target rows stamped
 # observational, so a background sweep cannot shadow the mutating op a
 # caller is waiting on, nor make an object look busy. Every other reader
-# still sees those rows. See docs/plans/PLAN-cluster-op-visibility.md.
+# still sees those rows.
 #
 # The behaviour test here drives the real enqueue path --
 # enqueue_cluster_operation() deriving the flag, and

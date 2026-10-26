@@ -122,10 +122,12 @@ class NodeInstOp(BaseClusterOperation):
                     inst.state = Instance.STATE_ERROR
 
     def _collect_billing_statistics(self, inst):
-        # The sweep enqueues this only for created instances, but a queued
-        # sweep is not cancelled by a later delete, so the instance may have
-        # moved on. There is nothing useful to measure on a guest that is
-        # being deleted, and its disks may vanish while we stat them.
+        # The sweep enqueues this only for created instances, but the
+        # instance may have moved on: enqueue_delete() aborts the queued
+        # operations it finds, but a sweep enqueued after that walk, or one
+        # already executing, still runs. There is nothing useful to measure
+        # on a guest that is being deleted, and its disks may vanish while we
+        # stat them.
         if inst.state.value != Instance.STATE_CREATED:
             return
 

@@ -279,10 +279,9 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
     target_uuid)`` pair per non-None target to
     create_and_enqueue_cluster_operation via its ``targets``
     argument, so the target rows are written in the same
-    transaction as the operation. These tests exercise the four
-    cases called out in the phase plan: single-target,
-    multi-target, nullable, and missing-declaration. They also
-    assert the targets travel in the atomic enqueue call.
+    transaction as the operation. These tests exercise four cases:
+    single-target, multi-target, nullable, and missing-declaration.
+    They also assert the targets travel in the atomic enqueue call.
     """
 
     def setUp(self):

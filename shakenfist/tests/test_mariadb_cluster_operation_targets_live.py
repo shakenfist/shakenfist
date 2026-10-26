@@ -10,9 +10,8 @@ MariaDB database (CI provides one via tools/ci-enum-widening-test.sh,
 which matches every test_mariadb_*_live.py module by regex; developers
 can point at a local instance).
 
-v3 adds the observational flag (see
-docs/plans/PLAN-cluster-op-visibility.md) and widens idx_cot_target to
-end in it. Both halves need a real server to check. The rest of the
+v3 adds the observational flag and widens idx_cot_target to end in it.
+Both halves need a real server to check. The rest of the
 unit suite runs against mocks or sqlite, which cannot say whether the
 ALTER is valid MariaDB, what default an existing row is given, or
 which index the optimizer picks. The ALTER also leans on MariaDB's IF
@@ -297,7 +296,6 @@ class ClusterOperationTargetsMigrationLiveTestCase(base.ShakenFistTestCase):
 
         message = f'v2 -> v3 migration of {rows} rows took {elapsed:.3f}s'
         self.addDetail('migration-time', text_content(message))
-        print(message)
 
         self.assertTrue(result['migrated'])
         self._assert_v3_shape()

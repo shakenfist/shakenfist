@@ -54,7 +54,7 @@ class ClusterOperationTargetData(BaseModel):
         observational: True if every task of the operation only
             observes the target rather than changing it. Such rows are
             skipped by the "current state" readers (get_latest and
-            has_pending); see docs/plans/PLAN-cluster-op-visibility.md.
+            has_pending).
             Defaults to False, the conservative (mutating) value.
     """
 

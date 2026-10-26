@@ -27,8 +27,7 @@ def is_observational(
     cluster_operation_targets rows are stamped observational so that
     the "current state" by-target queries (get_latest and has_pending)
     can ignore them, and a background sweep cannot shadow the
-    mutating op a caller is waiting on. See
-    docs/plans/PLAN-cluster-op-visibility.md for the rationale.
+    mutating op a caller is waiting on.
 
     The classification is declared per *task*, not per operation
     model, because several models carry both kinds of work
@@ -78,7 +77,8 @@ def enqueue_cluster_operation(
     """Create a cluster operation and enqueue its work item.
 
     Performs a single MariaDB-backed atomic write (cluster_operations
-    row, object_states row, work_queue row) via
+    row, object_states row, work_queue row, and one
+    cluster_operation_targets row per target) via
     mariadb.create_and_enqueue_cluster_operation() followed by an
     audit event emission via the eventlog service. Callers are
     the create_and_enqueue() wrappers in
