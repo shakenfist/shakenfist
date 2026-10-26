@@ -297,7 +297,8 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         # The readiness checker is the one loop, and it is allowed because
         # its only call is the gRPC health service, which the tier's
         # interceptor does not count (test_database_attribution.py holds
-        # that half up). The drain timer fires once, at shutdown.
+        # that half up). The drain thread waits for SIGTERM, then runs
+        # once, at shutdown.
         started = set()
         root = os.path.join(_repository_root(), 'shakenfist', 'external_api')
         for dirpath, _, filenames in os.walk(root):
@@ -326,7 +327,7 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(
             {('health.py', 'Thread', '_checker_loop'),
-             ('gunicorn_config.py', 'Timer', '_invoke_orig')},
+             ('gunicorn_config.py', 'Thread', '_drain_after_signal')},
             started,
             'sf-api starts a thread this check does not know about. Every '
             'api pair is exempt from the unbudgeted polling assertion '
