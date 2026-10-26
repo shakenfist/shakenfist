@@ -16229,8 +16229,8 @@ table entirely (decision D8).</p>
 </tr>
 <tr>
 <td>7a. An operator-readable capacity surface</td>
-<td>PLAN-scheduler-reservations-phase-07a-capacity-surface.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-scheduler-reservations-phase-07a-capacity-surface/">PLAN-scheduler-reservations-phase-07a-capacity-surface.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -16478,14 +16478,33 @@ is here.</p>
   records both, because a phase whose bookkeeping trails its code
   by a day is a phase whose status columns lie for a day.</p>
 <ul>
-<li><strong>Phases 7a and 7b</strong> were inserted on 2026-10-20, between phases
+<li>
+<p><strong>Phases 7a and 7b</strong> were inserted on 2026-10-20, between phases
   7 and 8, after a reading of <code>sf-client</code> against this plan's API
   surface found that an operator can see almost none of what
   phases 2 to 7 built without <code>curl</code>. The operator guide phase 8
   owes cannot document commands that do not exist, and phase 9's
   audit is meant to review the final client surface, so both
   phases sit ahead of them. Neither depends on phase 5, and 7b
-  needs nothing from 7a, so the two can run in parallel.</li>
+  needs nothing from 7a, so the two can run in parallel.</p>
+</li>
+<li>
+<p><strong>Phase 7a</strong>'s server half was implemented on 2026-10-25.</p>
+</li>
+<li><strong>What it adds:</strong> a <code>GetClusterCapacity</code> read, <code>cluster_capacity</code>
+    and <code>excluded</code> in <code>/admin/resources</code>, the <code>GET /admin/claims</code>
+    listing with a SQL-side <code>coverage_state</code> filter, and three
+    capability tokens.</li>
+<li><strong>Client verb:</strong> <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/438" title="GitHub Issue: shakenfist/client-python #438">client-python#438</a>. It must merge before the
+    shakenfist pull request's merge-queue run, because cluster CI
+    builds the client from <code>develop</code>.</li>
+<li><strong>Deferred:</strong> step 8, the <code>sf-client</code> readers, waits on 7b's
+    <code>node capacity</code> command.</li>
+<li><strong>Phase 5 has two keys to carry:</strong> its rewrite of the admin view
+    must keep <code>cluster_capacity</code> and <code>excluded</code> (see the phase 5
+    stub). The Execution notes in the phase plan record the two
+    gate decisions: an absolute <code>metrics_timestamp</code>, and the reason
+    strings as a closed set.</li>
 </ul>
 <h3 id="phase-scope-stubs">Phase scope stubs<a class="headerlink" href="#phase-scope-stubs" title="Permanent link">&para;</a></h3>
 <p>Each stub is the seed for that phase's plan file; decisions
@@ -16692,6 +16711,15 @@ ranking is in <code>schedule final candidates</code>. The finding also
 quoted headroom weights for the nodes it called eliminated, and
 a node only has a weight if it is in the returned list, so its
 own evidence refutes it.</p>
+<p><em>Input from phase 7a (2026-10-25):</em> D11's rewrite of <code>admin.py</code>'s
+capacity view onto the typed capacity columns has more to carry
+than this stub assumed. Phase 7a adds two top-level keys to
+<code>summarize_resources()</code>: <code>cluster_capacity</code> (the singleton's
+counters and <code>unallocated_*</code>) and <code>excluded</code> (why each active
+node is missing from <code>per_node</code>). The rewrite must keep both,
+and 7a's functional tests in <code>test_nodes.py</code> fail if it does not.
+7a deliberately left the endpoint's <code>Scheduler()</code> construction
+alone so that the migration stays this phase's (7a's H7).</p>
 <p>What survives for phase 6 is real but weaker: <code>cpu_load_1</code>
 measures activity rather than occupancy, so a node packed with
 idle CI runners <em>ranks ahead of</em> a busier node with more room.
@@ -16884,6 +16912,28 @@ server half: publish what the table above says nobody can read.</p>
   its best test. A server surface that nobody can read is the
   gap these two phases exist to close (7b's D7).</li>
 </ul>
+<p><em>Corrected by the phase 7a survey (2026-10-25).</em> Three premises
+above were wrong.</p>
+<ul>
+<li>Neither capacity guard <em>reads</em> the singleton. Both are guarded
+  <code>UPDATE</code>s (<code>mariadb.py:27577-27586</code> for an unclaimed placement,
+  <code>_claim_capacity_guard()</code> at <code>:28440</code> for a claim), and no RPC
+  reads the row on demand, so 7a adds one. Both guards test
+  against the same quantity, <code>total - claimed - unclaimed_used</code>,
+  so 7a publishes that as the one headroom figure and pins it to
+  both guards with a live-MariaDB test.</li>
+<li>The queue-length exclusion is one of five ways a hypervisor
+  leaves <code>per_node</code>. The others are: not <code>active</code>, stale metrics,
+  no metrics, and a failed metrics read. In the stale and empty
+  cases the server reads <code>is_hypervisor</code> from the emptied metrics
+  dict, so it cannot tell such a hypervisor from a network node.</li>
+<li>The <code>mariadb.py:28175</code> and <code>:29023</code> references above had
+  drifted. They are now <code>:27577</code> / <code>:28440</code> and <code>:29296</code>.</li>
+</ul>
+<p>The response shapes, the <code>/admin/claims</code> URL and the client pull
+request order are decided in
+<a href="../PLAN-scheduler-reservations-phase-07a-capacity-surface/">PLAN-scheduler-reservations-phase-07a-capacity-surface.md</a>,
+H1 to H9.</p>
 <p><strong>Phase 7b — capacity and claim views in sf-client.</strong> This is the
 client half. It lands entirely in <code>client-python</code>, so the phase
 plan goes there too, following agent operation deadlines phase 6.

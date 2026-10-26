@@ -15677,6 +15677,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#listing-every-namespaces-claims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Listing every namespace's claims
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#when-a-claim-cannot-be-made" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16029,6 +16040,17 @@
     <span class="md-ellipsis">
       
         The two states a claim carries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listing-every-namespaces-claims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Listing every namespace's claims
       
     </span>
   </a>
@@ -16673,7 +16695,26 @@ promptly.</p>
 </tbody>
 </table>
 <p>An expired claim reads as <code>state: created, coverage_state: expired</code>. A
-deleted claim has no row at all.</p>
+claim deleted through the API has no row at all: the delete returns its
+capacity and removes the row in one transaction. A claim can still read
+<code>state: deleted</code> while its row exists, when zombie repair has marked it
+and the reaper has not yet removed it. That row still holds capacity,
+which is why the listings below show it.</p>
+<h3 id="listing-every-namespaces-claims">Listing every namespace's claims<a class="headerlink" href="#listing-every-namespaces-claims" title="Permanent link">&para;</a></h3>
+<p><code>GET /admin/claims</code> lists the claims of every namespace in one request,
+admin-only, where <code>/auth/namespaces/&lt;namespace&gt;/claims</code> lists one
+namespace's. Each entry has the same shape as there. An optional
+<code>coverage_state</code> of <code>active</code> or <code>expired</code> restricts the listing to claims
+in that <a href="#the-two-states-a-claim-carries">coverage state</a>, and the
+filter is applied by the database. Any other value is a 400.</p>
+<p>The listing deliberately includes a claim whose object state is
+<code>deleted</code>. A claim has no soft delete: such a row still holds
+<code>claimed_*</code> in the cluster ledger, waiting for the reaper to remove it
+and return the capacity. Hiding it would make the one operator view of
+claims disagree with the capacity actually held. Looking one up by uuid
+answers 404 instead, since there is nothing useful left to do to it.</p>
+<p>To compare the claims with the ledger they draw on, read the same
+cluster's <a href="#the-cluster-wide-ledger-in-the-resources-response"><code>cluster_capacity</code></a>.</p>
 <h3 id="when-a-claim-cannot-be-made">When a claim cannot be made<a class="headerlink" href="#when-a-claim-cannot-be-made" title="Permanent link">&para;</a></h3>
 <p>A claim request that the cluster declines is not a failure, and the
 status code says which kind of no it was:</p>
@@ -16995,6 +17036,137 @@ enumerated before it has not. Between the two the call was still
 running, and a measurement may or may not reflect it. A <code>poweroff</code>
 event carries these fields only when that call is the one which stopped
 the domain; deleting an instance powers it off more than once.</p>
+<h3 id="the-cluster-wide-ledger-in-the-resources-response">The cluster-wide ledger in the resources response<a class="headerlink" href="#the-cluster-wide-ledger-in-the-resources-response" title="Permanent link">&para;</a></h3>
+<p><code>/admin/resources</code> also carries a top-level <code>cluster_capacity</code> key. It
+is the <code>cluster_capacity</code> singleton row itself, read once per request:
+the one ledger that both cluster-wide guards test against (see
+<a href="#namespace-capacity-claims">Namespace capacity claims</a>). It is not a sum
+of claims, and it is deliberately kept out of <code>total</code>: <code>total</code> adds up
+per-node headroom bounded by measurement, whereas this ledger's totals
+are sums of node <em>limits</em>, and the two should not be compared as if they
+were the same quantity.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>total_cpus</code>, <code>total_memory_mb</code>, <code>total_disk_gb</code></td>
+<td>The cluster's capacity, summed from the per-node limits</td>
+</tr>
+<tr>
+<td><code>claimed_cpus</code>, <code>claimed_memory_mb</code>, <code>claimed_disk_gb</code></td>
+<td>The limits of every active namespace claim</td>
+</tr>
+<tr>
+<td><code>unclaimed_used_cpus</code>, <code>unclaimed_used_memory_mb</code>, <code>unclaimed_used_disk_gb</code></td>
+<td>What instances in namespaces without a covering claim have drawn down</td>
+</tr>
+<tr>
+<td><code>unallocated_cpus</code>, <code>unallocated_memory_mb</code>, <code>unallocated_disk_gb</code></td>
+<td><code>total - claimed - unclaimed_used</code>, per dimension</td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td>Epoch seconds of the row's last write</td>
+</tr>
+<tr>
+<td><code>row_present</code>, <code>degraded</code></td>
+<td>Why the figures above are, or are not, there</td>
+</tr>
+</tbody>
+</table>
+<p><code>unallocated_*</code> is the figure to read. An unclaimed placement is admitted
+when it fits in what is neither claimed nor already used by unclaimed
+namespaces, and a new claim must fit in the same space, so one number
+per dimension answers both questions: a request of exactly
+<code>unallocated_*</code> is admitted, and one more is refused. For a claim, that
+is exact only when the namespace has no unclaimed instances of its own.
+A namespace that already runs unclaimed instances can claim up to
+<code>unallocated_*</code> plus that usage, because the claim takes the usage over:
+it leaves <code>unclaimed_used_*</code> as the claim enters <code>claimed_*</code>, so it is
+not counted twice. The server computes <code>unallocated_*</code> once, beside the
+read, so a client does not have to repeat the arithmetic and risk
+getting it slightly different.</p>
+<p><code>unallocated_*</code> can be negative, and is published as it is. Admission
+cannot drive it below zero, but the reconciler rebuilds <code>claimed_*</code> from
+the limits of every active claim whether or not they still fit, so a
+cluster that shrank underneath its claims reads as over-promised. That is
+the state you want to see, not one to clamp away.</p>
+<p><code>updated_at</code> is the row's last write by <em>either</em> admission or the
+reconciler. Every placement draws the row down, so on a busy cluster it
+moves constantly and says nothing about when the reconciler last ran.</p>
+<p><code>row_present</code> and <code>degraded</code> distinguish the two reasons there might be
+no figures, and when either is the case every other figure is <code>null</code>,
+never zero. A ledger of zeroes would claim the cluster is full, which
+neither case means.</p>
+<ul>
+<li><code>row_present: false, degraded: false</code> -- the reconciler has not yet
+  written the row. This is normal for the first few minutes of a
+  cluster's life, and until then unclaimed placements are not guarded
+  against the cluster total at all.</li>
+<li><code>degraded: true</code> -- the read failed or timed out (it is given a short,
+  bounded budget, because CI polls this endpoint continuously), and the
+  state of the row is unknown. Read it again.</li>
+</ul>
+<p>Both flags are the same idea as <code>cpu_committed_row_present</code> and
+<code>capacity_degraded</code>, which this response already publishes for the
+per-node ledger.</p>
+<h3 id="why-a-node-is-missing-from-the-resources-response">Why a node is missing from the resources response<a class="headerlink" href="#why-a-node-is-missing-from-the-resources-response" title="Permanent link">&para;</a></h3>
+<p>A hypervisor that is not in <code>per_node</code> is in the top-level <code>excluded</code>
+mapping, keyed by node uuid, if the scheduler considered it. Each entry
+carries a <code>reason</code>, and there are exactly four:</p>
+<table>
+<thead>
+<tr>
+<th><code>reason</code></th>
+<th>Meaning</th>
+<th>Extra fields</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>queue too long</code></td>
+<td>The node's <code>sf-resources</code> metrics are fresh, but its work queue exceeds the threshold, so it is not a placement candidate</td>
+<td><code>node_queue_waiting</code>, <code>unreasonable_threshold</code></td>
+</tr>
+<tr>
+<td><code>stale metrics</code></td>
+<td>The node's metrics row is more than 120 seconds old</td>
+<td><code>metrics_timestamp</code>, the row's own epoch timestamp</td>
+</tr>
+<tr>
+<td><code>no metrics</code></td>
+<td>The node has no metrics row</td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>metrics unreadable</code></td>
+<td>Reading the node's metrics row failed</td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<p><code>stale metrics</code> carries a timestamp rather than an age on purpose: a
+summary can be served from a cache, and an age computed when the metrics
+were loaded would be wrong by however long they had been held. Subtract
+it from the current time to get the age.</p>
+<p>Before this key existed a hypervisor whose daemon had stopped publishing
+was indistinguishable, in this response, from a network node. A node
+with a stale or missing metrics row has no <code>is_hypervisor</code> flag to read,
+so it was skipped as though it were not a hypervisor. The three metrics
+reasons are therefore reported for <em>every</em> active node whatever its role:
+the server cannot know the role of a node whose metrics it could not
+read. Filter on <code>is_hypervisor</code> from the node list to see only
+hypervisors. The same causes are recorded as audit events on the node.</p>
+<p>Two kinds of node never appear in <code>excluded</code>. A node that is not active
+is left out, because the node list already publishes its state. And a
+non-hypervisor with fresh metrics (a network node, say) is not a
+candidate and was never going to be in <code>per_node</code>, so it has nothing to
+explain.</p>
 <h3 id="was-affinity-ignored-or-was-there-no-choice">Was affinity ignored, or was there no choice?<a class="headerlink" href="#was-affinity-ignored-or-was-there-no-choice" title="Permanent link">&para;</a></h3>
 <p>This is the question almost every affinity report turns out to be,
 and the events answer it directly. Read them at the API's maximum
