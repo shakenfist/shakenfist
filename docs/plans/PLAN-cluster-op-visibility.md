@@ -288,7 +288,7 @@ every consumer, so that:
 | 2. Observational flag: schema and query layer | [PLAN-cluster-op-visibility-phase-02-observational-schema.md](PLAN-cluster-op-visibility-phase-02-observational-schema.md) | Complete | `9b098c6ac` (#4574) |
 | 3. Classify and mark observational tasks | [PLAN-cluster-op-visibility-phase-03-mark-observational.md](PLAN-cluster-op-visibility-phase-03-mark-observational.md) | Complete | `27ea18202` (#4588) |
 | 4. API surface: has_pending_operations and truthful outstanding ops | [PLAN-cluster-op-visibility-phase-04-api-surface.md](PLAN-cluster-op-visibility-phase-04-api-surface.md) | Complete | `3642e7a75` (#4606), `bdc91db78` (#4617) |
-| 5. CI helper simplification, functional coverage, documentation | [PLAN-cluster-op-visibility-phase-05-coverage-docs.md](PLAN-cluster-op-visibility-phase-05-coverage-docs.md) | In progress | — |
+| 5. CI helper simplification, functional coverage, documentation | [PLAN-cluster-op-visibility-phase-05-coverage-docs.md](PLAN-cluster-op-visibility-phase-05-coverage-docs.md) | Complete | `93c31035a` (#4650) |
 | 6. Push audit | PLAN-cluster-op-visibility-phase-06-push-audit.md | Not started | — |
 
 The `Merged` column records what put each phase on `develop`.
