@@ -582,6 +582,39 @@ the plan is not complete until each is resolved or declined
 in writing here. If the audit finds nothing, that is
 recorded in one sentence.
 
+#### Audit of phases 1 to 5
+
+Run on 2026-10-26 over the six merges and client-python #436. The full
+record is in the Findings section of [the phase 6
+plan](PLAN-cluster-op-visibility-phase-06-push-audit.md). The audit
+covered wave 1, all four judgment reviews, a check that the
+observational and pending rules agree everywhere, and the client
+contract.
+
+* Wave 1 passed: 6,216 tests and no failures. The stubs are fresh, and
+  mermaid renders.
+* **One finding is blocking**, #4665. A release note says a failing
+  billing or health task still errors its instance, which #4608 made
+  false. It is fixed in a follow-up pull request, together with ten
+  one-line documentation and comment corrections (A1-A10 in the
+  disposition table). That pull request also carries this phase's
+  close-out.
+* **Advisory findings filed:**
+  * #4666, the artifact listing shows instance uuids to shared and
+    trusted readers (low severity);
+  * #4667, the two listings diverge and are unbounded;
+  * #4668, the in-flight state list in four places;
+  * #4669, coverage gaps;
+  * #4670, task-level against operation-level observational checks.
+* **The client half**, filed as client-python #439, #440 and #441. In
+  particular, `await_no_pending_operations()` returns a deleted object
+  as settled.
+* **Predating problems, filed as issues rather than findings:** #4671,
+  #4672, #4673, #4674 and #4675. A note for whoever fixes #3922 is on
+  that issue.
+* **The rule-coherence check** found no reachable divergence beyond the
+  documented rolling-upgrade case.
+
 ## Agent guidance
 
 ### Execution model
@@ -735,7 +768,7 @@ because the following statements will be true:
   consult `has_pending_operations` instead of any remaining
   last-op reads (audit for other legacy readers of
   `last_cluster_operation` beyond the six `runs_after`
-  sites). *(Audited in phase 4: nothing in the scheduler or
+  sites). *(Filed as #4673 by the push audit.)* *(Audited in phase 4: nothing in the scheduler or
   cleaner reads the pointer. Its readers are the three views
   and the six `runs_after` sites, one of which, in
   `Network.new()`, always sees `None`. The four that phase 4
@@ -747,21 +780,26 @@ because the following statements will be true:
   phase 4 plan.)*
 * `/clusteroperations?all=true` pagination if history size
   becomes a practical problem. It is bounded by the seven-day
-  target-row retention, mostly by errored ops (#3922).
+  target-row retention, mostly by errored ops (#3922). *(Filed with
+  the listings' divergence as #4667 by the push audit.)*
 * If `HasPendingClusterOperationTarget` from sf-api becomes a
   real load problem, one RPC answering both latest and pending
   for an object would keep each view at today's query count.
   Phase 4 measured the field at about 2.5 requests a second on
-  sfcbr.
+  sfcbr. *(Stays an idea: the push audit found the list endpoints
+  multiply it by N, which is still not a measured problem.)*
 * Interfaces are targets of hot-plug ops but carry neither
-  `last_cluster_operation` nor `has_pending_operations`.
+  `last_cluster_operation` nor `has_pending_operations`. *(Stays an
+  idea: no consumer has asked for it.)*
 * The per-blob sweep's duplicate guard could pass
   `pending_only=True` (added in phase 4) instead of hydrating
-  every target row. Its load is negligible today.
+  every target row. Its load is negligible today. *(Stays an idea, for
+  that reason.)*
 * The 15-second enqueue-to-execution latency observed for the
   `user_waiting` hot-plug chain in CI (dependency deferral
   polling cadence) is worth a separate look — it is latency,
-  not correctness, but user-visible.
+  not correctness, but user-visible. *(Stays an idea: it belongs to
+  the queue performance work, not this plan.)*
 * #4585: a failing billing or KVM health check task moves a
   healthy instance to `created-error`, because
   `NodeInstOp.dispatch_task()` errors the instance on any task
@@ -778,12 +816,14 @@ because the following statements will be true:
 * An agent operation's preflight (`node_aop_op`) targets only the
   agent operation, not its instance, so an instance delete never
   cancels a pending one. Found in phase 4; it predates this plan.
+  *(Filed as #4672 by the push audit.)*
 * `Instance.enqueue_delete()` fails open: the target listing it
   walks returns `[]` on a database error, so the delete aborts
   nothing and waits for no snapshot. A variant of the listing which
   raises, so the delete is refused or retried instead, would make
   the snapshot guarantee hold. Found by the automated review of
   phase 4; the pointer walk it replaced failed the same way.
+  *(Filed as #4671 by the push audit.)*
 * Issue #3278 (CI and test coverage backlog) may want a note
   about the deflaked helper pattern. *(Declined in phase 5: the
   pattern is documented in `docs/developer_guide/ci.md`, where a

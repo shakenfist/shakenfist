@@ -154,12 +154,16 @@ need to redo them:
      because the per-blob sweep must see its own checksum ops;
    * `_direct_get_recent_terminal_op_states_for_target` (`:5455`),
      whose comment says its only callers ask about `net_op` on
-     networks, "which is never observational".
+     networks, "which is never observational". *(Corrected by 6h:
+     `daemons/network/maintain.py:779` also asks about `net_ip_op`, so
+     the comment was wrong when it was written. The classification
+     table is what keeps both types mutating.)*
 
    The "still in flight" state list is written twice: as
    `_ACTIVE_OPERATION_STATES` (`mariadb.py:5402`), and as a literal
    `active_states` in `_direct_delete_stale_cluster_operation_targets`
-   (`:5588`). The sweep test has its own `TERMINAL_STATES` set. Each
+   (`:5588`). *(6h found a third, in the orphan reaper at `:23986`.)*
+   The sweep test has its own `TERMINAL_STATES` set. Each
    is a place the rule can drift.
 
 8. **None of the master plan's Future work entries has an issue.**
@@ -424,6 +428,688 @@ to get wrong:
   request exists at all. Both are easier to agree before filing than
   to unwind after.
 
+## Findings
+
+Every candidate below was checked at `$TIP` by the management session.
+At least one claim from each report was reproduced against the file,
+and 6h's six proof tests were run. Where a report names a later merge,
+its classification under decision 2 is given. A finding with no
+classification is still true at `$TIP`.
+
+### Wave 1
+
+Run by 6b on 2026-10-26 against `$TIP` plus this phase's two planning
+commits. It passed, so decision 9's relaxation was not needed.
+
+| Check | Result |
+|-------|--------|
+| `pre-commit run --all-files` | Pass, exit 0 |
+| `tox` (py3, flake8, cover) | Pass, exit 0. stestr ran 6,216 tests: 6,065 passed, 151 skipped, 0 failed |
+| `tools/mermaid-lint.sh` | Exit 0, read directly rather than through a pipe |
+| `tox -e genprotos && git diff --exit-code shakenfist/protos` | Exit 0, no diff. The stubs are fresh |
+| `git status --short` afterwards | Empty |
+
+Across the 24 style-grep runs there are three kinds of hit:
+
+* **Lines over 120 characters:** only the generated `database_pb2.py`
+  descriptor, in #3465, #4574 and #4606, which is exempt.
+* **`print(`:** one hit, in #4574, `test_mariadb_cluster_operation_targets_live.py:300`.
+  It is graded under Style.
+* **`etcd`:** one hit, in #3465, and it is only the word in a mock's
+  docstring.
+
+`get_all_` produces no output in any range.
+
+### Mechanical sweep
+
+The 30 sweep runs found no TODO, FIXME, `# noqa`, `# type: ignore` or
+subprocess hits in any range. #4617 is the one range with no new test
+functions; it is the smallest, at four files. Below are the literal
+outputs for every range, all nine commands each. The three descriptor
+lines are described rather than quoted, because each one is 65,000 to
+91,000 characters of serialised protobuf.
+
+##### `bc7c119bf` (#3465)
+
+* `git diff bc7c119bf^1 bc7c119bf -- '*.py' | grep -nE '^\+[^+].{120,}'`
+
+  ```
+  392:+DESCRIPTOR = ... (generated shakenfist/protos/database_pb2.py, 65,581 characters; exempt)
+  ```
+* `git diff bc7c119bf^1 bc7c119bf -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+  no output
+* `git diff bc7c119bf^1 bc7c119bf -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+
+  ```
+  566:+        mock also writes the legacy etcd path at
+  ```
+* `git diff bc7c119bf^1 bc7c119bf -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+  no output
+* `git diff bc7c119bf^1 bc7c119bf -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+  no output
+* `git diff bc7c119bf^1 bc7c119bf -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+  no output
+* `git diff bc7c119bf^1 bc7c119bf --stat | tail -1; git diff bc7c119bf^1 bc7c119bf -- '*.py' | grep -cE '^\+\s*def test_'`
+
+  ```
+   18 files changed, 1196 insertions(+), 177 deletions(-)
+  2
+  ```
+* `git diff bc7c119bf^1 bc7c119bf --name-only -- 'docs/*' '*.md'`
+
+  ```
+  docs/plans/PLAN-cluster-op-visibility-phase-01-ci-deflake.md
+  docs/plans/PLAN-cluster-op-visibility.md
+  docs/plans/index.md
+  docs/plans/order.yml
+  ```
+* `git diff bc7c119bf^1 bc7c119bf -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+  no output
+
+##### `9b098c6ac` (#4574)
+
+* `git diff 9b098c6ac^1 9b098c6ac -- '*.py' | grep -nE '^\+[^+].{120,}'`
+
+  ```
+  792:+DESCRIPTOR = ... (generated shakenfist/protos/database_pb2.py, 90,549 characters; exempt)
+  ```
+* `git diff 9b098c6ac^1 9b098c6ac -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+
+  ```
+  2824:+        print(message)
+  ```
+* `git diff 9b098c6ac^1 9b098c6ac -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+  no output
+* `git diff 9b098c6ac^1 9b098c6ac -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+  no output
+* `git diff 9b098c6ac^1 9b098c6ac -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+  no output
+* `git diff 9b098c6ac^1 9b098c6ac -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+  no output
+* `git diff 9b098c6ac^1 9b098c6ac --stat | tail -1; git diff 9b098c6ac^1 9b098c6ac -- '*.py' | grep -cE '^\+\s*def test_'`
+
+  ```
+   32 files changed, 2542 insertions(+), 731 deletions(-)
+  43
+  ```
+* `git diff 9b098c6ac^1 9b098c6ac --name-only -- 'docs/*' '*.md'`
+
+  ```
+  docs/developer_guide/api_reference/clusteroperations.md
+  docs/developer_guide/database_internals.md
+  docs/developer_guide/network_dispatcher.md
+  docs/operator_guide/database.md
+  docs/operator_guide/upgrades.md
+  docs/plans/PLAN-cluster-op-visibility-phase-02-observational-schema.md
+  docs/plans/PLAN-cluster-op-visibility.md
+  ```
+* `git diff 9b098c6ac^1 9b098c6ac -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+  no output
+
+##### `27ea18202` (#4588)
+
+* `git diff 27ea18202^1 27ea18202 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+  no output
+* `git diff 27ea18202^1 27ea18202 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+  no output
+* `git diff 27ea18202^1 27ea18202 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+  no output
+* `git diff 27ea18202^1 27ea18202 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+  no output
+* `git diff 27ea18202^1 27ea18202 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+  no output
+* `git diff 27ea18202^1 27ea18202 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+  no output
+* `git diff 27ea18202^1 27ea18202 --stat | tail -1; git diff 27ea18202^1 27ea18202 -- '*.py' | grep -cE '^\+\s*def test_'`
+
+  ```
+   27 files changed, 984 insertions(+), 57 deletions(-)
+  15
+  ```
+* `git diff 27ea18202^1 27ea18202 --name-only -- 'docs/*' '*.md'`
+
+  ```
+  docs/developer_guide/database_internals.md
+  docs/plans/PLAN-cluster-op-visibility-phase-03-mark-observational.md
+  docs/plans/PLAN-cluster-op-visibility.md
+  docs/plans/index.md
+  docs/release_notes/v07-v08.md
+  ```
+* `git diff 27ea18202^1 27ea18202 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+  no output
+
+##### `3642e7a75` (#4606)
+
+* `git diff 3642e7a75^1 3642e7a75 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+
+  ```
+  715:+DESCRIPTOR = ... (generated shakenfist/protos/database_pb2.py, 91,099 characters; exempt)
+  ```
+* `git diff 3642e7a75^1 3642e7a75 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+  no output
+* `git diff 3642e7a75^1 3642e7a75 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+  no output
+* `git diff 3642e7a75^1 3642e7a75 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+  no output
+* `git diff 3642e7a75^1 3642e7a75 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+  no output
+* `git diff 3642e7a75^1 3642e7a75 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+  no output
+* `git diff 3642e7a75^1 3642e7a75 --stat | tail -1; git diff 3642e7a75^1 3642e7a75 -- '*.py' | grep -cE '^\+\s*def test_'`
+
+  ```
+   31 files changed, 1961 insertions(+), 408 deletions(-)
+  26
+  ```
+* `git diff 3642e7a75^1 3642e7a75 --name-only -- 'docs/*' '*.md'`
+
+  ```
+  docs/developer_guide/api_reference/artifacts.md
+  docs/developer_guide/api_reference/clusteroperations.md
+  docs/developer_guide/api_reference/instances.md
+  docs/developer_guide/api_reference/networks.md
+  docs/developer_guide/database_internals.md
+  docs/plans/PLAN-cluster-op-visibility-phase-04-api-surface.md
+  docs/plans/PLAN-cluster-op-visibility.md
+  docs/plans/index.md
+  docs/release_notes/v07-v08.md
+  ```
+* `git diff 3642e7a75^1 3642e7a75 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+  no output
+
+##### `bdc91db78` (#4617)
+
+* `git diff bdc91db78^1 bdc91db78 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+  no output
+* `git diff bdc91db78^1 bdc91db78 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+  no output
+* `git diff bdc91db78^1 bdc91db78 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+  no output
+* `git diff bdc91db78^1 bdc91db78 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+  no output
+* `git diff bdc91db78^1 bdc91db78 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+  no output
+* `git diff bdc91db78^1 bdc91db78 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+  no output
+* `git diff bdc91db78^1 bdc91db78 --stat | tail -1; git diff bdc91db78^1 bdc91db78 -- '*.py' | grep -cE '^\+\s*def test_'`
+
+  ```
+   4 files changed, 44 insertions(+), 5 deletions(-)
+  0
+  ```
+* `git diff bdc91db78^1 bdc91db78 --name-only -- 'docs/*' '*.md'`
+
+  ```
+  docs/plans/PLAN-cluster-op-visibility-phase-04-api-surface.md
+  docs/plans/PLAN-cluster-op-visibility.md
+  ```
+* `git diff bdc91db78^1 bdc91db78 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+  no output
+
+##### `93c31035a0` (#4650)
+
+* `git diff 93c31035a0^1 93c31035a0 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+  no output
+* `git diff 93c31035a0^1 93c31035a0 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+  no output
+* `git diff 93c31035a0^1 93c31035a0 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+  no output
+* `git diff 93c31035a0^1 93c31035a0 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+  no output
+* `git diff 93c31035a0^1 93c31035a0 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+  no output
+* `git diff 93c31035a0^1 93c31035a0 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+  no output
+* `git diff 93c31035a0^1 93c31035a0 --stat | tail -1; git diff 93c31035a0^1 93c31035a0 -- '*.py' | grep -cE '^\+\s*def test_'`
+
+  ```
+   26 files changed, 1060 insertions(+), 129 deletions(-)
+  11
+  ```
+* `git diff 93c31035a0^1 93c31035a0 --name-only -- 'docs/*' '*.md'`
+
+  ```
+  docs/developer_guide/api_reference/clusteroperations.md
+  docs/developer_guide/ci.md
+  docs/developer_guide/database_internals.md
+  docs/operator_guide/database.md
+  docs/operator_guide/networking/overview.md
+  docs/operator_guide/upgrades.md
+  docs/plans/PLAN-cluster-op-visibility-phase-05-coverage-docs.md
+  docs/plans/PLAN-cluster-op-visibility.md
+  docs/plans/index.md
+  docs/release_notes/v07-v08.md
+  ```
+* `git diff 93c31035a0^1 93c31035a0 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+  no output
+
+
+### Style (6c)
+
+* **A10, advisory.** `shakenfist/tests/test_mariadb_cluster_operation_targets_live.py:300`
+  (#4574). A `print(message)` duplicates the `addDetail()` on the line
+  above it.
+
+The three-layer rule holds. Neither #4574 nor #4606 adds a `_direct_*`
+function, so the 6c row's premise about new ones was wrong. #4574
+removes `_direct_create_cluster_operation_target` cleanly from all
+three layers, along with its RPC, Monitor counter and proto message.
+New parameters (`targets`, `observational`, `pending_only`) appear in
+the direct, gRPC, public and daemon layers alike.
+
+`has_pending_operations` and `observational` are additive, and no
+units changed. #4617 can append `None` to `runs_after`, which is
+harmless because `_convert_deps()`
+(`schema/operations/baseclusteroperation.py:114`) drops falsy entries.
+
+Read: the six ranges' diffs, excluding the pb2 stubs.
+
+### Code quality, 2a (6d)
+
+* **A6, advisory.** `operations/node_inst_op.py:125-127` (#4588, made
+  false by #4606). The comment says "a queued sweep is not cancelled by
+  a later delete". Since #4606, `enqueue_delete` aborts every queued op
+  that targets the instance. The guard is still needed, so only the
+  reason should change.
+* **I2, advisory.** "Operations targeting X" has two implementations.
+  One is `baseobject.py:809-847` (#4606); the other is
+  `external_api/clusteroperation.py:371-391` (#3465, #4574). They
+  differ in ordering, and in the `observational` key against an older
+  sf-database.
+* **Views, advisory, recorded on the Future work idea.** Each view now
+  makes a has-pending RPC beside the latest-op RPC (`instance.py:723`,
+  `network/network.py:350`, `artifact.py:598`). The list endpoints
+  multiply that by N.
+* **A4, advisory.** `mariadb.py:502, 1818, 1916, 5374, 5431, 5853,
+  5879, 21899`, `schema/operations/util.py:31`,
+  `schema/cluster_operation_target.py:57` and two test modules (#4574)
+  all end a stated reason with "See
+  docs/plans/PLAN-cluster-op-visibility.md".
+* **A8, advisory.** `schema/operations/util.py:80-82` (#3465). The
+  docstring omits the target rows written in the same transaction.
+* **A9, advisory.** The four-line swagger `all` description is copied
+  in `external_api/instance.py:2555`, `network.py:1076` and
+  `artifact.py:1065` (#4606, #4650). The condition at
+  `instance.py:2791` (#4617) reads inverted.
+
+Predating, not findings:
+
+* the in-flight state list in several copies (graded as I3 below);
+* row-to-dataclass construction copied three times (`mariadb.py:5283,
+  5336, 5382`);
+* `_hydrate_op` re-reading a header the listing already returned;
+* the listing failing open (S1).
+
+**What cancel-on-delete switched on (#4606).** Before #4606, a delete
+aborted the pointer op and its queued or executing
+`depends_on`/`runs_after` chain, and only when the pointer was in
+flight. It now also aborts:
+
+* ops that target the instance but sit off the pointer's chain, which
+  is the race this plan fixes;
+* observational sweeps;
+* multi-target ops that include the instance: `node_inst_net_iface_op`
+  and `artifact_fetch_op`, both of them per instance.
+
+It waits for every outstanding snapshot, not just the pointer. It no
+longer aborts shared network ops reached through dependencies, which
+the old walk did, failing other instances' work. Against #4615's later
+change to the same path, the cleaner's re-enqueue can abort only a
+repeat delete or a late-enqueued op. No harmful interaction was found.
+
+Read:
+
+* every target accessor in `mariadb.py`, with its gRPC and public pair;
+* the v3 migration;
+* `list_cluster_operations_for_target` and `create_and_enqueue`;
+* the database daemon handlers;
+* `baseobject.py:771-860` and the three views;
+* `enqueue_delete`;
+* the three Outstanding endpoints and `clusteroperation.py`;
+* `schema/operations/*`'s `target_fields` and `observational_tasks`;
+* `node_inst_op.py`, `artifact_fetch_op.py`, `baseoperation.py` and
+  `queues/workitem.py`;
+* the #4615, #4620 and #4650 changes to these files.
+
+### Tests, 2b (6e)
+
+* **I4, advisory.** The coverage gaps:
+  * `test_instance_enqueue_delete.py` never aborts an `executing` op;
+  * no functional test deletes an instance that has an op outstanding;
+  * only the network per-object listing is exercised functionally;
+  * no functional test checks `has_pending_operations` on network or
+    artifact views;
+  * nothing tests that a foreign namespace is refused on the instance
+    and network listings;
+  * in `test_observational_sweeps.py:79-84`, the in-loop pending check
+    probably never fires.
+* **I3, advisory, with 6h.** `mock_mariadb.py:3480` and `:3560` carry
+  further literal copies of the in-flight state list.
+
+The real-SQL tests use sqlite built from `mariadb.py`'s own table
+definitions, through `dbfixture.py`, not `mock_mariadb.py`. So the
+fixture-type shape behind #3465's by-target bug cannot recur in them.
+
+The `all` flag is tested on both the body and the query-string paths
+for all three object types, through the real Flask app
+(`test_outstanding_operations_all.py`).
+
+One merge lane, `debian-13-slim-primary`, is enough for what the two
+cluster tests guard (survey finding 6). They check server semantics,
+not anything specific to a guest OS or a topology.
+
+"net_op is never observational" is enforced by
+`test_observational_tasks.py`'s `CLASSIFICATION` table, not only by a
+comment.
+
+Each success criterion that names a behaviour maps to a test that
+would have failed before and passes after:
+
+* the pointer and the pending field ignoring an observational op:
+  `test_observational_current_state.py`;
+* the queued op behind a later terminal one:
+  `test_object_cluster_operations.py::test_success_criterion`;
+* `has_pending_operations`: `test_has_pending_operations_view.py`;
+* delete cancelling outstanding work:
+  `test_instance_enqueue_delete.py`;
+* the hot-plug race: the three `instance_hotplug.py` smoke tests.
+
+Predating:
+
+* the fail-closed branch of the direct has-pending query is untested;
+* the live-MariaDB suite does not cover the by-target uuid lookup.
+
+Read:
+
+* `test_observational_current_state.py`;
+* `test_object_cluster_operations.py`;
+* `test_instance_enqueue_delete.py`;
+* `test_has_pending_operations_view.py`;
+* `test_outstanding_operations_all.py`;
+* `test_observational_tasks.py`;
+* `test_ci_await_operations.py`;
+* `test_mariadb_cluster_operation_targets_live.py`;
+* `dbfixture.py` and `mock_mariadb.py`;
+* `cluster_ci_tests/test_api.py` and `test_observational_sweeps.py`.
+
+### Documentation, 2c (6f)
+
+* **B1, blocking.** `docs/release_notes/v07-v08.md:1485-1486` (#4588;
+  out of scope, made false by #4608). It says a failing billing or
+  health task still errors its instance. `node_inst_op.py:100-108`
+  now returns first for an observational task.
+* **A1, advisory.** `docs/operator_guide/upgrades.md:333-336` and
+  `:360` (#4574, made false by #4588). "Until a later release
+  classifies any task as observational" is stale: three tasks are
+  classified.
+* **A2, advisory.** `v07-v08.md:1482` says "No migration is needed".
+  `upgrades.md:327-344` requires `ensure-mariadb-schema` before
+  sf-database starts.
+* **A3, advisory, with 6h D4.** `docs/developer_guide/database_internals.md:363-366`
+  (#4606) says the pending-only listing and `has_pending_operations`
+  "agree". The listing includes observational ops
+  (`mariadb.py:5299-5352`) and the field does not (`:5405-5437`).
+  The reader list at `:381` is also incomplete.
+* **A4, advisory, with 6d.** `database_internals.md:291` and
+  `upgrades.md:336` link the master plan for built behaviour. The code
+  citations are listed under 6d.
+* **A5, advisory.** `clusteroperations.md:78` and `v07-v08.md:1497`
+  say `object-pending-operations` advertises only the field.
+  `external_api/app.py:433-437` says it also covers the per-object
+  listings.
+
+Fixed since: three plan citations, in `node_inst_op.py`,
+`mock_mariadb.py` and `test_observational_tasks.py`.
+
+Predating: `config.py:791` still calls the target table a "history
+table".
+
+Clean:
+
+* the sweep timings, prune states and retention;
+* the v3 column and index;
+* the three observational tasks;
+* cancel-on-delete;
+* the `ci.md` helper description;
+* the client wrapper names;
+* the Execution table, `index.md:106` and `order.yml:42`.
+
+No range changes `state_targets` or adds an ASCII diagram, and none
+touches README, AGENTS or ARCHITECTURE.
+
+Read:
+
+* `database.md`, `upgrades.md` and `database_internals.md`;
+* `clusteroperations.md`, `instances.md`, `networks.md` and
+  `artifacts.md`;
+* `ci.md` and `v07-v08.md`;
+* the master plan and `index.md`.
+
+### Security, 2d (6g)
+
+There are no critical, high or medium findings.
+
+* **I1, low.** `external_api/artifact.py:1073-1078` (#4606 widened a
+  predating class). The listing admits anyone who can see the
+  artifact. It returns every `artifact_fetch_op`, each with its
+  `instance_uuid` and `namespace`, so a reader of a shared or trusting
+  artifact learns other namespaces' instance uuids. The by-target
+  listing refuses the same caller with a 403
+  (`clusteroperation.py:360-372`).
+* **I2, low.** Both listings are unbounded and read once per row
+  (`baseobject.py:807-847`, `clusteroperation.py:375-391`).
+* **Informational.** `has_pending_operations` adds one indexed
+  `EXISTS` per view, and every endpoint that returns a view is
+  authenticated.
+* **Informational.** Cancel-on-delete marks executing ops `abort`. The
+  running task finishes and later tasks are skipped. The instance lock
+  serialises create, start and delete.
+* **P1, low, predating.** The single-op endpoint
+  (`clusteroperation.py:139-153`) admits a target that has no
+  namespace, and checks only one target row.
+* **Informational, predating.** The by-target endpoint answers 404 for
+  a missing object and 403 for a foreign one.
+
+Verdicts:
+
+* **Cross-namespace reads:**
+  * the instance and network listings leak nothing;
+  * the artifact listing leaks in a limited way (I1);
+  * the by-target listing fails closed;
+  * no enqueue site creates an op that targets two namespaces;
+  * #3465's body kwargs are type-checked and authorised on the uuid
+    that is queried.
+* **Resource exhaustion through `has_pending_operations`:** no.
+* **Cancel-on-delete:** it cannot reach an object the caller does not
+  own, because every target of such an op shares the instance's
+  namespace.
+* **Interpolated SQL:** none. The one f-string DDL, `mariadb.py:1944`,
+  uses a constant table name.
+
+Read:
+
+* `clusteroperation.py`;
+* the auth, ownership, `log_request` and `validate_request` decorators
+  in `external_api/base.py`;
+* the artifact access decorators;
+* the three listing endpoints;
+* `baseobject.py:770-860`;
+* `enqueue_disk_fetches`, `enqueue_delete` and `hot_plug_interface`;
+* the target accessors;
+* `enqueue_cluster_operation`;
+* every `target_fields` and `external_view`;
+* the op state machine and `workitem.py`'s dependency gating.
+
+### Rule coherence (6h)
+
+6h examined 21 pairs across the ten expressions in the 6h row. 15 are
+consistent, five are divergent but unreachable, and one is divergent
+and reachable only during a rolling upgrade, by design. None is
+blocking.
+
+| Pair | Verdict |
+|------|---------|
+| Declarations and the classification table; the declarations and `is_observational()` | Consistent |
+| `is_observational()` and `dispatch_task()` for a mixed op (D1) | Divergent, unreachable. No enqueue site mixes tasks: `scheduled_tasks.py:595` and `instance.py:2795` are the only `node_inst_op` sites. Filed as I5 |
+| `is_observational()` and `dispatch_task()` for an all-observational op | Consistent |
+| `is_observational()` and the stored flag, at this revision | Consistent |
+| The stored flag during a rolling upgrade (D2) | Divergent and reachable during the upgrade only. It is documented at `mariadb.py:1810-1817` and `:1916-1922`, and in `database.proto`, and matches pre-plan behaviour |
+| The stored flag and the filtered readers; latest and has-pending | Consistent |
+| The filtered readers and `:5299` (the blob guard, the listing, cancel-on-delete) | Consistent by design |
+| The filtered readers and `:5455` (D3) | Divergent, unreachable. The comment's "only callers ask about net_op" is wrong, because `daemons/network/maintain.py:779` also asks about `net_ip_op`. The classification table enforces the invariant. Graded A7 |
+| The filtered readers and `:21762`; both listings against an older sf-database | Consistent in meaning |
+| The views and the readers; `enqueue_delete` and the pointer | Consistent. On a database error has-pending fails closed and the listing fails open, which is S1 |
+| `dispatch_task()` and other dispatchers or the reaper (D5) | Divergent, unreachable. Only `NodeInstOp` spares its object |
+| The CI helper and the server | Consistent, with a latent dependency on #3922 (D6, recorded on #3922) |
+| Every in-flight and terminal list against the reachable states (D7) | Consistent on every reachable state. `preflight` cannot be reached. There is a third copy at `mariadb.py:23986`. Filed as I3 |
+| The blob declaration and the readers | Consistent and inert, because `Blob` is a plain `dbo` |
+
+Proof tests: `MixedOperationTestCase`, `RollingUpgradeFlagTestCase`,
+`StateListCoherenceTestCase` (three tests) and
+`NetworkTargetsNeverObservationalTestCase`. The management session ran
+all six in a copy of the tree, and all passed. 6h checked
+`MixedOperationTestCase` by mutating the condition at
+`node_inst_op.py:106`. The file is posted on #4668 for whoever takes
+I3 and I5.
+
+Predating: `NodeBlobOp.execute()` deletes its target row on every exit,
+including a requeue (P2).
+
+### Client contract (6i)
+
+client-python #436 (`fdcfe6e53d^1..fdcfe6e53d`) was read against
+`$TIP`. Its functions are unchanged on client `origin/develop`, apart
+from #438's unrelated addition. Nothing in that repository was edited.
+
+* **C1, advisory.** `await_no_pending_operations()` returns a deleted
+  object as settled, though its docstring and
+  `docs/object-operations.md` say it raises. A uuid lookup does not
+  filter on state (`baseobject.py:417-419`, `instance.py:515-516`),
+  and the view comes back until the hard delete, which waits for
+  `CLEANER_DELAY`. This repository repeats the claim:
+  * `docs/developer_guide/ci.md:228-229`;
+  * the helper's `ResourceNotFoundException` branch in
+    `deploy/shakenfist_ci/base.py`, added in #4650, which cannot fire
+    for a uuid;
+  * a unit test that pins a 404 the server does not send.
+
+  Fixing the client makes all three true. That fix is client-python#439.
+* **C2, advisory.** The listing wrappers check the 2025
+  `*-clusteroperations` tokens, but document the contract that
+  `object-pending-operations` advertises.
+* **C3, advisory.** `get_artifact(namespace=)` has no capability to
+  check.
+
+The contract otherwise holds:
+
+* `all` and `namespace` travel in the body and are read there;
+* the names match the API reference pages;
+* `check_capability`'s substring test has no false positive;
+* a missing field raises `IncapableException`;
+* timeouts and observational operations match the client docs.
+
+Floor items:
+
+1. **Pass.** `fdcfe6e53d` is a two-parent merge on client
+   `origin/develop`. client-python has no `PUSH-AUDIT.md`, so this is
+   the audit of record.
+2. **Not applicable.** Nothing in the range runs unattended.
+3. **Pass.** No secret, private hostname or address. Only a GitHub
+   docs link and the existing `localhost` test fixture.
+4. **Pass.** Only `get_artifact`'s signature changed, additively.
+   * The greps were `git grep -nE "get_artifact\(|_clusteroperations\(|await_no_pending_operations|has_pending_operations"`
+     in client-python, and the same family in client-python-k3s, sfui
+     and client-python-ova.
+   * The positional callers in client-python's command line and
+     client-python-ova are unaffected.
+5. **Pass.** client-python publishes from `v*` tags. No tag contains
+   `fdcfe6e53d`, so C1 to C3 are unreleased.
+
+Read:
+
+* `get_{instance,network,artifact}_clusteroperations`, `get_artifact`
+  and `await_no_pending_operations`;
+* `check_capability`, `_calculate_async_deadline` and
+  `delete_all_instances`;
+* the #436 tests and `docs/object-operations.md`;
+* on the server side, the capability list, the endpoints, the lookup
+  decorators and `from_db_by_ref`.
+
+### Disposition
+
+Graded with the operator on 2026-10-26, before anything was filed.
+Duplicate searches were run with `gh issue list --state all --search`,
+for each issue's key terms:
+
+* "release note billing health error state";
+* "artifact clusteroperations instance uuid shared";
+* "clusteroperations listing unbounded";
+* "by-target listing per-object listing";
+* "in-flight states duplicated queued preflight executing";
+* "enqueue_delete executing abort test";
+* "dispatch_task observational task";
+* "enqueue_delete fails open";
+* "agent operation preflight target instance";
+* "runs_after last_cluster_operation pointer";
+* "cluster operation single op endpoint namespace";
+* "NodeBlobOp target row requeue ensure_local";
+* in client-python, "await_no_pending_operations", "clusteroperations
+  capability" and "get_artifact namespace".
+
+None returned a duplicate. The nearest results were #4585, which is
+closed and fixed, and unrelated flake umbrellas.
+
+| Id | Grade | Disposition |
+|----|-------|-------------|
+| B1 | Blocking | Filed as #4665 with `automated-fix-attempted`. Fixed in the follow-up pull request |
+| A1-A10 | Advisory | Fixed in the same follow-up pull request. A one-line correction each, in this plan's own text |
+| I1 | Advisory (low security) | Filed as #4666 |
+| I2 | Advisory | Filed as #4667 |
+| I3 | Advisory | Filed as #4668, with 6h's tests posted on it |
+| I4 | Advisory | Filed as #4669 |
+| I5 | Advisory | Filed as #4670 |
+| D6 | Advisory | Recorded on #3922 |
+| C1 | Advisory | Filed as client-python#439 |
+| C2 | Advisory | Filed as client-python#440 |
+| C3 | Advisory | Filed as client-python#441 |
+| S1 | Predating | Filed as #4671 |
+| S2 | Predating | Filed as #4672 |
+| S3 | Predating | Filed as #4673 |
+| P1 | Predating (low security) | Filed as #4674 |
+| P2 | Predating | Filed as #4675 |
+| Views RPC count | Advisory | Recorded on the Future work idea. Phase 4 measured it at about 2.5 requests a second on sfcbr |
+| Other predating notes (test gaps, duplicated row construction, `config.py`'s "history table", the 404/403 existence oracle) | Predating | Not filed. Each is small, and recorded here |
+
+B1 is blocking, so the plan stays In progress. The fix is a follow-up
+pull request cut from `develop`. It also carries this phase's
+close-out: its `Merged` cell, and Complete for the plan.
+
 ## Execution notes
 
-None yet.
+* **2026-10-26 (AEDT), back brief.** Mikal confirmed the plan as
+  written, including both gates. He also gave this session permission
+  to push the branch and open the pull request.
+* **6b.** As planned, and wave 1 passed (gate 1). 6b's literal record
+  ran to about 167,000 tokens, because three of its grep hits are
+  generated protobuf descriptor lines of 65,000 to 91,000 characters.
+  The management session therefore re-ran the same nine commands per
+  range. It records their output with those three lines described
+  rather than quoted, and every other line verbatim.
+* **6c to 6i.** All seven ran in parallel after gate 1, read-only. Four
+  of them (6d, 6g, 6h and 6i) could not write `report.md`: the harness
+  refuses file writes from sub-agents. They returned their reports as
+  text, and the management session recorded them. 6h wrote its proof
+  tests to the scratchpad and ran them in a `git archive` copy. The
+  management session ran them again; all six pass. The worktree
+  stayed clean throughout.
+* **Corrections at source.** The 6c row assumed #4574 and #4606 add new
+  `_direct_*` functions, but they add none. Survey finding 7 repeated a
+  wrong comment and missed a third copy of the in-flight list. It is
+  corrected above.
+* **Commits.** The plan names a commit subject for each step. The
+  record is committed as one commit instead, "Record the cluster op
+  visibility push audit.". Every step only adds a section of this
+  file, and the disposition depends on all of them.
+* **Gate 2, 2026-10-26.** Mikal approved the grading as proposed. B1 is
+  blocking. A1-A10 are fixed in the follow-up pull request. I1-I5,
+  S1-S3, P1, P2 and C1-C3 are filed. D6 is recorded on #3922.
