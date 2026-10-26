@@ -12,6 +12,7 @@ from unittest import mock
 
 from shakenfist import eventlog_drainer
 from shakenfist import eventlog_spool
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.schema.event import EventRecord
 from shakenfist.tests import base
 
@@ -388,6 +389,28 @@ class DrainOneBatchTestCase(
                 self.thread, '_drain_one_batch') as mock_drain:
             self.thread.run()
         mock_drain.assert_not_called()
+
+    def test_a_failed_pass_does_not_end_the_thread(self):
+        """A pass which raises is retried, and its batch is written (#3431)."""
+        self._enqueue(2)
+
+        def record(records):
+            if mock_rpc.call_count == 1:
+                raise DatabaseUnavailable('gRPC record_event_batch failed')
+            self.thread.stop()
+            return True
+
+        with mock.patch(
+                'shakenfist.eventlog_drainer.mariadb.'
+                'record_event_batch', side_effect=record) as mock_rpc, \
+                mock.patch.object(self.thread._stop_event, 'wait') as mock_wait:
+            self.thread.run()
+
+        # It backed off before retrying, as for a failed write.
+        mock_wait.assert_called_once_with(eventlog_drainer.BACKOFF_INITIAL)
+        self.assertEqual(2, mock_rpc.call_count)
+        self.assertEqual(2, len(mock_rpc.call_args_list[1].args[0]))
+        self.assertEqual(0, eventlog_spool.get_spool().count())
 
 
 class BatchSizeCapTestCase(
