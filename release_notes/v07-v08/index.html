@@ -17371,6 +17371,24 @@ details.</p>
   <code>mysqldump</code>) to export the Shaken Fist database. To restore, use
   <code>mariadb</code> (or <code>mysql</code>) to import the dump. Event history is now part of
   the MariaDB database and no separate backup step is needed for it.</li>
+<li>Several ordinary outcomes are no longer reported as failures:</li>
+<li>An instance deleted while sf-sidechannel or sf-cleaner was walking the
+    node's domains is now logged at debug. Before, sf-sidechannel logged an
+    error and abandoned that pass's monitor audit, and sf-cleaner logged a
+    warning.</li>
+<li>A powered off instance's usage event now records its power state, disk
+    usage and console log size. Before, the whole record was dropped with an
+    <code>Ignoring libvirt error</code> warning.</li>
+<li>libvirt's own error reports go to the debug log rather than the
+    daemons' stderr, so handled errors no longer appear in the journal as
+    <code>libvirt: Domain Config error</code> lines.</li>
+<li>A gratuitous ARP for a floating address is no longer logged as failed
+    just because nothing answered it.</li>
+<li>The sentinels no longer log <code>Checking in</code> every 15 seconds. They warn
+    when a check-in takes more than five seconds instead.</li>
+<li>The per-object <code>/events</code> endpoints accept <code>limit</code> sent as a string, which
+  is how the shipped client sends it. Before, every one of them answered 500
+  whenever <code>limit</code> was given.</li>
 </ul>
 <h2 id="event-logging-migrated-to-mariadb">Event logging migrated to MariaDB<a class="headerlink" href="#event-logging-migrated-to-mariadb" title="Permanent link">&para;</a></h2>
 <p>Events previously lived in per-object SQLite files managed by a dedicated
