@@ -190,6 +190,12 @@ as well. This protects against machine or disk failures causing data loss. The
 default number of replicas is 2, but this is not configurable per-blob. It is
 configured with the `BLOB_REPLICATION_FACTOR` configuration variable.
 
+The replication factor is a target, not a limit. A blob ends up with more
+copies than the target whenever an instance on another node needs it, and the
+extra copies are only removed from nodes which are running low on disk. A copy
+on a node where an instance uses the blob as its disk's backing file is never
+removed, because that instance could not start again without it.
+
 ## Artifact uploads and downloads
 
 Artifacts may also be uploaded and downloaded. This means you can extract a

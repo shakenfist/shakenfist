@@ -358,6 +358,10 @@ class Monitor(daemon.Daemon):
         # the bulk of the cluster daemon's idle database load (issue 3502).
         blob_usage = instance.instance_blob_usage()
 
+        # Node UUID to name lookups for the pruner below, cached for the
+        # pass because many blobs share the same few nodes.
+        node_names = {}
+
         # We count fetches currently requested (or under way) as having completed
         # in order to stop over-replication for large blobs.
         #
@@ -436,13 +440,21 @@ class Monitor(daemon.Daemon):
                 # out of disk first, and copying a blob back to a machine if
                 # its needed there is slow and annoying.
 
-                # Work out where the blob is in active use.
+                # Work out where the blob is in active use. Blob
+                # locations are node names, but an instance's placement
+                # is a node UUID, so resolve the placement before
+                # comparing. Comparing the two directly never matched,
+                # so copies backing running instances were pruned and
+                # those instances could not start again (issue 4626).
                 excess_locations = list(blob_locations)
                 in_use_locations = []
 
                 for instance_uuid in instances:
                     i = instance.Instance.from_db(instance_uuid)
-                    node = i.placement.get('node')
+                    if not i:
+                        continue
+                    node = self._node_name(
+                        i.placement.get('node'), node_names)
                     if node in excess_locations:
                         excess_locations.remove(node)
                         in_use_locations.append(node)
@@ -706,6 +718,19 @@ class Monitor(daemon.Daemon):
             eventlog.add_event_multi(EVENT_TYPE_AUDIT, [n, b], reason)
             b.remove_location(n.fqdn)
             b.request_replication()
+
+    def _node_name(self, identifier, cache):
+        # Resolve a node UUID (or a name, which Node.from_db() also accepts)
+        # to the node name that blob locations are recorded under. A node
+        # which no longer exists cannot hold a copy of anything, so an
+        # unresolvable identifier is returned unchanged and simply matches
+        # no location.
+        if not identifier:
+            return None
+        if identifier not in cache:
+            n = Node.from_db(identifier, suppress_failure_audit=True)
+            cache[identifier] = n.fqdn if n else identifier
+        return cache[identifier]
 
     def _register_anchored_job(self, interval, task_name, func):
         """Register a maintenance job whose cadence is anchored in the database.
