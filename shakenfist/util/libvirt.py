@@ -46,11 +46,25 @@ SHUTOFF_REASON_STRINGS = {
 }
 
 
+def _log_libvirt_error(_ctx: Any, error: Any) -> None:
+    """Send libvirt's own error reports to the debug log, not stderr.
+
+    libvirt's default error handler writes every error to stderr ("libvirt:
+    Domain Config error : ...") as well as raising it, so an error the caller
+    expects and handles, such as asking a powered off domain for runtime
+    statistics, still reaches the daemon's journal as an unexplained line.
+    The exception carries the same error to the caller, which decides how
+    loudly to report it.
+    """
+    LOG.debug(f'libvirt reported: {error[2] if error else error}')
+
+
 def get_libvirt() -> ModuleType:
     global LIBVIRT
 
     if not LIBVIRT:
         LIBVIRT = importlib.import_module('libvirt')
+        LIBVIRT.registerErrorHandler(_log_libvirt_error, None)
 
     return LIBVIRT
 
@@ -83,6 +97,28 @@ class LibvirtConnection():
         except self.libvirt.libvirtError as e:
             LOG.debug(f'SF libvirt domain {u} not found: {e}')
             return None
+
+    def is_domain_gone(self, e: BaseException) -> bool:
+        """True if e is libvirt saying the domain no longer exists.
+
+        Listing domains and then asking each one about itself races with a
+        delete: the domain can be undefined between the two calls, and
+        libvirt then raises VIR_ERR_NO_DOMAIN. That is an ordinary outcome
+        for a caller walking the domains on a node, not a failure.
+        """
+        return (isinstance(e, self.libvirt.libvirtError) and
+                e.get_error_code() == self.libvirt.VIR_ERR_NO_DOMAIN)
+
+    def is_domain_not_running(self, e: BaseException) -> bool:
+        """True if e is libvirt refusing a call because the domain is not running.
+
+        Runtime queries (CPU, block and interface statistics) on an inactive
+        domain raise VIR_ERR_OPERATION_INVALID. That code means "not valid in
+        this state" in general, so only use this around calls whose only
+        state requirement is a running domain.
+        """
+        return (isinstance(e, self.libvirt.libvirtError) and
+                e.get_error_code() == self.libvirt.VIR_ERR_OPERATION_INVALID)
 
     def extract_power_state(self, domain: Any) -> str:
         state, _ = domain.state()

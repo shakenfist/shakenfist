@@ -333,6 +333,51 @@ class AddFloatingIPTestCase(PrivExecFloatingIPTestCase):
         self.assertEqual(privexec_pb2.AddFloatingIPReply.OK,
                          reply.add_floating_ip_reply.error)
 
+    def _announce(self, arping_result):
+        """Announce a float with arping returning arping_result, returning
+        the privexec log."""
+        self.patch_commands(results={'arping': arping_result})
+        request = self._request()
+        request.vxid = 0xc1bc81
+        with mock.patch(
+                'shakenfist.daemons.privexec.main.shutil.which',
+                return_value='/usr/sbin/arping'), \
+                mock.patch.object(privexec_main, 'LOG') as mock_log:
+            self.job._announce_floating_ip(request)
+        return mock_log.with_fields.return_value
+
+    # What Debian's arping (Habets, 2.25 on trixie) prints for an
+    # unsolicited ARP which, being an announcement, nothing answers.
+    UNANSWERED = (
+        'ARPING 192.168.10.44\nTimeout\nTimeout\n\n'
+        '--- 192.168.10.44 statistics ---\n'
+        '2 packets transmitted, 0 packets received, 100% unanswered '
+        '(0 extra)\n')
+
+    def test_unanswered_gratuitous_arp_is_success(self):
+        # Habets arping exits 1 when nothing replies, which for an
+        # announcement is every time.
+        log = self._announce((self.UNANSWERED, '', 1))
+        log.warning.assert_not_called()
+
+    def test_gratuitous_arp_exit_zero_is_success(self):
+        log = self._announce(('', '', 0))
+        log.warning.assert_not_called()
+
+    def test_gratuitous_arp_failures_are_warnings(self):
+        partial = self.UNANSWERED.replace(
+            '2 packets transmitted', '1 packets transmitted')
+        for name, result in [
+                ('stderr', ('', 'arping: Unable to find interface', 1)),
+                ('unanswered with stderr', (self.UNANSWERED, 'boom', 1)),
+                ('not every packet sent', (partial, '', 1)),
+                ('no summary', ('', '', 1)),
+                ('other exit code', (self.UNANSWERED, '', 2))]:
+            with self.subTest(name):
+                log = self._announce(result)
+                log.warning.assert_called_once_with(
+                    'Gratuitous ARP for floating address failed')
+
     def test_add_gratuitous_arp_skipped_when_arping_missing(self):
         recorder = self.patch_commands(results={' -C ': ('', '', 1)})
         self._patch_utils()

@@ -2147,6 +2147,32 @@ class Monitor(daemon.Daemon):
                 'starting a replacement thread with a fresh channel')
             self.start_dispatcher()
 
+    def _running_instance_uuids(self, lc):
+        """The instances whose domains are running here, and so need a monitor.
+
+        A delete can undefine a domain after it was listed. That domain is
+        gone, so it needs no monitor, and the rest of the audit still has to
+        run: raising here would leave every other instance's monitor
+        unstarted or uncleaned until the next pass.
+        """
+        running = []
+        for domain in lc.get_active_sf_domains():
+            try:
+                state = lc.extract_power_state(domain)
+            except lc.libvirt.libvirtError as e:
+                if not lc.is_domain_gone(e):
+                    raise
+                LOG.debug(f'Domain {domain.name()} went away while being audited')
+                continue
+
+            if state in ['off', 'crashed', 'paused']:
+                # If the domain isn't running, it shouldn't have a
+                # sidechannel monitor.
+                continue
+
+            running.append(domain.name().split(':')[1])
+        return running
+
     def _run_inner(self):
         self.start_dispatcher()
 
@@ -2170,14 +2196,7 @@ class Monitor(daemon.Daemon):
                     # also be powered off. Instead, we ask libvirt what domains are
                     # running.
                     with util_libvirt.LibvirtConnection() as lc:
-                        for domain in lc.get_active_sf_domains():
-                            state = lc.extract_power_state(domain)
-                            if state in ['off', 'crashed', 'paused']:
-                                # If the domain isn't running, it shouldn't have a
-                                # sidechannel monitor.
-                                continue
-
-                            instance_uuid = domain.name().split(':')[1]
+                        for instance_uuid in self._running_instance_uuids(lc):
                             if instance_uuid in extra_instances:
                                 extra_instances.remove(instance_uuid)
                             if instance_uuid not in self.monitors:

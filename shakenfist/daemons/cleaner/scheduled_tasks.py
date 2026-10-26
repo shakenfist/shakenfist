@@ -593,6 +593,20 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
         domain.setAutostart(0)
 
 
+def _log_per_domain_error(lc, instance_uuid, kind, e):
+    """Report an error which skipped one domain for this pass.
+
+    A delete can undefine a domain after the pass listed it, and libvirt
+    then says the domain does not exist. That is the delete finishing, not
+    a failure, so it is logged at debug; anything else is a warning.
+    """
+    log = LOG.with_fields({'instance': instance_uuid})
+    if lc.is_domain_gone(e):
+        log.debug(f'{kind.capitalize()} domain went away during this pass: {e}')
+    else:
+        log.warning(f'Failed to update {kind} domain, skipping it this pass: {e}')
+
+
 def _per_domain_errors(lc):
     """The errors which skip one domain for this pass, not every domain after it.
 
@@ -731,8 +745,7 @@ def update_power_states(pet_watchdog=None):
                     _update_listed_active_domain(
                         lc, domain, instance_uuid, pet, seen)
                 except _per_domain_errors(lc) as e:
-                    LOG.with_fields({'instance': instance_uuid}).warning(
-                        f'Failed to update active domain, skipping it this pass: {e}')
+                    _log_per_domain_error(lc, instance_uuid, 'active', e)
 
         except lc.libvirt.libvirtError as e:
             LOG.debug(f'Failed to lookup running domains: {e}')
@@ -756,8 +769,7 @@ def update_power_states(pet_watchdog=None):
                 try:
                     _update_inactive_domain(lc, domain, instance_uuid, pet)
                 except _per_domain_errors(lc) as e:
-                    LOG.with_fields({'instance': instance_uuid}).warning(
-                        f'Failed to update inactive domain, skipping it this pass: {e}')
+                    _log_per_domain_error(lc, instance_uuid, 'inactive', e)
 
         except lc.libvirt.libvirtError as e:
             LOG.debug(f'Failed to lookup inactive domains: {e}')

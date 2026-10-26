@@ -138,10 +138,20 @@ class NodeInstOp(BaseClusterOperation):
                     'network usage': {}
                 }
 
-                # Base libvirt statistics, if the domaine exists
+                # Runtime libvirt statistics exist only while the domain
+                # runs. A powered off instance still has a power state, disks
+                # and a console log worth recording, so only skip the part
+                # libvirt cannot answer. The domain can also stop between the
+                # isActive() check and the statistics calls.
                 domain = lc.get_domain_from_sf_uuid(inst.uuid)
                 if domain:
-                    statistics.update(util_libvirt.extract_statistics(domain))
+                    if domain.isActive():
+                        try:
+                            statistics.update(util_libvirt.extract_statistics(domain))
+                        except lc.libvirt.libvirtError as e:
+                            if not lc.is_domain_not_running(e):
+                                raise
+                            self.log.debug(f'Domain stopped while its statistics were read: {e}')
 
                     # Power information
                     statistics['libvirt_raw_power_state'] = \
@@ -199,7 +209,12 @@ class NodeInstOp(BaseClusterOperation):
                     suppress_event_logging=True)
 
             except lc.libvirt.libvirtError as e:
-                self.log.warning('Ignoring libvirt error: %s' % e)
+                # A delete which finished after the state check above
+                # undefines the domain; there is nothing left to measure.
+                if lc.is_domain_gone(e):
+                    self.log.debug(f'Domain went away while being measured: {e}')
+                else:
+                    self.log.warning('Ignoring libvirt error: %s' % e)
 
     def _health_check_kvm_process(self, inst):
         # Dispatched by name from dispatch_task() above, for the

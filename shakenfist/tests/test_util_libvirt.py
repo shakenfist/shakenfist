@@ -18,7 +18,12 @@ DOMAIN_XML = """<domain type='kvm'>
 
 
 class FakeLibvirtError(Exception):
-    ...
+    def __init__(self, message='', code=1):
+        super().__init__(message)
+        self.code = code
+
+    def get_error_code(self):
+        return self.code
 
 
 class FakeLibvirtModule:
@@ -53,6 +58,10 @@ class FakeLibvirtModule:
 
     VIR_CONNECT_LIST_DOMAINS_ACTIVE = 1
     VIR_CONNECT_LIST_DOMAINS_INACTIVE = 2
+
+    VIR_ERR_INTERNAL_ERROR = 1
+    VIR_ERR_NO_DOMAIN = 42
+    VIR_ERR_OPERATION_INVALID = 55
 
 
 class FakeDomain:
@@ -485,3 +494,54 @@ class UtilLibvirtStatistics(base.ShakenFistTestCase):
             },
             stats['disk usage']['vda'])
         self.assertIn('02:00:00:12:34:56', stats['network usage'])
+
+
+class UtilLibvirtErrorClassification(base.ShakenFistTestCase):
+    def test_no_domain_is_gone(self):
+        lc = _connection()
+        self.assertTrue(lc.is_domain_gone(FakeLibvirtError(
+            'Domain not found', code=FakeLibvirtModule.VIR_ERR_NO_DOMAIN)))
+
+    def test_not_running_is_not_gone(self):
+        lc = _connection()
+        error = FakeLibvirtError(
+            'domain is not running',
+            code=FakeLibvirtModule.VIR_ERR_OPERATION_INVALID)
+        self.assertFalse(lc.is_domain_gone(error))
+        self.assertTrue(lc.is_domain_not_running(error))
+
+    def test_other_codes_are_neither(self):
+        lc = _connection()
+        error = FakeLibvirtError(
+            'internal error', code=FakeLibvirtModule.VIR_ERR_INTERNAL_ERROR)
+        self.assertFalse(lc.is_domain_gone(error))
+        self.assertFalse(lc.is_domain_not_running(error))
+
+    def test_errors_which_are_not_libvirt_errors_are_neither(self):
+        # The cleaner's per-domain handler also catches database and
+        # process errors, which have no libvirt error code.
+        lc = _connection()
+        self.assertFalse(lc.is_domain_gone(RuntimeError('x')))
+        self.assertFalse(lc.is_domain_not_running(RuntimeError('x')))
+
+
+class UtilLibvirtErrorHandler(base.ShakenFistTestCase):
+    def test_loading_libvirt_installs_the_error_handler(self):
+        """Without it libvirt writes every error, handled or not, to the
+        daemon's stderr."""
+        fake = mock.MagicMock()
+        with mock.patch.object(util_libvirt, 'LIBVIRT', None), \
+                mock.patch.object(util_libvirt.importlib, 'import_module',
+                                  return_value=fake):
+            self.assertIs(fake, util_libvirt.get_libvirt())
+            util_libvirt.get_libvirt()
+
+        fake.registerErrorHandler.assert_called_once_with(
+            util_libvirt._log_libvirt_error, None)
+
+    def test_the_handler_logs_the_message_at_debug(self):
+        with mock.patch.object(util_libvirt, 'LOG') as mock_log:
+            util_libvirt._log_libvirt_error(
+                None, (55, 10, 'domain is not running', 2))
+        mock_log.debug.assert_called_once_with(
+            'libvirt reported: domain is not running')

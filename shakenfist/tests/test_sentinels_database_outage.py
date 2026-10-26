@@ -39,6 +39,30 @@ class CheckInTestCase(base.ShakenFistTestCase):
     def test_other_errors_still_propagate(self, observe):
         self.assertRaises(ValueError, daemon.check_in_this_node)
 
+    @mock.patch.object(daemon.Node, 'observe_this_node')
+    def test_a_check_in_which_works_is_not_logged(self, observe):
+        # Each sentinel checks in every 15 seconds, so a line per check-in
+        # was almost all of a cluster's debug log (#4541).
+        with mock.patch.object(daemon, 'LOG') as log:
+            self.assertTrue(daemon.check_in_this_node())
+        self.assertEqual([], log.mock_calls)
+
+    @mock.patch.object(daemon.Node, 'observe_this_node')
+    def test_a_slow_check_in_is_a_warning(self, observe):
+        with mock.patch.object(daemon, 'LOG') as log, \
+                mock.patch.object(daemon.time, 'monotonic',
+                                  side_effect=[100, 100 + daemon.SLOW_CHECK_IN_SECONDS + 1]):
+            self.assertTrue(daemon.check_in_this_node())
+        log.with_fields.assert_called_once_with(
+            {'duration': daemon.SLOW_CHECK_IN_SECONDS + 1})
+        log.with_fields.return_value.warning.assert_called_once_with('Slow check-in')
+
+    def test_the_sentinel_loops_do_not_log_each_check_in(self):
+        for module in (sentinel_first, sentinel_last):
+            with self.subTest(module.__name__):
+                with open(module.__file__) as f:
+                    self.assertNotIn("'Checking in'", f.read())
+
 
 class SentinelFirstStopTestCase(base.ShakenFistTestCase):
     def test_database_gone_before_the_daemon_state_write(self):

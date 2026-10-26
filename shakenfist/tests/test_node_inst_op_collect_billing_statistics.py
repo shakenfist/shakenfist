@@ -19,10 +19,52 @@ from shakenfist.schema.operations.node_inst_op import create_and_enqueue
 from shakenfist.schema.operations.node_inst_op import model_tasks
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
+from shakenfist.util import libvirt as util_libvirt
+
+
+# Kept before setUp() patches LibvirtConnection out of util_libvirt.
+RealLibvirtConnection = util_libvirt.LibvirtConnection
 
 
 class FakeLibvirtError(Exception):
-    pass
+    def __init__(self, message='', code=1):
+        super().__init__(message)
+        self.code = code
+
+    def get_error_code(self):
+        return self.code
+
+
+class FakeLibvirtModule:
+    """Just enough of libvirt for the power state and error code checks."""
+    libvirtError = FakeLibvirtError
+
+    VIR_ERR_INTERNAL_ERROR = 1
+    VIR_ERR_NO_DOMAIN = 42
+    VIR_ERR_OPERATION_INVALID = 55
+
+    VIR_DOMAIN_NOSTATE = 0
+    VIR_DOMAIN_RUNNING = 1
+    VIR_DOMAIN_BLOCKED = 2
+    VIR_DOMAIN_PAUSED = 3
+    VIR_DOMAIN_SHUTDOWN = 4
+    VIR_DOMAIN_SHUTOFF = 5
+    VIR_DOMAIN_CRASHED = 6
+    VIR_DOMAIN_PMSUSPENDED = 7
+
+
+class FakeDomain:
+    def __init__(self, state, state_error=None):
+        self._state = state
+        self._state_error = state_error
+
+    def isActive(self):
+        return 1 if self._state != FakeLibvirtModule.VIR_DOMAIN_SHUTOFF else 0
+
+    def state(self):
+        if self._state_error:
+            raise self._state_error
+        return self._state, 0
 
 
 class FakeInstance:
@@ -37,7 +79,7 @@ class FakeInstance:
         self.add_event = mock.Mock()
 
 
-class CollectBillingStatisticsTestCase(base.ShakenFistTestCase):
+class _BillingStatisticsTestBase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
         self.mock_mariadb = MockMariaDB(self, node_count=1)
@@ -76,6 +118,8 @@ class CollectBillingStatisticsTestCase(base.ShakenFistTestCase):
         inst.add_event.assert_called_once()
         return inst.add_event.call_args.kwargs['extra']
 
+
+class CollectBillingStatisticsTestCase(_BillingStatisticsTestBase):
     def test_created_instance_is_measured(self):
         inst = FakeInstance(self.instance_path, self.disk_path)
         self._make_op()._collect_billing_statistics(inst)
@@ -126,3 +170,85 @@ class CollectBillingStatisticsTestCase(base.ShakenFistTestCase):
             op.dispatch_task(model_tasks.collect_billing_statistics)
 
         self.assertIs(original_state, inst.state)
+
+
+class CollectBillingStatisticsLibvirtTestCase(_BillingStatisticsTestBase):
+    """Libvirt's answers for a domain which is off, stopping or gone.
+
+    These use the real LibvirtConnection against a fake libvirt module, so
+    the error code checks are the ones production runs.
+    """
+
+    def _connect(self, domain):
+        lc = RealLibvirtConnection()
+        lc.libvirt = FakeLibvirtModule()
+        lc.get_domain_from_sf_uuid = mock.Mock(return_value=domain)
+        self.mock_connection.return_value.__enter__.return_value = lc
+
+    def _collect(self, inst, extract_statistics=None):
+        op = self._make_op()
+        op.log = mock.MagicMock()
+        with mock.patch(
+                'shakenfist.operations.node_inst_op.util_libvirt.extract_statistics',
+                side_effect=extract_statistics,
+                return_value={'cpu usage': {'cpu time ns': 1}}) as mock_extract:
+            op._collect_billing_statistics(inst)
+        return op.log, mock_extract
+
+    def test_powered_off_domain_records_its_static_statistics(self):
+        self._connect(FakeDomain(FakeLibvirtModule.VIR_DOMAIN_SHUTOFF))
+        inst = FakeInstance(self.instance_path, self.disk_path)
+        log, mock_extract = self._collect(inst)
+
+        mock_extract.assert_not_called()
+        statistics = self._statistics(inst)
+        self.assertEqual('off', statistics['power_state'])
+        self.assertEqual('shutoff', statistics['libvirt_raw_power_state'])
+        self.assertEqual(
+            1024, statistics['disk usage']['vda']['actual bytes on disk'])
+        self.assertEqual(len('console'), statistics['console_log_size'])
+        log.warning.assert_not_called()
+
+    def test_running_domain_records_its_runtime_statistics(self):
+        self._connect(FakeDomain(FakeLibvirtModule.VIR_DOMAIN_RUNNING))
+        inst = FakeInstance(self.instance_path, self.disk_path)
+        _, mock_extract = self._collect(inst)
+
+        mock_extract.assert_called_once()
+        statistics = self._statistics(inst)
+        self.assertEqual({'cpu time ns': 1}, statistics['cpu usage'])
+        self.assertEqual('on', statistics['power_state'])
+
+    def test_domain_which_stops_mid_read_keeps_the_rest_of_the_record(self):
+        self._connect(FakeDomain(FakeLibvirtModule.VIR_DOMAIN_RUNNING))
+        inst = FakeInstance(self.instance_path, self.disk_path)
+        log, _ = self._collect(inst, extract_statistics=FakeLibvirtError(
+            'Requested operation is not valid: domain is not running',
+            code=FakeLibvirtModule.VIR_ERR_OPERATION_INVALID))
+
+        statistics = self._statistics(inst)
+        self.assertEqual(
+            1024, statistics['disk usage']['vda']['actual bytes on disk'])
+        self.assertEqual('on', statistics['power_state'])
+        log.warning.assert_not_called()
+
+    def test_domain_deleted_mid_read_is_not_a_warning(self):
+        self._connect(FakeDomain(
+            FakeLibvirtModule.VIR_DOMAIN_SHUTOFF,
+            state_error=FakeLibvirtError(
+                'Domain not found', code=FakeLibvirtModule.VIR_ERR_NO_DOMAIN)))
+        inst = FakeInstance(self.instance_path, self.disk_path)
+        log, _ = self._collect(inst)
+
+        inst.add_event.assert_not_called()
+        log.warning.assert_not_called()
+        log.debug.assert_called_once()
+
+    def test_other_libvirt_errors_are_still_warnings(self):
+        self._connect(FakeDomain(FakeLibvirtModule.VIR_DOMAIN_RUNNING))
+        inst = FakeInstance(self.instance_path, self.disk_path)
+        log, _ = self._collect(inst, extract_statistics=FakeLibvirtError(
+            'internal error', code=FakeLibvirtModule.VIR_ERR_INTERNAL_ERROR))
+
+        inst.add_event.assert_not_called()
+        log.warning.assert_called_once()
