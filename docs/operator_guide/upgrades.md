@@ -331,11 +331,12 @@ The v3 migration adds an `observational` column
 `(target_object_type, target_uuid)` to `(target_object_type, target_uuid,
 observational)`. The two "current state" readers
 (`last_cluster_operation` and the pending-operation check) will ignore
-observational rows. Until a later release classifies any task as
-observational, no row is marked observational, so behaviour is unchanged by
-this migration. See
-[the master plan](../plans/PLAN-cluster-op-visibility.md) for the
-rationale.
+observational rows. Three tasks are classified as observational
+(`collect_billing_statistics`, `health_check_kvm_process` and
+`verify_size_and_checksum`), so rows for those operations are marked
+observational and every other row is not. See
+[when is a task observational](../developer_guide/database_internals.md#when-is-a-task-observational)
+for the rationale.
 
 Run `sf-ctl ensure-mariadb-schema` before rolling the daemons. Only the
 database gateway (`sf-database`) checks schema versions at startup, via
@@ -357,10 +358,9 @@ column, so the rows they write take the default and are treated as
 mutating, which is how every row was treated before v3. The same holds in
 the other direction: a newer daemon whose enqueue reaches a gateway that
 predates v3 sends the flag, but that gateway drops it and writes the row as
-mutating. Nothing breaks, but once tasks are classified as observational a
-background sweep can still shadow `last_cluster_operation` until every
-gateway is upgraded, so roll the `sf-database` gateways before the other
-daemons.
+mutating. Nothing breaks, but a background sweep can still shadow
+`last_cluster_operation` until every gateway is upgraded, so roll the
+`sf-database` gateways before the other daemons.
 
 The `CreateClusterOperationTarget` RPC has been removed, because the atomic
 enqueue already writes the target rows. An older node daemon that still
