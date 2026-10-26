@@ -9322,7 +9322,10 @@ Global___NodeCapacity: _TypeAlias = NodeCapacity  # noqa: Y015
 
 @_typing.final
 class ClusterCapacity(_message.Message):
-    """The cluster_capacity singleton after the pass."""
+    """The cluster_capacity singleton's nine counters. The reconciler
+    returns it as the row after its pass, and GetClusterCapacity returns
+    it as the row currently stored.
+    """
 
     DESCRIPTOR: _descriptor.Descriptor
 
@@ -9938,6 +9941,63 @@ class GetSchedulerNodeCapacityReply(_message.Message):
 Global___GetSchedulerNodeCapacityReply: _TypeAlias = GetSchedulerNodeCapacityReply  # noqa: Y015
 
 @_typing.final
+class GetClusterCapacityRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetClusterCapacityRequest: _TypeAlias = GetClusterCapacityRequest  # noqa: Y015
+
+@_typing.final
+class GetClusterCapacityReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    CLUSTER_FIELD_NUMBER: _builtins.int
+    PRESENT_FIELD_NUMBER: _builtins.int
+    DEGRADED_FIELD_NUMBER: _builtins.int
+    UPDATED_AT_FIELD_NUMBER: _builtins.int
+    present: _builtins.bool
+    """False when the singleton does not exist yet, which is the normal
+    state of a cluster the reconciler has never run on. The counters
+    are then unknown, not zero.
+    """
+    degraded: _builtins.bool
+    """The daemon's own read of the row failed, so present=false means
+    "could not be read" rather than "absent". Carried for the same
+    reason as GetSchedulerNodeCapacityReply.degraded.
+    """
+    updated_at: _builtins.float
+    """The row's updated_at as epoch seconds: its last write by admission,
+    a claim change or the reconciler, not the last reconcile pass.
+    """
+    @_builtins.property
+    def cluster(self) -> Global___ClusterCapacity:
+        """Unset unless present is true."""
+
+    def __init__(
+        self,
+        *,
+        cluster: Global___ClusterCapacity | None = ...,
+        present: _builtins.bool = ...,
+        degraded: _builtins.bool = ...,
+        updated_at: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["cluster", b"cluster"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["cluster", b"cluster", "degraded", b"degraded", "present", b"present", "updated_at", b"updated_at"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetClusterCapacityReply: _TypeAlias = GetClusterCapacityReply  # noqa: Y015
+
+@_typing.final
 class NamespaceClaim(_message.Message):
     """Namespace claim CRUD (MariaDB)
     Creating, growing and shrinking a claim are themselves admission
@@ -10158,15 +10218,21 @@ class GetNamespaceClaimsRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: _builtins.int
+    COVERAGE_STATE_FIELD_NUMBER: _builtins.int
     namespace: _builtins.str
+    coverage_state: _builtins.str
+    """Empty means no filter. Otherwise 'active' or 'expired', matched
+    against the claims table's state column.
+    """
     def __init__(
         self,
         *,
         namespace: _builtins.str = ...,
+        coverage_state: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["namespace", b"namespace"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["coverage_state", b"coverage_state", "namespace", b"namespace"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

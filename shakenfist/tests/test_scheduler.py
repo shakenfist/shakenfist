@@ -853,6 +853,292 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
             self.assertIsNone(per_node['domains_enumerated_at'])
 
 
+class SummaryExclusionsTestCase(SchedulerTestCase):
+    """Why an active node is missing from the resources summary's per_node.
+
+    A node can vanish from per_node because its metrics row is stale,
+    missing or unreadable, or because its queue is too long. The first
+    two used to leave an empty metrics dict with no is_hypervisor, so a
+    stale hypervisor was skipped exactly as a network node is and the
+    response could not tell the two apart.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb.set_node_metrics_same()
+
+    def _make_stale(self, fqdn):
+        stale_at = time.time() - 400
+        self.mock_mariadb.node_metrics_store[self._node_uuid(fqdn)][
+            'timestamp'] = stale_at
+        return stale_at
+
+    def _summarize_with_unreadable(self, fqdn):
+        """Summarize with one node's metrics read raising ReadException."""
+        unreadable = self._node_uuid(fqdn)
+        real_get = self.mock_mariadb._mariadb_get_node_metrics
+
+        def get_node_metrics(node_uuid):
+            if str(node_uuid) == unreadable:
+                raise exceptions.ReadException('injected')
+            return real_get(node_uuid)
+
+        with mock.patch('shakenfist.mariadb.get_node_metrics',
+                        side_effect=get_node_metrics):
+            s = scheduler.Scheduler()
+            return s, s.summarize_resources()
+
+    def test_stale_metrics_are_excluded_with_their_timestamp(self):
+        node2 = self._node_uuid('node2')
+        stale_at = self._make_stale('node2')
+
+        resources = scheduler.Scheduler().summarize_resources()
+
+        self.assertNotIn(node2, resources['per_node'])
+        # The row's own timestamp, not an age, so the figure stays true
+        # however long the scheduler's metrics cache holds it.
+        self.assertEqual(
+            {'reason': 'stale metrics', 'metrics_timestamp': stale_at},
+            resources['excluded'][node2])
+
+    def test_every_reason_is_in_the_published_set(self):
+        # Four hypervisor-shaped nodes are needed for four reasons, and
+        # the metrics reasons apply to the network node too.
+        self._make_stale('node1_net')
+        self.mock_mariadb.update_node_metrics(
+            'node2', {'node_queue_waiting': scheduler.UNREASONABLE_QUEUE_LENGTH + 1})
+        del self.mock_mariadb.node_metrics_store[self._node_uuid('node3')]
+
+        _, resources = self._summarize_with_unreadable('node4')
+
+        reasons = {r['reason'] for r in resources['excluded'].values()}
+        # All four are emitted here, and none falls outside the set.
+        self.assertEqual(scheduler.EXCLUSION_REASONS, reasons)
+        self.assertEqual(
+            frozenset(('queue too long', 'stale metrics', 'no metrics',
+                       'metrics unreadable')),
+            scheduler.EXCLUSION_REASONS)
+
+    def test_missing_metrics_are_excluded(self):
+        node3 = self._node_uuid('node3')
+        del self.mock_mariadb.node_metrics_store[node3]
+
+        resources = scheduler.Scheduler().summarize_resources()
+
+        self.assertNotIn(node3, resources['per_node'])
+        self.assertEqual({'reason': 'no metrics'}, resources['excluded'][node3])
+
+    def test_unreadable_metrics_are_excluded(self):
+        node4 = self._node_uuid('node4')
+
+        s, resources = self._summarize_with_unreadable('node4')
+
+        self.assertNotIn(node4, resources['per_node'])
+        self.assertEqual(
+            {'reason': 'metrics unreadable'}, resources['excluded'][node4])
+        # Placement's view is what it always was: the node is absent.
+        self.assertNotIn(node4, s.metrics)
+
+    def test_long_queue_is_excluded_with_the_filters_reason(self):
+        node2 = self._node_uuid('node2')
+        node3 = self._node_uuid('node3')
+        self.mock_mariadb.update_node_metrics(
+            'node2', {'node_queue_waiting': scheduler.UNREASONABLE_QUEUE_LENGTH + 1})
+        # At the threshold a node is still a candidate.
+        self.mock_mariadb.update_node_metrics(
+            'node3', {'node_queue_waiting': scheduler.UNREASONABLE_QUEUE_LENGTH})
+
+        s = scheduler.Scheduler()
+        resources = s.summarize_resources()
+
+        self.assertNotIn(node2, resources['per_node'])
+        self.assertEqual(
+            {
+                'reason': 'queue too long',
+                'node_queue_waiting': scheduler.UNREASONABLE_QUEUE_LENGTH + 1,
+                'unreasonable_threshold': scheduler.UNREASONABLE_QUEUE_LENGTH,
+            },
+            resources['excluded'][node2])
+        self.assertIn(node3, resources['per_node'])
+        self.assertNotIn(node3, resources['excluded'])
+
+        # The candidate filter reports the same reason for the same node.
+        ok, reason = s._has_reasonable_queue_state(s.log, node2)
+        self.assertFalse(ok)
+        self.assertEqual(reason, resources['excluded'][node2])
+
+    def test_fresh_non_hypervisor_is_in_neither(self):
+        net = self._node_uuid('node1_net')
+
+        resources = scheduler.Scheduler().summarize_resources()
+
+        self.assertNotIn(net, resources['per_node'])
+        self.assertNotIn(net, resources['excluded'])
+        self.assertEqual({}, resources['excluded'])
+
+    def test_stale_non_hypervisor_is_excluded(self):
+        # Without metrics the server cannot know a node's role, so the
+        # metrics reasons are reported for every active node and the
+        # reader filters on is_hypervisor from the node list.
+        net = self._node_uuid('node1_net')
+        self._make_stale('node1_net')
+
+        resources = scheduler.Scheduler().summarize_resources()
+
+        self.assertEqual(
+            'stale metrics', resources['excluded'][net]['reason'])
+
+    def test_every_hypervisor_is_in_exactly_one(self):
+        self._make_stale('node2')
+        self.mock_mariadb.update_node_metrics(
+            'node3', {'node_queue_waiting': 100})
+
+        _, resources = self._summarize_with_unreadable('node4')
+
+        per_node = set(resources['per_node'])
+        excluded = set(resources['excluded'])
+        self.assertEqual(set(), per_node & excluded)
+        self.assertEqual(self._all_hypervisor_uuids(), per_node | excluded)
+        self.assertEqual(
+            self._node_uuids_set('node2', 'node3', 'node4'), excluded)
+
+    def test_recording_reasons_does_not_change_the_metrics(self):
+        # find_candidates() reads this mapping, so recording why a node
+        # is unusable must not change what it contains.
+        self._make_stale('node2')
+        del self.mock_mariadb.node_metrics_store[self._node_uuid('node3')]
+
+        unavailable = {}
+        recorded = scheduler.get_active_node_metrics(unavailable=unavailable)
+        plain = scheduler.get_active_node_metrics()
+
+        self.assertEqual(plain, recorded)
+        self.assertEqual({}, recorded[self._node_uuid('node2')])
+        self.assertEqual({}, recorded[self._node_uuid('node3')])
+        self.assertEqual(
+            self._node_uuids_set('node2', 'node3'), set(unavailable))
+
+    def test_refresh_replaces_the_reasons(self):
+        node2 = self._node_uuid('node2')
+        self._make_stale('node2')
+        s = scheduler.Scheduler()
+        self.assertIn(node2, s.metrics_unavailable)
+
+        self.mock_mariadb.node_metrics_store[node2]['timestamp'] = time.time()
+        s.refresh_metrics()
+
+        self.assertEqual({}, s.metrics_unavailable)
+        self.assertNotIn(node2, s.summarize_resources()['excluded'])
+
+
+class SummaryClusterCapacityTestCase(SchedulerTestCase):
+    """The cluster_capacity singleton, as the resources summary publishes it."""
+
+    FIGURES = (
+        'updated_at',
+        'total_cpus', 'total_memory_mb', 'total_disk_gb',
+        'claimed_cpus', 'claimed_memory_mb', 'claimed_disk_gb',
+        'unclaimed_used_cpus', 'unclaimed_used_memory_mb',
+        'unclaimed_used_disk_gb',
+        'unallocated_cpus', 'unallocated_memory_mb', 'unallocated_disk_gb',
+    )
+
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb.set_node_metrics_same()
+
+    def _row(self, **overrides):
+        row = {
+            'total_cpus': 64, 'total_memory_mb': 131072, 'total_disk_gb': 2000,
+            'claimed_cpus': 16, 'claimed_memory_mb': 32768,
+            'claimed_disk_gb': 500,
+            'unclaimed_used_cpus': 8, 'unclaimed_used_memory_mb': 16384,
+            'unclaimed_used_disk_gb': 100,
+            'updated_at': 1790581560.5,
+            'unallocated_cpus': 40, 'unallocated_memory_mb': 81920,
+            'unallocated_disk_gb': 1400,
+        }
+        row.update(overrides)
+        return row
+
+    def _set_read(self, row, degraded):
+        self.mock_mariadb.cluster_capacity_read = \
+            scheduler.mariadb.ClusterCapacityRead(row=row, degraded=degraded)
+
+    def _published(self):
+        return scheduler.Scheduler().summarize_resources()['cluster_capacity']
+
+    def test_present_row_is_published(self):
+        row = self._row()
+        self._set_read(row, False)
+
+        published = self._published()
+
+        self.assertEqual(
+            {'row_present', 'degraded'} | set(self.FIGURES), set(published))
+        self.assertTrue(published['row_present'])
+        self.assertFalse(published['degraded'])
+        for key in self.FIGURES:
+            self.assertEqual(row[key], published[key], key)
+
+    def test_unallocated_is_passed_through(self):
+        # Deliberately inconsistent with the counters: the summary copies
+        # the read's derived headroom rather than computing its own.
+        self._set_read(self._row(
+            unallocated_cpus=-3, unallocated_memory_mb=7,
+            unallocated_disk_gb=11), False)
+
+        published = self._published()
+
+        self.assertEqual(-3, published['unallocated_cpus'])
+        self.assertEqual(7, published['unallocated_memory_mb'])
+        self.assertEqual(11, published['unallocated_disk_gb'])
+
+    def test_absent_row_publishes_none_not_zero(self):
+        # The mock's default read is an absent, readable singleton.
+        published = self._published()
+
+        self.assertEqual(
+            {'row_present', 'degraded'} | set(self.FIGURES), set(published))
+        self.assertFalse(published['row_present'])
+        self.assertFalse(published['degraded'])
+        for key in self.FIGURES:
+            self.assertIsNone(published[key], key)
+
+    def test_degraded_read_publishes_none(self):
+        self._set_read(None, True)
+
+        published = self._published()
+
+        self.assertFalse(published['row_present'])
+        self.assertTrue(published['degraded'])
+        for key in self.FIGURES:
+            self.assertIsNone(published[key], key)
+
+    def test_degraded_read_with_a_row_still_publishes_none(self):
+        # Not a combination the accessor returns, but a degraded read is
+        # not a ledger to report, whatever came back with it.
+        self._set_read(self._row(), True)
+
+        published = self._published()
+
+        self.assertFalse(published['row_present'])
+        self.assertTrue(published['degraded'])
+        for key in self.FIGURES:
+            self.assertIsNone(published[key], key)
+
+    def test_read_once_per_summary_and_never_by_placement(self):
+        with mock.patch(
+                'shakenfist.mariadb.get_cluster_capacity',
+                wraps=self.mock_mariadb._mariadb_get_cluster_capacity) as reads:
+            s = scheduler.Scheduler()
+            s.find_candidates(self.mock_mariadb.create_instance('fake-inst'))
+            self.assertEqual(0, reads.call_count)
+
+            s.summarize_resources()
+            self.assertEqual(1, reads.call_count)
+
+
 class CapacityCounterTestCase(SchedulerTestCase):
     """The pre-filter reads the counters the guard will draw down (P2).
 

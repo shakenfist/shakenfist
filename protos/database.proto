@@ -412,6 +412,12 @@ service DatabaseService {
   // is these counters rather than a Python walk over placement rows.
   rpc GetSchedulerNodeCapacity (GetSchedulerNodeCapacityRequest) returns (GetSchedulerNodeCapacityReply) {}
 
+  // Read the cluster_capacity singleton. The admin resources summary
+  // publishes the counters both cluster-wide guards test against, and
+  // those guards are UPDATEs which never read the row back, so this is
+  // the only on-demand read of it.
+  rpc GetClusterCapacity (GetClusterCapacityRequest) returns (GetClusterCapacityReply) {}
+
   // Namespace claim CRUD. Creating, growing and shrinking a claim are
   // admission decisions in their own right -- a claim is a promise of
   // capacity the cluster has to be able to keep -- so each writes
@@ -2771,7 +2777,9 @@ message NodeCapacity {
   int64 delta_used_disk_gb = 11;
 }
 
-// The cluster_capacity singleton after the pass.
+// The cluster_capacity singleton's nine counters. The reconciler
+// returns it as the row after its pass, and GetClusterCapacity returns
+// it as the row currently stored.
 message ClusterCapacity {
   int64 total_cpus = 1;
   int64 total_memory_mb = 2;
@@ -3026,6 +3034,24 @@ message GetSchedulerNodeCapacityReply {
   bool degraded = 2;
 }
 
+message GetClusterCapacityRequest {}
+
+message GetClusterCapacityReply {
+  // Unset unless present is true.
+  ClusterCapacity cluster = 1;
+  // False when the singleton does not exist yet, which is the normal
+  // state of a cluster the reconciler has never run on. The counters
+  // are then unknown, not zero.
+  bool present = 2;
+  // The daemon's own read of the row failed, so present=false means
+  // "could not be read" rather than "absent". Carried for the same
+  // reason as GetSchedulerNodeCapacityReply.degraded.
+  bool degraded = 3;
+  // The row's updated_at as epoch seconds: its last write by admission,
+  // a claim change or the reconciler, not the last reconcile pass.
+  double updated_at = 4;
+}
+
 // Namespace claim CRUD (MariaDB)
 // Creating, growing and shrinking a claim are themselves admission
 // decisions against the cluster_capacity singleton (claimed + delta must
@@ -3106,6 +3132,9 @@ message GetNamespaceClaimReply {
 // to the namespace index rather than filtered in Python.
 message GetNamespaceClaimsRequest {
   string namespace = 1;
+  // Empty means no filter. Otherwise 'active' or 'expired', matched
+  // against the claims table's state column.
+  string coverage_state = 2;
 }
 
 message GetNamespaceClaimsReply {

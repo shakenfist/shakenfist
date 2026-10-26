@@ -1,18 +1,20 @@
 # Copyright 2026 Michael Still and contributors
 #
-# Tests for the /admin/vditokenpubkey endpoint.
+# Tests for the /admin/vditokenpubkey and /admin/resources endpoints.
 
 import json
 import logging
 import sys
 from unittest import mock
 
+from shakenfist import mariadb
+from shakenfist.external_api import admin as api_admin
 from shakenfist.external_api import app as external_api
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
-class AdminVDITokenPublicKeyEndpointTestCase(base.ShakenFistTestCase):
+class AdminEndpointTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
 
@@ -38,6 +40,8 @@ class AdminVDITokenPublicKeyEndpointTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
 
+
+class AdminVDITokenPublicKeyEndpointTestCase(AdminEndpointTestCase):
     @mock.patch(
         'shakenfist.external_api.admin.vdi_tokens.get_signing_material')
     def test_get_returns_404_when_no_key_configured(self, mock_material):
@@ -101,3 +105,46 @@ class AdminVDITokenPublicKeyEndpointTestCase(base.ShakenFistTestCase):
         self.assertEqual(500, resp.status_code)
         self.assertIn('corrupt', resp.get_json()['error'])
         self.assertIn("'keys'", resp.get_json()['error'])
+
+
+class AdminResourcesEndpointTestCase(AdminEndpointTestCase):
+    """The published example has to be the shape the endpoint returns.
+
+    Client scripts are written against the example, so a key the
+    summary gains or loses without the example following is a contract
+    quietly broken.
+    """
+
+    def test_the_example_has_every_key_the_response_has(self):
+        example = json.loads(api_admin.admin_resources_get_example)
+
+        self.mock_mariadb.set_node_metrics_same()
+        stale = self.mock_mariadb.node_uuids['node2']
+        self.mock_mariadb.node_metrics_store[stale]['timestamp'] = 0
+        for fqdn in ['node3', 'node4']:
+            self.mock_mariadb.set_node_capacity(
+                self.mock_mariadb.node_uuids[fqdn], limit_cpus=12,
+                limit_memory_mb=60000, limit_disk_gb=100)
+        counters = {
+            k: v for k, v in example['cluster_capacity'].items()
+            if k in mariadb.CLUSTER_CAPACITY_COUNTERS}
+        self.mock_mariadb.cluster_capacity_read = mariadb.ClusterCapacityRead(
+            row=mariadb._cluster_capacity_dict(
+                counters, example['cluster_capacity']['updated_at']),
+            degraded=False)
+
+        resp = self.client.get(
+            '/admin/resources', headers={'Authorization': self.auth_token})
+        self.assertEqual(200, resp.status_code)
+        body = resp.get_json()
+
+        self.assertEqual(set(example), set(body))
+        self.assertEqual(set(example['total']), set(body['total']))
+        example_node = next(iter(example['per_node'].values()))
+        for node in body['per_node'].values():
+            self.assertEqual(set(example_node), set(node))
+        self.assertEqual(
+            set(next(iter(example['excluded'].values()))),
+            set(body['excluded'][stale]))
+        # The example's ledger is the real derivation of its counters.
+        self.assertEqual(example['cluster_capacity'], body['cluster_capacity'])

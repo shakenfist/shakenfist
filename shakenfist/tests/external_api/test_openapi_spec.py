@@ -5,6 +5,7 @@ import json
 from openapi_spec_validator import OpenAPIV2SpecValidator
 
 from shakenfist.config import config
+from shakenfist.external_api import admin as api_admin
 from shakenfist.external_api import app as external_api
 from shakenfist.external_api import auth as api_auth
 from shakenfist.external_api import base as api_base
@@ -285,6 +286,11 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         # AuthNamespacesEndpoint.post().
         ('/auth/namespaces', 'post', 'namespace',
          {'type': 'string', 'pattern': api_auth.NAMESPACE_NAME_PATTERN}),
+        # The two coverage states a claim can be in. The handler guard
+        # in AdminClaimsEndpoint.get() backs it at every validation mode,
+        # because the database layer raises on anything else.
+        ('/admin/claims', 'get', 'coverage_state',
+         {'type': 'string', 'pattern': api_admin.COVERAGE_STATE_PATTERN}),
         ('/auth/namespaces/{namespace}/rules', 'post', 'scopes',
          {'type': 'array', 'items': {'type': 'string'}}),
         ('/auth/namespaces/{namespace}/rules', 'post', 'bound_claims',

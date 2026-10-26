@@ -388,7 +388,14 @@ class ConditionalCapability:
 
 
 API_CAPABILITIES = {
-    'admin': ['cluster-cacert', 'cluster-resources', 'vdi-token-pubkey'],
+    'admin': [
+        'cluster-cacert', 'cluster-resources', 'vdi-token-pubkey',
+        # Three separate reads, advertised separately: cluster-capacity
+        # is the cluster_capacity key of /admin/resources,
+        # cluster-resources-excluded its excluded key, and cluster-claims
+        # the cross-namespace /admin/claims listing. A client meeting a
+        # server without one can say so rather than guess.
+        'cluster-capacity', 'cluster-resources-excluded', 'cluster-claims'],
     'agent-operations': [
         'agentoperations-crud', 'instance-agentoperations',
         'instance-agentoperations-all', 'agentoperations-put-with-mode'],
@@ -546,6 +553,7 @@ api.add_resource(api_admin.AdminClusterCaCertificateEndpoint, '/admin/cacert')
 api.add_resource(api_admin.AdminVDITokenPublicKeyEndpoint,
                  '/admin/vditokenpubkey')
 api.add_resource(api_admin.AdminResourcesEndpoint, '/admin/resources')
+api.add_resource(api_admin.AdminClaimsEndpoint, '/admin/claims')
 
 api.add_resource(api_artifact.ArtifactEndpoint, '/artifacts/<artifact_ref>')
 api.add_resource(api_artifact.ArtifactsEndpoint, '/artifacts')

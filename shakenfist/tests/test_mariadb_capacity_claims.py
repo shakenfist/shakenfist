@@ -822,6 +822,50 @@ class ReadNamespaceClaimsTestCase(_ClaimMixin, base.ShakenFistTestCase):
                     if 'FROM namespace_claims' in text]
         self.assertNotIn('WHERE', select)
 
+    def test_the_state_predicate_appears_only_when_asked_for(self):
+        for state, expected in (('active', True), ('expired', True),
+                                ('', False)):
+            router = _ClaimRouter(claims=[_claim_row()])
+            self._run(router, namespace='', coverage_state=state)
+            [select] = [text for text in router.autocommit
+                        if 'FROM namespace_claims' in text]
+            self.assertEqual(
+                expected, 'namespace_claims.state = %s' in select, select)
+
+    def test_the_state_and_namespace_predicates_combine(self):
+        router = _ClaimRouter(claims=[_claim_row()])
+        self._run(router, namespace='ci-1', coverage_state='expired')
+        [select] = [text for text in router.autocommit
+                    if 'FROM namespace_claims' in text]
+        self.assertIn('namespace_claims.namespace = %s', select)
+        self.assertIn('namespace_claims.state = %s', select)
+
+    def test_a_bad_coverage_state_raises_before_any_io(self):
+        with mock.patch('shakenfist.mariadb._get_engine') as get_engine:
+            self.assertRaises(
+                ValueError, mariadb._direct_get_namespace_claims, '', 'bogus')
+            self.assertRaises(
+                ValueError, mariadb.get_namespace_claims, '', 'deleted')
+            self.assertRaises(
+                ValueError, mariadb.get_namespace_claims, 'ci-1', 'ACTIVE')
+        get_engine.assert_not_called()
+
+    def test_the_public_layer_passes_the_state_to_the_active_path(self):
+        for use_service, direct_calls, grpc_calls in ((False, 1, 0), (True, 0, 1)):
+            with mock.patch('shakenfist.mariadb._use_database_service',
+                            return_value=use_service), \
+                    mock.patch('shakenfist.mariadb._direct_get_namespace_claims',
+                               return_value=[]) as direct, \
+                    mock.patch('shakenfist.mariadb._grpc_get_namespace_claims',
+                               return_value=[]) as via_grpc:
+                mariadb.get_namespace_claims('ci-1', 'active')
+            self.assertEqual(direct_calls, direct.call_count)
+            self.assertEqual(grpc_calls, via_grpc.call_count)
+            if use_service:
+                via_grpc.assert_called_once_with('ci-1', 'active')
+            else:
+                direct.assert_called_once_with('ci-1', 'active')
+
     def test_timestamps_are_converted_server_side(self):
         router = _ClaimRouter(claims=[_claim_row()])
         self._run(router, namespace='')
@@ -997,6 +1041,15 @@ class ClaimGrpcWrapperTestCase(base.ShakenFistTestCase):
             rows = mariadb._grpc_get_namespace_claims('ci-1')
         self.assertEqual([str(CLAIM1)], [r['uuid'] for r in rows])
 
+    def test_the_coverage_state_reaches_the_wire(self):
+        reply = database_pb2.GetNamespaceClaimsReply()
+        with mock.patch('shakenfist.mariadb._grpc_call',
+                        return_value=reply) as call:
+            mariadb._grpc_get_namespace_claims('ci-1', 'expired')
+        [request] = call.call_args.args[1:]
+        self.assertEqual('ci-1', request.namespace)
+        self.assertEqual('expired', request.coverage_state)
+
 
 class ClaimServicerTestCase(base.ShakenFistTestCase):
     """The database daemon's side of the five RPCs."""
@@ -1085,8 +1138,27 @@ class ClaimServicerTestCase(base.ShakenFistTestCase):
             reply = self.servicer.GetNamespaceClaims(
                 database_pb2.GetNamespaceClaimsRequest(namespace='ci-1'),
                 self.context)
-        direct.assert_called_once_with('ci-1')
+        direct.assert_called_once_with('ci-1', '')
         self.assertEqual(1, len(reply.claims))
+
+    def test_list_passes_the_coverage_state_through(self):
+        with mock.patch('shakenfist.mariadb._direct_get_namespace_claims',
+                        return_value=[]) as direct:
+            self.servicer.GetNamespaceClaims(
+                database_pb2.GetNamespaceClaimsRequest(
+                    namespace='', coverage_state='active'), self.context)
+        direct.assert_called_once_with('', 'active')
+
+    def test_a_bad_coverage_state_is_invalid_argument(self):
+        # Not swallowed into an empty list, and not reported as a database
+        # fault either.
+        reply = self.servicer.GetNamespaceClaims(
+            database_pb2.GetNamespaceClaimsRequest(coverage_state='bogus'),
+            self.context)
+
+        self.assertEqual(0, len(reply.claims))
+        self.context.set_code.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT)
 
     def test_a_failed_get_sets_a_status_code(self):
         # found=False on its own is a well formed "no such claim", which

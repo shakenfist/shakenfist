@@ -29,6 +29,30 @@ from shakenfist_client import apiclient
 # the other, which is why each now names the one it is not.
 STRUCTURAL_MINIMUM_WAIT = 420
 
+# The node states which can run instances, from
+# shakenfist.constants.NODE_ACTIVE_STATES (which is also what
+# prefilter='active' resolves to). Repeated here rather than imported because
+# this suite runs from an installed shakenfist_ci package against a remote
+# cluster and cannot import the server's constants module.
+NODE_ACTIVE_STATES = frozenset({'initial', 'created', 'degraded'})
+
+# How long to wait for the capacity reconciler to write the cluster_capacity
+# row before believing it is absent. The elected loop's maintenance pass
+# forces a reconcile within about a minute of hypervisors becoming fresh, so
+# this is several times that.
+CLUSTER_CAPACITY_ROW_WAIT = 300
+
+# The closed set of reasons /admin/resources gives for a node missing from
+# per_node, from shakenfist.scheduler.EXCLUSION_REASONS. Clients match on these
+# exact strings, so a new one is an API change this test should notice.
+EXCLUSION_REASONS = frozenset({
+    'queue too long', 'stale metrics', 'no metrics', 'metrics unreadable'})
+
+CLUSTER_CAPACITY_COUNTERS = [
+    '%s_%s' % (kind, dim)
+    for kind in ('total', 'claimed', 'unclaimed_used')
+    for dim in ('cpus', 'memory_mb', 'disk_gb')]
+
 
 class TestNodes(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
@@ -128,6 +152,108 @@ class TestNodes(base.BaseNamespacedTestCase):
         if infra_schedulable and plain_schedulable:
             self.assertLessEqual(
                 max(infra_schedulable), min(plain_schedulable))
+
+    def test_cluster_resources_capacity_surface(self):
+        # /admin/resources publishes the cluster_capacity ledger and the
+        # reason each unusable node is missing from per_node. Neither is
+        # visible anywhere else over REST.
+        #
+        # The ledger row is written by the capacity reconciler. A young
+        # cluster reads row_present false until the forced reconcile has run
+        # (see test_cluster_resources_reservations), so wait for the row the
+        # same way that test waits for a node's row: poll the endpoint
+        # itself, since there is no other signal to wait on.
+        deadline = time.time() + CLUSTER_CAPACITY_ROW_WAIT
+        while True:
+            nodes_before = self.system_client.get_nodes()
+            resources = self.system_client.get_cluster_resources()
+            nodes_after = self.system_client.get_nodes()
+            capacity = resources.get('cluster_capacity') or {}
+            if capacity.get('row_present') or time.time() > deadline:
+                break
+            time.sleep(5)
+
+        self.addDetail('nodes before', content.text_content(json.dumps(
+            nodes_before, indent=4, sort_keys=True)))
+        self.addDetail('nodes after', content.text_content(json.dumps(
+            nodes_after, indent=4, sort_keys=True)))
+        self.addDetail('resources', content.text_content(json.dumps(
+            resources, indent=4, sort_keys=True)))
+
+        self.assertIn('cluster_capacity', resources)
+        self.assertIs(
+            True, capacity.get('row_present'),
+            'cluster_capacity has no row %d seconds into the run, so the '
+            'capacity reconciler has not written one'
+            % CLUSTER_CAPACITY_ROW_WAIT)
+        self.assertIs(False, capacity.get('degraded'))
+
+        def is_int(value):
+            return isinstance(value, int) and not isinstance(value, bool)
+
+        for name in CLUSTER_CAPACITY_COUNTERS:
+            self.assertTrue(
+                is_int(capacity.get(name)),
+                '%s is not an int: %r' % (name, capacity.get(name)))
+        for dim in ('cpus', 'memory_mb', 'disk_gb'):
+            name = 'unallocated_%s' % dim
+            self.assertTrue(
+                is_int(capacity.get(name)),
+                '%s is not an int: %r' % (name, capacity.get(name)))
+            self.assertEqual(
+                capacity['total_%s' % dim]
+                - capacity['claimed_%s' % dim]
+                - capacity['unclaimed_used_%s' % dim],
+                capacity[name],
+                '%s is not total - claimed - unclaimed_used: %s'
+                % (name, json.dumps(capacity, sort_keys=True)))
+        updated_at = capacity.get('updated_at')
+        self.assertTrue(
+            isinstance(updated_at, (int, float))
+            and not isinstance(updated_at, bool),
+            'updated_at is not a number: %r' % (updated_at,))
+
+        # Every active hypervisor is either schedulable (in per_node) or
+        # explained (in excluded), and never both. Non-hypervisors with
+        # unusable metrics also appear in excluded, so the nodes list is
+        # what says which entries are owed.
+        #
+        # get_nodes() and get_cluster_resources() are separate requests, so
+        # a node can change state between them: a node which has just
+        # joined, or just been marked missing, is judged by a state the
+        # resources response did not see. Only nodes which are active
+        # hypervisors in the list read both before and after the resources
+        # request are held to the rule, since those cannot have changed
+        # state across it (barring a flap, which the cluster does not
+        # produce on a healthy run). A node outside that set is not
+        # asserted about either way.
+        def active_hypervisors(node_list):
+            return {
+                n['uuid'] for n in node_list
+                if n.get('state') in NODE_ACTIVE_STATES
+                and n.get('is_hypervisor')}
+
+        expected = (active_hypervisors(nodes_before)
+                    & active_hypervisors(nodes_after))
+        self.assertGreaterEqual(
+            len(expected), 1, 'No active hypervisor was stable across the '
+            'resources request')
+
+        per_node = set(resources['per_node'])
+        excluded = set(resources.get('excluded', {}))
+        self.assertIn('excluded', resources)
+        for node_uuid in sorted(expected):
+            self.assertEqual(
+                1, int(node_uuid in per_node) + int(node_uuid in excluded),
+                'Active hypervisor %s must be in exactly one of per_node '
+                'and excluded. In per_node: %s. In excluded: %s'
+                % (node_uuid, node_uuid in per_node, node_uuid in excluded))
+
+        for node_uuid, entry in resources['excluded'].items():
+            self.assertIn(
+                entry.get('reason'), EXCLUSION_REASONS,
+                'Node %s is excluded for a reason outside the published '
+                'set: %r' % (node_uuid, entry))
 
     def test_cluster_topology_meets_the_structural_minimum(self):
         """The deployed cluster is big enough for this suite to mean anything.

@@ -141,6 +141,14 @@ class MockMariaDB():
         # mariadb._grpc_get_scheduler_node_capacity(), which returns no
         # rows and says so.
         self.node_capacity_read_degraded = False
+        # What a read of the cluster_capacity singleton returns. Absent
+        # and readable by default, which is the state of a cluster the
+        # reconciler has not reached yet, so a test which does not care
+        # about the cluster ledger never has to mention it. Tests which
+        # do assign a ClusterCapacityRead here. It is a canned reply, not
+        # a model: claims and placements in this mock never move it.
+        self.cluster_capacity_read = mariadb.ClusterCapacityRead(
+            row=None, degraded=False)
         # Mock namespace_claims rows, keyed by claim uuid, as the real
         # table is. Empty by default, which is the unclaimed namespace:
         # the claim stage is skipped entirely and nothing about it
@@ -905,6 +913,13 @@ class MockMariaDB():
         self.mariadb_get_scheduler_node_capacity.start()
         self.test_obj.addCleanup(
             self.mariadb_get_scheduler_node_capacity.stop)
+
+        self.mariadb_get_cluster_capacity = mock.patch(
+            'shakenfist.mariadb.get_cluster_capacity',
+            side_effect=self._mariadb_get_cluster_capacity)
+        self.mariadb_get_cluster_capacity.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_cluster_capacity.stop)
 
         # MariaDB namespace claim CRUD
         self.mariadb_create_namespace_claim = mock.patch(
@@ -2936,11 +2951,15 @@ class MockMariaDB():
         row = self._claim_by_uuid(claim_uuid)
         return self._claim_row(row) if row is not None else None
 
-    def _mariadb_get_namespace_claims(self, namespace=''):
+    def _mariadb_get_namespace_claims(self, namespace='', coverage_state=''):
         """Mock implementation of mariadb.get_namespace_claims()"""
+        # The real validation, so a caller that would raise there raises
+        # here too rather than quietly listing nothing.
+        mariadb._validate_claim_coverage_state(coverage_state)
         return [self._claim_row(row)
                 for _, row in sorted(self.namespace_claims.items())
-                if not namespace or row['namespace'] == str(namespace)]
+                if (not namespace or row['namespace'] == str(namespace))
+                and (not coverage_state or row['state'] == coverage_state)]
 
     def _mariadb_update_namespace_claim(
             self, claim_uuid, fields, limit_cpus=0, limit_memory_mb=0,
@@ -3011,6 +3030,14 @@ class MockMariaDB():
             result['returned_memory_mb'] = row['used_memory_mb']
             result['returned_disk_gb'] = row['used_disk_gb']
         return result
+
+    def _mariadb_get_cluster_capacity(self):
+        """Mock implementation of mariadb.get_cluster_capacity()
+
+        Returns ``cluster_capacity_read`` unchanged, which is an absent,
+        readable singleton unless a test has set it.
+        """
+        return self.cluster_capacity_read
 
     def _mariadb_get_scheduler_node_capacity(self):
         """Mock implementation of mariadb.get_scheduler_node_capacity()

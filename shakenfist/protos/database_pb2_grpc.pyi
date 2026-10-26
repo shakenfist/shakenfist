@@ -426,6 +426,12 @@ class DatabaseServiceStub:
     summary must publish what admission would actually allow, and that
     is these counters rather than a Python walk over placement rows.
     """
+    GetClusterCapacity: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetClusterCapacityRequest, _database_pb2.GetClusterCapacityReply]
+    """Read the cluster_capacity singleton. The admin resources summary
+    publishes the counters both cluster-wide guards test against, and
+    those guards are UPDATEs which never read the row back, so this is
+    the only on-demand read of it.
+    """
     CreateNamespaceClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceClaimRequest, _database_pb2.CreateNamespaceClaimReply]
     """Namespace claim CRUD. Creating, growing and shrinking a claim are
     admission decisions in their own right -- a claim is a promise of
@@ -838,6 +844,12 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     """Read the materialised per-node capacity counters. The admin resources
     summary must publish what admission would actually allow, and that
     is these counters rather than a Python walk over placement rows.
+    """
+    GetClusterCapacity: _aio.UnaryUnaryMultiCallable[_database_pb2.GetClusterCapacityRequest, _database_pb2.GetClusterCapacityReply]  # type: ignore[assignment]
+    """Read the cluster_capacity singleton. The admin resources summary
+    publishes the counters both cluster-wide guards test against, and
+    those guards are UPDATEs which never read the row back, so this is
+    the only on-demand read of it.
     """
     CreateNamespaceClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceClaimRequest, _database_pb2.CreateNamespaceClaimReply]  # type: ignore[assignment]
     """Namespace claim CRUD. Creating, growing and shrinking a claim are
@@ -2628,6 +2640,18 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         """Read the materialised per-node capacity counters. The admin resources
         summary must publish what admission would actually allow, and that
         is these counters rather than a Python walk over placement rows.
+        """
+
+    @_abc_1.abstractmethod
+    def GetClusterCapacity(
+        self,
+        request: _database_pb2.GetClusterCapacityRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetClusterCapacityReply, _abc.Awaitable[_database_pb2.GetClusterCapacityReply]]:
+        """Read the cluster_capacity singleton. The admin resources summary
+        publishes the counters both cluster-wide guards test against, and
+        those guards are UPDATEs which never read the row back, so this is
+        the only on-demand read of it.
         """
 
     @_abc_1.abstractmethod

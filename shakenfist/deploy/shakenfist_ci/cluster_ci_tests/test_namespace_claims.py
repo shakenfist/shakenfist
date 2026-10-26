@@ -55,9 +55,11 @@ the whole wait.
 What this file deliberately does not assert
 -------------------------------------------
 
-* **That the cluster's unclaimed usage did not move.** No REST endpoint
-  publishes ``cluster_capacity``: ``/admin/resources`` reports the
-  scheduler's per-node view, not the claim ledger. The claim branch and
+* **That the cluster's unclaimed usage did not move.**
+  ``/admin/resources`` publishes the ``cluster_capacity`` ledger, but it
+  is one row shared by every test running concurrently on this cluster,
+  so a before-and-after delta on it would measure the siblings as much
+  as this test. The claim branch and
   the unclaimed branch of ``_direct_admit_instance_placement()`` are
   mutually exclusive by construction (an ``elif``), so observing the
   claim charge is observing that the unclaimed sums were not charged --
@@ -666,6 +668,26 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
             claim['uuid'], replacement['uuid'],
             'The replacement claim reused the deleted claim\'s uuid, %s'
             % claim['uuid'])
+
+    def test_claim_appears_in_cluster_listing(self):
+        # The admin listing spans every namespace and filters on coverage,
+        # which is a different fact from the claim's existence (state).
+        # Other tests run concurrently on this cluster, so only this
+        # test's claim is looked for, never the listing's size.
+        claim = self._create_claim(
+            INSTANCE_CPUS, INSTANCE_MEMORY_MB, INSTANCE_DISK_GB)
+
+        def uuids(coverage_state=None):
+            listing = self.system_client.get_cluster_claims(coverage_state)
+            self.addDetail(
+                'cluster claims %s' % coverage_state,
+                content.text_content(json.dumps(
+                    listing, indent=4, sort_keys=True, default=str)))
+            return [c['uuid'] for c in listing]
+
+        self.assertIn(claim['uuid'], uuids())
+        self.assertIn(claim['uuid'], uuids('active'))
+        self.assertNotIn(claim['uuid'], uuids('expired'))
 
 
 class TestNamespaceClaimAccounting(ClaimAPIMixin,

@@ -612,7 +612,30 @@ A claim publishes two states, and they are two different facts:
 | `coverage_state` | `active`, `expired` | Whether the claim still covers placements |
 
 An expired claim reads as `state: created, coverage_state: expired`. A
-deleted claim has no row at all.
+claim deleted through the API has no row at all: the delete returns its
+capacity and removes the row in one transaction. A claim can still read
+`state: deleted` while its row exists, when zombie repair has marked it
+and the reaper has not yet removed it. That row still holds capacity,
+which is why the listings below show it.
+
+### Listing every namespace's claims
+
+`GET /admin/claims` lists the claims of every namespace in one request,
+admin-only, where `/auth/namespaces/<namespace>/claims` lists one
+namespace's. Each entry has the same shape as there. An optional
+`coverage_state` of `active` or `expired` restricts the listing to claims
+in that [coverage state](#the-two-states-a-claim-carries), and the
+filter is applied by the database. Any other value is a 400.
+
+The listing deliberately includes a claim whose object state is
+`deleted`. A claim has no soft delete: such a row still holds
+`claimed_*` in the cluster ledger, waiting for the reaper to remove it
+and return the capacity. Hiding it would make the one operator view of
+claims disagree with the capacity actually held. Looking one up by uuid
+answers 404 instead, since there is nothing useful left to do to it.
+
+To compare the claims with the ledger they draw on, read the same
+cluster's [`cluster_capacity`](#the-cluster-wide-ledger-in-the-resources-response).
 
 ### When a claim cannot be made
 
@@ -918,6 +941,99 @@ enumerated before it has not. Between the two the call was still
 running, and a measurement may or may not reflect it. A `poweroff`
 event carries these fields only when that call is the one which stopped
 the domain; deleting an instance powers it off more than once.
+
+### The cluster-wide ledger in the resources response
+
+`/admin/resources` also carries a top-level `cluster_capacity` key. It
+is the `cluster_capacity` singleton row itself, read once per request:
+the one ledger that both cluster-wide guards test against (see
+[Namespace capacity claims](#namespace-capacity-claims)). It is not a sum
+of claims, and it is deliberately kept out of `total`: `total` adds up
+per-node headroom bounded by measurement, whereas this ledger's totals
+are sums of node *limits*, and the two should not be compared as if they
+were the same quantity.
+
+| Field | Meaning |
+|-------|---------|
+| `total_cpus`, `total_memory_mb`, `total_disk_gb` | The cluster's capacity, summed from the per-node limits |
+| `claimed_cpus`, `claimed_memory_mb`, `claimed_disk_gb` | The limits of every active namespace claim |
+| `unclaimed_used_cpus`, `unclaimed_used_memory_mb`, `unclaimed_used_disk_gb` | What instances in namespaces without a covering claim have drawn down |
+| `unallocated_cpus`, `unallocated_memory_mb`, `unallocated_disk_gb` | `total - claimed - unclaimed_used`, per dimension |
+| `updated_at` | Epoch seconds of the row's last write |
+| `row_present`, `degraded` | Why the figures above are, or are not, there |
+
+`unallocated_*` is the figure to read. An unclaimed placement is admitted
+when it fits in what is neither claimed nor already used by unclaimed
+namespaces, and a new claim must fit in the same space, so one number
+per dimension answers both questions: a request of exactly
+`unallocated_*` is admitted, and one more is refused. For a claim, that
+is exact only when the namespace has no unclaimed instances of its own.
+A namespace that already runs unclaimed instances can claim up to
+`unallocated_*` plus that usage, because the claim takes the usage over:
+it leaves `unclaimed_used_*` as the claim enters `claimed_*`, so it is
+not counted twice. The server computes `unallocated_*` once, beside the
+read, so a client does not have to repeat the arithmetic and risk
+getting it slightly different.
+
+`unallocated_*` can be negative, and is published as it is. Admission
+cannot drive it below zero, but the reconciler rebuilds `claimed_*` from
+the limits of every active claim whether or not they still fit, so a
+cluster that shrank underneath its claims reads as over-promised. That is
+the state you want to see, not one to clamp away.
+
+`updated_at` is the row's last write by *either* admission or the
+reconciler. Every placement draws the row down, so on a busy cluster it
+moves constantly and says nothing about when the reconciler last ran.
+
+`row_present` and `degraded` distinguish the two reasons there might be
+no figures, and when either is the case every other figure is `null`,
+never zero. A ledger of zeroes would claim the cluster is full, which
+neither case means.
+
+- `row_present: false, degraded: false` -- the reconciler has not yet
+  written the row. This is normal for the first few minutes of a
+  cluster's life, and until then unclaimed placements are not guarded
+  against the cluster total at all.
+- `degraded: true` -- the read failed or timed out (it is given a short,
+  bounded budget, because CI polls this endpoint continuously), and the
+  state of the row is unknown. Read it again.
+
+Both flags are the same idea as `cpu_committed_row_present` and
+`capacity_degraded`, which this response already publishes for the
+per-node ledger.
+
+### Why a node is missing from the resources response
+
+A hypervisor that is not in `per_node` is in the top-level `excluded`
+mapping, keyed by node uuid, if the scheduler considered it. Each entry
+carries a `reason`, and there are exactly four:
+
+| `reason` | Meaning | Extra fields |
+|----------|---------|--------------|
+| `queue too long` | The node's `sf-resources` metrics are fresh, but its work queue exceeds the threshold, so it is not a placement candidate | `node_queue_waiting`, `unreasonable_threshold` |
+| `stale metrics` | The node's metrics row is more than 120 seconds old | `metrics_timestamp`, the row's own epoch timestamp |
+| `no metrics` | The node has no metrics row | none |
+| `metrics unreadable` | Reading the node's metrics row failed | none |
+
+`stale metrics` carries a timestamp rather than an age on purpose: a
+summary can be served from a cache, and an age computed when the metrics
+were loaded would be wrong by however long they had been held. Subtract
+it from the current time to get the age.
+
+Before this key existed a hypervisor whose daemon had stopped publishing
+was indistinguishable, in this response, from a network node. A node
+with a stale or missing metrics row has no `is_hypervisor` flag to read,
+so it was skipped as though it were not a hypervisor. The three metrics
+reasons are therefore reported for *every* active node whatever its role:
+the server cannot know the role of a node whose metrics it could not
+read. Filter on `is_hypervisor` from the node list to see only
+hypervisors. The same causes are recorded as audit events on the node.
+
+Two kinds of node never appear in `excluded`. A node that is not active
+is left out, because the node list already publishes its state. And a
+non-hypervisor with fresh metrics (a network node, say) is not a
+candidate and was never going to be in `per_node`, so it has nothing to
+explain.
 
 ### Was affinity ignored, or was there no choice?
 

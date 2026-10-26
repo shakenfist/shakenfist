@@ -37,7 +37,9 @@ from shakenfist.tests import base
 # Every token the API can advertise, by family. Keep in step with
 # API_CAPABILITIES in shakenfist/external_api/app.py.
 EXPECTED_CAPABILITIES = {
-    'admin': ['cluster-cacert', 'cluster-resources', 'vdi-token-pubkey'],
+    'admin': [
+        'cluster-cacert', 'cluster-resources', 'vdi-token-pubkey',
+        'cluster-capacity', 'cluster-resources-excluded', 'cluster-claims'],
     'agent-operations': [
         'agentoperations-crud', 'instance-agentoperations',
         'instance-agentoperations-all', 'agentoperations-put-with-mode'],

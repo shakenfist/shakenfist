@@ -30,6 +30,28 @@ CACHED_NETWORK_NODE = None
 
 UNREASONABLE_QUEUE_LENGTH = 20
 
+# Why an active node is missing from the resources summary's per_node,
+# as published in its `excluded` mapping. Clients match on these exact
+# strings, so they are a closed set: adding one is an API change.
+EXCLUSION_QUEUE_TOO_LONG = 'queue too long'
+EXCLUSION_STALE_METRICS = 'stale metrics'
+EXCLUSION_NO_METRICS = 'no metrics'
+EXCLUSION_METRICS_UNREADABLE = 'metrics unreadable'
+EXCLUSION_REASONS = frozenset((
+    EXCLUSION_QUEUE_TOO_LONG,
+    EXCLUSION_STALE_METRICS,
+    EXCLUSION_NO_METRICS,
+    EXCLUSION_METRICS_UNREADABLE,
+))
+
+# The figures summarize_resources() publishes from the cluster_capacity
+# singleton, in the order they are published: the row's last write, its
+# nine stored counters, and the headroom derived from them.
+CLUSTER_CAPACITY_FIGURES = (
+    ('updated_at',)
+    + mariadb.CLUSTER_CAPACITY_COUNTERS
+    + tuple(f'unallocated_{dim}' for dim in mariadb.CAPACITY_DIMENSIONS))
+
 
 def get_network_node():
     global CACHED_NETWORK_NODE
@@ -45,7 +67,20 @@ def get_network_node():
     raise exceptions.NoNetworkNode('Cannot find network node')
 
 
-def get_active_node_metrics():
+def get_active_node_metrics(unavailable=None):
+    """The usable metrics of every active node, keyed by node uuid.
+
+    A node whose row is stale or missing maps to an empty dict, and one
+    whose read raised is left out. The scheduler cannot use any of
+    those, but it cannot say why from the returned mapping either: an
+    empty dict carries no is_hypervisor, so a hypervisor whose daemon
+    stopped publishing looks exactly like a network node.
+
+    If ``unavailable`` is a dict, the reason each such node was unusable
+    is recorded in it against the node's uuid, at the point the
+    decision is made. The return value is the same whether or not it is
+    given, because placement reads it.
+    """
     metrics = {}
 
     for n in Nodes([], prefilter='active'):
@@ -55,7 +90,8 @@ def get_active_node_metrics():
             new_metrics = mariadb.get_node_metrics(node_uuid)
             if new_metrics:
                 row_timestamp = new_metrics.get('timestamp', 0)
-                if time.time() - row_timestamp < 120:
+                metrics_age = time.time() - row_timestamp
+                if metrics_age < 120:
                     new_metrics = new_metrics.get(
                         'metrics', {})
                     # When the resources daemon wrote this row. Kept so a
@@ -69,12 +105,23 @@ def get_active_node_metrics():
                         'stale metrics from database '
                         'for node')
                     new_metrics = {}
+                    # The row's own timestamp rather than its age: the
+                    # caller may hold this for as long as its metrics
+                    # cache lives, and an age computed now would be wrong
+                    # by however long that was.
+                    if unavailable is not None:
+                        unavailable[node_uuid] = {
+                            'reason': EXCLUSION_STALE_METRICS,
+                            'metrics_timestamp': row_timestamp,
+                        }
             else:
                 n.add_event(
                     EVENT_TYPE_AUDIT,
                     'empty metrics from database '
                     'for node')
                 new_metrics = {}
+                if unavailable is not None:
+                    unavailable[node_uuid] = {'reason': EXCLUSION_NO_METRICS}
             metrics[node_uuid] = new_metrics
 
         except exceptions.ReadException:
@@ -82,8 +129,29 @@ def get_active_node_metrics():
                 EVENT_TYPE_AUDIT,
                 'refreshing metrics for node '
                 'failed')
+            if unavailable is not None:
+                unavailable[str(n.uuid)] = {
+                    'reason': EXCLUSION_METRICS_UNREADABLE}
 
     return metrics
+
+
+def _queue_exclusion_reason(node_metrics):
+    """Why a node's queue is too long to place on, or None if it is not.
+
+    The one statement of the queue-length rule, shared by the candidate
+    filter and the resources summary so the two cannot disagree about
+    which nodes it excludes. It does not log: the summary calls it for
+    every hypervisor on every poll.
+    """
+    waiting = node_metrics.get('node_queue_waiting', 0)
+    if waiting > UNREASONABLE_QUEUE_LENGTH:
+        return {
+            'reason': EXCLUSION_QUEUE_TOO_LONG,
+            'node_queue_waiting': waiting,
+            'unreasonable_threshold': UNREASONABLE_QUEUE_LENGTH,
+        }
+    return None
 
 
 def _binary_affinity_spec(requested_affinity):
@@ -179,12 +247,18 @@ class Scheduler:
         self.log = LOG.with_fields({'scheduler_instance': self.__uuid})
 
         self.metrics = {}
+        # Why each active node missing usable metrics was unusable, from
+        # the same refresh as self.metrics. Only the resources summary
+        # reads it; placement never does.
+        self.metrics_unavailable = {}
         self.metrics_updated = 0
 
         self.refresh_metrics()
 
     def refresh_metrics(self):
-        self.metrics = get_active_node_metrics()
+        unavailable = {}
+        self.metrics = get_active_node_metrics(unavailable=unavailable)
+        self.metrics_unavailable = unavailable
         self.metrics_updated = time.time()
 
     def _oldest_node_metrics_age(self):
@@ -206,13 +280,8 @@ class Scheduler:
         return round(oldest, 2)
 
     def _has_reasonable_queue_state(self, log_ctx, node):
-        waiting = self.metrics[node].get('node_queue_waiting', 0)
-        if waiting > UNREASONABLE_QUEUE_LENGTH:
-            reason = {
-                'reason': 'queue too long',
-                'node_queue_waiting': waiting,
-                'unreasonable_threshold': UNREASONABLE_QUEUE_LENGTH,
-            }
+        reason = _queue_exclusion_reason(self.metrics[node])
+        if reason:
             log_ctx.with_fields({'node': node, **reason}).debug(
                 'Excluding node with many queued jobs')
             return False, reason
@@ -289,6 +358,28 @@ class Scheduler:
         """
         read = mariadb.get_scheduler_node_capacity()
         return ({row['node_uuid']: row for row in read.rows}, read.degraded)
+
+    def _cluster_capacity(self):
+        """The cluster_capacity singleton, as the resources summary publishes it.
+
+        Only the summary calls this; placement never reads the singleton,
+        because the guarded UPDATEs at admission test against it in SQL.
+
+        Always carries ``row_present`` and ``degraded``. Every figure is
+        None unless the row was read successfully, never zero: see the
+        comment in ``summarize_resources()`` for why. The figures are
+        copied from the read, including the ``unallocated_*`` headroom,
+        which mariadb derives once and this does not recompute.
+        """
+        read = mariadb.get_cluster_capacity()
+        row = None if read.degraded else read.row
+        published = {
+            'row_present': row is not None,
+            'degraded': read.degraded,
+        }
+        for key in CLUSTER_CAPACITY_FIGURES:
+            published[key] = row[key] if row is not None else None
+        return published
 
     def _satisfies_hard_affinity(self, inst, node, memo,
                                  require_with, require_without):
@@ -1069,24 +1160,67 @@ class Scheduler:
         # two apart instead of discarding every sample from a failed
         # read alongside every sample from a cluster the reconciler
         # simply has not reached yet (P7).
+        #
+        # cluster_capacity is the cluster-wide ledger, published for the
+        # same reason: it is the singleton row itself, the one both
+        # cluster-wide guards test against -- an unclaimed placement
+        # must fit in what is neither claimed nor used by unclaimed
+        # namespaces, and so must a new claim. It is not a sum of claim
+        # rows. Admission draws the row down directly and the reconciler
+        # rebuilds it, so a total computed here from the claims would be
+        # a second ledger which agrees with the first only until the
+        # next placement. The headroom figures come from the same read,
+        # derived once beside it, so no reader has to redo that
+        # arithmetic and risk getting it subtly different. It is kept
+        # out of `total`, because total sums per-node headroom bounded
+        # by measurement, while this ledger's totals are sums of node
+        # limits. Those are different quantities, and one key holding
+        # both would invite comparing them.
+        #
+        # A singleton the reconciler has not yet written, and one which
+        # could not be read, both publish every figure as None rather
+        # than zero. A ledger of zeroes says the cluster is full, which
+        # neither state means: before the first reconcile unclaimed
+        # placements are not guarded at all. row_present and degraded
+        # say which of the two a None is.
         capacity, capacity_degraded = self._capacity_by_node()
+        cluster_capacity = self._cluster_capacity()
 
-        # Only hypervisors with reasonable queue lengths are candidates
+        # Only hypervisors with reasonable queue lengths are candidates.
+        #
+        # `excluded` says why an active node is missing from per_node.
+        # Without it a reader can only infer the cause from an absence,
+        # and for the metrics cases it cannot even do that: a node whose
+        # metrics row is stale or missing has an empty metrics dict
+        # here, so it carries no is_hypervisor and is skipped below
+        # exactly as a network node is. Those reasons were decided when
+        # the metrics were loaded and are reported for every active node
+        # whatever its role, because a node's role is not knowable
+        # without its metrics; a reader who wants only hypervisors
+        # filters against the node list, which publishes the role. A
+        # node which is not active is left out, as the node list already
+        # publishes its state, and a non-hypervisor with fresh metrics
+        # is not a candidate at all, so it is not "excluded" either.
         resources = {
             'total': {
                 'cpu_available': 0,
                 'ram_available': 0,
                 'capacity_degraded': capacity_degraded,
             },
-            'per_node': {}
+            'per_node': {},
+            'excluded': {
+                n: dict(reason)
+                for n, reason in self.metrics_unavailable.items()},
+            'cluster_capacity': cluster_capacity,
         }
 
         for n in self.metrics.keys():
             if not self.metrics[n].get('is_hypervisor', False):
                 continue
 
-            if (self.metrics[n].get('node_queue_waiting', 0) >
-                    UNREASONABLE_QUEUE_LENGTH):
+            queue_reason = _queue_exclusion_reason(self.metrics[n])
+            if queue_reason:
+                resources['excluded'][n] = queue_reason
                 continue
 
             resources['per_node'][n] = {}
