@@ -157,6 +157,28 @@ def remove_netns_iptables_rule(netns, table, rule):
     return removed
 
 
+# How many gratuitous ARPs announce a new floating address.
+GRATUITOUS_ARP_COUNT = 2
+ARPING_TRANSMITTED_RE = re.compile(r'^(\d+) packets transmitted', re.MULTILINE)
+
+
+def _gratuitous_arp_sent(stdout, stderr, returncode):
+    """Whether arping sent every announcement, whatever its exit code says.
+
+    Debian's arping (Habets) exits 1 when nothing replies, even after sending
+    every packet, and an unsolicited ARP is an announcement which nothing
+    replies to. So exit 1 is success when stderr is empty and the summary
+    says all the packets went out. A real failure, such as a missing
+    interface or network namespace, writes to stderr.
+    """
+    if returncode == 0:
+        return True
+    if returncode != 1 or stderr.strip():
+        return False
+    m = ARPING_TRANSMITTED_RE.search(stdout)
+    return m is not None and int(m.group(1)) == GRATUITOUS_ARP_COUNT
+
+
 # How sf-privexec ends requests still running when it is asked to stop. It
 # waits STOP_GRACE seconds for them, then sends the commands they are running
 # SIGTERM, then SIGKILL TERM_GRACE seconds later, and gives up KILL_GRACE
@@ -645,16 +667,17 @@ class PrivExecJob:
             return
 
         egress_veth_inner = f'egr-{req.vxid:06x}-i'
-        _, stderr, returncode = privexec_util.command_helper(
+        stdout, stderr, returncode = privexec_util.command_helper(
             privexec_util.locate_command('ip'), 'netns', 'exec',
-            req.network_uuid, arping, '-c', '2', '-U',
+            req.network_uuid, arping, '-c', str(GRATUITOUS_ARP_COUNT), '-U',
             '-i', egress_veth_inner, '-S', req.floating_address,
             req.floating_address, failure_is_error=False)
-        if returncode != 0:
+        if not _gratuitous_arp_sent(stdout, stderr, returncode):
             LOG.with_fields({
                 'floating_address': req.floating_address,
                 'netns': req.network_uuid,
                 'interface': egress_veth_inner,
+                'returncode': returncode,
                 'stderr': stderr}).warning(
                 'Gratuitous ARP for floating address failed')
 
