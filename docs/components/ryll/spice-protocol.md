@@ -540,25 +540,21 @@ is converted to RGBA with alpha=255 for opaque formats).
 
 The image dimensions come from the server, so every image decoder
 (QUIC, LZ, GLZ, zlib-GLZ, LZ4, JPEG, H.264/video, pixmap and
-cursor) refuses an image over the shared per-side and total-pixel
-caps before allocating its RGBA output. For the pure-Rust decoders
-that is everything they allocate. The H.264 decoder and the
-platform JPEG backends (WIC on Windows, ImageIO on macOS) hand the
-compressed data to a codec library first, and it allocates its own
-intermediate buffers before ryll sees the dimensions, so those
-buffers are bounded only by the library's own limits. Of the JPEG
-backends, `jpeg-decoder` is capped through its
-`set_max_decoding_buffer_size`, and mozjpeg's dimensions are
-checked after the header is read and before any scanline is
-decoded. The constants (`MAX_IMAGE_DIMENSION` and
-`MAX_IMAGE_PIXELS`) and the checked `rgba_len` size helper live in
-the [`limits`
+cursor) refuses an image over a shared per-side and total-pixel cap
+before allocating its RGBA output. The constants
+(`MAX_IMAGE_DIMENSION` and `MAX_IMAGE_PIXELS`) and the `rgba_len`
+size helper live in the [`limits`
 module](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-compression/src/limits.rs)
 of `shakenfist-spice-compression`. A refused image is dropped and
-not painted, in the same way as a truncated LZ4 image above. The
-zlib layer of `ZLIB_GLZ_RGB` is inflated against a bound slightly
-above the RGBA size, because a GLZ stream can be a little larger
-than the pixels it decodes to.
+not painted, in the same way as a truncated LZ4 image above.
+
+Decoders that wrap a codec library (H.264, and the WIC and ImageIO
+JPEG backends) only learn the dimensions once the library has parsed
+the frame. For the JPEG backends ryll's RGBA output is still capped,
+but the library's own intermediate buffers are bounded only by its
+own limits. The zlib layer of `ZLIB_GLZ_RGB` is inflated against a
+bound slightly above the RGBA size, because a GLZ stream can be a
+little larger than the pixels it decodes to.
 
 ## Display Channel Capabilities
 

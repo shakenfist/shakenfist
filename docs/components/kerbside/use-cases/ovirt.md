@@ -72,7 +72,7 @@ flowchart TD
     kerbside -- "2. .vv file" --> broker
     broker -- "3. deliver" --> client
     client -- "4. connect, token as password" --> kerbside
-    kerbside <-- "A. discovery (per minute)<br/>B. ticket, per .vv request" --> engine
+    kerbside <-- "A. discovery (per minute)<br/>B. ticket, when a session's<br/>first channel connects" --> engine
     kerbside -- "5. 5900 → NEED_SECURED → 5901 TLS:<br/>engine CA verified, subject pinned" --> hypervisor
 ```
 
@@ -89,14 +89,48 @@ flowchart TD
 Only VMs that are `up` and have a SPICE graphics console become
 consoles kerbside will broker.
 
-**Ticket (B).** oVirt graphics-console tickets are short-lived
-(on the order of two minutes), so kerbside does not cache them.
-`console_service(<id>).ticket()` is called at the moment a `.vv`
-file is generated, and the ticket is stored against that console
-for the connection that is about to happen. A `.vv` that sits in
-a download folder for five minutes will not work — this is oVirt
-behaviour, not a kerbside limitation, and any broker built on
-this path should hand the file to the client immediately.
+**Ticket (B).** Downloading the `.vv` asks the engine for
+nothing. Kerbside calls `console_service(<id>).ticket()` when a
+session's first channel connects, asking for an explicit lifetime:
+the token's remaining life plus 30 seconds, so a channel authorized
+in the token's last moment can still finish its SPICE link. Without
+that the engine applies its own default of two hours. The ticket is
+held on the session's token row in the database, so the session's
+other channels reuse it whichever proxy node they land on, and only
+one channel mints. A stored ticket is reused while at least 10
+seconds of it remain; a channel arriving later than that gets a
+replacement. Replacing a ticket changes the password for new
+connections but leaves the session's established channels up, which
+is how QEMU's `set_password`, the call oVirt uses, behaves. The
+maintenance loop clears the ticket once it, or the token, has
+expired.
+
+Two consequences follow. A `.vv` can sit in a download folder for as
+long as its token lives (`CONSOLE_TOKEN_DURATION`, a minute by
+default) and still work, because the ticket does not exist until the
+client connects. And the engine is now needed to connect, not only to
+discover: the whole mint is bounded at 20 seconds (each engine
+request at 15), and a mint that fails or times out denies the channel
+with `console ticket unavailable` rather than leaving the client
+hanging. Each mint is audited, with its lifetime on success or the
+exception class name on failure; the ticket itself is never logged.
+
+A direct console (`/console/direct`, administrators only) mints in the
+same way when the file is downloaded, with a lifetime of
+`CONSOLE_TOKEN_DURATION`, since nothing else is placed between the
+file and the hypervisor. An errored source answers 404; any other
+failure answers 502.
+
+**Two sessions on one VM.** SPICE servers serve one client at a time:
+when a second client links, the hypervisor drops the first. A second
+kerbside session on the same VM therefore disconnects the first,
+whatever the tickets. This is how SPICE behaves, not something
+kerbside adds, and the ticket handling above does not change it. Each
+mint also sets the VM's one SPICE password, so a second session's
+mint, or a direct console download, leaves the first session's stored
+ticket stale: a channel of the first session connecting afterwards is
+refused at the hypervisor, even while that ticket is within its reuse
+window.
 
 **The client leg (4).** The `.vv` points at `PUBLIC_FQDN` and
 kerbside's own ports, carries kerbside's CA, and uses a
@@ -234,8 +268,8 @@ CA, are in [configuration.md](/components/kerbside/configuration/).
 
 The `ovirt_matrix` job in
 `.github/workflows/functional-tests.yml` builds a single-node
-oVirt 4.5 environment and deploys kerbside against it on every
-merge-queue entry. The runner-side scripts are in
+oVirt 4.5 environment and deploys kerbside against it every night,
+and on demand through `workflow_dispatch`. The runner-side scripts are in
 `tools/ovirt-e2e/` (see `tools/ovirt-e2e/README.md`):
 `gen-sources.py` writes the `sources.yaml` above — including
 fetching the engine CA so the equality check passes by
@@ -287,7 +321,8 @@ Not covered, and worth knowing before you deploy:
 | oVirt 4.5 only | No other version is tested. |
 | Least-privilege accounts untested | Only `SuperUser` has been exercised. See the account note above. |
 | Live migration during a session | Not tested. The console's address and subject are captured at discovery; a VM that migrates mid-session has not been characterised. |
-| Ticket lifetime | Roughly two minutes, set by oVirt. Brokers must deliver the `.vv` promptly. |
+| Ticket lifetime | Set by kerbside, not oVirt: the token's remaining life plus 30 seconds, so a `.vv` is good for `CONSOLE_TOKEN_DURATION` (a minute by default) after download. |
+| Engine availability | The engine is called when a session connects, so an engine that is down or hung (beyond the 20 second bound) stops new sessions connecting, not only discovery. Established sessions are unaffected. |
 | oVirt upstream | oVirt itself is minimally maintained. This integration is kept working, not extended. |
 
 ## See also

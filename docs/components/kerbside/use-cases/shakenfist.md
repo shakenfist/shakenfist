@@ -161,8 +161,8 @@ why Kerbside needs both ports reachable, and it is worth
 knowing which of your nodes are which.
 
 **No per-connection call to the cloud.** Unlike the oVirt path,
-which acquires a ticket from the engine at the moment a `.vv` is
-generated, the Shaken Fist connect path normally asks the cluster
+which acquires a ticket from the engine when a session's first
+channel connects, the Shaken Fist connect path normally asks the cluster
 nothing: the inventory is up to a scrape interval old and the
 token verifies against cached keys, so a connection survives a
 control plane that is busy or restarting. The exception is a

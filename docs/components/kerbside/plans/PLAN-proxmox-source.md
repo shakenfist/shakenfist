@@ -479,4 +479,5 @@ and cited from phase 2's *Outcome*.
 In progress. Phases 1, 1b and 2 are complete: CI can build a
 Proxmox VE node on demand, and ryll tunnels through
 `spiceproxy`, proven against a real node on every ryll pull
-request that touches the tunnel. Phase 3a is planned.
+request that touches the tunnel. Phase 3a is being
+implemented.

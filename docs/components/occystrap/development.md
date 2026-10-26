@@ -65,8 +65,9 @@ Both CI lanes -- `Sanity checks` and `Functional tests` -- run on
 ephemeral VM runners. A pull request that touches only `docs/**` or
 markdown skips them, because nothing they run reads those files: a
 `Check paths` job in each workflow decides, and the lane's jobs skip on
-its output. A merge queue entry always runs both in full. To test a
-documentation-only branch anyway, run the functional workflow by hand
+its output. A push to `develop` (and a merge queue entry, when the
+queue is enabled) always runs both in full. To test a documentation-only
+branch anyway, run the functional workflow by hand
 (`workflow_dispatch`, which the filter does not apply to) or comment
 `@shakenfist-bot please retest` on the pull request. The `Supply chain`
 lane is deliberately not filtered.
@@ -80,7 +81,9 @@ discarded after the job, and the `debian-13-docker` image the mermaid
 lane needs has its docker daemon inside that VM. Fork pull requests
 additionally need a maintainer to approve the run before any of it
 starts, which is a repository setting rather than something these files
-can assert. A lane which needed more than that would have to run from
+can assert. The mermaid lane also refuses a fork's pull request outright,
+as defence in depth, because its script runs on the VM outside the
+container it starts. A lane which needed more than that would have to run from
 the base branch's copy of the script instead.
 
 ## Supply chain checks
@@ -153,23 +156,38 @@ daemon and therefore a different runner image.
 
 ## Merging
 
-Pull requests merge through a merge queue on `develop`, not with the
-merge button directly. A pull request can be queued once "Can enqueue"
-and "Can enqueue: unit" pass. The queue then runs `Sanity checks` and
-`Functional tests` again on the commit it is about to merge, and merges
-only when "Can merge" and "Can merge: unit" pass. Each workflow has a
-pair of its own, because a job's `needs:` cannot reach across workflows
-and the queue has to require both. That second run is the one a release
-counts (see below), so a change merged around the queue, by an
-administrator bypassing it, cannot be released until a later commit has
-gone through the queue.
+The merge queue on `develop` is disabled while
+[occystrap#169](https://github.com/shakenfist/occystrap/issues/169) is
+open: the queue never built a merge group, so nothing could merge
+through it. Pull requests merge to `develop` directly, once "Can
+enqueue" and "Can enqueue: unit" pass; those are the checks the
+`Develop branch` ruleset requires. `Sanity checks` and `Functional
+tests` then run again on the push to `develop`, in full, and that push
+run is the one a release counts (see below). Each workflow has an
+aggregator of its own, because a job's `needs:` cannot reach across
+workflows. A push run is keyed by commit in each `concurrency` group,
+so a later merge never cancels or drops an earlier commit's run.
 
-The queue builds one entry at a time (`max_entries_to_build: 1` in the
-`develop` ruleset). The `concurrency` groups in `python-unit-tests.yml`
-and `functional-tests.yml` depend on that: a queue run shares a group
+Without the queue, a pull request's checks ran on its merge with
+`develop` as it was when they started. If `develop` has moved since,
+two pull requests that were each green can still break it together.
+The push run is what catches that, and the release gate will not
+accept a tag on the broken commit, so the fix is a follow-up pull
+request.
+
+The `merge_group` trigger and the "Can merge" and "Can merge: unit"
+jobs are kept, so re-enabling the queue is a ruleset change only: add
+a `merge_queue` rule with merge method `MERGE`,
+`max_entries_to_build: 1`, `min_entries_to_merge: 1`,
+`max_entries_to_merge: 5`, `min_entries_to_merge_wait_minutes: 5`,
+grouping strategy `ALLGREEN` and `check_response_timeout_minutes: 360`,
+and add "Can merge" and "Can merge: unit" to the required checks. The
+queue run then becomes the one a release counts, and the push run tests
+the same commit again. The `merge_group` `concurrency` groups depend on
+the queue building one entry at a time: a queue run shares a group
 with whatever the queue builds next, so that a superseded run is
-cancelled. Raising the setting would make each entry cancel the one
-ahead of it, so revisit those groups first.
+cancelled. Raising `max_entries_to_build` would make each entry cancel
+the one ahead of it, so revisit those groups first.
 
 A new job in either workflow goes in the `needs:` of that workflow's
 two aggregator jobs.
@@ -186,10 +204,13 @@ Pushing a `v*` tag triggers `release.yml`. Its jobs, in order:
 
 1. `ci-gate` checks that `python-unit-tests.yml` and
    `functional-tests.yml` both succeeded on the tagged commit, in their
-   merge queue runs. A run started by hand, as `pr-retest.yml` does
-   with `workflow_dispatch`, does not count. A queue run that fails,
-   flaky or not, ejects its entry, so the commit it built never reaches
-   `develop` and re-running that run cannot make any tag pass: re-queue
+   runs from the push to `develop` (or their merge queue runs, when the
+   queue is enabled). A run started by hand, as `pr-retest.yml` does
+   with `workflow_dispatch`, does not count. A failed push run can be
+   re-run with "Re-run jobs", and then `ci-gate` with it. With the
+   queue enabled, a queue run that fails, flaky or not, ejects its
+   entry, so the commit it built never reaches `develop` and
+   re-running that run cannot make any tag pass: re-queue
    the pull request and tag the commit that merges. Re-running a queue
    run helps only when the tagged commit's run was re-run after it
    merged and that later attempt failed, because the gate judges each
@@ -203,10 +224,9 @@ Pushing a `v*` tag triggers `release.yml`. Its jobs, in order:
    environment, re-sign the tag with gitsign, and publish to PyPI with
    attestations.
 
-So tag a commit that is on `develop` and went through the merge
-queue, and wait for both workflows' runs on it to finish first. A gate
-failure means nothing was signed or published, so every failure is
-recoverable: the template's
+So tag a commit that is on `develop`, and wait for both workflows'
+runs on it to finish first. A gate failure means nothing was signed
+or published, so every failure is recoverable: the template's
 [recovery table](https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure)
 says what to do for each cause, which is usually moving the tag or
 re-running CI and then the `ci-gate` job.
@@ -258,7 +278,7 @@ kept that way so that drift is a `diff` rather than a judgement:
 | `.github/workflows/pr-re-review.yml` | `templates/ci-review-automation/pr-re-review.yml` | `3b5142c` |
 | `.github/workflows/pr-retest.yml` | `templates/ci-review-automation/pr-retest.yml` | `5e9a4b3` |
 | `.github/workflows/pr-fix-tests.yml` | `templates/test-drift-fix/pr-fix-tests.yml` | `aec16db` |
-| `.github/workflows/mermaid-lint.yml` | `templates/mermaid-lint/mermaid-lint.yml` | `7cadf3e` |
+| `.github/workflows/mermaid-lint.yml` | `templates/mermaid-lint/mermaid-lint.yml` | `a0dcf84` |
 | `tools/mermaid-lint.sh` | `templates/mermaid-lint/mermaid-lint.sh` | `5279ac3` |
 
 Fix them upstream and re-copy, rather than editing them here: the

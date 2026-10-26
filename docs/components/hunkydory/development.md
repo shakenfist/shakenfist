@@ -56,10 +56,10 @@ and a path-filtered workflow made required never reports on the pull
 requests it filters out, so it would hold them in the queue forever. A red
 "Mermaid lint" on a pull request blocks nothing automatically; fix it
 before enqueueing anyway. `tools/mermaid-lint.sh` runs it by hand. Both
-files are copies of shakenfist/development's `templates/mermaid-lint/`, so
-change them there rather than here; the workflow keeps two local changes,
-named in its header -- like `ci.yml`, it skips a pull request from a fork,
-and its checkout keeps no token.
+files are byte-identical copies of shakenfist/development's
+`templates/mermaid-lint/`, so change them there rather than here. Like
+`ci.yml`, the workflow skips a pull request from a fork, and its checkout
+keeps no token.
 
 Enqueueing a fork's pull request is the point at which its code first
 runs here. On the pull request itself `ci.yml` skips a fork, but a merge

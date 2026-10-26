@@ -551,6 +551,10 @@ answers), and this plan's *Results*.
       a window resize after that adopting too, the
       `desktop_resize_flag` FreeRDP sent, the cursor formats the
       guest sent, and server mouse mode's cursor behaviour.
+      *Closed out unmet on 2026-10-25, by Mikal's decision: the
+      guest adopting a requested size and server mouse mode's
+      cursor were not observed (see Execution notes); both are
+      under Future work.*
 - [x] `docs/multi-mode-parity.md`'s RDP row (`:26`) names
       cursor shapes and resize, and *Results* lists the RDP
       cursor and resize cells phase 6's column will need.

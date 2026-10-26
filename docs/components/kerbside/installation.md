@@ -412,7 +412,8 @@ If you ran v0.6.0 or earlier:
   source's ticket is a console password you configured rather than one
   minted per request, so unlike an oVirt ticket it does not expire on
   its own. oVirt, OpenStack and Shaken Fist tickets need no action:
-  they are short lived and are reissued on every request.
+  oVirt tickets are minted for each session and last no longer than its
+  console token plus 30 seconds, and the others are short lived.
 - **Scrub or expire the daemon logs** from before the upgrade,
   including anywhere they were shipped: a log aggregator, a backup, a
   support bundle, or CI artifacts from a deployment lane.
@@ -438,3 +439,22 @@ else keeps using the proxied download. Membership is read at login, so
 a user gains or loses direct access when their current session expires
 (`API_TOKEN_DURATION`) and they log in again. See
 [the configuration reference](/components/kerbside/configuration/#keystone-settings).
+
+### Upgrading past connect-time oVirt tickets
+
+Earlier releases minted an oVirt graphics-console ticket when a `.vv`
+file was downloaded and stored it on the console, for the engine's
+two-hour default. Kerbside now mints it when a session's first channel
+connects, with a lifetime of the console token's remaining life plus
+30 seconds, and holds it on the session's token row. `kerbside db
+upgrade` adds the two columns for that and clears the oVirt tickets
+stored on consoles, since nothing reads them any more.
+
+The proxy's authorization call is what mints, so a daemon from before
+this change cannot authorize an oVirt channel against a database
+upgraded to it: it would present the cleared, empty ticket, and the
+proxy would log `hypervisor connection failed` with `PermissionDenied`
+for each oVirt channel. Upgrade every node's daemon together, not one
+at a time. Kerbside also now
+needs the oVirt engine to be reachable when a session connects, not
+only for discovery; see [Console Sources](/components/kerbside/console-sources/#ovirt).
