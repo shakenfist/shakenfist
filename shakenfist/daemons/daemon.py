@@ -235,6 +235,11 @@ def check_abort_path(abort_path):
     return not os.path.exists(abort_path)
 
 
+# A check-in slower than this is logged. It is a single database write, so
+# one this slow means the database or the path to it is struggling.
+SLOW_CHECK_IN_SECONDS = 5
+
+
 def check_in_this_node():
     """Record that this node is alive, if the database lets us.
 
@@ -244,13 +249,22 @@ def check_in_this_node():
     whole-cluster reboot, with the database hosts already down, nothing
     recorded the nodes stopping (#4628). A missed check-in costs nothing: the
     next one catches up. Returns True if this one was recorded.
+
+    A check-in which works is not logged: the database's check-in timestamp
+    already records it, and a line every 15 seconds from each sentinel was
+    almost all of a cluster's debug log (#4541). A failed or slow one is.
     """
+    start = time.monotonic()
     try:
         Node.observe_this_node()
-        return True
     except DatabaseUnavailable as e:
         LOG.warning(f'Database unavailable, skipping this check-in: {e}')
         return False
+
+    duration = time.monotonic() - start
+    if duration > SLOW_CHECK_IN_SECONDS:
+        LOG.with_fields({'duration': round(duration, 2)}).warning('Slow check-in')
+    return True
 
 
 def health_check_privexec():

@@ -80,7 +80,6 @@ def main():
     send_systemd_ready()
 
     while daemon.check_abort_path(ABORT_PATH):
-        LOG.debug('Checking in')
         daemon.check_in_this_node()
         time.sleep(15)
 
