@@ -16736,6 +16736,25 @@ cluster's ceiling in proportion to its size.</p>
   docstring that records this obligation -- but a probe that is simply
   never launched again looks identical to a running one from here.</li>
 </ul>
+<p>Since issue 4021 the check also reports, rather than fails on, <em>every</em>
+unbudgeted pair from the <code>api</code> caller, listing them under
+<code>request_driven</code> in the run's detail. sf-api runs no timer loop that
+reaches the database tier -- its readiness checker calls only the gRPC
+health service, which the tier does not count -- so an <code>api</code> pair is
+always somebody's HTTP request, and in CI that somebody is the suite.
+The check's activity filter could not tell suite workload from a poll
+for these pairs: it certified object creates and deletes,
+<code>(SetObjectState, api)</code>, as a new poll in most of that issue's twenty
+failures. That makes the probe's five pairs above a special case of the
+caller rule. They are still listed, because <code>harness_driven</code> names the
+loop which produced the traffic and <code>request_driven</code> cannot. The blind
+spot is the same shape and still CI's alone, and
+<code>test_sf_api_starts_only_the_threads_it_is_known_to_start</code> fails if
+<code>external_api</code> grows a thread that could poll. Each pair the check
+names now carries <code>measured_qps_per_window</code>, and both the unbudgeted
+and over budget findings are reported from one run (issue 4177).
+<a href="../../plans/PLAN-idle-load-measurement/">Measure database polling on an idle cluster</a>
+is the plan to replace the activity filter rather than work around it.</p>
 <p>An absent census is not zero refusals. When the Loki query failed or
 log shipping was unhealthy, the report says so explicitly rather than
 printing "0 refusals", which would look exactly like a run that
