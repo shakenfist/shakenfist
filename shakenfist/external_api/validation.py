@@ -195,6 +195,30 @@ def declared_boolean(value: Any) -> bool:
     return bool(value)
 
 
+def declared_integer(value: Any) -> Any:
+    """Read a caller's integer the way the published schema reads it.
+
+    The integer counterpart of declared_boolean(), for the same reason:
+    this layer is check-only, so a value which passes the compiled
+    _ExactInteger check reaches the handler exactly as the caller sent
+    it. A query parameter is always a string on the wire, and a body
+    integer may be a JSON string ("500"), and both are valid integers to
+    the schema. A handler which passes such a value on without reading
+    it publishes a specification the server then contradicts: the
+    per-object events endpoints handed '500' to a comparison with an
+    int and answered 500 (#4627, and #3609 before it).
+
+    Reads with the same field class the schema compiles to, so what the
+    check accepts and what this returns cannot drift. None comes back as
+    None, so a handler's own default still applies. A value the schema
+    would refuse raises marshmallow.ValidationError, which only a
+    handler running with validation at warn or off can see.
+    """
+    if value is None:
+        return None
+    return _ExactInteger().deserialize(value)
+
+
 # ---------------------------------------------------------------------
 # Semantic formats (issue 3269).
 #

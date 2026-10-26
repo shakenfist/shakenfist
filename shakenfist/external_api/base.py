@@ -26,6 +26,7 @@ from flask_jwt_extended.exceptions import WrongTokenError
 from jwt.exceptions import PyJWTError
 from jwt.exceptions import DecodeError
 from jwt.exceptions import ExpiredSignatureError
+import marshmallow
 import requests
 from webargs.flaskparser import parser as webargs_parser
 from werkzeug.exceptions import HTTPException
@@ -2359,7 +2360,18 @@ def object_events_response(object_type, object_uuid, limit, event_type):
     endpoints: each handler does authn / authz / object lookup, then
     delegates the read-and-shape step here so the wire-format change
     only happens in one place.
+
+    limit is read here, for every one of them, because the validation
+    layer checks it without converting it: a caller may send "500".
     """
+    try:
+        limit = validation.declared_integer(limit)
+    except marshmallow.ValidationError:
+        # Only reachable with API_VALIDATION_MODE at warn or off.
+        return sf_api.error(400, 'limit is not an integer', suppress_traceback=True)
+    if limit is None:
+        limit = 100
+
     return [
         row.model_dump(mode='json')
         for row in mariadb.get_object_events(
