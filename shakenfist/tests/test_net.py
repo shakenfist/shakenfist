@@ -447,9 +447,9 @@ class NetworkNetNodeTestCase(NetworkTestCase):
 
 
 class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
-    """Tests for the phase 2f flip of ``Network.ensure_mesh()``.
+    """Tests for ``Network.ensure_mesh()`` enqueueing its work.
 
-    After phase 2f, ``Network.ensure_mesh()`` no longer mutates host
+    ``Network.ensure_mesh()`` does not mutate host
     state inline. Instead it enqueues a ``NetOp`` with task
     ``network_ensure_mesh`` on the calling node's per-node ``network``
     queue and returns the enqueued op so callers can call
@@ -1019,12 +1019,12 @@ class NetworkIsMeshOkayTestCase(NetworkTestCase):
 
 
 class NetworkFloatingIPEnqueueTestCase(NetworkTestCase):
-    """Tests for the phase 3e flip of the five floating-IP / route
-    methods on ``Network``.
+    """Tests for the five floating-IP / route methods on ``Network``
+    enqueueing their work.
 
-    After phase 3e, each of ``add_floating_ip``, ``remove_floating_ip``,
-    ``route_address``, ``unroute_address``, and ``remove_nat`` no longer
-    mutates host state inline. Instead each enqueues a cluster operation
+    Each of ``add_floating_ip``, ``remove_floating_ip``,
+    ``route_address``, ``unroute_address``, and ``remove_nat`` does not
+    mutate host state inline. Instead each enqueues a cluster operation
     on ``networknode-clusteroperation-user_facing`` (the existing
     network-node queue family) and returns the loaded op so callers can
     call ``op.raise_for_error()``. These tests pin that contract.
@@ -1202,12 +1202,12 @@ class NetworkFloatingIPEnqueueTestCase(NetworkTestCase):
 
 
 class NetworkDnsmasqEnqueueTestCase(NetworkTestCase):
-    """Tests for the phase 4d flip of the five dnsmasq-related methods
-    on ``Network``.
+    """Tests for the five dnsmasq-related methods on ``Network``
+    enqueueing their work.
 
-    After phase 4d, each of ``update_dnsmasq``, ``remove_dnsmasq``,
+    Each of ``update_dnsmasq``, ``remove_dnsmasq``,
     ``remove_dhcp_lease``, ``update_dns_entry``, and
-    ``remove_dns_entry`` no longer mutates dnsmasq state inline. Each
+    ``remove_dns_entry`` does not mutate dnsmasq state inline. Each
     enqueues a cluster operation on the network-node queue family and
     returns the loaded op so callers can call ``op.raise_for_error()``.
     ``update_dns_entry`` and ``remove_dns_entry`` still mutate the
@@ -1509,12 +1509,12 @@ class NetworkDnsmasqEnqueueTestCase(NetworkTestCase):
 
 
 class NetworkLifecycleEnqueueTestCase(NetworkTestCase):
-    """Tests for the phase 5d flip of the four ``Network`` lifecycle
-    methods.
+    """Tests for the four ``Network`` lifecycle methods enqueueing
+    their work.
 
-    After phase 5d, each of ``create_on_hypervisor``,
+    Each of ``create_on_hypervisor``,
     ``create_on_network_node``, ``delete_on_hypervisor`` and
-    ``delete_on_network_node`` no longer mutates host state inline.
+    ``delete_on_network_node`` does not mutate host state inline.
     Each enqueues a cluster operation (a ``node_net_op`` for the
     per-hypervisor pair, a ``net_op`` for the network-node pair) and
     returns the loaded op so callers can call ``op.raise_for_error()``.
@@ -1667,11 +1667,11 @@ class NetworkLifecycleEnqueueTestCase(NetworkTestCase):
         self.assertEqual(metadata['uuid'], str(op.uuid))
 
     def test_enable_nat_method_is_removed(self):
-        """``Network.enable_nat`` is no longer part of the public API.
+        """``Network.enable_nat`` is not part of the public API.
 
-        Phase 5b lifted the only call site into
-        ``BridgedVXLanNetwork._apply_enable_nat``; phase 5d deletes
-        the method from ``Network`` entirely.
+        Enabling NAT mutates host state, so it lives only in
+        ``BridgedVXLanNetwork._apply_enable_nat``, which runs inside
+        the network worker.
         """
         n, _ = self._make_network()
         self.assertIsNone(getattr(n, 'enable_nat', None))
@@ -1680,10 +1680,9 @@ class NetworkLifecycleEnqueueTestCase(NetworkTestCase):
 class NetworkInternalSiblingCallsTestCase(NetworkTestCase):
     """Tests for ``remove_networkinterface_lease``.
 
-    The phase 4e sibling-call tests for ``create_on_network_node`` and
-    ``delete_on_network_node`` were removed by phase 5d when those
-    method bodies moved to ``BridgedVXLanNetwork``. The
-    ``remove_networkinterface_lease`` tests remain — that method still
+    ``create_on_network_node`` and ``delete_on_network_node`` have no
+    sibling-call tests here because their bodies live in
+    ``BridgedVXLanNetwork``. ``remove_networkinterface_lease`` still
     enqueues via ``Network.remove_dhcp_lease`` and blocks on the op.
     """
 

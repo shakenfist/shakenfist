@@ -23,7 +23,7 @@ class AddEventMultiSpoolPayloadTestCase(
         _SpoolRootMixin, base.ShakenFistTestCase):
     """``add_event_multi`` produces the correct spool payload shape.
 
-    Phase 2a guarantees:
+    The drainer and the events table rely on:
     - ``event_uuid`` is always present at the top level.
     - ``request_id`` is a top-level key (not buried in ``extra``).
     - ``extra`` no longer contains a ``request-id`` key.
@@ -81,8 +81,8 @@ class AddEventMultiSpoolPayloadTestCase(
         self.assertIsNone(payload.get('request_id'))
 
     def test_extra_does_not_contain_request_id_key(self):
-        """``extra`` no longer carries a ``request-id`` key (phase 2a change)."""
-        fake_request_id = 'req-phase2a-check'
+        """``extra`` does not carry a ``request-id`` key; it is top level."""
+        fake_request_id = 'req-top-level-check'
         with mock.patch('shakenfist.eventlog.flask') as mock_flask:
             mock_flask.request.environ.get.return_value = fake_request_id
             eventlog.add_event_multi(

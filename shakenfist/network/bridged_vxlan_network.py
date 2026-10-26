@@ -3,7 +3,7 @@
 
 `BridgedVXLanNetwork` is the worker-side counterpart of `Network`. While
 `Network` is the public, externally-visible object that callers interact with
-(and which, after Phase 2f, enqueues operations onto the per-node `network`
+(and which enqueues operations onto the per-node `network`
 queue), `BridgedVXLanNetwork` is the place where host-state mutation actually
 happens.
 

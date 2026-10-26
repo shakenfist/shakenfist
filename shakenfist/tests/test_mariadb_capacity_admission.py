@@ -790,7 +790,8 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertFalse(denial.demand_only)
 
     def test_a_node_under_target_does_not_report_demand_exceeded(self):
-        # The discriminating case for phase 4a. Measured load 4.0 plus
+        # The discriminating case for an uncharged demand clause.
+        # Measured load 4.0 plus
         # expected_demand 0.5 is 4.5 against a budget of 12.0, so the
         # clause passed on demand and the node refused on something
         # else. Charging the placement's 10.0 would push 4.5 over 12.0
@@ -1575,8 +1576,7 @@ class DimensionDetailTestCase(base.ShakenFistTestCase):
         self.assertTrue(detail['exceeded'])
 
     def test_an_uncharged_dimension_reports_state_not_state_plus_request(self):
-        # The demand dimension is the one caller: since phase 4a the
-        # clause tests the node's existing state alone, so the detail
+        # The demand dimension is the one caller: its clause tests the node's existing state alone, so the detail
         # has to as well or it names refusals the guard did not make.
         # requested is still reported, because an operator wants to
         # know what the placement would have added.
@@ -1641,7 +1641,8 @@ class DimensionDetailTestCase(base.ShakenFistTestCase):
 
     def test_shortfall_on_an_uncharged_dimension_ignores_requested(self):
         # The demand dimension's exceeded test is used > limit, not
-        # used + requested > limit (phase 4a), and shortfall has to
+        # used + requested > limit, because the clause does not
+        # charge the placement (issue #3813), and shortfall has to
         # track the same effective-used value or the two fields would
         # disagree about which dimension is over.
         detail = mariadb._capacity_dimension(

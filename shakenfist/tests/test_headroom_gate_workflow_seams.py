@@ -52,7 +52,7 @@ SHAPE_INPUTS = ('topology', 'tier', 'test_kind', 'stestr_config')
 # without the fraction separating them. deploy_profile is deliberately not
 # part of the shape either, for the same reason: a profile such as the
 # slim-tier row's Kerbside one adds processes to a node, not instances to the
-# ledger (PLAN-kerbside-deployer-phase-04-ci S3).
+# ledger.
 MEASURED_SHAPES = {
     ('slim-primary', 'full', 'functional', 'cluster-ci.conf'),
     ('slim-primary', 'full', 'functional', 'guest-ci.conf'),

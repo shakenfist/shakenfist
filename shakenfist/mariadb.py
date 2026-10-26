@@ -3982,8 +3982,7 @@ def _ensure_namespace_claims_schema(engine: sa.Engine) -> dict[str, Any]:
         _set_table_version(engine, table_name, current_ver)
 
     if current_ver < 2:
-        # v2 adds the used_* high-water mark (claim coverage and sizing
-        # phase 2b, D2). Spec-driven, existence-guarded ADD COLUMNs, so
+        # v2 adds the used_* high-water mark. Spec-driven, existence-guarded ADD COLUMNs, so
         # a re-run is a no-op and the end state does not depend on which
         # step introduced a column.
         LOG.info(f'Adding high water mark columns to {table_name} table '
@@ -25749,7 +25748,7 @@ _NAMESPACE_USAGE_AGGREGATION = '''
 # peak of every real workload within five minutes of it being reached
 # -- this pass runs every five minutes, and a CI job deletes its
 # instances before anybody asks what it used. A mark that can go down
-# is not a mark (claim sizing phase 2b, D3).
+# is not a mark.
 #
 # Unlike the admission drawdown, the SET order here is not load
 # bearing: the peak assignment reads ``c.peak_used_cpus``, which this
@@ -26730,7 +26729,7 @@ def _capacity_dimension(
     changes whether the P9 waiver fires (below), so it must never be
     supplied by landing in the right argument position by accident. The three
     allocation dimensions are guarded as ``used + requested <= limit``,
-    but since phase 4a the demand clause compares only the node's
+    but the demand clause compares only the node's
     existing state (``cpu_load_1 + expected_demand <= target_load x
     cpu_schedulable``) and does not charge the incoming placement --
     that is what makes it satisfiable at every node size. Reporting
@@ -26885,7 +26884,7 @@ def _demand_guard_clause(
     though the same UPDATE still adds it to ``expected_demand`` so it is
     charged for the next decision. The clause asks whether the node is
     already at or above its target load, not whether it would be after
-    this placement (phase 4a decision E2). Both sides are then node
+    this placement. Both sides are then node
     state in units of runnable threads, where the old form compared a
     per-request charge against a per-node budget: at the original seed
     constants that made a 1-vCPU instance need 3.34 schedulable threads
@@ -27009,7 +27008,7 @@ def _floored_namespace_decrement(
 
     Deliberately does not touch ``peak_used_*``: a high-water mark does
     not come down, and a release is exactly the event it exists to
-    survive (claim sizing phase 2b, D2).
+    survive.
     """
     if claim_uuid is not None:
         table: sa.Table = _get_namespace_claims_table()
@@ -28862,7 +28861,7 @@ def _direct_create_namespace_claim(
             # already reached that figure, so a mark of zero would be
             # wrong and the next reconcile pass would raise it anyway --
             # which would make the seeding look like a defect rather
-            # than the fix (claim sizing phase 2b, D3).
+            # than the fix.
             conn.execute(sa.insert(claims).values(
                 uuid=claim_key,
                 namespace=namespace,

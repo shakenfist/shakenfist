@@ -127,7 +127,7 @@ def _build_records(
       granularity preserves the rest of the batch.
 
     Handles the upgrade case where in-flight rows may have been
-    written before the phase 2a payload-shape change:
+    spooled by an older release, which wrote an older payload shape:
 
     * ``event_uuid`` may be missing -- fall back to a fresh UUID
       (acceptable for the single drain cycle's worth of legacy
