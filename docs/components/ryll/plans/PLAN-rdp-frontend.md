@@ -511,6 +511,23 @@ cursor, resize, text clipboard and audio playback. Specifically:
    authenticated connection takes over and the old one is
    disconnected, which matches `--web`'s bridge replacement
    and the way RDP's own session reconnection behaves.
+   *Revised by phase 5's survey:* IronRDP 0.13.0 waits for the
+   connected client to leave before it accepts the next, so
+   phase 5 runs one IronRDP server per connection. A new
+   connection takes over once it has authenticated, which is
+   when IronRDP first asks the display handler for updates.
+   - **Answer (phase 5):** takeover as revised: the client that
+     authenticates last wins, but only a client that has
+     authenticated can displace the one being served, so a wrong
+     password disturbs nothing. Only one client at a time may be
+     between connecting and authenticating (others wait
+     unaccepted), and one that has not authenticated within 30
+     seconds is dropped. SPICE loss is handled by auto-reconnect
+     in `--rdp` with the GUI's retry rules, the client keeping
+     its connection and seeing the last frame at half brightness.
+     Both are exercised by the RDP smoke lane
+     ([`docs/ci.md`](/components/ryll/ci/), "The RDP smoke lane"); the run
+     record is in the phase plan's *Results*.
 5. **Unicode key events.** Mobile clients and some IMEs send
    `UnicodePressed` with no scancode. **Recommendation:**
    drop them with a `warn_once!` in the MVP; map the ASCII
@@ -571,8 +588,8 @@ cursor, resize, text clipboard and audio playback. Specifically:
 | 1. Renderer prep: damage, pointer translation, slim build, device-free audio | [PLAN-rdp-frontend-phase-01-renderer-prep.md](/components/ryll/plans/PLAN-rdp-frontend-phase-01-renderer-prep/) | Complete | 4696a95 |
 | 2. RDP skeleton: `shakenfist-spice-rdp`, `--rdp`, display, keyboard, mouse, security | [PLAN-rdp-frontend-phase-02-rdp-skeleton.md](/components/ryll/plans/PLAN-rdp-frontend-phase-02-rdp-skeleton/) | Complete | 7b389b1, c314094 |
 | 3. Cursor and resize | [PLAN-rdp-frontend-phase-03-cursor-resize.md](/components/ryll/plans/PLAN-rdp-frontend-phase-03-cursor-resize/) | Complete | c9a763d |
-| 4. Clipboard and audio | [PLAN-rdp-frontend-phase-04-clipboard-audio.md](/components/ryll/plans/PLAN-rdp-frontend-phase-04-clipboard-audio/) | In progress | |
-| 5. Lifecycle and CI: reconnect, takeover, an `rdp-smoke` lane | - | Not started | |
+| 4. Clipboard and audio | [PLAN-rdp-frontend-phase-04-clipboard-audio.md](/components/ryll/plans/PLAN-rdp-frontend-phase-04-clipboard-audio/) | Complete | fe563e1 |
+| 5. Lifecycle and CI: SPICE auto-reconnect, takeover, an `rdp-smoke` lane | [PLAN-rdp-frontend-phase-05-lifecycle-ci.md](/components/ryll/plans/PLAN-rdp-frontend-phase-05-lifecycle-ci/) | In progress | |
 | 6. Documentation and parity | - | Not started | |
 | 7. Push audit | - | Not started | |
 
@@ -724,6 +741,40 @@ evidence-based answers in the plan.
   frame arrives, and that an input event reaches the guest.
   Start it advisory, and decide whether it joins the smoke
   tier once it has a flake record.
+
+*What shipped:* `--rdp` reconnects SPICE automatically with the
+GUI's retry rules (moved to `ryll/src/reconnect_policy.rs`),
+and the client sees the last frame darkened meanwhile;
+`shakenfist-spice-rdp` owns its listener and runs one IronRDP
+server per connection, so a client that authenticates takes the
+session over; Ctrl+C is proved with a client connected; and the
+`rdp-smoke` lane (`.github/workflows/rdp-smoke.yml`, nightly and
+manual, advisory) checks all of it against the UEFI latency
+guest. The run record is in the phase plan's *Results*. The
+user-facing behaviour is in `docs/session-lifecycle.md`.
+
+*Corrected by phase 5's survey* (see its *What the survey
+found*):
+
+- No server mode reconnects SPICE today. `--rdp` exits when the
+  SPICE session ends, and `--web` keeps serving a dead session;
+  the `--web` reaper reaps WebRTC bridges, not SPICE sessions.
+  Only the GUI retries, with rules that are compiled only into
+  GUI builds. Phase 5 moves those rules out of the GUI and
+  gives `--rdp` automatic SPICE reconnect.
+- Ctrl+C already shuts `--rdp` down cleanly, and a client can
+  already disconnect and reconnect; phase 5 proves both rather
+  than building them.
+- Takeover cannot be built on IronRDP 0.13.0's `RdpServer::run`,
+  which does not accept a second client while one is connected.
+  Phase 5 runs one IronRDP server per connection behind an
+  accept loop of its own.
+- `web-smoke` does not run against a QEMU guest: it checks only
+  that `ryll --web` binds and exits on SIGTERM, against a stub
+  `.vv`. No CI lane runs a QEMU guest today. The `rdp-smoke`
+  lane is modelled instead on `proxmox-functional.yml` (an
+  advisory workflow of its own, driven by a standard-library
+  Python script), with the UEFI latency guest as its oracle.
 
 ### Phase 6: Documentation and parity
 

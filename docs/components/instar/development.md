@@ -113,15 +113,17 @@ To move the pin, change `DEBIAN_SNAPSHOT` only. Do not change
 pointing back at `deb.debian.org`.
 
 **Both devcontainer images set `Acquire::Retries "3"`.** Pinning to a
-snapshot removed the 404 failure mode and left the transport one, and
-if anything raised it: `snapshot.debian.org` is a single origin behind
-a CDN, not the `deb.debian.org` mirror network. A fetch failure here is
-not an ordinary build failure — the release image is only built in the
-merge queue for a docs-only change, so there is no pull-request run to
-catch it, and the failure ejects the pull request from the queue
-instead (#531). The occurrence on PR #560 was one object out of 150
-dying with a TCP reset ten seconds in, after 125 MB had come down from
-the same host at 15.3 MB/s, with the next object succeeding. apt
+snapshot removed the 404 failure mode and left the transport one, and if
+anything raised it: `snapshot.debian.org` is a single origin behind a
+CDN, not the `deb.debian.org` mirror network. A fetch failure here is
+not an ordinary build failure — the release image is built in the merge
+queue, and when it fails there it ejects the pull request from the queue
+(#531). That pull request was docs-only, which had no pull-request run
+to catch the failure first; a docs-only merge group now skips the build
+altogether (see "Pull requests versus the merge queue" in
+[testing.md](/components/instar/testing/)). The occurrence on PR #560 was one object out
+of 150 dying with a TCP reset ten seconds in, after 125 MB had come down
+from the same host at 15.3 MB/s, with the next object succeeding. apt
 retries the failed object rather than the transaction, so a retry costs
 nothing on a healthy run and still fails promptly against a genuinely
 missing object. If this class of failure returns despite the retries,
@@ -1039,8 +1041,9 @@ pins in the same file managed.
 
 The `ci-tooling` CI job runs the cheap guards over CI's own tooling:
 the test-partition check below, plus
-`tools/ci/test-report-fuzz-crash.sh` and
-`tools/ci/test-pick-fuzz-artifact.sh` for the coverage-fuzz helpers
+`tools/ci/test-report-fuzz-crash.sh`,
+`tools/ci/test-pick-fuzz-artifact.sh` and `tools/ci/test-fuzz-tier.sh`
+for the coverage-fuzz helpers
 (see "Crash reporting" in [docs/testing.md](/components/instar/testing/)) and
 `tools/ci/test-check-devcontainer-pins.sh` for the devcontainer pin
 guard (see "Cargo tool pinning" above). It is
@@ -1129,16 +1132,17 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 - `tools/propose-release.sh`, `tools/tag-release.sh` - The two release steps: open the version-bump pull request, then tag the commit that merged it (see "Releases" above)
 - `tools/release-version.sh` - Reads and checks the release version in `src/vmm/Cargo.toml`; `check-version` in `release.yml` and `make check-version` run it
 - `tools/sign-release-tag.sh` - Re-signs the release tag with gitsign and force-pushes it; `sign-tag` in `release.yml` runs it on a throwaway runner
-- `tools/ci/fuzz-tier.sh` - Computes tiered nightly per-target fuzz durations
+- `tools/ci/fuzz-tier.sh` - Computes tiered nightly per-target fuzz durations, and the fuzzing budget left before the job's deadline
+- `tools/ci/test-fuzz-tier.sh` - Tests that a plan never sums to more than its budget and that the budget leaves its reserve; the `ci-tooling` CI job runs it
 - `tools/ci/report-fuzz-crash.sh` - Files the `security-audit` issue for a coverage-fuzz crash (bounds the log excerpt, dedups against open issues; see "Crash reporting" in `docs/testing.md`)
 - `tools/ci/pick-fuzz-artifact.sh` - Chooses which libFuzzer artifact to report as the reproducer
 - `tools/ci/test-report-fuzz-crash.sh`, `tools/ci/test-pick-fuzz-artifact.sh` - Tests for those two; run them after any change (the `ci-tooling` CI job does)
-- `tools/ci/check-fuzz-targets.sh` - Fails if the three places a fuzz target has to be registered by hand disagree: the `.rs` file under `src/fuzz/fuzz_targets/`, the `[[bin]]` stanza in `src/fuzz/Cargo.toml`, and the `TARGETS=(...)` array in `coverage-fuzz.yml`. A target absent from that array is never fuzzed in CI at all, silently, while its row in `docs/testing.md` keeps claiming it is. `FAST_TIER` in `fuzz-tier.sh` is checked as a subset, since an unlisted target legitimately defaults to the deep tier
-- `tools/ci/count-fuzz-targets.sh` - The number of `[[bin]]` targets in `src/fuzz/Cargo.toml`, so `coverage-fuzz.yml` derives the count instead of restating it
+- `tools/ci/check-fuzz-targets.sh` - Fails if the three places a fuzz target has to be registered by hand disagree: the `.rs` file under `src/fuzz/fuzz_targets/`, the `[[bin]]` stanza in `src/fuzz/Cargo.toml`, and the `TARGETS=(...)` array in `coverage-fuzz.yml`. It also fails if `coverage-fuzz.yml`'s `FUZZ_DEADLINE` is computed from a different number of minutes than the job's `timeout-minutes`, which GitHub cannot read back at runtime. A target absent from that array is never fuzzed in CI at all, silently, while its row in `docs/testing.md` keeps claiming it is. `FAST_TIER` in `fuzz-tier.sh` is checked as a subset, since an unlisted target legitimately defaults to the deep tier
 - `tools/ci/test-check-fuzz-targets.sh` - Tests for the registration guard, against a synthetic four-target tree; the `ci-tooling` CI job runs it
 - `tools/ci/check-doc-phrases.sh` - Fails if any tracked file contains a plan filename mangled by a bad automated replace that spliced the word "work" into it; seven of these in `docs/testing.md` were repaired by hand, and a further 17 had spread to other pages before anything checked. It decides by rejoining the text either side of " work" and asking whether that names a file in `docs/plans/`, so it catches a splice at any offset and cannot false-positive on a real English continuation like "PLAN-differencing workflow", which rejoins to nothing. `docs/plans/` and `tools/ci/` are exempt: the plan pages quote corrupted phrases verbatim as examples when describing the bug, and this guard's own tests build fixtures carrying the pattern on purpose
 - `tools/ci/test-check-doc-phrases.sh` - Tests for that guard, including that it does not false-positive on legitimate strings like "the PLAN-map work" or "PLAN-differencing workflow"; the `ci-tooling` CI job runs it
 - `tools/fuzz-coverage.sh` - Per-function coverage for one fuzz target, via `make fuzz-coverage` (see "Coverage-Guided Fuzzing" in `docs/testing.md`). Calls `llvm-cov` directly because `cargo cov` panics on cargo-fuzz 0.12
+- `tools/ci/test_differential_fuzz_issues.py` - Tests that the differential fuzzer files one issue per divergence shape, capped at `--max-issues`, and does not report a failed filing as filed. Run with `python3 -m unittest`; the `ci-tooling` CI job does
 - `tools/ci/test_extract_fuzz_corpus.py` - Tests the corpus seed builders in `scripts/extract-fuzz-corpus.py`: that a fixture carrying a hostile locator offset cannot abort the nightly seeding run, and that the defect it carries survives the reshape. Run with `python3 -m unittest`; the `ci-tooling` CI job does
 - `tools/ci/check-glibc-floor.sh` - Fails if the built `instar` binary needs a glibc above the published floor (`GLIBC_2.31`, Debian 11; see `docs/installation.md`). Runs immediately after `make instar` in both `build-and-test` and the release workflow. Do not raise the ceiling to make it pass: it means the release image's base moved, and `src/.devcontainer/build/Dockerfile` must stay on `debian:bullseye`
 - `tools/ci/test-check-glibc-floor.sh` - Tests for that check; the `ci-tooling` CI job runs it

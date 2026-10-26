@@ -525,6 +525,91 @@ node in the CI mesh, and this lane uses it to create a Shaken
 Fist instance, so it does not run against a pull request from a
 fork.
 
+## The RDP smoke lane
+
+`rdp-smoke.yml` proves that `ryll --rdp` serves a real RDP client
+end to end. It builds ryll with the default-off `rdp` feature
+(`make release-rdp`), then runs `tools/rdp-smoke.py` in an image of
+its own (`tools/rdp-smoke/Dockerfile`: Debian 13 with QEMU, OVMF,
+Xvfb, FreeRDP, xdotool and xwd), so the build devcontainer stays
+lean and the runner installs nothing. The driver boots the UEFI
+latency guest in QEMU, starts `ryll --rdp` against it and connects
+FreeRDP under Xvfb. Everything talks over the container's loopback
+(`--network none`). QEMU is given `/dev/kvm` when the runner has
+one and falls back to TCG when it does not; the driver prints which,
+and the FreeRDP and QEMU versions it ran.
+
+Any keypress in that guest advances a fixed eight-colour cycle, so
+the oracle is the colour at the centre of FreeRDP's window, read
+with `xwd` and compared with the guest's own screen as QEMU dumps
+it. A colour change can only come from a key that went from FreeRDP
+through ryll and SPICE to the guest, and a frame that came all the
+way back; no ryll log line can make it pass. The seven checks run
+in order, each building on the state the one before left:
+
+1. **authenticate**: FreeRDP connects with the driver's fixed
+   password, and ryll logs that it authenticated the client.
+2. **frame**: the window's centre shows the guest's colour.
+3. **input**: a key typed into FreeRDP moves the centre to the
+   guest's next colour.
+4. **client-reconnect**: FreeRDP is killed and started again, and
+   input works through the new one.
+5. **takeover**: a second FreeRDP connects, the first is
+   disconnected, and input works through the second.
+6. **spice-reconnect**: QEMU is stopped and started again on the
+   same port. FreeRDP stays connected and shows its last frame at
+   half brightness, then the new guest's frame, and input works.
+7. **ctrl-c**: SIGINT to ryll with FreeRDP connected; ryll exits 0
+   within 5 seconds and FreeRDP is disconnected.
+
+Each check prints a `[rdp-smoke] <check>: PASS` or `FAIL` summary
+line. Once one fails the rest print `SKIP`. A failure the
+environment caused (Xvfb not starting, QEMU not starting, the guest
+not booting) prints `FAIL (harness)` instead, so it is not read as
+a ryll defect; the guest's boot is checked from its own screen
+before ryll is started. The driver's docstring has the oracles and
+the deadlines. Its pure parts, the pixel reads, the colour
+comparisons, the ryll output lines it matches and the password
+scrub, have unit tests in `tools/test-rdp-smoke.py`, which
+pre-commit runs.
+
+The password is a fixed test value, but it is still kept out of
+the uploaded logs: ryll prints it at launch, so each process writes
+to a private directory in the container, and only copies with the
+password redacted are saved. The lane fails if ryll prints it
+anywhere but its launch line.
+
+To run it locally, which takes about half a minute once the image
+and the build are warm (the checks themselves take under twenty
+seconds with KVM, and barely longer without):
+
+```bash
+make rdp-smoke
+```
+
+It boots its own QEMU on a port it picks inside the container, so
+it does not disturb a `make test-qemu` guest or anything listening
+on this host. Logs land in `target/rdp-smoke/logs/` (set
+`RDP_SMOKE_LOGS` to move them).
+
+It is advisory, for the same reason as [the mermaid lint
+lane](#it-is-deliberately-not-a-gate): its `pull_request` trigger is
+filtered to `.github/workflows/rdp-smoke.yml` alone, so it would
+never report on any other pull request. It runs nightly against
+`develop` at 14:40 UTC, which is what builds its flake record, and
+on `workflow_dispatch`. The pull request trigger exists so that a
+change to the lane runs before it merges: a workflow cannot be
+dispatched or scheduled until it is on `develop`. Pull requests
+that touch the RDP code do not run it, to keep `l` runners free; run
+`make rdp-smoke` locally for those.
+
+The criterion for moving it into `ci.yml`'s smoke tier, set before
+the record exists so that it cannot drift to whatever is convenient
+later: **fourteen consecutive green nightly runs, with no rerun
+needed**. Once that is met, a pull request proposes the move, and
+with it whether release builds should turn the `rdp` feature on.
+Until then a red nightly is investigated, not re-run until green.
+
 ## The three gates
 
 The `develop` ruleset requires exactly three status checks, and
@@ -715,6 +800,7 @@ make check-windows   # the Windows cross-check
 make test            # the unit test suite
 make web-smoke       # --web startup and shutdown
 make web-smoke-tls   # the same, with TLS
+make rdp-smoke       # the RDP smoke lane (rdp-smoke.yml)
 ```
 
 The merge tier cannot be reproduced locally — we own no macOS,
@@ -735,6 +821,7 @@ consistency audit.
 | `fuzz.yml` | Nightly `cargo-fuzz` build and smoke run against develop; failures filed as issues |
 | `mermaid-lint.yml` | Renders every mermaid diagram in the repository's markdown; advisory, not a gate |
 | `proxmox-functional.yml` | Deploys a real Proxmox VE node and runs the SPICE HTTP CONNECT smoke checks against it; advisory, not a gate |
+| `rdp-smoke.yml` | Nightly FreeRDP against `ryll --rdp` against a QEMU guest: authentication, frames, input, reconnects, takeover and Ctrl+C; advisory, not a gate |
 | `renovate.yml` | Automated dependency updates (hourly) |
 | `export-repo-config.yml` | Daily repository configuration export |
 | `pr-re-review.yml` | Bot-triggered PR re-review (`@shakenfist-bot please re-review`) |
@@ -833,6 +920,16 @@ N is failed by GitHub after 24 hours and correctly files
 superseding a nightly, which is the one the report job is right
 to ignore.
 
+`rdp-smoke.yml` has the same problem with a third event: it also
+runs on `pull_request`, where the general rule wants superseded runs
+cancelled. Its flag is therefore true for everything but the
+schedule, so a pull request or a dispatch supersedes, and a nightly
+never cancels the nightly queued before it:
+
+```yaml
+      cancel-in-progress: ${{ github.event_name != 'schedule' }}
+```
+
 ## Build network isolation
 
 Cargo runs a dependency's `build.rs` as ordinary code at compile
@@ -844,8 +941,8 @@ compiles. To contain that, the Makefile splits the build in two:
   `Cargo.lock` but compiles nothing, so no build script runs. It
   is the only build step allowed network access.
 - the targets that compile the workspace — `build`,
-  `build-tokio-console`, `release`, `check-windows`, `test`, `lint`,
-  `lint-fix` and `package-check` — then run in the devcontainer with
+  `build-tokio-console`, `release`, `release-rdp`, `check-windows`,
+  `test`, `lint`, `lint-fix` and `package-check` — then run in the devcontainer with
   `--network none` and the cargo cache mounted read-only. A malicious build
   script cannot reach a C2 or exfiltrate secrets (its download call
   fails and the build aborts loudly), and it cannot poison the
@@ -886,7 +983,10 @@ writable.
 (`fuzz-fmt-check` and `fuzz-fmt` also run networked, but they
 only run `cargo fmt` and compile nothing. So do `deb`, `rpm` and
 the `web-smoke` targets, which repackage or run the binary
-`release` already produced.)
+`release` already produced. `rdp-smoke-image` builds the RDP smoke
+lane's image from Debian packages with the network up, and
+`rdp-smoke` then runs the binary `release-rdp` produced in it with
+`--network none`.)
 
 Outside the Makefile but under the same split: release's
 `build-ryll-wheels` job runs `tools/build-ryll-wheel.sh`, which

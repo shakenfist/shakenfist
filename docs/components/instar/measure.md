@@ -102,9 +102,10 @@ Honoured:
   is refused (`measure: preallocation=metadata is not supported for
   FORMAT`), through `-o` and through `--preallocation`. qemu-img refuses
   metadata preallocation for these formats when it creates them
-  (`block/file-posix.c:2024-2026`, qemu 7.0.0), and measure predicts what
-  instar's own writer produces. qemu-img cannot measure these formats at
-  all, so there is no qemu-img answer to compare with.
+  (`handle_aiocb_truncate()` in qemu 7.0.0's `block/file-posix.c`), and
+  measure predicts what instar's own writer produces. qemu-img cannot
+  measure these formats at all, so there is no qemu-img answer to compare
+  with.
 
 Accepted but no size effect:
 - `adapter_type`, `hwversion`, `toolsversion`, `zeroed_grain`

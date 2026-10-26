@@ -711,8 +711,8 @@ rather than merge requests.
 |-------|------|--------|--------|
 | 1. Pin qemu's behaviour across the 80 static builds, build the structural VHDX comparator, correct `docs/create.md` | [PLAN-bat-population-phase-01-pin.md](/components/instar/plans/PLAN-bat-population-phase-01-pin/) | Complete | `fef62417` (#809) |
 | 2. Fixed VHDX fixtures (instar-testdata + instar) | [PLAN-bat-population-phase-02-fixtures.md](/components/instar/plans/PLAN-bat-population-phase-02-fixtures/) | Complete | instar-testdata `d2f9467719` (direct to `main`); instar `5c5bba75` (#819) |
-| 3. Host-only create: non-qcow2 preallocation parity and monolithicFlat | [PLAN-bat-population-phase-03-host-create.md](/components/instar/plans/PLAN-bat-population-phase-03-host-create/) | In progress | |
-| 4. Read side: BAT entry count (#626), partial last block, `LeaveBlocksAllocated` and `resize` | PLAN-bat-population-phase-04-read-side.md | Not started | |
+| 3. Host-only create: non-qcow2 preallocation parity and monolithicFlat | [PLAN-bat-population-phase-03-host-create.md](/components/instar/plans/PLAN-bat-population-phase-03-host-create/) | Complete | `a8d2f4ca` (#824) |
+| 4. Read side: BAT entry count (#626), partial last block, `LeaveBlocksAllocated` and `resize` | [PLAN-bat-population-phase-04-read-side.md](/components/instar/plans/PLAN-bat-population-phase-04-read-side/) | In progress | |
 | 5. VHDX geometry: default block size (#645), 64 TiB ceiling, one shared layout | PLAN-bat-population-phase-05-geometry.md | Not started | |
 | 6. Streaming BAT emitter and the fixed `plan_vhdx` | PLAN-bat-population-phase-06-emitter.md | Not started | |
 | 7. `create -f vhdx -o subformat=fixed`: guest streaming and host CLI | PLAN-bat-population-phase-07-create.md | Not started | |
@@ -809,6 +809,16 @@ corrupt. Three changes, in this order:
   `HasParent`, and have `resize` refuse a fixed VHDX (open question 6).
   `info` does not surface it, because `qemu-img info` does not.
 
+Its survey found three things this paragraph did not know. The count
+has a fourth copy, an independent one in the qcow2 crate's VHDX test
+fixtures. `measure` was not in phase 2's read matrix, although the
+success criteria name it, so it joins. And qemu's partial-last-block
+allowance indexes by BAT entry rather than payload block, so past the
+first chunk qemu refuses to open its own fixed `block_state_zero=off`
+images (measured on all 80 builds at 4608.5 MiB with 1 MiB blocks).
+instar's `check` judges by payload index, which is what qemu intends,
+and `docs/quirks.md` records the divergence (see the phase 4 plan).
+
 **Phase 5** puts the VHDX geometry in one place before the emitter is
 written against it. Today the region layout is spelled out in
 `plan_vhdx`, in `convert_to_vhdx`, in `measure_vhdx`'s comment and
@@ -833,7 +843,11 @@ tests compare the planned bytes against the phase 2 fixtures, field
 by field, which is possible because qemu's structural fields are
 deterministic. Splitting the crate from the guest wiring follows
 `PLAN-differencing`'s emitter/guest split: the crate is testable
-without a VM, the guest phase is not.
+without a VM, the guest phase is not. Phase 4's survey found a
+structural divergence this phase has to settle before the first
+success criterion can hold: `build_region_table` writes the Required
+bit as 1 for the BAT and metadata regions, and every pinned qemu
+build writes 0.
 
 **Phase 7** wires create end to end: the guest streams the BAT
 through one slot and extends the file to `data_start +
@@ -845,7 +859,12 @@ device from the layout, and refuses a backing file with
 `subformat=fixed`. Integration tests compare instar's fixed images
 with qemu's through the structural comparator, not only through
 `qemu-img info`. This phase also measures the streaming cost
-(open question 4) and records it.
+(open question 4) and records it. One trap from phase 4's survey:
+with `block_state_zero=off`, a fixed image whose partial last block
+lies past the first chunk is one qemu creates but cannot open again,
+so for those sizes `qemu-img check`, `info` and `compare` cannot be
+the oracle. Compare structure against the pin, and read back with
+instar.
 
 **Phases 8 and 9** carry the same layout into convert and measure.
 Convert's fixed path uses the phase 6 filler for its BAT instead of
@@ -855,7 +874,13 @@ capacity estimate replaced by the shared layout. Measure follows
 convert because convert's output is measure's oracle: `required` and
 `fully allocated` for a fixed target are both the fixed file length.
 They are separate phases because they are separate operations with
-separate test suites and reviewers, and measure is small.
+separate test suites and reviewers, and measure is small. Convert's
+in-place layout is the `block_state_zero=off` one, so phase 7's
+warning about qemu-unreadable partial-last-block sizes applies to
+phase 8 too. Phase 9 also corrects `docs/quirks.md`'s measure entry
+for VHDX sources, which says instar treats every BAT block as fully
+allocated. The reverse is true: qemu counts every block, and instar
+counts no `ZERO` block (measured in phase 4's survey).
 
 **Phase 10** is the cross-version matrix for everything above:
 create and convert fixed cases across every profile (including the
@@ -1540,6 +1565,19 @@ None fixed yet. Found while planning, and assigned to phases above:
   reason that is not true (multi-output-device support); convert
   already writes the format with one output device. Phase 3, which
   also adds the feature.
+* qemu's partial-last-block allowance indexes by BAT entry, so qemu
+  creates, by default and with no error, fixed `block_state_zero=off`
+  images it then refuses to open. instar's `check` deliberately does
+  not copy it. Phase 4 records the divergence; reporting it upstream
+  is the operator's call.
+* `build_region_table` writes the region table's Required bit as 1;
+  qemu writes 0. Phase 6.
+* `docs/quirks.md`'s measure entry for VHDX sources states the
+  divergence backwards. Phase 9.
+* Found by phase 3 and filed, outside this plan's scope: `convert`
+  rounds a raw source's virtual size up to 64 KiB (#821); `check`
+  refuses every monolithicFlat VMDK (#822); sparse VMDK descriptors
+  name their extent `"output.vmdk"` (#823).
 * Not assigned, noted for whoever owns `docs/format-coverage.md`: note
   10 says `qemu-img map` refuses dynamic VHDX. On 10.0.13 that holds
   for the human output format only; `qemu-img map --output=json`

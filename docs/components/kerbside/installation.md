@@ -17,7 +17,7 @@ On Debian:
 
 ```bash
 sudo apt-get install build-essential pkg-config python3-dev \
-    libmariadb-dev-compat libxml2-dev libxslt1-dev
+    python3-venv libmariadb-dev-compat libxml2-dev libxslt1-dev
 ```
 
 On Ubuntu the same list applies with `libmysqlclient-dev` in place of
@@ -27,6 +27,13 @@ On Ubuntu the same list applies with `libmysqlclient-dev` in place of
 sudo dnf install gcc pkgconfig python3-devel mariadb-devel \
     libxml2-devel libxslt-devel
 ```
+
+If you will use an `ovirt` source, the `ovirt-engine-sdk-python`
+client library (see
+[Client libraries for console sources](#client-libraries-for-console-sources))
+is also a C extension and needs `libcurl4-openssl-dev` and
+`libssl-dev` on Debian and Ubuntu, or `libcurl-devel` and
+`openssl-devel` on RHEL, CentOS and Fedora.
 
 You will also want a MariaDB or MySQL server, either locally or
 reachable over the network — see
@@ -75,6 +82,26 @@ refuses to launch a binary whose gRPC contract does not match this
 to fix it. `KERBSIDE_SKIP_CONTRACT_CHECK=1` is the explicit, unsupported
 escape hatch that downgrades the refusal to a logged warning. See
 [proxy-architecture.md](/components/kerbside/proxy-architecture/) for how the check works.
+
+### Client libraries for console sources
+
+Some features import a client library that is not a Kerbside
+dependency, so `pip install kerbside` does not bring it in. Install
+what you use into the same virtual environment as Kerbside:
+
+| You use | Install | Without it |
+|---------|---------|------------|
+| A `shakenfist` source | `shakenfist-client` 0.8.3 or later | The source is marked errored and ignored, and the daemon logs why. Older versions cannot fetch signing keys, which leaves token exchange unavailable for that source. |
+| An `ovirt` source | `ovirt-engine-sdk-python` | The source is marked errored and ignored, and the daemon logs why. |
+| An `openstack` source (token exchange) | `openstacksdk`, `keystoneauth1` and `python-keystoneclient` | The API answers 500 to the token exchange request and logs the import failure. |
+| Interactive login, whatever your sources | `keystoneauth1` and `python-keystoneclient` | The API answers 500 to login and logs the import failure. |
+| Only `static` sources | Nothing | |
+
+Login is Keystone-only today (issue
+[#300](https://github.com/shakenfist/kerbside/issues/300)), so
+interactive login needs the Keystone libraries even if none of your
+sources are OpenStack. There is no tested version floor for the three
+OpenStack libraries.
 
 ## What a running Kerbside needs
 

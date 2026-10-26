@@ -256,6 +256,9 @@ surfaces totalling 114 tests:
   --shrink, invalid size strings, --preallocation=metadata on
   raw, --preallocation=falloc + --shrink, --object,
   --image-opts.
+- The differencing and fixed VHDX refusals, each on a scratch copy of
+  a qemu-written fixture that must come back byte-identical, and a
+  qemu-written dynamic VHDX that must still grow.
 
 Wall clock: ~32 s serial / ~10 s with `make test-container`'s
 `--concurrency 4`.
@@ -626,9 +629,30 @@ stops gating merges entirely rather than merely tolerating its own
 failure. Never leave a flag behind after its issue is fixed.
 
 Because `merge_group` does not inherit the `pull_request` trigger's
-`paths:` filter, this workflow always runs in the queue — including for
+`paths:` filter, this workflow always runs in the queue, including for
 docs-only changes. That is deliberate (a required check that never runs
-hangs the queue), at the cost of matrix latency on doc merges.
+hangs the queue). What it runs there is decided by the `check_paths`
+job, as on a pull request: a merge group that changes only
+documentation skips `build-and-test`, `package-build` and the matrix,
+and `can_merge` reports success on the skips. The filter diffs the
+group against `merge_group.base_sha` from the event payload, not
+against `develop`, so a re-run of the queue run after the group has
+merged sees the same diff rather than an empty one. `can_merge` lists
+`check_paths` among its needs, because if the filter itself failed,
+every job after it would skip and skips alone read as success.
+
+This used to run everything in the queue, so a docs-only pull request
+such as #659 spent seven `xl` legs and part of the 360-minute deadline
+on code it did not touch. The release gate (`require-ci-success`)
+counts the run, as it counts a docs-only pull request's: the code in
+such a commit is identical to the most recent `develop` commit that
+changed code, and that commit ran the full queue. This relies on
+`develop` advancing only through the merge queue. What enforces that is
+the repository's "Develop branch" ruleset, which requires a pull request
+and the merge queue for `develop`; members of the "SF Can Skip Merge
+Queue" team can bypass it, and a direct push by one of them would break
+this argument for every docs-only group after it until the next change
+to code went through the queue.
 
 **Superseded merge groups are cancelled.** `build-and-test`,
 `package-build` and `package-matrix` each carry a `concurrency:` block,
@@ -1571,18 +1595,44 @@ python3 scripts/differential-fuzz.py \
 ### CI integration
 
 The fuzzer runs automatically via `.github/workflows/differential-fuzz.yml`
-at three tiers:
+at two tiers, plus by hand:
 
 | Trigger | Iterations | When |
 |---------|-----------|------|
 | `pull_request` | 100 | PR changes fuzzer script or workflow |
-| `push` to develop | 200 | Post-merge smoke test |
 | `schedule` | 1000 | Nightly at 02:00 UTC |
 | `workflow_dispatch` | configurable | Manual trigger |
 
-On failure, the workflow uploads logs as artifacts and auto-files GitHub
-Issues with the `security-audit` label, including the seed, iteration,
-image attributes, and a reproduction command.
+There is no post-merge run. One of 200 iterations used to follow every
+push to `develop` that touched `src/`, and was dropped as a fifth of
+the nightly's work bought with about 20 minutes of an `xl` runner per
+merge, from the pool the merge queue waits on. The same reasoning
+removed coverage-guided fuzzing's post-merge run; see "CI integration"
+under Coverage-Guided Fuzzing.
+
+On failure, the workflow uploads logs as artifacts. The nightly and a
+manual run also file GitHub Issues with the `security-audit` label,
+including the seed, iteration, image attributes, and a reproduction
+command; a pull-request run does not, because its divergences belong
+on that pull request, as its red check and its uploaded logs.
+
+Filing is grouped and capped (`--max-issues`, default 5). A run files
+one issue per divergence *shape* -- the divergence type, the operation,
+the fields that say what diverged (the target format, the libyal tool
+and the fields it disagreed on, the measure or map field, the repair
+corruption class, and the like; `SHAPE_FIELDS` in the script), and the
+first line of instar's stderr with paths, hex values and numbers of
+three or more digits taken out -- when it first sees that shape, and at
+the end of the run comments on it with how many more iterations diverged
+the same way. Once a run has tried its limit, further shapes are only
+logged and counted in `summary-<seed>.json`. The limit counts attempts,
+since a failed filing is nearly always `gh` itself failing, but the
+summary reports `issues_filed` and `issues_failed` apart, so a run whose
+filings failed does not claim them. Both rules exist because one
+100-iteration pull-request run on 2026-10-17 filed 98 issues for a
+single kernel fault (#787); under these rules it would have filed five,
+and its log would have said why it stopped.
+`tools/ci/test_differential_fuzz_issues.py` holds both, in `ci-tooling`.
 
 ### Reproducing a divergence
 
@@ -1850,19 +1900,54 @@ The CI workflow (`.github/workflows/coverage-fuzz.yml`) runs:
   durations** (see below).
 - **PR validation:** single-target smoke test when fuzz/parser code
   changes.
-- **Post-merge** (push to `develop`): 15s per target.
 - **Manual dispatch:** configurable duration and target selection.
+
+There is no post-merge run, on purpose. One used to fuzz every target
+for 15s after each push to `develop` that touched `src/`, and it cost
+about 75 minutes of an `xl` runner per merge -- corpus seeding and the
+build, not the fuzzing -- from the pool the merge queue waits on, for a
+strictly weaker copy of the nightly. It last found anything in August
+(#485 and #492, one `fuzz_rebase_planners` crash twice). A merged change
+that crashes a target is found by the next nightly instead, within a
+day.
 
 #### Tiered nightly durations
 
-The nightly run has a fixed wall-clock budget (450 min, inside the
-480 min job timeout). Rather than splitting it evenly, the run plan is
-computed by `tools/ci/fuzz-tier.sh`: the fast-saturating targets (pure
-window math, CHS rounding, and the planner/emitter crates) take a short
-fixed slice (300s — they reach steady coverage in well under a minute),
-and the deep parser/format targets split the remainder. With the
-current 43 targets (17 fast, 26 deep) that gives the 26 deep targets
-~14 min each versus ~10 min under an even split (27000 / 43).
+The nightly run's wall-clock budget is **what is left of the 480-minute
+job timeout** once the targets are built, less 30 minutes held back for
+the corpus push and everything after it, and never more than 450
+minutes. The job records its deadline in its first step, and
+`tools/ci/fuzz-tier.sh budget` turns that into seconds after the build.
+Rather than splitting the budget evenly, the run plan is computed by
+`tools/ci/fuzz-tier.sh plan`: the fast-saturating targets (pure window
+math, CHS rounding, and the planner/emitter crates) take a short fixed
+slice (300s — they reach steady coverage in well under a minute), and
+the deep parser/format targets split the remainder. With the current
+43 targets (17 fast, 26 deep) and the full 450 minutes, that gives the
+26 deep targets ~14 min each versus ~10 min under an even split
+(27000 / 43). A plan never sums to more than its budget: a budget too
+small for every target's fast slice is shared equally instead, with a
+warning. `tools/ci/test-fuzz-tier.sh` asserts both, in `ci-tooling`.
+
+The budget used to be a fixed 450 minutes, which left 30 for setup and
+the push, and that is #519 twice over. In August the push alone took
+22 minutes and the job died in it. In October setup grew instead:
+seeding the corpus went from two minutes to twenty-five once the job
+read testdata from the dependencies disk, because it reads every
+accumulated corpus entry and those reads are cold there, where a fresh
+clone had just left them in the page cache. The job then died in the
+fuzzing step on seven nights out of nine, before the push ran at all.
+Sizing from the deadline makes slow setup cost fuzzing time rather than
+the night's corpus; the job summary records the budget each night got.
+
+The plan is made before anything is fuzzed, so each target is also
+clamped to the deadline as it starts: `fuzz-tier.sh budget` is asked
+again, with that target's planned duration as the cap. Time an earlier
+crash spent being minimised and reported comes out of the targets after
+it, rather than out of the push, and a target with nothing left is
+skipped with a warning (not run with `-max_total_time=0`, which
+libFuzzer reads as no limit). The job summary counts the targets
+shortened and skipped.
 
 This is one of two levers for keeping per-target time useful as the
 target count grows; the other is corpus persistence (see *Corpus
@@ -1889,9 +1974,14 @@ it still fails when one list loses an entry.
 
 #### Crash reporting
 
-Crashes are minimized with `cargo fuzz tmin` and filed as GitHub
-Issues with the `security-audit` label immediately when found, by
-`tools/ci/report-fuzz-crash.sh`. New corpus entries are pushed to
+Crashes are minimized with `cargo fuzz tmin` and filed as GitHub Issues
+with the `security-audit` label immediately when found, by
+`tools/ci/report-fuzz-crash.sh`. Minimization gets at most two minutes a
+crash, and never time the corpus push needs before the job's deadline;
+the limit is a `timeout` on the `docker run` client, with `--init` so
+the signal it forwards ends the container, since a timeout inside it
+would kill `cargo` and leave libFuzzer holding the log pipe open. A
+crash out of time is reported as found. New corpus entries are pushed to
 `instar-testdata/custom/fuzz-corpus/` after nightly runs, and restored
 by target name on the next run so coverage compounds.
 
@@ -2683,8 +2773,8 @@ structure or contents the tests need to be exactly known:
   `block_state_zero=off`, where the `off` ones carry known data
   written with `qemu-io` (0x11 at 0 and 0x22 at 12M; 0x33 at 0 and
   0x44 in the last 64 KiB), and a dynamic VHDX of 131041M with 1 MiB
-  blocks, whose BAT exactly fills its region and which reproduces #626
-  in 8 MiB on disk. Each of the five must keep the structure of its
+  blocks, whose BAT exactly fills its region, the geometry #626 was
+  about, in 8 MiB on disk. Each of the five must keep the structure of its
   case in `tests/helpers/qemu_pins.py`, which
   `tests/test_vhdx_fixed_fixtures.py` checks. It takes two output
   directories, `create-vhd-testdata.sh [output-dir] [audit-dir]`,
@@ -2718,10 +2808,24 @@ generator wrote (needing neither qemu nor instar, since both would
 agree on an image whose writes never landed), then runs instar's
 read operations on them (and on some fixed and convert-built images
 made at test time) against `qemu-img`'s answers. Images at the 131041M
-geometry get only `info`, `check` and `map`, since a convert or compare
-would read 128 GiB. Its `KNOWN_READ_FAILURES` table lists the known
-failures by issue (#626, #797); a listed entry must still fail with its
-recorded message, and one that starts passing fails the test, asking
+geometry get only `info`, `check`, `map` and `measure`, since a full
+convert or compare would read 128 GiB; `measure` is compared on
+`fully-allocated` only, because instar and `qemu-img` count a VHDX
+source's allocation differently. The committed dynamic image at that
+geometry is also converted to qcow2, which walks its all-`ZERO` BAT
+without reading 128 GiB. A fixed `block_state_zero=off` image of
+4608.5M with 1 MiB blocks, whose partial last block lies past the first
+chunk, gets the same four operations; `qemu-img` cannot open it (see
+"VHDX partial last block past the first chunk" in
+[quirks.md](/components/instar/quirks/)), so its oracle is the size it was created with,
+and a separate test requires the host `qemu-img check` to keep exiting
+2 on it. The 17M fixture's partial last block is also checked cut short
+in the file and cut off at its start, both of which `check` must report
+as corrupt, and whole, where `check` must report the image as ending at
+the end of the file. Its `KNOWN_READ_FAILURES` table is empty, because
+instar reads every image there as `qemu-img` does; it is kept for the
+next regression, whose entry must still fail with its recorded message
+until the fix lands, and one that starts passing fails the test, asking
 for the entry to be removed.
 
 Most adversarial and CVE-reproducer image generation scripts live in

@@ -308,6 +308,8 @@ nav:
             - "Network Ports": components/kerbside/network-ports.md
             - "Testing": components/kerbside/testing.md
             - "The direct-qemu mock harness": components/kerbside/direct-qemu-harness.md
+            - Deployment:
+                - "By hand": components/kerbside/deployment/manual.md
             - Performance:
                 - "Proxy backpressure on a shaped client link": components/kerbside/performance/proxy-backpressure.md
                 - "Streaming and the qemu damage series on a shaped link": components/kerbside/performance/streaming-rebaseline.md
@@ -325,6 +327,7 @@ nav:
                 - "Convert the kerbside admin UI to sfui": components/kerbside/plans/PLAN-sfui-conversion.md
                 - "Deployment options": components/kerbside/plans/PLAN-deployment-options.md
                 - "Deployment options phase 1: survey, matrix and scaffolding": components/kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding.md
+                - "Deployment options phase 2: by hand, with pip, a venv and systemd": components/kerbside/plans/PLAN-deployment-options-phase-02-manual.md
                 - "Host subject phase 1: subject pinning in shakenfist-spice-protocol": components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier.md
                 - "Host subject phase 2: kerbside adoption, CI proof, docs": components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption.md
                 - "Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange.md
