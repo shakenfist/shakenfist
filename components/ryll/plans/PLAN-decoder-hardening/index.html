@@ -15895,14 +15895,14 @@ split.</p>
 <tr>
 <td>1. Decoder hardening</td>
 <td>This file, steps below</td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>a167670</td>
 </tr>
 <tr>
 <td>2. Push audit</td>
-<td>This file, below</td>
-<td>Not started</td>
-<td></td>
+<td><a href="/components/ryll/plans/PLAN-decoder-hardening-phase-02-push-audit/">PLAN-decoder-hardening-phase-02-push-audit.md</a></td>
+<td>Complete</td>
+<td>7d4abf5</td>
 </tr>
 </tbody>
 </table>
@@ -15972,13 +15972,12 @@ commit builds and passes <code>make test</code> on its own.</p>
 </tr>
 </tbody>
 </table>
-<p>All six steps are complete on the <code>decoder-hardening</code> branch (PR</p>
-<h1 id="443-step-1b-ran-after-the-branch-was-rebased-onto-437-the-phase">443); Step 1b ran after the branch was rebased onto #437. The phase<a class="headerlink" href="#443-step-1b-ran-after-the-branch-was-rebased-onto-437-the-phase" title="Permanent link">&para;</a></h1>
-<p>stays <code>In progress</code> until the PR merges and its merge commit is
-recorded.</p>
+<p>All six steps landed on the <code>decoder-hardening</code> branch, merged as
+PR #443 (<code>a167670</code>) on 2026-10-04; Step 1b ran after the branch was
+rebased onto #437.</p>
 <p>Because <code>DecompressedImage::new</code>/<code>new_glz</code> now return <code>Option</code> and
-<code>MAX_DECODED_RGBA_BYTES</code> dropped from 1 GiB to 256 MiB, the next
-release must be a minor bump (0.2.0), not a patch; see
+<code>MAX_DECODED_RGBA_BYTES</code> dropped from 1 GiB to 256 MiB, the change
+shipped in a minor release, 0.2.0, rather than a patch; see
 <a href="/components/ryll/releasing/#choosing-the-version">Choosing the version</a>.
 The kerbside proxy needs no bump: it depends only on
 <code>shakenfist-spice-protocol</code>, at a pinned git revision, and the only
@@ -16114,10 +16113,13 @@ commit each).</strong></p>
   change, so it belongs there.</li>
 </ul>
 <h3 id="phase-2-push-audit">Phase 2: Push audit<a class="headerlink" href="#phase-2-push-audit" title="Permanent link">&para;</a></h3>
-<p>Run <code>PUSH-AUDIT.md</code> over Phase 1's merge commit, once it is known.
-Findings land as their own pull request, and that pull request
-records Phase 1's <code>Merged</code> cell and closes this plan out. If the
-audit finds nothing, this phase sets the plan <code>Complete</code> in its own
+<p>Run <code>PUSH-AUDIT.md</code> over Phase 1's merge commit, <code>a167670</code>; the
+phase plan is
+<a href="/components/ryll/plans/PLAN-decoder-hardening-phase-02-push-audit/">PLAN-decoder-hardening-phase-02-push-audit.md</a>.
+Phase 1's <code>Merged</code> cell is recorded by the first commit of this
+phase's branch. Findings land as their own pull request, and that
+pull request closes this plan out. If the audit finds nothing that
+needs a code change, this phase sets the plan <code>Complete</code> in its own
 pull request.</p>
 <h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
 <h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
@@ -16137,6 +16139,98 @@ pull request.</p>
 <li>The style guide, <code>docs/spice-protocol.md</code> and <code>AGENTS.md</code> describe
   the shared limit, and no prose quotes its value.</li>
 </ul>
+<h3 id="items-deferred-from-the-push-audit">Items deferred from the push audit<a class="headerlink" href="#items-deferred-from-the-push-audit" title="Permanent link">&para;</a></h3>
+<p>Phase 2 audited <code>a167670^1..a167670</code> (22 files, 1 889 insertions)
+and produced 30 findings once duplicates were merged. The triage
+table, with each finding located in current <code>develop</code>, is in
+<a href="/components/ryll/plans/PLAN-decoder-hardening-phase-02-push-audit/">PLAN-decoder-hardening-phase-02-push-audit.md</a>.
+The security review found all nine issues closed. Nothing the
+audit found reopens one.</p>
+<p><strong>To fix in the findings pull request</strong> (16):</p>
+<ul>
+<li>Tests:</li>
+<li><strong>T1</strong> (blocking): the #173 test's width is refused by the
+    per-side cap before the stride guard runs. Use 16384 x 1 at
+    stride 4, which the old code also panics on.</li>
+<li><strong>T2</strong>: add an in-cap FromCache mismatch, a 3x3 descriptor over
+    a cached 2x2.</li>
+<li><strong>T3</strong>: drive a ZlibGlzRgb image through <code>handle_message</code>.</li>
+<li><strong>T5</strong>: add QUIC headers at the pixel cap and one over it.</li>
+<li><strong>T8</strong>: add a cursor over the pixel cap with in-cap sides.</li>
+<li>QUIC run guard:</li>
+<li><strong>Q1</strong> and <strong>T4</strong>: fold the four run-overshoot guards into one
+    helper, so a single test covers all four loops, the tail loops
+    included.</li>
+<li>Comments:</li>
+<li><strong>Q3</strong> and <strong>Q4</strong>: cut the repeated and over-long comments to
+    their reasons.</li>
+<li><strong>Q6</strong>: the LZ4 pixel-cap test uses sides that are both legal
+    (8192 x 8193).</li>
+<li>Messages:</li>
+<li><strong>W1</strong>: the pixmap refusal prints <code>{}x{}</code>.</li>
+<li>Docs:</li>
+<li><strong>D1</strong> and <strong>D2</strong>: trim the "Decode limits" paragraph to the
+    contract, and make the docs and <code>jpeg.rs</code> give one account of
+    how the platform JPEG backends are bounded.</li>
+<li><strong>D3</strong>: drop the module-history sentence from <code>limits.rs</code>.</li>
+<li>Security:</li>
+<li><strong>S3</strong>: bound the zlib-GLZ inflate by the validated
+    <code>declared_glz_size</code>, not by the outer limit.</li>
+<li><strong>S4</strong>: check the pure-Rust JPEG backend's dimensions from
+    <code>read_info()</code> before <code>decode()</code>.</li>
+</ul>
+<p>The findings pull request fixed all 16, one commit per finding. Two
+of the new or changed tests prove less than intended. T2's in-cap
+mismatch is also refused by <code>DecompressedImage::new</code>, so removing
+the display channel's own pre-clone check fails no test; the test
+shows the mismatch is refused, not which layer refuses it. Q6's
+corrected sides make the LZ4 case say what it means, but a payload
+that small is refused whether or not the pixel cap applies, which
+is T7's declined point. The QUIC tail run loops (T4) are covered
+through the shared helper's unit test, not through the decoder: they
+only run on images over 2048 pixels, which cannot be hand-packed.</p>
+<p><strong>Filed as issues, outside this plan</strong> (5): problems that predate
+it, which the audit found in files it read.</p>
+<ul>
+<li><strong>S1</strong>, #626 (high): the LZ/GLZ back-reference one pixel before
+  the start panics.</li>
+<li><strong>Q8/S2</strong>, #627 (medium): surfaces skip the pixel cap and have no
+  count limit. <strong>Q5</strong>, the stale "1 GiB" comment, goes with that fix.</li>
+<li><strong>W3/S5</strong>, #628 (low): decode refusals log at message rate. The
+  compression crate has no <code>warn_once!</code>, so this is a design
+  question rather than an edit.</li>
+<li><strong>Q9</strong>, #629: <code>display.rs</code> is about 6 000 lines.</li>
+</ul>
+<p><strong>Declined</strong> (8):</p>
+<ul>
+<li><strong>W2</strong>: the <code>pixmap:too_large</code> key's message names both limits,
+  so the log is accurate, and renaming a key breaks anyone grepping
+  for it.</li>
+<li><strong>Q2</strong>: one shared refusal type across nine sites, whose error
+  types differ (<code>anyhow</code>, <code>Option</code>, <code>warn_once!</code>), would cost more
+  churn than the uneven wording does. W1 fixes the one real
+  inconsistency.</li>
+<li><strong>T6</strong>: hand-packed QUIC bitstreams are the only practical way to
+  reach those states, and the tests document the model state they
+  rely on.</li>
+<li><strong>T7</strong>: an allocation that was never made cannot be observed
+  without an allocator hook. The LZ and GLZ tests do tell old code
+  from new. The LZ4 case is covered by <code>rgba_len</code>'s unit tests.</li>
+<li><strong>D4</strong>: the "Breaking changes" heading is a reviewer convention.
+  A pull request template is a repository-wide change, not this
+  plan's.</li>
+<li><strong>D5</strong>: the guest-driver claims about <code>QXL_IMAGE_CACHE</code> come from
+  the driver sources, which are not in this repository. Checking
+  them belongs to a docs audit.</li>
+<li><strong>S7</strong>: <code>runlen</code> overflow needs a 32-bit <code>usize</code>, ryll ships only
+  64-bit targets, and the run guard makes it harmless in release.</li>
+<li><strong>Q10/S6</strong>: <code>DecompressedImage</code>'s <code>pub</code> fields. Nothing mutates
+  them, and the security review found no path by which server data
+  could. Making them private is a breaking change, and 0.2.0 and
+  0.3.0 have both shipped since the plan's own break, so it would
+  need a release of its own.</li>
+</ul>
+<p><strong>No action</strong> (1): <strong>Q7</strong>, already fixed by <code>df2f06b</code>.</p>
 <h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>decode_image_and_emit</code> (<code>display.rs</code>, the <code>no_image_data</code> guard
@@ -16148,8 +16242,12 @@ pull request.</p>
   by #457, which merged into this branch.</li>
 <li>Fuzz targets for the compression crate's decoders (#135). The
   helper makes "never allocates past the cap" a property a fuzzer
-  can assert.</li>
+  can assert. The LZ4 decoder has one since <code>9364569</code>
+  (<code>fuzz_lz4_decode</code>); QUIC, LZ, GLZ and the cursor decoder do
+  not.</li>
 <li>Per-channel message size caps (#436).</li>
+<li>The four issues the push audit filed: #626, #627, #628 and #629
+  (see above).</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>Issues #171, #172, #173, #174, #175, #176, #177 and #182, plus #442

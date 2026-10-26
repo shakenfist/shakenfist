@@ -15981,8 +15981,8 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <td>2026-10-03</td>
 <td><a href="/components/ryll/plans/PLAN-decoder-hardening/">Image decoder hardening</a></td>
 <td>Give every image decoder one shared size limit and fix the decoder half of the July hardening cluster (#171-#177, #182): QUIC run overruns, unbounded LZ/GLZ/LZ4/zlib/cursor allocations, and pixmap, FromCache and blit bounds panics.</td>
-<td>In progress</td>
-<td>1. Decoder hardening (inline), 2. Push audit (inline)</td>
+<td>Complete</td>
+<td>1. Decoder hardening (inline), <a href="/components/ryll/plans/PLAN-decoder-hardening-phase-02-push-audit/">2. Push audit</a></td>
 </tr>
 <tr>
 <td>2026-10-10</td>
@@ -15996,7 +15996,7 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <td><a href="/components/ryll/plans/PLAN-rdp-frontend/">RDP frontend</a></td>
 <td>A <code>--rdp</code> mode of ryll that transcodes SPICE to a stock RDP client (mstsc, FreeRDP) with IronRDP, so users on locked-down desktops or RDP-only networks can reach a console. A reachability fallback, not a better path. Replaces Kerbside's <code>PLAN-rdp-gateway.md</code>; its renderer prep also delivers the slim build and damage tracking Kerbside's transcoding spike needs</td>
 <td>In progress</td>
-<td><a href="/components/ryll/plans/PLAN-rdp-frontend-phase-01-renderer-prep/">1. Renderer prep</a>, <a href="/components/ryll/plans/PLAN-rdp-frontend-phase-02-rdp-skeleton/">2. RDP skeleton</a>, <a href="/components/ryll/plans/PLAN-rdp-frontend-phase-03-cursor-resize/">3. Cursor and resize</a>, 4. Clipboard and audio, 5. Lifecycle and CI, 6. Docs, 7. Push audit</td>
+<td><a href="/components/ryll/plans/PLAN-rdp-frontend-phase-01-renderer-prep/">1. Renderer prep</a>, <a href="/components/ryll/plans/PLAN-rdp-frontend-phase-02-rdp-skeleton/">2. RDP skeleton</a>, <a href="/components/ryll/plans/PLAN-rdp-frontend-phase-03-cursor-resize/">3. Cursor and resize</a>, <a href="/components/ryll/plans/PLAN-rdp-frontend-phase-04-clipboard-audio/">4. Clipboard and audio</a>, 5. Lifecycle and CI, 6. Docs, 7. Push audit</td>
 </tr>
 <tr>
 <td>2026-10-23</td>

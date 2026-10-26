@@ -16553,8 +16553,9 @@ Three things about it only matter while developing:</p>
   binary's gRPC contract hash against its own at launch either way.</li>
 <li><strong><code>rust.yml</code> verifies wheel stamping on pull requests as a packaging
   guard</strong> (<code>tools/verify-wheel-stamping.sh</code>: an unstamped tree must
-  produce a dev-versioned wheel, a release-stamped tree an
-  exactly-versioned one), so a change that breaks the maturin build or
+  produce a dev-versioned wheel, or the release's own version when it
+  sits on a <code>v*</code> tag, and a release-stamped tree an exactly-versioned
+  one), so a change that breaks the maturin build or
   the stamping surfaces before the release tag rather than during it.</li>
 <li><code>release.yml</code> runs the cross-compiled matrix build and publishes both
   packages, proxy first, from a single <code>v*</code> tag; <code>dev-proxy-wheel.yml</code>
@@ -16624,7 +16625,14 @@ time. The release runs it on the proxy wheels too.</p>
    release.</li>
 </ol>
 <p>So tag a commit that is on <code>develop</code> and went through the merge queue,
-and wait for its <code>functional-tests.yml</code> run to finish first. A merge
+and wait for its <code>functional-tests.yml</code> run to finish first.</p>
+<p>The gate does not cover the oVirt and OpenStack cloud lanes, which run
+nightly rather than in the merge queue (see "CI tiers" in
+<a href="/components/kerbside/testing/#ci-tiers">testing.md</a>). Before tagging, check that no
+<code>Nightly oVirt lane failing</code> or <code>Nightly OpenStack lane failing</code> issue
+is open and that the last nightly ran on or after the commit you are
+tagging. If not, dispatch <code>functional-tests.yml</code> on <code>develop</code> with both
+cloud targets selected and tag once it passes. A merge
 that bypassed the queue has no merge queue run, so it cannot be
 released until a later commit has gone through the queue. A gate
 failure means nothing was signed or published, so every failure is

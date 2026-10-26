@@ -15947,7 +15947,7 @@ It never reads an engine-generated <code>.vv</code> file.</p>
     kerbside -- "2. .vv file" --&gt; broker
     broker -- "3. deliver" --&gt; client
     client -- "4. connect, token as password" --&gt; kerbside
-    kerbside &lt;-- "A. discovery (per minute)&lt;br/&gt;B. ticket, per .vv request" --&gt; engine
+    kerbside &lt;-- "A. discovery (per minute)&lt;br/&gt;B. ticket, when a session's&lt;br/&gt;first channel connects" --&gt; engine
     kerbside -- "5. 5900 → NEED_SECURED → 5901 TLS:&lt;br/&gt;engine CA verified, subject pinned" --&gt; hypervisor</code></pre>
 <p><strong>Discovery (A).</strong> Once a minute the <code>type: ovirt</code> source driver
 (<code>kerbside/sources/ovirt.py</code>) walks the engine:</p>
@@ -15979,14 +15979,45 @@ It never reads an engine-generated <code>.vv</code> file.</p>
 </table>
 <p>Only VMs that are <code>up</code> and have a SPICE graphics console become
 consoles kerbside will broker.</p>
-<p><strong>Ticket (B).</strong> oVirt graphics-console tickets are short-lived
-(on the order of two minutes), so kerbside does not cache them.
-<code>console_service(&lt;id&gt;).ticket()</code> is called at the moment a <code>.vv</code>
-file is generated, and the ticket is stored against that console
-for the connection that is about to happen. A <code>.vv</code> that sits in
-a download folder for five minutes will not work — this is oVirt
-behaviour, not a kerbside limitation, and any broker built on
-this path should hand the file to the client immediately.</p>
+<p><strong>Ticket (B).</strong> Downloading the <code>.vv</code> asks the engine for
+nothing. Kerbside calls <code>console_service(&lt;id&gt;).ticket()</code> when a
+session's first channel connects, asking for an explicit lifetime:
+the token's remaining life plus 30 seconds, so a channel authorized
+in the token's last moment can still finish its SPICE link. Without
+that the engine applies its own default of two hours. The ticket is
+held on the session's token row in the database, so the session's
+other channels reuse it whichever proxy node they land on, and only
+one channel mints. A stored ticket is reused while at least 10
+seconds of it remain; a channel arriving later than that gets a
+replacement. Replacing a ticket changes the password for new
+connections but leaves the session's established channels up, which
+is how QEMU's <code>set_password</code>, the call oVirt uses, behaves. The
+maintenance loop clears the ticket once it, or the token, has
+expired.</p>
+<p>Two consequences follow. A <code>.vv</code> can sit in a download folder for as
+long as its token lives (<code>CONSOLE_TOKEN_DURATION</code>, a minute by
+default) and still work, because the ticket does not exist until the
+client connects. And the engine is now needed to connect, not only to
+discover: the whole mint is bounded at 20 seconds (each engine
+request at 15), and a mint that fails or times out denies the channel
+with <code>console ticket unavailable</code> rather than leaving the client
+hanging. Each mint is audited, with its lifetime on success or the
+exception class name on failure; the ticket itself is never logged.</p>
+<p>A direct console (<code>/console/direct</code>, administrators only) mints in the
+same way when the file is downloaded, with a lifetime of
+<code>CONSOLE_TOKEN_DURATION</code>, since nothing else is placed between the
+file and the hypervisor. An errored source answers 404; any other
+failure answers 502.</p>
+<p><strong>Two sessions on one VM.</strong> SPICE servers serve one client at a time:
+when a second client links, the hypervisor drops the first. A second
+kerbside session on the same VM therefore disconnects the first,
+whatever the tickets. This is how SPICE behaves, not something
+kerbside adds, and the ticket handling above does not change it. Each
+mint also sets the VM's one SPICE password, so a second session's
+mint, or a direct console download, leaves the first session's stored
+ticket stale: a channel of the first session connecting afterwards is
+refused at the hypervisor, even while that ticket is within its reuse
+window.</p>
 <p><strong>The client leg (4).</strong> The <code>.vv</code> points at <code>PUBLIC_FQDN</code> and
 kerbside's own ports, carries kerbside's CA, and uses a
 short-lived kerbside token as the SPICE password. The client
@@ -16100,8 +16131,8 @@ CA, are in <a href="/components/kerbside/configuration/">configuration.md</a>.</
 <h3 id="a-worked-example">A worked example<a class="headerlink" href="#a-worked-example" title="Permanent link">&para;</a></h3>
 <p>The <code>ovirt_matrix</code> job in
 <code>.github/workflows/functional-tests.yml</code> builds a single-node
-oVirt 4.5 environment and deploys kerbside against it on every
-merge-queue entry. The runner-side scripts are in
+oVirt 4.5 environment and deploys kerbside against it every night,
+and on demand through <code>workflow_dispatch</code>. The runner-side scripts are in
 <code>tools/ovirt-e2e/</code> (see <code>tools/ovirt-e2e/README.md</code>):
 <code>gen-sources.py</code> writes the <code>sources.yaml</code> above — including
 fetching the engine CA so the equality check passes by
@@ -16167,7 +16198,11 @@ relayed SPICE session, and API-driven termination.</p>
 </tr>
 <tr>
 <td>Ticket lifetime</td>
-<td>Roughly two minutes, set by oVirt. Brokers must deliver the <code>.vv</code> promptly.</td>
+<td>Set by kerbside, not oVirt: the token's remaining life plus 30 seconds, so a <code>.vv</code> is good for <code>CONSOLE_TOKEN_DURATION</code> (a minute by default) after download.</td>
+</tr>
+<tr>
+<td>Engine availability</td>
+<td>The engine is called when a session connects, so an engine that is down or hung (beyond the 20 second bound) stops new sessions connecting, not only discovery. Established sessions are unaffected.</td>
 </tr>
 <tr>
 <td>oVirt upstream</td>

@@ -16367,7 +16367,7 @@ same shape with a different transport. Read the renderer
 surface it drives: <code>run_connection</code> in
 <code>shakenfist-spice-renderer/src/session.rs</code>, <code>SurfaceMirror</code>,
 <code>DisplaySurface</code>, the <code>ChannelEvent</code> enum, the inputs channel's
-<code>make_scancode</code>, the main channel's resize path, <code>OpusPacketSink</code>
+<code>make_scancode</code>, the main channel's resize path, <code>PlaybackSink</code>
 and <code>MemoryClipboard</code>. Ground your answers in what the code
 actually does today. Do not speculate about the codebase when
 you could read it instead.</p>
@@ -16465,7 +16465,9 @@ session through one renderer call and a little glue:</p>
   non-egui frontend can drive (<code>set_host_text</code>,
   <code>subscribe_guest_copies</code>).</li>
 <li><code>OpusPacketSink</code> taps the playback channel's Opus packets
-  (and PCM, in raw mode) before decode.</li>
+  (and PCM, in raw mode) before decode. (Phase 1 replaced it
+  with <code>PlaybackSink</code> and <code>PlaybackOutput::Sink</code>, which also
+  hands over decoded PCM and opens no audio device; see gap 4.)</li>
 <li>An H.264 encoder already exists (<code>encoder/h264.rs</code>, over the
   compression crate's openh264 encoder), so the licensing
   decision Kerbside's plan worried about has already been
@@ -16513,7 +16515,10 @@ Kerbside spike</em> below).</p>
    channel is not linked at all, so there is no tap either:
    a slim ryll serves <code>--web</code> with no audio. A server process wants Opus packets
    when the client accepts Opus, decoded PCM when it does not,
-   and no local audio device in either case.</li>
+   and no local audio device in either case. Phase 1 closed
+   this gap: <code>PlaybackOutput::Sink</code> links the playback channel
+   in every build, opens no device, and gives the sink each
+   Opus packet and the PCM decoded from it.</li>
 <li><strong>Single primary surface.</strong> The mirror keys surfaces by
    <code>(channel, surface)</code> but every consumer uses
    <code>primary_key()</code>, and the main channel's monitors config
@@ -16603,11 +16608,16 @@ release); items marked <em>(main)</em> are on <code>master</code> and not in
   <code>DisplayUpdate::Resize</code>, which triggers deactivate and
   reactivate. Multi-monitor is effectively absent: the
   acceptor always advertises one primary monitor.</li>
-<li><strong>Channels.</strong> cliprdr has a full server backend. rdpsnd is
-  format-agnostic: we advertise formats and push pre-encoded
-  waves, and Opus (<code>0x704F</code>) is defined but not encoded for
-  us. Drive redirection (rdpdr) server-side is main-only and
-  raw.</li>
+<li><strong>Channels.</strong> cliprdr has a full server-side state machine,
+  driven by a backend we write. rdpsnd is format-agnostic: we
+  advertise formats and push pre-encoded waves, and Opus
+  (<code>0x704F</code>) is defined but not encoded for us. The server's
+  handler, not the client, chooses the format, from those both
+  sides support. Either channel sent a message before it is
+  ready (a wave before a format is chosen, a paste before the
+  clipboard handshake) drops the whole connection; phase 4's
+  survey has the detail. Drive redirection (rdpdr) server-side
+  is main-only and raw.</li>
 <li><strong>The routing token is discarded.</strong> The acceptor keeps only
   the negotiated protocol from the X.224 connection request,
   and an opaque <code>loadbalanceinfo</code> token that is not a
@@ -16923,7 +16933,19 @@ cursor, resize, text clipboard and audio playback. Specifically:</p>
    reportedly only some clients take Opus. PCM needs decoded
    samples without opening a local device (gap 4).
    <strong>Recommendation:</strong> advertise Opus and PCM 48 kHz stereo,
-   and let the client pick; phase 4 checks what mstsc picks.</li>
+   and let the client pick; phase 4 checks what mstsc picks.
+   <em>Revised by phase 4's survey:</em> in IronRDP 0.13.0 the
+   server's handler chooses among the formats both sides
+   support, so the client "picks" only by leaving Opus out of
+   its reply. Phase 4 advertises Opus first and PCM second, and
+   takes the first one the client also supports. mstsc is
+   still untested.</li>
+<li><strong>Answer (phase 4):</strong> FreeRDP 3.15.0 accepted Opus as
+     offered; with <code>/sound:format:1</code> it got PCM. Measured under
+     the video workload, ryll sent 1.36 Mbit/s with Opus and
+     2.78 Mbit/s with PCM. Audio was clean on both, with one
+     choppy episode on PCM that was not diagnosed. mstsc was
+     not tested.</li>
 <li><strong>Is a bitmap codec good enough?</strong> Planar and RemoteFX are
    fine for desktops and terminals and poor for video, which
    ryll would decode and re-encode. <strong>Recommendation:</strong>
@@ -17010,13 +17032,13 @@ cursor, resize, text clipboard and audio playback. Specifically:</p>
 <tr>
 <td>3. Cursor and resize</td>
 <td><a href="/components/ryll/plans/PLAN-rdp-frontend-phase-03-cursor-resize/">PLAN-rdp-frontend-phase-03-cursor-resize.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>c9a763d</td>
 </tr>
 <tr>
 <td>4. Clipboard and audio</td>
-<td>-</td>
-<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-rdp-frontend-phase-04-clipboard-audio/">PLAN-rdp-frontend-phase-04-clipboard-audio.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -17163,8 +17185,9 @@ evidence-based answers in the plan.</p>
   (<code>CF_UNICODETEXT</code>) and <code>MemoryClipboard</code>. Rich formats and
   files are Future work.</li>
 <li>Audio through rdpsnd, from phase 1's device-free playback:
-  Opus passthrough where the client picks Opus, PCM where it
-  does not. Record what mstsc and FreeRDP pick.</li>
+  Opus passthrough where the client accepts Opus, PCM where it
+  does not (the server chooses; see open question 6). Record
+  what mstsc and FreeRDP negotiate.</li>
 </ul>
 <h3 id="phase-5-lifecycle-and-ci">Phase 5: Lifecycle and CI<a class="headerlink" href="#phase-5-lifecycle-and-ci" title="Permanent link">&para;</a></h3>
 <ul>

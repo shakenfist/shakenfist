@@ -15966,6 +15966,8 @@
         string source FK
         integer created "epoch seconds"
         integer expires "epoch seconds"
+        string backend_ticket "nullable, minting sources only"
+        integer backend_ticket_expires "nullable, epoch seconds"
     }
 
     consoletokens ||--o{ proxychannels: "consoletokens authenticate proxychannels"
@@ -16165,7 +16167,7 @@ could plausibly have gone the other way:</p>
 <tr>
 <td>ticket</td>
 <td>string</td>
-<td>SPICE ticket for authentication</td>
+<td>SPICE ticket for authentication (static sources only)</td>
 </tr>
 </tbody>
 </table>
@@ -16181,15 +16183,19 @@ for this console, and it gets the same treatment as a source's
 <code>password</code>. <code>db.get_console()</code> and <code>db.get_consoles()</code> return only the
 fields in <code>db.CONSOLE_PUBLIC_FIELDS</code> unless a caller opts in with
 <code>include_secrets=True</code>, so it reaches neither the REST API nor the web
-UI. The ticket's lifetime depends on the source: oVirt mints a fresh
-one on every <code>.vv</code> request and expires it in about two minutes, while a
-static source persists the console password from its configuration
-indefinitely.</p>
-<p>There are exactly two callers entitled to read it back out of the
-database, and <code>git grep include_secrets</code> finds them alongside the
-source ones: the static branch of the direct <code>.vv</code> handler, which
-writes it into the file it returns, and the gRPC servicer, which hands
-it to the proxy to present to the hypervisor.</p>
+UI. Only static sources keep a ticket here: it is the console password
+from the source's configuration, persisted at enumeration time and
+valid indefinitely. oVirt consoles have an empty <code>ticket</code>. An oVirt
+ticket is minted when the first channel of a session connects, and held
+on that session's <code>consoletokens</code> row until it expires (see below), so
+it is never shared between sessions and never outlives its session's
+token by long.</p>
+<p>There are exactly two callers entitled to read a console's ticket back
+out of the database, and <code>git grep include_secrets</code> finds them
+alongside the source ones: the static branch of the direct <code>.vv</code>
+handler, which writes it into the file it returns, and the gRPC
+servicer, which hands it to the proxy to present to the hypervisor for
+sources that do not mint tickets.</p>
 <p>The allowlist governs what leaves the database, which is not the whole
 story for logs. Discovery holds a ticket before there is a database row
 to read: the source driver yields it and <code>main._parse_sources()</code> passes
@@ -16252,8 +16258,46 @@ allowlist that protects everything else.</p>
 <td>integer</td>
 <td>Token expiration time (epoch seconds)</td>
 </tr>
+<tr>
+<td>backend_ticket</td>
+<td>string</td>
+<td>Nullable; the session's minted SPICE ticket</td>
+</tr>
+<tr>
+<td>backend_ticket_expires</td>
+<td>integer</td>
+<td>Nullable; when that ticket expires (epoch seconds)</td>
+</tr>
 </tbody>
 </table>
+<p>There is one row per session: the <code>.vv</code> file a user is issued carries
+the token, and every channel of the session presents it to the proxy.
+A channel is only authorized while <code>expires</code> is in the future, but the
+row outlives that while the session has channels open, because it is
+what maps a session back to its console.
+<code>db.reap_expired_tokens()</code> deletes it once it has expired and the
+session's last channel has closed.</p>
+<p><code>backend_ticket</code> holds the SPICE password for a source that mints
+tickets, which oVirt does. Each mint revokes the previous ticket for
+new connections, so channels of one session minting independently
+would lock each other out. Instead a session mints once and shares the
+result with every channel, on every proxy node.
+<code>db.session_ticket()</code> selects the row <code>FOR UPDATE</code>: the first channel
+to connect holds the row lock while it asks the source for a ticket,
+and the session's other channels wait for it and then reuse what it
+stored. A stored ticket is reused while enough of its lifetime remains,
+and replaced otherwise. A failed mint stores nothing, so the next
+channel tries again. The lock is per session, so nothing but that
+session's own channels waits on it.</p>
+<p>The ticket gets the treatment <code>consoles.ticket</code> gets.
+<code>ConsoleToken.export()</code> leaves out the fields in
+<code>db.CONSOLE_TOKEN_SECRET_FIELDS</code> unless a caller passes
+<code>include_secrets=True</code>, so none of the token getters, and no API
+handler built on them, can return it; its expiry is not a credential
+and is included. The maintenance pass's
+<code>db.clear_expired_backend_tickets()</code> nulls both columns once the ticket
+has expired or the token has, since after either no channel can use it.
+Both columns are <code>NULL</code> for sources that do not mint tickets.</p>
 <h3 id="proxychannels">proxychannels<a class="headerlink" href="#proxychannels" title="Permanent link">&para;</a></h3>
 <p>Active SPICE channel connections being proxied.</p>
 <table>

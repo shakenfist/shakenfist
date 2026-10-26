@@ -15995,7 +15995,7 @@ Kerbside authenticates to Keystone as the service account you
 configured for the cloud and asks Nova to validate the token it
 was handed; which endpoints that needs is under <strong>Network</strong>
 below. That is a live call per exchange, so it sits
-between oVirt's per-request ticket and Shaken Fist's entirely
+between oVirt's per-session ticket and Shaken Fist's entirely
 offline signature check: a Nova that is down means no <em>new</em>
 consoles, while sessions already running are untouched. Where
 several OpenStack clouds are configured, each is tried in turn,
@@ -16355,8 +16355,8 @@ alongside Nova's own test of the hypervisor console; see
 <td>Nova's token validation returns no certificate subject for the compute node, so the console Kerbside records carries none and the proxy relays that backend without host-subject enforcement. A redirected backend is then caught by CA verification, where a CA is configured and the hypervisor escalated to TLS, but never by identity. This is <em>not</em> <code>PROXY_HOST_SUBJECT</code>, which pins the client-to-Kerbside leg and is unaffected; the unpinned leg is Kerbside-to-hypervisor. Both the oVirt and Shaken Fist paths can pin this leg because their discovery learns a subject; this path has no discovery.</td>
 </tr>
 <tr>
-<td><code>openstack_matrix</code> is merge-tier only</td>
-<td>The lane builds container images and an all-in-one cloud, so it runs in the merge queue and on <code>workflow_dispatch</code>, never on a pull request. An OpenStack regression therefore surfaces after review has finished, when the change is already queued to land, and ejects the merge group rather than failing the author's own PR. The Shaken Fist and static equivalents are smoke-tier and catch the same class of regression per-PR. See <a href="/components/kerbside/testing/#ci-tiers">testing.md</a>.</td>
+<td><code>openstack_matrix</code> is nightly-tier only</td>
+<td>The lane builds container images and an all-in-one cloud, so it runs once a night against <code>develop</code> and on <code>workflow_dispatch</code>, never on a pull request or in the merge queue. An OpenStack regression therefore surfaces the morning after the change merges, as a <code>Nightly OpenStack lane failing</code> issue, unless the author dispatched the lane on the PR. The Shaken Fist and static equivalents are smoke-tier and catch the same class of regression per-PR. See <a href="/components/kerbside/testing/#ci-tiers">testing.md</a>.</td>
 </tr>
 <tr>
 <td>The backend leg is not driven end to end in CI</td>

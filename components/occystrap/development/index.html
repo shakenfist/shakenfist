@@ -15967,8 +15967,9 @@ with test images.</p>
 ephemeral VM runners. A pull request that touches only <code>docs/**</code> or
 markdown skips them, because nothing they run reads those files: a
 <code>Check paths</code> job in each workflow decides, and the lane's jobs skip on
-its output. A merge queue entry always runs both in full. To test a
-documentation-only branch anyway, run the functional workflow by hand
+its output. A push to <code>develop</code> (and a merge queue entry, when the
+queue is enabled) always runs both in full. To test a documentation-only
+branch anyway, run the functional workflow by hand
 (<code>workflow_dispatch</code>, which the filter does not apply to) or comment
 <code>@shakenfist-bot please retest</code> on the pull request. The <code>Supply chain</code>
 lane is deliberately not filtered.</p>
@@ -15981,7 +15982,9 @@ discarded after the job, and the <code>debian-13-docker</code> image the mermaid
 lane needs has its docker daemon inside that VM. Fork pull requests
 additionally need a maintainer to approve the run before any of it
 starts, which is a repository setting rather than something these files
-can assert. A lane which needed more than that would have to run from
+can assert. The mermaid lane also refuses a fork's pull request outright,
+as defence in depth, because its script runs on the VM outside the
+container it starts. A lane which needed more than that would have to run from
 the base branch's copy of the script instead.</p>
 <h2 id="supply-chain-checks">Supply chain checks<a class="headerlink" href="#supply-chain-checks" title="Permanent link">&para;</a></h2>
 <p>The <code>Supply chain</code> workflow runs the two checks which look at the
@@ -16035,22 +16038,36 @@ it locally, with a docker daemon available:</p>
 <p>It is not in the <code>Supply chain</code> workflow because it needs a docker
 daemon and therefore a different runner image.</p>
 <h2 id="merging">Merging<a class="headerlink" href="#merging" title="Permanent link">&para;</a></h2>
-<p>Pull requests merge through a merge queue on <code>develop</code>, not with the
-merge button directly. A pull request can be queued once "Can enqueue"
-and "Can enqueue: unit" pass. The queue then runs <code>Sanity checks</code> and
-<code>Functional tests</code> again on the commit it is about to merge, and merges
-only when "Can merge" and "Can merge: unit" pass. Each workflow has a
-pair of its own, because a job's <code>needs:</code> cannot reach across workflows
-and the queue has to require both. That second run is the one a release
-counts (see below), so a change merged around the queue, by an
-administrator bypassing it, cannot be released until a later commit has
-gone through the queue.</p>
-<p>The queue builds one entry at a time (<code>max_entries_to_build: 1</code> in the
-<code>develop</code> ruleset). The <code>concurrency</code> groups in <code>python-unit-tests.yml</code>
-and <code>functional-tests.yml</code> depend on that: a queue run shares a group
+<p>The merge queue on <code>develop</code> is disabled while
+<a href="https://github.com/shakenfist/occystrap/issues/169">occystrap#169</a> is
+open: the queue never built a merge group, so nothing could merge
+through it. Pull requests merge to <code>develop</code> directly, once "Can
+enqueue" and "Can enqueue: unit" pass; those are the checks the
+<code>Develop branch</code> ruleset requires. <code>Sanity checks</code> and <code>Functional
+tests</code> then run again on the push to <code>develop</code>, in full, and that push
+run is the one a release counts (see below). Each workflow has an
+aggregator of its own, because a job's <code>needs:</code> cannot reach across
+workflows. A push run is keyed by commit in each <code>concurrency</code> group,
+so a later merge never cancels or drops an earlier commit's run.</p>
+<p>Without the queue, a pull request's checks ran on its merge with
+<code>develop</code> as it was when they started. If <code>develop</code> has moved since,
+two pull requests that were each green can still break it together.
+The push run is what catches that, and the release gate will not
+accept a tag on the broken commit, so the fix is a follow-up pull
+request.</p>
+<p>The <code>merge_group</code> trigger and the "Can merge" and "Can merge: unit"
+jobs are kept, so re-enabling the queue is a ruleset change only: add
+a <code>merge_queue</code> rule with merge method <code>MERGE</code>,
+<code>max_entries_to_build: 1</code>, <code>min_entries_to_merge: 1</code>,
+<code>max_entries_to_merge: 5</code>, <code>min_entries_to_merge_wait_minutes: 5</code>,
+grouping strategy <code>ALLGREEN</code> and <code>check_response_timeout_minutes: 360</code>,
+and add "Can merge" and "Can merge: unit" to the required checks. The
+queue run then becomes the one a release counts, and the push run tests
+the same commit again. The <code>merge_group</code> <code>concurrency</code> groups depend on
+the queue building one entry at a time: a queue run shares a group
 with whatever the queue builds next, so that a superseded run is
-cancelled. Raising the setting would make each entry cancel the one
-ahead of it, so revisit those groups first.</p>
+cancelled. Raising <code>max_entries_to_build</code> would make each entry cancel
+the one ahead of it, so revisit those groups first.</p>
 <p>A new job in either workflow goes in the <code>needs:</code> of that workflow's
 two aggregator jobs.</p>
 <p>The wheel check in the functional lane is
@@ -16063,10 +16080,13 @@ release time.</p>
 <ol>
 <li><code>ci-gate</code> checks that <code>python-unit-tests.yml</code> and
    <code>functional-tests.yml</code> both succeeded on the tagged commit, in their
-   merge queue runs. A run started by hand, as <code>pr-retest.yml</code> does
-   with <code>workflow_dispatch</code>, does not count. A queue run that fails,
-   flaky or not, ejects its entry, so the commit it built never reaches
-   <code>develop</code> and re-running that run cannot make any tag pass: re-queue
+   runs from the push to <code>develop</code> (or their merge queue runs, when the
+   queue is enabled). A run started by hand, as <code>pr-retest.yml</code> does
+   with <code>workflow_dispatch</code>, does not count. A failed push run can be
+   re-run with "Re-run jobs", and then <code>ci-gate</code> with it. With the
+   queue enabled, a queue run that fails, flaky or not, ejects its
+   entry, so the commit it built never reaches <code>develop</code> and
+   re-running that run cannot make any tag pass: re-queue
    the pull request and tag the commit that merges. Re-running a queue
    run helps only when the tagged commit's run was re-run after it
    merged and that later attempt failed, because the gate judges each
@@ -16080,10 +16100,9 @@ release time.</p>
    environment, re-sign the tag with gitsign, and publish to PyPI with
    attestations.</li>
 </ol>
-<p>So tag a commit that is on <code>develop</code> and went through the merge
-queue, and wait for both workflows' runs on it to finish first. A gate
-failure means nothing was signed or published, so every failure is
-recoverable: the template's
+<p>So tag a commit that is on <code>develop</code>, and wait for both workflows'
+runs on it to finish first. A gate failure means nothing was signed
+or published, so every failure is recoverable: the template's
 <a href="https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure">recovery table</a>
 says what to do for each cause, which is usually moving the tag or
 re-running CI and then the <code>ci-gate</code> job.</p>
@@ -16147,7 +16166,7 @@ kept that way so that drift is a <code>diff</code> rather than a judgement:</p>
 <tr>
 <td><code>.github/workflows/mermaid-lint.yml</code></td>
 <td><code>templates/mermaid-lint/mermaid-lint.yml</code></td>
-<td><code>7cadf3e</code></td>
+<td><code>a0dcf84</code></td>
 </tr>
 <tr>
 <td><code>tools/mermaid-lint.sh</code></td>

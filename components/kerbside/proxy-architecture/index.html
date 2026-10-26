@@ -7574,6 +7574,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#minting-a-backend-ticket-during-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minting a backend ticket during authorization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#audit-logging" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16117,6 +16128,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#minting-a-backend-ticket-during-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minting a backend ticket during authorization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#audit-logging" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16430,7 +16452,10 @@ default. See <a href="/components/kerbside/console-sources/#shaken-fist">Console
    decrypted and sent to the control plane via the <code>AuthorizeConnection</code> RPC,
    which resolves it to a hypervisor <code>Target</code> (host, port, backend ticket,
    <code>host_subject</code>, <code>session_id</code>, and the firewall policy) or returns <code>Denied</code>.
-   A denial closes the connection.</li>
+   A denial closes the connection. For a source whose driver mints tickets
+   (oVirt), the control plane may call that source's API while authorizing
+   (see "Minting a backend ticket during authorization" below), and denies
+   the channel if it cannot.</li>
 <li><strong>Backend connect.</strong> The proxy opens the backend leg to the hypervisor's
    SPICE port (honouring a <code>need_secured</code> retry to the TLS port) and completes
    the server-side handshake with the backend ticket, advertising the
@@ -16566,6 +16591,68 @@ different surfaces:</p>
   only this decision; the JWT exchange has already completed before any SPICE
   connection is made.</li>
 </ul>
+<h3 id="minting-a-backend-ticket-during-authorization">Minting a backend ticket during authorization<a class="headerlink" href="#minting-a-backend-ticket-during-authorization" title="Permanent link">&para;</a></h3>
+<p>For a static source, <code>AuthorizeConnection</code> returns the ticket stored on the
+console. For a source whose driver sets <code>MINTS_TICKETS</code> (oVirt) there is no
+stored ticket: the first channel of a session to be authorized mints one
+from the source, and the rest reuse it. The sequence is:</p>
+<ol>
+<li>The lifetime asked for is the token's remaining life plus 30 seconds
+   (<code>TICKET_SLACK</code> in <code>kerbside/rpc/servicer.py</code>), since no channel is
+   authorized after the token expires.</li>
+<li><code>db.session_ticket()</code> selects the session's <code>consoletokens</code> row <code>FOR
+   UPDATE</code>. If it holds a ticket with at least 10 seconds left
+   (<code>REUSE_MARGIN</code>) that ticket is returned; otherwise the caller mints and
+   the result is stored. The lock is shared by all proxy nodes, so channels
+   of one session arriving together on different nodes mint once.</li>
+<li>The mint runs on a worker thread, and the caller waits at most
+   <code>MINT_DEADLINE</code> (20 seconds, <code>kerbside/sources/minting.py</code>). The deadline
+   covers building the driver, logging in and the ticket request, because
+   <code>ovirtsdk4</code> does not bound its login; each engine request is separately
+   bounded at 15 seconds. A late result from an abandoned worker is
+   discarded, never stored. Mints for one console run one at a time in
+   each daemon: while a worker for the console is still running, even an
+   abandoned one, a new mint waits for it within its own deadline and is
+   refused if it does not finish. Otherwise the late worker could replace
+   the hypervisor's password after a newer mint had set and stored its
+   own, and every later channel would be refused. A worker still running
+   after five minutes (<code>MINT_STUCK_AFTER</code>) stops holding mints up. Daemons
+   on different nodes do not see each other's workers, nor does the direct
+   <code>.vv</code> handler, which mints in the web workers; and any mint for a VM,
+   whichever session it is for, replaces the password other sessions'
+   stored tickets were for.</li>
+<li>A failed or timed-out mint stores nothing, denies the channel with
+   <code>console ticket unavailable</code>, and is audited with the exception's class
+   name (never its text, which an API client can fill with the request it
+   failed on). The next channel tries again. A successful mint is audited
+   with its lifetime. No <code>Channel created</code> event is written for a denied
+   channel.</li>
+</ol>
+<p>The maintenance loop clears a stored ticket once it or its token has expired.
+A replacement ticket leaves a session's established channels connected;
+QEMU's <code>set_password</code> keeps connected clients. Separately, a SPICE server
+serves one client at a time and drops its connected client when another
+links, so a second session on the same VM disconnects the first regardless of
+tickets.</p>
+<p><strong>Worst case for the gRPC worker pool.</strong> Every channel waiting on the row lock
+occupies one of the <code>API_GRPC_WORKERS</code> threads (default 8) serving
+<code>AuthorizeConnection</code> for the whole of the wait. With a healthy engine the
+wait is one mint. Against an engine that
+accepts connections and then hangs, the channel holding the lock gives up
+after <code>MINT_DEADLINE</code>, and each channel behind it then takes its own turn at
+the lock and its own 20 second wait. A session opening more than a few
+channels at once can therefore keep that many workers busy for 20 seconds
+each in turn, and the later ones can wait past MariaDB's lock wait timeout
+(<code>innodb_lock_wait_timeout</code>, 50 seconds by default); they then fail with an
+internal error rather than <code>console ticket unavailable</code>, and the client sees
+the connection refused either way. Sessions on other VMs are not held up by
+the lock, but all sessions share the worker pool, so a hung engine can
+exhaust it for every source until the waits end. Each waiting channel also
+holds a database connection, from the daemon's SQLAlchemy pool (5 plus 10
+overflow by default), which the maintenance loop and the other gRPC calls
+share; raising <code>API_GRPC_WORKERS</code> much above that makes a hung engine
+exhaust the pool too. The deadline caps each wait; it does not make a hung
+engine cheap.</p>
 <h3 id="audit-logging">Audit Logging<a class="headerlink" href="#audit-logging" title="Permanent link">&para;</a></h3>
 <p>State-changing events (channel created/removed, firewall verdicts, session
 termination) are recorded as audit events through the control-plane RPCs
@@ -16574,7 +16661,8 @@ trail is owned by the Python side and consistent across proxy nodes.</p>
 <h3 id="process-and-blast-radius">Process and Blast-Radius<a class="headerlink" href="#process-and-blast-radius" title="Permanent link">&para;</a></h3>
 <p>The proxy runs as a single unprivileged process consulting a filesystem-guarded
 UDS (directory <code>0700</code>, socket <code>0600</code>); it holds no database credentials and no
-long-lived secrets. Tickets are short-lived and are never logged. The firewall
+long-lived secrets. It receives each channel's ticket from the daemon when the
+channel is authorized, and never logs it. The firewall
 (below) bounds what an untrusted client can send through to a hypervisor.</p>
 <h2 id="the-spice-firewall">The SPICE Firewall<a class="headerlink" href="#the-spice-firewall" title="Permanent link">&para;</a></h2>
 <p>Rather than relaying post-authentication traffic opaquely, the relay

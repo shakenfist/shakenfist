@@ -15902,7 +15902,8 @@ is CI. This standalone harness is for local verification.</p>
   wheel-installed <code>kerbside-proxy</code> binary (resolved by
   <code>find_proxy_bin()</code> on <code>PATH</code>), against real MariaDB + the REST API +
   ryll, and asserts the full <code>run-scenario.sh</code> Sextant scenario plus a
-  live API-terminate test and a non-gating loadtest. Bring one up
+  live API-terminate test, a SPICE password-rotation test and a
+  non-gating loadtest. Bring one up
   locally with <code>tools/direct-qemu/lane-up.sh</code> (the <code>kerbside-proxy</code>
   wheel installed, or <code>KERBSIDE_PROXY_BIN</code> set).</li>
 </ul>
