@@ -303,11 +303,11 @@ One commit per step. Every commit passes `tox -eflake8`,
 |------|--------|-------|-----------|---------------------|
 | 3a.1 | medium | sonnet | none | **Registry.** Create `kerbside/sources/__init__.py` with `driver_class(source_type)` returning `ShakenFistSource`, `oVirtSource` or `StaticSource` for `'shakenfist'`, `'ovirt'`, `'static'`, and raising `KeyError` for anything else (OpenStack has no driver; `main.py:175-178` skips it and must keep doing so). Import the driver modules lazily inside the function or at module level, matching how `main.py:20-22` imports them today, and check for an import cycle with `kerbside/sources/base.py`. Replace the dispatch at `main.py:169-180` with it, keeping its `openstack` skip and its unknown-type error. Do not touch `api.py` yet; 3a.4 and 3a.5 rewrite those call sites. Add `MINTS_TICKETS = False` and a `mint_console_ticket(self, uuid, lifetime)` that raises `NotImplementedError` to `BaseSource` (`kerbside/sources/base.py`), plus a `MintedTicket` named tuple `(ticket, expires)` there, with docstrings saying what the method promises: return a ticket valid until `expires` (epoch seconds), honouring `lifetime` where the source's API allows and reporting the shorter expiry where it does not. Unit tests in a new `kerbside/tests/unit/test_sources_registry.py`. Commit: "Look source drivers up by type." |
 | 3a.2 | high | opus | none | **Measure supersession on a real qemu.** The direct-qemu lane's qemu has no monitor; `tools/direct-qemu/start-qemu.sh:121` sets SPICE up with `password-secret`. Add a QMP unix socket to that qemu (under the lane's existing work directory, mode 0600). Write `tools/direct-qemu/verify-ticket-rotation.sh`, modelled on `tools/direct-qemu/verify-terminate-live.sh`: bring up a ryll headless session through the proxy (as that script does), confirm its channels are up over ryll's control socket, then over QMP (a) `set_password` with protocol spice and a new password and no `connected` argument, and (b) `expire_password` with protocol spice and time `now`. After each, wait 10 s and assert over the control socket that the session is still connected and still has its surface. Then assert that a fresh connection presenting the *old* password is refused (the lane's mock or static source can be pointed at the old value; read how `verify-terminate-live.sh` and `mock-grpc-server.py:286` supply the ticket). Wire it into `.github/workflows/direct-qemu-functional.yml` as its own step beside `verify-terminate-live.sh` (`:185`). Keep the workflow step to one line calling the script. Never print a password: pass them through files or environment variables, not arguments that land in `ps` or the log. Record the result in this plan's *Outcome*. Commit: "Prove a new SPICE password keeps connected clients." |
-| 3a.3 | high | opus | none | **Schema.** Use the `add-database-migration` skill in `.claude/skills/`. Add nullable `backend_ticket` (String) and `backend_ticket_expires` (Integer) to `ConsoleToken` (`db.py:442-468`) and its migration, with a working downgrade. In the same migration, clear `consoles.ticket` to `''` for every console whose `consoles.source` names a `sources` row with `type = 'ovirt'` (decision 7); downgrade leaves those rows empty, which is safe because a pre-3a daemon re-mints on the next `.vv`. Keep the ticket out of `ConsoleToken.export()` unless `include_secrets=True`, mirroring `CONSOLE_SECRET_FIELDS` (`db.py:246`) and how `get_console` takes `include_secrets`; check every caller of `export()` and of `get_token_by_token`/`get_tokens_by_console`/`get_token_by_session_id` still gets what it needs. Add to `db.py`: (1) `session_ticket(session_id, mint, lifetime, reuse_margin)` which, in one transaction, selects the token row by `session_id` `with_for_update()`, returns the stored `(ticket, expires)` if `expires - now >= reuse_margin`, and otherwise calls `mint(lifetime)` (a callable returning a `MintedTicket`) with the lock held, stores the result and commits; on an exception from `mint` it rolls back and re-raises; (2) `clear_expired_backend_tickets()`, nulling both columns where `backend_ticket_expires < now` or the token itself has expired, returning the count. Call (2) from the maintenance loop beside `_reap_expired_console_tokens` (`main.py:283-287`). Unit tests in `test_db.py` and `test_migrations.py` following their existing SQLite patterns; note in a test docstring that SQLite ignores `FOR UPDATE`, which is why 3a.6 exists. Update `docs/schema.md` (the `consoletokens` table, and the `consoles.ticket` paragraph at `:149-171`, which must now say only static sources store a ticket there). Commit: "Give each session somewhere to keep its ticket." |
+| 3a.3 | high | opus | none | **Schema.** Use the `add-database-migration` skill in `.claude/skills/`. Add nullable `backend_ticket` (String) and `backend_ticket_expires` (Integer) to `ConsoleToken` (`db.py:442-468`) and its migration, with a working downgrade. In the same migration, clear `consoles.ticket` to `''` for every console whose `consoles.source` names a `sources` row with `type = 'ovirt'` (decision 7); downgrade leaves those rows empty, which is safe because a pre-3a daemon re-mints on the next `.vv`. Keep the ticket out of `ConsoleToken.export()` unless `include_secrets=True`, mirroring `CONSOLE_SECRET_FIELDS` (`db.py:246`) and how `get_console` takes `include_secrets`; check every caller of `export()` and of `get_token_by_token`/`get_tokens_by_console`/`get_token_by_session_id` still gets what it needs. Add to `db.py`: (1) `session_ticket(session_id, mint, lifetime, reuse_margin)` which, in one transaction, selects the token row by `session_id` `with_for_update()`, returns the stored `(ticket, expires)` if `expires - now >= reuse_margin`, and otherwise calls `mint(lifetime)` (a callable returning a `MintedTicket`) with the lock held, stores the result and commits; on an exception from `mint` it rolls back and re-raises; (2) `clear_expired_backend_tickets()`, nulling both columns where `backend_ticket_expires < now` or the token itself has expired, returning the count. Call (2) from the maintenance loop beside `_reap_expired_console_tokens` (`main.py:283-287`). Unit tests for the two functions in `test_db.py` on SQLite; note in a test docstring that SQLite ignores `FOR UPDATE`, which is why 3a.6 exists. The initial schema cannot be created on SQLite, so the migration is tested the way `test_timestamp_precision.py` tests `a8d3f6e1c9b2`: render it offline as MySQL and assert the SQL, both directions. Then run it up, down and up again against a MariaDB 11 container, with a static and an oVirt console present, and record in the commit message that the static ticket survived. Update `docs/schema.md` (the `consoletokens` table, and the `consoles.ticket` paragraph at `:149-171`, which must now say only static sources store a ticket there). Commit: "Give each session somewhere to keep its ticket." |
 | 3a.4 | high | opus | none | **The oVirt driver mints.** In `kerbside/sources/ovirt.py`: set `MINTS_TICKETS = True`; give the CA fetch at `:46-48` a `timeout=MINT_TIMEOUT` (15 s, a module constant) and pass `timeout=MINT_TIMEOUT` to the SDK `Connection` wherever `_ensure_connection` builds one; change `get_console_for_vm(..., acquire_ticket=False)` to take `ticket_lifetime=None` and, when acquiring, call `console_service.ticket(ticket=OVIRT_SDK_TYPES.Ticket(expiry=int(lifetime)))` and return the ticket's value *and* the expiry the engine actually granted (the returned `Ticket` carries `.expiry`; read the ovirtsdk4 source in the lane's venv or `/srv/src-reference/ovirt/ovirt-engine-sdk` rather than guessing its units, and assert them in a test). Implement `mint_console_ticket(uuid, lifetime)` on top of it, returning `MintedTicket(value, now + granted_expiry)`. Update the direct handler (`api.py:380-479`) to use `sources.driver_class`, and to request `config.CONSOLE_TOKEN_DURATION * 60` seconds (decision 4); keep its existing secrets discipline (only the oVirt branch reads the source secrets). Tests in `test_sources_ovirt.py` and `test_api.py` (`:713-741` mock `get_console_for_vm` today; update them to the new signature and assert the lifetime requested). Commit: "Ask oVirt for a ticket that expires." |
 | 3a.5 | xhigh | opus | none | **Mint in the authorize path.** In `kerbside/rpc/servicer.py:93-147`: after the token and console checks, look the source's driver up with `sources.driver_class(source['type'])`. If the class has `MINTS_TICKETS`, call `db.session_ticket(token['session_id'], mint, lifetime, REUSE_MARGIN)`, where `lifetime = max(token['expires'] - now, 0) + TICKET_SLACK` (decision 2; `TICKET_SLACK = 30`, `REUSE_MARGIN = 10`, module constants with a comment each saying why), and `mint` constructs the driver from `db.get_source(..., include_secrets=True)` and calls `mint_console_ticket(console['uuid'], lifetime)`, closing the driver in a `finally`. Audit per decision 6 (`db.add_audit_event`, as the function already does for "Channel created"); deny per decision 5 with `Denied(reason='console ticket unavailable')`. Put the minted ticket in `Target.ticket`; sources that do not mint keep `console['ticket']`. Never log the ticket, and check the existing `LOG.error('AuthorizeConnection failed: %s' % e)` at `:144` cannot carry one (an SDK exception can quote its request; log the class name there if in doubt, and say why in a comment). In `api.py:482-534` (`ConsolesProxyVirtViewer`), remove the oVirt mint and both `store_console_ticket` calls, so the proxied GET touches no ticket for any source type, and rewrite the comment block above it; then check whether `db.store_console_ticket` (`db.py:424`) has any caller left and delete it if not. Tests in `test_rpc.py`: a minting source mints once for three channels of one session; a stored ticket within the margin is reused; one past the margin is replaced; a mint failure denies, audits and stores nothing; a non-minting source still gets its row ticket. Commit: "Mint console tickets when a channel connects." |
 | 3a.6 | high | opus | none | **Prove the lock on MariaDB.** SQLite ignores `FOR UPDATE`, so the unit tests cannot show that concurrent channels mint once. Add `kerbside/tests/functional/test_session_ticket_lock.py` (create the package if absent), skipped unless `KERBSIDE_TEST_SQL_URL` is set: create the schema on that URL, insert one token, and run eight threads calling `db.session_ticket` for the same session with a `mint` that sleeps 1 s and counts its calls. Assert exactly one mint and eight identical tickets. Add a second case where the stored ticket is inside the reuse margin, and assert one re-mint. The direct-qemu lane already runs MariaDB (`tools/direct-qemu/setup-mariadb.sh`); add one workflow step after it that runs this file against that database, calling a `tools/direct-qemu/run-ticket-lock-test.sh` rather than inlining commands. Check it fails with the `with_for_update()` removed, and record that in the commit message. Commit: "Test that one session mints once." |
-| 3a.7 | high | opus | none | **The oVirt lane proves the lifetime.** In `tools/ovirt-e2e/drive-console.py`: correct the docstring's "expire in ~120s" (`:18-19`), and after step 4 hold the session until at least 30 s past the ticket's expiry, which is the token's remaining lifetime plus `TICKET_SLACK` from issue, then re-run the smoke client and assert the session is still up. Assert the console's `consoles.ticket` is empty for the lane's oVirt console, that the session's token row carries a `backend_ticket_expires`, and that exactly one `Minted backend console ticket` audit event exists for the session however many channels it opened. Never print the ticket. This lane runs in the merge tier only (`functional-tests.yml:380`), so run it once from the pull request with the bot's retest mechanism described in `docs/testing.md` before asking for merge, and record the run in *Outcome*. Commit: "Hold the oVirt session past its ticket." |
+| 3a.7 | high | opus | none | **The oVirt lane proves the lifetime.** In `tools/ovirt-e2e/drive-console.py`: correct the docstring's "expire in ~120s" (`:18-19`), and after step 4 hold the session until at least 30 s past the ticket's expiry, which is the token's remaining lifetime plus `TICKET_SLACK` from issue, then re-run the smoke client and assert the session is still up. Assert the console's `consoles.ticket` is empty for the lane's oVirt console, that the session's token row carries a `backend_ticket_expires`, and that exactly one `Minted backend console ticket` audit event exists for the session however many channels it opened. Never print the ticket. This lane runs in the merge tier only (`functional-tests.yml:380`), so run it once on the phase branch with a `workflow_dispatch` of `functional-tests.yml` selecting the oVirt target (`docs/testing.md`, the workflow table) before asking for merge, and record the run in *Outcome*. Commit: "Hold the oVirt session past its ticket." |
 | 3a.8 | medium | sonnet | none | **Docs.** Rewrite oVirt's ticket lifecycle where survey finding 4 found it wrong: `docs/use-cases/ovirt.md:88-112` (flow step B moves from the `.vv` request to the first channel; the mermaid edge label at `:73` changes with it) and the limitations row at `:288` (kerbside now sets the lifetime: token lifetime plus 30 s proxied, `CONSOLE_TOKEN_DURATION` direct); `ARCHITECTURE.md:269-280` (the driver row, and the paragraph on where tickets are stored); `docs/console-sources.md` (the oVirt section, plus the two-sessions note from decision 8 and the supersession finding); `docs/proxy-architecture.md:95-105,203-235` (authorize now calls a source driver for minting sources, and can deny when the source is unreachable); `docs/configuration.md:18` (`CONSOLE_TOKEN_DURATION` now also bounds oVirt ticket lifetimes). Every claim about ticket lifetime must agree across these pages: grep `docs/ ARCHITECTURE.md tools/ovirt-e2e` for `ticket` near `minute`, `second`, `short-lived` and `expir` and reconcile each hit. Describe the code as it is: no references to this plan, its phases or its decisions. Commit: "Describe where console tickets come from now." |
 
 ## Risks and mitigations
@@ -345,31 +345,32 @@ One commit per step. Every commit passes `tox -eflake8`,
 
 ## Definition of done
 
-- [ ] `grep -rn "store_console_ticket\|acquire_ticket=True" kerbside`
+- [x] `grep -rn "store_console_ticket\|acquire_ticket=True" kerbside`
       finds no call that stores an oVirt ticket on a
       `Console` row.
-- [ ] `grep -rn "oVirtSource(\|ShakenFistSource(\|StaticSource(" kerbside --include=*.py | grep -v tests`
+- [x] `grep -rn "oVirtSource(\|ShakenFistSource(\|StaticSource(" kerbside --include=*.py | grep -v tests`
       finds only `kerbside/sources/`.
-- [ ] Every `console_service.ticket(` call in
+- [x] Every `console_service.ticket(` call in
       `kerbside/sources/ovirt.py` passes an explicit expiry.
-- [ ] The migration upgrades and downgrades on SQLite in
-      `test_migrations.py`, and clears `consoles.ticket` for
-      oVirt consoles only; a test shows a static console's
-      ticket survives it.
-- [ ] `test_rpc.py` shows one mint for three channels of one
+- [x] The migration's offline MySQL SQL is asserted in both
+      directions by a unit test, and it runs up, down and up
+      again against MariaDB, clearing `consoles.ticket` for
+      oVirt consoles only while a static console's ticket
+      survives.
+- [x] `test_rpc.py` shows one mint for three channels of one
       session, reuse within the margin, a re-mint outside
       it, and a denial with an audit event and nothing
       stored when the mint fails.
-- [ ] The MariaDB lock test runs in the direct-qemu lane and
+- [x] The MariaDB lock test runs in the direct-qemu lane and
       passes, and the commit message records that it failed
       with `with_for_update()` removed.
-- [ ] `verify-ticket-rotation.sh` runs in the direct-qemu
+- [x] `verify-ticket-rotation.sh` runs in the direct-qemu
       lane and passes: the session survives `set_password`
       and `expire_password`, and the old password is refused.
-- [ ] An `ovirt_matrix` run on this phase's pull request is
-      green with 3a.7's assertions, and is linked in
+- [x] A `workflow_dispatch` run of the oVirt lane on the phase
+      branch is green with 3a.7's assertions, and is linked in
       *Outcome*.
-- [ ] No page under `docs/`, nor `ARCHITECTURE.md`, nor
+- [x] No page under `docs/`, nor `ARCHITECTURE.md`, nor
       `tools/ovirt-e2e/`, states oVirt's ticket lifetime as
       anything but what kerbside now requests.
 - [ ] The master plan's Execution table records this phase's
@@ -377,24 +378,186 @@ One commit per step. Every commit passes `tox -eflake8`,
 
 ## Bugs fixed during this work
 
-None yet. Three are expected: the 7200 s oVirt ticket
-(the master plan's finding), the oVirt ticket shared between
-concurrent sessions through the `Console` row (survey
-finding 8), and the untimed CA fetch (survey finding 6).
+- oVirt console tickets lived for the engine's default
+  7200 s. Kerbside now asks for the session's remaining
+  token lifetime plus 30 s, and stores the expiry the engine
+  echoes back.
+- One oVirt ticket was shared by every session on a console
+  through the `Console` row, so a new `.vv` reset the
+  password under an earlier session's feet. Each session now
+  holds its own ticket on its `consoletokens` row.
+- The oVirt CA certificate fetch had no timeout. It is now
+  bounded, and a failure marks the source errored and still
+  removes its temporary file.
+- `get_console_for_vm` leaked an SDK connection on every API
+  `.vv`. It now closes any connection it opens.
+- The drivers read a source's name from `source`, but
+  database rows carry `name`, so a CA failure on an API path
+  raised `KeyError` instead of erroring the source.
+- The direct `.vv` for a VM with no SPICE console was handed
+  out with `password=None`. It now fails with 502.
 
 ## Future work
 
 - Move waiting channels off the gRPC worker pool if a slow
   source ever exhausts it (see *Risks*).
+- Remember a failed mint for a few seconds. Against a hung
+  engine each channel of a session takes its own
+  `MINT_DEADLINE` turn behind the row lock, and the later ones
+  exceed MariaDB's 50 s lock wait and fail as INTERNAL rather
+  than as a denial. The session fails either way.
+- Serialise mints for one console across daemons. Within one
+  daemon a new mint waits for a still-running worker on the same
+  console, so an abandoned worker cannot replace a newer ticket;
+  a worker abandoned on another node still can. The row lock
+  covers the callers, not their abandoned workers.
 - Issue #319: the proxied `.vv` GET still mints a token.
-- Issue #134: `/console/direct` hands a raw hypervisor
-  ticket to any authenticated user. Decision 4 bounds how
-  long that ticket lives, which narrows the issue without
-  closing it.
+- `/console/direct` still hands a raw hypervisor ticket to
+  its caller, though since #537 (issue #134) only to an
+  administrator. Decision 4 bounds how long that ticket
+  lives.
+
+## Execution notes
+
+Implementation started 2026-10-25 (AEDT) on branch
+`proxmox-source-phase-03a-minting`, on `develop` at `d4a4d49`.
+The plan was merged in #506 but sat unimplemented for four
+weeks, so it was re-surveyed first. Twenty-one commits had
+touched its target files. The design held, and these premises
+moved:
+
+1. `2d543e7` keys `consoles` on `(source, uuid)` and points
+   the `consoletokens` cascade at the pair.
+   `store_console_ticket` now takes both. The migration's join
+   on `consoles.source` is unaffected.
+2. The initial schema cannot be created on SQLite, so
+   migrations are tested as offline MySQL SQL plus a MariaDB
+   run. 3a.3's brief and the definition of done said SQLite;
+   both are corrected above.
+3. `3fcba92` (#533) moved every `time.time()` column to
+   `Double`. `ConsoleToken.expires` is still an `Integer` of
+   whole seconds, so `backend_ticket_expires` is an `Integer`
+   too, matching the row it sits on. Decision 1 is otherwise
+   unchanged.
+4. #537 closed issue #134: `/console/direct` is now
+   administrator-only. *Future work* is corrected above.
+   Decision 4 still applies.
+5. The merge tier runs by `workflow_dispatch`, not a bot
+   retest. 3a.7's brief is corrected above.
+6. `oVirtSource.get_console_for_vm` never closes an SDK
+   connection it opened itself, so the API paths leak one per
+   `.vv`. 3a.4's mint hook closes what it opens.
+7. Every line reference in the step table has moved. The
+   briefs given to the agents carry the current ones; the
+   table is left as written.
+
+Back brief answered 2026-10-25: decision 1 confirmed before
+3a.3. The branch may be pushed and the direct-qemu and oVirt
+workflows dispatched on it without a pull request; the pull
+request waits for a separate ask. 3a.2's measurement runs in
+CI while 3a.3 and 3a.4 proceed, and 3a.5 waits for its
+result.
+
+3a.2 ran the full rotation lane locally before CI, against qemu
+10.0.13, MariaDB 11 and the Rust proxy: a connected session
+survived `set_password` and `expire_password now`, and a fresh
+session through the proxy presenting the old password was
+refused with `PermissionDenied`. That settles the back brief's
+second gate; 3a.5 may rely on it. The step added two checks
+beyond its brief and both were kept: a refusal check after
+`set_password` as well as after `expire_password` (once the
+password is expired qemu refuses everything, so only the first
+proves the old password is refused for being wrong), and a
+positive control connecting with the new password.
+
+It also found that spice-server drops its connected client when
+a new client links. Decision 8's reasoning is therefore wrong
+for two sessions on one VM: the second session's main channel
+disconnects the first session outright, whatever the password,
+today and after this phase. Supersession still matters within
+one session, where a re-mint for a late channel leaves the
+session's established channels up, which is what 3a.5 relies
+on. 3a.8 documents the two-session case as a disconnect, not as
+a revoked password.
+
+The back brief's third gate fired before 3a.4 ran. ovirtsdk4's
+`Connection(timeout=)` sets `pycurl.TIMEOUT` on the API handle
+(`ovirtsdk4/__init__.py:413`), so it bounds the ticket call,
+but the SSO login runs on its own curl handle with no timeout
+(`_get_sso_response`, `:654-690`), and a fresh connection logs
+in on its first request. Decision 5's timeouts therefore cannot
+bound a whole mint. The operator chose, on 2026-10-25, a
+deadline in the authorize path: 3a.5 runs the mint in a worker
+thread and waits at most a fixed deadline, denying on expiry and
+releasing the row lock, and a stuck worker's late result is
+discarded. It wraps whichever driver mints, so phase 4 inherits
+it. 3a.4 keeps the SDK and `requests` timeouts as the inner
+bound.
+
+3a.4 went beyond its brief in three ways, all kept: the direct
+handler mints through `mint_console_ticket`, so a VM with no
+SPICE console now fails instead of handing out a `.vv` with
+`password=None`; a failed direct mint returns 502 and logs only
+the exception's class name; and a CA fetch that raises marks
+the source errored rather than raising from `__init__`, so its
+temporary CA file is still removed. It also closes the SDK
+connection that `get_console_for_vm` used to leak.
+
+3a.5 put the deadline in `kerbside/sources/minting.py`
+(`mint_with_deadline`, `MINT_DEADLINE = 20`, a daemon worker
+that builds, uses and closes the driver), and on review the
+direct `.vv` path was moved onto it too, so a stalled login
+holds neither a gRPC worker nor a web worker. The mint now runs
+before the channel is recorded, so a denied channel writes no
+`Channel created` event, as an invalid-console denial already
+did not. `db.store_console_ticket` lost its last caller and was
+deleted. Review also found that the drivers read a source's
+name from `source`, as the scrape loop's `sources.yaml` entries
+carry it, while `db.get_source()` rows carry `name`, so a CA
+failure on any API path raised `KeyError` instead of marking
+the source errored. That predates this phase on the `.vv`
+paths; it is fixed where both minting paths now turn a row into
+driver arguments.
+
+The first automated review of #604 found that a worker abandoned
+at the deadline still finishes its ticket request if the engine is
+slow rather than hung, replacing the hypervisor's password after a
+newer mint has stored its own. `minting.py` now keeps the running
+worker per console and makes a new mint wait for it, which also
+caps stuck workers at one per console; a worker stuck for five
+minutes stops blocking, so a connection that never answers cannot
+disable a console until restart. The rotation script now fails if
+the new password reaches an uploaded artifact.
 
 ## Outcome
 
-Not started.
+All eight steps landed on `proxmox-source-phase-03a-minting`
+on 2026-10-25 (AEDT), one commit each, after a re-survey
+commit. 536 unit tests pass.
+
+The oVirt lane was dispatched on `581f5de`, which carries every
+code and harness change in the phase (only 3a.8's docs follow
+it), and passed:
+[run 40148744908](https://github.com/shakenfist/kerbside/actions/runs/40148744908).
+In it one session minted one 8-character ticket for four
+channels, expiring 30 s after its token, with no failed mint.
+The session was held 30 s past that expiry, re-ran the smoke
+client with all four channels still open, and the maintenance
+loop cleared the expired ticket. The ticket appeared in none
+of the 8 collected files nor the audit trail. The migration
+cleared the stored ticket of 0 oVirt consoles on that fresh
+install.
+
+The direct-qemu workflow has no `workflow_dispatch` trigger, so
+the MariaDB lock test and `verify-ticket-rotation.sh` first ran in
+CI on #604, at `ed59e13`, and passed:
+[run 40158168216](https://github.com/shakenfist/kerbside/actions/runs/40158168216).
+Both lock tests passed (one mint for eight concurrent channels,
+with an empty row and inside the reuse margin). The rotation lane
+kept the same five channels up through `set_password` and
+`expire_password`, refused a fresh session presenting the old
+password after each, and accepted the new password in the positive
+control, with the new password in no uploaded artifact.
 
 ## Back brief
 

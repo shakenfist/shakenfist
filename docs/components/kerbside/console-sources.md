@@ -199,6 +199,39 @@ certificate subject), read graphics consoles, and acquire console tickets
 hosts is an administrative operation, so a plain VM-portal role is not
 enough; only `SuperUser` has been tested.
 
+### oVirt console tickets
+
+Kerbside asks the engine for a graphics-console ticket when the first
+channel of a session connects, not when the `.vv` file is downloaded.
+The ticket is requested with an explicit lifetime (the engine would
+otherwise apply two hours): the token's remaining life plus 30 seconds.
+It is stored on the session's `consoletokens` row, which every proxy
+node shares, so the session's other channels reuse it and only one
+channel mints, under a row lock. A stored ticket with less than 10
+seconds left is replaced. The maintenance loop clears the ticket once
+it or the token has expired. Static sources are different: their
+ticket is the configured console password, stored on the console.
+
+QEMU's `set_password`, which oVirt uses to set a SPICE ticket, keeps
+clients that are already connected, so replacing a session's ticket
+leaves its established channels up. This is exercised
+against real QEMU by `tools/direct-qemu/verify-ticket-rotation.sh`.
+
+The mint is bounded as a whole at 20 seconds, because `ovirtsdk4`
+applies no timeout to its login; each engine request is separately
+bounded at 15 seconds. A mint that fails or times out denies the
+channel (`console ticket unavailable`) and is audited with the
+exception's class name. A successful mint is audited with its
+lifetime. An unreachable engine therefore breaks connection setup as
+well as discovery. Direct consoles (`/console/direct`, administrators
+only) mint through the same deadline with a lifetime of
+`CONSOLE_TOKEN_DURATION`; an errored source answers 404 and any other
+failure 502.
+
+Only one client is served per VM at a time: when a second session
+connects to a VM, the SPICE server drops the first session's client,
+regardless of tickets. That is unchanged by how tickets are minted.
+
 Kerbside connects to the hypervisor's SPICE ports directly, so it needs L3
 reachability to every hypervisor, and oVirt's own SPICE proxy
 (`SpiceProxyDefault`) is not in the path. See

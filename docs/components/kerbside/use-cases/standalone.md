@@ -124,8 +124,8 @@ problem is and changes nothing, so every source keeps what it had
 published until the file is repaired. Either way a mistake costs
 at most freshness, never the published inventory or the daemon.
 
-**Nothing is fetched per request.** oVirt acquires a short-lived
-credential from the engine for every `.vv` file, and OpenStack
+**Nothing is fetched per request.** oVirt acquires a credential from
+the engine whenever a session connects, and OpenStack
 calls Nova to validate a token on every exchange. Here the SPICE
 password Kerbside presents to the target is written in the file
 and stored with the console when the pass records it, so `.vv`

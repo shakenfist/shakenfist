@@ -25,7 +25,8 @@ There are two distinct paths, for two purposes:
   wheel-installed `kerbside-proxy` binary (resolved by
   `find_proxy_bin()` on `PATH`), against real MariaDB + the REST API +
   ryll, and asserts the full `run-scenario.sh` Sextant scenario plus a
-  live API-terminate test and a non-gating loadtest. Bring one up
+  live API-terminate test, a SPICE password-rotation test and a
+  non-gating loadtest. Bring one up
   locally with `tools/direct-qemu/lane-up.sh` (the `kerbside-proxy`
   wheel installed, or `KERBSIDE_PROXY_BIN` set).
 

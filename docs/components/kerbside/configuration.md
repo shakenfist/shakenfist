@@ -25,7 +25,7 @@ discrepancies, the source code in `config.py` is authoritative.
 |---------------------|------|-------------|
 | SOURCES_PATH | String (default ./sources.yaml) | The path the console sources file (sources.yaml) resides at. |
 | SQL_URL | String | The SQLAlchemy SQL connection URL for the VDI proxy database. |
-| CONSOLE_TOKEN_DURATION | Integer (default 1) | The number of minutes a console access token should be valid for. |
+| CONSOLE_TOKEN_DURATION | Integer (default 1) | The number of minutes a console access token should be valid for. It also bounds the lifetime of the hypervisor tickets Kerbside mints for oVirt: a proxied session's ticket is asked to live for the token's remaining life plus 30 seconds, and a direct console's for this many minutes. |
 | AUTH_SECRET_SEED | String (must be set) | A random string used as the signing key for JWT authentication tokens; anyone who knows it can forge a token for any user. Generate one with `openssl rand -hex 32`. The built-in default is the sentinel `~~unconfigured~~`, and the API refuses to start while the value is that sentinel or blank. |
 | API_TOKEN_DURATION | Integer (default 60) | The number of minutes that a JWT is valid for after being issued. Importantly, Keystone credentials are only validated on JWT creation, so it is possible for a JWT to outlive the Keystone user access token it encapsulates. |
 
