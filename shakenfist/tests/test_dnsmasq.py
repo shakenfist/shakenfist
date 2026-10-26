@@ -1,11 +1,13 @@
 import builtins
 import os
 import signal
+import subprocess
 import tempfile
 import time
 import uuid
 from unittest import mock
 
+import psutil
 import testtools
 from pydantic import AnyHttpUrl
 from pydantic import IPvAnyAddress
@@ -13,6 +15,7 @@ from shakenfist.network import network
 from shakenfist.config import BaseSettings
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.managed_executables import dnsmasq
+from shakenfist.managed_executables import managedexecutable
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -625,8 +628,8 @@ class DnsMasqTestCase(testtools.TestCase):
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('psutil.pid_exists', return_value=True)
     @mock.patch('os.kill')
-    @mock.patch('os.waitpid')
-    def test_send_signal(self, mock_waitpid, mock_kill, mock_pid_exists,
+    @mock.patch('psutil.Process')
+    def test_send_signal(self, mock_process, mock_kill, mock_pid_exists,
                          mock_path_exists):
         self.mock_mariadb = MockMariaDB(self, node_count=4)
         self.mock_mariadb.setup()
@@ -645,6 +648,105 @@ class DnsMasqTestCase(testtools.TestCase):
         mock_path_exists.assert_called_with(
             f'{TEST_DIR}/files/dhcp/{network_uuid}/pid')
         mock_kill.assert_called_with(424242, signal.SIGKILL)
+        # dnsmasq is not our child, so it is waited for by pid, not waitpid()
+        # (#4472).
+        mock_process.assert_called_with(424242)
+        mock_process.return_value.wait.assert_called_with(
+            timeout=managedexecutable.KILL_WAIT_TIMEOUT)
+
+    @mock.patch('os.path.exists', return_value=True)
+    @mock.patch('psutil.pid_exists', return_value=True)
+    @mock.patch('os.kill')
+    @mock.patch('psutil.Process')
+    def test_send_signal_waits_only_after_sigkill(
+            self, mock_process, mock_kill, mock_pid_exists, mock_path_exists):
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n)
+
+        mock_open = mock.mock_open(read_data='424242')
+        with mock.patch.object(builtins, 'open', new=mock_open):
+            self.assertEqual(True, d._send_signal(signal.SIGHUP))
+
+        mock_kill.assert_called_with(424242, signal.SIGHUP)
+        mock_process.assert_not_called()
+
+    @mock.patch('os.path.exists', return_value=True)
+    @mock.patch('psutil.pid_exists', return_value=True)
+    @mock.patch('os.kill')
+    @mock.patch('psutil.Process')
+    def test_send_signal_survives_a_process_which_will_not_die(
+            self, mock_process, mock_kill, mock_pid_exists, mock_path_exists):
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n)
+
+        mock_process.return_value.wait.side_effect = psutil.TimeoutExpired(
+            managedexecutable.KILL_WAIT_TIMEOUT, 424242)
+        mock_open = mock.mock_open(read_data='424242')
+        with mock.patch.object(builtins, 'open', new=mock_open), \
+                mock.patch.object(managedexecutable, 'LOG') as mock_log:
+            self.assertEqual(True, d._send_signal(signal.SIGKILL))
+
+        mock_log.with_fields.return_value.warning.assert_called_once()
+        self.assertIn(
+            'still running',
+            mock_log.with_fields.return_value.warning.call_args.args[0])
+
+    @mock.patch('os.path.exists', return_value=True)
+    @mock.patch('psutil.pid_exists', return_value=True)
+    @mock.patch('os.kill')
+    @mock.patch('psutil.Process', side_effect=psutil.NoSuchProcess(424242))
+    def test_send_signal_to_a_process_already_gone(
+            self, mock_process, mock_kill, mock_pid_exists, mock_path_exists):
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n)
+
+        mock_open = mock.mock_open(read_data='424242')
+        with mock.patch.object(builtins, 'open', new=mock_open):
+            self.assertEqual(True, d._send_signal(signal.SIGKILL))
+
+    def test_a_killed_process_which_is_not_our_child_is_gone_on_return(self):
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n)
+
+        # Like a daemonised dnsmasq: the shell starts it and exits, so it is
+        # reparented away from us and waitpid() cannot wait for it.
+        pid = int(subprocess.check_output(
+            ['sh', '-c', 'sleep 60 >/dev/null 2>&1 & echo $!']))
+        self.addCleanup(self._kill_quietly, pid)
+        with mock.patch.object(d, 'get_pid', return_value=pid):
+            self.assertEqual(True, d._send_signal(signal.SIGKILL))
+        self.assertFalse(psutil.pid_exists(pid))
+
+    @staticmethod
+    def _kill_quietly(pid):
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
 
     @mock.patch('os.path.exists', return_value=True)
     @mock.patch('psutil.pid_exists', return_value=False)
