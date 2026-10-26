@@ -287,9 +287,9 @@ every consumer, so that:
 | 1b. Atomic target writes + by-target JOIN fix | (folded into phase 1 PR; see below) | Complete | `bc7c119bf` (#3465) |
 | 2. Observational flag: schema and query layer | [PLAN-cluster-op-visibility-phase-02-observational-schema.md](PLAN-cluster-op-visibility-phase-02-observational-schema.md) | Complete | `9b098c6ac` (#4574) |
 | 3. Classify and mark observational tasks | [PLAN-cluster-op-visibility-phase-03-mark-observational.md](PLAN-cluster-op-visibility-phase-03-mark-observational.md) | Complete | `27ea18202` (#4588) |
-| 4. API surface: has_pending_operations and truthful outstanding ops | [PLAN-cluster-op-visibility-phase-04-api-surface.md](PLAN-cluster-op-visibility-phase-04-api-surface.md) | Complete | `3642e7a75` (#4606), `bdc91db78` (#4617) |
+| 4. API surface: has_pending_operations and truthful outstanding ops | [PLAN-cluster-op-visibility-phase-04-api-surface.md](PLAN-cluster-op-visibility-phase-04-api-surface.md) | Complete | `3642e7a75` (#4606), `bdc91db78` (#4617), client-python `fdcfe6e53` (#436) |
 | 5. CI helper simplification, functional coverage, documentation | [PLAN-cluster-op-visibility-phase-05-coverage-docs.md](PLAN-cluster-op-visibility-phase-05-coverage-docs.md) | Complete | `93c31035a` (#4650) |
-| 6. Push audit | PLAN-cluster-op-visibility-phase-06-push-audit.md | Not started | — |
+| 6. Push audit | [PLAN-cluster-op-visibility-phase-06-push-audit.md](PLAN-cluster-op-visibility-phase-06-push-audit.md) | In progress | — |
 
 The `Merged` column records what put each phase on `develop`.
 These entries were reconstructed after the fact, because the
@@ -310,7 +310,9 @@ Phase 4 landed in two pull requests: #4606, and the follow-up #4617,
 which removed a duplicate `runs_after` entry its automated review
 found after #4606 had entered the merge queue. The audit reads both
 ranges. Its client accessors landed separately, in
-shakenfist/client-python#436.
+shakenfist/client-python#436 (`fdcfe6e53`). That repository has no
+`PUSH-AUDIT.md` and #436 was never audited, so this plan's audit reads
+it too, as a contract rather than as code to change.
 
 ### Phase 1b: Atomic cluster_operation_targets writes (done, in the phase 1 PR)
 
@@ -562,7 +564,16 @@ original outline follows.
   for the new column and field, `docs/plans/index.md`
   status updates.
 
-### Phase 6: Push audit
+### Phase 6: Push audit (plan at medium effort)
+
+See [the phase 6
+plan](PLAN-cluster-op-visibility-phase-06-push-audit.md). Its survey
+found the six ranges sound, and found the client half of phase 4 never
+audited, so it adds client-python #436 to the scope. It adds one heading
+of its own, on whether every place that applies the observational and
+pending rules agrees. None of the Future work entries below has an
+issue, and the audit's disposition gives each one an issue or a reason.
+The original outline follows.
 
 Runs `PUSH-AUDIT.md` over the accumulated diff of every
 phase in this plan against `develop`, not the last phase's
@@ -615,7 +626,9 @@ Recommended planning effort per phase is noted in the phase
 summaries above: phases 2 and 4 (schema design, cross-daemon
 protocol changes, API semantics) at high effort; phases 1, 3
 and 5 (well-understood test changes, a classification sweep
-with a clear rubric, docs) at medium effort.
+with a clear rubric, docs) at medium effort. Phase 6, the push
+audit, was planned at medium effort; its judgment steps carry
+their own effort levels.
 
 ### Step-level guidance
 
