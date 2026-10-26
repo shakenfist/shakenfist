@@ -16347,8 +16347,10 @@ database gateway (<code>sf-database</code>) checks schema versions at startup, v
 <code>cluster_operation_targets</code> is below v3. Other daemons do not check, but
 they reach the table only through a gateway.</p>
 <p>The migration is online. Adding the column is an instant metadata change,
-and the index is rebuilt in place over a small table, because operations
-delete their target rows about thirty seconds after going terminal. It took
+and the index is rebuilt in place over a small table, because finished
+operations are eligible for removal thirty seconds after going terminal and
+are removed, with their target rows, by the
+<a href="../database/#the-deleted-object-sweep">deleted-object sweep</a>. It took
 under half a second for 50,000 rows in testing. The migration is a single
 <code>ALTER TABLE</code> and is safe to re-run if interrupted: the re-run just rebuilds
 the index.</p>

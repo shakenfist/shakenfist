@@ -17725,10 +17725,12 @@ observational only if all of its tasks are. The tasks classified this way are
 <p>What you will see:</p>
 <ul>
 <li>An instance's <code>last_cluster_operation</code> no longer names the billing and
-  health sweep. It names the newest mutating operation, and because terminal
-  operations are removed about thirty seconds after they finish, it is
-  usually <code>null</code> for an instance at rest. Clients should already treat it as
-  optional.</li>
+  health sweep. It names the newest mutating operation, and because finished
+  operations are eligible for removal thirty seconds after finishing and are
+  removed by the
+  <a href="../../operator_guide/database/#the-deleted-object-sweep">deleted-object sweep</a>,
+  it is usually <code>null</code> for an instance at rest. Clients should already treat
+  it as optional.</li>
 <li><code>runs_after</code> chains built from an instance's <code>last_cluster_operation</code> now
   serialise behind the last user-requested change rather than behind the
   last sweep.</li>
@@ -17772,9 +17774,10 @@ new <code>object-pending-operations</code> capability in the <code>cluster-opera
   network's list; <code>GET /clusteroperations/{op_uuid}/chain</code> traces what an
   operation waits on.</li>
 <li>By default only queued, preflight and executing operations are listed.
-  <code>all=true</code> adds finished operations which have not yet been removed:
-  normally those from the last fifteen minutes or so, and errored ones for up
-  to seven days. It is not a history.</li>
+  <code>all=true</code> adds finished operations which have not yet been removed
+  (eligible for removal thirty seconds after finishing and removed by the
+  <a href="../../operator_guide/database/#the-deleted-object-sweep">deleted-object sweep</a>),
+  and errored ones for up to seven days. It is not a history.</li>
 <li>Deleting an instance cancels every outstanding operation which targets it,
   billing and health sweeps included, except snapshots. It no longer cancels
   network reconcile work which an instance operation depended on, because

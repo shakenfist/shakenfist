@@ -15693,117 +15693,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#phase-6-push-audit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 6: Push audit
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#agent-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agent guidance
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Agent guidance">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#execution-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution model
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#planning-effort" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Planning effort
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-level-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step-level guidance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#management-session-review-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Management session review checklist
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Administration and logistics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Administration and logistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success criteria
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -16022,12 +15911,17 @@ corrected inline.</p>
   in-flight ops plus recently terminal ones, not a full
   history. <em>(Corrected in phase 4.)</em> "About thirty seconds after
   going terminal" is when an op becomes eligible. The sweep that
-  deletes it runs every fifteen minutes, so a finished op
-  normally lingers for up to about fifteen minutes. Errored ops
+  deletes it ran every fifteen minutes then. <em>(Corrected in phase
+  5.)</em> Since #4595 it runs every minute, but it walks a type
+  again only five minutes after its last walk reached the end, so
+  a finished op normally goes within about six minutes, longer
+  while the sweep has a backlog. Errored ops
   are never hard deleted (#3922), and their target rows go only
   when the seven-day <code>CLUSTER_OPERATION_TARGET_RETENTION</code> prune
   removes them. See survey finding 6 of
-  <a href="../PLAN-cluster-op-visibility-phase-04-api-surface/">the phase 4 plan</a>.</li>
+  <a href="../PLAN-cluster-op-visibility-phase-04-api-surface/">the phase 4 plan</a>
+  and survey finding 5 of
+  <a href="../PLAN-cluster-op-visibility-phase-05-coverage-docs/">the phase 5 plan</a>.</li>
 <li>The pending query joins <code>object_states</code> and filters on
   <code>_ACTIVE_OPERATION_STATES</code> (<code>mariadb.py:3682</code>); it fails
   closed (returns True) on DB errors.</li>
@@ -16081,11 +15975,11 @@ every consumer, so that:</p>
   family, advertising both the field and the truthful
   per-object listings. See decision 2 of the phase 4 plan.</li>
 <li><strong><code>all=true</code> semantics.</strong> <em>Resolved by the phase 2
-  survey, and corrected by the phase 4 survey.</em> Since #3864,
+  survey, and corrected by the phase 4 and 5 surveys.</em> Since #3864,
   terminal ops are hard-deleted, so <code>/clusteroperations?all=true</code>
-  returns in-flight ops, finished ops from about the last fifteen
-  minutes (the deleted-object sweep's cadence, not thirty
-  seconds), and errored ops for up to the seven-day target-row
+  returns in-flight ops, finished ops the deleted-object sweep has
+  not yet reached (normally up to about six minutes of them since
+  #4595), and errored ops for up to the seven-day target-row
   retention (#3922). It is not a full history and is bounded by
   that retention. No limit parameter is needed, and phase 4
   documents it as what it is.</li>
@@ -16134,13 +16028,13 @@ every consumer, so that:</p>
 <tr>
 <td>4. API surface: has_pending_operations and truthful outstanding ops</td>
 <td><a href="../PLAN-cluster-op-visibility-phase-04-api-surface/">PLAN-cluster-op-visibility-phase-04-api-surface.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>3642e7a75</code> (#4606), <code>bdc91db78</code> (#4617)</td>
 </tr>
 <tr>
 <td>5. CI helper simplification, functional coverage, documentation</td>
-<td>PLAN-cluster-op-visibility-phase-05-coverage-docs.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-cluster-op-visibility-phase-05-coverage-docs/">PLAN-cluster-op-visibility-phase-05-coverage-docs.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -16164,6 +16058,11 @@ request put on <code>develop</code>. A phase which has not landed reads
 <p>Phase 1b was folded into phase 1's pull request rather than
 landing separately, so both rows name the same merge and the
 audit reads that one range for both.</p>
+<p>Phase 4 landed in two pull requests: #4606, and the follow-up #4617,
+which removed a duplicate <code>runs_after</code> entry its automated review
+found after #4606 had entered the merge queue. The audit reads both
+ranges. Its client accessors landed separately, in
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/436" title="GitHub Issue: shakenfist/client-python #436">client-python#436</a>.</p>
 <h3 id="phase-1b-atomic-cluster_operation_targets-writes-done-in-the-phase-1-pr">Phase 1b: Atomic cluster_operation_targets writes (done, in the phase 1 PR)<a class="headerlink" href="#phase-1b-atomic-cluster_operation_targets-writes-done-in-the-phase-1-pr" title="Permanent link">&para;</a></h3>
 <p>Discovered while verifying phase 1 in CI. Even with the
 by-target endpoint fixed, <code>test_interface_plug_and_exec_dhcp</code>
@@ -16292,7 +16191,10 @@ survey corrected this section in five places, marked inline: the endpoints are
 current listing is not newest-first; the delete walk also
 aborts other objects' ops it reaches through dependencies; the
 client has no per-object accessors at all; and finished ops
-live for up to about fifteen minutes, not thirty seconds. It
+live for up to about fifteen minutes, not thirty seconds. <em>(That
+last was already untrue when phase 4 merged: #4595 had moved the
+sweep to every minute. Phase 5 corrects it; see its survey finding
+5.)</em> It
 also adds a <code>pending_only</code> request field, so the default
 listing filters on state in SQL. The original outline follows.</p>
 <ul>
@@ -16350,6 +16252,21 @@ listing filters on state in SQL. The original outline follows.</p>
   and its twins, which have never existed.)</em></li>
 </ul>
 <h3 id="phase-5-ci-helper-simplification-functional-coverage-documentation-plan-at-medium-effort">Phase 5: CI helper simplification, functional coverage, documentation (plan at medium effort)<a class="headerlink" href="#phase-5-ci-helper-simplification-functional-coverage-documentation-plan-at-medium-effort" title="Permanent link">&para;</a></h3>
+<p>See <a href="../PLAN-cluster-op-visibility-phase-05-coverage-docs/">the phase 5
+plan</a>. Its
+survey changed this section in four places. The pending field is a
+boolean, so the helpers keep a listing for the error check, read
+before and after the wait (decision 2). No CI job runs this suite
+against an older server, so the fallback is dropped and a missing
+capability fails the test (decision 3). A sweep cannot be made to
+land inside a given await, so the functional test checks that real
+sweep ops are stored as observational and never become the pointer
+(decision 4). The deleted-object sweep has run every minute since</p>
+<h1 id="4595-so-the-phase-also-absorbs-4603-and-corrects-phase-4s">4595, so the phase also absorbs #4603 and corrects phase 4's<a class="headerlink" href="#4595-so-the-phase-also-absorbs-4603-and-corrects-phase-4s" title="Permanent link">&para;</a></h1>
+<p>"fifteen minutes" (decision 6). <code>ARCHITECTURE.md</code>, <code>AGENTS.md</code> and
+<code>README.md</code> describe none of the affected storage, so they do not
+change, and this repository has no <code>CLAUDE.md</code> (decision 7). The
+original outline follows.</p>
 <ul>
 <li>Switch the phase-1 CI helpers to poll
   <code>has_pending_operations</code> (cheaper, single GET) once the
@@ -16364,7 +16281,9 @@ listing filters on state in SQL. The original outline follows.</p>
   (<code>cluster_ci_tests/test_api.py</code>) can use the new
   <code>get_network_clusteroperations()</code> wrapper instead of
   <code>_request_url</code>, though it must keep one raw call, because the
-  raw body path is what it tests.</li>
+  raw body path is what it tests. <em>(Corrected in phase 5: the
+  wrapper sends <code>all</code> in the body, so it is the body path. The
+  call that stays raw is the query-string one.)</em></li>
 <li><em>(Added by the phase 3 survey.)</em> <code>_await_object_operations_complete()</code>
   (<code>deploy/shakenfist_ci/base.py</code>) fails a test when any op it
   watched go in flight ends in <code>error</code>, and its by-target listing
@@ -16561,9 +16480,11 @@ because the following statements will be true:</p>
 <li>
 <h1 id="4603-pages-and-code-comments-outside-this-plans-api">4603: pages and code comments outside this plan's API<a class="headerlink" href="#4603-pages-and-code-comments-outside-this-plans-api" title="Permanent link">&para;</a></h1>
   reference say terminal ops are removed after about thirty
-  seconds, when that is only eligibility and the sweep runs
-  every fifteen minutes. Several of those sentences were
-  written by phases 2 and 3. Found by the phase 4 survey.</li>
+  seconds, when that is only eligibility. Several of those
+  sentences were written by phases 2 and 3. Found by the phase 4
+  survey. Phase 5 absorbs it, re-scoped for the one-minute sweep,
+  together with phase 4's own "fifteen minutes" text (decision 6
+  of the phase 5 plan).</li>
 <li>An agent operation's preflight (<code>node_aop_op</code>) targets only the
   agent operation, not its instance, so an instance delete never
   cancels a pending one. Found in phase 4; it predates this plan.</li>
@@ -16574,7 +16495,10 @@ because the following statements will be true:</p>
   the snapshot guarantee hold. Found by the automated review of
   phase 4; the pointer walk it replaced failed the same way.</li>
 <li>Issue #3278 (CI and test coverage backlog) may want a note
-  about the deflaked helper pattern.</li>
+  about the deflaked helper pattern. <em>(Declined in phase 5: the
+  pattern is documented in <code>docs/developer_guide/ci.md</code>, where a
+  test author looks, and the tracking issue would only restate
+  it.)</em></li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <ul>

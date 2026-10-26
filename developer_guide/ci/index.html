@@ -15644,6 +15644,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#waiting-for-an-objects-cluster-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Waiting for an object's cluster operations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#creating-instances-in-the-functional-suite" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16282,6 +16293,33 @@ wedged, which is a state a test may well have just put it in. ssh's
 that connects and then stops responding; without this the job would stall
 until the CI runner's own timeout killed it, with no indication of which test
 was to blame.</p>
+<h2 id="waiting-for-an-objects-cluster-operations">Waiting for an object's cluster operations<a class="headerlink" href="#waiting-for-an-objects-cluster-operations" title="Permanent link">&para;</a></h2>
+<p>A test that mutates an instance or a network and then asserts on the result
+waits with <code>self._await_instance_operations_complete()</code> or
+<code>self._await_network_operations_complete()</code> (both in
+<code>shakenfist/deploy/shakenfist_ci/base.py</code>). Mutating API calls often return
+once the database is updated and leave the real work to a cluster operation
+which runs later, so an assertion made straight after the call can race it.</p>
+<p>Do not wait by polling <code>last_cluster_operation</code>. It names only the newest
+operation, so a later background operation reaching a final state masks an
+earlier one which is still queued, and the wait returns before the operation
+under test has run. The helpers instead wait on <code>has_pending_operations</code>,
+through the client's <code>await_no_pending_operations()</code>. That field covers every
+mutating operation, and leaves out observational work such as the billing and
+health sweep, so that work neither holds a wait open nor fails it. See
+<a href="../api_reference/clusteroperations/#waiting-for-an-object-to-settle">Waiting for an object to settle</a>
+for what the field means.</p>
+<p>The field is a boolean, and an operation in error is not pending, so waiting
+on it alone would return happily after the operation under test had failed.
+The helpers therefore also list the object's operations either side of the
+wait. A mutating operation which ends in <code>error</code> during the wait fails the
+test. One which was already in error beforehand does not, because that is
+history and would otherwise fail every later wait on the same object.
+Operations still pending after five minutes fail the test, and so does an
+object which is deleted while the helper waits on it.</p>
+<p>The suite always runs against a server built from its own revision, so the
+helpers do not skip on an old server: if it does not advertise the
+<code>object-pending-operations</code> capability, the test fails.</p>
 <h2 id="creating-instances-in-the-functional-suite">Creating instances in the functional suite<a class="headerlink" href="#creating-instances-in-the-functional-suite" title="Permanent link">&para;</a></h2>
 <p>Every functional test creates instances through <code>self.create_instance()</code> on
 <code>BaseTestCase</code> (<code>shakenfist/deploy/shakenfist_ci/base.py</code>), never through a

@@ -16625,13 +16625,14 @@ itself):</p>
 <h3 id="reading-these-events-back">Reading these events back<a class="headerlink" href="#reading-these-events-back" title="Permanent link">&para;</a></h3>
 <p>Neither event survives its operation for long, so plan to read them
 from the log stream rather than from the database.</p>
-<p>A cluster operation is hard deleted 30 seconds after it reaches a
-final state, and hard deleting an object removes the rows which join
-its events to it. Roughly half a minute after an operation completes
-there is nothing left to query: the operation is gone, and its events
-are orphaned rows which the daily prune sweep then deletes. The
-<code>MAX_USAGE_EVENT_AGE</code> and <code>MAX_STATUS_EVENT_AGE</code> retention settings
-never come into it -- they bound how long an event may live, not how
+<p>A cluster operation is eligible for hard delete thirty seconds after it
+reaches a final state and is removed by the
+<a href="../../database/#the-deleted-object-sweep">deleted-object sweep</a>, and hard
+deleting an object removes the rows which join its events to it. Soon
+after an operation completes there is nothing left to query: the operation
+is gone, and its events are orphaned rows which the daily prune sweep then
+deletes. The <code>MAX_USAGE_EVENT_AGE</code> and <code>MAX_STATUS_EVENT_AGE</code> retention
+settings never come into it -- they bound how long an event may live, not how
 long the object it describes does. This is issue #3864.</p>
 <p>What does persist is the log stream. Every event is echoed as a log
 line carrying the whole <code>extra</code> dict, unless <code>LOG_EVENTS_TO_LOKI</code> has

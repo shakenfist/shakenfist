@@ -15747,10 +15747,12 @@ the instance's, and <code>GET /clusteroperations/{op_uuid}/chain</code> traces w
 operation waits on. Every entry carries an <code>observational</code> boolean, as
 described below. By default only operations which are queued, in preflight or
 executing are listed. With <code>all=true</code> the list also includes finished
-operations which have not yet been removed. Finished operations are normally
-removed within about fifteen minutes, and errored operations are kept for up
-to <code>CLUSTER_OPERATION_TARGET_RETENTION</code>, seven days by default, so <code>all=true</code>
-is a bounded window onto recent work and not a history.</p>
+operations which have not yet been removed. Finished operations are
+eligible for removal thirty seconds after finishing and are removed by the
+<a href="../../../operator_guide/database/#the-deleted-object-sweep">deleted-object sweep</a>,
+and errored operations are kept for up to
+<code>CLUSTER_OPERATION_TARGET_RETENTION</code>, seven days by default, so <code>all=true</code> is
+a bounded window onto recent work and not a history.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>

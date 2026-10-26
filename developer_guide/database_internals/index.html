@@ -16084,8 +16084,10 @@ gating is required.</p>
 readers (for example <code>get_cluster_operation_targets_for_object()</code>, which the
 per-blob sweep uses to avoid queueing a duplicate checksum op, and the
 by-target listing) deliberately see everything. Rows normally disappear when
-their operation is hard-deleted, about thirty seconds after it goes
-terminal, so the prune is a backstop.</p>
+their operation is hard-deleted (eligible for removal thirty seconds after
+it goes terminal and removed by the
+<a href="../../operator_guide/database/#the-deleted-object-sweep">deleted-object sweep</a>),
+so the prune is a backstop.</p>
 <h2 id="cluster-operation-storage-and-work-queues">Cluster Operation Storage and Work Queues<a class="headerlink" href="#cluster-operation-storage-and-work-queues" title="Permanent link">&para;</a></h2>
 <p>Cluster operation headers and the per-node work queues both live in
 MariaDB. The <code>cluster_operations</code> table stores the full operation

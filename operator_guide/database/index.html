@@ -15497,6 +15497,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-deleted-object-sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The deleted-object sweep
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -16659,6 +16670,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-deleted-object-sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The deleted-object sweep
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -17752,7 +17774,7 @@ constraints. These get dedicated tables optimized for their access patterns:</p>
 </tr>
 <tr>
 <td><code>cluster_operation_targets</code></td>
-<td>Operation-to-object targeting with AUTO_INCREMENT ordering, plus an <code>observational</code> flag per row (schema v3). Holds in-flight operations and the last ~30 seconds of terminal ones, not a full history</td>
+<td>Operation-to-object targeting with AUTO_INCREMENT ordering, plus an <code>observational</code> flag per row (schema v3). Holds in-flight operations and finished ones until the <a href="#the-deleted-object-sweep">deleted-object sweep</a> removes them, not a full history</td>
 </tr>
 <tr>
 <td><code>cluster_operation_errors</code></td>
@@ -18024,10 +18046,23 @@ schedule. It re-queues or rejects rows whose claim has gone stale:</p>
   <code>cluster_op_reaper_requeued_total</code> and
   <code>cluster_op_reaper_rejected_total</code> record reaper activity.</li>
 </ul>
+<h4 id="the-deleted-object-sweep">The deleted-object sweep<a class="headerlink" href="#the-deleted-object-sweep" title="Permanent link">&para;</a></h4>
 <p>The cluster daemon also runs a deleted-object sweep, every minute, which
 hard deletes objects that have been in a final state (<code>deleted</code>,
 <code>complete</code>, <code>abort</code>) for longer than their grace period (<code>CLEANER_DELAY</code>
-for most objects, 30 seconds for completed operations):</p>
+for most objects, 30 seconds for completed operations).</p>
+<p>A finished cluster operation is therefore eligible for hard delete thirty
+seconds after it reaches a final state. The sweep then removes it, along
+with its <code>cluster_operation_targets</code> rows. Because the sweep walks a type
+again only five minutes after its last walk reached the end (see below),
+removal normally comes within about six minutes of the operation
+finishing, and later while the sweep is working through a backlog (the
+<code>cluster_deleted_object_backlog</code> metric, described under
+<a href="#watching-for-sweeps-that-silently-do-nothing">Watching for sweeps that silently do nothing</a>,
+shows how far behind it is). Operations which finished in <code>error</code> are
+never hard deleted (#3922), so their target rows stay until the
+<code>CLUSTER_OPERATION_TARGET_RETENTION</code> prune removes them, seven days by
+default.</p>
 <ul>
 <li><strong><code>DELETED_OBJECT_SWEEP_SECONDS</code></strong> — the time budget of each pass
   (default <code>20</code>). Reading the sweep's work counts against it: no read
@@ -18181,11 +18216,12 @@ repaired to.</p>
 <li><strong>Indexed queries</strong>: Efficient lookups for "latest operation on this instance"
   and "all operations on this object in order"</li>
 </ul>
-<p>Target rows live only until their operation is hard-deleted, which happens
-about thirty seconds after the operation goes terminal, so the table holds
-in-flight operations plus the last half minute of finished ones. As a
-backstop for rows that outlive their operation, the table is also bounded by
-a periodic prune in the cluster daemon (alongside the existing
+<p>Target rows live only until their operation is hard-deleted. A finished
+operation is eligible for removal thirty seconds after it goes terminal and
+is removed by the <a href="#the-deleted-object-sweep">deleted-object sweep</a>, so the
+table holds in-flight operations plus recently finished ones. As a backstop
+for rows that outlive their operation, the table is also bounded by a
+periodic prune in the cluster daemon (alongside the existing
 <code>delete_stale_transfers</code> cleanup).
 The cluster daemon runs cluster-wide cleanup under <code>ClusterLock</code> election,
 so the prune naturally runs from a single node at a time. The prune
@@ -18227,7 +18263,9 @@ columns still serve readers that do not filter on the flag.</p>
 </ul>
 <p>Rows are written automatically by <code>enqueue_cluster_operation</code>; operators
 do not need to manage them. Normally a row is removed when its operation is
-hard-deleted, about thirty seconds after the operation goes terminal. The
+hard-deleted: a finished operation is eligible for removal thirty seconds
+after it goes terminal and is removed by the
+<a href="#the-deleted-object-sweep">deleted-object sweep</a>. The
 cluster daemon's prune, performed under <code>ClusterLock</code> election via
 <code>_direct_delete_stale_cluster_operation_targets</code>, is a backstop: rows older
 than <code>CLUSTER_OPERATION_TARGET_RETENTION</code> (7 days by default) whose
