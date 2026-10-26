@@ -308,6 +308,11 @@ class Job(util_concurrency.Job):
         operation it is running and exits. At process exit the daemon
         abandons this thread after its own stop grace, and the workers go
         with the process.
+
+        The cost is liveness: a worker wedged in an operation keeps this
+        dispatcher from exiting, so no network on the node is dispatched
+        until sf-net restarts, which recovers through reset_network_queues.
+        The warning below repeats every WORKER_STOP_LOG_INTERVAL until then.
         """
         stop.set()
         for t in worker_threads:
@@ -338,20 +343,60 @@ class Job(util_concurrency.Job):
                     break
                 jobs.append((queue_name, jobname))
 
+        # Never raises: this runs on the dispatcher's way out, where an
+        # exception would replace the one it is failing with, and abandon the
+        # claims not yet given back. sf-net's next start, or the stuck-row
+        # reaper, frees any claim left here.
         released = []
-        failed = []
-        for queue_name, jobname in jobs:
+        not_released = []
+        remaining = collections.deque(jobname for _, jobname in jobs)
+        while remaining:
+            jobname = remaining.popleft()
             try:
-                mariadb.clear_work_queue_claim(int(jobname))
-                released.append(jobname)
+                # False means the claim was not cleared: the database
+                # reported an error, or the row was already resolved or
+                # reaped.
+                if mariadb.clear_work_queue_claim(int(jobname)):
+                    released.append(jobname)
+                else:
+                    not_released.append(jobname)
             except DatabaseUnavailable:
-                # sf-net's next start, or the stuck-row reaper, frees it.
-                failed.append(jobname)
+                # Each call has already waited out its retries, so do not
+                # make the rest wait in turn and delay the restart.
+                not_released.append(jobname)
+                not_released.extend(remaining)
+                remaining.clear()
+            except Exception as e:
+                util_exceptions.ignore_exception(
+                    f'releasing the claim on network work item {jobname}', e)
+                not_released.append(jobname)
         if jobs:
             LOG.with_fields({
                 'released': released,
-                'not_released': failed
+                'not_released': not_released
             }).info('Released claims on network work items not run')
+
+    def _route_item(self, queue_name, jobname, workitem, batch_size,
+                    worker_count):
+        """Load a claimed work item's operation and pick its worker.
+
+        Returns the worker index and the item to queue for it, or None for
+        an operation which no longer exists, whose work item is resolved.
+        """
+        op_type = workitem.get('operation_type')
+        op_uuid = workitem.get('operation_uuid')
+        op = get_object_class(op_type).from_db(op_uuid)
+        if not op:
+            LOG.with_fields({
+                'operation_type': op_type,
+                'operation_uuid': op_uuid,
+            }).error('Operation not found')
+            mariadb.resolve_work_item(queue_name, jobname)
+            return None
+
+        op.current_defer_count = workitem.get('defer_count', 0)
+        index = zlib.crc32(self._routing_key(op).encode()) % worker_count
+        return index, (queue_name, jobname, op, batch_size)
 
     def execute(self):
         LOG.info('Starting network worker')
@@ -433,37 +478,30 @@ class Job(util_concurrency.Job):
 
                     while unrouted:
                         queue_name, jobname, workitem = unrouted[0]
-                        op_type = workitem.get('operation_type')
-                        op_uuid = workitem.get('operation_uuid')
                         try:
-                            op = get_object_class(op_type).from_db(op_uuid)
+                            routed = self._route_item(
+                                queue_name, jobname, workitem, batch_size,
+                                worker_count)
                         except DatabaseUnavailable:
                             raise
                         except Exception as e:
-                            # Skip an item which cannot even be loaded, and
-                            # leave it claimed: the stuck-row reaper retries
-                            # it, and errors it after CLUSTER_OP_MAX_ATTEMPTS.
-                            # Letting this end the dispatcher would hand the
-                            # claim back on the way out, so the next
-                            # dispatcher would claim it first and end too.
+                            # Skip an item which cannot be loaded or routed,
+                            # and leave it claimed: the stuck-row reaper
+                            # retries it, and errors it after
+                            # CLUSTER_OP_MAX_ATTEMPTS. Letting this end the
+                            # dispatcher would hand the claim back on the way
+                            # out, so the next dispatcher would claim it first
+                            # and end too.
                             util_exceptions.ignore_exception(
-                                f'loading network work item {jobname}', e)
+                                f'routing network work item {jobname}', e)
                             unrouted.popleft()
                             continue
 
-                        if not op:
-                            LOG.with_fields({
-                                'operation_type': op_type,
-                                'operation_uuid': op_uuid,
-                            }).error('Operation not found')
-                            mariadb.resolve_work_item(queue_name, jobname)
+                        if not routed:
                             unrouted.popleft()
                             continue
 
-                        op.current_defer_count = workitem.get('defer_count', 0)
-                        index = (zlib.crc32(self._routing_key(op).encode())
-                                 % worker_count)
-                        item = (queue_name, jobname, op, batch_size)
+                        index, item = routed
                         # A blocking put with a timeout so shutdown stays
                         # responsive while a full worker queue applies
                         # backpressure.

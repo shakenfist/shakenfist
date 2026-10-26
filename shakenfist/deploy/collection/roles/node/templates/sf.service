@@ -70,6 +70,12 @@ RuntimeDirectoryPreserve=yes
 # and ends the commands still running when the drain's grace runs out (see
 # STOP_GRACE in shakenfist/daemons/privexec/main.py). A daemonised dnsmasq
 # outlives the restart, as it would have outlived an ordinary command.
+#
+# So stopping sf-privexec does not stop dnsmasq, which sf-net starts and stops
+# with its networks; nothing should stop sf-privexec to get rid of it. Nor does
+# a SIGKILL after TimeoutStopSec reach the commands still running. Both stay in
+# the control group, and systemd's "Found left-over process" warnings when
+# sf-privexec next starts are expected.
 KillMode=process
 {% endif %}
 {% if item == "cluster" %}

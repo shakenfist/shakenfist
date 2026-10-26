@@ -185,7 +185,12 @@ def main():
                 'iptables -w 10 -t nat -A POSTROUTING '
                 '-o %(egress_nic)s -j MASQUERADE' % subst)
 
-    reset_network_queues(config.NODE_UUID or str(n.uuid))
+    # The dispatcher names its queues from config.NODE_UUID, which the
+    # monitor would otherwise only resolve once it starts. Resolve it here,
+    # so that the queues reset are the ones the dispatcher drains.
+    if not config.NODE_UUID:
+        config.NODE_UUID = str(n.uuid)
+    reset_network_queues(config.NODE_UUID)
 
     duration = time.time() - start_time
     LOG.info(f'Startup tasks took {duration:.2f} seconds')

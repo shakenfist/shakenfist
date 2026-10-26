@@ -547,6 +547,18 @@ class FakeNetOp:
         self.network_uuid = network_uuid
 
 
+class FakeUnroutableOp:
+    """An operation which loads, but whose routing key cannot be read."""
+    coalescible_key_columns = ('network_uuid',)
+
+    def __init__(self, uuid):
+        self.uuid = uuid
+
+    @property
+    def network_uuid(self):
+        raise ValueError('unroutable')
+
+
 class FakeUntargetedOp:
     coalescible_key_columns = ()
 
@@ -866,7 +878,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
     def load(self, op_uuid):
         return FakeNetOp(op_uuid, self.NETWORK)
 
-    def run_dispatcher(self, dequeue, fake_execute, load=None):
+    def run_dispatcher(self, dequeue, fake_execute, load=None, clear=None):
         from shakenfist.daemons.network import workitem
 
         op_class = mock.MagicMock()
@@ -881,6 +893,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
             mock_config.NODE_IS_NETWORK_NODE = False
             mock_config.NETWORK_OPERATION_WORKERS = 1
             mock_mariadb.dequeue_work_items.side_effect = dequeue
+            mock_mariadb.clear_work_queue_claim.side_effect = clear
 
             job = workitem.Job.__new__(workitem.Job)
             job.name = 'test-worker'
@@ -955,16 +968,85 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         self.assertEqual(executed, self.resolved)
         self.assertEqual([1, 2, 3, 4], self.released[-4:])
 
-    def test_an_item_which_cannot_be_loaded_does_not_end_dispatch(self):
+    def release(self, clear, count):
+        """Release the claims on count unrouted items, clearing each with
+        clear. Returns the rows it tried to clear, and the jobs it reported
+        released and not released."""
+        from shakenfist.daemons.network import workitem
+
+        unrouted = [(QUEUE_NAME, str(i), {}) for i in range(count)]
+        with mock.patch.object(workitem, 'mariadb') as mock_mariadb, \
+                mock.patch.object(workitem, 'LOG') as mock_log:
+            mock_mariadb.clear_work_queue_claim.side_effect = clear
+            job = workitem.Job.__new__(workitem.Job)
+            job._release_claims(unrouted, [])
+        attempted = [c.args[0] for c in mock_mariadb.clear_work_queue_claim.call_args_list]
+        fields = mock_log.with_fields.call_args.args[0]
+        return attempted, fields['released'], fields['not_released']
+
+    def test_a_claim_which_was_not_cleared_is_not_reported_released(self):
+        # clear_work_queue_claim reports a database error, or a row already
+        # resolved or reaped, by returning False rather than raising.
+        attempted, released, not_released = self.release(lambda row: row != 1, 3)
+        self.assertEqual([0, 1, 2], attempted)
+        self.assertEqual(['0', '2'], released)
+        self.assertEqual(['1'], not_released)
+
+    def test_a_release_which_fails_does_not_stop_the_rest(self):
+        def clear(row):
+            if row == 1:
+                raise ValueError('unexpected')
+            return True
+
+        attempted, released, not_released = self.release(clear, 3)
+        self.assertEqual([0, 1, 2], attempted)
+        self.assertEqual(['0', '2'], released)
+        self.assertEqual(['1'], not_released)
+
+    def test_a_database_outage_stops_the_release_at_once(self):
+        # Each call has already waited out its retries; the rest are left
+        # for sf-net's next start or the reaper rather than waited on too.
+        def clear(row):
+            if row == 1:
+                raise exceptions.DatabaseUnavailable('down')
+            return True
+
+        attempted, released, not_released = self.release(clear, 3)
+        self.assertEqual([0, 1], attempted)
+        self.assertEqual(['0'], released)
+        self.assertEqual(['1', '2'], not_released)
+
+    def test_a_failed_release_does_not_hide_why_the_dispatcher_failed(self):
+        release = threading.Event()
+
+        def fake_execute(queue_name, op, batch_size, defer_delays):
+            if op.uuid == 'op-0':
+                release.wait(10)
+
+        def dequeue(queue_names, limit):
+            if dequeue.calls == 0:
+                dequeue.calls += 1
+                return self.items(3)
+            threading.Timer(0.3, release.set).start()
+            raise RuntimeError('dispatcher failure')
+        dequeue.calls = 0
+
+        def clear(row):
+            raise ValueError('release failure')
+
+        from shakenfist.daemons.network import workitem
+        with mock.patch.object(workitem, 'WORKER_STOP_LOG_INTERVAL', 0.05):
+            self.assertRaisesRegex(
+                RuntimeError, 'dispatcher failure',
+                self.run_dispatcher, dequeue, fake_execute, clear=clear)
+        # Every item queued behind the busy worker was still tried.
+        self.assertEqual([1, 2], self.released)
+
+    def assert_poison_item_left_claimed(self, load):
         executed = []
 
         def fake_execute(queue_name, op, batch_size, defer_delays):
             executed.append(op.uuid)
-
-        def load(op_uuid):
-            if op_uuid == 'op-0':
-                raise ValueError('unloadable')
-            return self.load(op_uuid)
 
         def dequeue(queue_names, limit):
             if dequeue.calls == 0:
@@ -982,6 +1064,22 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         # every dispatcher after this one.
         self.assertEqual([], self.released)
         self.assertEqual([1], self.resolved)
+
+    def test_an_item_which_cannot_be_routed_does_not_end_dispatch(self):
+        def load(op_uuid):
+            if op_uuid == 'op-0':
+                return FakeUnroutableOp(op_uuid)
+            return self.load(op_uuid)
+
+        self.assert_poison_item_left_claimed(load)
+
+    def test_an_item_which_cannot_be_loaded_does_not_end_dispatch(self):
+        def load(op_uuid):
+            if op_uuid == 'op-0':
+                raise ValueError('unloadable')
+            return self.load(op_uuid)
+
+        self.assert_poison_item_left_claimed(load)
 
     def test_items_a_database_outage_interrupted_are_routed_afterwards(self):
         executed = []

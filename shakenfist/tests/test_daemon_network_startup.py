@@ -49,18 +49,32 @@ class ResetNetworkQueuesTestCase(base.ShakenFistTestCase):
 
 
 class MainResetsBeforeDispatchTestCase(base.ShakenFistTestCase):
-    def test_queues_are_reset_before_the_monitor_runs(self):
-        order = mock.Mock()
+    def _main(self, order, node_uuid):
+        """Run sf-net's main() with config.NODE_UUID set to node_uuid, and
+        return config.NODE_UUID as the monitor's dispatcher would see it."""
+        mock_node = mock.Mock()
+        mock_node.from_db.return_value.uuid = NODE_UUID
         with mock.patch.object(network_main, 'reset_network_queues', order.reset), \
                 mock.patch.object(network_main, 'Monitor', order.Monitor), \
                 mock.patch.object(network_main, 'daemon'), \
-                mock.patch.object(network_main, 'Node'), \
+                mock.patch.object(network_main, 'Node', mock_node), \
                 mock.patch.object(network_main, 'setproctitle'), \
                 mock.patch.object(network_main, 'util_exceptions'), \
                 mock.patch.object(network_main.config, 'NODE_IS_NETWORK_NODE', False), \
-                mock.patch.object(network_main.config, 'NODE_UUID', NODE_UUID):
+                mock.patch.object(network_main.config, 'NODE_UUID', node_uuid):
             network_main.main()
+            return network_main.config.NODE_UUID
 
+    def test_queues_are_reset_before_the_monitor_runs(self):
+        order = mock.Mock()
+        self._main(order, NODE_UUID)
         calls = [c[0] for c in order.mock_calls]
         self.assertEqual(['reset', 'Monitor', 'Monitor().run'], calls)
+        order.reset.assert_called_once_with(NODE_UUID)
+
+    def test_the_queues_reset_are_the_ones_the_dispatcher_drains(self):
+        # Without SHAKENFIST_NODE_UUID the monitor only resolves it once it
+        # starts, after the reset; the dispatcher names its queues from it.
+        order = mock.Mock()
+        self.assertEqual(NODE_UUID, self._main(order, None))
         order.reset.assert_called_once_with(NODE_UUID)
