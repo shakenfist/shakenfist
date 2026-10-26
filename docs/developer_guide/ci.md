@@ -1087,7 +1087,10 @@ runner rather than staying where it is.
 
 `mermaid-lint.yml` executes `tools/mermaid-lint.sh` from the pull
 request head under the same rule, but on an ephemeral `vm` runner, and
-the container it starts gets `--network none`.
+the container it starts gets `--network none`. It also refuses a fork's
+pull request outright, as defence in depth: the script itself runs on
+the runner, outside that container. The guard lives in the workflow a
+pull request can edit, so the approval setting stays the control.
 
 ## Branch Protection
 

@@ -91,13 +91,30 @@ permissions:
 jobs:
   mermaid-lint:
     name: Mermaid lint
+    # No pull requests from forks. The job runs the checkout's own
+    # tools/mermaid-lint.sh, a fork can edit it, and editing it runs
+    # this lane. The script's bash runs on the runner host: --network
+    # none and the read-only mount only constrain the container it
+    # starts. This is defence in depth rather than the boundary. The
+    # virtual machine is discarded after the job, and the guard lives
+    # in a file the pull request can edit, so it stops a fork that
+    # changes the script, not one that also deletes the guard. GitHub's
+    # fork workflow approval covers that, if the repository requires it
+    # for all external contributors rather than only first-time ones.
+    if: |
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, vm, debian-13-docker, s]
     timeout-minutes: 15
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
+      # Nothing here pushes or calls the API, and the checkout is
+      # mounted into a third-party container, so it keeps no token.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       # The script does the work; see the CI script rule in AGENTS.md.
       # It lints every tracked markdown file rather than only the
