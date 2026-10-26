@@ -1,7 +1,11 @@
 # Copyright 2019 Michael Still and contributors
 
+import os
 import queue as queue_module
+import shutil
+import tempfile
 import threading
+import time as real_time
 from unittest import mock
 
 from shakenfist import exceptions
@@ -624,12 +628,13 @@ class PartitionedDispatchTest(base.ShakenFistTestCase):
             return []
 
         def fake_check_abort(path):
-            # Workers exit via the dispatcher's shutdown sentinel so they
-            # always drain their queues; the dispatcher exits once it has
-            # seen an empty dequeue after the batch.
+            # Workers stop when the dispatcher exits, so it exits only once
+            # it has seen an empty dequeue after the batch and every op has
+            # run.
             if threading.current_thread().name.startswith('net-worker-'):
                 return True
-            return dequeues['count'] < 2
+            with exec_lock:
+                return dequeues['count'] < 2 or len(executions) < 4
 
         with mock.patch(
             'shakenfist.daemons.network.workitem.config'
@@ -729,13 +734,14 @@ class DatabaseUnavailableTest(base.ShakenFistTestCase):
     def _run_worker_loop(self, items, fake_execute):
         """Drive _worker_loop in this thread over a pre-loaded queue.
 
-        The queue ends with the None shutdown sentinel so the loop
+        The worker is told to stop once its queue is empty, so the loop
         terminates deterministically.
         """
         worker_queue = queue_module.Queue()
         for item in items:
             worker_queue.put(item)
-        worker_queue.put(None)
+        stop = mock.Mock()
+        stop.is_set.side_effect = worker_queue.empty
 
         with mock.patch(
             'shakenfist.daemons.network.workitem.daemon'
@@ -752,7 +758,7 @@ class DatabaseUnavailableTest(base.ShakenFistTestCase):
             # PartitionedDispatchTest.
             job._cluster_operation_execute = fake_execute
 
-            job._worker_loop(0, worker_queue)
+            job._worker_loop(0, worker_queue, stop)
 
     def test_worker_abandons_item_on_database_unavailable(self):
         """DatabaseUnavailable from an op leaves its work item claimed
@@ -833,3 +839,177 @@ class DatabaseUnavailableTest(base.ShakenFistTestCase):
             self.assertEqual(2, mock_mariadb.resolve_work_item.call_count)
 
         self.assertEqual(['op-1', 'op-2'], executed)
+
+
+class DispatcherStopTest(base.ShakenFistTestCase):
+    """The dispatcher exits only once its workers have, and gives back the
+    claims on work it will not run (#4645, #4660)."""
+
+    NETWORK = 'cccc5222-a825-401f-ac76-7afd65b143ac'
+
+    def setUp(self):
+        super().setUp()
+        tmp = tempfile.mkdtemp(prefix='sf-net-stop-')
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        self.abort_path = os.path.join(tmp, 'abort')
+
+    def abort(self):
+        with open(self.abort_path, 'w') as f:
+            f.write('1')
+
+    def items(self, count):
+        return [
+            (QUEUE_NAME, str(i),
+             {'operation_type': 'net_op', 'operation_uuid': f'op-{i}'})
+            for i in range(count)]
+
+    def load(self, op_uuid):
+        return FakeNetOp(op_uuid, self.NETWORK)
+
+    def run_dispatcher(self, dequeue, fake_execute, load=None):
+        from shakenfist.daemons.network import workitem
+
+        op_class = mock.MagicMock()
+        op_class.from_db.side_effect = load or self.load
+        with mock.patch.object(workitem, 'config') as mock_config, \
+                mock.patch.object(workitem, 'mariadb') as mock_mariadb, \
+                mock.patch.object(workitem, 'time'), \
+                mock.patch.object(workitem, 'util_concurrency'), \
+                mock.patch.object(workitem, 'get_object_class',
+                                  return_value=op_class):
+            mock_config.NODE_UUID = NODE_UUID
+            mock_config.NODE_IS_NETWORK_NODE = False
+            mock_config.NETWORK_OPERATION_WORKERS = 1
+            mock_mariadb.dequeue_work_items.side_effect = dequeue
+
+            job = workitem.Job.__new__(workitem.Job)
+            job.name = 'test-worker'
+            job.abort_path = self.abort_path
+            job._cluster_operation_execute = fake_execute
+            try:
+                job.execute()
+            finally:
+                self.released = sorted(
+                    c.args[0]
+                    for c in mock_mariadb.clear_work_queue_claim.call_args_list)
+                self.resolved = sorted(
+                    int(c.args[1])
+                    for c in mock_mariadb.resolve_work_item.call_args_list)
+                self.dequeues = mock_mariadb.dequeue_work_items.call_count
+
+    def live_workers(self):
+        return [t for t in threading.enumerate()
+                if t.name.startswith('net-worker-') and t.is_alive()]
+
+    def test_workers_have_stopped_when_a_failed_dispatcher_exits(self):
+        # One worker, busy with the first op, and a full queue behind it:
+        # the old shutdown sentinel did not fit, the join gave up after five
+        # seconds, and the old worker carried on draining its queue
+        # alongside the restarted dispatcher's (#4645).
+        release = threading.Event()
+        executed = []
+
+        def fake_execute(queue_name, op, batch_size, defer_delays):
+            executed.append(op.uuid)
+            if op.uuid == 'op-0':
+                release.wait(10)
+
+        def dequeue(queue_names, limit):
+            if dequeue.calls == 0:
+                dequeue.calls += 1
+                return self.items(21)
+            threading.Timer(0.3, release.set).start()
+            raise RuntimeError('dispatcher failure')
+        dequeue.calls = 0
+
+        # Wait in short steps, so that a wait with any limit gives up while
+        # the worker is still busy.
+        from shakenfist.daemons.network import workitem
+        with mock.patch.object(workitem, 'WORKER_STOP_LOG_INTERVAL', 0.05):
+            self.assertRaises(
+                RuntimeError, self.run_dispatcher, dequeue, fake_execute)
+        self.assertEqual([], self.live_workers())
+        self.assertEqual(['op-0'], executed)
+        self.assertEqual([0], self.resolved)
+        # The twenty items queued behind it are given back, not stranded.
+        self.assertEqual(list(range(1, 21)), self.released)
+
+    def test_items_not_run_at_shutdown_are_given_back(self):
+        executed = []
+
+        def fake_execute(queue_name, op, batch_size, defer_delays):
+            executed.append(int(op.uuid[3:]))
+
+        def load(op_uuid):
+            if op_uuid == 'op-1':
+                self.abort()
+            return self.load(op_uuid)
+
+        self.run_dispatcher(lambda q, limit: self.items(5), fake_execute,
+                            load=load)
+        self.assertEqual([], self.live_workers())
+        # op-0 was routed before the abort, and either ran or was still
+        # queued; the rest were never routed. Each is run or given back,
+        # never both and never neither.
+        self.assertEqual(list(range(5)), sorted(executed + self.released))
+        self.assertEqual(executed, self.resolved)
+        self.assertEqual([1, 2, 3, 4], self.released[-4:])
+
+    def test_an_item_which_cannot_be_loaded_does_not_end_dispatch(self):
+        executed = []
+
+        def fake_execute(queue_name, op, batch_size, defer_delays):
+            executed.append(op.uuid)
+
+        def load(op_uuid):
+            if op_uuid == 'op-0':
+                raise ValueError('unloadable')
+            return self.load(op_uuid)
+
+        def dequeue(queue_names, limit):
+            if dequeue.calls == 0:
+                dequeue.calls += 1
+                return self.items(2)
+            if executed:
+                self.abort()
+            return []
+        dequeue.calls = 0
+
+        self.run_dispatcher(dequeue, fake_execute, load=load)
+        self.assertEqual(['op-1'], executed)
+        # Left claimed for the stuck-row reaper, which gives up on it after
+        # CLUSTER_OP_MAX_ATTEMPTS. Given back, it would be claimed first by
+        # every dispatcher after this one.
+        self.assertEqual([], self.released)
+        self.assertEqual([1], self.resolved)
+
+    def test_items_a_database_outage_interrupted_are_routed_afterwards(self):
+        executed = []
+
+        def fake_execute(queue_name, op, batch_size, defer_delays):
+            executed.append(op.uuid)
+
+        def load(op_uuid):
+            if op_uuid == 'op-1' and not load.failed:
+                load.failed = True
+                raise exceptions.DatabaseUnavailable('down')
+            return self.load(op_uuid)
+        load.failed = False
+
+        # Give up waiting for op-1 after a while, so that a dispatcher which
+        # lost it fails rather than polls forever. The dispatcher's own clock
+        # is mocked, so this uses the real one.
+        give_up_at = real_time.monotonic() + 10
+
+        def dequeue(queue_names, limit):
+            dequeue.calls += 1
+            if dequeue.calls == 1:
+                return self.items(2)
+            if len(executed) == 2 or real_time.monotonic() > give_up_at:
+                self.abort()
+            return []
+        dequeue.calls = 0
+
+        self.run_dispatcher(dequeue, fake_execute, load=load)
+        self.assertEqual(['op-0', 'op-1'], executed)
+        self.assertEqual([], self.released)
