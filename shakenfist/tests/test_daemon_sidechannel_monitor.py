@@ -7,6 +7,7 @@ from shakenfist import constants
 from shakenfist.daemons.sidechannel import main as sidechannel
 from shakenfist.protos import agent_pb2
 from shakenfist.tests import base
+from shakenfist.util import libvirt as util_libvirt
 
 
 class _Clock:
@@ -189,3 +190,69 @@ class SideChannelMonitorReplyGapTestCase(base.ShakenFistTestCase):
 
         self.assertEqual([degraded], inst.agent_state_writes)
         self.assertEqual('gather_facts_request', sent[-1])
+
+
+class _FakeLibvirtError(Exception):
+    def __init__(self, message, code):
+        super().__init__(message)
+        self.code = code
+
+    def get_error_code(self):
+        return self.code
+
+
+class _FakeLibvirtModule:
+    libvirtError = _FakeLibvirtError
+    VIR_ERR_INTERNAL_ERROR = 1
+    VIR_ERR_NO_DOMAIN = 42
+    VIR_DOMAIN_RUNNING = 1
+    VIR_DOMAIN_PAUSED = 3
+    VIR_DOMAIN_PMSUSPENDED = 7
+    VIR_DOMAIN_SHUTOFF = 5
+    VIR_DOMAIN_CRASHED = 6
+
+
+class _FakeDomain:
+    def __init__(self, instance_uuid, state=_FakeLibvirtModule.VIR_DOMAIN_RUNNING,
+                 error=None):
+        self._name = f'sf:{instance_uuid}'
+        self._state = state
+        self._error = error
+
+    def name(self):
+        return self._name
+
+    def state(self):
+        if self._error:
+            raise self._error
+        return self._state, 0
+
+
+class SideChannelMonitorAuditTestCase(base.ShakenFistTestCase):
+    """The audit pass's walk over this node's running domains."""
+
+    def _running(self, domains):
+        lc = util_libvirt.LibvirtConnection()
+        lc.libvirt = _FakeLibvirtModule()
+        lc.get_active_sf_domains = mock.Mock(return_value=domains)
+        m = sidechannel.Monitor.__new__(sidechannel.Monitor)
+        return m._running_instance_uuids(lc)
+
+    def test_running_domains_are_listed_and_stopped_ones_are_not(self):
+        self.assertEqual(['a'], self._running([
+            _FakeDomain('a'),
+            _FakeDomain('b', state=_FakeLibvirtModule.VIR_DOMAIN_PAUSED)]))
+
+    def test_a_domain_deleted_mid_audit_is_skipped_not_raised(self):
+        """A delete can undefine a domain between the listing and the state
+        read. The domains after it must still be audited."""
+        gone = _FakeLibvirtError(
+            'Domain not found', _FakeLibvirtModule.VIR_ERR_NO_DOMAIN)
+        self.assertEqual(['b'], self._running([
+            _FakeDomain('a', error=gone), _FakeDomain('b')]))
+
+    def test_other_libvirt_errors_still_end_the_pass(self):
+        broken = _FakeLibvirtError(
+            'internal error', _FakeLibvirtModule.VIR_ERR_INTERNAL_ERROR)
+        self.assertRaises(_FakeLibvirtError, self._running, [
+            _FakeDomain('a', error=broken), _FakeDomain('b')])

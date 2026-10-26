@@ -45,6 +45,13 @@ class FakeLibvirtError(Exception):
     `except libvirtError` handlers would swallow every error, including the
     ones these tests exist to see."""
 
+    def __init__(self, message, code=1):
+        super().__init__(message)
+        self.code = code
+
+    def get_error_code(self):
+        return self.code
+
 
 class FakeLibvirt:
     VIR_DOMAIN_BLOCKED = 1
@@ -76,6 +83,11 @@ class FakeLibvirt:
     VIR_DOMAIN_DISK_ERROR_NONE = 0
     VIR_DOMAIN_DISK_ERROR_UNSPEC = 1
     VIR_DOMAIN_DISK_ERROR_NO_SPACE = 2
+
+    # libvirt's virErrorNumber values.
+    VIR_ERR_INTERNAL_ERROR = 1
+    VIR_ERR_NO_DOMAIN = 42
+    VIR_ERR_OPERATION_INVALID = 55
 
     libvirtError = FakeLibvirtError
 
@@ -154,7 +166,8 @@ class FakeLibvirtConnection:
         for domain in self.listAllDomains(0):
             if domain.name() == name:
                 return domain
-        raise FakeLibvirtError(f'Domain not found: no domain with name {name}')
+        raise FakeLibvirtError(f'Domain not found: no domain with name {name}',
+                               code=FakeLibvirt.VIR_ERR_NO_DOMAIN)
 
     def close(self):
         pass
@@ -1270,6 +1283,44 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
             [('lock', detected), ('unlock', detected),
              ('lock', already_off), ('unlock', already_off)],
             self.locks.events)
+
+    def _run_with_domain_error(self, error):
+        """Run a pass where clearing one domain's autostart raises error,
+        returning the cleaner's log and the other domain's uuid."""
+        failing = self._inactive_instance()
+        other = self._inactive_instance()
+        real_set_autostart = FakeLibvirtDomain.setAutostart
+
+        def set_autostart(domain, flag):
+            if domain.name() == f'sf:{failing}':
+                raise error
+            return real_set_autostart(domain, flag)
+
+        with mock.patch.object(FakeLibvirtDomain, 'setAutostart',
+                               autospec=True, side_effect=set_autostart), \
+                mock.patch.object(cleaner_st, 'LOG') as mock_log:
+            self._run()
+        return mock_log.with_fields.return_value, other
+
+    def test_domain_deleted_mid_pass_is_not_a_warning(self):
+        """A delete which undefines a domain after the pass listed it is the
+        delete finishing, not a failure to report."""
+        log, other = self._run_with_domain_error(FakeLibvirtError(
+            'Domain not found', code=FakeLibvirt.VIR_ERR_NO_DOMAIN))
+
+        log.warning.assert_not_called()
+        log.debug.assert_any_call(
+            'Inactive domain went away during this pass: Domain not found')
+        self.assertEqual('off', self._power_state(other))
+
+    def test_other_per_domain_libvirt_errors_are_warnings(self):
+        log, other = self._run_with_domain_error(
+            FakeLibvirtError('setAutostart failed'))
+
+        log.warning.assert_called_once_with(
+            'Failed to update inactive domain, skipping it this pass: '
+            'setAutostart failed')
+        self.assertEqual('off', self._power_state(other))
 
     def test_virsh_failure_skips_only_that_domain(self):
         """A failure which is not a libvirt error, such as the virsh
