@@ -360,7 +360,7 @@ table entirely (decision D8).
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started | — |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
-| 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | In progress | — |
+| 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654) |
 | 7b. Capacity and claim views in sf-client | `PLAN-scheduler-reservations-phase-07b-client-views.md` (in shakenfist/client-python, branch `scheduler-reservations-phase-07b-client-views`; a relative link cannot cross repositories, so it is named rather than linked) | Not started | — |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started | — |
 | 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started | — |
@@ -608,16 +608,18 @@ is here.
   phases sit ahead of them. Neither depends on phase 5, and 7b
   needs nothing from 7a, so the two can run in parallel.
 
-- **Phase 7a**'s server half was implemented on 2026-10-25.
+- **Phase 7a** merged as #4654 on 2026-10-26, with its client verb
+  in client-python#438.
   - **What it adds:** a `GetClusterCapacity` read, `cluster_capacity`
     and `excluded` in `/admin/resources`, the `GET /admin/claims`
     listing with a SQL-side `coverage_state` filter, and three
     capability tokens.
-  - **Client verb:** client-python#438. It must merge before the
-    shakenfist pull request's merge-queue run, because cluster CI
-    builds the client from `develop`.
-  - **Deferred:** step 8, the `sf-client` readers, waits on 7b's
-    `node capacity` command.
+  - **Client verb:** client-python#438, merged first, because
+    cluster CI builds the client from `develop`.
+  - **Moved to 7b:** step 8, the `sf-client` readers, needs 7b's
+    `node capacity` command, so it became 7b's last step rather
+    than holding 7a open (decided 2026-10-27). 7a's tokens and
+    response shapes are what that step reads.
   - **Phase 5 has two keys to carry:** its rewrite of the admin view
     must keep `cluster_capacity` and `excluded` (see the phase 5
     stub). The Execution notes in the phase plan record the two
@@ -1074,8 +1076,13 @@ repository's functional tests. Nothing in 7b needs 7a.
 *Corrected by the phase 7b survey (2026-10-20):* this stub first
 put 7a's client reader in 7b, gated on 7a's tokens. The phase
 plan's D7 moves that work into 7a, whose plan designs the shapes
-it reads. The second bullet below is kept as a record and is not
-7b's scope.
+it reads.
+
+*Corrected again on 2026-10-27:* 7a merged with that reader as its
+deferred step 8, which needed 7b's `node capacity` to render
+into. Rather than hold 7a open across a client phase, the reader
+moved back to 7b as its last step, now that 7a's shapes are
+fixed. The second bullet below is 7b's scope again.
 
 * *Needs nothing from 7a:* a command that renders
   `/admin/resources` per node. The command name and its home
@@ -1091,7 +1098,7 @@ it reads. The second bullet below is kept as a record and is not
   phase 7's tokens. Add `peak_used_*` to `namespace claim show`.
   Add daemon states, which `Node.external_view()` already
   returns, to `node show`.
-* *Gated on 7a, and moved to 7a:* the cluster claims ledger on
+* *Gated on 7a's tokens, and back in 7b:* the cluster claims ledger on
   the capacity view, showing total, claimed, unclaimed used and
   what remains claimable; a cross-namespace `claim list`; and the
   excluded hypervisors with their reasons.
