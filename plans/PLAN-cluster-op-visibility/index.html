@@ -16029,18 +16029,18 @@ every consumer, so that:</p>
 <td>4. API surface: has_pending_operations and truthful outstanding ops</td>
 <td><a href="../PLAN-cluster-op-visibility-phase-04-api-surface/">PLAN-cluster-op-visibility-phase-04-api-surface.md</a></td>
 <td>Complete</td>
-<td><code>3642e7a75</code> (#4606), <code>bdc91db78</code> (#4617)</td>
+<td><code>3642e7a75</code> (#4606), <code>bdc91db78</code> (#4617), client-python <code>fdcfe6e53</code> (#436)</td>
 </tr>
 <tr>
 <td>5. CI helper simplification, functional coverage, documentation</td>
 <td><a href="../PLAN-cluster-op-visibility-phase-05-coverage-docs/">PLAN-cluster-op-visibility-phase-05-coverage-docs.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>93c31035a</code> (#4650)</td>
 </tr>
 <tr>
 <td>6. Push audit</td>
-<td>PLAN-cluster-op-visibility-phase-06-push-audit.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-cluster-op-visibility-phase-06-push-audit/">PLAN-cluster-op-visibility-phase-06-push-audit.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 </tbody>
@@ -16062,7 +16062,9 @@ audit reads that one range for both.</p>
 which removed a duplicate <code>runs_after</code> entry its automated review
 found after #4606 had entered the merge queue. The audit reads both
 ranges. Its client accessors landed separately, in
-<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/436" title="GitHub Issue: shakenfist/client-python #436">client-python#436</a>.</p>
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/436" title="GitHub Issue: shakenfist/client-python #436">client-python#436</a> (<code>fdcfe6e53</code>). That repository has no
+<code>PUSH-AUDIT.md</code> and #436 was never audited, so this plan's audit reads
+it too, as a contract rather than as code to change.</p>
 <h3 id="phase-1b-atomic-cluster_operation_targets-writes-done-in-the-phase-1-pr">Phase 1b: Atomic cluster_operation_targets writes (done, in the phase 1 PR)<a class="headerlink" href="#phase-1b-atomic-cluster_operation_targets-writes-done-in-the-phase-1-pr" title="Permanent link">&para;</a></h3>
 <p>Discovered while verifying phase 1 in CI. Even with the
 by-target endpoint fixed, <code>test_interface_plug_and_exec_dhcp</code>
@@ -16303,13 +16305,63 @@ original outline follows.</p>
   for the new column and field, <code>docs/plans/index.md</code>
   status updates.</li>
 </ul>
-<h3 id="phase-6-push-audit">Phase 6: Push audit<a class="headerlink" href="#phase-6-push-audit" title="Permanent link">&para;</a></h3>
+<h3 id="phase-6-push-audit-plan-at-medium-effort">Phase 6: Push audit (plan at medium effort)<a class="headerlink" href="#phase-6-push-audit-plan-at-medium-effort" title="Permanent link">&para;</a></h3>
+<p>See <a href="../PLAN-cluster-op-visibility-phase-06-push-audit/">the phase 6
+plan</a>. Its survey
+found the six ranges sound, and found the client half of phase 4 never
+audited, so it adds client-python #436 to the scope. It adds one heading
+of its own, on whether every place that applies the observational and
+pending rules agrees. None of the Future work entries below has an
+issue, and the audit's disposition gives each one an issue or a reason.
+The original outline follows.</p>
 <p>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every
 phase in this plan against <code>develop</code>, not the last phase's
 diff alone. Findings land as their own pull request, and
 the plan is not complete until each is resolved or declined
 in writing here. If the audit finds nothing, that is
 recorded in one sentence.</p>
+<h4 id="audit-of-phases-1-to-5">Audit of phases 1 to 5<a class="headerlink" href="#audit-of-phases-1-to-5" title="Permanent link">&para;</a></h4>
+<p>Run on 2026-10-26 over the six merges and client-python #436. The full
+record is in the Findings section of <a href="../PLAN-cluster-op-visibility-phase-06-push-audit/">the phase 6
+plan</a>. The audit
+covered wave 1, all four judgment reviews, a check that the
+observational and pending rules agree everywhere, and the client
+contract.</p>
+<ul>
+<li>Wave 1 passed: 6,216 tests and no failures. The stubs are fresh, and
+  mermaid renders.</li>
+<li><strong>One finding is blocking</strong>, #4665. A release note says a failing
+  billing or health task still errors its instance, which #4608 made
+  false. It is fixed in a follow-up pull request, together with ten
+  one-line documentation and comment corrections (A1-A10 in the
+  disposition table). That pull request also carries this phase's
+  close-out.</li>
+<li><strong>Advisory findings filed:</strong></li>
+<li>
+<h1 id="4666-the-artifact-listing-shows-instance-uuids-to-shared-and">4666, the artifact listing shows instance uuids to shared and<a class="headerlink" href="#4666-the-artifact-listing-shows-instance-uuids-to-shared-and" title="Permanent link">&para;</a></h1>
+<p>trusted readers (low severity);</p>
+</li>
+<li>
+<h1 id="4667-the-two-listings-diverge-and-are-unbounded">4667, the two listings diverge and are unbounded;<a class="headerlink" href="#4667-the-two-listings-diverge-and-are-unbounded" title="Permanent link">&para;</a></h1>
+</li>
+<li>
+<h1 id="4668-the-in-flight-state-list-in-four-places">4668, the in-flight state list in four places;<a class="headerlink" href="#4668-the-in-flight-state-list-in-four-places" title="Permanent link">&para;</a></h1>
+</li>
+<li>
+<h1 id="4669-coverage-gaps">4669, coverage gaps;<a class="headerlink" href="#4669-coverage-gaps" title="Permanent link">&para;</a></h1>
+</li>
+<li>
+<h1 id="4670-task-level-against-operation-level-observational-checks">4670, task-level against operation-level observational checks.<a class="headerlink" href="#4670-task-level-against-operation-level-observational-checks" title="Permanent link">&para;</a></h1>
+</li>
+<li><strong>The client half</strong>, filed as client-python #439, #440 and #441. In
+  particular, <code>await_no_pending_operations()</code> returns a deleted object
+  as settled.</li>
+<li><strong>Predating problems, filed as issues rather than findings:</strong> #4671,
+  #4672, #4673, #4674 and #4675. A note for whoever fixes #3922 is on
+  that issue.</li>
+<li><strong>The rule-coherence check</strong> found no reachable divergence beyond the
+  documented rolling-upgrade case.</li>
+</ul>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the
@@ -16347,7 +16399,9 @@ sub-agents can work directly in the main tree.</p>
 summaries above: phases 2 and 4 (schema design, cross-daemon
 protocol changes, API semantics) at high effort; phases 1, 3
 and 5 (well-understood test changes, a classification sweep
-with a clear rubric, docs) at medium effort.</p>
+with a clear rubric, docs) at medium effort. Phase 6, the push
+audit, was planned at medium effort; its judgment steps carry
+their own effort levels.</p>
 <h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
 <p>Each phase plan should include a step table using this
 format:</p>
@@ -16443,7 +16497,7 @@ because the following statements will be true:</p>
   consult <code>has_pending_operations</code> instead of any remaining
   last-op reads (audit for other legacy readers of
   <code>last_cluster_operation</code> beyond the six <code>runs_after</code>
-  sites). <em>(Audited in phase 4: nothing in the scheduler or
+  sites). <em>(Filed as #4673 by the push audit.)</em> <em>(Audited in phase 4: nothing in the scheduler or
   cleaner reads the pointer. Its readers are the three views
   and the six <code>runs_after</code> sites, one of which, in
   <code>Network.new()</code>, always sees <code>None</code>. The four that phase 4
@@ -16455,21 +16509,26 @@ because the following statements will be true:</p>
   phase 4 plan.)</em></li>
 <li><code>/clusteroperations?all=true</code> pagination if history size
   becomes a practical problem. It is bounded by the seven-day
-  target-row retention, mostly by errored ops (#3922).</li>
+  target-row retention, mostly by errored ops (#3922). <em>(Filed with
+  the listings' divergence as #4667 by the push audit.)</em></li>
 <li>If <code>HasPendingClusterOperationTarget</code> from sf-api becomes a
   real load problem, one RPC answering both latest and pending
   for an object would keep each view at today's query count.
   Phase 4 measured the field at about 2.5 requests a second on
-  sfcbr.</li>
+  sfcbr. <em>(Stays an idea: the push audit found the list endpoints
+  multiply it by N, which is still not a measured problem.)</em></li>
 <li>Interfaces are targets of hot-plug ops but carry neither
-  <code>last_cluster_operation</code> nor <code>has_pending_operations</code>.</li>
+  <code>last_cluster_operation</code> nor <code>has_pending_operations</code>. <em>(Stays an
+  idea: no consumer has asked for it.)</em></li>
 <li>The per-blob sweep's duplicate guard could pass
   <code>pending_only=True</code> (added in phase 4) instead of hydrating
-  every target row. Its load is negligible today.</li>
+  every target row. Its load is negligible today. <em>(Stays an idea, for
+  that reason.)</em></li>
 <li>The 15-second enqueue-to-execution latency observed for the
   <code>user_waiting</code> hot-plug chain in CI (dependency deferral
   polling cadence) is worth a separate look — it is latency,
-  not correctness, but user-visible.</li>
+  not correctness, but user-visible. <em>(Stays an idea: it belongs to
+  the queue performance work, not this plan.)</em></li>
 <li>
 <h1 id="4585-a-failing-billing-or-kvm-health-check-task-moves-a">4585: a failing billing or KVM health check task moves a<a class="headerlink" href="#4585-a-failing-billing-or-kvm-health-check-task-moves-a" title="Permanent link">&para;</a></h1>
   healthy instance to <code>created-error</code>, because
@@ -16487,13 +16546,15 @@ because the following statements will be true:</p>
   of the phase 5 plan).</li>
 <li>An agent operation's preflight (<code>node_aop_op</code>) targets only the
   agent operation, not its instance, so an instance delete never
-  cancels a pending one. Found in phase 4; it predates this plan.</li>
+  cancels a pending one. Found in phase 4; it predates this plan.
+  <em>(Filed as #4672 by the push audit.)</em></li>
 <li><code>Instance.enqueue_delete()</code> fails open: the target listing it
   walks returns <code>[]</code> on a database error, so the delete aborts
   nothing and waits for no snapshot. A variant of the listing which
   raises, so the delete is refused or retried instead, would make
   the snapshot guarantee hold. Found by the automated review of
-  phase 4; the pointer walk it replaced failed the same way.</li>
+  phase 4; the pointer walk it replaced failed the same way.
+  <em>(Filed as #4671 by the push audit.)</em></li>
 <li>Issue #3278 (CI and test coverage backlog) may want a note
   about the deflaked helper pattern. <em>(Declined in phase 5: the
   pattern is documented in <code>docs/developer_guide/ci.md</code>, where a
