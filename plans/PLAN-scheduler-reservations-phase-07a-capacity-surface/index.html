@@ -16202,18 +16202,18 @@ plan was written.</p>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>grep -c "rpc GetClusterCapacity" protos/database.proto</code>
       returns 1. It returns 0 today.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Step 1's live test passes against MariaDB in CI. It shows
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Step 1's live test passes against MariaDB in CI. It shows
       that a claim and an unclaimed placement of exactly
       <code>unallocated_cpus</code> are admitted, and <code>+1</code> is refused, for
       each. Changing <code>_cluster_unallocated()</code> by one breaks it,
       which the management session checks with a local mutation
       (the <code>mutation-check</code> skill).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> On every cluster topology, <code>/admin/resources</code> carries
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> On every cluster topology, <code>/admin/resources</code> carries
       <code>cluster_capacity</code> with <code>row_present</code> true, and
       <code>unallocated_&lt;dim&gt; == total - claimed - unclaimed_used</code> in
       the same response. This is asserted by step 6, not by
       reading the code.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> On every cluster topology, every active hypervisor is in
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> On every cluster topology, every active hypervisor is in
       exactly one of <code>per_node</code> or <code>excluded</code>, asserted by step 6.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A hypervisor with a stale metrics row appears in <code>excluded</code>
       with reason <code>stale metrics</code>, asserted by step 3's unit test.
@@ -16238,10 +16238,11 @@ plan was written.</p>
       <code>CLAIM_ENFORCEMENT_HARD</code>, and adds no line inside
       <code>find_candidates()</code>. The management session verifies this
       by reading the diff and states it in the Outcome.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Client-python: <code>get_cluster_claims</code> exists on <code>develop</code>
-      (step 5), and <code>sf-client node capacity</code> against an <code>excluded</code>
-      fixture prints each node's reason instead of 7b's D4 sentence
-      (step 8).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Client-python: <code>get_cluster_claims</code> exists on <code>develop</code>
+      (step 5). The second half, <code>sf-client node capacity</code> against
+      an <code>excluded</code> fixture printing each node's reason instead of
+      7b's D4 sentence, moved to 7b with step 8 and is 7b's to
+      check.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> passes in both repositories,
       including <code>check-plan-status.py</code> and <code>check-doc-anchors.py</code>
       here.</li>
@@ -16300,8 +16301,9 @@ server stays the only validator.</p>
 than a sub-agent, because it records reviews and decisions held in
 that session.</p>
 <h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>The server half is implemented. Steps 1 to 4, 6, 7 and 9 are on
-this branch. Step 5 is <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/438" title="GitHub Issue: shakenfist/client-python #438">client-python#438</a>, and step 8 is deferred.</p>
+<p>Merged as #4654 (<code>e8585a874</code>) on 2026-10-26, after <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/438" title="GitHub Issue: shakenfist/client-python #438">client-python#438</a>
+(step 5). Step 8 moved to phase 7b on 2026-10-27; see <em>Deferred</em>
+below.</p>
 <table>
 <thead>
 <tr>
@@ -16383,21 +16385,26 @@ unbudgeted <code>GetSchedulerNodeCapacity</code> read, which placement makes as
 well. So the new pair can never be faster than that one, and cannot
 trip the fixed-rate check unless that one trips first. The budget
 was not changed, and merge CI is the confirmation.</p>
-<p><strong>Deferred:</strong>
-- Step 8 waits on 7b's step 4 (<code>sf-client node capacity</code>). It is
-  recorded as a <code>plan-blockers</code> note on this plan, and its own
-  floor audit belongs to its client pull request.
+<p><strong>Moved to 7b:</strong>
+- Step 8 needs 7b's step 4 (<code>sf-client node capacity</code>) to render
+  into. Rather than hold this phase open across a client phase,
+  it became 7b's last step, with its brief unchanged. Its floor
+  audit belongs to that client pull request.
 - <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/438" title="GitHub Issue: shakenfist/client-python #438">client-python#438</a>'s review asked for <code>docs/namespace-claims.md</code>
-  to cover cluster-wide listing. That page change is step 8's,
-  since there is no CLI behaviour to document yet.</p>
-<p><strong>Definition of done:</strong> four items are open.
-- <strong>Two need a cluster CI run:</strong> the <code>cluster_capacity</code> and the
-  exactly-one-of assertions on every topology. Those tests are
-  written, but cluster CI has not run them yet.
-- <strong>The live tests have not run in CI yet.</strong> Locally, against
-  MariaDB 10.11, all 118 capacity live tests passed.
-- <strong>The client item waits on two things:</strong> <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/438" title="GitHub Issue: shakenfist/client-python #438">client-python#438</a>
-  merging, and step 8.</p>
+  to cover cluster-wide listing. That page change goes with step
+  8, since there is no CLI behaviour to document until then.</p>
+<p><strong>Definition of done:</strong> every item is met, on this evidence.
+- <strong>Live tests:</strong> the <code>Schema ENUM widening</code> job of merge run
+  40268867051 ran both capacity live modules and reported "Live
+  MariaDB tests passed."
+- <strong>The two cluster assertions:</strong> <code>test_cluster_resources_capacity_surface</code>
+  and <code>test_claim_appears_in_cluster_listing</code> passed on the Debian
+  13 cluster lane of that run, and that lane has passed in the
+  five merge groups that ran it since. It is the only cluster lane
+  merge CI runs: Ubuntu 24.04 cluster was skipped in all of those
+  groups, so it has not run these tests yet.
+- <strong>The client item:</strong> <code>get_cluster_claims</code> is on client-python
+  <code>develop</code>. Its <code>node capacity</code> half moved to 7b with step 8.</p>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, please back brief the
 operator as to your understanding of the plan and how the work you

@@ -16341,8 +16341,8 @@ table entirely (decision D8).</p>
 <tr>
 <td>7a. An operator-readable capacity surface</td>
 <td><a href="../PLAN-scheduler-reservations-phase-07a-capacity-surface/">PLAN-scheduler-reservations-phase-07a-capacity-surface.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>e8585a874</code> (#4654)</td>
 </tr>
 <tr>
 <td>7b. Capacity and claim views in sf-client</td>
@@ -16600,17 +16600,19 @@ is here.</p>
   needs nothing from 7a, so the two can run in parallel.</p>
 </li>
 <li>
-<p><strong>Phase 7a</strong>'s server half was implemented on 2026-10-25.</p>
+<p><strong>Phase 7a</strong> merged as #4654 on 2026-10-26, with its client verb
+  in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/438" title="GitHub Issue: shakenfist/client-python #438">client-python#438</a>.</p>
 </li>
 <li><strong>What it adds:</strong> a <code>GetClusterCapacity</code> read, <code>cluster_capacity</code>
     and <code>excluded</code> in <code>/admin/resources</code>, the <code>GET /admin/claims</code>
     listing with a SQL-side <code>coverage_state</code> filter, and three
     capability tokens.</li>
-<li><strong>Client verb:</strong> <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/438" title="GitHub Issue: shakenfist/client-python #438">client-python#438</a>. It must merge before the
-    shakenfist pull request's merge-queue run, because cluster CI
-    builds the client from <code>develop</code>.</li>
-<li><strong>Deferred:</strong> step 8, the <code>sf-client</code> readers, waits on 7b's
-    <code>node capacity</code> command.</li>
+<li><strong>Client verb:</strong> <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/438" title="GitHub Issue: shakenfist/client-python #438">client-python#438</a>, merged first, because
+    cluster CI builds the client from <code>develop</code>.</li>
+<li><strong>Moved to 7b:</strong> step 8, the <code>sf-client</code> readers, needs 7b's
+    <code>node capacity</code> command, so it became 7b's last step rather
+    than holding 7a open (decided 2026-10-27). 7a's tokens and
+    response shapes are what that step reads.</li>
 <li><strong>Phase 5 has two keys to carry:</strong> its rewrite of the admin view
     must keep <code>cluster_capacity</code> and <code>excluded</code> (see the phase 5
     stub). The Execution notes in the phase plan record the two
@@ -17053,8 +17055,12 @@ repository's functional tests. Nothing in 7b needs 7a.</p>
 <p><em>Corrected by the phase 7b survey (2026-10-20):</em> this stub first
 put 7a's client reader in 7b, gated on 7a's tokens. The phase
 plan's D7 moves that work into 7a, whose plan designs the shapes
-it reads. The second bullet below is kept as a record and is not
-7b's scope.</p>
+it reads.</p>
+<p><em>Corrected again on 2026-10-27:</em> 7a merged with that reader as its
+deferred step 8, which needed 7b's <code>node capacity</code> to render
+into. Rather than hold 7a open across a client phase, the reader
+moved back to 7b as its last step, now that 7a's shapes are
+fixed. The second bullet below is 7b's scope again.</p>
 <ul>
 <li><em>Needs nothing from 7a:</em> a command that renders
   <code>/admin/resources</code> per node. The command name and its home
@@ -17070,7 +17076,7 @@ it reads. The second bullet below is kept as a record and is not
   phase 7's tokens. Add <code>peak_used_*</code> to <code>namespace claim show</code>.
   Add daemon states, which <code>Node.external_view()</code> already
   returns, to <code>node show</code>.</li>
-<li><em>Gated on 7a, and moved to 7a:</em> the cluster claims ledger on
+<li><em>Gated on 7a's tokens, and back in 7b:</em> the cluster claims ledger on
   the capacity view, showing total, claimed, unclaimed used and
   what remains claimable; a cross-namespace <code>claim list</code>; and the
   excluded hypervisors with their reasons.</li>
