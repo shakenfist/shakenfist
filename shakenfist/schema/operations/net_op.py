@@ -49,8 +49,8 @@ class model_tasks(Enum):
 
 
 # Tasks for which N pending ops sharing a coalescing key can be
-# folded into a single execution by the worker (step 4) or skipped at
-# enqueue time (step 5):
+# folded into a single execution by the worker or skipped at
+# enqueue time:
 #
 # * ``network_apply_update_dnsmasq`` regenerates the dnsmasq config
 #   from current DB state. Six instance starts on the same network
@@ -91,14 +91,17 @@ class model_tasks(Enum):
 # sites in the network maintainer pass it -- and that family is what
 # puts the operation on ``{node_uuid}-network-*``, drained by that
 # node's own sf-net dispatcher, within which every operation for a
-# network hashes to a single worker thread. So a fold can never mark
-# complete an operation another thread is executing. The default
-# ``clusteroperation`` family routes per-node queues to sf-queues
-# instead, which starts one worker per claimed item with no routing
-# key at all: two of its workers can hold two operations for the same
-# (network, node) at once, and one's fold can flip the other's
-# operation to ``complete`` mid-dequeue. A coalescible task on that
-# family would be unsafe however wide the key. Both guards refuse it
+# network hashes to a single worker thread. So a fold never claims an
+# operation another thread is running, and a sibling the survivor
+# leaves ``executing`` is run by sf-net when its own work item comes
+# up. The default ``clusteroperation`` family routes per-node queues
+# to sf-queues instead, which starts one worker per claimed item with
+# no routing key at all, so two of its workers can hold two operations
+# for the same (network, node) at once and one's fold can claim the
+# other's mid-dequeue. sf-queues also drops any operation it dequeues
+# which is not ``queued``, so a folded sibling there is never run if
+# its survivor fails. A coalescible task on that family would be
+# unsafe however wide the key. Both guards refuse it
 # -- ``InvalidCoalescibleEnqueue`` below at enqueue time, and
 # ``BaseClusterOperation.execute``'s ``key_cannot_distinguish_queue``
 # at fold time -- but the reason they do is here. The argument in
@@ -251,12 +254,12 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
     # intentionally distinct from a bare reconciliation enqueue, and
     # collapsing them would erase the ordering constraint the caller
     # encoded. See ``BaseClusterOperation.execute``'s cross-op fold
-    # (worker-side dedup, step 4) for the safety net that catches the
+    # (the worker-side dedup) for the safety net that catches the
     # race where two callers both miss the lookup.
     #
     # Neither the enqueue-side dedup below nor the worker-side fold in
     # ``BaseClusterOperation.execute`` keys on the queue: the dedup
-    # query and ``claim_coalescible_siblings`` both match on
+    # query and ``fold_coalescible_siblings`` both match on
     # (op_type, COALESCIBLE_KEY_COLUMNS, task, state), and
     # ``cluster_operations`` has no queue column to filter on. The key
     # therefore has to do the queue's job, and it only does so for a
@@ -293,7 +296,7 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
         # not partition at all. A node-aware key on a sf-queues queue
         # would let two workers on the same node hold two operations
         # for the same (network, node) at once, and one worker's fold
-        # could then mark the other's operation complete between its
+        # could then claim the other's operation between its
         # queued-state check and its own transition to executing.
         key_distinguishes_target = (
             'node_uuid' in COALESCIBLE_KEY_COLUMNS

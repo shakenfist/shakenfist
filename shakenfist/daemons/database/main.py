@@ -393,6 +393,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         ``FindExistingCoalescibleOpV2``. See
         ``mariadb._direct_claim_coalescible_siblings`` for the safety
         guards.
+
+        Siblings still go to ``complete`` here, before the survivor has
+        done their work, because that is what clients predating
+        ``FoldCoalescibleSiblings`` expect. No current client calls it;
+        its retirement is #4639.
         """
         try:
             self.monitor.counters['claim_coalescible_siblings_v2'].inc()
@@ -407,6 +412,36 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database ClaimCoalescibleSiblingsV2 failed', e)
+            return database_pb2.ClaimCoalescibleSiblingsReply(
+                folded_op_uuids=[])
+
+    def FoldCoalescibleSiblings(
+        self,
+        request: database_pb2.ClaimCoalescibleSiblingsV2Request,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ClaimCoalescibleSiblingsReply:
+        """Fold sibling pending coalescible ops to ``executing``.
+
+        Matches exactly what ``ClaimCoalescibleSiblingsV2`` matches, with
+        the same request, but moves each sibling to ``executing`` with a
+        message naming the survivor rather than to ``complete``. The
+        survivor completes them once its own tasks have succeeded, so a
+        sibling never reads as done before its work is (#4638). See
+        ``mariadb._direct_claim_coalescible_siblings``.
+        """
+        try:
+            self.monitor.counters['fold_coalescible_siblings'].inc()
+            folded = mariadb._direct_fold_coalescible_siblings(
+                request.operation_type,
+                [(k.column, None if k.is_null else k.uuid)
+                 for k in request.keys],
+                list(request.task_names),
+                request.exclude_op_uuid)
+            return database_pb2.ClaimCoalescibleSiblingsReply(
+                folded_op_uuids=folded)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FoldCoalescibleSiblings failed', e)
             return database_pb2.ClaimCoalescibleSiblingsReply(
                 folded_op_uuids=[])
 
@@ -6519,6 +6554,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'find_existing_coalescible_op',
             'claim_coalescible_siblings_v2',
             'find_existing_coalescible_op_v2',
+            'fold_coalescible_siblings',
             'acquire_lock', 'release_lock', 'refresh_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks',
             'get_cluster_config', 'get_cluster_config_value',

@@ -64,8 +64,24 @@ class Job(util_concurrency.Job):
         #   3. The cross-op coalescing fold in BaseClusterOperation.execute()
         #      only claims sibling ops with the same target, which by (1)
         #      route to the same worker *within this process* -- so a fold
-        #      can never mark an op complete while another thread here is
-        #      executing it.
+        #      never claims an op another thread here is running, and the
+        #      survivor never completes one either.
+        #
+        #      The fold moves each sibling from queued to executing, and
+        #      the survivor moves them on to complete only after its own
+        #      tasks have succeeded. On any other outcome -- an error, a
+        #      defer back to queued, an exception, a crash -- the siblings
+        #      are left executing, each with the work_queue row the fold
+        #      never touched. When that row is dequeued here the sibling
+        #      runs itself, because _cluster_operation_execute() skips
+        #      only terminal states and a transition to executing from
+        #      executing is a no-op. So a sibling's final state is always
+        #      a real outcome, and nothing waiting on it is released before
+        #      the work is done (#4638). That makes "sf-net re-runs an op it
+        #      dequeues in executing" part of this invariant: treat
+        #      executing as terminal there and every folded sibling of a
+        #      survivor which failed is stranded until the orphan reaper
+        #      errors it.
         #
         #      Note what (1) does NOT give you: routing is per-process, so
         #      two ops with the same target on two different queues are
@@ -102,29 +118,52 @@ class Job(util_concurrency.Job):
         #           anywhere, because the only thread which could be
         #           executing it is the one doing the folding.
         #
-        #      Both guards enforcing this are key-aware, not queue-aware:
+        #           The links do not all cost the same to break. Without
+        #           (i), (ii) or (iii) a fold claims another node's
+        #           operation, and a survivor which succeeds marks it
+        #           complete with that node's work undone -- the
+        #           cross-node fold. Without (iv) two threads here run the
+        #           same idempotent work at once, which wastes effort but
+        #           loses nothing: the sibling is never complete unless a
+        #           run of its work succeeded. A dispatcher restart breaks
+        #           (iv) for a moment today, because the old workers can
+        #           outlive it, and per-target ordering with it (#4645).
+        #
+        #      Both guards enforcing this are key-aware and family-aware:
         #      InvalidCoalescibleEnqueue in schema/operations/net_op.py
-        #      refuses the enqueue, and BaseClusterOperation.execute()
-        #      records key_cannot_distinguish_queue and skips the fold.
-        #      Weaken either only by strengthening the key, never by
-        #      arguing from this invariant alone -- link (iv) is this
-        #      invariant, and it is one link of four.
+        #      refuses the enqueue unless the key names node_uuid and the
+        #      family is 'network', and BaseClusterOperation.execute()
+        #      records key_cannot_distinguish_queue and skips the fold
+        #      unless the queue is {node_uuid}-network-*. A key naming
+        #      node_uuid is necessary but not sufficient: the queue family
+        #      decides which dispatcher drains the work. The same two
+        #      guards are also what keep every foldable operation off
+        #      sf-queues, below. Weaken neither by arguing from this
+        #      invariant alone -- link (iv) is this invariant, and it is
+        #      one link of four.
         #
         #      The argument does NOT extend to sf-queues, and that is a
-        #      deliberate limit rather than an oversight. sf-queues is a
-        #      WorkerPoolDaemon: it fills its spare slots from a single
-        #      dequeue_work_items() call (shakenfist/daemons/daemon.py)
-        #      and starts one worker per claimed item, with no routing key
-        #      and no per-target affinity, so link (iv) simply does not
-        #      exist there. Two of its workers can hold two ops for the
-        #      same (network, node) at once, and one's fold can flip the
-        #      other's op to complete in the window between that worker's
-        #      queued-state check and its own transition to executing --
-        #      for which state_targets has no edge. That is why
+        #      deliberate limit rather than an oversight. Every operation a
+        #      fold can claim has to be drained by sf-net, never by
+        #      sf-queues, because sf-queues drops any operation it dequeues
+        #      which is not queued. A folded sibling reaching it would be
+        #      dropped while still executing, and if the survivor then
+        #      failed nothing would ever run it: it would sit there until
+        #      the orphan reaper errored it. sf-queues is a
+        #      WorkerPoolDaemon as well: it fills its spare slots from a
+        #      single dequeue_work_items() call
+        #      (shakenfist/daemons/daemon.py) and starts one worker per
+        #      claimed item, with no routing key and no per-target
+        #      affinity, so link (iv) simply does not exist there. Two of
+        #      its workers can hold two ops for the same (network, node)
+        #      at once, and one's fold can claim the other's op in the
+        #      window between that worker's queued-state check and its own
+        #      transition to executing. That is why
         #      NodeNetOp.network_apply_create_hypervisor is not
         #      coalescible even though its model already carries both key
-        #      columns. The design record is in
-        #      docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
+        #      columns. Revisiting that is tracked in issue #4017, and
+        #      would mean teaching sf-queues to run an op it dequeues in
+        #      executing.
         #
         # Additionally each queue is drained by exactly ONE dispatcher
         # process: per-node {node_uuid}-network-* queues only by that node's
@@ -362,16 +401,22 @@ class Job(util_concurrency.Job):
 
     def _cluster_operation_execute(self, queue_name, op, batch_size,
                                    defer_delays):
+        # Executing is deliberately not here. An op dequeued in executing
+        # is a sibling a coalescing survivor folded and did not complete,
+        # because the survivor failed, deferred or died; running it now is
+        # the only way it reaches a real outcome. See property (3) of the
+        # safety invariant above.
         terminal_states = {
             BaseClusterOperation.STATE_ABORT,
             BaseClusterOperation.STATE_COMPLETE,
             dbo.STATE_DELETED,
             dbo.STATE_ERROR,
         }
-        if op.state.value in terminal_states:
+        state = op.state
+        if state.value in terminal_states:
             op.add_event(
                 EVENT_TYPE_AUDIT,
-                f'skipping op already in terminal state {op.state.value}')
+                f'skipping op already in terminal state {state.value}')
             self._drop_defer_entry(str(op.uuid), defer_delays)
             return
 
@@ -462,6 +507,16 @@ class Job(util_concurrency.Job):
         # this op chained onto a different dep) starts back at the initial
         # delay rather than carrying over the previous chain's depth.
         self._drop_defer_entry(str(op.uuid), defer_delays)
+        if state.value == BaseClusterOperation.STATE_EXECUTING:
+            # Its state row still says "coalesced into <survivor>", and
+            # execute() cannot refresh that because an unchanged state is
+            # never rewritten. Say here that this run is the op's own.
+            op.add_event(
+                EVENT_TYPE_AUDIT,
+                'running an op which was already executing, because the '
+                'survivor which folded it, or an earlier run, did not '
+                'complete it',
+                extra={'previous_state_message': state.message})
         start_time = time.time()
         op.execute()
         # The op may have transitioned to a terminal state during execute();

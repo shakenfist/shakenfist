@@ -639,9 +639,10 @@ and can be removed with `sudo ip netns delete <uuid>`.
 ## Dispatcher diagnostic events
 
 Operators reading the event log for a cluster operation will see two
-events emitted directly by the queue dispatcher (in addition to the
-operation-specific audit and mutate events emitted by the operation
-itself):
+events emitted directly by the queue dispatcher and one emitted at
+enqueue time (in addition to the operation-specific audit and mutate
+events emitted by the operation itself). The enqueue-side dedup event
+is emitted by the enqueuing process, not by the dispatcher:
 
 * **`execution duration`** (`EVENT_TYPE_USAGE`). Emitted when the
   dispatcher finishes running an op. Carries four fields in `extra`:
@@ -691,12 +692,21 @@ itself):
       multi-column), `type_not_coalescible` (this
       operation type declares no coalescing at all, which is every
       cluster operation that is not a `net_op` and so most of them)
-      or `no_coalescible_tasks` (a type which could have coalesced,
-      carrying nothing coalescible this time). The last two are
-      separate outcomes on purpose: merged, the boring case buries
-      the interesting one.
-    * `coalesce_seconds` — cost of the `claim_coalescible_siblings`
-      call, present only when the fold ran. Measured with a monotonic
+      `key_column_missing` (the coalescing key names a column the
+      operation does not have; the fold is skipped, an error is
+      logged, and this is a mis-declaration rather than a runtime
+      condition), `coalescing_unavailable` (the fold was attempted but
+      the `sf-database` on the other end predates the coalescing RPCs;
+      this is what you see during a rolling upgrade, the op still
+      runs and only the optimisation is lost until the upgrade
+      finishes) or `no_coalescible_tasks` (a type which could have
+      coalesced, carrying nothing coalescible this time).
+      `type_not_coalescible` and `no_coalescible_tasks` are separate
+      outcomes on purpose: merged, the boring case buries the
+      interesting one.
+    * `coalesce_seconds` — cost of the `fold_coalescible_siblings`
+      call, present when the call was attempted: outcomes `ran` and
+      `coalescing_unavailable`. Measured with a monotonic
       clock, so it is an interval rather than a difference of two wall
       clock readings.
     * `coalesce_folded` — how many siblings that call folded away,
@@ -721,8 +731,17 @@ itself):
   fields in `extra`:
     * `sibling_count` — how many siblings were folded.
     * `sibling_uuids` — their op uuids. Looking up any of those
-      will show their state as `complete` with the message
-      `coalesced into sibling op`.
+      while the survivor runs shows it `executing`, with the message
+      `coalesced into <survivor uuid>`. It moves to `complete`, with
+      the same message, only once the survivor's tasks have all
+      succeeded. If the survivor errored or deferred instead, the
+      sibling stays `executing` until its own work item comes up and
+      it runs itself, so its final state is always its own outcome.
+      A sibling sitting in `executing` behind a failed survivor is
+      therefore waiting its turn on the queue, not stuck. When its
+      turn comes its state message still names the survivor, so the
+      dispatcher records an audit event, "running an op which was
+      already executing", to mark the start of its own run.
     * `tasks` — which coalescible task(s) drove the fold.
 
   A burst of these on `network_apply_update_dnsmasq` is the
@@ -731,7 +750,7 @@ itself):
   during a CI run that's known to be enqueueing duplicate work
   would point at a bug in either the enqueue-side dedup
   (`mariadb.find_existing_coalescible_op`) or the worker-side fold
-  (`mariadb.claim_coalescible_siblings`).
+  (`mariadb.fold_coalescible_siblings`).
 
   Note that the worker-side fold also skips itself when the
   dispatcher just observed an empty queue
@@ -804,8 +823,7 @@ itself):
   carries both columns, is *not* coalescible: it is drained by
   `sf-queues`, where the per-worker-partitioning guarantee the
   argument rests on does not hold. See
-  [PLAN-queue-performance-phase-11-multi-column-key.md](../../plans/PLAN-queue-performance-phase-11-multi-column-key.md)
-  and #3884.
+  #3884.
 
 ### Reading these events back
 

@@ -29,7 +29,7 @@ stream for ``Added event`` finds nothing.
 The same event also carries the cross-op coalescing instrumentation, when
 the build which emitted it has any: ``coalesce_outcome`` (``ran``, or which
 of the three guards skipped the fold), ``coalesce_seconds`` (the wall clock
-cost of the ``claim_coalescible_siblings`` call) and ``coalesce_folded`` (how
+cost of the ``fold_coalescible_siblings`` call) and ``coalesce_folded`` (how
 many sibling operations that call folded away). ``BaseClusterOperation.execute``
 records them and both dispatchers copy them onto this event through
 ``op.execution_duration_extra``. Events without them are from a build

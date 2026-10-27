@@ -1008,9 +1008,10 @@ before #4007. Both are named as such. Sub-agents ran further searches of their o
 ("coalesce complete before", "rolling upgrade coalescing",
 "coalesced into sibling" and others), with the same result.
 
-A blocking finding remains open, so phase 12 and the plan stay In
-progress. The follow-up pull request fixes B1, A1, A2, A3 and R1's
-comment, and carries the close-out (decision 7).
+A blocking finding was open when the audit merged as PR #4646
+(`1e15a3bfd`), so phase 12 and the plan stayed In progress. The
+follow-up pull request fixes B1, A1, A2, A3 and R1's comment, and
+carries the close-out (decision 7) that marks both Complete.
 
 ### Execution notes
 
@@ -1028,6 +1029,14 @@ comment, and carries the close-out (decision 7).
   six pre-commit runs to separate prose.
 * Survey finding 6 was corrected in place (eleven later commits, not
   ten).
+* The operator approved B1's fix design before any code was written.
+  Folded siblings move to `executing` rather than `complete`, through
+  a new `FoldCoalescibleSiblings` RPC, and only the survivor's success
+  completes them. On any other outcome each sibling runs itself from
+  its own `work_queue` row. The constraint this puts on folding
+  `sf-queues` work was recorded on #4017.
+* The fix branch was cut from the audit branch before #4646 merged,
+  and rebased onto `develop` after it did.
 
 ## Back brief
 

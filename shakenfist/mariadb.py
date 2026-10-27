@@ -31,7 +31,7 @@ import math
 import random
 import time
 import threading
-from typing import (Any, Callable, cast, Dict, Iterator, List, NamedTuple, NotRequired,
+from typing import (Any, Callable, cast, Dict, Iterator, List, Literal, NamedTuple, NotRequired,
                     Optional, TypedDict, TypeVar)
 from uuid import UUID
 from uuid import uuid4
@@ -22742,20 +22742,22 @@ def _coalescible_key_pairs(
         for column, value in keys]
 
 
-# Both coalescing wrappers below talk to the V2 RPCs, which carry the
-# whole multi-column key. An sf-database from before the V2 pair existed
-# answers UNIMPLEMENTED, and the *only* correct response to that is to
-# behave as though coalescing is unavailable. Falling back to the V1 RPC
-# would send just the first key column, and the server would happily
-# fold every operation matching it -- during a rolling upgrade that is a
-# survivor on one hypervisor marking another hypervisor's genuinely
-# different work complete, which is the cross-node corruption the
-# separate RPC names exist to prevent. Losing an optimisation loudly for
-# the length of an upgrade is the cheap failure; folding across nodes
-# silently is not.
+# The coalescing wrappers below talk to the V2 RPCs and to
+# FoldCoalescibleSiblings, all of which carry the whole multi-column key.
+# An sf-database from before an RPC existed answers UNIMPLEMENTED, and
+# the *only* correct response to that is to behave as though coalescing
+# is unavailable. Falling back to the V1 RPC would send just the first
+# key column, and the server would happily fold every operation matching
+# it -- during a rolling upgrade that is a survivor on one hypervisor
+# marking another hypervisor's genuinely different work complete, which
+# is the cross-node corruption the separate RPC names exist to prevent.
+# Falling back from the fold to V2 is wrong too, for a different reason:
+# V2 marks siblings complete before the survivor has done their work
+# (#4638). Losing an optimisation loudly for the length of an upgrade is
+# the cheap failure; folding wrongly and silently is not.
 #
 # "Loudly" is why UNIMPLEMENTED raises CoalescingUnavailable rather than
-# returning the same "nothing matched" both functions return on every
+# returning the same "nothing matched" every one of these returns on any
 # other failure. The fold records its outcome for the queue-wait report,
 # and a fold which never ran reported as ``ran`` with zero siblings
 # folded reads there exactly like a fold which ran and matched nothing.
@@ -22837,6 +22839,51 @@ def _grpc_claim_coalescible_siblings(
                 'database service')
         LOG.warning(
             f'gRPC ClaimCoalescibleSiblingsV2 failed for '
+            f'{operation_type}/{_coalescible_key_description(keys)}: {e}')
+        return []
+
+
+def _grpc_fold_coalescible_siblings(
+        operation_type: str,
+        keys: 'list[tuple[str, Optional[str]]]',
+        task_names: list[str],
+        exclude_op_uuid: str) -> list[str]:
+    """Fold sibling pending coalescible ops to ``executing`` via the
+    database microservice.
+
+    Returns the list of uuids that were folded. See
+    ``_direct_claim_coalescible_siblings`` for the safety guards and for
+    why the siblings go to ``executing`` rather than ``complete``.
+
+    An sf-database which predates the RPC answers UNIMPLEMENTED, and
+    that raises ``CoalescingUnavailable`` for the reasons given above
+    ``_grpc_find_existing_coalescible_op``. There is no fallback to
+    ``ClaimCoalescibleSiblingsV2`` either: it would mark the siblings
+    complete before the survivor had done their work, which is #4638.
+    """
+    if not task_names:
+        return []
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ClaimCoalescibleSiblingsV2Request(
+            operation_type=operation_type,
+            keys=_coalescible_key_pairs(keys),
+            task_names=task_names,
+            exclude_op_uuid=exclude_op_uuid)
+        reply = _grpc_call(stub.FoldCoalescibleSiblings, request)
+        return list(reply.folded_op_uuids)
+    except grpc.RpcError as e:
+        if e.code() == grpc.StatusCode.UNIMPLEMENTED:
+            LOG.warning(
+                f'gRPC FoldCoalescibleSiblings is not implemented by '
+                f'this database service, the coalescing fold is '
+                f'unavailable for '
+                f'{operation_type}/{_coalescible_key_description(keys)}')
+            raise exceptions.CoalescingUnavailable(
+                'FoldCoalescibleSiblings is not implemented by this '
+                'database service')
+        LOG.warning(
+            f'gRPC FoldCoalescibleSiblings failed for '
             f'{operation_type}/{_coalescible_key_description(keys)}: {e}')
         return []
 
@@ -23810,19 +23857,35 @@ def _direct_claim_coalescible_siblings(
         operation_type: str,
         keys: 'list[tuple[str, Optional[str]]]',
         task_names: list[str],
-        exclude_op_uuid: str) -> list[str]:
-    """Atomically transition sibling pending coalescible ops to COMPLETE.
+        exclude_op_uuid: str,
+        folded_state: Literal['complete', 'executing'] = 'complete') -> list[str]:
+    """Atomically fold sibling pending coalescible ops into the survivor.
 
     Used by the dispatcher (``BaseClusterOperation.execute``) before
     running a coalescible task: any other ops in the queue matching
     every ``(column, uuid)`` pair in ``keys`` with the same
-    single-task work get their state
-    flipped to ``complete`` here, so when their work_queue row is
-    eventually picked up the dispatcher's terminal-state branch
-    (``shakenfist/daemons/network/workitem.py``) drops them cleanly.
+    single-task work get their state moved to ``folded_state`` here.
+
+    ``executing`` is what ``FoldCoalescibleSiblings`` asks for, and is
+    the only correct choice. The sibling then reads as in progress --
+    so its dependents and ``raise_for_error()`` callers keep waiting --
+    until the survivor's tasks have succeeded and the survivor moves it
+    on to ``complete``. If the survivor fails, defers or dies instead,
+    the sibling is simply left ``executing``: its own work_queue row is
+    untouched, and when that row is dequeued the sf-net dispatcher runs
+    the sibling itself, because it skips only terminal states. Its final
+    state is therefore always a real outcome. The state message names
+    the survivor, so an operator can see which operation absorbed it.
+
+    ``complete``, the default, is the behaviour the two
+    ``ClaimCoalescibleSiblings`` RPCs keep for clients which predate
+    the fold RPC. It releases everything waiting on a sibling before
+    the survivor has done the work, and an error the survivor then hits
+    is never seen by them (#4638).
 
     Returns the list of uuids that were folded so the caller can
-    audit-log a "coalesced N siblings" event on the survivor.
+    audit-log a "coalesced N siblings" event on the survivor, and
+    complete them once its own work has succeeded.
 
     Safety guards baked into the SQL:
 
@@ -23830,7 +23893,9 @@ def _direct_claim_coalescible_siblings(
     * ``os.state_value = 'queued'`` -- skip anything already being
       executed by another worker, or already terminal. Combined with
       ``FOR UPDATE`` on the SELECT, this serialises against the
-      dispatcher's own ``state = STATE_EXECUTING`` write.
+      dispatcher's own ``state = STATE_EXECUTING`` write. It also stops
+      a sibling another survivor already folded to ``executing`` from
+      being folded a second time.
     * ``JSON_LENGTH(metadata_json, '$.tasks') = 1`` -- only fold
       ops whose entire task list is one task. A multi-task sibling
       might also carry non-coalescible work that we mustn't drop.
@@ -23844,14 +23909,16 @@ def _direct_claim_coalescible_siblings(
     do: a key whose ``node_uuid`` is NULL matches only the cluster-wide
     operations, which one elected worker drains, and a key naming a node
     matches only that node's operations, which that node's own
-    dispatcher drains. A key which names neither -- the network alone,
-    for an operation doing node-local work -- would let a survivor on
-    one host fold away another host's genuinely different work.
+    dispatcher drains -- but only on the ``network`` family, because the
+    queue family decides which dispatcher that is. A key which names
+    neither -- the network alone, for an operation doing node-local
+    work -- would let a survivor on one host fold away another host's
+    genuinely different work.
 
-    Two guards keep that from happening, and both are key-aware rather
-    than queue-aware: ``InvalidCoalescibleEnqueue`` in
+    Two guards keep that from happening, and both are key-aware and
+    family-aware: ``InvalidCoalescibleEnqueue`` in
     ``schema/operations/net_op.py`` refuses to enqueue a coalescible
-    task where its key cannot distinguish the target, and
+    task where its key and queue family cannot distinguish the target, and
     ``BaseClusterOperation.execute`` records
     ``key_cannot_distinguish_queue`` and skips the fold rather than
     issuing this statement. The full four-link argument is written out
@@ -23864,6 +23931,8 @@ def _direct_claim_coalescible_siblings(
     ``_coalescible_preflight`` and ``_coalescible_states_join``. Every
     other value in the statement is bound by SQLAlchemy.
     """
+    if folded_state not in ('complete', 'executing'):
+        raise ValueError(f'cannot fold coalescible siblings to {folded_state!r}')
     if not task_names:
         return []
 
@@ -23872,6 +23941,10 @@ def _direct_claim_coalescible_siblings(
     if preflight is None:
         return []
     state_object_type, coerced_keys, (exclude_op_uuid_val,) = preflight
+    if folded_state == 'executing':
+        message = f'coalesced into {exclude_op_uuid}'
+    else:
+        message = 'coalesced into sibling op'
 
     engine = _get_engine()
     cluster_ops_table = _get_cluster_operations_table()
@@ -23924,9 +23997,9 @@ def _direct_claim_coalescible_siblings(
                 .where(states_table.c.object_type == state_object_type)
                 .where(states_table.c.object_uuid.in_(folded_uuids))
                 .values(
-                    state_value='complete',
+                    state_value=folded_state,
                     update_time=sa.func.unix_timestamp(sa.func.now(6)),
-                    message='coalesced into sibling op')
+                    message=message)
             )
             conn.execute(update_stmt)
             conn.commit()
@@ -23936,6 +24009,23 @@ def _direct_claim_coalescible_siblings(
             f'MariaDB claim_coalescible_siblings failed for '
             f'{operation_type}/{_coalescible_key_description(keys)}: {e}')
         return []
+
+
+def _direct_fold_coalescible_siblings(
+        operation_type: str,
+        keys: 'list[tuple[str, Optional[str]]]',
+        task_names: list[str],
+        exclude_op_uuid: str) -> list[str]:
+    """Fold sibling pending coalescible ops to ``executing``.
+
+    The direct half of ``FoldCoalescibleSiblings``. The statement is
+    ``_direct_claim_coalescible_siblings``'s, so the two RPCs cannot
+    disagree about which siblings match; only the state they are moved
+    to differs.
+    """
+    return _direct_claim_coalescible_siblings(
+        operation_type, keys, task_names, exclude_op_uuid,
+        folded_state='executing')
 
 
 def _orphaned_cluster_operations_stmt(threshold_seconds: float) -> Any:
@@ -25031,6 +25121,32 @@ def claim_coalescible_siblings(
         return _grpc_claim_coalescible_siblings(
             operation_type, keys, task_names, exclude_op_uuid)
     return _direct_claim_coalescible_siblings(
+        operation_type, keys, task_names, exclude_op_uuid)
+
+
+def fold_coalescible_siblings(
+        operation_type: str,
+        keys: 'list[tuple[str, Optional[str]]]',
+        task_names: list[str],
+        exclude_op_uuid: str) -> list[str]:
+    """Atomically fold sibling pending coalescible ops into a survivor.
+
+    Used by ``BaseClusterOperation.execute`` before running a
+    coalescible task. Every matching sibling's ``object_states`` row
+    moves from ``queued`` to ``executing`` in one statement, with a
+    message naming the survivor, and the affected uuids are returned.
+    The caller completes them once its own tasks have succeeded; on any
+    other outcome it leaves them alone and each runs itself when its
+    work_queue row is dequeued. See
+    ``_direct_claim_coalescible_siblings`` for the safety guards.
+
+    Raises ``CoalescingUnavailable`` when the database service predates
+    the RPC.
+    """
+    if _use_database_service():
+        return _grpc_fold_coalescible_siblings(
+            operation_type, keys, task_names, exclude_op_uuid)
+    return _direct_fold_coalescible_siblings(
         operation_type, keys, task_names, exclude_op_uuid)
 
 

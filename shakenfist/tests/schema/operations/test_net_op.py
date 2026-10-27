@@ -5,6 +5,7 @@ from uuid import uuid4
 from pydantic import ValidationError
 
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
@@ -264,6 +265,42 @@ class NetOpTestCase(base.ShakenFistTestCase):
                 and row.get('network_uuid') == u1
             ))
 
+    def test_mock_fold_sets_executing_like_the_real_one(self):
+        # MockMariaDB parity with _direct_fold_coalescible_siblings: the
+        # sibling is executing, naming its survivor, rather than complete
+        # -- which is what the V2 claim the mock also models still does.
+        u1 = str(uuid4())
+        _, survivor_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.background,
+        )
+        _, sibling_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+        )
+        keys = [('network_uuid', u1), ('node_uuid', None)]
+        tasks = [model_tasks.network_apply_update_dnsmasq.name]
+
+        self.assertEqual(
+            [sibling_uuid],
+            mariadb.fold_coalescible_siblings(
+                'net_op', keys, tasks, survivor_uuid))
+        state = NetOp.from_db(sibling_uuid).state
+        self.assertEqual('executing', state.value)
+        self.assertEqual(f'coalesced into {survivor_uuid}', state.message)
+        self.assertEqual(
+            'queued', NetOp.from_db(survivor_uuid).state.value)
+
+        # An executing sibling is not folded a second time, by either.
+        self.assertEqual(
+            [], mariadb.fold_coalescible_siblings(
+                'net_op', keys, tasks, survivor_uuid))
+        self.assertEqual(
+            [], mariadb.claim_coalescible_siblings(
+                'net_op', keys, tasks, survivor_uuid))
+
     def test_enqueue_side_dedup_reuses_a_more_urgent_pending_op(self):
         # The other direction is fine and should still coalesce: the
         # background caller inherits work which runs sooner than it
@@ -361,7 +398,7 @@ class EnqueueTimeCoalescibleGuardTestCase(base.ShakenFistTestCase):
         )
 
     def test_coalescible_task_per_node_network_family_is_allowed(self):
-        # The case this phase exists to allow: family='network' reaches
+        # The case the guard exists to allow: family='network' reaches
         # sf-net, which partitions its workers by target.
         u1 = str(uuid4())
         node = str(uuid4())
