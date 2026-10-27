@@ -774,6 +774,24 @@ merge group runs *of the workflow that failed* — `--event merge_group` on its
 own is every workflow in the repository, and those twenty slots exist to answer
 "is this happening to everybody?" about this suite.
 
+A merge group run can also be cut short. The private-ci conductor's merge
+queue fail-fast cancels a run once one of its jobs has failed, so the queue
+moves on instead of waiting for the rest; that run concludes `cancelled`, which
+`workflow_run` never triages. The conductor dispatches the workflow for it
+instead, with `cut_short: true` and `cut_short_job` naming the job it saw fail.
+The flag alone is not believed, because after a cancel the aggregator job
+always fails, superseded runs included: the named job has to have concluded
+`failure` or `timed_out` in the run's latest attempt according to GitHub.
+A dispatch that does not check out — no job named, or a job that did not fail
+— publishes no document and fails the triage run, since only a broken dispatch
+gets there. A cancelled run dispatched without the flag is refused as before,
+and so is a failed run with it, which is `workflow_run`'s to triage. A run
+that does check out is triaged as usual, with `cut_short` and `cut_short_job`
+(GitHub's spelling of the name) in the document's envelope, a line on the pull
+request comment saying so, and a paragraph in the prompt telling the model
+that cancelled jobs and steps were stopped deliberately and are not evidence.
+Failed-job selection counts `timed_out` jobs as failures on every run.
+
 #### Why it is a separate workflow
 
 The obvious implementation is another job in `functional-tests.yml`, gated on

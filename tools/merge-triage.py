@@ -8,7 +8,7 @@ describing whether a merge queue failure was the pull request's fault. Three
 things then need doing to it, and each is here rather than in
 tools/merge-ci-triage.sh because each has edge cases worth testing:
 
-    merge-triage.py envelope <repository> <run json> <output> [triage run url]
+    merge-triage.py envelope <repository> <run json> <output> [triage run url] [cut short job]
     merge-triage.py extract <response> <envelope> <output> [no verdict error]
     merge-triage.py fallback <envelope> <output> <error>
     merge-triage.py render <triage> <output>
@@ -19,6 +19,10 @@ about the run, including picking the pull request number out of the merge
 group ref. It is here rather than in the shell because the ref shapes worth
 getting right -- a base branch with a slash in it, a ref that is not a queue
 ref at all -- are worth a test each, and jq is a poor place to keep them.
+The cut short job, when given, is the name of the job the private-ci
+conductor's merge queue fail-fast saw fail before it cancelled the run, as
+tools/merge-ci-triage.sh read it back from GitHub. It is recorded as
+`cut_short` and `cut_short_job`; absent or empty, the run ended on its own.
 
 **extract** pulls the object out of the model's captured stdout and merges it
 into an envelope the workflow built from GitHub's own data. The envelope always
@@ -420,8 +424,14 @@ def parse_queue_ref(ref):
     return match.group('base'), int(match.group('number'))
 
 
-def do_envelope(repository, run_path, output_path, triage_run_url=''):
-    """Build the facts half of the document from what GitHub said."""
+def do_envelope(repository, run_path, output_path, triage_run_url='', cut_short_job=''):
+    """Build the facts half of the document from what GitHub said.
+
+    cut_short_job is only ever a name the driver has already checked against
+    the run's jobs. It is envelope rather than model output for the same
+    reason the run id is: a model which decided the run was or was not cut
+    short must not be able to say so in the document.
+    """
     with open(run_path) as f:
         run = json.load(f)
 
@@ -454,7 +464,9 @@ def do_envelope(repository, run_path, output_path, triage_run_url=''):
         'head_sha': run.get('headSha') or '',
         'base_branch': base_branch,
         'pull_request': pull_request,
-        'triage_run_url': triage_run_url or None
+        'triage_run_url': triage_run_url or None,
+        'cut_short': bool(cut_short_job),
+        'cut_short_job': cut_short_job or None
     }
 
     with open(output_path, 'w') as f:
@@ -568,6 +580,15 @@ def render_markdown(document):
         lines.append(document['summary'])
         lines.append('')
 
+    if document.get('cut_short') is True and document.get('cut_short_job'):
+        # The job name is GitHub's, not the model's, but it is still free
+        # text going into an inline code span: a newline would end the line
+        # and a backtick the span. Not _table_cell(), because this is not a
+        # table and an escaped pipe would render with its backslash.
+        job = TABLE_WHITESPACE_RE.sub(' ', str(document['cut_short_job'])).strip().replace('`', "'")
+        lines.append('This run was cut short by the merge queue fail-fast after `%s` failed.' % job)
+        lines.append('')
+
     facts = []
     if document.get('run_url'):
         facts.append('| Failed run | %s |' % document['run_url'])
@@ -642,7 +663,7 @@ def main(argv):
     command = argv[1]
     args = argv[2:]
 
-    if command == 'envelope' and len(args) in (3, 4):
+    if command == 'envelope' and len(args) in (3, 4, 5):
         return do_envelope(*args)
     if command == 'extract' and len(args) in (3, 4):
         return do_extract(*args)

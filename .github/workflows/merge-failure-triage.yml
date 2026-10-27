@@ -105,6 +105,22 @@ on:
         required: false
         default: false
         type: boolean
+      # The private-ci conductor's merge queue fail-fast cancels a merge group
+      # run once a job in it has failed, so the queue can move on. A cancelled
+      # run never reaches the workflow_run trigger above as a failure, so the
+      # conductor dispatches its triage here instead, naming the job it saw
+      # fail. The driver checks that job against GitHub before it believes the
+      # flag.
+      cut_short:
+        description: 'The private-ci conductor cancelled this run after cut_short_job failed'
+        required: false
+        default: false
+        type: boolean
+      cut_short_job:
+        description: 'Name of the failed job the conductor cancelled the run for'
+        required: false
+        default: ''
+        type: string
 
 # actions:read is not optional: naming any scope sets every unnamed one to
 # none, and every piece of evidence this workflow gathers -- the run, its jobs,
@@ -150,6 +166,11 @@ jobs:
       MODELS: ${{ inputs.models || 'claude-fable-5,claude-opus-5' }}
       DRY_RUN: ${{ inputs.dry_run || 'false' }}
       FAILED_RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+      # Through env: and never into a run: line, because a job name is free
+      # text. Gated on the event so that a workflow_run delivery can never
+      # claim a run was cut short.
+      CUT_SHORT: ${{ github.event_name == 'workflow_dispatch' && inputs.cut_short && 'true' || 'false' }}
+      CUT_SHORT_JOB: ${{ github.event_name == 'workflow_dispatch' && inputs.cut_short_job || '' }}
       TRIAGE_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     steps:

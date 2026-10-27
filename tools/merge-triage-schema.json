@@ -59,6 +59,14 @@
       "type": ["string", "null"],
       "description": "URL of the triage run which produced this document"
     },
+    "cut_short": {
+      "type": "boolean",
+      "description": "True when the private-ci conductor's merge queue fail-fast cancelled the run after cut_short_job failed, so the run concluded cancelled rather than failure. Written by the workflow, never by the model."
+    },
+    "cut_short_job": {
+      "type": ["string", "null"],
+      "description": "The job the run was cut short after, as GitHub names it, checked to have failed or timed out in this run. Null when cut_short is false."
+    },
     "verdict": {
       "type": "string",
       "enum": ["pr_caused", "systemic", "ambiguous", "unknown"],
