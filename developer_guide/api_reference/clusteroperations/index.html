@@ -15895,8 +15895,10 @@ cluster operation targeting the object is queued, in preflight or executing,
 and it is true when the server cannot tell, so a transient database problem
 makes an object look busy rather than idle. Unlike <code>last_cluster_operation</code>,
 it is not masked by a later operation which has already finished. It is also
-present on the objects returned by the list endpoints. The field is
-advertised by the <code>object-pending-operations</code> capability.</p>
+present on the objects returned by the list endpoints. The field, and the
+per-object <code>/clusteroperations</code> listings which report every operation
+targeting the object, each with an <code>observational</code> key, are advertised by the
+<code>object-pending-operations</code> capability.</p>
 <p>Observational operations never make an object pending. A background sweep, or
 a checksum verification requested through
 <code>GET /blobs/{blob_uuid}/checksum/{algorithm}</code>, is listed with

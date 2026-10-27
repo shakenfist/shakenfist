@@ -16151,8 +16151,8 @@ every consumer, so that:</p>
 <tr>
 <td>6. Push audit</td>
 <td><a href="../PLAN-cluster-op-visibility-phase-06-push-audit/">PLAN-cluster-op-visibility-phase-06-push-audit.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>905c3002e</code> (#4676)</td>
 </tr>
 </tbody>
 </table>
@@ -16473,6 +16473,11 @@ contract.</p>
 <li><strong>The rule-coherence check</strong> found no reachable divergence beyond the
   documented rolling-upgrade case.</li>
 </ul>
+<h1 id="4678-fixed-b1-and-a1-a10-except-the-second-half-of-a9-the-none">4678 fixed B1 and A1-A10, except the second half of A9. The <code>None</code><a class="headerlink" href="#4678-fixed-b1-and-a1-a10-except-the-second-half-of-a9-the-none" title="Permanent link">&para;</a></h1>
+<p>pointer that <code>enqueue_delete()</code> can append to <code>runs_after</code> stays, since
+removing it would store <code>None</code> rather than <code>[]</code> as the dependency list,
+which is a behaviour change and not a correction. With that, every
+finding is resolved or declined in writing, and the plan is complete.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the

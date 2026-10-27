@@ -17874,12 +17874,18 @@ observational only if all of its tasks are. The tasks classified this way are
   console log removed mid-measurement as absent, so a sweep that is already
   executing when the delete arrives cannot error the instance.</li>
 </ul>
-<p>No migration is needed. The flag is stored per row at enqueue time, so rows
-written before the upgrade stay mutating until their operation is removed.
+<p>No data migration is needed, but the <code>cluster_operation_targets</code> schema step is
+required: run <code>sf-ctl ensure-mariadb-schema</code> before <code>sf-database</code> starts (see
+<a href="../../operator_guide/upgrades/#cluster_operation_targets-v2-to-v3">Upgrades</a>).
+The flag is stored per row at enqueue time, so rows written before the
+upgrade stay mutating until their operation is removed.
 During a rolling upgrade, an older daemon or database gateway writes the
 flag as false, which is the safe direction.</p>
-<p>A billing or health check task that fails for any other reason still moves
-its instance to an error state, as it did before (<a href="https://github.com/shakenfist/shakenfist/issues/4585">issue 4585</a>).</p>
+<p>A billing or health check task that fails errors its own operation but leaves
+the instance's state alone, because a failure to measure an instance says
+nothing about the guest
+(<a href="https://github.com/shakenfist/shakenfist/pull/4608">pull request 4608</a>,
+which fixed <a href="https://github.com/shakenfist/shakenfist/issues/4585">issue 4585</a>).</p>
 <h2 id="objects-report-whether-operations-are-pending">Objects report whether operations are pending<a class="headerlink" href="#objects-report-whether-operations-are-pending" title="Permanent link">&para;</a></h2>
 <p>Instance, network and artifact views, including the list endpoints, now carry
 a <code>has_pending_operations</code> boolean beside <code>last_cluster_operation</code>. It is true
@@ -17888,8 +17894,10 @@ preflight or executing, true when the server cannot tell, and false for an
 object which is not stored. Operations marked observational, such as the
 billing and health sweep or a checksum verification, never make an object
 pending. A client which requested a blob hash waits by polling
-<code>GET /blobs/{blob_uuid}/checksum/{algorithm}</code>. The field is advertised by the
-new <code>object-pending-operations</code> capability in the <code>cluster-operations</code> family.</p>
+<code>GET /blobs/{blob_uuid}/checksum/{algorithm}</code>. The field, and the per-object
+<code>/clusteroperations</code> listings which report every operation targeting the
+object, each with an <code>observational</code> key, are advertised by the new
+<code>object-pending-operations</code> capability in the <code>cluster-operations</code> family.</p>
 <p>What you will see:</p>
 <ul>
 <li><code>GET /instances/{instance_ref}/clusteroperations</code>, and the network and

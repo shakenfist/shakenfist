@@ -16447,11 +16447,12 @@ in-flight v1 ops drain.</p>
 <code>(target_object_type, target_uuid)</code> to <code>(target_object_type, target_uuid,
 observational)</code>. The two "current state" readers
 (<code>last_cluster_operation</code> and the pending-operation check) will ignore
-observational rows. Until a later release classifies any task as
-observational, no row is marked observational, so behaviour is unchanged by
-this migration. See
-<a href="../../plans/PLAN-cluster-op-visibility/">the master plan</a> for the
-rationale.</p>
+observational rows. Three tasks are classified as observational
+(<code>collect_billing_statistics</code>, <code>health_check_kvm_process</code> and
+<code>verify_size_and_checksum</code>), so rows for those operations are marked
+observational and every other row is not. See
+<a href="../../developer_guide/database_internals/#when-is-a-task-observational">when is a task observational</a>
+for the rationale.</p>
 <p>Run <code>sf-ctl ensure-mariadb-schema</code> before rolling the daemons. Only the
 database gateway (<code>sf-database</code>) checks schema versions at startup, via
 <code>verify_schema_versions()</code>; it refuses to start if
@@ -16470,10 +16471,9 @@ column, so the rows they write take the default and are treated as
 mutating, which is how every row was treated before v3. The same holds in
 the other direction: a newer daemon whose enqueue reaches a gateway that
 predates v3 sends the flag, but that gateway drops it and writes the row as
-mutating. Nothing breaks, but once tasks are classified as observational a
-background sweep can still shadow <code>last_cluster_operation</code> until every
-gateway is upgraded, so roll the <code>sf-database</code> gateways before the other
-daemons.</p>
+mutating. Nothing breaks, but a background sweep can still shadow
+<code>last_cluster_operation</code> until every gateway is upgraded, so roll the
+<code>sf-database</code> gateways before the other daemons.</p>
 <p>The <code>CreateClusterOperationTarget</code> RPC has been removed, because the atomic
 enqueue already writes the target rows. An older node daemon that still
 makes the call during the roll gets an <code>UNIMPLEMENTED</code> error from an

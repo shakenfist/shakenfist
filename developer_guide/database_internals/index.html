@@ -16105,9 +16105,8 @@ operation mutating. Three tasks on two models are declared today:
 <code>collect_billing_statistics</code> and <code>health_check_kvm_process</code> on
 <code>node_inst_op</code>, and <code>verify_size_and_checksum</code> on <code>node_blob_op</code>. The
 instance sweep enqueues the first two together, and every caller enqueues
-the third on its own. Every other task mutates. See
-<a href="../../plans/PLAN-cluster-op-visibility/">the master plan</a> for the
-rationale.</p>
+the third on its own. Every other task mutates. The rationale is in the
+next section.</p>
 <h3 id="when-is-a-task-observational">When is a task observational?<a class="headerlink" href="#when-is-a-task-observational" title="Permanent link">&para;</a></h3>
 <p>A task is observational if its purpose is to measure or verify its target,
 and its only writes are of one of two kinds:</p>
@@ -16153,9 +16152,8 @@ briefly becomes the object's latest operation.</p>
 table of every task of every operation model, so adding a task or a model
 fails the test until someone classifies it. Update the table in the same
 change that adds the task, and add the task to <code>observational_tasks</code> only if
-it is observational. The reasoning for each existing task is in the
-<a href="../../plans/PLAN-cluster-op-visibility-phase-03-mark-observational/#audit-table">audit table</a>
-of the plan which classified them.</p>
+it is observational. The criteria above say why each existing task is
+classified as it is.</p>
 <p><code>DatabaseBackedObjectWithOperations</code> exposes three read shapes over the
 history:</p>
 <ul>
@@ -16177,7 +16175,10 @@ history:</p>
   object, newest first by sequence number, each hydrated into its operation and
   paired with the <code>observational</code> flag stored on its row. By default the rows
   are filtered in SQL to operations which are pending, using the same join as
-  <code>has_pending_cluster_operation()</code>, so a listing and the pending field agree.
+  <code>has_pending_cluster_operation()</code>. The two do not always agree: the listing
+  is not filtered on the <code>observational</code> flag, so it includes pending
+  observational operations, each reported with <code>observational: true</code>, while
+  <code>has_pending_cluster_operation()</code> ignores them.
   It does not follow <code>depends_on</code> or <code>runs_after</code>, so operations on other
   objects are not included. The per-object <code>/clusteroperations</code> endpoints
   render it, and <code>Instance.enqueue_delete()</code> walks it to decide what to abort.</li>
@@ -16192,11 +16193,18 @@ of age. Because the cluster daemon already runs cluster-wide cleanup
 under <code>ClusterLock</code> election, no additional locking or master-node
 gating is required.</p>
 <p>Only these two readers ignore observational rows. The other by-target
-readers (for example <code>get_cluster_operation_targets_for_object()</code>, which the
-per-blob sweep uses to avoid queueing a duplicate checksum op, and the
-by-target listing) deliberately see everything. Rows normally disappear when
-their operation is hard-deleted (eligible for removal thirty seconds after
-it goes terminal and removed by the
+readers deliberately see everything:</p>
+<ul>
+<li><code>get_cluster_operation_targets_for_object()</code>, which both the per-blob
+  sweep (to avoid queueing a duplicate checksum op) and
+  <code>get_cluster_operations()</code> (the per-object listings) use;</li>
+<li>the by-target listing;</li>
+<li><code>get_recent_terminal_op_states_for_target()</code>, a circuit breaker which
+  wants every failure of a network operation, none of which is
+  observational.</li>
+</ul>
+<p>Rows normally disappear when their operation is hard-deleted (eligible for
+removal thirty seconds after it goes terminal and removed by the
 <a href="../../operator_guide/database/#the-deleted-object-sweep">deleted-object sweep</a>),
 so the prune is a backstop.</p>
 <h2 id="cluster-operation-storage-and-work-queues">Cluster Operation Storage and Work Queues<a class="headerlink" href="#cluster-operation-storage-and-work-queues" title="Permanent link">&para;</a></h2>

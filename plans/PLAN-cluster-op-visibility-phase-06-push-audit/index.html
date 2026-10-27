@@ -17030,12 +17030,12 @@ closed and fixed, and unrelated flake umbrellas.</p>
 <tr>
 <td>B1</td>
 <td>Blocking</td>
-<td>Filed as #4665 with <code>automated-fix-attempted</code>. Fixed in the follow-up pull request</td>
+<td>Filed as #4665 with <code>automated-fix-attempted</code>. Fixed in #4678</td>
 </tr>
 <tr>
 <td>A1-A10</td>
 <td>Advisory</td>
-<td>Fixed in the same follow-up pull request. A one-line correction each, in this plan's own text</td>
+<td>Fixed in #4678, a one-line correction each, except the second half of A9, which is declined (see the execution notes)</td>
 </tr>
 <tr>
 <td>I1</td>
@@ -17119,9 +17119,9 @@ closed and fixed, and unrelated flake umbrellas.</p>
 </tr>
 </tbody>
 </table>
-<p>B1 is blocking, so the plan stays In progress. The fix is a follow-up
-pull request cut from <code>develop</code>. It also carries this phase's
-close-out: its <code>Merged</code> cell, and Complete for the plan.</p>
+<p>B1 was blocking, so the plan stayed In progress until the follow-up
+pull request, #4678, fixed it. That pull request also carries this
+phase's close-out: its <code>Merged</code> cell, and Complete for the plan.</p>
 <h2 id="execution-notes">Execution notes<a class="headerlink" href="#execution-notes" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>2026-10-26 (AEDT), back brief.</strong> Mikal confirmed the plan as
@@ -17151,6 +17151,22 @@ close-out: its <code>Merged</code> cell, and Complete for the plan.</p>
 <li><strong>Gate 2, 2026-10-26.</strong> Mikal approved the grading as proposed. B1 is
   blocking. A1-A10 are fixed in the follow-up pull request. I1-I5,
   S1-S3, P1, P2 and C1-C3 are filed. D6 is recorded on #3922.</li>
+<li><strong>Follow-up, #4678.</strong> Cut from <code>develop</code> after gate 2. A sonnet
+  sub-agent made the fixes and the management session reviewed and
+  committed them. One fix was declined: the second half of A9. The
+  condition at <code>instance.py:2791</code> reads inverted, but it appends a
+  <code>None</code> pointer to <code>runs_after</code> on purpose. Two tests pin that call,
+  and <code>_convert_deps</code> drops falsy entries, so <code>[None]</code> stores <code>[]</code>
+  while the "fixed" <code>[]</code> would store <code>None</code>. That is a behaviour
+  change, not a correction. Two review rounds followed. The first
+  found two more copies of claims the branch had already corrected,
+  and a sweep found a third in the billing statistics test. The
+  second round raised no fix items.</li>
+<li><strong>Close-out, 2026-10-27 (AEDT).</strong> #4676 merged as <code>905c3002e</code>, on
+  its second pass through the merge queue. Meanwhile develop had been
+  failing a unit test for a reason unrelated to this plan: #4635 and
+  #4653 disagreed about sf-api's drain thread, until #4681 fixed it.
+  #4678 was rebased onto the merge and carries this close-out.</li>
 </ul>
 
 
