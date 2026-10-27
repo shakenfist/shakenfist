@@ -89,9 +89,20 @@ class NodeBlobOp(BaseClusterOperation):
 
     # Tasks
     def execute(self):
-        try:
-            super().execute()
-        finally:
+        super().execute()
+
+        # Eagerly remove this operation's cluster_operation_targets row,
+        # but only once the operation is terminal. A requeued operation
+        # (an ensure_local which hit transfer contention and deferred
+        # itself back to STATE_QUEUED) is still pending, and deleting its
+        # row here dropped it out of the per-blob sweep's duplicate
+        # guard, the by-target listings and cancel-on-delete (issue
+        # 4675). hard_delete() and the stale-target backstop remove the
+        # row anyway; this early delete only keeps the table small for
+        # high-churn blob sweeps. An exception from execute() keeps the
+        # row too: the operation is not terminal, and the stuck-row
+        # reaper will run it again.
+        if not self.is_outstanding():
             mariadb.delete_cluster_operation_target(str(self.uuid))
 
     def dispatch_task(self, task):
