@@ -900,8 +900,28 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             if object_type is None:
                 return database_pb2.DeleteOrphanedObjectStatesReply(
                     success=False, deleted=0)
-            deleted = mariadb.delete_orphaned_object_states(
-                object_type, request.updated_before)
+            # This sweep used to run as one unbounded DELETE which never
+            # looked at the caller: when the anti-join outgrew the
+            # client's deadline the statement kept running after the
+            # client gave up, and each retry queued another copy over
+            # the same rows (issue 4659, the issue 3607 shape). Drop a
+            # call nobody is waiting for, and bound a live one's work
+            # inside whatever deadline the caller has left, so the
+            # reply always beats the client's deadline and a retry
+            # never stacks on a still-running sweep.
+            budget = mariadb.DELETE_ORPHANS_TIME_BUDGET
+            remaining = context.time_remaining()
+            if isinstance(remaining, (int, float)):
+                if remaining <= 0:
+                    context.set_code(grpc.StatusCode.DEADLINE_EXCEEDED)
+                    context.set_details(
+                        'caller deadline expired before the sweep started')
+                    return database_pb2.DeleteOrphanedObjectStatesReply(
+                        success=False, deleted=0)
+                budget = min(budget, max(remaining - 10.0, 1.0))
+            deleted = mariadb._direct_delete_orphaned_object_states(
+                object_type, request.updated_before,
+                deadline=time.time() + budget)
             if deleted is None:
                 return database_pb2.DeleteOrphanedObjectStatesReply(
                     success=False, deleted=0)

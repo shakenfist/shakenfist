@@ -8,15 +8,20 @@
 # these tests, MariaDB in production). The queries must transform between
 # the two forms or they silently never match.
 
+import itertools
+import time
 import uuid
 from unittest import mock
 
+import grpc
 import sqlalchemy as sa
 
 from shakenfist import constants
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject
 from shakenfist.daemons.cluster import scheduled_tasks
+from shakenfist.daemons.database import main as daemons_database_main
+from shakenfist.protos import database_pb2
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests import dbfixture
@@ -114,6 +119,105 @@ class OrphanQueryTestCase(
             remaining = conn.execute(
                 sa.select(states.c.object_type)).fetchall()
         self.assertEqual([('network',)], remaining)
+
+    @mock.patch('shakenfist.mariadb._PRUNE_BATCH_SIZE', 3)
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_phantom_delete_windows_cover_whole_key_range(
+            self, mock_get_engine):
+        # The windowed walk (issue 4659) must reach phantoms in every
+        # window, including the short tail window past the last full one.
+        engine = self._build_engine(
+            [mariadb._get_object_states_table, mariadb._get_ipams_table])
+        mock_get_engine.return_value = engine
+        states = mariadb._get_object_states_table()
+        ipams = mariadb._get_ipams_table()
+
+        # uuid.UUID(int=n) sorts as a string in the same order as n, so
+        # phantom positions within the windows are deterministic: 1 is in
+        # the first window, 5 in the second, 10 in the tail.
+        uuids = [uuid.UUID(int=n) for n in range(1, 11)]
+        phantoms = {uuids[0], uuids[4], uuids[9]}
+        with engine.connect() as conn:
+            for object_uuid in uuids:
+                if object_uuid not in phantoms:
+                    self._insert_ipam(conn, ipams, object_uuid)
+                self._insert_state(conn, states, str(object_uuid), 'ipam')
+            conn.commit()
+
+        deleted = mariadb._direct_delete_orphaned_object_states(
+            ObjectType.IPAM, updated_before=200.0)
+        self.assertEqual(3, deleted)
+
+        with engine.connect() as conn:
+            remaining = conn.execute(
+                sa.select(states.c.object_uuid)).fetchall()
+        self.assertEqual(
+            sorted(str(u) for u in uuids if u not in phantoms),
+            sorted(row.object_uuid for row in remaining))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_phantom_delete_expired_deadline_does_nothing(
+            self, mock_get_engine):
+        engine = self._build_engine(
+            [mariadb._get_object_states_table, mariadb._get_ipams_table])
+        mock_get_engine.return_value = engine
+        states = mariadb._get_object_states_table()
+
+        phantom = uuid.uuid4()
+        with engine.connect() as conn:
+            self._insert_state(conn, states, str(phantom), 'ipam')
+            conn.commit()
+
+        deleted = mariadb._direct_delete_orphaned_object_states(
+            ObjectType.IPAM, updated_before=200.0,
+            deadline=time.time() - 1.0)
+        self.assertEqual(0, deleted)
+
+        with engine.connect() as conn:
+            remaining = conn.execute(
+                sa.select(states.c.object_uuid)).fetchall()
+        self.assertEqual([(str(phantom),)], remaining)
+
+    @mock.patch('shakenfist.mariadb._PRUNE_BATCH_SIZE', 3)
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_phantom_delete_stops_between_windows_keeping_progress(
+            self, mock_get_engine):
+        # A deadline expiring mid-walk stops the sweep between windows:
+        # phantoms in the windows already walked stay deleted, phantoms
+        # past the stopping point are left for the next pass.
+        engine = self._build_engine(
+            [mariadb._get_object_states_table, mariadb._get_ipams_table])
+        mock_get_engine.return_value = engine
+        states = mariadb._get_object_states_table()
+        ipams = mariadb._get_ipams_table()
+
+        uuids = [uuid.UUID(int=n) for n in range(1, 11)]
+        phantoms = {uuids[0], uuids[4], uuids[9]}
+        with engine.connect() as conn:
+            for object_uuid in uuids:
+                if object_uuid not in phantoms:
+                    self._insert_ipam(conn, ipams, object_uuid)
+                self._insert_state(conn, states, str(object_uuid), 'ipam')
+            conn.commit()
+
+        # The walk checks the clock once per window; let the first two
+        # windows (rows 1-3 and 4-6) run, then expire the deadline. Only
+        # mariadb's reference to the time module is patched, so
+        # sqlalchemy's own clock reads are unaffected.
+        fake_time = mock.MagicMock()
+        fake_time.time.side_effect = itertools.chain(
+            [0.0, 0.0], itertools.repeat(100.0))
+        with mock.patch('shakenfist.mariadb.time', fake_time):
+            deleted = mariadb._direct_delete_orphaned_object_states(
+                ObjectType.IPAM, updated_before=200.0, deadline=50.0)
+        self.assertEqual(2, deleted)
+
+        with engine.connect() as conn:
+            remaining = {row.object_uuid for row in conn.execute(
+                sa.select(states.c.object_uuid)).fetchall()}
+        self.assertNotIn(str(uuids[0]), remaining)
+        self.assertNotIn(str(uuids[4]), remaining)
+        self.assertIn(str(uuids[9]), remaining)
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_zombie_static_rows_listed_dashed(self, mock_get_engine):
@@ -282,3 +386,88 @@ class OrphanQueryTestCase(
             'destroy live objects of that type: override '
             'zombie_repair_state() to return a live state when the object '
             'would be honoured, and add the type here (issue 3836)')
+
+
+class DeleteOrphanedObjectStatesServicerTestCase(base.ShakenFistTestCase):
+    """The servicer must bound the sweep inside the caller's deadline.
+
+    The sweep used to run as one unbounded DELETE the server kept
+    running after the client's deadline expired, and each retry queued
+    another copy over the same rows (issue 4659, the issue 3607 shape).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.servicer = daemons_database_main.DatabaseService(
+            mock.MagicMock())
+        self.request = database_pb2.DeleteOrphanedObjectStatesRequest(
+            object_type=ObjectType.IPAM.proto_id, updated_before=200.0)
+
+    def _context(self, time_remaining):
+        context = mock.MagicMock()
+        context.time_remaining.return_value = time_remaining
+        return context
+
+    @mock.patch('shakenfist.mariadb._direct_delete_orphaned_object_states')
+    def test_expired_call_is_dropped_without_a_sweep(self, mock_direct):
+        context = self._context(0.0)
+
+        reply = self.servicer.DeleteOrphanedObjectStates(
+            self.request, context)
+
+        mock_direct.assert_not_called()
+        self.assertFalse(reply.success)
+        context.set_code.assert_called_once_with(
+            grpc.StatusCode.DEADLINE_EXCEEDED)
+
+    @mock.patch('shakenfist.mariadb._direct_delete_orphaned_object_states',
+                return_value=3)
+    def test_live_call_is_bounded_inside_the_deadline(self, mock_direct):
+        context = self._context(30.0)
+        before = time.time()
+
+        reply = self.servicer.DeleteOrphanedObjectStates(
+            self.request, context)
+
+        self.assertTrue(reply.success)
+        self.assertEqual(3, reply.deleted)
+        context.set_code.assert_not_called()
+        _, kwargs = mock_direct.call_args
+        # The sweep must stop early enough that the final in-flight
+        # window and the reply itself still beat the caller's deadline.
+        self.assertGreater(kwargs['deadline'], before)
+        self.assertLessEqual(
+            kwargs['deadline'],
+            before + mariadb.DELETE_ORPHANS_TIME_BUDGET + 1.0)
+
+    @mock.patch('shakenfist.mariadb._direct_delete_orphaned_object_states',
+                return_value=0)
+    def test_tight_caller_deadline_shrinks_the_budget(self, mock_direct):
+        context = self._context(12.0)
+        before = time.time()
+
+        reply = self.servicer.DeleteOrphanedObjectStates(
+            self.request, context)
+
+        self.assertTrue(reply.success)
+        _, kwargs = mock_direct.call_args
+        self.assertLessEqual(kwargs['deadline'], before + 3.0)
+
+    @mock.patch('shakenfist.mariadb._direct_delete_orphaned_object_states',
+                return_value=0)
+    def test_call_without_a_deadline_uses_the_fixed_budget(
+            self, mock_direct):
+        # time_remaining() is None when the caller set no deadline at all.
+        context = self._context(None)
+        before = time.time()
+
+        reply = self.servicer.DeleteOrphanedObjectStates(
+            self.request, context)
+
+        self.assertTrue(reply.success)
+        context.set_code.assert_not_called()
+        _, kwargs = mock_direct.call_args
+        self.assertGreater(kwargs['deadline'], before)
+        self.assertLessEqual(
+            kwargs['deadline'],
+            before + mariadb.DELETE_ORPHANS_TIME_BUDGET + 1.0)

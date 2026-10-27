@@ -25260,14 +25260,40 @@ def _static_table_for_object_type(
     return getter(), pk
 
 
+# Wall-clock budget for one DeleteOrphanedObjectStates sweep. The
+# windowed walk below stops between batches once the budget is spent,
+# and the headroom left under the client's GRPC_TIMEOUT covers the
+# final in-flight window and the reply itself on a struggling database
+# (the PRUNE_EVENTS_TIME_BUDGET arithmetic, at this RPC's scale). Rows
+# past the stopping point are reached by the next hourly reconcile pass.
+DELETE_ORPHANS_TIME_BUDGET = GRPC_TIMEOUT - 10.0
+
+
 def _direct_delete_orphaned_object_states(
         object_type: ObjectType,
-        updated_before: float) -> Optional[int]:
+        updated_before: float,
+        deadline: Optional[float] = None) -> Optional[int]:
     """Delete phantom object_states rows for one object type.
 
     A row is a phantom when no static-values row exists for its uuid.
     ``updated_before`` guards against racing object creation, where the
-    static and state rows are written moments apart.
+    static and state rows are written moments apart. That guard is also
+    what makes the select-then-delete split below safe: a phantom is a
+    state row which has sat without a static row for ORPHAN_MINIMUM_AGE,
+    and the creation path writes the two rows moments apart, so a row
+    selected as a phantom cannot acquire a static row before its delete.
+
+    Phantoms are sparse, so one DELETE asking for all of them walked
+    every state row of the type in a single unbounded statement,
+    next-key-locking each row it examined (the issue 3982 shape). On
+    sfcbr that outran the client's deadline, and the abandoned statement
+    kept running while each retry queued another copy over the same rows
+    (issue 4659). Instead walk the primary key in windows of
+    ``_PRUNE_BATCH_SIZE`` rows: one query finds where the window ends, a
+    non-locking anti-join looks only inside it, and the phantoms found
+    are deleted by key in that window's own transaction. No statement
+    examines more than one window, and ``deadline`` (a time.time()
+    value) stops the walk between windows.
 
     Returns the number of rows deleted, or None on error.
     """
@@ -25292,16 +25318,48 @@ def _direct_delete_orphaned_object_states(
     if 'operation_type' in static.c:
         exists_clauses.append(static.c.operation_type == object_type.value)
 
+    total = 0
+    cursor = ''
     try:
-        with engine.begin() as conn:
-            stmt = sa.delete(states).where(sa.and_(
-                states.c.object_type == object_type,
-                states.c.update_time < updated_before,
-                ~sa.exists(
-                    sa.select(sa.literal(1)).where(sa.and_(*exists_clauses)))
-            ))
-            result = conn.execute(stmt)
-            return int(result.rowcount)
+        while True:
+            if deadline is not None and time.time() >= deadline:
+                break
+            with engine.connect() as conn:
+                window_end = conn.execute(
+                    sa.select(states.c.object_uuid)
+                    .where(sa.and_(
+                        states.c.object_type == object_type,
+                        states.c.object_uuid > cursor))
+                    .order_by(states.c.object_uuid)
+                    .limit(1).offset(_PRUNE_BATCH_SIZE - 1)).scalar()
+
+                phantom_clauses = [
+                    states.c.object_type == object_type,
+                    states.c.object_uuid > cursor,
+                    states.c.update_time < updated_before,
+                    ~sa.exists(
+                        sa.select(sa.literal(1)).where(
+                            sa.and_(*exists_clauses)))]
+                # The last window, shorter than a full one, has no end
+                # row to bound it and runs to the end of the primary key.
+                if window_end is not None:
+                    phantom_clauses.append(
+                        states.c.object_uuid <= window_end)
+                phantoms = conn.execute(
+                    sa.select(states.c.object_uuid).where(
+                        sa.and_(*phantom_clauses))).scalars().all()
+
+                if phantoms:
+                    result = conn.execute(sa.delete(states).where(sa.and_(
+                        states.c.object_type == object_type,
+                        states.c.object_uuid.in_(phantoms))))
+                    conn.commit()
+                    total += int(result.rowcount)
+
+            if window_end is None:
+                break
+            cursor = window_end
+        return total
     except OperationalError as e:
         LOG.warning(
             f'MariaDB delete of orphaned {object_type} states failed: {e}')
