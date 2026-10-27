@@ -533,6 +533,13 @@ cursor, resize, text clipboard and audio playback. Specifically:
    drop them with a `warn_once!` in the MVP; map the ASCII
    range through the paste-as-keystrokes translator later,
    which already turns characters into scancodes.
+   - **Answer (phase 6):** implemented as recommended.
+     `UnicodePressed` and `UnicodeReleased` are dropped with a
+     warn-once (`shakenfist-spice-rdp/src/input.rs`, with a unit
+     test), so text typed through a mobile client or an IME that
+     sends only Unicode events does not reach the guest. Keys
+     that carry a scancode work. The paste-translator mapping
+     stays in *Future work*.
 6. **Audio formats.** rdpsnd takes whatever we advertise.
    Opus passthrough via `OpusPacketSink` costs nothing, but
    reportedly only some clients take Opus. PCM needs decoded
@@ -580,6 +587,13 @@ cursor, resize, text clipboard and audio playback. Specifically:
    phase 5 is green and stable, then on for Linux builds.
    macOS and Windows builds follow once someone has tried
    them.
+   - **Answer (phase 6):** deferred, not answered. Phase 5's
+     criterion for the lane is fourteen consecutive green
+     nightly runs of `rdp-smoke`, and that record does not exist
+     yet: the lane has one green CI run (on the phase 5 pull
+     request) and ten green local runs. Until it does, `make
+     release` leaves the `rdp` feature out and the operator guide
+     documents building from source.
 
 ## Execution
 
@@ -589,8 +603,8 @@ cursor, resize, text clipboard and audio playback. Specifically:
 | 2. RDP skeleton: `shakenfist-spice-rdp`, `--rdp`, display, keyboard, mouse, security | [PLAN-rdp-frontend-phase-02-rdp-skeleton.md](/components/ryll/plans/PLAN-rdp-frontend-phase-02-rdp-skeleton/) | Complete | 7b389b1, c314094 |
 | 3. Cursor and resize | [PLAN-rdp-frontend-phase-03-cursor-resize.md](/components/ryll/plans/PLAN-rdp-frontend-phase-03-cursor-resize/) | Complete | c9a763d |
 | 4. Clipboard and audio | [PLAN-rdp-frontend-phase-04-clipboard-audio.md](/components/ryll/plans/PLAN-rdp-frontend-phase-04-clipboard-audio/) | Complete | fe563e1 |
-| 5. Lifecycle and CI: SPICE auto-reconnect, takeover, an `rdp-smoke` lane | [PLAN-rdp-frontend-phase-05-lifecycle-ci.md](/components/ryll/plans/PLAN-rdp-frontend-phase-05-lifecycle-ci/) | In progress | |
-| 6. Documentation and parity | - | Not started | |
+| 5. Lifecycle and CI: SPICE auto-reconnect, takeover, an `rdp-smoke` lane | [PLAN-rdp-frontend-phase-05-lifecycle-ci.md](/components/ryll/plans/PLAN-rdp-frontend-phase-05-lifecycle-ci/) | Complete | 13044d7, 280c047 |
+| 6. Documentation and parity | [PLAN-rdp-frontend-phase-06-docs-parity.md](/components/ryll/plans/PLAN-rdp-frontend-phase-06-docs-parity/) | In progress | |
 | 7. Push audit | - | Not started | |
 
 Phase plans are written one at a time with `/next-phase`.
@@ -790,6 +804,42 @@ found*):
 - `docs/rdp-mode-internals.md` if the internals warrant it,
   as `docs/web-mode-internals.md` does for `--web`.
 
+*Corrected by phase 6's survey* (see its *What the survey
+found*):
+
+- `ARCHITECTURE.md`, `README.md` and `docs/index.md` do not
+  mention RDP at all yet; `ARCHITECTURE.md` still counts six
+  crates and three modes.
+- No released binary has `--rdp`: the feature is off in
+  release builds and v0.3.0 predates the crate, which is not
+  on crates.io. The guide documents building from source.
+- Only FreeRDP 3.15.0 has been tested; mstsc never was, so the
+  first success criterion cannot be checked as written.
+- Open question 5 was implemented as recommended but never
+  answered, and phase 5's deferred items are in its own plan
+  only, not in this plan's *Future work*.
+- Kerbside's documentation needs no change: nothing there
+  outside its plans mentions RDP.
+
+*What shipped:* `docs/rdp-frontend.md`, an operator guide
+(getting a binary, clients, what works and what is lost,
+security modes, service mode, troubleshooting);
+`docs/rdp-mode-internals.md`; an RDP column and an *RDP frontend*
+section in `docs/multi-mode-parity.md`, which now covers four
+modes; `ARCHITECTURE.md` (seven crates, four modes, the new
+crate's boundary), `README.md`, `docs/index.md` and
+`docs/features.md`; and `docs/configuration.md`'s *RDP Mode*
+section cut to a paragraph and the flag table, the behaviour
+prose having moved to the guide. Open questions 5 and 8 are
+answered above, and phase 5's deferred items are in *Future
+work*. Checking the parity column found that `--usb-disk`,
+`--usb-disk-ro`, `--share-dir` and `--share-dir-ro` do reach the
+session in `--rdp`, as in headless, although an RDP client
+cannot pass its own devices or folders; the `--rdp` help text
+says the mode loses them, and was wrong. No code changed in this
+phase. Only FreeRDP 3.15.0 has been tested; mstsc and the other
+clients are documented as expected to work and untested.
+
 ### Phase 7: Push audit
 
 Run `PUSH-AUDIT.md` over the accumulated diff of phases 1 to
@@ -826,25 +876,58 @@ and commits in the management session.
 ### Success criteria
 
 We will know this plan has been implemented successfully
-because the following statements will be true:
+because the following statements will be true. Status as of
+phase 6, 2026-10-27:
 
-* `ryll --rdp connection.vv` serves the session to FreeRDP
-  and mstsc with display, keyboard, mouse, cursor, resize,
-  text clipboard and audio playback.
+* `ryll --rdp --file connection.vv` serves the session to FreeRDP
+  with display, keyboard, mouse, cursor, resize, text
+  clipboard and audio playback.
+  **Reworded in phase 6.** The criterion originally also named
+  mstsc. No Windows machine or other RDP client has been
+  available, so mstsc was never tested and the criterion could
+  not be checked as written; it now says what was verified.
+  Mstsc and the other clients are documented as expected to
+  work and untested. *Status: holds for FreeRDP 3.15.0 on
+  Linux.* Checked by each phase's *Results* (phases 2 to 5:
+  scripted and visual sessions against FreeRDP, with the audio,
+  clipboard, cursor and resize behaviour recorded), and by the
+  phase 5 visual check with Mikal.
 * The `rdp-smoke` lane passes in CI.
+  *Status: holds, with a short record.* One green CI run (7/7,
+  run 40379796107, on the phase 5 pull request) and ten
+  consecutive green local runs on 2026-10-26. The lane is
+  advisory and nightly, and fourteen consecutive green nightly
+  runs is the bar for promoting it, which has not been met.
 * `docs/multi-mode-parity.md` has an RDP column with every
   cell filled.
+  *Status: holds.* Phase 6 added the column; a script checks
+  that every matrix row has five cells and every RDP cell
+  starts with an allowed verdict.
 * The RDP code is a library crate that a Kerbside gateway
   could depend on without the ryll binary.
+  *Status: holds.* `shakenfist-spice-rdp` depends on the
+  renderer and protocol crates and not on `ryll`
+  (`shakenfist-spice-rdp/Cargo.toml`). It is not on crates.io.
 * The code passes `pre-commit run --all-files` (rustfmt,
   clippy with `-D warnings`, shellcheck), `make test` passes,
   and new logic has unit tests.
+  *Status: holds.* `pre-commit run --all-files` passes on the
+  phase 6 branch, and `make lint` and `make test` build the
+  `rdp` feature in CI. The unit tests were added with each
+  phase's code.
 * Documentation in `docs/` describes the mode as a
   reachability fallback; `ARCHITECTURE.md` reflects the new
   crate and mode; `AGENTS.md` changes only if a convention
   changed.
+  *Status: holds after phase 6.* Checked by reading the guide,
+  `ARCHITECTURE.md` and the parity page against the code.
 * The Kerbside documentation that mentions RDP out points
   here.
+  *Status: holds vacuously.* Nothing in Kerbside's `develop`
+  outside `docs/plans/` mentions RDP, and its superseded
+  `PLAN-rdp-gateway.md` and index row already link here
+  (phase 6 survey). The *Framing* item under *Moving to
+  Kerbside* covers its docs for when the code moves.
 
 ### Future work
 
@@ -921,6 +1004,25 @@ worked these out, and they are recorded here so they survive:
   today).
 - **Unicode key events** through the paste-as-keystrokes
   translator (open question 5).
+- **SPICE reconnect for `--web` and `--headless`**, on the
+  retry rules phase 5 moved to `ryll/src/reconnect_policy.rs`.
+  `--web` keeps serving a dead session today.
+- **A text overlay on the outage frame** saying why it is
+  dark, if users find the half-brightness frame unclear.
+- **Promoting the `rdp-smoke` lane** into the smoke tier, and
+  answering open question 8, once fourteen consecutive green
+  nightly runs exist.
+- **Reporting a red nightly** of the lane, as `fuzz.yml` files
+  an issue for its failures; the run history is the only
+  record today.
+- **Replaying a resize** an RDP client made during a SPICE
+  outage once the session is back; it is dropped today.
+- **Limiting how long one peer can hold `--rdp`'s only
+  pre-authentication slot**, for example with per-address
+  limits, for a listener on a non-loopback address.
+- **A cap on `--rdp` reconnects** to a SPICE server that
+  accepts the link and drops every session at once; unattended
+  it retries every second for ever.
 - **VNC out**, only if a real network is found that allows
   VNC and not SPICE.
 

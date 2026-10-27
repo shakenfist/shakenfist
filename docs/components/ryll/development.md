@@ -328,8 +328,10 @@ targets used locally); macOS, Windows, and aarch64 Linux use
 GitHub-hosted runners because we own no matching hardware.
 PRs also receive an automated code review via Claude Code. Changes
 that only touch code-review artifacts (`REVIEWS.md`,
-`.vscode/*.weaudit*`, `.vscode/review-scope.toml`) skip every CI job
-and the CodeQL workflow.
+`.vscode/*.weaudit*`) skip every CI job and the CodeQL workflow. A
+change to `.vscode/review-scope.toml` runs CI and gets the review
+like code, since it decides what is reviewed at all; only CodeQL
+skips it.
 
 Because `develop` is behind a merge queue, merging a pull request
 enqueues it rather than merging it immediately, and the merge tier's

@@ -63,6 +63,9 @@ for how each subsystem works internally see
 - **Cadence mode** - Automatic keystroke injection every 2 seconds for latency testing.
 - **Web mode** - Browser frontend over WebRTC with native TLS; see
   [web-frontend.md](/components/ryll/web-frontend/) for the operator guide.
+- **RDP mode** - A reachability fallback that serves the session to stock RDP
+  clients; needs a build with the `rdp` feature. See
+  [rdp-frontend.md](/components/ryll/rdp-frontend/) for the operator guide.
 
 The sections below describe the non-GUI modes in more detail.
 
@@ -121,7 +124,7 @@ for a runnable Python example client.
 ### Web mode (`--web`)
 
 ```bash
-ryll --web session.vv
+ryll --web --file session.vv
 ```
 
 Open the printed `http://<host>:<port>/?token=...` URL in

@@ -86,6 +86,7 @@ both ends of the traffic through the proxy. This would allow:
 - [Installation](/components/ryll/installation/) - Pre-built packages, pip, and building from source
 - [Configuration](/components/ryll/configuration/) - CLI options and .vv file format
 - [Web frontend](/components/ryll/web-frontend/) - Operator guide for `--web` mode
+- [RDP frontend](/components/ryll/rdp-frontend/) - Operator guide for `--rdp` mode
 - [Kasm workspace](/components/ryll/kasm-workspace/) - Packaging the ryll GUI as a Kasm Workspaces image
 - [Control socket protocol](/components/ryll/control-socket-protocol/) - Driving headless sessions from external tools, and how the socket is implemented
 - [Key design decisions](/components/ryll/design-decisions/) - Why ryll is shaped the way it is
@@ -95,7 +96,8 @@ both ends of the traffic through the proxy. This would allow:
 - [Diagnostics and instrumentation](/components/ryll/diagnostics/) - Capture, statistics, snapshots, bug reports
 - [Session lifecycle](/components/ryll/session-lifecycle/) - Reconnection and graceful shutdown
 - [Web mode internals](/components/ryll/web-mode-internals/) - Encoder, WebRTC bridge, and the `--web` relays
-- [Multi-mode feature parity](/components/ryll/multi-mode-parity/) - Which features work in GUI, headless, and web modes
+- [RDP mode internals](/components/ryll/rdp-mode-internals/) - The IronRDP servers, takeover, the display and input handlers, and reconnect
+- [Multi-mode feature parity](/components/ryll/multi-mode-parity/) - Which features work in GUI, headless, web, and RDP modes
 - [Development](/components/ryll/development/) - Building, testing, and contributing
 - [macOS Development](/components/ryll/development-macos/) - Build and test locally on macOS
 - [Continuous integration](/components/ryll/ci/) - The two CI tiers, the merge queue, and where binaries come from
