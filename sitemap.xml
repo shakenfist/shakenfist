@@ -725,6 +725,10 @@
          <lastmod>2026-10-27</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-bat-population-phase-04-read-side/</loc>
+         <lastmod>2026-10-27</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bat-population/</loc>
          <lastmod>2026-10-27</lastmod>
     </url>
@@ -1625,6 +1629,10 @@
          <lastmod>2026-10-27</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/deployment/manual/</loc>
+         <lastmod>2026-10-27</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/kerbside/performance/proxy-backpressure/</loc>
          <lastmod>2026-10-27</lastmod>
     </url>
@@ -1686,6 +1694,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/</loc>
+         <lastmod>2026-10-27</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-deployment-options-phase-02-manual/</loc>
          <lastmod>2026-10-27</lastmod>
     </url>
     <url>
@@ -2678,6 +2690,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-rdp-frontend-phase-04-clipboard-audio/</loc>
+         <lastmod>2026-10-27</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/plans/PLAN-rdp-frontend-phase-05-lifecycle-ci/</loc>
          <lastmod>2026-10-27</lastmod>
     </url>
     <url>
