@@ -410,18 +410,18 @@ plan was written.
 
 - [x] `grep -c "rpc GetClusterCapacity" protos/database.proto`
       returns 1. It returns 0 today.
-- [ ] Step 1's live test passes against MariaDB in CI. It shows
+- [x] Step 1's live test passes against MariaDB in CI. It shows
       that a claim and an unclaimed placement of exactly
       `unallocated_cpus` are admitted, and `+1` is refused, for
       each. Changing `_cluster_unallocated()` by one breaks it,
       which the management session checks with a local mutation
       (the `mutation-check` skill).
-- [ ] On every cluster topology, `/admin/resources` carries
+- [x] On every cluster topology, `/admin/resources` carries
       `cluster_capacity` with `row_present` true, and
       `unallocated_<dim> == total - claimed - unclaimed_used` in
       the same response. This is asserted by step 6, not by
       reading the code.
-- [ ] On every cluster topology, every active hypervisor is in
+- [x] On every cluster topology, every active hypervisor is in
       exactly one of `per_node` or `excluded`, asserted by step 6.
 - [x] A hypervisor with a stale metrics row appears in `excluded`
       with reason `stale metrics`, asserted by step 3's unit test.
@@ -446,10 +446,11 @@ plan was written.
       `CLAIM_ENFORCEMENT_HARD`, and adds no line inside
       `find_candidates()`. The management session verifies this
       by reading the diff and states it in the Outcome.
-- [ ] Client-python: `get_cluster_claims` exists on `develop`
-      (step 5), and `sf-client node capacity` against an `excluded`
-      fixture prints each node's reason instead of 7b's D4 sentence
-      (step 8).
+- [x] Client-python: `get_cluster_claims` exists on `develop`
+      (step 5). The second half, `sf-client node capacity` against
+      an `excluded` fixture printing each node's reason instead of
+      7b's D4 sentence, moved to 7b with step 8 and is 7b's to
+      check.
 - [x] `pre-commit run --all-files` passes in both repositories,
       including `check-plan-status.py` and `check-doc-anchors.py`
       here.
@@ -514,8 +515,9 @@ that session.
 
 ## Outcome
 
-The server half is implemented. Steps 1 to 4, 6, 7 and 9 are on
-this branch. Step 5 is client-python#438, and step 8 is deferred.
+Merged as #4654 (`e8585a874`) on 2026-10-26, after client-python#438
+(step 5). Step 8 moved to phase 7b on 2026-10-27; see *Deferred*
+below.
 
 | Step | Commit | What it did |
 |------|--------|-------------|
@@ -561,22 +563,27 @@ well. So the new pair can never be faster than that one, and cannot
 trip the fixed-rate check unless that one trips first. The budget
 was not changed, and merge CI is the confirmation.
 
-**Deferred:**
-- Step 8 waits on 7b's step 4 (`sf-client node capacity`). It is
-  recorded as a `plan-blockers` note on this plan, and its own
-  floor audit belongs to its client pull request.
+**Moved to 7b:**
+- Step 8 needs 7b's step 4 (`sf-client node capacity`) to render
+  into. Rather than hold this phase open across a client phase,
+  it became 7b's last step, with its brief unchanged. Its floor
+  audit belongs to that client pull request.
 - client-python#438's review asked for `docs/namespace-claims.md`
-  to cover cluster-wide listing. That page change is step 8's,
-  since there is no CLI behaviour to document yet.
+  to cover cluster-wide listing. That page change goes with step
+  8, since there is no CLI behaviour to document until then.
 
-**Definition of done:** four items are open.
-- **Two need a cluster CI run:** the `cluster_capacity` and the
-  exactly-one-of assertions on every topology. Those tests are
-  written, but cluster CI has not run them yet.
-- **The live tests have not run in CI yet.** Locally, against
-  MariaDB 10.11, all 118 capacity live tests passed.
-- **The client item waits on two things:** client-python#438
-  merging, and step 8.
+**Definition of done:** every item is met, on this evidence.
+- **Live tests:** the `Schema ENUM widening` job of merge run
+  40268867051 ran both capacity live modules and reported "Live
+  MariaDB tests passed."
+- **The two cluster assertions:** `test_cluster_resources_capacity_surface`
+  and `test_claim_appears_in_cluster_listing` passed on the Debian
+  13 cluster lane of that run, and that lane has passed in the
+  five merge groups that ran it since. It is the only cluster lane
+  merge CI runs: Ubuntu 24.04 cluster was skipped in all of those
+  groups, so it has not run these tests yet.
+- **The client item:** `get_cluster_claims` is on client-python
+  `develop`. Its `node capacity` half moved to 7b with step 8.
 
 ## Back brief
 
