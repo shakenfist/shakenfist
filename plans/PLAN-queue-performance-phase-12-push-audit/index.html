@@ -16773,9 +16773,10 @@ plan's code: F3 predates it, and R1's trigger lies in data written
 before #4007. Both are named as such. Sub-agents ran further searches of their own
 ("coalesce complete before", "rolling upgrade coalescing",
 "coalesced into sibling" and others), with the same result.</p>
-<p>A blocking finding remains open, so phase 12 and the plan stay In
-progress. The follow-up pull request fixes B1, A1, A2, A3 and R1's
-comment, and carries the close-out (decision 7).</p>
+<p>A blocking finding was open when the audit merged as PR #4646
+(<code>1e15a3bfd</code>), so phase 12 and the plan stayed In progress. The
+follow-up pull request fixes B1, A1, A2, A3 and R1's comment, and
+carries the close-out (decision 7) that marks both Complete.</p>
 <h3 id="execution-notes">Execution notes<a class="headerlink" href="#execution-notes" title="Permanent link">&para;</a></h3>
 <ul>
 <li>2026-10-25 (AEDT). 12b ran alone. Then 12c to 12h ran in parallel,
@@ -16792,6 +16793,14 @@ comment, and carries the close-out (decision 7).</p>
   six pre-commit runs to separate prose.</li>
 <li>Survey finding 6 was corrected in place (eleven later commits, not
   ten).</li>
+<li>The operator approved B1's fix design before any code was written.
+  Folded siblings move to <code>executing</code> rather than <code>complete</code>, through
+  a new <code>FoldCoalescibleSiblings</code> RPC, and only the survivor's success
+  completes them. On any other outcome each sibling runs itself from
+  its own <code>work_queue</code> row. The constraint this puts on folding
+  <code>sf-queues</code> work was recorded on #4017.</li>
+<li>The fix branch was cut from the audit branch before #4646 merged,
+  and rebased onto <code>develop</code> after it did.</li>
 </ul>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, back brief the operator on

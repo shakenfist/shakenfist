@@ -16388,12 +16388,10 @@ they fold only each other; <code>network_ensure_mesh</code>, enqueued per
 participating hypervisor, carries its own node's uuid and folds only
 that node's own siblings. Both are strictly narrower than the
 network-alone key this replaced, which is the property the whole
-widening rests on. Binding <code>None</code> as <code>IS NULL</code> was a correction made
-mid-phase: an earlier version of the preflight refused a <code>None</code> key
-value outright, which would have silently switched off the only
-coalescing the cluster does the moment the key grew a second column
--- see decision 8 in
-<code>docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md</code>.</p>
+widening rests on. <code>None</code> is bound as <code>IS NULL</code> rather than
+refused: refusing a <code>None</code> key value would have silently switched off
+the only coalescing the cluster does the moment the key grew a second
+column.</p>
 <p>The fold runs at two layers, both controlled by this metadata:</p>
 <ul>
 <li>
@@ -16407,15 +16405,45 @@ coalescing the cluster does the moment the key grew a second column
 </li>
 <li>
 <p><strong>Worker-side fold</strong>
-  (<code>mariadb.claim_coalescible_siblings</code>): inside
-  <code>BaseClusterOperation.execute</code>, the survivor atomically
-  transitions every other pending coalescible op matching the same
-  key to <code>STATE_COMPLETE</code> in one SQL statement. When the dispatcher
-  surfaces a folded sibling's <code>work_queue</code> row, the terminal-state
-  branch drops it cleanly. A <code>'coalesced sibling ops'</code> event
-  on the survivor records the folded uuids.</p>
+  (<code>mariadb.fold_coalescible_siblings</code>): inside
+  <code>BaseClusterOperation.execute</code>, the survivor atomically moves
+  every other pending coalescible op matching the same key from
+  <code>queued</code> to <code>executing</code> in one SQL statement, with the state
+  message <code>coalesced into &lt;survivor uuid&gt;</code>. Only once every one of
+  the survivor's own tasks has succeeded does it move those siblings
+  on to <code>complete</code>. A <code>'coalesced sibling ops'</code> event on the survivor
+  records the folded uuids.</p>
 </li>
 </ul>
+<p>The order matters. A sibling is often an operation something else
+waits on: an instance create names the per-node <code>network_ensure_mesh</code>
+in <code>depends_on</code>, and an API caller blocks in <code>raise_for_error()</code>.
+Until #4638 the fold set siblings <code>complete</code> before the survivor had
+run anything, so those waiters were released as soon as the survivor
+<em>started</em>, and went ahead even if it then failed or deferred. Now a
+sibling reads as in progress until the work is actually done.</p>
+<p>On every other survivor outcome -- an error, a defer back to
+<code>queued</code>, an exception escaping <code>execute()</code>, an abort, or a crash --
+the siblings are simply left <code>executing</code>. Nothing is propagated and
+nothing has to be undone. The fold never touches <code>work_queue</code>, so
+each sibling still has its own row, and when that row is dequeued the
+<code>sf-net</code> dispatcher runs the sibling itself: it skips only terminal
+states, and a transition to <code>executing</code> from <code>executing</code> is a no-op.
+A sibling's final state is therefore always its own real outcome,
+and a dependent aborts on its error exactly as it would on any other
+dependency's. The same holds if completing a sibling fails (the
+database is unavailable, say): the failure is logged rather than
+raised, so the survivor's work item still resolves, and the sibling
+runs itself.</p>
+<p>Two things have to stay true for that to work, and the
+<code>PARTITIONED-WORKER SAFETY INVARIANT</code> comment in
+<code>shakenfist/daemons/network/workitem.py</code> states both. <code>sf-net</code> must
+keep running an operation it dequeues in <code>executing</code>, and every
+foldable operation must be drained by <code>sf-net</code> and never by
+<code>sf-queues</code>, which drops anything it dequeues that is not <code>queued</code> --
+a folded sibling which reached it would be stranded until the orphan
+reaper errored it. The two guards described below are what keep
+foldable work off <code>sf-queues</code>.</p>
 <p>The enqueue-side dedup is the cheaper of the two -- the row never
 gets inserted -- but the worker-side fold is the safety net for the
 race where two concurrent callers both lose the lookup.</p>
@@ -16458,14 +16486,14 @@ instead, which fills spare worker slots from a single unpartitioned
 dequeue call and has no per-target routing at all. <code>sf-net</code>, by
 contrast, hashes every operation for a given target to one worker
 thread (<code>_routing_key</code> in <code>shakenfist/daemons/network/workitem.py</code>),
-so a fold there can never mark an operation complete while another
-thread is executing it. That guarantee is the load-bearing part of
-the safety argument for a per-node fold, and it does not extend to
-<code>sf-queues</code> -- see the <code>PARTITIONED-WORKER SAFETY INVARIANT</code> comment
-at the top of <code>Job.__init__</code> in that file for the argument in full,
-including why <code>NodeNetOp.network_apply_create_hypervisor</code> (whose
-model already carries both columns) stays out of
-<code>COALESCIBLE_TASKS</code>.</p>
+so a fold there never claims an operation another thread is running,
+and a survivor never completes one. That guarantee is the
+load-bearing part of the safety argument for a per-node fold, and it
+does not extend to <code>sf-queues</code> -- see the
+<code>PARTITIONED-WORKER SAFETY INVARIANT</code> comment at the top of
+<code>Job.__init__</code> in that file for the argument in full, including why
+<code>NodeNetOp.network_apply_create_hypervisor</code> (whose model already
+carries both columns) stays out of <code>COALESCIBLE_TASKS</code>.</p>
 <p>Both guards therefore test the family as well as the key:</p>
 <ul>
 <li>The enqueue-time guard (<code>InvalidCoalescibleEnqueue</code> in
@@ -16498,11 +16526,13 @@ reading that let #3878 sit undetected for three months:</p>
   and skips, rather than reading the value with a default.</li>
 <li><code>coalescing_unavailable</code>: the database service answered
   <code>UNIMPLEMENTED</code>, meaning a rolling upgrade against an <code>sf-database</code>
-  predating the V2 RPCs. The wrappers raise
-  <code>exceptions.CoalescingUnavailable</code> for this rather than returning
-  the same "nothing matched" they return on every other failure, so an
-  operator can watch the upgrade window open and close in the same
-  table as everything else instead of grepping daemon logs.</li>
+  predating the RPC the client called -- <code>FoldCoalescibleSiblings</code> for
+  the fold, <code>FindExistingCoalescibleOpV2</code> for the dedup. The wrappers
+  raise <code>exceptions.CoalescingUnavailable</code> for this rather than
+  returning the same "nothing matched" they return on every other
+  failure, so an operator can watch the upgrade window open and close
+  in the same table as everything else instead of grepping daemon
+  logs.</li>
 </ul>
 <h3 id="the-v2-grpc-methods">The V2 gRPC methods<a class="headerlink" href="#the-v2-grpc-methods" title="Permanent link">&para;</a></h3>
 <p><code>ClaimCoalescibleSiblingsV2</code> and <code>FindExistingCoalescibleOpV2</code> take a
@@ -16524,6 +16554,17 @@ priorities</code>, the priority filter described above. Unlike a key
 column, an old V2 server ignoring that field is only a lost
 optimisation -- it deduplicates the way the code did before the
 field existed -- so it travels as a field rather than needing a V3.</p>
+<p><code>FoldCoalescibleSiblings</code> takes the same request and returns the same
+reply as <code>ClaimCoalescibleSiblingsV2</code>, and runs the same statement,
+but moves the siblings to <code>executing</code> rather than <code>complete</code>. It is a
+new RPC rather than a flag on the request for the same reason the V2
+pair is: an old server would ignore the flag and complete the
+siblings up front. A client which gets <code>UNIMPLEMENTED</code> from it skips
+the fold and never falls back to <code>ClaimCoalescibleSiblingsV2</code>, which
+would bring back exactly the premature completion it replaces.
+<code>ClaimCoalescibleSiblingsV2</code> keeps its old behaviour for clients
+which predate the fold and has no caller in this tree; retiring it,
+with the V1 pair, is #4639.</p>
 
 
 
