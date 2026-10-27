@@ -1,6 +1,6 @@
 # Phase 5 — Auto-snapshot bug-report mode
 
-Phase 5 of [PLAN-stream-caps-and-flap.md](/components/ryll/plans/completed/PLAN-stream-caps-and-flap/).
+Phase 5 of [PLAN-stream-caps-and-flap.md](/components/ryll/plans/PLAN-stream-caps-and-flap/).
 
 ## Prompt
 
