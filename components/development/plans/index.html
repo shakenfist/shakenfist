@@ -2747,6 +2747,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/release-merge-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Release merge queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/release-process/" class="md-nav__link">
         
   
@@ -12043,6 +12071,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ryll/rdp-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP mode internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ryll/releasing/" class="md-nav__link">
         
   
@@ -12107,6 +12163,34 @@
     
   
     Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/rdp-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ryll --rdp operator guide
   
 
     
@@ -12275,10 +12359,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_27" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_27" id="__nav_3_10_27_label" tabindex="0">
             
   
   
@@ -12296,8 +12380,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_25">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_27_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_27">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -15855,7 +15939,7 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tr>
 <td>2026-10-18</td>
 <td><a href="/components/development/plans/PLAN-release-gating/">Release gating</a></td>
-<td>Settle <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python-ova/issues/19" title="GitHub Issue: shakenfist/client-python-ova #19">client-python-ova#19</a> fleet-wide: a criterion that every release environment has a reviewer and a tag-only policy, a shared gate that stops a release whose tagged commit did not pass CI, a shared wheel check that keeps tests off PyPI, which eight of nine packages ship today, and a merge queue and one release shape per language (Python and Rust) on every release repository, all measured by the audit</td>
+<td>Settle <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python-ova/issues/19" title="GitHub Issue: shakenfist/client-python-ova #19">client-python-ova#19</a> fleet-wide: a criterion that every release environment has a reviewer and a tag-only policy, a shared gate that stops a release whose tagged commit did not pass CI, a shared wheel check that keeps tests off PyPI, which eight of nine packages ship today, and a merge queue and one release shape per language (Python and Rust) on every release repository, all measured by the audit. Phases 1 to 3 have landed. Phase 4 runs the release rules for every language, not only Python, and adds the queue criterion. occystrap's queue never ran, so it goes back to a single tier of CI until GitHub's side is fixed</td>
 <td>In progress</td>
 </tr>
 </tbody>

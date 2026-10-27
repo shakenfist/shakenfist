@@ -16,7 +16,7 @@
         <link rel="prev" href="../macos-metrics-verification/">
       
       
-        <link rel="next" href="../releasing/">
+        <link rel="next" href="../rdp-mode-internals/">
       
       
         
@@ -2725,6 +2725,34 @@
     
   
     Audit: Release environment protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/audits/release-merge-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Release merge queue
   
 
     
@@ -12122,6 +12150,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../rdp-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP mode internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../releasing/" class="md-nav__link">
         
   
@@ -12186,6 +12242,34 @@
     
   
     Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rdp-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ryll --rdp operator guide
   
 
     
@@ -12354,10 +12438,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_27" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_27" id="__nav_3_10_27_label" tabindex="0">
             
   
   
@@ -12375,8 +12459,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_25">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_27_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_27">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -15847,17 +15931,18 @@
 
 
 <h1 id="multi-mode-feature-parity">Multi-mode feature parity<a class="headerlink" href="#multi-mode-feature-parity" title="Permanent link">&para;</a></h1>
-<p>Ryll is one binary with three delivery modes: a <strong>GUI</strong> desktop window
+<p>Ryll is one binary with four delivery modes: a <strong>GUI</strong> desktop window
 (egui/eframe), a <strong>headless</strong> mode (no window; stdout, metrics, and an
-optional control socket), and a <strong>web</strong> mode (browser client over
-WebRTC via <code>--web</code>). Features usually land in one mode first and reach
-the others later — or never, when a mode physically can't support them.
-This page is the honest ledger of that drift: a per-feature matrix of
-what is reachable in each mode today.</p>
+optional control socket), a <strong>web</strong> mode (browser client over WebRTC
+via <code>--web</code>), and an <strong>RDP</strong> mode (a stock RDP client via <code>--rdp</code>, in
+builds with the <code>rdp</code> feature). Features usually land in one mode
+first and reach the others later — or never, when a mode physically
+can't support them. This page is the honest ledger of that drift: a
+per-feature matrix of what is reachable in each mode today.</p>
 <p>Use it two ways:</p>
 <ul>
 <li><strong>Choosing a mode.</strong> "Can I do X in headless?" is answered by one
-  cell lookup rather than by reading three documents or trying it.</li>
+  cell lookup rather than by reading several documents or trying it.</li>
 <li><strong>Reviewing changes.</strong> A new feature that only works in the mode its
   author happened to test in is a parity regression waiting to be
   discovered by a user. The matrix makes that visible at review time.</li>
@@ -15890,7 +15975,7 @@ what is reachable in each mode today.</p>
 <tr>
 <td>RDP</td>
 <td><code>--rdp</code></td>
-<td>Serves a stock RDP client with IronRDP; in progress, display, input, cursor shapes, desktop resize, text clipboard and audio so far; the column lands with the operator guide</td>
+<td>Serves the session to one stock RDP client at a time with IronRDP: a reachability fallback for users with no SPICE client, not a better path. Needs a build with the <code>rdp</code> feature, which releases leave out. See the <a href="/components/ryll/rdp-frontend/">RDP frontend operator guide</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -15932,7 +16017,12 @@ what is reachable in each mode today.</p>
   oversights.</li>
 <li>Several headless cells are reachable only through the control
   socket, which requires launching with <code>--control-socket &lt;path&gt;</code>.
-  Those cells say so explicitly.</li>
+  Those cells say so explicitly. The same holds for the Web and RDP
+  columns.</li>
+<li>An <strong>RDP</strong> cell reads "available" when a stock RDP client can use
+  the feature through <code>--rdp</code>. A feature ryll offers only to its own
+  operator (a control socket verb, <code>--capture</code>, <code>--usb-disk</code>) is
+  judged, as in the Web column, by what the mode wires up.</li>
 </ul>
 <h2 id="maintenance-protocol">Maintenance protocol<a class="headerlink" href="#maintenance-protocol" title="Permanent link">&para;</a></h2>
 <p>Reviewers are expected to keep this matrix honest:</p>
@@ -15941,6 +16031,8 @@ what is reachable in each mode today.</p>
 <li>When a mode gains or loses a feature, update the cell.</li>
 <li>When a "missing"/"partial" gap is closed, update the cell and remove
   the source link.</li>
+<li><code>tools/check-parity-matrix.py</code>, run by pre-commit, checks that every
+  row has a cell per mode and every cell starts with a verdict above.</li>
 </ul>
 <p>This document records the baseline; it does not propose fixes. There
 is no standing gap-closure plan — gaps get closed by mode-specific
@@ -15952,13 +16044,19 @@ the socket, its <code>status</code> and event rows, and the shared digest
 poller), media socket binding added 2026-08-21, clipboard and
 resize rows refreshed 2026-10-14 (control protocol 1.3), display,
 streaming and statistics rows refreshed 2026-10-16 (control protocol
-1.4's <code>stats</code> verb).</p>
+1.4's <code>stats</code> verb), RDP column and <em>RDP frontend</em> section added
+2026-10-27, each cell judged from <code>run_rdp</code>.</p>
 <h2 id="parity-matrix">Parity matrix<a class="headerlink" href="#parity-matrix" title="Permanent link">&para;</a></h2>
 <p>Headless cells name two functions. The renderer's <code>run_headless()</code>,
 in <code>shakenfist-spice-renderer/src/session.rs</code>, runs the session and its
 event loop. Ryll's <code>run_headless()</code>, in <code>ryll/src/main.rs</code>, builds the
 notification store and registers the <code>--pedantic</code> and gap observers
 around it.</p>
+<p>RDP cells name <code>run_rdp</code>, in <code>ryll/src/rdp.rs</code>. It builds the SPICE
+side as <code>run_web</code> does (event bus, surface mirror, optional control
+socket), supervises SPICE reconnects, and hands the session to the
+<code>shakenfist-spice-rdp</code> library, which serves it to the client. The
+<a href="/components/ryll/rdp-mode-internals/">RDP mode internals</a> page describes both.</p>
 <table>
 <thead>
 <tr>
@@ -15966,11 +16064,13 @@ around it.</p>
 <th>GUI</th>
 <th>Headless</th>
 <th>Web</th>
+<th>RDP</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><strong>Connection</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -15980,9 +16080,11 @@ around it.</p>
 <td>available</td>
 <td>available</td>
 <td>available</td>
+<td>available</td>
 </tr>
 <tr>
 <td>Connect via URL (<code>--url</code>)</td>
+<td>available</td>
 <td>available</td>
 <td>available</td>
 <td>available</td>
@@ -15992,9 +16094,11 @@ around it.</p>
 <td>available</td>
 <td>available</td>
 <td>available</td>
+<td>available</td>
 </tr>
 <tr>
 <td>TLS / secure channel (inline CA from .vv)</td>
+<td>available</td>
 <td>available</td>
 <td>available</td>
 <td>available</td>
@@ -16003,10 +16107,12 @@ around it.</p>
 <td>HTTP CONNECT proxy (<code>proxy=</code> in .vv)</td>
 <td>available</td>
 <td>available</td>
-<td>available (all three build the same <code>ConnectionConfig</code>)</td>
+<td>available (every mode builds the same <code>ConnectionConfig</code>)</td>
+<td>available (<code>run_rdp</code> builds the same <code>ConnectionConfig</code> as the other modes)</td>
 </tr>
 <tr>
 <td>Password authentication</td>
+<td>available</td>
 <td>available</td>
 <td>available</td>
 <td>available</td>
@@ -16016,33 +16122,39 @@ around it.</p>
 <td></td>
 <td></td>
 <td></td>
+<td></td>
 </tr>
 <tr>
 <td>Control socket (<code>--control-socket</code>)</td>
 <td>n/a — intrinsic (the window owns input and the surface; combining with the GUI is a CLI error)</td>
 <td>available</td>
 <td>available</td>
+<td>available (wired to the session's fixed ends, so a SPICE reconnect does not disturb it)</td>
 </tr>
 <tr>
 <td>Session state query (<code>status</code> verb)</td>
 <td>n/a — intrinsic</td>
 <td>available</td>
 <td>available (<code>run_web</code> builds a <code>SessionStatus</code> from the same <code>spice_connected</code> flag, <code>SessionState</code> agent watch and surface mirror headless uses)</td>
+<td>available (<code>run_rdp</code> builds a <code>SessionStatus</code> from a <code>connected</code> flag and agent watch that each SPICE attempt updates, so <code>status</code> reports SPICE down during an outage and up again after a reconnect)</td>
 </tr>
 <tr>
 <td>Display and video-stream counters (<code>stats</code> verb)</td>
 <td>n/a — intrinsic</td>
 <td>available</td>
 <td>available (<code>run_web</code> hands the socket the same display snapshot it gives the session)</td>
+<td>available (<code>run_rdp</code> hands the socket the display and playback snapshots it gives each SPICE attempt)</td>
 </tr>
 <tr>
 <td>Event subscription (<code>latency</code>, <code>agent_connected</code>, <code>paste_*</code>, <code>surface_drawn</code>, <code>clipboard_changed</code>, <code>digest_updated</code>)</td>
 <td>n/a — intrinsic</td>
 <td>available (<code>digest_updated</code> needs the <code>digest-decode</code> build feature)</td>
 <td>available (same <code>event_broadcast_tx</code>; <code>digest_updated</code> needs the <code>digest-decode</code> build feature, and the poller is spawned only when <code>--control-socket</code> is given so an ordinary browser session does not pay to decode QR)</td>
+<td>available (same event bus as web mode; <code>paste_*</code> never fires because paste-as-keystrokes is off; <code>digest_updated</code> needs the <code>digest-decode</code> build feature and a <code>--control-socket</code>)</td>
 </tr>
 <tr>
 <td><strong>Display</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16052,27 +16164,32 @@ around it.</p>
 <td>available</td>
 <td>available (the renderer's <code>run_headless()</code> applies every draw op to a <code>SurfaceMirror</code> as it arrives, whether or not a control socket is open; nothing displays it, but the <code>screenshot</code> verb reads it)</td>
 <td>available (single monitor, MVP)</td>
+<td>available (the primary surface, sent to the client as bitmaps of the damage read from the <code>SurfaceMirror</code>)</td>
 </tr>
 <tr>
 <td>Multi-monitor (<code>--monitors N</code>)</td>
 <td>available</td>
 <td>partial (<code>--monitors</code> reaches the session as in the GUI, and the renderer's <code>run_headless()</code> applies every display channel's draws to the <code>SurfaceMirror</code>, which creates a surface for each <code>SurfaceCreated</code>; <code>status</code> lists them all with their channel, but <code>screenshot</code> takes only a <code>surface_id</code> and so reaches only the primary's display channel. Multi-monitor headless is unverified end to end: <a href="https://github.com/shakenfist/ryll/issues/549">ryll#549</a>)</td>
 <td>missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope)</td>
+<td>partial (<code>--monitors</code> reaches the SPICE session and the mirror keeps every surface, but the display handler serves only the primary, and a client's multi-monitor layout is reduced to its primary monitor: <code>shakenfist-spice-rdp/src/display.rs:381</code>)</td>
 </tr>
 <tr>
 <td>Full draw-op coverage (FILL, COPY, BLEND, etc.)</td>
 <td>available</td>
 <td>available (the same <code>SurfaceMirror::apply_event</code> dispatch as the GUI and web mode)</td>
 <td>available (inherited from shared framebuffer)</td>
+<td>available (the same <code>SurfaceMirror</code> as web mode)</td>
 </tr>
 <tr>
 <td>SPICE video streams (MJPEG, H.264)</td>
 <td>available</td>
 <td>available (decoded frames are applied to the <code>SurfaceMirror</code> like any draw; the <code>stats</code> verb reports each stream's codec and decode counts)</td>
 <td>available (inherited)</td>
+<td>available (decoded frames are applied to the mirror and reach the client as bitmaps like any draw)</td>
 </tr>
 <tr>
 <td>Display capabilities advertisement (COMPOSITE, MONITORS_CONFIG, etc.)</td>
+<td>available</td>
 <td>available</td>
 <td>available</td>
 <td>available</td>
@@ -16082,33 +16199,39 @@ around it.</p>
 <td>available</td>
 <td>available</td>
 <td>available (affects only the SPICE side; the WebRTC encoder is unchanged)</td>
+<td>available (affects only the SPICE side; the RDP client is sent bitmaps either way)</td>
 </tr>
 <tr>
 <td>Do not offer H.264 to the server (<code>--no-h264</code>)</td>
 <td>available</td>
 <td>available</td>
 <td>available (affects only the SPICE side; the WebRTC encoder is unchanged)</td>
+<td>available (affects only the SPICE side; the RDP client is sent bitmaps either way)</td>
 </tr>
 <tr>
 <td>Window auto-resize to surface size</td>
 <td>available</td>
 <td>n/a — intrinsic (no window)</td>
 <td>n/a — intrinsic (browser viewport is user-controlled)</td>
+<td>available (when the guest's surface changes size the client's desktop is resized to match; whether its window follows is the client's choice)</td>
 </tr>
 <tr>
 <td>Obey guest size hints toggle (<code>--no-obey-guest-size</code> / hamburger toggle)</td>
 <td>available</td>
 <td>n/a — intrinsic (no window; flag accepted in headless for CLI symmetry but ignored, <code>_obey_guest_size</code> in ryll's <code>run_headless()</code>)</td>
 <td>missing (out of MVP scope; the web frontend's "guest fits browser viewport" inverse is planned)</td>
+<td>n/a — intrinsic (the RDP desktop is the guest's surface, so the client is always resized to it; the flag is accepted and ignored, as <code>main.rs</code> does not pass it to <code>run_rdp</code>)</td>
 </tr>
 <tr>
 <td>Guest resolution follows viewport (<code>VDAgentMonitorsConfig</code>)</td>
 <td>available</td>
 <td>available (via the control socket <code>resize</code> verb, rounded to the GUI's 8-pixel grid; there is no viewport to follow)</td>
 <td>available (also via the control socket <code>resize</code> verb, which shares the browser's resize queue)</td>
+<td>available (the size the client connects with and every layout it sends are asked of the guest, rounded down to a multiple of 8; the control socket <code>resize</code> verb shares the queue)</td>
 </tr>
 <tr>
 <td><strong>Cursor</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16118,27 +16241,32 @@ around it.</p>
 <td>available</td>
 <td>missing (the renderer's <code>run_headless()</code> — <code>CursorChannel</code> runs, events arrive, but its event loop has no handler for <code>CursorImage</code>/<code>CursorPos</code> events)</td>
 <td>available (datachannel CSS overlay; the host cursor is only hidden once a real SPICE shape has arrived, so a guest that never sends one leaves the browser's own pointer visible rather than none at all)</td>
+<td>available (sent as an RDP pointer, scaled down to fit 96x96 when larger)</td>
 </tr>
 <tr>
 <td>Cursor position tracking</td>
 <td>available</td>
 <td>missing (same as above)</td>
 <td>available (MVP)</td>
+<td>missing (the cursor relay keeps only the shape and visibility, <code>shakenfist-spice-rdp/src/cursor.rs:114</code>, so the client draws the pointer where its own mouse is; in server mouse mode the two drift apart)</td>
 </tr>
 <tr>
 <td>Cursor hide/show</td>
 <td>available</td>
 <td>missing (same as above)</td>
 <td>available (MVP)</td>
+<td>available</td>
 </tr>
 <tr>
 <td>Default arrow fallback cursor</td>
 <td>available</td>
 <td>n/a — intrinsic (no display)</td>
 <td>available</td>
+<td>available (the client is told to use its default pointer until the guest sends a shape)</td>
 </tr>
 <tr>
 <td><strong>Audio</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16148,21 +16276,25 @@ around it.</p>
 <td>available</td>
 <td>partial (<code>shakenfist-spice-renderer/src/channels/playback.rs</code> — <code>PlaybackChannel</code> connects and decodes, but always spawns a cpal thread (the headless runner plays locally); with no audio device present it raises one notification and retries with a backoff of up to 30 s; headless does not use a playback sink, so there is no discard path there)</td>
 <td>available (MVP; Opus passthrough; raw-PCM servers give silent audio. The session uses a playback sink, so no host cpal thread or audio device is opened and the <code>output_*</code> snapshot fields stay empty)</td>
+<td>available (Opus passed through, or 48 kHz stereo PCM, whichever the client accepts first; no host audio device is opened. Raw PCM from the server is not played to a client that chose Opus)</td>
 </tr>
 <tr>
 <td>Volume control (slider + mute)</td>
 <td>available</td>
 <td>missing (the renderer's <code>run_headless()</code> — a <code>VolumeControl</code> is passed to <code>run_connection()</code> but no CLI flag, stdout interface, or control-socket verb exposes it in headless)</td>
 <td>missing (out of MVP scope; not listed in PLAN-web-frontend.md MVP)</td>
+<td>n/a — intrinsic (the RDP client plays the audio, so its own volume control sets the level; ryll sends the client no volume)</td>
 </tr>
 <tr>
 <td>Audio volume/mute persisted across reconnect</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI; VolumeControl is re-created on reconnect anyway)</td>
 <td>missing (out of MVP scope)</td>
+<td>n/a — intrinsic (ryll has no volume of its own in this mode; the client's is untouched by a SPICE reconnect)</td>
 </tr>
 <tr>
 <td><strong>Keyboard / Mouse Input</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16172,45 +16304,53 @@ around it.</p>
 <td>available</td>
 <td>available (via the control socket <code>send_key</code> verb — down/up/press with AT-set-1 scancodes; without <code>--control-socket</code> only cadence and <code>--paste-text</code> generate input)</td>
 <td>available (MVP; browser-side scancode table)</td>
+<td>available (scancodes from the client; Unicode key events, which carry no scancode, are dropped — see the operator guide)</td>
 </tr>
 <tr>
 <td>Mouse input (position and buttons)</td>
 <td>available</td>
 <td>missing (the control socket declares mouse verbs a non-goal until a test needs them; no other pointer path exists in headless)</td>
 <td>available (MVP)</td>
+<td>partial (position, left and right buttons work in both mouse modes; a client that sends the middle button on the standard mouse message loses it, <code>shakenfist-spice-rdp/src/input.rs:441</code>, <a href="https://github.com/shakenfist/ryll/issues/604">ryll#604</a>. FreeRDP sends it on its own channel and is unaffected)</td>
 </tr>
 <tr>
 <td>Mouse wheel</td>
 <td>available (egui scroll events become SPICE wheel clicks)</td>
 <td>missing (no pointer path in headless; the control socket has no wheel verb)</td>
 <td>missing (<code>BrowserMsg</code> has no wheel message, so the browser shell does not forward scrolling)</td>
+<td>available (vertical, accumulated into whole notches; horizontal scrolling is dropped, as SPICE has no horizontal wheel)</td>
 </tr>
 <tr>
 <td>Mouse mode negotiation (CLIENT/SERVER)</td>
 <td>available (both modes drive the guest pointer. In server mode the relative deltas come from host hover positions with no pointer grab, so they drift under guest pointer acceleration until targets near the window edge cannot be reached)</td>
 <td>available (negotiation runs in <code>MainChannel</code> regardless of mode)</td>
 <td>available (both modes drive the guest pointer: absolute <code>MouseMove</code> in client mode, relative <code>MouseMotion</code> derived from consecutive browser positions in server mode. Pointer Lock is still absent, so the derived deltas drift under guest pointer acceleration and dead-zone at the window edge — see docs/web-frontend.md)</td>
+<td>available (both modes drive the guest pointer; in server mode the deltas derived from the client's positions drift under guest pointer acceleration, as in web mode)</td>
 </tr>
 <tr>
 <td>Extended key prefix (E0 for nav cluster)</td>
 <td>available</td>
 <td>available (the control socket <code>send_key</code> verb accepts 0xE0-prefixed 16-bit scancodes in logical form and converts them; protocol 1.1 and earlier sent them prefix-second and unusable — see docs/control-socket-protocol.md. Cadence alone only sends space)</td>
 <td>available (browser table is in logical form; ryll converts via <code>make_scancode</code>)</td>
+<td>available (a key RDP flags as extended is sent with the 0xE0 prefix)</td>
 </tr>
 <tr>
 <td>macOS Cmd chords (Cmd+Q, Cmd+W, ...)</td>
 <td>available (treated as host shortcuts: the chord key is withheld from the guest, press and release; Cmd is not mapped to the guest's Super key)</td>
 <td>n/a — intrinsic (no keyboard)</td>
 <td>available, by a different policy (Cmd is forwarded as the guest's Super key — <code>MetaLeft</code>/<code>MetaRight</code> are in the browser scancode table — so the guest sees a Super chord rather than a bare letter)</td>
+<td>n/a — intrinsic (the RDP client decides what a Cmd chord sends; ryll forwards the scancodes it receives)</td>
 </tr>
 <tr>
 <td>Modifier state tracking (Ctrl/Shift/Alt)</td>
 <td>available</td>
 <td>partial (<code>InputsChannel</code> in <code>shakenfist-spice-renderer/src/channels/inputs.rs</code> — tracked internally but only used by the paste state machine; cadence does not restore modifiers)</td>
 <td>available (MVP)</td>
+<td>available (modifiers arrive as ordinary key events; Scroll, Num and Caps Lock follow the client's synchronize event; keys still held when a client leaves or is taken over are released)</td>
 </tr>
 <tr>
 <td><strong>Cadence mode</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16220,9 +16360,11 @@ around it.</p>
 <td>available</td>
 <td>available</td>
 <td>missing (out of MVP scope; no test-automation use case in browser)</td>
+<td>missing (<code>run_rdp</code>, <code>ryll/src/rdp.rs:460</code>, never reads <code>--cadence</code>; only the GUI and the renderer's <code>run_headless()</code> run it)</td>
 </tr>
 <tr>
 <td><strong>Clipboard</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16232,9 +16374,11 @@ around it.</p>
 <td>available (host clipboard via <code>arboard</code>)</td>
 <td>available (via the control socket: <code>clipboard_set</code> offers text to the guest, <code>clipboard_get</code> reads it back, <code>clipboard_changed</code> reports guest copies; the in-memory clipboard exists only with <code>--control-socket</code>)</td>
 <td>partial (the browser has no clipboard sync — out of MVP scope; the control socket's clipboard verbs work as in headless)</td>
+<td>available (text both ways through the RDP clipboard channel, CRLF and LF converted, via one <code>MemoryClipboard</code> for the run; the control socket's clipboard verbs share it. Rich formats and files are not shared)</td>
 </tr>
 <tr>
 <td><strong>Paste-as-keystrokes</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16244,39 +16388,46 @@ around it.</p>
 <td>available</td>
 <td>available (<code>--enable-paste-as-keystrokes</code>)</td>
 <td>missing (out of MVP scope; clipboard sync is in Future work list in PLAN-web-frontend.md)</td>
+<td>missing (<code>run_rdp</code> passes <code>enable_paste</code> as false, <code>ryll/src/rdp.rs:341</code>)</td>
 </tr>
 <tr>
 <td>Paste-as-keystrokes (runtime trigger via Ctrl+Alt+V)</td>
 <td>available</td>
 <td>available (via the control socket <code>paste</code> verb; Ctrl+Alt+V itself is GUI-only)</td>
 <td>missing (out of MVP scope)</td>
+<td>missing (paste is off, so the inputs channel ignores the control socket <code>paste</code> verb, <code>shakenfist-spice-renderer/src/channels/inputs.rs:859</code>)</td>
 </tr>
 <tr>
 <td>Paste-as-keystrokes (headless <code>--paste-text</code>)</td>
 <td>n/a — intrinsic (GUI reads clipboard; <code>--paste-text</code> is headless-only per README)</td>
 <td>available</td>
 <td>missing (out of MVP scope)</td>
+<td>missing (<code>run_rdp</code> never reads <code>--paste-text</code>; paste is off, <code>ryll/src/rdp.rs:341</code>)</td>
 </tr>
 <tr>
 <td>Paste-as-keystrokes (inter-character delay <code>--paste-char-delay-ms</code>)</td>
 <td>available</td>
 <td>available (also settable per-request via the control socket <code>paste</code> verb's <code>char_delay_ms</code>)</td>
 <td>missing (out of MVP scope)</td>
+<td>missing (paste is off, <code>ryll/src/rdp.rs:341</code>)</td>
 </tr>
 <tr>
 <td>Paste-as-keystrokes (vdagent auto-disable)</td>
 <td>available (<code>RyllApp::trigger_paste()</code> in <code>ryll/src/app/</code>)</td>
 <td>available (vdagent state logged from the session's <code>SessionState</code> watch; <code>enable_paste</code> flag passed through)</td>
 <td>missing (out of MVP scope)</td>
+<td>missing (paste is off, <code>ryll/src/rdp.rs:341</code>)</td>
 </tr>
 <tr>
 <td>Paste character validation / error dialog</td>
 <td>available</td>
 <td>partial (the renderer's <code>run_headless()</code> — <code>PasteFailed</code> logged and causes non-zero exit; control-socket clients get a <code>paste_failed</code> event; no interactive dialog)</td>
 <td>missing (out of MVP scope)</td>
+<td>missing (paste is off, <code>ryll/src/rdp.rs:341</code>)</td>
 </tr>
 <tr>
 <td><strong>USB Redirection</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16286,45 +16437,53 @@ around it.</p>
 <td>available</td>
 <td>available (<code>--usb-disk</code>, <code>--usb-disk-ro</code> CLI flags work in headless)</td>
 <td>missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope)</td>
+<td>available (the channel links; <code>--usb-disk</code> and <code>--usb-disk-ro</code> reach it, as below. The RDP client cannot drive it)</td>
 </tr>
 <tr>
 <td>USB interactive panel (Menu → USB)</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI)</td>
 <td>missing (out of MVP scope)</td>
+<td>n/a — intrinsic (no ryll UI inside an RDP session)</td>
 </tr>
 <tr>
 <td>Connect physical USB device (Linux only)</td>
 <td>available</td>
 <td>missing (the renderer's <code>run_headless()</code> — <code>_usb_tx</code> is created but <code>usb_rx</code> is never sent a ConnectPhysical command in headless; no CLI flag for physical devices)</td>
 <td>missing (out of MVP scope)</td>
+<td>missing (the USB command channel is created closed, <code>ryll/src/rdp.rs:303</code>, and there is no flag for a physical device)</td>
 </tr>
 <tr>
 <td>Connect virtual USB disk (<code>--usb-disk</code>)</td>
 <td>available</td>
 <td>available</td>
 <td>missing (out of MVP scope)</td>
+<td>available (<code>run_rdp</code> hands the disks to every SPICE attempt, and the usbredir channel connects them at its hello; not yet tested through <code>--rdp</code>)</td>
 </tr>
 <tr>
 <td>Connect read-only virtual USB disk (<code>--usb-disk-ro</code>)</td>
 <td>available</td>
 <td>available</td>
 <td>missing (out of MVP scope)</td>
+<td>available (as <code>--usb-disk</code>)</td>
 </tr>
 <tr>
 <td>Runtime USB disk addition (file picker)</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI file picker)</td>
 <td>missing (out of MVP scope)</td>
+<td>n/a — intrinsic (no ryll UI inside an RDP session)</td>
 </tr>
 <tr>
 <td>USB error reporting (bug report integration)</td>
 <td>available</td>
 <td>partial (the renderer's <code>run_headless()</code> — errors logged; no zip written unless <code>--pedantic</code>)</td>
 <td>missing (out of MVP scope)</td>
+<td>partial (errors are logged; <code>run_rdp</code> writes bug reports only from the <code>--pedantic</code> observer, <code>ryll/src/rdp.rs:536</code>)</td>
 </tr>
 <tr>
 <td><strong>Folder Sharing (WebDAV)</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16334,33 +16493,39 @@ around it.</p>
 <td>available</td>
 <td>available (<code>--share-dir</code>, <code>--share-dir-ro</code> CLI flags work in headless)</td>
 <td>missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope)</td>
+<td>available (the channel links; <code>--share-dir</code> and <code>--share-dir-ro</code> reach it, as below. The RDP client cannot drive it)</td>
 </tr>
 <tr>
 <td>WebDAV interactive panel (Menu → Folders)</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI)</td>
 <td>missing (out of MVP scope)</td>
+<td>n/a — intrinsic (no ryll UI inside an RDP session)</td>
 </tr>
 <tr>
 <td>Share directory (<code>--share-dir</code>)</td>
 <td>available</td>
 <td>available</td>
 <td>missing (out of MVP scope)</td>
+<td>available (<code>run_rdp</code> hands the share to every SPICE attempt, and the WebDAV channel serves it from the start; not yet tested through <code>--rdp</code>)</td>
 </tr>
 <tr>
 <td>Read-only share (<code>--share-dir-ro</code>)</td>
 <td>available</td>
 <td>available</td>
 <td>missing (out of MVP scope)</td>
+<td>available (as <code>--share-dir</code>)</td>
 </tr>
 <tr>
 <td>Runtime directory picker (native file dialog)</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI)</td>
 <td>missing (out of MVP scope)</td>
+<td>n/a — intrinsic (no ryll UI inside an RDP session)</td>
 </tr>
 <tr>
 <td><strong>Statistics and Instrumentation</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16370,51 +16535,60 @@ around it.</p>
 <td>available</td>
 <td>partial (no FPS is computed; the control socket's <code>stats</code> verb returns <code>marks_received</code>, whose rate between polls is the GUI's measure)</td>
 <td>partial (no stats panel in the browser MVP; the control socket's <code>stats</code> verb works as in headless)</td>
+<td>partial (no FPS is computed; the control socket's <code>stats</code> verb returns <code>marks_received</code>, <code>ryll/src/rdp.rs:727</code>)</td>
 </tr>
 <tr>
 <td>Bandwidth sparkline (rolling bytes/sec graph)</td>
 <td>available</td>
 <td>partial (no graph; the control socket's <code>stats</code> verb returns the display channel's <code>bytes_in</code>, whose rate between polls is its bandwidth)</td>
 <td>partial (no graph; the control socket's <code>stats</code> verb works as in headless)</td>
+<td>partial (no graph; the control socket's <code>stats</code> verb returns the display channel's <code>bytes_in</code>, <code>ryll/src/rdp.rs:727</code>)</td>
 </tr>
 <tr>
 <td>PING interval sparkline (inter-PING interval graph)</td>
 <td>available</td>
 <td>partial (no graph; raw samples are reachable as control-socket <code>latency</code> events)</td>
 <td>missing (out of MVP scope)</td>
+<td>partial (no graph; raw samples are reachable as control-socket <code>latency</code> events, <code>ryll/src/rdp.rs:735</code>)</td>
 </tr>
 <tr>
 <td>Inputs round trip (<code>RTT</code> in the status bar)</td>
 <td>available</td>
 <td>missing (headless sends no pointer input, and a round trip is only measured from pointer messages)</td>
 <td>partial (no stats panel; the browser's pointer drives control-socket <code>input_rtt</code> events)</td>
+<td>partial (no stats panel; the RDP client's pointer drives control-socket <code>input_rtt</code> events, <code>ryll/src/rdp.rs:735</code>)</td>
 </tr>
 <tr>
 <td>Periodic stats to stdout (headless only)</td>
 <td>n/a — intrinsic (GUI shows live stats in status bar)</td>
 <td>available (every 10 s: DISPLAY_MARKs, image draws, and bytes in and out across every channel)</td>
 <td>n/a — intrinsic (browser context)</td>
+<td>missing (<code>run_rdp</code>, <code>ryll/src/rdp.rs:460</code>, logs no periodic stats line)</td>
 </tr>
 <tr>
 <td><code>--latency-file</code> latency measurements export</td>
 <td>missing (<code>Args::latency_file</code> in <code>ryll/src/config.rs</code> — flag declared but never read or acted upon anywhere in the codebase)</td>
 <td>missing (same — flag is declared but unused; control-socket <code>latency</code> events are the working alternative)</td>
 <td>missing (out of MVP scope)</td>
+<td>missing (same — <code>Args::latency_file</code> in <code>ryll/src/config.rs</code> is declared and never read)</td>
 </tr>
 <tr>
 <td>Channel state snapshots (for bug reports)</td>
 <td>available</td>
 <td>available</td>
 <td>missing (out of MVP scope)</td>
+<td>available (<code>run_rdp</code> keeps <code>ChannelSnapshots</code> for every attempt; <code>--pedantic</code> reports and the <code>stats</code> verb read them)</td>
 </tr>
 <tr>
 <td>Traffic ring buffer (always active)</td>
 <td>available</td>
 <td>available</td>
 <td>missing (out of MVP scope)</td>
+<td>available (<code>run_rdp</code> builds the <code>TrafficBuffers</code> every attempt records into)</td>
 </tr>
 <tr>
 <td><strong>Protocol Gap Tracking</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16424,27 +16598,32 @@ around it.</p>
 <td>available</td>
 <td>missing (ryll's <code>run_headless()</code> — gap observer registered; warn_once fires; but the renderer's event loop has no handler to surface the count)</td>
 <td>missing (out of MVP scope)</td>
+<td>missing (<code>run_rdp</code> registers the gap observer, <code>ryll/src/rdp.rs:553</code>, but nothing surfaces the count)</td>
 </tr>
 <tr>
 <td>Protocol gap floating window (click Gaps button)</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI)</td>
 <td>missing (out of MVP scope)</td>
+<td>n/a — intrinsic (no ryll UI inside an RDP session)</td>
 </tr>
 <tr>
 <td><code>--pedantic</code> mode (auto bug-report per gap)</td>
 <td>available</td>
 <td>available (partial: ryll's <code>run_headless()</code> — <code>app_snapshot</code> is an empty default, so pedantic zips omit surface/bandwidth/latency data)</td>
 <td>missing (out of MVP scope)</td>
+<td>partial (<code>run_rdp</code> registers the observer with an empty <code>app_snapshot</code>, <code>ryll/src/rdp.rs:537</code>, so pedantic zips omit surface, bandwidth and latency data)</td>
 </tr>
 <tr>
 <td><code>--pedantic-dir</code> directory selection</td>
 <td>available</td>
 <td>available</td>
 <td>missing (out of MVP scope)</td>
+<td>available</td>
 </tr>
 <tr>
 <td><strong>Bug Reports</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16454,33 +16633,39 @@ around it.</p>
 <td>available</td>
 <td>n/a — intrinsic (no GUI)</td>
 <td>missing (out of MVP scope)</td>
+<td>n/a — intrinsic (no ryll UI inside an RDP session)</td>
 </tr>
 <tr>
 <td>Bug report zip assembly (metadata, pcap, screenshot, metrics)</td>
 <td>available</td>
 <td>partial (ryll's <code>run_headless()</code> — <code>--pedantic</code> zips have an empty <code>app_snapshot</code>; no interactive zip generation in headless)</td>
 <td>missing (out of MVP scope)</td>
+<td>partial (only <code>--pedantic</code> writes zips, with an empty <code>app_snapshot</code>, <code>ryll/src/rdp.rs:537</code>; there is no other trigger)</td>
 </tr>
 <tr>
 <td>Bug report display region selection</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI)</td>
 <td>missing (out of MVP scope)</td>
+<td>n/a — intrinsic (no ryll UI inside an RDP session)</td>
 </tr>
 <tr>
 <td>Bug report trigger-time screenshot capture</td>
 <td>available</td>
 <td>n/a — intrinsic (no continuously-painted display)</td>
 <td>missing (out of MVP scope)</td>
+<td>missing (the only reports <code>--rdp</code> writes are pedantic ones, which take no screenshot, <code>ryll/src/bugreport.rs:2404</code>)</td>
 </tr>
 <tr>
 <td>Runtime metrics in bug reports (Linux <code>/proc</code>)</td>
 <td>available</td>
 <td>available (sampled in <code>metrics.rs</code>; used by pedantic observer)</td>
 <td>missing (out of MVP scope)</td>
+<td>available (sampled for each pedantic report)</td>
 </tr>
 <tr>
 <td><strong>Screenshot</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16490,15 +16675,18 @@ around it.</p>
 <td>available</td>
 <td>available (via the control socket <code>screenshot</code> verb — PNG or raw RGBA of any live surface; the backing <code>SurfaceMirror</code> is created on first use)</td>
 <td>missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope "Recording / capture")</td>
+<td>available (via the control socket <code>screenshot</code> verb, against the mirror the RDP client is served from)</td>
 </tr>
 <tr>
 <td>Multi-surface screenshot (suffix <code>-1</code>, <code>-2</code>, …)</td>
 <td>available</td>
 <td>available (the <code>screenshot</code> verb takes a <code>surface_id</code> parameter; one call per surface)</td>
 <td>missing (out of MVP scope)</td>
+<td>available (the <code>screenshot</code> verb takes a <code>surface_id</code>; one call per surface)</td>
 </tr>
 <tr>
 <td><strong>Live Traffic Viewer</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16508,21 +16696,25 @@ around it.</p>
 <td>available</td>
 <td>n/a — intrinsic (no GUI)</td>
 <td>missing (out of MVP scope)</td>
+<td>n/a — intrinsic (no ryll UI inside an RDP session)</td>
 </tr>
 <tr>
 <td>Traffic viewer channel filters</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI)</td>
 <td>missing (out of MVP scope)</td>
+<td>n/a — intrinsic (no ryll UI inside an RDP session)</td>
 </tr>
 <tr>
 <td>Traffic viewer pause/resume</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI)</td>
 <td>missing (out of MVP scope)</td>
+<td>n/a — intrinsic (no ryll UI inside an RDP session)</td>
 </tr>
 <tr>
 <td><strong>Notifications</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16532,21 +16724,25 @@ around it.</p>
 <td>available</td>
 <td>missing (ryll's <code>run_headless()</code> — store exists and is populated, but no bell or side panel in headless; no stdout drain)</td>
 <td>missing (out of MVP scope)</td>
+<td>missing (<code>run_rdp</code> builds a notification store, <code>ryll/src/rdp.rs:523</code>, but nothing shows it to the client or prints it)</td>
 </tr>
 <tr>
 <td>SPICE_MSG_NOTIFY surfacing</td>
 <td>available</td>
 <td>partial (stored in notification store; printed nowhere in headless event loop unless captured by <code>--pedantic</code>)</td>
 <td>missing (out of MVP scope)</td>
+<td>partial (logged by the main channel, <code>shakenfist-spice-renderer/src/channels/main_channel.rs:1063</code>; nothing on <code>run_rdp</code>'s event bus stores or shows it)</td>
 </tr>
 <tr>
 <td>Gap observer notification feed</td>
 <td>available</td>
 <td>partial (registered by <code>register_gap_notification_observer()</code> in ryll's <code>run_headless()</code>; notifications accumulate in store but are never printed to stdout)</td>
 <td>missing (out of MVP scope)</td>
+<td>partial (registered at <code>ryll/src/rdp.rs:553</code>; notifications accumulate in the store but are never shown or printed)</td>
 </tr>
 <tr>
 <td><strong>Reconnect / Lifecycle</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16556,39 +16752,46 @@ around it.</p>
 <td>available</td>
 <td>n/a — intrinsic (no GUI; headless exits when main channel disconnects)</td>
 <td>available (SPICE session held while PeerConnection is dead; browser auto-reconnects with 1 s/2 s/4 s/8 s/16 s backoff, max 5 attempts then a manual button)</td>
+<td>available (automatic, with no button: SPICE is retried after 1, 4 and 16 s while the RDP client stays connected; see the RDP frontend section below)</td>
 </tr>
 <tr>
 <td>State preserved across reconnect (disks, share dir, paste toggle)</td>
 <td>available</td>
 <td>n/a — intrinsic (headless does not reconnect)</td>
 <td>partial (SPICE session continuity is preserved — the bridge is reaped and rebuilt, leaving the SPICE channels untouched; per-tab UI state is browser-managed)</td>
+<td>available (every SPICE attempt is given the same disks and share, clipboard text is kept, and the RDP client stays connected; paste is never on)</td>
 </tr>
 <tr>
 <td>Notification history preserved across reconnect</td>
 <td>available</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic (browser tab holds its own page state)</td>
+<td>partial (one store lasts the whole run, <code>ryll/src/rdp.rs:523</code>, so a SPICE reconnect keeps it, but nothing shows it)</td>
 </tr>
 <tr>
 <td>Disconnect dialog</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI)</td>
 <td>missing (not in MVP scope; browser tab closure is the UX)</td>
+<td>partial (during an outage the client is shown the last frame at half brightness with no text saying why, <code>shakenfist-spice-rdp/src/display.rs:602</code>; when ryll gives up it disconnects the client, which shows its own message)</td>
 </tr>
 <tr>
 <td>Graceful Ctrl+C shutdown</td>
 <td>available</td>
 <td>available</td>
 <td>available (SIGTERM/Ctrl-C drains axum then explicitly closes the active bridge so DTLS/SRTP tears down cleanly before the process exits)</td>
+<td>available (SIGINT only: the RDP server is stopped first, each client is asked to end, then SPICE is torn down and ryll exits 0)</td>
 </tr>
 <tr>
 <td>Cancel superseded connection attempt</td>
 <td>available</td>
 <td>n/a — intrinsic (headless does not reconnect)</td>
 <td>n/a — intrinsic (single-session MVP)</td>
+<td>n/a — intrinsic (nothing starts a SPICE attempt while another runs: the supervisor runs them one after another)</td>
 </tr>
 <tr>
 <td><strong>Window / Session Persistence</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16598,15 +16801,18 @@ around it.</p>
 <td>available</td>
 <td>n/a — intrinsic (no window)</td>
 <td>n/a — intrinsic (browser manages its own viewport)</td>
+<td>n/a — intrinsic (the RDP client owns its window)</td>
 </tr>
 <tr>
 <td>Open side panels survive reconnect</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI)</td>
 <td>n/a — intrinsic (no side panels in web MVP)</td>
+<td>n/a — intrinsic (no ryll panels inside an RDP session)</td>
 </tr>
 <tr>
 <td><strong>Capture Mode</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16616,21 +16822,25 @@ around it.</p>
 <td>available</td>
 <td>available</td>
 <td>missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope "Recording / capture")</td>
+<td>available (every SPICE attempt writes to the one capture session)</td>
 </tr>
 <tr>
 <td>Display video capture (<code>display.mp4</code> via openh264)</td>
 <td>available</td>
 <td>missing (only the GUI's frame loop calls <code>CaptureSink::frame</code>; headless keeps no continuously-painted surface to encode, so <code>--capture</code> writes the pcaps but no <code>display.mp4</code>)</td>
 <td>missing (out of MVP scope)</td>
+<td>missing (only the GUI's frame loop calls <code>CaptureSink::frame</code>, so <code>--capture</code> writes the pcaps but no <code>display.mp4</code>)</td>
 </tr>
 <tr>
 <td>Session metadata (<code>metadata.json</code>)</td>
 <td>available</td>
 <td>available</td>
 <td>missing (out of MVP scope)</td>
+<td>available</td>
 </tr>
 <tr>
 <td><strong>Diagnostics / Verbose Logging</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16640,9 +16850,11 @@ around it.</p>
 <td>available</td>
 <td>available</td>
 <td>available (stdout logging works regardless of mode)</td>
+<td>available</td>
 </tr>
 <tr>
 <td>File logging to <code>/tmp/ryll.log</code> (<code>-v</code>)</td>
+<td>available</td>
 <td>available</td>
 <td>available</td>
 <td>available</td>
@@ -16652,9 +16864,11 @@ around it.</p>
 <td>available</td>
 <td>available</td>
 <td>missing (no interactive input to log in web MVP that wouldn't also appear in the browser console)</td>
+<td>available (<code>run_rdp</code> passes the global log config to each attempt, so the inputs channel logs the RDP client's input as it does the GUI's)</td>
 </tr>
 <tr>
 <td><strong>Connection Source</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16664,15 +16878,18 @@ around it.</p>
 <td>available (status-bar <code>Agent</code> indicator; a server with no agent is notified as such, not as a disconnect)</td>
 <td>available (read from the session's <code>SessionState</code> watch and logged; also a control-socket event and <code>status</code> field)</td>
 <td>available (wired through same channel path)</td>
+<td>available (each attempt's agent state is copied into a watch the input handler and the control socket's <code>status</code> and <code>agent_connected</code> event read)</td>
 </tr>
 <tr>
 <td>TCP keepalive on all channel sockets</td>
 <td>available</td>
 <td>available</td>
 <td>available (inherited from SpiceClient)</td>
+<td>available (inherited from SpiceClient)</td>
 </tr>
 <tr>
 <td><strong>Authentication / Session Token</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16682,21 +16899,25 @@ around it.</p>
 <td>n/a — intrinsic (no HTTP server)</td>
 <td>n/a — intrinsic (no HTTP server)</td>
 <td>available (MVP; random 32-byte token printed to stdout)</td>
+<td>n/a — intrinsic (no HTTP server; the RDP counterpart is the generated password in the RDP frontend section)</td>
 </tr>
 <tr>
 <td>TLS for browser-facing endpoint</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
 <td>available (<code>--web-tls-cert</code> / <code>--web-tls-key</code> flags; axum-server with rustls)</td>
+<td>n/a — intrinsic (no browser; RDP's own TLS is in the RDP frontend section)</td>
 </tr>
 <tr>
 <td>WebRTC media socket binding</td>
 <td>n/a — intrinsic (no WebRTC)</td>
 <td>n/a — intrinsic (no WebRTC)</td>
 <td>available (<code>--web-media-addr</code> takes an address or an interface name, <code>--web-media-port</code> pins the UDP port for a firewall rule, <code>--web-ice-server</code> supplies STUN/TURN URLs)</td>
+<td>n/a — intrinsic (no WebRTC)</td>
 </tr>
 <tr>
 <td><strong>Web frontend (--web mode)</strong></td>
+<td></td>
 <td></td>
 <td></td>
 <td></td>
@@ -16706,54 +16927,147 @@ around it.</p>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
 <td>available (<code>ryll/src/web/server.rs</code>)</td>
+<td>n/a — intrinsic (no HTTP server)</td>
 </tr>
 <tr>
 <td>Embedded browser shell (HTML/JS/CSS via include_bytes!)</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
 <td>available</td>
+<td>n/a — intrinsic (no browser)</td>
 </tr>
 <tr>
 <td>WebRTC SDP signalling endpoint (<code>POST /offer</code>)</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
 <td>available</td>
+<td>n/a — intrinsic (no WebRTC)</td>
 </tr>
 <tr>
 <td>Synthetic video stream over WebRTC (test pattern)</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
 <td>available (SyntheticFrameSource)</td>
+<td>n/a — intrinsic (no WebRTC)</td>
 </tr>
 <tr>
 <td>Synthetic audio stream over WebRTC (440 Hz tone)</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic</td>
 <td>available</td>
+<td>n/a — intrinsic (no WebRTC)</td>
 </tr>
 <tr>
 <td>Real SPICE display frames over WebRTC</td>
 <td>available (egui paint loop)</td>
 <td>n/a — intrinsic (no encoder driven from real frames)</td>
 <td>available (RealFrameSource over SurfaceMirror)</td>
+<td>n/a — intrinsic (no WebRTC; frames reach the RDP client as bitmaps, see Display)</td>
 </tr>
 <tr>
 <td>Real SPICE audio over WebRTC (Opus passthrough)</td>
 <td>available (cpal sink)</td>
 <td>n/a — intrinsic (no audio sink)</td>
 <td>available (Opus path; PCM-only servers give silent audio with a one-time warn, as <code>WebPlaybackSink</code> discards raw PCM and does not encode it)</td>
+<td>n/a — intrinsic (no WebRTC; audio reaches the RDP client over its audio channel, see Audio)</td>
 </tr>
 <tr>
 <td>Browser-side keyboard/mouse input over datachannel</td>
 <td>available (egui inputs)</td>
 <td>n/a — intrinsic (no input device)</td>
 <td>available</td>
+<td>n/a — intrinsic (no browser; RDP input is under Keyboard / Mouse Input)</td>
 </tr>
 <tr>
 <td>Browser-side cursor overlay (datachannel)</td>
 <td>available (egui overlay)</td>
 <td>n/a — intrinsic</td>
 <td>available</td>
+<td>n/a — intrinsic (no browser; the RDP pointer is under Cursor)</td>
+</tr>
+<tr>
+<td><strong>RDP frontend (--rdp mode)</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>RDP listener (<code>--rdp-host</code>, <code>--rdp-port</code>)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>available (loopback by default; port 3389, or an ephemeral port if 3389 is taken, unless a port is named; needs a build with the <code>rdp</code> feature)</td>
+</tr>
+<tr>
+<td>Login credentials (<code>--rdp-user</code>, <code>--rdp-password</code>)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>available (user <code>ryll</code> and a password generated at each launch unless given; both printed to stdout at launch, and compared in constant time)</td>
+</tr>
+<tr>
+<td>TLS security mode (<code>--rdp-security tls</code>, the default)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>available (the username and password are checked by ryll inside TLS; the domain a client sends is ignored)</td>
+</tr>
+<tr>
+<td>NLA security mode (<code>--rdp-security nla</code>)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>available (CredSSP; a client that cannot do NLA is refused)</td>
+</tr>
+<tr>
+<td>Generated certificate and printed SHA-256 fingerprint</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>available (a self-signed certificate made at each launch, held in memory; its fingerprint is printed in the form RDP clients show)</td>
+</tr>
+<tr>
+<td>Own certificate (<code>--rdp-tls-cert</code>, <code>--rdp-tls-key</code>)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>available (PEM, read once at startup; an unreadable or mismatched pair fails the launch)</td>
+</tr>
+<tr>
+<td>One client at a time, taken over by the next to authenticate</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>available (the connected client is disconnected only once the new one has authenticated)</td>
+</tr>
+<tr>
+<td>Bounded handshake (one unauthenticated client at a time, 30 s limit)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>available</td>
+</tr>
+<tr>
+<td>Held keys and buttons released when a client leaves or is taken over</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>available</td>
+</tr>
+<tr>
+<td>Outage frame (last frame at half brightness while SPICE is down)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>n/a — intrinsic (no RDP listener)</td>
+<td>available (input and resize requests made meanwhile are dropped, not replayed)</td>
+</tr>
+<tr>
+<td>SPICE auto-reconnect</td>
+<td>available (the GUI retries with the same rules before showing its disconnect dialog, <code>ryll/src/app/reconnect.rs</code>)</td>
+<td>missing (ryll's <code>run_headless()</code> runs the session once and exits when it ends, <code>ryll/src/main.rs:476</code>)</td>
+<td>missing (<code>run_web</code> runs the session once, <code>ryll/src/main.rs:782</code>; a lost SPICE session is not retried)</td>
+<td>available (retries after 1, 4 and 16 s, honouring a single-use or expired <code>.vv</code> ticket; the client and the listener stay up throughout)</td>
 </tr>
 </tbody>
 </table>

@@ -2745,6 +2745,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/release-merge-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Release merge queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/release-process/" class="md-nav__link">
         
   
@@ -12338,6 +12366,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../rdp-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP mode internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../releasing/" class="md-nav__link">
         
   
@@ -12402,6 +12458,34 @@
     
   
     Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rdp-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ryll --rdp operator guide
   
 
     
@@ -12570,10 +12654,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_27" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_27" id="__nav_3_10_27_label" tabindex="0">
             
   
   
@@ -12591,8 +12675,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_25">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_27_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_27">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -16848,7 +16932,8 @@ in order, each building on the state the one before left:</p>
 <p>Each check prints a <code>[rdp-smoke] &lt;check&gt;: PASS</code> or <code>FAIL</code> summary
 line. Once one fails the rest print <code>SKIP</code>. A failure the
 environment caused (Xvfb not starting, QEMU not starting, the guest
-not booting) prints <code>FAIL (harness)</code> instead, so it is not read as
+not booting, or QEMU restarting too slowly to land inside ryll's
+retries) prints <code>FAIL (harness)</code> instead, so it is not read as
 a ryll defect; the guest's boot is checked from its own screen
 before ryll is started. The driver's docstring has the oracles and
 the deadlines. Its pure parts, the pixel reads, the colour
@@ -16973,9 +17058,9 @@ one entry at a time this is usually invisible, but it is the
 thing to look at if you see queue churn.</p>
 <h2 id="review-only-changes">Review-only changes<a class="headerlink" href="#review-only-changes" title="Permanent link">&para;</a></h2>
 <p>Changes that touch only the code-review artefacts —
-<code>REVIEWS.md</code>, <code>.vscode/*.weaudit</code>, <code>.vscode/*.weaudit-shas.json</code>
-and <code>.vscode/review-scope.toml</code> — cannot affect the build, so
-the <code>check_paths</code> job skips every tier job for them. Both gates
+<code>REVIEWS.md</code>, <code>.vscode/*.weaudit</code> and <code>.vscode/*.weaudit-shas.json</code>
+— cannot affect the build, so the <code>check_paths</code> job skips every
+tier job for them. Both gates
 still pass, because their jq counts a skipped dependency as
 success, so such a pull request goes through the queue without
 running a single build.</p>
@@ -16984,7 +17069,9 @@ running a single build.</p>
 quantifier a file matches if it matches <em>any</em> pattern, so <code>'**'</code>
 would match everything and silently defeat the <code>!REVIEWS.md</code>
 exclusions. Keep its skip list in sync with the <code>.vscode</code>
-whitelist in <code>.gitignore</code> and with <code>codeql-analysis.yml</code>.</p>
+whitelist in <code>.gitignore</code> and with <code>codeql-analysis.yml</code>, which
+alone also skips <code>.vscode/review-scope.toml</code> because CodeQL does
+not read it.</p>
 <h2 id="retesting">Retesting<a class="headerlink" href="#retesting" title="Permanent link">&para;</a></h2>
 <p>Commenting <code>@shakenfist-bot please retest</code> on a pull request
 dispatches <code>ci.yml</code> against the branch. <code>pr-retest.yml</code> is the
@@ -17216,11 +17303,18 @@ superseding a nightly, which is the one the report job is right
 to ignore.</p>
 <p><code>rdp-smoke.yml</code> has the same problem with a third event: it also
 runs on <code>pull_request</code>, where the general rule wants superseded runs
-cancelled. Its flag is therefore true for everything but the
-schedule, so a pull request or a dispatch supersedes, and a nightly
-never cancels the nightly queued before it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.event_name != 'schedule' }}</span>
+cancelled. Its flag is therefore true only for a pull request. A
+dispatch on <code>develop</code> shares the nightly's group, and must not
+cancel a running nightly whose result is part of the lane's flake
+record:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.event_name == 'pull_request' }}</span>
 </code></pre></div>
+<p>The flag governs running jobs only. GitHub keeps at most one
+pending run per concurrency group whatever it says, so a new run on
+<code>develop</code> still replaces a queued one: two nightlies queued behind a
+starved <code>l</code> pool collapse into one, and a dispatch replaces a queued
+nightly (or a nightly a queued dispatch). On other refs, dispatches
+no longer cancel each other's running jobs.</p>
 <h2 id="build-network-isolation">Build network isolation<a class="headerlink" href="#build-network-isolation" title="Permanent link">&para;</a></h2>
 <p>Cargo runs a dependency's <code>build.rs</code> as ordinary code at compile
 time, so a compromised crate can execute during a plain <code>cargo

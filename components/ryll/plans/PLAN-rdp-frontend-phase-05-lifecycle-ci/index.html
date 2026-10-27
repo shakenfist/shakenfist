@@ -2739,6 +2739,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/release-merge-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Release merge queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/release-process/" class="md-nav__link">
         
   
@@ -12023,6 +12051,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../rdp-mode-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP mode internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../releasing/" class="md-nav__link">
         
   
@@ -12087,6 +12143,34 @@
     
   
     Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rdp-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ryll --rdp operator guide
   
 
     
@@ -12255,10 +12339,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_27" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_27" id="__nav_3_10_27_label" tabindex="0">
             
   
   
@@ -12276,8 +12360,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_25">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_27_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_27">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -16603,7 +16687,7 @@ this plan.</p>
       notes</em>.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>make rdp-smoke</code> passed ten times in a row on the Kasm
       host, recorded in <em>Results</em>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>rdp-smoke.yml</code> ran green on the pull request, with its
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>rdp-smoke.yml</code> ran green on the pull request, with its
       link in <em>Results</em>, and is in no gate's <code>needs:</code> list
       (<code>grep -n 'rdp' .github/workflows/ci.yml</code> finds no job).</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/ci.md</code> lists <code>rdp-smoke.yml</code> in <em>Workflow
@@ -16627,8 +16711,16 @@ from #960000 to #490000 0.6 s after QEMU stopped and the new
 guest's frame arriving 1.4 s after it restarted, after one SPICE
 attempt; Ctrl+C exiting 0 in 0.11 s. Nothing was left running
 after the ten runs.</p>
-<p><strong>First CI run.</strong> Pending: recorded once the pull request's
-<code>rdp-smoke.yml</code> run finishes.</p>
+<p><strong>First CI run.</strong> <code>rdp-smoke.yml</code> on pull request #640 at
+0d6061d, run
+<a href="https://github.com/shakenfist/ryll/actions/runs/40379796107">40379796107</a>:
+green, 7/7. The job waited about 33 minutes for an <code>l</code> runner
+and then took 12 minutes, most of it the release build; the
+driver ran 18.4 s. The runner had <code>/dev/kvm</code> (the guest booted
+in 1.3 s under KVM), with the same FreeRDP 3.15.0 and QEMU
+10.0.13 as the local runs. The frame darkened 0.6 s after QEMU
+stopped, and the new guest's frame arrived 1.8 s after it
+restarted.</p>
 <p><strong>Visual check with Mikal, 2026-10-27 (AEDT).</strong> FreeRDP 3 on
 Mikal's desktop against <code>ryll --rdp</code> (port 3391) against the
 XFCE desktop guest (<code>make test-qemu-desktop</code> with SPICE on 5931
@@ -16729,9 +16821,31 @@ ryll with C connected stopped ryll in 0.10 s and closed C.</p>
 <li><strong>Step 6</strong> was run by the management session; see <em>Results</em>.
   The visual check needed the desktop guest image downloaded
   again, as phase 4's worktree had gone.</li>
+<li><strong>Review round 1</strong> (automated, 0 fix, 2 document, 5 consider)
+  arrived after Mikal had queued #640, so what it took landed in
+  a follow-up pull request rather than on #640. Taken: the
+  smoke lane's spice-reconnect check now reports a QEMU restart
+  that misses ryll's retry window as a harness
+  failure, not a ryll one, and its darkening bound is shortened
+  to leave room inside that window; <code>rdp-smoke.yml</code> cancels in
+  progress only for pull requests, so a dispatch on <code>develop</code>
+  cannot cancel a nightly; the back brief and <em>Results</em> above.
+  Declined: limiting pre-authentication connections per peer
+  (one stalled peer can hold the only handshake slot for 30 s
+  at a time); a cap on reconnects to a server that accepts and
+  drops every session (the GUI retries the same way); and an
+  in-band mirror reset (the clear relies on the backoff of at
+  least 1 s outlasting the mirror task's lag). The first two
+  are in <em>Future work</em>.</li>
 </ul>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
+<li>Limiting how long one peer can hold <code>--rdp</code>'s only
+  pre-authentication slot, for example per-address limits, for
+  a listener on a non-loopback address.</li>
+<li>A cap on <code>--rdp</code> reconnects to a SPICE server that accepts the
+  link and drops every session at once; unattended, it retries
+  every second for ever.</li>
 <li>Reporting a red nightly of the RDP smoke lane, as <code>fuzz.yml</code>
   files an issue for its failures; today the run history is the
   only record.</li>
@@ -16759,7 +16873,8 @@ before the steps that depend on them:</p>
   before step 1.</li>
 <li>Decision 7: a new advisory workflow that books an <code>l</code> runner
   on each pull request touching the RDP code or the renderer,
-  and nightly.</li>
+  and nightly. (Answered: nightly only, with a <code>pull_request</code>
+  trigger on the workflow file alone; see <em>Execution notes</em>.)</li>
 <li>Mikal available to watch step 6's visual check.</li>
 <li>Whether this session may push and open the pull request once
   the definition of done passes.</li>

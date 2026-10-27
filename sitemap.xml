@@ -293,6 +293,10 @@
          <lastmod>2026-10-27</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/audits/release-merge-queue/</loc>
+         <lastmod>2026-10-27</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/audits/release-process/</loc>
          <lastmod>2026-10-27</lastmod>
     </url>
@@ -2221,6 +2225,14 @@
          <lastmod>2026-10-27</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/ryll/rdp-frontend/</loc>
+         <lastmod>2026-10-27</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/rdp-mode-internals/</loc>
+         <lastmod>2026-10-27</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/ryll/releasing/</loc>
          <lastmod>2026-10-27</lastmod>
     </url>
@@ -2694,6 +2706,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-rdp-frontend-phase-05-lifecycle-ci/</loc>
+         <lastmod>2026-10-27</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/plans/PLAN-rdp-frontend-phase-06-docs-parity/</loc>
          <lastmod>2026-10-27</lastmod>
     </url>
     <url>
