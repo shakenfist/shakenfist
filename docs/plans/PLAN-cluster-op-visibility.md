@@ -289,7 +289,7 @@ every consumer, so that:
 | 3. Classify and mark observational tasks | [PLAN-cluster-op-visibility-phase-03-mark-observational.md](PLAN-cluster-op-visibility-phase-03-mark-observational.md) | Complete | `27ea18202` (#4588) |
 | 4. API surface: has_pending_operations and truthful outstanding ops | [PLAN-cluster-op-visibility-phase-04-api-surface.md](PLAN-cluster-op-visibility-phase-04-api-surface.md) | Complete | `3642e7a75` (#4606), `bdc91db78` (#4617), client-python `fdcfe6e53` (#436) |
 | 5. CI helper simplification, functional coverage, documentation | [PLAN-cluster-op-visibility-phase-05-coverage-docs.md](PLAN-cluster-op-visibility-phase-05-coverage-docs.md) | Complete | `93c31035a` (#4650) |
-| 6. Push audit | [PLAN-cluster-op-visibility-phase-06-push-audit.md](PLAN-cluster-op-visibility-phase-06-push-audit.md) | In progress | — |
+| 6. Push audit | [PLAN-cluster-op-visibility-phase-06-push-audit.md](PLAN-cluster-op-visibility-phase-06-push-audit.md) | Complete | `905c3002e` (#4676) |
 
 The `Merged` column records what put each phase on `develop`.
 These entries were reconstructed after the fact, because the
@@ -614,6 +614,12 @@ contract.
   that issue.
 * **The rule-coherence check** found no reachable divergence beyond the
   documented rolling-upgrade case.
+
+#4678 fixed B1 and A1-A10, except the second half of A9. The `None`
+pointer that `enqueue_delete()` can append to `runs_after` stays, since
+removing it would store `None` rather than `[]` as the dependency list,
+which is a behaviour change and not a correction. With that, every
+finding is resolved or declined in writing, and the plan is complete.
 
 ## Agent guidance
 
