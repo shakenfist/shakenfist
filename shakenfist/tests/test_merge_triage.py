@@ -118,7 +118,8 @@ class MergeTriageTestCase(base.ShakenFistTestCase):
             with open(rendered) as f:
                 return f.read()
 
-    def _envelope(self, run, repository='shakenfist/shakenfist', triage_run_url=''):
+    def _envelope(self, run, repository='shakenfist/shakenfist', triage_run_url='',
+                  cut_short_job=None):
         """Run the envelope builder over a gh run view document."""
         with tempfile.TemporaryDirectory() as tempdir:
             run_path = os.path.join(tempdir, 'run.json')
@@ -126,10 +127,11 @@ class MergeTriageTestCase(base.ShakenFistTestCase):
             with open(run_path, 'w') as f:
                 json.dump(run, f)
 
-            proc = subprocess.run(
-                [sys.executable, SCRIPT, 'envelope', repository, run_path,
-                 output_path, triage_run_url],
-                capture_output=True, text=True)
+            command = [sys.executable, SCRIPT, 'envelope', repository, run_path,
+                       output_path, triage_run_url]
+            if cut_short_job is not None:
+                command.append(cut_short_job)
+            proc = subprocess.run(command, capture_output=True, text=True)
             if not os.path.exists(output_path):
                 return proc.returncode, None
             with open(output_path) as f:
@@ -543,3 +545,93 @@ class MergeTriageTestCase(base.ShakenFistTestCase):
             '```json\n%s\n```' % json.dumps(dict(VERDICT, tracking_issue=38.13)))
         self.assertEqual(0, code)
         self.assertIsNone(document['tracking_issue'])
+
+    # -- runs the conductor cut short ----------------------------------------
+
+    def test_an_envelope_for_a_run_that_ended_on_its_own_says_so(self):
+        # Always present, so a consumer reading false is reading a fact rather
+        # than guessing from an absence. Both today's caller, which passes no
+        # job, and the driver's, which passes an empty one, mean the same.
+        for cut_short_job in [None, '']:
+            code, envelope = self._envelope(RUN, cut_short_job=cut_short_job)
+            self.assertEqual(0, code)
+            self.assertIs(False, envelope['cut_short'])
+            self.assertIsNone(envelope['cut_short_job'])
+
+    def test_an_envelope_for_a_cut_short_run_names_the_job(self):
+        code, envelope = self._envelope(
+            dict(RUN, conclusion='cancelled'), triage_run_url='https://example.com/t',
+            cut_short_job='Sanity checks')
+        self.assertEqual(0, code)
+        self.assertIs(True, envelope['cut_short'])
+        self.assertEqual('Sanity checks', envelope['cut_short_job'])
+        self.assertEqual(1, envelope['schema_version'])
+
+    def test_the_model_cannot_say_whether_a_run_was_cut_short(self):
+        # Envelope, not model output, in both directions: a model which
+        # decides from the cancelled jobs that the run was cut short, or from
+        # the failed one that it was not, is overwritten.
+        claims = dict(VERDICT, cut_short=True, cut_short_job='Something else')
+        code, document = self._extract(
+            '```json\n%s\n```' % json.dumps(claims),
+            envelope=dict(ENVELOPE, cut_short=False, cut_short_job=None))
+        self.assertEqual(0, code)
+        self.assertIs(False, document['cut_short'])
+        self.assertIsNone(document['cut_short_job'])
+
+        denial = dict(VERDICT, cut_short=False, cut_short_job=None)
+        code, document = self._extract(
+            '```json\n%s\n```' % json.dumps(denial),
+            envelope=dict(ENVELOPE, cut_short=True, cut_short_job='Sanity checks'))
+        self.assertEqual(0, code)
+        self.assertIs(True, document['cut_short'])
+        self.assertEqual('Sanity checks', document['cut_short_job'])
+        self.assertEqual(0, self._validate(document))
+
+    def test_the_schema_accepts_both_cut_short_fields(self):
+        cut_short = dict(VERDICT, **ENVELOPE)
+        cut_short.update({'schema_version': 1, 'triaged_at': '2026-09-05T00:00:00+00:00',
+                          'cut_short': True, 'cut_short_job': 'Sanity checks'})
+        self.assertEqual(0, self._validate(cut_short))
+        self.assertEqual(0, self._validate(dict(cut_short, cut_short=False, cut_short_job=None)))
+
+        # Optional: a document written before the fields existed still
+        # validates, which is why the version does not move.
+        del cut_short['cut_short']
+        del cut_short['cut_short_job']
+        self.assertEqual(0, self._validate(cut_short))
+
+    def test_the_schema_still_rejects_an_unknown_field(self):
+        # The schema sets additionalProperties false, which is why the new
+        # fields had to be declared, and it must go on refusing anything that
+        # was not.
+        with open(os.path.join(os.path.dirname(SCRIPT), 'merge-triage-schema.json')) as f:
+            schema = json.load(f)
+        self.assertIs(False, schema['additionalProperties'])
+        self.assertIn('cut_short', schema['properties'])
+        self.assertIn('cut_short_job', schema['properties'])
+
+        document = dict(VERDICT, **ENVELOPE)
+        document.update({'schema_version': 1, 'triaged_at': '2026-09-05T00:00:00+00:00',
+                         'cut_short': True, 'cut_short_job': 'Sanity checks'})
+        self.assertNotEqual(0, self._validate(dict(document, cut_short_reason='fail-fast')))
+        self.assertNotEqual(0, self._validate(dict(document, cut_short='true')))
+
+    def test_a_cut_short_run_is_named_in_the_comment(self):
+        document = dict(VERDICT, **ENVELOPE)
+        document.update({'cut_short': True, 'cut_short_job': 'Sanity checks'})
+        rendered = self._render(document)
+        self.assertIn(
+            'This run was cut short by the merge queue fail-fast after `Sanity checks` failed.',
+            rendered)
+        embedded = rendered.split('```json\n')[-1].split('```')[0]
+        self.assertEqual(document, json.loads(embedded))
+
+        rendered = self._render(dict(document, cut_short=False, cut_short_job=None))
+        self.assertNotIn('cut short by the merge queue', rendered)
+
+    def test_a_cut_short_job_name_cannot_break_its_line(self):
+        document = dict(VERDICT, **ENVELOPE)
+        document.update({'cut_short': True, 'cut_short_job': 'Sanity\n`checks`'})
+        rendered = self._render(document)
+        self.assertIn("after `Sanity 'checks'` failed.", rendered)

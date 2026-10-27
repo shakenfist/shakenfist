@@ -204,3 +204,40 @@ class MergeTriageWorkflowSeamsTestCase(base.ShakenFistTestCase):
             neutralise.start(), comment.start(),
             'the comment body is posted before it is neutralised, so an '
             '@mention or an issue-closing keyword fires on publication.')
+
+    def test_the_cut_short_inputs_are_declared(self):
+        # The private-ci conductor dispatches this workflow by file name with
+        # exactly these inputs for a merge group run it cancelled. GitHub
+        # refuses a dispatch carrying an input the workflow does not declare,
+        # so renaming one breaks every such triage.
+        inputs = self._triggers()['workflow_dispatch']['inputs']
+        self.assertEqual('boolean', inputs['cut_short']['type'])
+        self.assertIs(False, inputs['cut_short']['required'])
+        self.assertIs(False, inputs['cut_short']['default'])
+        self.assertEqual('string', inputs['cut_short_job']['type'])
+        self.assertIs(False, inputs['cut_short_job']['required'])
+        self.assertEqual('', inputs['cut_short_job']['default'])
+        for name in ['run_id', 'models', 'dry_run']:
+            self.assertIn(name, inputs)
+
+    def test_the_cut_short_inputs_reach_the_driver_through_env(self):
+        # A job name is free text, so it goes to the driver as an environment
+        # variable and never into a run: line, where the expression would be
+        # spliced into the shell before it runs. Gated on the event, so that a
+        # workflow_run delivery can never claim a run was cut short.
+        env = self.workflow['jobs']['triage']['env']
+        self.assertEqual(
+            "${{ github.event_name == 'workflow_dispatch' && inputs.cut_short && 'true' || 'false' }}",
+            env['CUT_SHORT'])
+        self.assertEqual(
+            "${{ github.event_name == 'workflow_dispatch' && inputs.cut_short_job || '' }}",
+            env['CUT_SHORT_JOB'])
+        for step in self.steps:
+            self.assertNotIn('cut_short', step.get('run', ''),
+                             '%r interpolates a cut short input into the shell'
+                             % step.get('name'))
+
+        # And the dispatch is admitted at all, whatever the run concluded: a
+        # run the conductor cut short concluded cancelled.
+        gate = self.workflow['jobs']['triage']['if']
+        self.assertIn("github.event_name == 'workflow_dispatch' ||", gate)

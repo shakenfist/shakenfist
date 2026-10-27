@@ -21,6 +21,10 @@
 #   LOG_TAIL_BYTES  bytes kept from the end, where the error message is
 #   DRY_RUN         "true" to classify without writing anything to GitHub
 #   TRIAGE_RUN_URL  URL of the run doing the triage, recorded in the verdict
+#   CUT_SHORT       "true" when the private-ci conductor cancelled the run
+#                   after one of its jobs failed (default "false")
+#   CUT_SHORT_JOB   the name of the job the conductor saw fail. Required with
+#                   CUT_SHORT, and checked against GitHub before it is believed
 #   GH_TOKEN        token for gh, as usual. Needs actions:read to read the
 #                   failed run at all, plus issues:write and
 #                   pull-requests:write to publish anything.
@@ -37,7 +41,11 @@
 # than only for the ones which reach a model.
 #
 # The one exception is a run which is not a failed merge_group run at all.
-# Nothing was triaged, so there is nothing to publish a verdict about.
+# Nothing was triaged, so there is nothing to publish a verdict about. A run
+# the conductor's merge queue fail-fast cancelled counts as failed, but only
+# when the dispatch says so and names a job GitHub agrees failed in it; a
+# dispatch which says so and does not check out is the same no-document exit,
+# made red, because only a broken dispatch reaches it.
 #
 # Three things the model reports are checked rather than believed, on the same
 # argument the issue-fix workflow makes when it re-runs the test suite the
@@ -112,6 +120,8 @@ MODELS="${MODELS:-claude-fable-5,claude-opus-5}"
 MAX_TURNS="${MAX_TURNS:-60}"
 DRY_RUN="${DRY_RUN:-false}"
 TRIAGE_RUN_URL="${TRIAGE_RUN_URL:-}"
+CUT_SHORT="${CUT_SHORT:-false}"
+CUT_SHORT_JOB="${CUT_SHORT_JOB:-}"
 
 TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p "${OUTPUT_DIR}"
@@ -171,16 +181,72 @@ echo "merge-ci-triage: ${REPO} run ${RUN_ID} (${run_event}, ${run_conclusion}) o
 
 # The workflow filters on these too, but this script is also run by hand
 # against a run id, and triaging a green run or a pull request run would
-# produce a confident verdict about nothing. Nothing was triaged, so this is
-# the one exit which publishes no document.
-if [ "${run_event}" != "merge_group" ] || [ "${run_conclusion}" != "failure" ]; then
+# produce a confident verdict about nothing. Nothing was triaged, so these are
+# the exits which publish no document.
+#
+# A run the private-ci conductor cut short concluded cancelled, not failure,
+# and a cancelled run is otherwise exactly what this guard exists to refuse: a
+# merge group superseded by a newer one, which says nothing about the pull
+# request. So the flag alone is not believed. After a cancel the aggregator
+# job always fails, which makes "something failed" true of every cancelled
+# run, superseded or not; the dispatch therefore also names the job the
+# conductor saw fail, and that job has to have failed in this run according to
+# GitHub. It is the same argument as the tracking issue check further down:
+# checked, not believed.
+#
+# A run which concluded failure with the flag set is refused too. The cancel
+# lost a race, the run ended on its own, and workflow_run owns its triage; the
+# two triggers between them see each run once.
+#
+# The two refusals of a dispatch that does not check out exit 1 rather than 0.
+# Nothing was triaged, so there is still no document, but only a broken
+# dispatch reaches them, and a red triage run is how somebody notices.
+cut_short=false
+cut_short_job=''
+if [ "${run_event}" != "merge_group" ]; then
+    echo "merge-ci-triage: not a failed merge_group run, nothing to triage" >&2
+    publish_document=false
+    exit 0
+elif [ "${run_conclusion}" = "failure" ] && [ "${CUT_SHORT}" != "true" ]; then
+    :
+elif [ "${run_conclusion}" = "cancelled" ] && [ "${CUT_SHORT}" = "true" ]; then
+    if [ -z "${CUT_SHORT_JOB}" ]; then
+        echo "merge-ci-triage: cut_short needs cut_short_job, nothing to triage" >&2
+        publish_document=false
+        exit 1
+    fi
+
+    # The latest attempt's jobs, which is what gh reports without --attempt.
+    # The name is compared by jq with --arg rather than spliced into a filter,
+    # because it is free text from the dispatch. What travels on is GitHub's
+    # spelling of the name, not the input's.
+    if gh run view "${RUN_ID}" --repo "${REPO}" --json jobs \
+            > "${OUTPUT_DIR}/cut-short-jobs.json" 2>/dev/null; then
+        cut_short_job=$(jq -r --arg name "${CUT_SHORT_JOB}" \
+            'first(.jobs[] | select(.name == $name and
+                                    (.conclusion == "failure" or .conclusion == "timed_out")) |
+                   .name) // ""' \
+            "${OUTPUT_DIR}/cut-short-jobs.json" 2>/dev/null || true)
+    fi
+    if [ -z "${cut_short_job}" ]; then
+        echo "merge-ci-triage: the job '${CUT_SHORT_JOB}' did not fail in run ${RUN_ID}, nothing to triage" >&2
+        publish_document=false
+        exit 1
+    fi
+    cut_short=true
+    echo "merge-ci-triage: run ${RUN_ID} was cut short after '${cut_short_job}' failed"
+else
+    # Cancelled without the flag is a superseded run, which is what this guard
+    # was first written to refuse. Failed with the flag belongs to
+    # workflow_run, as above.
     echo "merge-ci-triage: not a failed merge_group run, nothing to triage" >&2
     publish_document=false
     exit 0
 fi
 
 if ! python3 "${TOOLS_DIR}/merge-triage.py" envelope \
-        "${REPO}" "${OUTPUT_DIR}/run.json" "${ENVELOPE_JSON}" "${TRIAGE_RUN_URL}"; then
+        "${REPO}" "${OUTPUT_DIR}/run.json" "${ENVELOPE_JSON}" "${TRIAGE_RUN_URL}" \
+        "${cut_short_job}"; then
     failure_reason='The run metadata could not be turned into a verdict envelope.'
     exit 1
 fi
@@ -204,8 +270,13 @@ run_url=$(jq -r '.run_url // ""' "${ENVELOPE_JSON}")
 # Silence here is how a model ends up classifying a failure it was never shown.
 gather_notes=()
 
+# A job which timed out is as much evidence as one which failed. A cancelled
+# job is not, which matters on a run that was cut short: every job still
+# running when the run was cancelled concludes cancelled, part way through and
+# for no reason of its own. --log-failed below reads only failed steps, so a
+# cancelled job's truncated log does not reach the prompt either.
 if ! gh run view "${RUN_ID}" --repo "${REPO}" --json jobs \
-        --jq '[.jobs[] | select(.conclusion == "failure") |
+        --jq '[.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out") |
                {job: .name, url: .url,
                 failed_steps: [.steps[] | select(.conclusion == "failure") | .name]}]' \
         > "${OUTPUT_DIR}/failed-jobs.json" 2>/dev/null; then
@@ -332,6 +403,26 @@ else
           request, and do not close anything."
     fi
 
+    # A run that was cut short is full of jobs and steps which concluded
+    # cancelled, and a model which reads those, or the cancelled sibling runs,
+    # as evidence triages a different failure from the one that occurred.
+    # Both pieces are empty otherwise, so the prompt
+    # for a run which ended on its own is unchanged. The name is the one read
+    # back from GitHub above, not the dispatch input.
+    cut_short_bullet=''
+    cut_short_paragraph=''
+    if [ "${cut_short}" = "true" ]; then
+        cut_short_bullet=$'\n'"- Cut short: yes, after \"${cut_short_job}\" failed"
+        cut_short_paragraph="
+This run did not finish on its own. After the job \"${cut_short_job}\" failed,
+the merge queue fail-fast cancelled the run so the queue could move on. Jobs
+and steps that concluded cancelled were stopped deliberately, and are not
+evidence of anything; \"${cut_short_job}\" is the first failure, and other
+recent merge group runs listed as cancelled may have been cut short the same
+way or superseded, which says nothing about whether they would have passed.
+"
+    fi
+
     cat > "${OUTPUT_DIR}/prompt.txt" <<PROMPT_EOF
 You are triaging a failed merge queue CI run for ${REPO}. This is a
 non-interactive, single-shot run: everything you need to do must happen in this
@@ -342,8 +433,8 @@ The failure:
 - Run: ${run_url} (id ${RUN_ID}, attempt ${run_attempt})
 - Merge group ref: ${head_branch}
 - Pull request in the merge group: ${pr_number:-unknown}
-- Base branch: ${base_branch:-unknown}
-
+- Base branch: ${base_branch:-unknown}${cut_short_bullet}
+${cut_short_paragraph}
 Your job, in order:
 
 1. Work out what actually failed. The first failing step is the diagnosis;

@@ -76,13 +76,37 @@ VERDICT = {
     'evidence': ['Three sibling merge groups failed the same way.']
 }
 
+# What "gh run view --json jobs" returns for a run the private-ci conductor
+# cut short: the job it saw fail, the aggregator that always fails after a
+# cancel, and the jobs that were still running and concluded cancelled.
+CUT_SHORT_JOB = 'Sanity checks'
+CUT_SHORT_JOBS = {'jobs': [
+    {'name': CUT_SHORT_JOB, 'conclusion': 'failure',
+     'url': '%s/job/1' % RUN_URL,
+     'steps': [{'name': 'Run flake8', 'conclusion': 'failure'}]},
+    {'name': 'develop debian 12 cluster (collection)', 'conclusion': 'cancelled',
+     'url': '%s/job/2' % RUN_URL,
+     'steps': [{'name': 'Build the smoke cluster', 'conclusion': 'cancelled'}]},
+    {'name': 'Can merge', 'conclusion': 'failure',
+     'url': '%s/job/3' % RUN_URL,
+     'steps': [{'name': 'Check every job passed', 'conclusion': 'failure'}]},
+]}
+
 # A stub gh. Dispatches on the same argument shapes the driver uses and reads
 # its answers out of a fixture directory, so a test says what GitHub knows by
 # writing files. Every invocation is appended to gh.log, which is how the
 # tests that care about *which* API was called assert it.
+#
+# "run view --json jobs" is asked two ways. Without --jq it is the cut short
+# check reading the raw jobs, answered from jobs.json. With --jq it is the
+# evidence gathering, answered by running the driver's own filter over
+# jobs.json through jq when that fixture exists -- so a test of which jobs are
+# selected tests the real filter -- and otherwise from failed-jobs.json, which
+# holds what the filter would already have returned.
 GH_STUB = '''#!/usr/bin/env python3
 import os
 import shutil
+import subprocess
 import sys
 
 args = sys.argv[1:]
@@ -110,6 +134,12 @@ if args[:2] == ['run', 'view']:
     if '--log-failed' in args:
         sys.exit(emit('failed-logs.txt', missing_is_failure=False))
     if 'jobs' in args:
+        if '--jq' not in args:
+            sys.exit(emit('jobs.json'))
+        if os.path.exists(os.path.join(fixtures, 'jobs.json')):
+            sys.exit(subprocess.run(
+                ['jq', args[args.index('--jq') + 1],
+                 os.path.join(fixtures, 'jobs.json')]).returncode)
         sys.exit(emit('failed-jobs.json'))
     sys.exit(emit('run.json'))
 
@@ -621,3 +651,157 @@ class MergeCiTriageShellTestCase(base.ShakenFistTestCase):
         code, document, _ = self.run_triage()
         self.assertEqual(0, code)
         self.assertIsNone(document)
+
+    # -- runs the conductor cut short --------------------------------------
+
+    def cut_short_run(self, job=CUT_SHORT_JOB, flag=True):
+        """A cancelled merge group run, and the environment of its dispatch."""
+        self.write_fixture('run.json', json.dumps(dict(RUN_JSON, conclusion='cancelled')))
+        self.write_fixture('jobs.json', json.dumps(CUT_SHORT_JOBS))
+        self.write_fixture('issue-3772.body', 'The 507 flake.\n')
+        self.write_fixture('issue-3772.comments', 'Seen again in %s\n' % RUN_URL)
+        env = {'CUT_SHORT_JOB': job}
+        if flag:
+            env['CUT_SHORT'] = 'true'
+        return env
+
+    def assert_nothing_triaged(self, code, document, expected_code):
+        self.assertEqual(expected_code, code)
+        self.assertIsNone(document)
+        self.assertFalse(os.path.exists(os.path.join(self.output, 'prompt.txt')))
+        self.assertIsNone(self.claude_args())
+        self.assertIsNone(self.read_fixture('posted-comment.md'))
+
+    def test_a_cut_short_run_naming_a_failed_job_is_triaged(self):
+        code, document, _ = self.run_triage(env=self.cut_short_run())
+        self.assertEqual(0, code)
+        self.assertEqual('systemic', document['verdict'])
+        self.assertIs(True, document['cut_short'])
+        self.assertEqual(CUT_SHORT_JOB, document['cut_short_job'])
+
+        prompt = self.prompt()
+        self.assertIn('- Cut short: yes, after "%s" failed' % CUT_SHORT_JOB, prompt)
+        self.assertIn('This run did not finish on its own. After the job "%s" failed,'
+                      % CUT_SHORT_JOB, prompt)
+        self.assertIn('were stopped deliberately, and are not\nevidence of anything',
+                      prompt)
+        # The bullet is in the list and the paragraph follows it, both before
+        # the instructions.
+        self.assertLess(prompt.index('- Base branch:'), prompt.index('- Cut short:'))
+        self.assertLess(prompt.index('- Cut short:'),
+                        prompt.index('This run did not finish on its own.'))
+        self.assertLess(prompt.index('This run did not finish on its own.'),
+                        prompt.index('Your job, in order:'))
+
+        self.assertIn('This run was cut short by the merge queue fail-fast after `%s` failed.'
+                      % CUT_SHORT_JOB, self.read_fixture('posted-comment.md'))
+
+    def test_a_cut_short_run_shows_the_model_no_cancelled_job(self):
+        # The jobs still running when the run was cancelled stopped part way
+        # through for no reason of their own. They are not evidence.
+        code, _, _ = self.run_triage(env=self.cut_short_run())
+        self.assertEqual(0, code)
+        with open(os.path.join(self.output, 'failed-jobs.json')) as f:
+            selected = [job['job'] for job in json.load(f)]
+        self.assertEqual([CUT_SHORT_JOB, 'Can merge'], selected)
+
+    def test_a_cancelled_run_without_the_flag_is_refused(self):
+        # A merge group superseded by a newer one, which is what the guard
+        # was first written to refuse. Not a broken dispatch, so not red.
+        code, document, _ = self.run_triage(env=self.cut_short_run(flag=False))
+        self.assert_nothing_triaged(code, document, 0)
+
+    def test_the_flag_without_a_job_name_fails_the_run(self):
+        # Every cancelled run's aggregator fails, so a flag with no job named
+        # would check nothing. Only a broken dispatch gets here, and a red
+        # triage run is how somebody notices.
+        code, document, stderr = self.run_triage(env=self.cut_short_run(job=''))
+        self.assert_nothing_triaged(code, document, 1)
+        self.assertIn('cut_short needs cut_short_job', stderr)
+
+    def test_the_flag_naming_a_job_that_did_not_fail_fails_the_run(self):
+        # Cancelled is not failed, and a job GitHub has never heard of has not
+        # failed either.
+        for job in ['develop debian 12 cluster (collection)', 'No such job',
+                    CUT_SHORT_JOB.lower()]:
+            self.write_fixture('gh.log', '')
+            code, document, stderr = self.run_triage(env=self.cut_short_run(job=job))
+            self.assert_nothing_triaged(code, document, 1)
+            self.assertIn('did not fail in run %s' % RUN_ID, stderr)
+            self.assertIn('run view %s --repo %s --json jobs' % (RUN_ID, REPO),
+                          self.gh_log())
+
+    def test_the_flag_fails_the_run_when_the_jobs_cannot_be_read(self):
+        env = self.cut_short_run()
+        os.unlink(os.path.join(self.fixtures, 'jobs.json'))
+        code, document, _ = self.run_triage(env=env)
+        self.assert_nothing_triaged(code, document, 1)
+
+    def test_a_failed_run_without_the_flag_is_unchanged(self):
+        # The workflow_run path. The document says so explicitly rather than
+        # by omission, and the prompt is the one it has always been.
+        self.write_fixture('issue-3772.body', 'The 507 flake.\n')
+        self.write_fixture('issue-3772.comments', 'Seen again in %s\n' % RUN_URL)
+
+        code, document, _ = self.run_triage()
+        self.assertEqual(0, code)
+        self.assertEqual('systemic', document['verdict'])
+        self.assertIs(False, document['cut_short'])
+        self.assertIsNone(document['cut_short_job'])
+        self.assertNotIn('Cut short', self.prompt())
+        self.assertNotIn('did not finish on its own', self.prompt())
+        self.assertIn('- Base branch: develop\n\nYour job, in order:', self.prompt())
+        self.assertNotIn('cut short', self.read_fixture('posted-comment.md'))
+        # No second read of the jobs on this path.
+        self.assertNotIn('--json jobs\n', self.gh_log())
+
+    def test_a_failed_run_with_the_flag_is_refused(self):
+        # The cancel lost a race and the run ended on its own, so
+        # workflow_run owns its triage. Triaging it here too would see the
+        # same run twice.
+        env = self.cut_short_run()
+        self.write_fixture('run.json', json.dumps(RUN_JSON))
+        code, document, _ = self.run_triage(env=env)
+        self.assert_nothing_triaged(code, document, 0)
+
+    def test_timed_out_jobs_are_selected(self):
+        # On every run, not only one that was cut short: a job which timed out
+        # is as much evidence as one which failed.
+        self.write_fixture('jobs.json', json.dumps({'jobs': [
+            {'name': 'slow cluster', 'conclusion': 'timed_out',
+             'url': '%s/job/1' % RUN_URL, 'steps': []},
+            {'name': 'stopped lane', 'conclusion': 'cancelled',
+             'url': '%s/job/2' % RUN_URL, 'steps': []},
+            {'name': 'green lane', 'conclusion': 'success',
+             'url': '%s/job/3' % RUN_URL, 'steps': []},
+        ]}))
+        code, _, _ = self.run_triage()
+        self.assertEqual(0, code)
+        with open(os.path.join(self.output, 'failed-jobs.json')) as f:
+            self.assertEqual(['slow cluster'], [job['job'] for job in json.load(f)])
+
+    def test_a_cut_short_run_naming_a_timed_out_job_is_triaged(self):
+        env = self.cut_short_run()
+        jobs = json.loads(json.dumps(CUT_SHORT_JOBS))
+        jobs['jobs'][0]['conclusion'] = 'timed_out'
+        self.write_fixture('jobs.json', json.dumps(jobs))
+        code, document, _ = self.run_triage(env=env)
+        self.assertEqual(0, code)
+        self.assertIs(True, document['cut_short'])
+        self.assertEqual(CUT_SHORT_JOB, document['cut_short_job'])
+
+    def test_a_job_name_is_data_not_code(self):
+        # The name is free text from a dispatch. It is compared by jq with
+        # --arg and reaches the prompt through a variable, so nothing in it is
+        # evaluated by the shell or by jq.
+        job = 'Lint $(touch %s/pwned) `id` "quoted" \\ and | pipes' % self.tempdir
+        jobs = {'jobs': [{'name': job, 'conclusion': 'failure',
+                          'url': '%s/job/1' % RUN_URL, 'steps': []}]}
+        env = self.cut_short_run(job=job)
+        self.write_fixture('jobs.json', json.dumps(jobs))
+
+        code, document, _ = self.run_triage(env=env)
+        self.assertEqual(0, code)
+        self.assertEqual(job, document['cut_short_job'])
+        self.assertIn('- Cut short: yes, after "%s" failed' % job, self.prompt())
+        self.assertFalse(os.path.exists(os.path.join(self.tempdir, 'pwned')))
