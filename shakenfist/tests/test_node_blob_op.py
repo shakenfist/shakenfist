@@ -14,6 +14,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import GiB
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
 from shakenfist.operations.node_blob_op import NodeBlobOp
+from shakenfist.operations.node_blob_op import NoSuchTask
 from shakenfist.tests import base
 
 
@@ -72,6 +73,87 @@ class NodeBlobOpEnsureLocalTestCase(base.ShakenFistTestCase):
 
         b.ensure_local.assert_called_once_with(wait_for_other_transfers=False)
         b.add_event.assert_not_called()
+
+
+class NodeBlobOpTargetRowCleanupTestCase(base.ShakenFistTestCase):
+    """Tests for when execute() removes the cluster_operation_targets row.
+
+    execute() used to delete the row in a finally block, on every exit.
+    A requeued operation (an ensure_local which hit transfer contention
+    and deferred itself back to STATE_QUEUED) is still pending, so that
+    delete dropped it out of the per-blob sweep's duplicate guard, the
+    by-target listings and cancel-on-delete (issue 4675). The row must
+    now only be removed once the operation is terminal.
+    """
+
+    def _op(self, state_value):
+        op = NodeBlobOp.__new__(NodeBlobOp)
+
+        uuid_patcher = mock.patch.object(
+            NodeBlobOp, 'uuid', new_callable=mock.PropertyMock,
+            return_value='uuid-op')
+        uuid_patcher.start()
+        self.addCleanup(uuid_patcher.stop)
+
+        # is_outstanding() reads self.state.value, which is a database
+        # round trip on a real operation.
+        state = mock.MagicMock()
+        state.value = state_value
+        state_patcher = mock.patch.object(
+            NodeBlobOp, 'state', new_callable=mock.PropertyMock,
+            return_value=state)
+        state_patcher.start()
+        self.addCleanup(state_patcher.stop)
+
+        return op
+
+    @mock.patch(
+        'shakenfist.operations.node_blob_op.mariadb.'
+        'delete_cluster_operation_target')
+    @mock.patch(
+        'shakenfist.operations.baseoperation.BaseClusterOperation.execute')
+    def test_requeued_op_keeps_its_target_row(
+            self, mock_execute, mock_delete):
+        op = self._op(NodeBlobOp.STATE_QUEUED)
+        op.execute()
+        mock_execute.assert_called_once()
+        mock_delete.assert_not_called()
+
+    @mock.patch(
+        'shakenfist.operations.node_blob_op.mariadb.'
+        'delete_cluster_operation_target')
+    @mock.patch(
+        'shakenfist.operations.baseoperation.BaseClusterOperation.execute')
+    def test_complete_op_deletes_its_target_row(
+            self, mock_execute, mock_delete):
+        op = self._op(NodeBlobOp.STATE_COMPLETE)
+        op.execute()
+        mock_delete.assert_called_once_with('uuid-op')
+
+    @mock.patch(
+        'shakenfist.operations.node_blob_op.mariadb.'
+        'delete_cluster_operation_target')
+    @mock.patch(
+        'shakenfist.operations.baseoperation.BaseClusterOperation.execute')
+    def test_errored_op_deletes_its_target_row(
+            self, mock_execute, mock_delete):
+        op = self._op(NodeBlobOp.STATE_ERROR)
+        op.execute()
+        mock_delete.assert_called_once_with('uuid-op')
+
+    @mock.patch(
+        'shakenfist.operations.node_blob_op.mariadb.'
+        'delete_cluster_operation_target')
+    @mock.patch(
+        'shakenfist.operations.baseoperation.BaseClusterOperation.execute',
+        side_effect=NoSuchTask(mock.MagicMock(), 'bogus'))
+    def test_exception_keeps_the_target_row(
+            self, mock_execute, mock_delete):
+        # An exception out of execute() leaves the op non-terminal; the
+        # stuck-row reaper will run it again, so the row must survive.
+        op = self._op(NodeBlobOp.STATE_EXECUTING)
+        self.assertRaises(NoSuchTask, op.execute)
+        mock_delete.assert_not_called()
 
 
 class NodeBlobOpAlreadyBeingTransferredTestCase(base.ShakenFistTestCase):
