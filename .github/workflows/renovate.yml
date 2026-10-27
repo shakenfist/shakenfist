@@ -59,7 +59,7 @@ jobs:
       - name: Self-hosted Renovate
         env:
           # renovate: datasource=npm depName=renovate
-          PINNED_RENOVATE_VERSION: 44.181.1
+          PINNED_RENOVATE_VERSION: 44.181.5
           RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
           RENOVATE_AUTODISCOVER: "true"
           RENOVATE_AUTODISCOVER_FILTER: ${{ github.repository }}
