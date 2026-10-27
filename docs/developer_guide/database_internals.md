@@ -286,9 +286,8 @@ operation mutating. Three tasks on two models are declared today:
 `collect_billing_statistics` and `health_check_kvm_process` on
 `node_inst_op`, and `verify_size_and_checksum` on `node_blob_op`. The
 instance sweep enqueues the first two together, and every caller enqueues
-the third on its own. Every other task mutates. See
-[the master plan](../plans/PLAN-cluster-op-visibility.md) for the
-rationale.
+the third on its own. Every other task mutates. The rationale is in the
+next section.
 
 ### When is a task observational?
 
@@ -338,9 +337,8 @@ The classification of every task is pinned by
 table of every task of every operation model, so adding a task or a model
 fails the test until someone classifies it. Update the table in the same
 change that adds the task, and add the task to `observational_tasks` only if
-it is observational. The reasoning for each existing task is in the
-[audit table](../plans/PLAN-cluster-op-visibility-phase-03-mark-observational.md#audit-table)
-of the plan which classified them.
+it is observational. The criteria above say why each existing task is
+classified as it is.
 
 `DatabaseBackedObjectWithOperations` exposes three read shapes over the
 history:
@@ -363,7 +361,10 @@ history:
   object, newest first by sequence number, each hydrated into its operation and
   paired with the `observational` flag stored on its row. By default the rows
   are filtered in SQL to operations which are pending, using the same join as
-  `has_pending_cluster_operation()`, so a listing and the pending field agree.
+  `has_pending_cluster_operation()`. The two do not always agree: the listing
+  is not filtered on the `observational` flag, so it includes pending
+  observational operations, each reported with `observational: true`, while
+  `has_pending_cluster_operation()` ignores them.
   It does not follow `depends_on` or `runs_after`, so operations on other
   objects are not included. The per-object `/clusteroperations` endpoints
   render it, and `Instance.enqueue_delete()` walks it to decide what to abort.
@@ -379,11 +380,18 @@ under `ClusterLock` election, no additional locking or master-node
 gating is required.
 
 Only these two readers ignore observational rows. The other by-target
-readers (for example `get_cluster_operation_targets_for_object()`, which the
-per-blob sweep uses to avoid queueing a duplicate checksum op, and the
-by-target listing) deliberately see everything. Rows normally disappear when
-their operation is hard-deleted (eligible for removal thirty seconds after
-it goes terminal and removed by the
+readers deliberately see everything:
+
+* `get_cluster_operation_targets_for_object()`, which both the per-blob
+  sweep (to avoid queueing a duplicate checksum op) and
+  `get_cluster_operations()` (the per-object listings) use;
+* the by-target listing;
+* `get_recent_terminal_op_states_for_target()`, a circuit breaker which
+  wants every failure of a network operation, none of which is
+  observational.
+
+Rows normally disappear when their operation is hard-deleted (eligible for
+removal thirty seconds after it goes terminal and removed by the
 [deleted-object sweep](../operator_guide/database.md#the-deleted-object-sweep)),
 so the prune is a backstop.
 

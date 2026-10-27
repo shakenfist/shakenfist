@@ -1625,6 +1625,14 @@ VISIBLE_ARTIFACT_REF_NAMESPACE_DESCRIPTION = (
     'namespace or the request answers 404. Defaults to the namespace of '
     'the caller, and only the system namespace may name another.')
 
+# The `all` parameter of the per-object /clusteroperations listings, which
+# is the same for instances, networks and artifacts.
+CLUSTER_OPERATIONS_ALL_DESCRIPTION = (
+    'Also include finished operations which have not yet been removed. '
+    'Finished operations become eligible for removal thirty seconds '
+    'after they finish, and errored ones are kept for up to seven '
+    'days, so this is not a history.')
+
 
 def arg_is_instance_ref(func):
     def wrapper(*args, **kwargs):

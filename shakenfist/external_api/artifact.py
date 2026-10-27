@@ -1062,10 +1062,7 @@ class ArtifactOutstandingOperationsEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.VISIBLE_ARTIFACT_REF_NAMESPACE_DESCRIPTION, False),
          ('all', 'query', 'boolean',
-          'Also include finished operations which have not yet been removed. '
-          'Finished operations become eligible for removal thirty seconds '
-          'after they finish, and errored ones are kept for up to seven '
-          'days, so this is not a history.', False)],
+          api_base.CLUSTER_OPERATIONS_ALL_DESCRIPTION, False)],
         [(
             200,
             'The cluster operations targeting this artifact, newest first.',

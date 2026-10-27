@@ -105,8 +105,9 @@ class HealthCheckKvmProcessTestCase(base.ShakenFistTestCase):
         inst.enqueue_delete_due_error.assert_not_called()
 
     def test_instance_no_longer_created_is_skipped(self):
-        # A queued sweep survives a later delete, so the task can run
-        # against an instance that is being deleted.
+        # enqueue_delete() aborts the queued operations it finds, but a
+        # sweep enqueued after that walk, or one already executing, still
+        # runs, so the task can see an instance that is being deleted.
         for state in [Instance.STATE_DELETE_WAIT, Instance.STATE_DELETED,
                       Instance.STATE_ERROR]:
             with self.subTest(state=state):

@@ -1061,8 +1061,8 @@ closed and fixed, and unrelated flake umbrellas.
 
 | Id | Grade | Disposition |
 |----|-------|-------------|
-| B1 | Blocking | Filed as #4665 with `automated-fix-attempted`. Fixed in the follow-up pull request |
-| A1-A10 | Advisory | Fixed in the same follow-up pull request. A one-line correction each, in this plan's own text |
+| B1 | Blocking | Filed as #4665 with `automated-fix-attempted`. Fixed in #4678 |
+| A1-A10 | Advisory | Fixed in #4678, a one-line correction each, except the second half of A9, which is declined (see the execution notes) |
 | I1 | Advisory (low security) | Filed as #4666 |
 | I2 | Advisory | Filed as #4667 |
 | I3 | Advisory | Filed as #4668, with 6h's tests posted on it |
@@ -1080,9 +1080,9 @@ closed and fixed, and unrelated flake umbrellas.
 | Views RPC count | Advisory | Recorded on the Future work idea. Phase 4 measured it at about 2.5 requests a second on sfcbr |
 | Other predating notes (test gaps, duplicated row construction, `config.py`'s "history table", the 404/403 existence oracle) | Predating | Not filed. Each is small, and recorded here |
 
-B1 is blocking, so the plan stays In progress. The fix is a follow-up
-pull request cut from `develop`. It also carries this phase's
-close-out: its `Merged` cell, and Complete for the plan.
+B1 was blocking, so the plan stayed In progress until the follow-up
+pull request, #4678, fixed it. That pull request also carries this
+phase's close-out: its `Merged` cell, and Complete for the plan.
 
 ## Execution notes
 
@@ -1113,3 +1113,19 @@ close-out: its `Merged` cell, and Complete for the plan.
 * **Gate 2, 2026-10-26.** Mikal approved the grading as proposed. B1 is
   blocking. A1-A10 are fixed in the follow-up pull request. I1-I5,
   S1-S3, P1, P2 and C1-C3 are filed. D6 is recorded on #3922.
+* **Follow-up, #4678.** Cut from `develop` after gate 2. A sonnet
+  sub-agent made the fixes and the management session reviewed and
+  committed them. One fix was declined: the second half of A9. The
+  condition at `instance.py:2791` reads inverted, but it appends a
+  `None` pointer to `runs_after` on purpose. Two tests pin that call,
+  and `_convert_deps` drops falsy entries, so `[None]` stores `[]`
+  while the "fixed" `[]` would store `None`. That is a behaviour
+  change, not a correction. Two review rounds followed. The first
+  found two more copies of claims the branch had already corrected,
+  and a sweep found a third in the billing statistics test. The
+  second round raised no fix items.
+* **Close-out, 2026-10-27 (AEDT).** #4676 merged as `905c3002e`, on
+  its second pass through the merge queue. Meanwhile develop had been
+  failing a unit test for a reason unrelated to this plan: #4635 and
+  #4653 disagreed about sf-api's drain thread, until #4681 fixed it.
+  #4678 was rebased onto the merge and carries this close-out.
