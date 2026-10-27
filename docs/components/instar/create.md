@@ -401,14 +401,15 @@ the `MetadataPlan`. The host's `apply_preallocation` helper handles
 
 `falloc` and `full` on vmdk, vpc and vhdx are accepted and change nothing: the
 image is the one `off` writes. That is qemu-img's behaviour, not a shortcut.
-None of the three drivers lists a `preallocation` create option
-(`block/vpc.c:1194`, qemu 7.0.0); the key is consumed by the file protocol
-that creates the image file (`block/file-posix.c:2614`), which preallocates
-the empty file before the driver writes anything. The committed
-`tests/golden/qemu-create-pins.json` records, for all 80 qemu-img builds from
-6.0.0, that `falloc` and `full` images equal the `off` image in content and
-in allocated blocks. `metadata` is refused ("Unsupported preallocation mode:
-metadata", `block/file-posix.c:2024-2026`), and instar refuses it too, with
+None of the three drivers lists a `preallocation` create option (see
+`vpc_create_opts` in qemu 7.0.0's `block/vpc.c`); the key is consumed by the
+file protocol that creates the image file (`raw_co_create_opts()` in
+`block/file-posix.c`), which preallocates the empty file before the driver
+writes anything. The committed `tests/golden/qemu-create-pins.json` records,
+for all 80 qemu-img builds from 6.0.0, that `falloc` and `full` images equal
+the `off` image in content and in allocated blocks. `metadata` is refused
+("Unsupported preallocation mode: metadata", from `handle_aiocb_truncate()`
+in `block/file-posix.c`), and instar refuses it too, with
 `create: preallocation=metadata is not supported for FORMAT`. By contrast,
 `instar resize --preallocation falloc|full` on these formats does allocate
 the newly appended region (see [format-coverage.md](/components/instar/format-coverage/)).

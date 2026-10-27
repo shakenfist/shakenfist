@@ -59,7 +59,7 @@ beyond the new EOF.
 | qcow2  | ✓    | ✓ (`--shrink`) | off, falloc, full (metadata gap) | L1 + refcount-table grow           |
 | vmdk   | ✓    | reject         | off                              | monolithicSparse only              |
 | vpc    | ✓    | reject         | off                              | dynamic + fixed grow               |
-| vhdx   | ✓    | reject         | off                              | dynamic; two-header dance          |
+| vhdx   | ✓    | reject         | off                              | dynamic only; two-header dance     |
 
 For raw and qcow2, the post-resize `qemu-img info --output=json`
 matches `qemu-img resize` byte-for-byte across every shipped
@@ -147,7 +147,8 @@ entire data region. This is a deliberate divergence — see
 
 - **vmdk / vpc / vhdx supported by instar only**. `qemu-img resize`
  rejects every version of these formats with `Image format driver
- does not support resize`. instar resizes all three; the baseline
+ does not support resize`. instar resizes all three (vhdx only when
+ dynamic: fixed and differencing images are refused); the baseline
  matrix has no qemu side to diff against, so coverage is via the
  internal consistency suite (`TestResizeConsistency`).
 - **Sparse-format data-region preallocation**. For grow with
@@ -209,15 +210,28 @@ The create-side carry-forwards are listed in
  pass over its data region.
 - vmdk multi-extent subformats (`twoGbMaxExtentSparse`,
  `twoGbMaxExtentFlat`, `monolithicFlat`): currently rejected
- with `UnsupportedSubformat`. Multi-file resize needs the same
- multi-output-device call-table extension that create's roadmap
- already calls out.
+ with `UnsupportedSubformat`. Resizing one means rewriting the
+ descriptor and an extent file together, so the guest would need
+ several output devices open at once, which resize does not do
+ today.
 - Differencing VHD / VHDX as a resize target: both are refused
  (`ResizeResult::ERROR_UNSUPPORTED_SUBFORMAT`, "subformat does not
  support resize"), as qemu-img refuses a differencing VHDX. Growing a
  child alone would leave it claiming sectors its parent cannot
  describe, so neither can be supported until the parent-locator update
  path exists.
+- Fixed VHDX as a resize target: refused for every request, grow,
+ no-op and `--shrink` alike (`ResizeResult::ERROR_FIXED_VHDX`,
+ "refusing to resize a fixed VHDX"), and the file is left untouched.
+ A fixed VHDX is one whose File Parameters `LeaveBlocksAllocated`
+ flag is set, which is every fixed image qemu-img writes, and
+ SPEC(VHDX) 2.6.2.1 says a writer "SHOULD NOT change the state of any
+ blocks to a BLOCK_NOT_PRESENT state" on it. The dynamic grow adds
+ exactly such blocks, so it would leave an image still flagged fixed
+ whose new range is unallocated. To resize one, convert it to a
+ dynamic VHDX (`instar convert -O vhdx`) and resize that. A grow that
+ keeps the image fixed, by appending allocated blocks, is not
+ implemented. qemu-img cannot resize any VHDX.
 - `--object OBJDEF` and `--image-opts`: rejected at the host CLI. LUKS-encrypted resize would land alongside the
  matching `--object` plumbing on the convert side.
 - Tightening `QCOW2_MAX_RESIZE_SCRATCH` (32 MiB) for non-default

@@ -61,7 +61,7 @@ keeps the option of a second one without redeploying.
 
 | Mechanism | State on 2026-10-10 | Where |
 |-----------|---------------------|-------|
-| By hand: pip, a venv, two processes | The pieces are documented; turning them into durable services is not. Kerbside ships no systemd units. | `docs/installation.md` "What a running Kerbside needs"; the CI scripts above are the nearest thing to a recipe |
+| By hand: pip, a venv, two processes | The pieces are documented; turning them into durable services is not. Kerbside ships no systemd units. (Since #580 the role, now in this repository, carries both units as Jinja templates; phase 2 found this and ships static copies.) | `docs/installation.md` "What a running Kerbside needs"; the CI scripts above are the nearest thing to a recipe |
 | Shaken Fist's ansible collection | A `kerbside` role exists and is the most complete deployer Kerbside has: about 2000 lines, two systemd units, validation plays, and co-located or dedicated hosts. It writes exactly one `type: shakenfist` source (`templates/sources.yaml`). It also has a bring-your-own-Kerbside path: set `kerbside_url` with an empty `kerbside` group, and Shaken Fist is configured for a Kerbside it does not deploy. | `shakenfist/deploy/collection/roles/kerbside/`; being built by `PLAN-kerbside-deployer.md`, phases 1 to 3 merged, phase 4 open as shakenfist#4479 |
 | Kolla-Ansible | The Kolla image build merged upstream (kolla 975495). The deployment (kolla-ansible 976889) and four CI and enablement changes are still open. | `kerbside-patches`; `docs/use-cases/openstack.md` "Deployment" |
 | Docker compose | Demo only, and labelled that way. Builds its image locally. | `demo/`; `installation.md` "Try it: the demo stack" |
@@ -210,6 +210,16 @@ units, which already encode two hard-won lessons: `Restart=always`
 because of #313, and `WantedBy=multi-user.target` rather than
 Shaken Fist's target.
 
+**Decided in phase 2: yes, as static files held to the role's
+templates.** By then the role had moved into this repository
+(#580), so the coupling this question set out to remove no longer
+existed, and the units already lived here as Jinja templates under
+`ansible/roles/kerbside/templates/`. Phase 2 ships rendered copies
+in `etc/systemd/` for operators who do not run Ansible, with a unit
+test that holds their directives to the templates. #313 is closed.
+`Restart=always` stands for the reason the templates now give:
+Kerbside never exits on purpose.
+
 ### 4. One container page, or an index row only?
 
 With no first-party image, a "Containers" page would mostly say
@@ -230,8 +240,8 @@ would creep back in. **Recommendation: yes.** Extend
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. Survey, matrix and scaffolding | [PLAN-deployment-options-phase-01-survey-and-scaffolding.md](/components/kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/) | In progress | |
-| 2. By hand: pip, venv and systemd | | Not started | |
+| 1. Survey, matrix and scaffolding | [PLAN-deployment-options-phase-01-survey-and-scaffolding.md](/components/kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/) | Complete | 200d6b3 |
+| 2. By hand: pip, venv and systemd | [PLAN-deployment-options-phase-02-manual.md](/components/kerbside/plans/PLAN-deployment-options-phase-02-manual/) | In progress | |
 | 3. OpenStack: Kolla-Ansible, and Kerbside in front of OpenStack | | Not started | |
 | 4. Containers: compose beyond the demo, and Kubernetes | | Not started | |
 | 5. Ansible: the `kerbside` role | | Not started | |
@@ -255,9 +265,11 @@ judgment calls that every later phase inherits.
 
 **Phase 2: by hand.** `docs/deployment/manual.md`: turn
 `installation.md`'s pieces into durable services, covering
-units, a service user, state and log directories, the database,
-TLS material, and upgrades. Ships the example units if question
-3 says so. `installation.md` keeps acquisition and the list of
+units, a service user, the configuration layout, the database,
+TLS material, and upgrades. Kerbside keeps no state on disk and
+logs to syslog, so there are no state or log directories to
+create; phase 2's survey corrected this. Ships the example units
+(question 3). `installation.md` keeps acquisition and the list of
 pieces, and this page must not restate them. Planned at medium
 effort.
 
@@ -284,8 +296,12 @@ covers the bring-your-own-Kerbside path, which is how a Shaken
 Fist cluster joins a front-door Kerbside. The role move was
 accepted, so this phase documents a Kerbside-owned role that
 accepts several sources. The move has landed (see Dependencies
-on other plans), so this phase is unblocked. Planned at medium
-effort.
+on other plans), so this phase is unblocked. Phase 2 found that
+the role installs no client library but `shakenfist-client`, so it
+cannot yet deploy a working oVirt or OpenStack source or a Keystone
+login (#602), and the index's sources cell for the role says so;
+this page states the role's state on the day and updates that
+cell. Planned at medium effort.
 
 **Phase 6: installation hand-off and closeout.**
 `installation.md`'s "Deploying for real" becomes a pointer to

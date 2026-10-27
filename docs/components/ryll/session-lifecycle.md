@@ -23,6 +23,11 @@ a clean shutdown instead of killing the process immediately.
   ends, `run_headless` then winds the connection task down and joins it
   (aborting it if it has not stopped within two seconds), so a connection
   error is always logged and returned, and a Ctrl+C shutdown still exits 0.
+- **RDP mode**: a bridge task turns the flag into the connection's cancel
+  flag, and the wait loop stops the RDP server first, so no client is left
+  looking at a session being torn down. Every connected client is asked to
+  end, the listener closes, and the SPICE side is then stopped. This works
+  with a client connected, and exits 0. See [RDP mode](#rdp-mode).
 
 ### Unbuffered capture I/O
 
@@ -55,8 +60,12 @@ When the SPICE main channel closes or any secondary channel
 reports an unrecoverable error, ryll surfaces a "Disconnected"
 dialog with two buttons: Close and Reconnect. The Reconnect
 path is implemented in
-`RyllApp::reconnect` (`ryll/src/app/`) and is a user gesture
-— ryll never auto-reconnects.
+`RyllApp::reconnect` (`ryll/src/app/`) and is a user gesture.
+Before that dialog appears the GUI retries on its own, as
+described under [Auto-reconnect with
+backoff](#auto-reconnect-with-backoff). `--rdp` does the same
+without a dialog (see [RDP mode](#rdp-mode)); `--web` and
+`--headless` never reconnect.
 
 ### What is recreated
 
@@ -169,6 +178,13 @@ machine lands in `Modal(Generic { latest_error })`. The
 `latest_error` field carries the most recent attempt's
 failure string into the modal body.
 
+The rules themselves (`RECONNECT_BACKOFF_SECS`,
+`MAX_RECONNECT_ATTEMPTS`, `RECONNECT_CLUSTER_RESET`, and
+`next_step()`, which returns `RetryAfter(d)` or
+`GiveUp(Exhausted | Ticket(..))`) are in
+`ryll/src/reconnect_policy.rs`; `ReconnectState` only turns
+their answer into a state.
+
 A `last_modal_at: Option<Instant>` field tracks when the
 modal last opened; further disconnects within 5 minutes
 skip the retry budget and go straight back to Modal — a
@@ -245,8 +261,9 @@ The `Modal` variant carries one of four discriminants:
   since nothing was consumed that ryll knows of.
 
 `ReconnectPolicy::forbid_retry(now_wall)` consults the two
-ticket-related `Config` fields and returns the appropriate
-`ModalVariant` when retry would be doomed. The state-machine
+ticket-related `Config` fields and says why retry would be
+doomed; the GUI maps that onto the matching `ModalVariant`.
+The state-machine
 transition consults it first, so a single-use ticket
 disconnects directly to Modal without burning the budget.
 
@@ -267,4 +284,88 @@ in the kerbside-wt-docs repository.
 the bug-report `session.json`) increments on every entry into
 `Pending`, so a future zip shows how rocky the session was.
 
+## RDP mode
 
+`--rdp` serves one SPICE session to an RDP client. The RDP listener and
+the SPICE connection have separate lifetimes: a client can come and go
+while SPICE stays up, and SPICE can be lost and re-established while the
+client stays connected. `--web` and `--headless` do not reconnect: `--web`
+keeps serving HTTP over a dead session and `--headless` exits.
+
+### When SPICE is lost
+
+Once a SPICE session has been established and is then lost, `--rdp`
+reconnects on its own, using the same rules as the GUI's
+[auto-reconnect](#auto-reconnect-with-backoff). They live in
+`ryll/src/reconnect_policy.rs`, which both call:
+
+- The wait before retry 1, 2 and 3 is 1, 4 and 16 seconds. A retry that
+  fails moves on to the next wait; after the third has failed ryll gives
+  up. A retry that reaches a session restores all three, so a session that
+  is lost again later gets the full budget.
+- If the `.vv` file's ticket is single-use (`delete-this-file=1`) or past
+  `ticket-valid-until`, there is no retry at all. The ticket is checked
+  again after each wait, since a long wait can outlive it.
+- The GUI's five-minute rule for a disconnect soon after giving up never
+  applies here, because giving up ends the process.
+
+What the RDP client sees:
+
+- It stays connected. The RDP listener keeps accepting clients too, and a
+  client that connects during the outage is shown the same darkened frame.
+- It is shown the last frame at half brightness, sent once as a whole-surface
+  update. A frozen frame alone would look like a hang. There is no text
+  overlay. If the guest's last frame was a different size from the client's
+  window, the client is resized to it first. If SPICE was lost before any
+  frame arrived, the client keeps whatever it was showing.
+- When the new session's first surface arrives, the client is sent the whole
+  surface at full brightness, resized first if the new session's surface is
+  another size. A session that comes back too quickly for the darkened
+  frame to be noticed still gets this full resend.
+- Keyboard and mouse input, and resize requests, made during the outage are
+  discarded, not queued for a session that does not exist yet. ryll counts
+  them, and logs how many were dropped once a session is back.
+- Text copied on the client or the guest stays on ryll's clipboard for the
+  whole run, so text set during the outage reaches the guest's agent once it
+  reconnects.
+
+The retry progress is in the log: each attempt, each wait ("reconnecting to
+SPICE in 4s (retry 2 of 3)") and, at the end, why ryll gave up.
+
+### When ryll exits
+
+`--rdp` stops serving, disconnects the client and closes the port when:
+
+- The first SPICE attempt never reaches a session (a mistyped port, a server
+  that is down). It does not retry, as in the GUI, and exits with the
+  attempt's error.
+- The retries are used up. This always exits non-zero, even if the last
+  attempt ended without an error of its own.
+- The ticket is single-use or expired when the session is lost, or expires
+  during a wait. No retry is made. The exit status follows the lost
+  session's result: non-zero if it ended with an error, zero if it ended
+  cleanly.
+- Ctrl+C is pressed. This exits 0 (see [Graceful Shutdown](#graceful-shutdown)).
+
+In every case the RDP server is stopped before the SPICE side is torn
+down, and the process exits when both have stopped. A stop that stalls is
+abandoned after two seconds rather than hanging the exit.
+
+### Takeover
+
+One client is served at a time per SPICE session, and the one that
+authenticated last wins:
+
+- A new client takes over only once it has authenticated, in either security
+  mode, and before it is sent any pixels. The client it replaces is asked to
+  end, stops forwarding input and taking frames at that moment, and has any
+  keys or buttons it was holding released in the guest.
+- A client that fails to authenticate does not disturb the one being served.
+- Only one client at a time may be between connecting and authenticating.
+  Others wait in the listen backlog without being accepted. A client that
+  has not authenticated within 30 seconds of being accepted is dropped, so a
+  stalled or half-open connection cannot hold up the next client for long, nor
+  tie up a TLS handshake and an encoder.
+- Each connection has its own IronRDP server and event channel, so nothing a
+  leaving connection queued (a clipboard message, say) reaches
+  the next client.

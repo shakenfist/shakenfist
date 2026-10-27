@@ -101,7 +101,15 @@ For VHDX images, check validates:
 - Differencing disk detection — refused rather than validated, see
   "Differencing images" below
 - BAT entries: block offsets within file bounds, 1MB alignment,
-  overlap detection, state validation
+  overlap detection, state validation. A present block must start
+  inside the file and the file must hold all of it, except that the
+  last block ends with the virtual disk: when the virtual size is not
+  a whole number of blocks, the file need hold only the part of that
+  block the virtual disk uses, which is all `qemu-img` allocates. That
+  part is measured from the block's position in the virtual disk, so
+  `check` accepts some fixed images `qemu-img check` calls truncated;
+  see "VHDX partial last block past the first chunk" in
+  [quirks.md](/components/instar/quirks/).
 - A payload block naming file offset zero, or a byte range
   overlapping any region the image's own region table declares (the
   BAT region, the metadata region, or one this build does not
