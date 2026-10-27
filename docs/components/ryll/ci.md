@@ -565,7 +565,8 @@ in order, each building on the state the one before left:
 Each check prints a `[rdp-smoke] <check>: PASS` or `FAIL` summary
 line. Once one fails the rest print `SKIP`. A failure the
 environment caused (Xvfb not starting, QEMU not starting, the guest
-not booting) prints `FAIL (harness)` instead, so it is not read as
+not booting, or QEMU restarting too slowly to land inside ryll's
+retries) prints `FAIL (harness)` instead, so it is not read as
 a ryll defect; the guest's boot is checked from its own screen
 before ryll is started. The driver's docstring has the oracles and
 the deadlines. Its pure parts, the pixel reads, the colour
@@ -712,9 +713,9 @@ thing to look at if you see queue churn.
 ## Review-only changes
 
 Changes that touch only the code-review artefacts —
-`REVIEWS.md`, `.vscode/*.weaudit`, `.vscode/*.weaudit-shas.json`
-and `.vscode/review-scope.toml` — cannot affect the build, so
-the `check_paths` job skips every tier job for them. Both gates
+`REVIEWS.md`, `.vscode/*.weaudit` and `.vscode/*.weaudit-shas.json`
+— cannot affect the build, so the `check_paths` job skips every
+tier job for them. Both gates
 still pass, because their jq counts a skipped dependency as
 success, so such a pull request goes through the queue without
 running a single build.
@@ -724,7 +725,9 @@ running a single build.
 quantifier a file matches if it matches *any* pattern, so `'**'`
 would match everything and silently defeat the `!REVIEWS.md`
 exclusions. Keep its skip list in sync with the `.vscode`
-whitelist in `.gitignore` and with `codeql-analysis.yml`.
+whitelist in `.gitignore` and with `codeql-analysis.yml`, which
+alone also skips `.vscode/review-scope.toml` because CodeQL does
+not read it.
 
 ## Retesting
 
@@ -922,13 +925,21 @@ to ignore.
 
 `rdp-smoke.yml` has the same problem with a third event: it also
 runs on `pull_request`, where the general rule wants superseded runs
-cancelled. Its flag is therefore true for everything but the
-schedule, so a pull request or a dispatch supersedes, and a nightly
-never cancels the nightly queued before it:
+cancelled. Its flag is therefore true only for a pull request. A
+dispatch on `develop` shares the nightly's group, and must not
+cancel a running nightly whose result is part of the lane's flake
+record:
 
 ```yaml
-      cancel-in-progress: ${{ github.event_name != 'schedule' }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 ```
+
+The flag governs running jobs only. GitHub keeps at most one
+pending run per concurrency group whatever it says, so a new run on
+`develop` still replaces a queued one: two nightlies queued behind a
+starved `l` pool collapse into one, and a dispatch replaces a queued
+nightly (or a nightly a queued dispatch). On other refs, dispatches
+no longer cancel each other's running jobs.
 
 ## Build network isolation
 

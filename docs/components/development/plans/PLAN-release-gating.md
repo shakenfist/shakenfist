@@ -437,12 +437,12 @@ Out of scope, each for a stated reason:
 |-------|--------|--------|
 | 1. Release environment criterion | Complete | b87012d (#288) |
 | 2. Shared `require-ci-success` and `check-dist` actions | Complete | actions 69d4589 (#182) |
-| 3. Template and fleet adoption | In progress | |
-| 4. Release-flow and merge-queue criteria | Not started | |
+| 3. Template and fleet adoption | Complete | development f3f8472 (#294), 8d032a5 (#295), 10e3145 (#299), d668b98 (#300), 3e0ced1 (#304); actions 658d767 (#184), e1e2c85 (#185); client-python-ova 4a8eeed (#29), 3b40144 (#30), 4b1764d (#31); library-utilities 0940cbe (#74); divergulent 70ae4c3 (#132); occystrap e9e66d9 (#163); client-python-k3s 6d40cee (#154); clingwrap f4966df (#145); hunkydory b421cef (#103); agent-python 65a1778 (#155); client-python d789e0b (#432); kerbside d30ff34 (#582); shakenfist b3dc0c6 (#4597), 6a3f307 (#4581), 1ec1a6c (#4607); ryll d70ff4d (#591), 20e3cd4 (#599); instar a31e0d1 (#796); andris 288aba3 (#34) |
+| 4. Release-flow and merge-queue criteria | In progress | |
 | 5. Push audit | Not started | |
 
 Phases run in order. Phase 2 lands in `shakenfist/actions` and
-phase 3 lands in the template and in twelve other repositories, so
+phase 3 lands in the template and in fourteen other repositories, so
 their `Merged` cells take the `<repo> <sha> (#pr)` form, one entry
 per repository.
 
@@ -1440,43 +1440,589 @@ Started on 2026-10-19 (AEDT).
   "Can merge" waits for every need, and two lanes only got runners at
   08:50 and 08:59, so the entry hit the 360-minute timeout instead of
   ejecting. See Future work.
+* **occystrap's queue has never built a merge group.** The completion
+  check on 2026-10-25 (AEDT) found no `merge_group` run in occystrap
+  at all. The other seven new queues had each merged a pull request
+  through the queue by then.
+  - occystrap#164 waited in the queue from 2026-10-21 until it was
+    dequeued by hand and merged around the queue (487a2e2).
+  - occystrap#166 was closed unmerged: #168 had removed the action it
+    bumped.
+
+  The repository settings, the Actions permissions and the workflow
+  states all match divergulent's, whose queue works. The ruleset
+  differs from divergulent's only in also requiring the
+  `Can enqueue: unit` and `Can merge: unit` pair, and all four checks
+  reported on #164's head. The cause is not known yet. occystrap's
+  gated workflows have no push trigger, so no commit on its `develop`
+  carries a run the gate accepts, and it cannot release at all until
+  its queue works. The 3g note above is therefore wrong for occystrap.
+  With the operator's agreement, phase 3 closes with this open, and
+  phase 4 owns finding the cause and holds its own merge on the fix
+  (plan-blockers b1).
+* **Merge commits.** The note on 3c gives `ca8d9a5` for
+  client-python-ova#29, which is the commit rather than the merge.
+  The Execution table records its merge commit, 4a8eeed.
 
 ### Phase 4: release-flow and merge-queue criteria
 
-Planning effort: high, because this phase now includes a new
-criterion and the Rust release-flow rules, which decide what fourteen
-repositories are held to. The phase was widened after phase 3's back
-brief (decision 11) and will be re-surveyed when it is planned in
-detail.
+Planning effort: high. This phase decides what all fourteen release
+repositories are held to, adds a criterion, and changes which
+repositories an existing criterion applies to. The workflow reading
+is fiddly, but the hard part is deciding what each rule means.
 
-Its scope is:
-* the three `release-process` helpers below, in the shape of the five
-  already in `ReleaseProcess`;
-* Rust release-flow rules taken from the Rust template README's
-  invariants checklist, applied to the repositories with `Cargo.toml`
-  and a `release.yml`;
-* a new criterion, `release-merge-queue`. It fails a repository that
-  has a `release.yml` but no merge queue on its default branch, and
-  leaves judging the queue's settings to `merge-queue-config`. Its
-  six files follow `docs/consistency-audits.md`.
+This phase spans three pull requests:
+* this repository's, which carries the criteria;
+* one in ryll (step 4f);
+* whatever fix step 4e finds for occystrap's queue, tracked as
+  occystrap#169.
 
-Blast radius: newly fails **zero** repositories once phase 3 has
-merged everywhere. Step 4b measures that before merge, and a
-repository whose phase 3 pull request has not merged holds this phase
-rather than taking a failure.
+This repository's pull request merges last. It does not merge until
+both others have landed, and until occystrap has merged a pull request
+through its queue (plan-blockers b1).
+
+#### Scope
+
+In scope:
+* `release-process` runs its workflow-safety rules on every repository
+  with a `release.yml`. Today it runs them only where there is a
+  `pyproject.toml`. Its Python packaging rules keep that skip
+  (decision 4.1).
+* Three new rules in that same workflow-safety set: the CI gate, the
+  workflows the gate names (including how their path filters read a
+  merge group), and `check-dist` (decisions 4.3, 4.4 and 4.8).
+* The Rust rules: one for each item on the Rust template README's
+  invariants checklist that the new rules do not already enforce
+  (decision 4.5).
+* The `release-merge-queue` criterion (decision 4.6).
+* Moving the release rules out of `packaging.py` into modules of their
+  own (decision 4.9).
+* Finding out why occystrap's queue has never built a merge group, and
+  fixing it, or failing that, moving occystrap back to a single tier of
+  CI (decision 4.7).
+* ryll's two findings (decision 4.2).
+
+Out of scope:
+* Whether a queue actually runs, as opposed to how it is configured
+  (decision 4.6).
+* Measuring the Python template's own copies job by job. The Rust
+  template gets that treatment because its README lists invariants.
+  The Python template does not, and the drift Future work lists
+  stays there.
+* Merges that go around the queue: `PLAN-bot-bypass-identity.md`.
+
+#### What the survey found
+
+Two planning sessions surveyed independently on 2026-10-25 (AEDT).
+Both read `main` at afab0ab and fresh clones of the fourteen release
+repositories' `develop`, and their findings agree. They ran the five
+existing workflow-safety helpers on those clones, plus a throwaway
+prototype of the three new rules. The old phase 4 section was right
+about the shape of the work, but wrong or out of date in the places
+below, so it has been rewritten rather than patched.
+
+1. **`ReleaseProcess` has no `applies()`.** The `pyproject.toml` skip
+   is the first statement of `run()`
+   (`scripts/audit/checks/packaging.py:839-840`). The old brief said the
+   skip was in `applies`. `docs/consistency-audits.md` ("Adding a
+   criterion", item 1) says an applicability test belongs in
+   `applies()`. The line references the old brief gave are right: the
+   class is at :831, `run()` at :837-859, and
+   `release_dispatch_guard_issues` at :771.
+2. **The skip hides four release repositories, not three:** hunkydory,
+   ryll, instar and andris. The old brief left out andris, which joined
+   phase 3 after it was written. Like ryll, andris keeps its
+   `pyproject.toml` under a subdirectory (`andris/pyproject.toml`), and
+   that stops mattering once applicability depends on `release.yml`.
+   `PLAN-typescript-onboarding.md`'s Future work entry on splitting
+   `release-process` says to revisit the split at the second
+   non-Python release. There are now four.
+3. **Run on those four, the five existing helpers find one
+   problem.** ryll's `publish-ryll-pypi` job runs
+   `pypa/gh-action-pypi-publish` without checking out, so
+   `release_container_path_issues` fails it. The rule's reason
+   (persistent-pool residue) does not apply to that job, because it
+   runs on `[self-hosted, vm, debian-13-docker, l]`, which is
+   ephemeral. andris's matching job checks out anyway (`release.yml:207`).
+4. **No repository fails the three new rules in the prototype.**
+   - Every job that names an environment is downstream of `ci-gate`.
+   - Every `!cancelled()` guard has a `needs.<job>.result == 'success'`
+     clause for each job it needs.
+   - `always()` appears only in a comment, in ryll.
+   - Every workflow named in `workflows` exists and triggers on
+     `merge_group`.
+   - **None of them triggers on `push`.** Decision 3.2 removed every
+     push trigger, so the old brief's push-concurrency rule has nothing
+     to judge in today's fleet (decision 4.3).
+   - Every job that builds or uploads a wheel runs `check-dist` before
+     the upload. The Python repositories build with `python -m build`
+     and upload `dist/`. ryll and andris build through a script
+     (`tools/build-ryll-wheel.sh`, `scripts/build-andris-wheel.sh`) and
+     upload `target/wheels/*.whl`. So no single signal finds every
+     wheel job (decision 4.4).
+5. **Merge-group path filters come in two shapes, and both are safe.**
+   Ten repositories run `dorny/paths-filter@v4` in a gated workflow.
+   - Six pass `base: ${{ github.event.merge_group.base_sha || 'develop' }}`:
+     agent-python, client-python, client-python-k3s, kerbside, ryll
+     (`ci.yml:67`) and shakenfist.
+   - Four run the filter step only when
+     `github.event_name == 'pull_request'`, and default its output to
+     `'true'`: occystrap, hunkydory, instar
+     (`functional-tests.yml:100-102`) and andris. Then a merge group
+     always runs in full.
+   - client-python-ova, library-utilities, divergulent and clingwrap
+     have no path filter in a gated workflow.
+
+   Future work asked phase 4 for this rule. A rule that reads the
+   step's `base:` and `if:` from the text can decide it, so the
+   rule does not have to guess from shell (decision 4.8).
+6. **ryll fails Rust invariant 14** in the mechanical spot checks of
+   invariants 8, 14 and 15. The differences are both in comments:
+   - its `tools/tag-release.sh` reflows one comment (lines 158-160);
+   - its `tools/sign-release-tag.sh` fills in the `<repository>`
+     placeholder in the comment on line 15.
+
+   instar's and andris's copies match byte for byte. In all three,
+   `propose-release.sh` and `release-version.sh` match outside their
+   per-repository markers, and all three pass 8 and 15. The other
+   twelve invariants were not measured. The template-resync helper
+   cannot make ryll's fix: it copies all five files, and would
+   overwrite `release.yml` and the per-repository sections.
+7. **The invariants overlap the new rules.** Rule 1 already enforces
+   the downstream-of-the-gate parts of invariants 4 to 6 and 10, and
+   rule 3 already enforces invariant 13.
+8. **`packaging.py` is 2,777 lines, and `test_packaging.py` is
+   4,012.** The `source-file-size` block wants a stated reason to keep
+   a file over about 1,500 lines whole, and to split one along an
+   existing seam. `ReleaseProcess`, with the helpers only it uses, is
+   one such seam: about 450 lines, from :405 to :859.
+9. **The helpers the new rules need are spread across three
+   modules.**
+   - `job_environment` is in `github_config.py` (:311).
+   - The trigger readers are in `ci_workflows.py`: `trigger_re`
+     (:607), `MERGE_GROUP_TRIGGER_RE` (:641), `concurrency_block`
+     (:718) and `workflow_header` (:851). d140ac8 has just made
+     trigger reading follow GitHub's own rules.
+   - `job_needs` is in `audit/text/workflows.py` (:614).
+
+   Invariant 14 has a precedent: `review.py` compares copies with this
+   repository's templates through `DEVELOPMENT_ROOT` (:222) and
+   `read_within` (:507-512).
+10. **No criterion reads GitHub Actions run history or pull request
+    history.** `MergeQueueConfig` reads the branch rules and skips a
+    branch with no queue (`github_config.py:289-290`). That skip is the
+    gap `release-merge-queue` closes. A configuration criterion would
+    pass occystrap, whose queue is configured but has never run.
+11. **The fourteen are the whole release set.** None of the other
+    thirteen repositories in the audit matrix has a `release.yml` on
+    its default branch, so the applicability change in decision 4.1
+    reaches only hunkydory, ryll, instar and andris.
+12. **occystrap's queue has never run**, as phase 3's execution notes
+    record. That makes occystrap unreleasable today, and it is filed
+    as occystrap#169.
+13. **The old section's repository counts were wrong.** Its phase 5
+    and Execution text said "twelve" adopting repositories; phase 3
+    ended with fourteen. Both are corrected at source in this planning
+    commit.
+
+#### Decisions
+
+* **4.1. `release-process` splits by applicability, but stays one
+  criterion.**
+  - `applies()` is true for a repository with a `pyproject.toml` or a
+    `release.yml`.
+  - The packaging rules run only where there is a `pyproject.toml`, as
+    today: `release.sh` and `requirements.txt` must be gone, and
+    `release.yml` and `RELEASE-SETUP.md` must exist.
+  - The workflow-safety rules run wherever there is a `release.yml`.
+    These are the five existing helpers and the three in decision 4.4.
+  - The Rust rules (decision 4.5) run where both `Cargo.toml` and
+    `release.yml` exist.
+
+  Why one criterion rather than a new one: an issue title is the
+  idempotency key for filing and closing issues, and "Release process"
+  already describes these failures. A second criterion would add a
+  second issue per repository for the same workflow file, and a line in
+  every frozen table. Decision 9 already said the shape rules join
+  `release-process`. This is the same call, made for every language.
+* **4.2. ryll gets a checkout; the helper does not learn about runner
+  labels.** `release_container_path_issues` fails a job that runs
+  `pypa/gh-action-pypi-publish` without checking out. It does so on
+  every runner, though the residue it guards against only builds up
+  on persistent ones. Exempting a `vm` label would make the helper
+  trust a label to mean the runner is ephemeral, and that could stop
+  being true when the pool changes without anything telling the audit.
+  A checkout costs seconds, matches andris, and keeps the rule simple.
+  Step 4f makes the change in ryll.
+* **4.3. Rule 2 accepts either trigger the gate counts, and keeps the
+  push-concurrency branch.** `require-ci-success` counts a run from a
+  `push` to the default branch as well as one from a `merge_group`, so
+  the rule accepts either: rejecting a trigger the gate accepts would
+  hold a repository to something stricter than its own release. Nothing
+  in the fleet triggers on `push` any more (survey 4). The push branch
+  stays anyway, tested on fixtures, because it is what fails a
+  repository that adds a push trigger back with a ref-keyed
+  concurrency group, whatever its `cancel-in-progress` says: a group
+  with `false` still drops the pending run when a newer one queues, as
+  phase 3's survey found. `merge-group-cancellation` already judges
+  concurrency on merge groups, and this rule does not repeat it.
+* **4.4. The three new rules, as built:**
+  - **Rule 1, the gate:** exactly one job has a step that uses
+    `shakenfist/actions/require-ci-success@…`. Every job that names an
+    environment is downstream of it, through `needs:`. Every job on
+    that path either has no `always()` or `!cancelled()` in its `if:`,
+    or has a `needs.<job>.result == 'success'` clause for each job it
+    needs. The template's `build` guard admits a skipped gate only
+    off `push` events. The rule accepts that only because the
+    environment jobs downstream are confined to `push`, and the rule
+    checks that through the existing `job_is_push_guarded`.
+  - **Rule 2, the named workflows:** each file in that step's
+    `workflows` input exists under `.github/workflows/`, triggers as
+    decision 4.3 says, and reads a merge group's paths as decision 4.8
+    says.
+  - **Rule 3, `check-dist`:** a job handles wheels if it has a step
+    that runs `python -m build` or uses `PyO3/maturin-action`, or a
+    step that uploads a path naming `*.whl`. In such a job, a step
+    using `shakenfist/actions/check-dist@…` comes after every
+    recognised build step and before every upload step. Its `path`
+    names the same directory as the upload, compared with
+    `dist_directory()`. A job that builds through a script and uploads
+    only a directory is invisible to this rule. The spec says so, and
+    nothing in the fleet has that shape today.
+
+  A job graph the rule cannot read (a cycle, or a `needs:` naming a job
+  that does not exist) is reported as an issue rather than raised.
+  These rules run on parsed text, and a reading that crashes would be
+  an error on every run.
+* **4.5. Each Rust invariant is checked once.** Where a
+  workflow-safety rule already enforces an invariant, the Rust rules do
+  not repeat it, so one defect produces one message. A table in
+  `docs/audits/release-process.md` maps each of the fifteen invariants
+  to the rule that checks it. A test reads the README's numbered list
+  and fails if the table misses a number. Without that, the sixteenth
+  invariant would be added to the README and never measured.
+  Invariant 14 compares the repository's scripts with the template's.
+  It reads the template the way `review.py` does, through
+  `DEVELOPMENT_ROOT`. If the template copy cannot be read, that is a
+  `ToolFailure`, not a fail.
+* **4.6. `release-merge-queue` judges configuration, not liveness.**
+  It applies wherever there is a `release.yml`. It fails when the
+  default branch's rules have no `merge_queue` rule, reusing
+  `MergeQueueConfig`'s read, and leaves judging the queue's settings to
+  `merge-queue-config`. It would not have caught occystrap.
+
+  It does not check liveness, for example "a pull request merged in
+  the last 30 days, so a `merge_group` run should exist in that
+  window", for three reasons:
+  - No criterion reads history (survey 10). A verdict that depends on
+    traffic flips for a quiet repository with no change to the
+    repository.
+  - A queue that never runs is loud on its own. Every pull request
+    sits in it, as occystrap#164 did for three days. The operator saw
+    it within that window, and the gate still fails safe: a release
+    then publishes nothing.
+  - The audit is weekly, which is the wrong cadence for an incident.
+
+  This is the decision a reviewer is most likely to dispute, and the
+  back brief asks the operator to confirm it. If it holds, Future work
+  records liveness as declined, with these reasons.
+* **4.7. occystrap goes back to a single tier of CI until its queue
+  works.** When phase 3 closed, the operator chose to fix occystrap's
+  queue before this phase's criteria merged, so that
+  `release-merge-queue` would not pass a repository that cannot
+  release. Step 4e and the probe that followed found nothing on our
+  side to fix (see the execution notes). The operator then chose to
+  disable the queue and gate releases on push runs to `develop`
+  instead, keeping occystrap#169 open to try the queue again.
+  occystrap keeps its `merge_group` triggers and "Can merge"
+  aggregators, so turning the queue back on is only a ruleset change.
+  Until then `release-merge-queue` fails occystrap, and the audit's
+  issue keeps that gap visible alongside #169. This repository's pull
+  request waits for occystrap's single-tier pull request rather than
+  for the queue. Every ruleset or settings change needs the operator's
+  yes at the time, as in phase 3.
+* **4.8. Rule 2 checks how a gated workflow's path filter reads a merge
+  group.** It applies to a named workflow that triggers on
+  `merge_group` and has a `dorny/paths-filter` step. That step must
+  either pass a `base:` that references
+  `github.event.merge_group.base_sha`, or be confined by its own `if:`
+  or its job's `if:` to `github.event_name == 'pull_request'`. A filter
+  that diffs a merge group against the branch name passes untested on
+  a re-run after the merge. The gate then counts that run, so this is a
+  gate rule, not a general CI one, and it is limited to the named
+  workflows. A path filter written in shell is invisible to it. The
+  spec says so, and no gated workflow in the fleet has one (survey 5).
+  The Future work entry that asked for this rule is removed.
+* **4.9. The release rules leave `packaging.py`, along the check's
+  seam.**
+  - `ReleaseProcess`, with the five helpers and constants only it
+    uses, moves to `scripts/audit/checks/release.py`.
+  - Its tests move to `scripts/tests/test_release.py`.
+  - The Rust rules go in `scripts/audit/checks/release_rust.py`, with
+    `scripts/tests/test_release_rust.py`.
+  - `job_environment` moves from `github_config.py`, and the trigger
+    and concurrency readers from `ci_workflows.py`, into
+    `audit/text/workflows.py`. Every check module then imports them
+    from there, and no check module imports another.
+
+  `CHECKS` keeps `release-process` in its current position, because
+  that list orders the results.
+
+  The moves come first, as commits with no change in behaviour, so the
+  diffs for the new rules stay readable. Leaving the rules in
+  `packaging.py` would take it past 3,500 lines. Every edit to it
+  discards the review of the whole file, and the release rules are
+  the part of it that changes most.
+
+#### Steps
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
-| 4a | medium | opus | none | In `scripts/audit/checks/packaging.py`, add three helpers called from `ReleaseProcess.run` (:831-858), each returning a list of issue strings like `release_dispatch_guard_issues` (:771). (1) `release_ci_gate_issues`: some job has a step that `uses: shakenfist/actions/require-ci-success@...`, and every job that names an `environment:` is downstream of it through `needs:` (walk the needs graph; a cycle or unknown job name is an issue, not a crash). Being downstream is not enough on its own. A job whose `if:` contains `always()` or `!cancelled()` runs even when an upstream job failed, so every job on the path from the gate to an environment job must either have no such guard, or require `needs.<job>.result == 'success'` for the job it depends on. `build`'s own guard in the template passes this test only because the `workflow_dispatch` branch of it leads to no environment job, since the publishing jobs require a `push` event. The helper checks that the publishing jobs' guards exclude `workflow_dispatch`, rather than taking it on trust. (2) `release_ci_trigger_issues`: every file in that step's `workflows` input exists under `.github/workflows/` and has `push` with the default branch in `branches` (or no branch filter), or `merge_group`. Where that file has a `push` trigger, it is also an issue if any `concurrency` group in it is keyed on `github.ref` with `cancel-in-progress` and is not keyed by sha on a push, since a cancelled run fails the gate. A file with no `push` trigger is not judged on this, because a `merge_group` ref is unique per entry. The helper cannot see that a workflow's runs conclude `skipped` (kerbside's `direct-qemu-functional.yml` does on every merge group); the gate fails that case closed, and the spec says so. (3) `release_check_dist_issues`: wherever a job runs `python -m build` or uploads a `*.whl`, a `check-dist` step follows in that job. Since `ReleaseProcess.applies` skips repositories without `pyproject.toml`, also add the first two to the path for hunkydory, instar and ryll (ryll's `pyproject.toml` is under `ryll/`, not at the root), the language-neutral case `PLAN-typescript-onboarding.md:637-665` describes, without changing what the skip means for the existing helpers. Update `docs/audits/release-process.md` to describe each rule and its reason. Tests in `scripts/tests/test_packaging.py` beside the existing `ReleaseProcess` tests: each helper's pass, fail, and the edge cases named here. No new criterion, so no metadata tables change; confirm `test_metadata.py` still passes. |
-| 4b | high | opus | none | Add the Rust release-flow rules to `ReleaseProcess` (or a sibling helper set that it calls), one rule per invariant on the Rust template README's checklist, applied where `Cargo.toml` and `release.yml` both exist. Update `docs/audits/release-process.md`, and add tests beside 4a's. |
-| 4c | medium | opus | none | Add `release-merge-queue` as a new criterion in `scripts/audit/checks/github_config.py`, beside `MergeQueueConfig`, reusing its rules read. It does not apply without a `release.yml`; it fails when the default branch has no `merge_queue` rule. Write all six of its files. |
-| 4d | low | sonnet | none | `pre-commit run --all-files`; `audit-check.py` against this repository, unchanged; and `release-process` and `release-merge-queue` against fresh clones of the fourteen, reporting any failure with its text. |
+| 4a | medium | sonnet | none | Pure moves, in this repository, as two uncommitted changes the management session commits separately. **(1)** Move `job_environment` (with `FLOW_ENVIRONMENT_NAME_RE` and `unquote`) from `scripts/audit/checks/github_config.py`, and `trigger_re`, `flow_trigger_re`, the `*_TRIGGER_RE` and `*_FLOW_RE` constants built from them, `concurrency_block` and `workflow_header` from `scripts/audit/checks/ci_workflows.py`, into `scripts/audit/text/workflows.py`. **(2)** Move `ReleaseProcess`, and the helpers and constants only it uses (`packaging.py` :405-859; check each name with grep before moving it), into a new `scripts/audit/checks/release.py` with a module docstring in the style of its neighbours. Move `ReleaseProcessTest` and the tests of those helpers into a new `scripts/tests/test_release.py`. Update `scripts/audit/registry.py` without changing `release-process`'s position in `CHECKS`, and update every import, including the test modules and `scripts/tests/test_containment.py`'s allowlist if it names modules. Keep every docstring and comment with its code. Behaviour must not change. Afterwards, `python3 -m unittest discover -s scripts/tests -t scripts` passes with no test edits other than imports and moves. `scripts/audit-check.py` against this repository gives the same id-to-status map before and after. Run `pre-commit run --all-files`. |
+| 4b | high | opus | none | In `scripts/audit/checks/release.py`, after 4a. **(1)** Give `ReleaseProcess` an `applies()` that is true when `repo.props['has_pyproject_toml']` or `repo.isfile('.github/workflows/release.yml')`. Inside `run()`, gate the four packaging rules on `pyproject.toml` (decision 4.1), and run the five existing workflow-safety helpers wherever `release.yml` exists. **(2)** Add three helpers that return issue strings, shaped like `release_dispatch_guard_issues`, implementing decisions 4.3, 4.4 and 4.8 exactly: `release_ci_gate_issues`, `release_ci_trigger_issues` and `release_check_dist_issues`. Use `job_needs`, `job_level_keys`, `job_environment`, `job_is_push_guarded`, `step_action`, `step_with_inputs` and the moved trigger and concurrency readers; do not parse YAML another way. Read workflows only through `repo.workflow()`. **(3)** Tests in `scripts/tests/test_release.py`. For each rule: a pass, a fail, and the edge cases. Rule 1: a cycle, an unknown need, `!cancelled()` with and without the success clause, `always()`, and an environment job that is not downstream. Rule 2: a missing file, push with and without a `branches` filter, a ref-keyed `cancel-in-progress` group on a push workflow, the same group keyed by sha on push, merge_group only, and a paths-filter step that passes, that has a `base:` without `merge_group.base_sha`, and that is confined to pull_request at step and at job level. Rule 3: check-dist after the upload, no check-dist, a mismatched path, a maturin-action job, a script build that uploads `*.whl`, and a job that only uploads. Also test applicability: a non-Python repository with a `release.yml` gets the workflow-safety findings and not the packaging ones, and a repository with neither is not applicable. **(4)** Update `docs/audits/release-process.md`: the new applicability, and each new rule with its reason. Say that the gate fails a named workflow whose runs conclude `skipped` (kerbside's `direct-qemu-functional.yml` does on every merge group), and that rule 2 cannot see that case. Also name the two shapes rules 2 and 3 cannot see. Run pre-commit and the unit tests. Then use the mutation-check skill: delete each rule and each paths-filter clause in turn, and show that a test fails. Leave the change uncommitted. |
+| 4c | high | opus | none | After 4b. Add the Rust rules in a new `scripts/audit/checks/release_rust.py`, called from `ReleaseProcess.run()` where `Cargo.toml` and `release.yml` both exist, following decision 4.5. Read `templates/release-automation-rust/README.md`'s "Invariants" section; it is the authority, and its definitions of the three guards are exact strings. Write one rule per invariant, except where 4b's rules already enforce it: rule 1 covers the downstream-of-the-gate parts of 4 to 6 and 10, and rule 3 covers 13. Invariant 14 reads the template's scripts through `DEVELOPMENT_ROOT` and `read_within`, as `scripts/audit/checks/review.py` does (:222, :507-512), and the repository's copies through `repo.read_blob()`. An unreadable template is a `ToolFailure`. Invariant 15 searches `Makefile`, `*.sh` and `.github/workflows/*` through `repo.read()`. Add a table to `docs/audits/release-process.md` mapping invariants 1 to 15 to rules. Add a test that reads the README's numbered list and fails if the table lacks any number. Put each rule's pass and fail tests in `scripts/tests/test_release_rust.py`, along with tests for the template's own `release.yml`, which must pass with its placeholders left in. Run pre-commit, the unit tests and mutation-check, as in 4b. Leave the change uncommitted. |
+| 4d | medium | opus | none | Add `release-merge-queue` to `scripts/audit/checks/github_config.py`, beside `MergeQueueConfig` (:260), as decision 4.6 describes. `applies()` reads the repository for `release.yml`, so no API call is made for a repository without one. `run()` reuses `MergeQueueConfig`'s default-branch and rules reads; factor them into a shared function rather than copying them. It fails, naming the branch, when there is no `merge_queue` rule, and passes otherwise. It does not judge the queue's settings. Write all six files in `docs/consistency-audits.md`'s "Adding a criterion" list: the check, its `registry.py` line, tests in `scripts/tests/test_github_config.py`, `docs/audits/release-merge-queue.md`, the `docs/audits/README.md` index line, and the frozen lines in `scripts/tests/test_metadata.py`. The issue title is `Release merge queue`. The spec explains why the criterion checks configuration and not whether the queue runs, by citing the decision's reasons rather than its number. Run pre-commit and the unit tests. Leave the change uncommitted. This step can run alongside 4b and 4c, since it touches other files. |
+| 4e | high | opus | none | Read-only diagnosis of occystrap's merge queue (occystrap#169). It has never built a merge group: no `merge_group` run exists, and #164 sat queued from 2026-10-21 to 2026-10-24. Phase 3's execution notes in `docs/plans/PLAN-release-gating.md` list what has been ruled out; start from there, and do not repeat those checks. Compare occystrap with divergulent, whose queue works. Look at the ruleset's history, the PR timeline events (GraphQL `AddedToMergeQueueEvent` and `RemovedFromMergeQueueEvent`), GitHub's merge-queue state for occystrap's `develop`, organisation rulesets, the required check names against the job names that report them, and any app or integration setting that differs. Do not change anything in GitHub: no ruleset edits, no enqueueing, no pull requests, no comments. Report the cause with its evidence, or the remaining candidates with how to tell them apart, and the smallest fix. The management session takes the fix to the operator and records it on occystrap#169. |
+| 4f | low | sonnet | own clone of ryll | In ryll, on a branch named `release-gating-phase-04`. Add an `actions/checkout` step at the start of `publish-ryll-pypi` in `.github/workflows/release.yml`, as andris's `publish-pypi` does (andris `release.yml:207`). Copy `tools/tag-release.sh` and `tools/sign-release-tag.sh` byte for byte, with `cp`, from this repository's `templates/release-automation-rust/`. Copy those two files only: the template-resync helper copies all five and would overwrite `release.yml` and the per-repository sections. Confirm with `cmp` and check that the mode is executable. Run ryll's pre-commit through its Docker wrapper; never install a Rust toolchain. Leave the change uncommitted. The management session commits, pushes and opens the pull request, which lands before this repository's. |
+| 4g | low | sonnet | none | Verification, after 4a to 4d are committed, 4f has merged, and occystrap's single-tier pull request has merged. Run `pre-commit run --all-files` and the unit tests here. Run `scripts/audit-check.py` against this repository and diff its id-to-status map against `main`'s: only `release-process` and `release-merge-queue` may differ, and both must be `not_applicable`. Then run the Definition of done script against fresh clones of the fourteen, and report any failure with its full text. Read by hand the job graphs of kerbside, shakenfist and ryll, the three most complex, and confirm that rule 1's verdict matches. Do not file or close issues; do not run `audit-manage-issues.py` without `--dry-run`. |
+
+Order:
+1. 4a first; 4e and 4f can start at once.
+2. 4b after 4a, then 4c; 4d alongside them.
+3. 4g last.
+
+The management session reviews each step and commits it with its
+own subject. For the ryll pull request, and for each operator action
+4e leads to, it asks first unless the back brief granted it.
+
+Commit subjects:
+* 4a(1): "Share the workflow job and trigger readers."
+* 4a(2): "Move release-process into its own module."
+* 4b: "Gate every release on CI in release-process."
+* 4c: "Measure the Rust release invariants."
+* 4d: "Require a merge queue where there are releases."
+
+#### Risks and mitigations
+
+* **The criteria file issues the first week after merge.** Measured
+  before merge, the rules fail ryll (survey 3 and 6). The Rust rules
+  that were not spot-checked could fail more. Mitigation: 4f lands
+  ryll's fix first, and 4g runs the merged criteria against all
+  fourteen. Any failure holds this pull request. The management
+  session reads every failure, and either a repository pull request
+  fixes it or the rule changes. A rule is never weakened just to make
+  it pass.
+* **A text reading of a job graph is wrong**, so a job reached through
+  a spelling the helpers do not read counts as not downstream, or as
+  downstream when it is not. Mitigation: the tests cover every spelling
+  of `needs:` that `job_needs` documents, and 4g reads the three most
+  complex graphs by hand.
+* **A move in 4a changes behaviour.** For example, an import cycle, or
+  a constant left behind that two modules then define differently.
+  Mitigation: 4a's own done criteria are an unchanged test suite and an
+  unchanged id-to-status map, and the management session checks the
+  diff with `git diff --color-moved`, so only the import lines show as
+  changed.
+* **The Rust rules are too literal.** The README defines the guards
+  as exact strings, so a harmless respelling fails. Mitigation: the
+  README is the authority. A mismatch is fixed in the repository, or
+  in the README and then the rule. The management session decides
+  which, case by case, and records each decision in the execution
+  notes.
+* **The template's own `release.yml` fails its own rules**, because of
+  its placeholders. 4c tests the template directly, so this shows up
+  before any repository does.
+* **occystrap's cause lies outside what the API shows**, such as a
+  GitHub-side defect. Then 4e reports candidates rather than a cause.
+  Mitigation: the operator decides whether to contact GitHub, or to
+  remove and re-add the ruleset. The block stays recorded until a pull
+  request merges through the queue.
+* **`release-merge-queue` calls the API for repositories that never
+  release.** `applies()` checks for `release.yml` first, so the API
+  is called only for the fourteen.
+
+#### Definition of done
+
+* `pre-commit run --all-files` and
+  `python3 -m unittest discover -s scripts/tests -t scripts` pass.
+* mutation-check shows that deleting each new rule, and each clause of
+  the paths-filter rule, fails a named test.
+* `audit-check.py` against this repository differs from `main` only
+  in `release-process` and `release-merge-queue`, and both are
+  `not_applicable`.
+* `scripts/audit/checks/packaging.py` no longer defines
+  `ReleaseProcess` or any of its helpers, and no check module imports
+  another, except that `release.py` imports `release_rust.py`, one
+  check split across two files for size:
+  `grep -n 'from audit.checks' scripts/audit/checks/*.py` prints only
+  that line.
+* Run from a directory of fresh clones of the fourteen release
+  repositories, this prints only occystrap's `release-merge-queue`
+  failure (decision 4.7):
+
+  ```bash
+  for r in */; do r=${r%/}
+    python3 <development>/scripts/audit-check.py --repo-path "$r" --repo-name "$r" |
+      python3 -I -c 'import json, sys
+  for c in json.load(sys.stdin)["checks"]:
+      if c["id"] in ("release-process", "release-merge-queue") and c["status"] != "pass":
+          print(sys.argv[1], c["id"], c["status"], c["details"])' "$r"
+  done
+  ```
+* hunkydory, ryll, instar and andris report `release-process` as
+  `pass`, not `not_applicable`.
+* `docs/audits/release-process.md` maps all fifteen Rust invariants
+  to rules, and the test that reads the README passes.
+* occystrap gates its releases on push runs: its single-tier pull
+  request has merged, its "Develop branch" ruleset has no
+  `merge_queue` rule, and `develop`'s tip has a successful `push` run
+  of both gated workflows. This prints two lines, each `success`:
+
+  ```bash
+  tip=$(gh api repos/shakenfist/occystrap/commits/develop --jq .sha)
+  for w in python-unit-tests.yml functional-tests.yml; do
+    gh api "repos/shakenfist/occystrap/actions/workflows/$w/runs?event=push&head_sha=$tip" \
+      --jq '.workflow_runs[0].conclusion'
+  done
+  ```
+
+  plan-blockers b1 is resolved, and occystrap#169 is open and listed
+  in Future work.
+* Future work no longer asks for the merge-group path-filter rule,
+  and records queue liveness as declined or, if the operator chose it,
+  no longer lists it.
+
+#### Back brief
+
+Before 4a starts, the operator confirms:
+
+1. **Decision 4.6:** `release-merge-queue` checks configuration only,
+   or it also checks that the queue has run recently.
+2. **Decision 4.2:** ryll adds a checkout, or the container-path rule
+   learns to exempt ephemeral runners.
+3. **Decision 4.7:** this repository's pull request waits for
+   occystrap's queue to be fixed, or it merges with occystrap#169 still
+   open, and occystrap is left failing nothing while it cannot
+   release.
+4. **Pushing and opening pull requests:** ask each time, or the same
+   standing grant as phase 3. Merging, rulesets and anything 4e leads
+   to are always asked at the time.
+
+#### Phase 4 execution notes
+
+Started on 2026-10-25 (AEDT).
+
+* **Back brief.** The operator chose:
+  - `release-merge-queue` checks configuration only (decision 4.6);
+  - ryll adds a checkout, rather than the container-path rule
+    exempting ephemeral runners (decision 4.2);
+  - this repository's pull request waits for occystrap's queue to be
+    fixed (decision 4.7);
+  - the same standing grant as phase 3 to push and open pull
+    requests. Merging, rulesets and anything 4e led to were asked at
+    the time.
+* **Order.** 4a, 4e and 4f ran in parallel: 4e only read, and 4f
+  worked in its own clone of ryll. 4d ran after 4c rather than
+  alongside it, because both run pre-commit and the unit tests in
+  this worktree.
+* **4a** sonnet at medium effort, as two commits: the shared
+  workflow readers (2ba7e1f), then `release-process` in its own
+  module (05df069).
+* **4b** opus at high effort (248946e). The first version's
+  push-concurrency rule flagged only a `cancel-in-progress: true`
+  group. That followed decision 4.3 as written, but phase 3's survey
+  had already shown that `false` drops a pending run too, so the rule
+  was sent back and widened, and decision 4.3 is corrected at its
+  source.
+* **4c** opus at high effort (844eeff). The first version had
+  `release_rust.py` import its helpers from `release.py`, and
+  `release.py` call it through an import inside `run()`, so that the
+  two imported each other. The 4c brief's "called from `run()`" and
+  the Definition of done's empty import grep could not both hold. The
+  operator chose to move the shared helpers into
+  `audit/text/release_jobs.py` and keep one import, `release.py`'s of
+  `release_rust.py`. The Definition of done's import item is corrected
+  to allow exactly that line.
+* **4d** opus at medium effort (9cad4f1). The criterion also had to
+  join `NETWORK_CHECKS` in `scripts/audit_snapshot.py`, which
+  "Adding a criterion" in `docs/consistency-audits.md` did not list;
+  that page now says so.
+* **4f** sonnet at low effort, as ryll#623 (67cc32e3). Its `cargo
+  audit` and `cargo deny` jobs failed, and so did ryll#621's and #622's,
+  so the failure was not this change's. The operator was told. A later
+  run failed `cargo deny` on a yanked `crypto-bigint` 0.7.7 that
+  `develop`'s lock file held. Rebased onto a `develop` holding 0.7.9,
+  the pull request passed, and it merged on 2026-10-27 as f8b99b38.
+* **4e** opus at high effort, read only. occystrap's event feed has
+  never had a `gh-readonly-queue` branch created, while divergulent's
+  appear within a minute of each enqueue. The queue's settings match
+  divergulent's exactly, and toggling the ruleset on 2026-10-24 did
+  not help. The diagnosis is posted on occystrap#169.
+* **The occystrap probe.** The operator approved occystrap#170, an
+  empty commit, to test the queue directly:
+  - enqueued at 2026-10-24 23:32:14Z, it sat `QUEUED` at position 1
+    with every check reported, and no merge group was built. It was
+    never `AWAITING_CHECKS`, which rules out an unreported required
+    check;
+  - with the operator's approval, the "Develop branch" ruleset's
+    `Can enqueue: unit` and `Can merge: unit` checks were dropped at
+    00:29:05Z, leaving the same required checks as divergulent. The
+    entry stayed `QUEUED`, with no group;
+  - the operator re-enqueued #170 at 02:37:04Z. By 02:48:06Z it was
+    still `QUEUED` at position 1, with no queue branch, and occystrap
+    still had no `merge_group` run. The required checks are not the
+    cause;
+  - with the operator's approval, the ruleset was deleted and
+    recreated from its JSON at 02:52:27Z (new ruleset 25807190, new
+    merge queue `MQ_kwDOFKiz484ABO4F`). Re-enqueued at 03:40:16Z, #170
+    was still `QUEUED` with no group at 03:51. A runner shortage is
+    ruled out too: GitHub creates the queue branch before any
+    workflow runs, and occystrap had no run waiting for a runner. The
+    repository's merge methods, Actions permissions, protection and
+    fork status match divergulent's. A GitHub support ticket was
+    drafted for the operator, and the results are posted on #169.
+* **occystrap goes single tier.** The operator chose to disable the
+  queue rather than wait on GitHub, and decision 4.7 is rewritten at
+  its source. The merge_queue rule and the two "Can merge" required
+  checks came out of the ruleset at 04:46:40Z, and #170 was closed.
+  An occystrap pull request adds the push trigger the gate then
+  needs. The operator also chose to let `release-merge-queue` fail
+  occystrap rather than exempt it, with #169 kept open.
+* **Review rounds.** Writing occystrap's single-tier change (90eadd6)
+  showed that `push_concurrency_issues` passed a push group keyed by
+  `github.ref` behind an `event_name == 'push'` branch. It now also
+  requires `github.sha` in such a group (0cab7d4). A review round on
+  this pull request moved the gate's job selection into one shared
+  function, so the gate rule and the Rust rules cannot disagree, and
+  taught the triggers to read a scalar `on:` (dd1a20a).
+* **occystrap#174 merged** on 2026-10-25 at 22:49Z (199f5b8e). The
+  first push runs of both gated workflows on `develop` succeeded; the
+  functional job waited about 90 minutes for a runner.
+* **4g** sonnet at low effort, read only, on 2026-10-27, against
+  fresh clones of the fourteen and this branch at dd1a20a:
+  - pre-commit passes, and 2411 unit tests pass;
+  - this repository's id-to-status map differs from `main`'s only by
+    the new `release-merge-queue`, which is `not_applicable`;
+    `release-process` is `not_applicable` on both;
+  - the Definition of done loop printed one line, occystrap's
+    expected `release-merge-queue` failure. `release-process` passes
+    for all fourteen, and `release-merge-queue` for the other
+    thirteen;
+  - by hand, kerbside's, shakenfist's and ryll's `release.yml` reach
+    every `release` environment job and every publishing job only
+    through a job whose `if` checks the gate's result, which matches
+    rule 1's pass for all three. In ryll the gate is checked once, by
+    `check-version`, and the builds need `check-version`'s success;
+  - the import grep, the fifteen-invariant table, occystrap's push
+    runs and ruleset, b1, #169 and Future work all hold as the
+    Definition of done states.
 
 ### Phase 5: push audit
 
 Runs `PUSH-AUDIT.md` over every recorded landing in the Execution
-table, across `development`, `actions` and the twelve adopting
-repositories. Checklist item 5 is the centre of it: for each
+table, across `development`, `actions` and the fourteen adopting
+repositories, including phase 4's ryll pull request and whatever
+fixed occystrap's queue. Checklist item 5 is the centre of it: for each
 repository, confirm with a `workflow_dispatch` dry run (which skips
 the publish jobs by design) that `build` and `check-dist` still run,
 and confirm by reading that `ci-gate` is upstream of every
@@ -1832,10 +2378,21 @@ chosen to defer to here, so that we do not forget them.
   merge commit that changed no gated file, as hunkydory's review marks
   need too (above). The conductor merging past a failed queue run is
   `PLAN-bot-bypass-identity.md`'s to close.
-* **Phase 4 should check the build-job guard** in Rust releases
-  (template invariant 6), and that a path filter on a merge group
-  diffs against `merge_group.base_sha`. Neither is a rule yet, and the
-  closest, `release_dispatch_guard_issues`, skips build jobs.
+* **occystrap's merge queue has never run** (occystrap#169). Phase 4
+  found no cause on our side, so the queue is disabled and occystrap
+  gates releases on push runs (decision 4.7). Turning it back on is a
+  ruleset change, with the settings in occystrap's `RELEASE-SETUP.md`,
+  once GitHub support or a later attempt shows the queue builds
+  groups. Until then `release-merge-queue` fails occystrap.
+* **Scalar `on:` triggers in the CI criteria.** `release-process`
+  reads `on: push` and `on: merge_group` written as a bare scalar,
+  through `scalar_trigger_re()` in `audit/text/workflows.py`.
+  `merge-group-cancellation` (for `merge_group` and `workflow_call`),
+  `fuzz-nightly-reporting` (for `merge_group`) and
+  `expensive-lane-path-filter` (for `pull_request`) still read only
+  the block and flow forms, so a workflow spelled the scalar way reads
+  to them as not triggered. No workflow in the fleet uses that
+  spelling. This predates the plan.
 * **CodeQL on merge groups.** `codeql-analysis.yml` runs on push
   only. It only needs `merge_group` if it becomes a required check.
 * **shakenfist's "Can merge" does not require `sanity_checks`**

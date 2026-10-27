@@ -9,8 +9,10 @@ individually:
 * `max_entries_to_build: 1` — no speculative stacking.
 * `min_entries_to_merge: 1` — merge each green entry immediately.
 
-Repositories without a merge queue are out of scope; whether to adopt
-two-stage CI at all is a per-project decision.
+Repositories without a merge queue are out of scope here; whether to
+adopt two-stage CI at all is a per-project decision, except for a
+repository that releases, which
+[release-merge-queue](/components/development/audits/release-merge-queue/) requires to have one.
 
 The check reads the effective rules for the default branch via
 `GET /repos/shakenfist/<repo>/rules/branches/<branch>` and validates

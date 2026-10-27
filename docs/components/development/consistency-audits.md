@@ -506,6 +506,12 @@ so a step added to it reaches both.
    `FROZEN_COLUMN_NAMES` when it declares a `column`. Why these are
    frozen is below.
 
+A criterion that reaches the network needs one more line: its id in
+`NETWORK_CHECKS` in `scripts/audit_snapshot.py`. `NetworkCheckListTest`
+fails until it is there, and
+[Before and after a change to a check](#before-and-after-a-change-to-a-check)
+says what the list is for.
+
 `AUDIT_METADATA` and `ISSUE_TITLES` in `scripts/audit_common.py`, and
 `COLUMN_NAMES` in `scripts/audit-update-docs.py`, are views over the
 registry rather than tables to update. There is no longer a way to

@@ -75,49 +75,18 @@ window. The operator guide, including reverse-proxy and TLS setup, is
 
 ### RDP Mode
 
-`--rdp` runs ryll as a SPICE-to-RDP server instead of opening a GUI window,
-so a stock RDP client (FreeRDP, mstsc, Remmina) can drive the guest. The
-binary must be built with the `rdp` feature (see
-[development.md](/components/ryll/development/)); one built without it refuses `--rdp` with
-a clear message. An operator guide is to come; this table is the flag
-reference.
-
-The RDP client sees the guest's display and can send keyboard and mouse
-input. It also gets the guest's cursor shape, which is sent as an RDP
-pointer (scaled down to fit 96x96 when larger) and hidden and shown with the
-guest's; the guest's cursor position is not sent, because the client draws
-the pointer where its own mouse is. ryll asks the guest to use the RDP
-client's desktop size: the size the client connects with, and the size its
-window changes to (FreeRDP needs `/dynamic-resolution` to send window
-changes). The guest only adopts a requested size if it runs vdagent. A
-connection whose size differs from the guest's sees a blank desktop for up to
-about 2 seconds at connect, before the client is resized to the guest's size.
-
-Text on the clipboard is shared both ways between the client and the guest
-(the guest needs vdagent); rich formats and files are not. Text the client
-copies that is longer than 100 MiB, the most ryll sends a guest's vdagent, is
-not shared, and a warning is logged. The guest's audio plays on the client:
-as Opus when the client accepts it, and as 16-bit 48 kHz stereo PCM
-otherwise, which is about 1.5 Mbit/s. ryll has no flag to
-turn either off; do it in the client. With FreeRDP, give `-clipboard`
-to disable the clipboard and leave out `/sound` to disable audio (or give
-`/sound:format:1` to force PCM). In mstsc, use the clipboard and remote
-audio settings on the "Local Resources" tab.
-
-Only one client is served at a time. A client that authenticates takes the
-session over from the one connected, which is disconnected; one that fails
-to authenticate leaves it alone, and a client that has not authenticated
-within 30 seconds of connecting is dropped. If the SPICE connection is lost
-after a session has been established, ryll keeps the RDP listener and the
-connected client up, shows the client the last frame at half brightness,
-and retries SPICE after 1, 4 and 16 seconds. Keyboard and mouse input and
-resize requests made meanwhile are discarded, not replayed. ryll exits when
-the retries are used up or the ticket cannot be used again. See
-[session-lifecycle.md](/components/ryll/session-lifecycle/) for the details.
+`--rdp` runs ryll as a SPICE-to-RDP server instead of opening a GUI window, so
+a stock RDP client can drive the guest. It is a reachability fallback for
+users with no SPICE client, and the RDP client cannot use SPICE features such
+as USB redirection and folder sharing. The binary must be built with the
+`rdp` feature, which release builds leave out; one built without it refuses
+`--rdp` with a clear message. The operator guide, including what works, how
+clients are served, certificates and running it as a service, is
+[rdp-frontend.md](/components/ryll/rdp-frontend/); this table is the flag reference.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--rdp` | false | Run as a SPICE → RDP server. A reachability fallback for users with no SPICE client: it loses SPICE features such as USB redirection and folder sharing. Serves one client per session: a new client that authenticates takes the session over and the one connected is disconnected, while a client that fails to authenticate leaves it connected. Prints the address, username, password and certificate fingerprint at launch. Mutually exclusive with `--web` and `--headless`; `--control-socket` works with it |
+| `--rdp` | false | Run as a SPICE → RDP server. Prints the address, username, password and security mode at launch, and the certificate fingerprint when the certificate is generated. Mutually exclusive with `--web` and `--headless`; `--control-socket` works with it |
 | `--rdp-host <ADDR>` | `127.0.0.1` | Bind address for the RDP listener. Use `0.0.0.0` for LAN access |
 | `--rdp-port <PORT>` | 3389, or an ephemeral port if 3389 is taken | TCP port to listen on. The port actually bound is printed at launch. A port given explicitly is used or the launch fails; `0` asks for an ephemeral port |
 | `--rdp-user <NAME>` | `ryll` | Username RDP clients log in with |

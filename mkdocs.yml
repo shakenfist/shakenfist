@@ -151,6 +151,7 @@ nav:
                 - "Audit: README structure": components/development/audits/readme-structure.md
                 - "Audit: Release artifacts exclude docs/plans": components/development/audits/release-artifacts-exclude-plans.md
                 - "Audit: Release environment protection": components/development/audits/release-environment-protection.md
+                - "Audit: Release merge queue": components/development/audits/release-merge-queue.md
                 - "Audit: Release process": components/development/audits/release-process.md
                 - "Audit: Renovate for dependency bumps": components/development/audits/renovate.md
                 - "Audit: Renovate groups for lockstep dependency families": components/development/audits/renovate-lockstep-groups.md
@@ -463,9 +464,11 @@ nav:
             - "Libvirt / QEMU Settings for Best SPICE Performance with Ryll": components/ryll/libvirt-spice-recommendations.md
             - "macOS runtime-metrics verification runbook": components/ryll/macos-metrics-verification.md
             - "Multi-mode feature parity": components/ryll/multi-mode-parity.md
+            - "RDP mode internals": components/ryll/rdp-mode-internals.md
             - "Releasing": components/ryll/releasing.md
             - "Rendering and audio pipeline": components/ryll/rendering-pipeline.md
             - "Running ryll as a Kasm workspace": components/ryll/kasm-workspace.md
+            - "ryll --rdp operator guide": components/ryll/rdp-frontend.md
             - "ryll --web operator guide": components/ryll/web-frontend.md
             - "Session lifecycle": components/ryll/session-lifecycle.md
             - "SPICE protocol handling": components/ryll/spice-protocol.md

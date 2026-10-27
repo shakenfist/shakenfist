@@ -591,7 +591,7 @@ this plan.
       notes*.
 - [x] `make rdp-smoke` passed ten times in a row on the Kasm
       host, recorded in *Results*.
-- [ ] `rdp-smoke.yml` ran green on the pull request, with its
+- [x] `rdp-smoke.yml` ran green on the pull request, with its
       link in *Results*, and is in no gate's `needs:` list
       (`grep -n 'rdp' .github/workflows/ci.yml` finds no job).
 - [x] `docs/ci.md` lists `rdp-smoke.yml` in *Workflow
@@ -617,8 +617,16 @@ guest's frame arriving 1.4 s after it restarted, after one SPICE
 attempt; Ctrl+C exiting 0 in 0.11 s. Nothing was left running
 after the ten runs.
 
-**First CI run.** Pending: recorded once the pull request's
-`rdp-smoke.yml` run finishes.
+**First CI run.** `rdp-smoke.yml` on pull request #640 at
+0d6061d, run
+[40379796107](https://github.com/shakenfist/ryll/actions/runs/40379796107):
+green, 7/7. The job waited about 33 minutes for an `l` runner
+and then took 12 minutes, most of it the release build; the
+driver ran 18.4 s. The runner had `/dev/kvm` (the guest booted
+in 1.3 s under KVM), with the same FreeRDP 3.15.0 and QEMU
+10.0.13 as the local runs. The frame darkened 0.6 s after QEMU
+stopped, and the new guest's frame arrived 1.8 s after it
+restarted.
 
 **Visual check with Mikal, 2026-10-27 (AEDT).** FreeRDP 3 on
 Mikal's desktop against `ryll --rdp` (port 3391) against the
@@ -721,9 +729,31 @@ ryll with C connected stopped ryll in 0.10 s and closed C.
 - **Step 6** was run by the management session; see *Results*.
   The visual check needed the desktop guest image downloaded
   again, as phase 4's worktree had gone.
+- **Review round 1** (automated, 0 fix, 2 document, 5 consider)
+  arrived after Mikal had queued #640, so what it took landed in
+  a follow-up pull request rather than on #640. Taken: the
+  smoke lane's spice-reconnect check now reports a QEMU restart
+  that misses ryll's retry window as a harness
+  failure, not a ryll one, and its darkening bound is shortened
+  to leave room inside that window; `rdp-smoke.yml` cancels in
+  progress only for pull requests, so a dispatch on `develop`
+  cannot cancel a nightly; the back brief and *Results* above.
+  Declined: limiting pre-authentication connections per peer
+  (one stalled peer can hold the only handshake slot for 30 s
+  at a time); a cap on reconnects to a server that accepts and
+  drops every session (the GUI retries the same way); and an
+  in-band mirror reset (the clear relies on the backoff of at
+  least 1 s outlasting the mirror task's lag). The first two
+  are in *Future work*.
 
 ## Future work
 
+- Limiting how long one peer can hold `--rdp`'s only
+  pre-authentication slot, for example per-address limits, for
+  a listener on a non-loopback address.
+- A cap on `--rdp` reconnects to a SPICE server that accepts the
+  link and drops every session at once; unattended, it retries
+  every second for ever.
 - Reporting a red nightly of the RDP smoke lane, as `fuzz.yml`
   files an issue for its failures; today the run history is the
   only record.
@@ -749,7 +779,8 @@ before the steps that depend on them:
   before step 1.
 - Decision 7: a new advisory workflow that books an `l` runner
   on each pull request touching the RDP code or the renderer,
-  and nightly.
+  and nightly. (Answered: nightly only, with a `pull_request`
+  trigger on the workflow file alone; see *Execution notes*.)
 - Mikal available to watch step 6's visual check.
 - Whether this session may push and open the pull request once
   the definition of done passes.
