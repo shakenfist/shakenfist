@@ -15989,7 +15989,7 @@ cursor to its last uuid. A page without it resets the cursor to <code>''</code>,
 so the next walk picks up anything that arrived behind it. A type
 whose page came back empty is not read again for
 <code>DELETED_OBJECT_EMPTY_RECHECK</code> (300 seconds), so an idle cluster
-costs at most 28 small reads every five minutes. A restart is no
+costs at most 29 small reads every five minutes. A restart is no
 longer what refills the sweep.</p>
 <p><em>Revised in review:</em> any completed walk backs off, not only an empty
 page, so an object whose hard delete always fails is retried every
@@ -16432,7 +16432,7 @@ tests for:</p>
 <p>Commit subject: <code>Document the paged deleted-object sweep.</code></p>
 <h3 id="brief-2g-measure-management-session-after-deploy">Brief 2g: measure (management session, after deploy)<a class="headerlink" href="#brief-2g-measure-management-session-after-deploy" title="Permanent link">&para;</a></h3>
 <p>Run this once sfcbr runs a build containing this phase, which
-<code>count(cluster_deleted_object_backlog)</code> confirms by answering 28.
+<code>count(cluster_deleted_object_backlog)</code> confirms by answering 29.
 Wait 24 hours. Then query <code>http://maui.home.stillhq.com:9099/api/v1/query</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a># Every type with a backlog is being served
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>sum by (object_type) (increase(cluster_deleted_object_seconds_count{outcome="hard_deleted"}[24h]))
@@ -16483,7 +16483,7 @@ plan, under "What phase 2 measured".</p>
   after. The memory note on labqnap's buffer pool (sf-database
   watchdog stalls) is the failure mode to watch for. If it reappears,
   lower the budget first and investigate second.</li>
-<li><strong>The backlog count is a new hourly scan.</strong> 28 index-only range
+<li><strong>The backlog count is a new hourly scan.</strong> 29 index-only range
   counts covering about 1.7M index entries. Mitigation: the
   <code>deleted_object_backlog</code> scope publishes each count's latency, and
   brief 2g reports the worst type. If one count exceeds a few seconds,

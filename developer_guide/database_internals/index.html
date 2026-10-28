@@ -15910,6 +15910,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#batched-hard-deletes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batched hard deletes
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -16657,6 +16668,28 @@ would bring back exactly the premature completion it replaces.
 <code>ClaimCoalescibleSiblingsV2</code> keeps its old behaviour for clients
 which predate the fold and has no caller in this tree; retiring it,
 with the V1 pair, is #4639.</p>
+<h2 id="batched-hard-deletes">Batched hard deletes<a class="headerlink" href="#batched-hard-deletes" title="Permanent link">&para;</a></h2>
+<p>The deleted-object sweep hard deletes most object types through the
+<code>HardDeleteObjects</code> RPC, which deletes up to 1000 objects of one type in a
+single transaction. A call is either guarded, naming the states and the age
+an object must still have, with the check made in the same transaction as
+the delete, or unconditional, for a caller which has already decided (this
+is what <code>DatabaseBackedObject.hard_delete()</code> sends for one object). The
+rows a type loses are declared in one place, <code>HARD_DELETE_BATCH_FUNCTIONS</code>
+in <code>mariadb.py</code>, which lists the public delete functions run for the type
+before <code>delete_state</code>, <code>delete_object_metadata</code> and <code>delete_object_events</code>;
+<code>HARD_DELETE_STATEMENTS</code> maps each name to its many-object statement and to
+a call of the public function. Instances, namespaces, namespace claims and
+nodes are absent because their hard delete does more than delete rows. An
+<code>sf-database</code> which predates the RPC makes <code>hard_delete_objects()</code> raise
+<code>HardDeleteBatchUnavailable</code>, and callers fall back to
+<code>hard_delete_objects_per_call()</code>, the same deletes as separate commits. The
+client remembers that answer for <code>HARD_DELETE_BATCH_RECHECK_SECONDS</code> (five
+minutes) and raises without asking again until then, so a rolling upgrade
+does not cost every hard delete a refused round trip and a warning.
+<code>shakenfist/tests/test_hard_delete_batch_parity.py</code> checks the mapping
+against each class's own deletes, so its <code>EXPECTED_DELETES</code> literal must
+change whenever the mapping does.</p>
 
 
 

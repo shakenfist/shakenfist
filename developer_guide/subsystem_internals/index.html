@@ -16648,10 +16648,12 @@ holds when it is deleted: <code>Instance._delete_globally()</code>, <code>Artifa
 and the agent operation delete paths call
 <code>mariadb.remove_all_references_from()</code>. A blob does it in its state
 transition (<code>Blob._state_update()</code>), because several paths delete a blob by
-assigning <code>STATE_DELETED</code> directly. <code>Blob.hard_delete()</code> repeats the removal
-as a backstop for blobs deleted before that was the case. Anything new a
-blob comes to hold (container members, chunks) has to be cleared in
-<code>Blob._remove_references_held()</code> too.</p>
+assigning <code>STATE_DELETED</code> directly. A blob's hard delete repeats the removal
+as a backstop for blobs deleted before that was the case: it is the first of
+the blob's entries in <code>mariadb.HARD_DELETE_BATCH_FUNCTIONS</code>, so the batch,
+its per-call fallback and the deleted-object sweep all make it. Anything new
+a blob comes to hold (container members, chunks) has to be cleared in
+<code>Blob._remove_references_held()</code> and in those batch entries too.</p>
 <p><code>INSTANCE_LOCATION</code> references similarly replace the legacy <code>instances</code>
 JSON list on <code>node_attributes</code>: the list was maintained by read-modify-write
 of the whole attributes row, so concurrent full-row writers (for example the

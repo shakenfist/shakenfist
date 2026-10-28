@@ -17363,7 +17363,17 @@ own is refreshed exactly as it always was.</p>
   large backlog in one type no longer delays the others. Upgrade
   <code>sf-database</code> before <code>sf-cluster</code>: until it is upgraded, an older
   <code>sf-database</code> ignores the paging and the sweep reads each type's whole
-  list as it did before.</li>
+  list as it did before. Most object types (25) are now hard deleted
+  in batches, many to one database transaction, controlled by the new
+  <code>DELETED_OBJECT_BATCH_SIZE</code> (default 25) and
+  <code>DELETED_OBJECT_SWEEP_MAX_OBJECTS</code> (default 100, the most objects one
+  pass takes and so the drain rate). Instances, namespaces, namespace
+  claims and nodes are still hard deleted one at a time. Every other
+  hard delete of the batched types is also one transaction rather than
+  one commit per table. An older
+  <code>sf-database</code> without the batch RPC still works, one object at a time.
+  New metrics are the <code>skipped</code> outcome of <code>cluster_deleted_object_seconds</code>
+  and <code>cluster_deleted_object_batch_seconds</code>.</li>
 <li>The floating network now uses a well-known UUID (<code>f10a7f10-a7f1-4a7f-a10a-7f10a7f10a7f</code>)
   instead of the invalid string "floating". Existing deployments must run
   <code>sf-ctl migrate-floating-network-uuid</code> after stopping services to migrate.

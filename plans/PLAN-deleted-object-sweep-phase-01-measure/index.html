@@ -16368,7 +16368,7 @@ commit, as the <code>next-phase</code> skill's survey step, and revise phase 2
 and 3's scope to match.</p>
 <h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Series count.</strong> <code>database_client_rpc_seconds</code> has up to 28 types
+<li><strong>Series count.</strong> <code>database_client_rpc_seconds</code> has up to 29 types
   times the RPCs each type's hard delete makes. A realistic estimate is
   under 200 label sets, times 12 series each (ten buckets, <code>_sum</code>,
   <code>_count</code>), so about 2,400 series, all on one node. That is
