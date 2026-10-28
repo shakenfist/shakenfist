@@ -12,6 +12,7 @@ from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.schema.operations.baseclusteroperation import TERMINAL_OPERATION_STATES
 from shakenfist.util import exceptions as util_exceptions
 
 
@@ -925,12 +926,9 @@ class BaseClusterOperation(BaseOperation):
         pass
 
     def is_outstanding(self) -> bool:
-        if self.state.value in [BaseClusterOperation.STATE_ERROR,
-                                BaseClusterOperation.STATE_DELETED,
-                                BaseClusterOperation.STATE_ABORT,
-                                BaseClusterOperation.STATE_COMPLETE]:
-            return False
-        return True
+        # The same terminal set mariadb's queries use, so that this reader
+        # and the SQL filter in get_cluster_operations() cannot disagree.
+        return self.state.value not in TERMINAL_OPERATION_STATES
 
     @property
     def error_report(self) -> Optional[ErrorReport]:

@@ -510,7 +510,10 @@ Since v0.8, [cluster operations](/developer_guide/api_reference/clusteroperation
 for a given artifact have been exposed. This lists the various pieces of queued
 work that Shaken Fist has queued against a given object, newest first. By
 default only operations which are still queued, in preflight or executing are
-listed.
+listed. Only the namespace which owns the artifact, or system, may list them:
+a namespace the artifact is shared with, or which its owner trusts, can read
+the artifact but is refused here with a 404, because a fetch operation names
+the instance whose boot caused it.
 [Looking up cluster operations](/developer_guide/api_reference/clusteroperations#looking-up-cluster-operations)
 says how long finished operations remain visible, and
 [waiting for an object to settle](/developer_guide/api_reference/clusteroperations#waiting-for-an-object-to-settle)

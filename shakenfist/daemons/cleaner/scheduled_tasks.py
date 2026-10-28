@@ -337,6 +337,12 @@ def _enqueue_stray_delete(inst, log_ctx):
     The queued delete also removes the instance's interfaces and cleans up
     networks no longer used on this node, which a delete done in place
     would skip and leak. The caller holds the instance lock.
+
+    enqueue_delete() raises DatabaseUnavailable rather than enqueue a
+    delete which has not read the operations targeting the instance.
+    The attempt is counted by then, and is not given back: the outage is
+    a per-domain error to the caller, which moves on, and the next
+    enqueueing attempt tries again.
     """
     attempts = inst.enforced_deletes_increment()
     log_ctx = log_ctx.with_fields({'attempt': attempts})

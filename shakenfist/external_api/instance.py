@@ -1294,11 +1294,20 @@ class InstancesEndpoint(api_base.Resource):
           'The namespace to delete instances from', False)],
         [(200, 'A list of the UUIDs of instances awaiting deletion.', None),
          (400, 'The confirm parameter is not True or a administrative user has '
-               'not specified a namespace.', None)]))
+               'not specified a namespace.', None),
+         (503, 'The outstanding operations of an instance could not be read, '
+               'so its delete was not enqueued. Deletes enqueued before it '
+               'stand. Retry the request.', None)]))
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def delete(self, confirm=False, namespace=None):
-        """Delete all instances in the namespace."""
+        """Delete all instances in the namespace.
+
+        Each instance is deleted in turn, so a 503 from one of them
+        leaves the deletes already enqueued standing and the rest not
+        done. A retry enqueues every delete again: an instance already
+        deleting gets a fresh delete, which supersedes the earlier one.
+        """
 
         if confirm is not True:
             return sf_api.error(400, 'parameter confirm is not set true')
@@ -2331,6 +2340,7 @@ class InstanceAgentPutEndpoint(api_base.Resource):
         o.state = AgentOperation.STATE_PREFLIGHT
         na_create_and_enqueue(
             instance_from_db.placement['node'], o.uuid,
+            str(instance_from_db.uuid),
             [na_tasks.preflight],
             PRIORITY.user_facing,
             request_id=util_general.get_request_id())

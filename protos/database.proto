@@ -2530,7 +2530,13 @@ message GetClusterOperationTargetRequest {
 
 message GetClusterOperationTargetReply {
   bool found = 1;
+  // The first target row, kept for clients which predate ``targets``.
   ClusterOperationTargetProto target = 2;
+  // Every target row of the operation, in sequence order. An operation
+  // with several declared targets (a hot plug targets its instance,
+  // network and interface) has one row per target. An older sf-database
+  // leaves this empty and reports only ``target``.
+  repeated ClusterOperationTargetProto targets = 3;
 }
 
 message GetClusterOperationTargetsForObjectRequest {

@@ -16,6 +16,7 @@ from shakenfist import instance
 from shakenfist.operations.baseoperation import BaseClusterOperation as bco
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.schema.operations import node_aop_op
 from shakenfist.schema.operations import node_inst_net_iface_op
 from shakenfist.schema.operations import node_inst_op
 from shakenfist.schema.operations import node_inst_snap_op
@@ -80,8 +81,8 @@ class InstanceEnqueueDeleteTestCase(base.ShakenFistTestCase):
                 new_callable=mock.PropertyMock,
                 return_value={'node': NODE_UUID}), \
                 mock.patch.object(
-                    instance.Instance, 'last_cluster_operation',
-                    new_callable=mock.PropertyMock, return_value=pointer), \
+                    instance.Instance, 'latest_cluster_operation',
+                    return_value=pointer) as self.latest, \
                 mock.patch.object(
                     instance.Instance, 'get_cluster_operations',
                     return_value=targeted) as self.get_ops, \
@@ -157,7 +158,53 @@ class InstanceEnqueueDeleteTestCase(base.ShakenFistTestCase):
 
     def test_only_outstanding_ops_are_listed(self):
         self._delete([])
-        self.get_ops.assert_called_once_with(outstanding_only=True)
+        self.get_ops.assert_called_once_with(
+            outstanding_only=True, raise_on_error=True)
+        self.latest.assert_called_once_with(raise_on_error=True)
+
+    def _delete_with_failing_read(self, listing_fails=False,
+                                  pointer_fails=False):
+        """Run enqueue_delete() over mariadb readers which honour the
+        raise_on_error contract: quiet by default, raising on request.
+
+        Patched at the mariadb layer, not on the Instance methods, so a
+        delete which forgot to ask for the exception gets the quiet
+        answer and carries on, which is the failure under test.
+        """
+        def listing(*args, raise_on_error=False, **kwargs):
+            if listing_fails and raise_on_error:
+                raise exceptions.DatabaseUnavailable('boom')
+            return []
+
+        def latest(*args, raise_on_error=False, **kwargs):
+            if pointer_fails and raise_on_error:
+                raise exceptions.DatabaseUnavailable('boom')
+            return None
+
+        inst = _instance()
+        with mock.patch.object(
+                instance.Instance, 'placement',
+                new_callable=mock.PropertyMock,
+                return_value={'node': NODE_UUID}), \
+                mock.patch('shakenfist.mariadb.get_cluster_operation_targets_for_object',
+                           side_effect=listing), \
+                mock.patch('shakenfist.mariadb.get_latest_cluster_operation_target',
+                           side_effect=latest), \
+                mock.patch('shakenfist.instance.add_event_multi') as events, \
+                mock.patch('shakenfist.instance.nio_create_and_enqueue') as enqueue:
+            with self.assertRaises(exceptions.DatabaseUnavailable):
+                inst.enqueue_delete()
+        enqueue.assert_not_called()
+        events.assert_not_called()
+
+    def test_unreadable_listing_refuses_the_delete(self):
+        # A listing which cannot be read used to come back empty, so the
+        # delete aborted nothing and waited for no snapshot (issue 4671).
+        # It now raises, and nothing is enqueued.
+        self._delete_with_failing_read(listing_fails=True)
+
+    def test_unreadable_pointer_refuses_the_delete(self):
+        self._delete_with_failing_read(pointer_fails=True)
 
 
 class InstanceEnqueueDeleteSqlTestCase(
@@ -174,6 +221,11 @@ class InstanceEnqueueDeleteSqlTestCase(
             NODE_UUID, NETWORK_UUID,
             [node_net_op.model_tasks.network_apply_create_hypervisor],
             PRIORITY.user_facing)
+        _, preflight = node_aop_op.create_and_enqueue(
+            NODE_UUID, str(uuid4()), INSTANCE_UUID,
+            [node_aop_op.model_tasks.preflight], PRIORITY.user_facing)
+        # The hot plug is enqueued last, so it stays the newest mutating
+        # operation the delete also waits for.
         _, hot_plug = node_inst_net_iface_op.create_and_enqueue(
             NODE_UUID, INSTANCE_UUID, NETWORK_UUID, INTERFACE_UUID,
             HOT_PLUG_TASKS, PRIORITY.user_facing,
@@ -196,6 +248,9 @@ class InstanceEnqueueDeleteSqlTestCase(
         self.assertEqual('queued', self._op_state(snap))
         self.assertEqual('abort', self._op_state(hot_plug))
         self.assertEqual('abort', self._op_state(sweep))
+        # The agent operation preflight targets the instance since issue
+        # 4672, so it is found by the walk and cancelled.
+        self.assertEqual('abort', self._op_state(preflight))
         self.assertEqual('queued', self._op_state(net))
 
         self.assertEqual(

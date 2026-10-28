@@ -2743,6 +2743,22 @@ class Instance(dbowo):
         self.add_event(EVENT_TYPE_AUDIT, 'console log cleared')
 
     def enqueue_delete(self):
+        """Cancel what targets this instance, then enqueue its delete.
+
+        Raises DatabaseUnavailable, and enqueues nothing, when the
+        outstanding operations cannot be read. The walk below exists to
+        abort them and to make the delete wait for a snapshot; an empty
+        answer from a failed read would abort nothing and wait for
+        nothing, and the delete would race the snapshot's disks. There
+        is no best-effort form: a delete is never enqueued blind.
+
+        Who retries is the caller's business. The API answers 503 and
+        the client retries. enqueue_delete_due_error() catches the
+        exception and leaves the instance errored, to be deleted
+        explicitly. The cleaner's re-enqueue of a delete-wait instance
+        lets it propagate: a database outage is a per-domain error
+        there, and a later pass tries again.
+        """
         # If this instance is not on a node, just enqueue on this node
         placement = self.placement
         if not placement.get('node'):
@@ -2767,7 +2783,8 @@ class Instance(dbowo):
         # start or hot-plug depends on, are left alone: other instances
         # share them.
         survivors = []
-        for t in self.get_cluster_operations(outstanding_only=True):
+        for t in self.get_cluster_operations(outstanding_only=True,
+                                             raise_on_error=True):
             op = t.op
             if niso_tasks.instance_snapshot in op.tasks:
                 survivors.append(op)
@@ -2788,7 +2805,9 @@ class Instance(dbowo):
         ]
         # The newest mutating operation is often a snapshot already listed
         # above, and the delete would otherwise check it twice per deferral.
-        pointer = self.last_cluster_operation
+        # Read strictly for the same reason as the walk: a None from a
+        # failed read would wait for nothing.
+        pointer = self.latest_cluster_operation(raise_on_error=True)
         if pointer is None or str(pointer['op_uuid']) not in {
                 r['op_uuid'] for r in runs_after}:
             runs_after.append(pointer)
@@ -2820,7 +2839,29 @@ class Instance(dbowo):
             # not prevent the instance being cleaned up (issue 4112).
             LOG.with_fields({'instance': self.uuid}).error(
                 f'Failed to record error message before delete: {e}')
-        self.enqueue_delete()
+
+        try:
+            self.enqueue_delete()
+        except exceptions.DatabaseUnavailable as e:
+            # The instance is already errored, which is what its client
+            # waits on. A delete enqueued without reading the operations
+            # targeting the instance would abort nothing and wait for no
+            # snapshot, so none is enqueued: the instance stays errored,
+            # holding its placement, until it is deleted explicitly. That
+            # is the same outcome as a start which errors an instance and
+            # then fails to queue its delete (see
+            # NodeInstNetdescOp._dependency_failed), and nothing retries
+            # either. This is an error handler, so the exception must not
+            # escape: the API paths which call it are reporting a
+            # scheduling failure, not an outage, and an operation's
+            # handler must finish marking the operation.
+            LOG.with_fields({'instance': self.uuid}).error(
+                f'Could not enqueue delete of errored instance: {e}')
+            self.add_event(
+                EVENT_TYPE_AUDIT,
+                'delete not enqueued after error, outstanding operations '
+                'unreadable; delete the instance to clean it up',
+                extra={'error': str(e)}, log_as_error=True)
 
     def snapshot(self, all=False, device=None, max_versions=None, thin=False):
         disks = self.block_devices['devices']

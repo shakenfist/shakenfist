@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
+from shakenfist.constants import get_object_class
 from shakenfist.external_api import app as external_api
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.tests import base
@@ -30,8 +31,9 @@ def _fake_op(uuid_, operation_type, depends_on=None, created_at=1.0,
     return op
 
 
-class ClusterOperationChainTestCase(base.ShakenFistTestCase):
-    """Tests for ``GET /clusteroperations/<op_uuid>/chain``."""
+class _ClusterOperationFixture(base.ShakenFistTestCase):
+    """Namespaces foo and other, a network in each, and tokens for foo
+    and system."""
 
     def setUp(self):
         super().setUp()
@@ -99,7 +101,9 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
         """Patch the endpoint's mariadb / hydration helpers.
 
         ``ops_by_uuid``: dict[uuid -> (operation_type, depends_on, created_at)].
-        ``targets_by_uuid``: dict[uuid -> (target_object_type, target_uuid)].
+        ``targets_by_uuid``: dict[uuid -> (target_object_type, target_uuid)],
+        or a list of such pairs for an operation with several targets,
+        in the order its rows were written.
         """
         def fake_get_cluster_operation(uuid_):
             data = ops_by_uuid.get(uuid_)
@@ -112,18 +116,21 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
                 'created_at': created_at,
             }
 
-        def fake_get_target(uuid_):
+        def fake_get_targets(uuid_):
             t = targets_by_uuid.get(uuid_)
             if t is None:
-                return None
-            target_type, target_uuid = t
-            return ClusterOperationTargetData(
-                operation_uuid=uuid_,
-                operation_type=ops_by_uuid[uuid_][0],
-                target_object_type=target_type,
-                target_uuid=target_uuid,
-                sequence_number=1,
-                created_at=ops_by_uuid[uuid_][2])
+                return []
+            if isinstance(t, tuple):
+                t = [t]
+            return [
+                ClusterOperationTargetData(
+                    operation_uuid=uuid_,
+                    operation_type=ops_by_uuid[uuid_][0],
+                    target_object_type=target_type,
+                    target_uuid=target_uuid,
+                    sequence_number=seq,
+                    created_at=ops_by_uuid[uuid_][2])
+                for seq, (target_type, target_uuid) in enumerate(t, 1)]
 
         # Build the fake op objects that _hydrate_op() would return for
         # operation lookups. Target-object lookups (the namespace check
@@ -146,8 +153,8 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
                 side_effect=fake_get_cluster_operation),
             mock.patch(
                 'shakenfist.external_api.clusteroperation.mariadb'
-                '.get_cluster_operation_target',
-                side_effect=fake_get_target),
+                '.get_cluster_operation_targets',
+                side_effect=fake_get_targets),
             mock.patch(
                 'shakenfist.external_api.clusteroperation._hydrate_op',
                 side_effect=fake_hydrate_op),
@@ -155,7 +162,19 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
         for p in patches:
             p.start()
             self.addCleanup(p.stop)
+        self._chain_patches = patches
         return fakes
+
+    def _unpatch_chain(self):
+        """Stop the patches _patch_chain() started, and only those, so a
+        test can patch again with different rows."""
+        for p in self._chain_patches:
+            p.stop()
+        self._chain_patches = []
+
+
+class ClusterOperationChainTestCase(_ClusterOperationFixture):
+    """Tests for ``GET /clusteroperations/<op_uuid>/chain``."""
 
     def test_chain_happy_path_three_ops_same_namespace(self):
         uuid_a = str(uuid4())
@@ -295,6 +314,24 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
             headers={'Authorization': self.foo_token})
         self.assertEqual(403, resp.status_code)
 
+    def test_chain_multi_target_op_with_a_foreign_target_returns_403(self):
+        # A hot plug targets its instance, network and interface. One
+        # foreign row among them hides the chain, whichever row the
+        # database would have returned first.
+        uuid_a = str(uuid4())
+        ops = {uuid_a: ('net_op', [], 1.0)}
+        for rows in ([('network', self.network_uuid),
+                      ('network', self.other_network_uuid)],
+                     [('network', self.other_network_uuid),
+                      ('network', self.network_uuid)]):
+            with self.subTest(rows=rows):
+                self._patch_chain(ops, {uuid_a: rows})
+                resp = self.client.get(
+                    '/clusteroperations/%s/chain' % uuid_a,
+                    headers={'Authorization': self.foo_token})
+                self.assertEqual(403, resp.status_code)
+                self._unpatch_chain()
+
     def test_chain_self_referential_cycle_does_not_loop(self):
         # A self-referential ``depends_on`` (op refers to itself) must
         # be handled by the visited-set guard; the response is the
@@ -368,6 +405,84 @@ class ClusterOperationChainTestCase(base.ShakenFistTestCase):
                 '/clusteroperations/%s/chain' % uuids[0],
                 headers={'Authorization': self.foo_token})
         self.assertEqual(400, resp.status_code)
+
+
+class ClusterOperationSingleTestCase(_ClusterOperationFixture):
+    """Tests for ``GET /clusteroperations/<operation_type>/<operation_uuid>``.
+
+    The caller must own every object the operation targets. The endpoint
+    used to read one target row, with no ORDER BY, so a multi-target
+    operation was judged on whichever row the database returned first,
+    and it admitted a target with no namespace, so a tenant could read a
+    blob or interface operation belonging to another namespace (issue
+    4674).
+    """
+
+    def _get(self, op_uuid, targets, token=None):
+        self._patch_chain({op_uuid: ('net_op', [], 1.0)},
+                          {op_uuid: targets} if targets else {})
+        fake_class = mock.MagicMock()
+        fake_class.from_db.return_value = _fake_op(op_uuid, 'net_op')
+
+        def classes(name):
+            # The operation itself is faked; the target objects (networks
+            # MockMariaDB holds) resolve through the real mapping, so the
+            # namespace check is the real one.
+            if name == 'net_op':
+                return fake_class
+            return get_object_class(name)
+
+        with mock.patch(
+                'shakenfist.external_api.clusteroperation.get_object_class',
+                side_effect=classes):
+            resp = self.client.get(
+                '/clusteroperations/net_op/%s' % op_uuid,
+                headers={'Authorization': token or self.foo_token})
+        self._unpatch_chain()
+        return resp
+
+    def test_own_target_is_visible(self):
+        op_uuid = str(uuid4())
+        resp = self._get(op_uuid, ('network', self.network_uuid))
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(op_uuid, resp.get_json()['uuid'])
+
+    def test_foreign_target_returns_403(self):
+        resp = self._get(str(uuid4()), ('network', self.other_network_uuid))
+        self.assertEqual(403, resp.status_code)
+
+    def test_no_recorded_target_returns_403(self):
+        resp = self._get(str(uuid4()), None)
+        self.assertEqual(403, resp.status_code)
+
+    def test_every_target_row_is_checked(self):
+        # Whichever order the rows come back in, the foreign one refuses.
+        for rows in ([('network', self.network_uuid),
+                      ('network', self.other_network_uuid)],
+                     [('network', self.other_network_uuid),
+                      ('network', self.network_uuid)]):
+            with self.subTest(rows=rows):
+                resp = self._get(str(uuid4()), rows)
+                self.assertEqual(403, resp.status_code)
+
+    def test_cluster_scoped_target_returns_403(self):
+        # A blob has no namespace. Before the fix a tenant who knew the
+        # uuid could read another namespace's blob operation.
+        resp = self._get(str(uuid4()), ('blob', str(uuid4())))
+        self.assertEqual(403, resp.status_code)
+
+    def test_cluster_scoped_target_behind_an_own_target_returns_403(self):
+        resp = self._get(str(uuid4()), [('network', self.network_uuid),
+                                        ('blob', str(uuid4()))])
+        self.assertEqual(403, resp.status_code)
+
+    def test_system_sees_everything(self):
+        for targets in (None, ('blob', str(uuid4())),
+                        ('network', self.other_network_uuid)):
+            with self.subTest(targets=targets):
+                resp = self._get(str(uuid4()), targets,
+                                 token=self.admin_token)
+                self.assertEqual(200, resp.status_code)
 
 
 class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):

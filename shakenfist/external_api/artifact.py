@@ -1055,22 +1055,33 @@ class ArtifactOutstandingOperationsEndpoint(api_base.Resource):
         'all': fields.Boolean(load_default=False)
     }
 
+    # An owner's route, although it only reads. The listing returns every
+    # operation targeting the artifact, and an artifact_fetch_op names the
+    # namespace and instance whose boot caused the fetch. On a shared
+    # system image that is every tenant's instance uuids, and from the
+    # timestamps their boot times, so the read rule handed them to any
+    # namespace the artifact was shared with or whose owner trusted it.
+    # The by-target listing, GET /clusteroperations?target_object_type=
+    # artifact, already refused those callers; the two now agree.
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Get the outstanding cluster operations for an artifact.',
         [('artifact_ref', 'path', 'uuidorname',
           'The UUID or name of the artifact.', True),
          ('namespace', 'body', 'namespace',
-          api_base.VISIBLE_ARTIFACT_REF_NAMESPACE_DESCRIPTION, False),
+          api_base.ARTIFACT_REF_NAMESPACE_DESCRIPTION, False),
          ('all', 'query', 'boolean',
           api_base.CLUSTER_OPERATIONS_ALL_DESCRIPTION, False)],
         [(
             200,
-            'The cluster operations targeting this artifact, newest first.',
+            'The cluster operations targeting this artifact, newest first. '
+            'Only the owning namespace, or system, may list them: sharing or '
+            'trust makes an artifact readable, not its operations, because '
+            'a fetch operation names the instance whose boot caused it.',
             artifact_outstanding_operations_example),
-         (404, 'Artifact not found.', None)]))
+         (404, 'Artifact not found, or not owned by the caller.', None)]))
     @use_kwargs(get_args, location='json_or_query')
-    @arg_is_visible_artifact_ref
-    @requires_artifact_access
+    @arg_is_artifact_ref
+    @requires_artifact_ownership
     @api_base.log_token_use
     def get(self, artifact_ref=None, all=False, artifact_from_db=None):
         return artifact_from_db.cluster_operation_views(outstanding_only=(not all))

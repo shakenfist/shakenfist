@@ -9,6 +9,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.schema.operations import node_inst_op as schema
+from shakenfist.schema.operations.util import is_observational
 from shakenfist.instance import Instance
 from shakenfist.instance import Instances
 from shakenfist.instance import this_node_filter
@@ -98,12 +99,20 @@ class NodeInstOp(BaseClusterOperation):
             util_exceptions.ignore_exception('node_inst_op', e)
             self.state = NodeInstOp.STATE_ERROR
 
-            # An observational task only measures the instance, so failing
-            # to measure it says nothing about the guest. The cluster daemon
-            # enqueues these for every created instance on every sweep, and
-            # a transient database error while recording a usage event would
-            # otherwise error a healthy instance.
-            if task in schema.model.observational_tasks:
+            # An observational operation only measures the instance, so
+            # failing to measure it says nothing about the guest. The cluster
+            # daemon enqueues these for every created instance on every
+            # sweep, and a transient database error while recording a usage
+            # event would otherwise error a healthy instance.
+            #
+            # The question is asked of the whole operation, as
+            # is_observational() asked it when the target rows were
+            # stamped, not of the failing task. A failing task in a
+            # mutating operation ends the operation (execute() stops at
+            # the error state), so the mutating work behind it never runs
+            # and the instance must show that, whatever the failing task
+            # itself was.
+            if is_observational(schema.model, self.tasks):
                 self.log.with_fields({'task': task.name}).warning(
                     'Observational task failed, instance state unchanged')
                 return

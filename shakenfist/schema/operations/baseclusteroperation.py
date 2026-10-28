@@ -17,6 +17,22 @@ class PRIORITY(Enum):
     background_high_io = 40
 
 
+# The states an operation can be in while it is still in flight, and the
+# states that end one. mariadb's pending check, per-object listing, stale
+# target prune and orphan reaper, BaseClusterOperation.is_outstanding() and
+# the mock database all read these two names, so a state cannot drop out of
+# one copy while the others keep it. test_cluster_operation_state_lists pins
+# that the two sets are disjoint and together cover every state
+# BaseClusterOperation.state_targets can reach.
+#
+# ``preflight`` is an instance state and state_targets never enters it, but
+# it has always been in the in-flight set and it is harmless there: a query
+# for in-flight work errs towards counting a state, never towards missing
+# one.
+ACTIVE_OPERATION_STATES: tuple[str, ...] = ('queued', 'preflight', 'executing')
+TERMINAL_OPERATION_STATES: tuple[str, ...] = ('complete', 'abort', 'deleted', 'error')
+
+
 # The set of ObjectType values that are valid cluster operations.
 VALID_CLUSTER_OPERATIONS: frozenset[ObjectType] = frozenset([
     ObjectType.NODE_BLOB_OP,

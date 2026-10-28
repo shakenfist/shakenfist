@@ -102,6 +102,8 @@ from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_state import clip_state_message
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.operations.baseclusteroperation import ACTIVE_OPERATION_STATES
+from shakenfist.schema.operations.baseclusteroperation import TERMINAL_OPERATION_STATES
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.sqlalchemy import get_table_columns
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
@@ -5262,10 +5264,16 @@ def delete_object_metadata(
 # Track which cluster operations target which objects, with sequence ordering.
 # =============================================================================
 
-def _direct_get_cluster_operation_target(
+def _direct_get_cluster_operation_targets(
     operation_uuid: str
-) -> Optional[ClusterOperationTargetData]:
-    """Read a single cluster operation target by operation_uuid."""
+) -> list[ClusterOperationTargetData]:
+    """Read every target row of a cluster operation, in sequence order.
+
+    An operation with several declared targets has one row per target,
+    so a caller deciding who may see the operation must read them all. A
+    database error reads as no rows: the API treats an operation with no
+    recorded target as one it cannot verify, and refuses it.
+    """
     engine = _get_engine()
     table = _get_cluster_operation_targets_table()
 
@@ -5273,31 +5281,44 @@ def _direct_get_cluster_operation_target(
         with engine.connect() as conn:
             stmt = sa.select(table).where(
                 table.c.operation_uuid == operation_uuid
-            )
-            result = conn.execute(stmt).fetchone()
-            if result is None:
-                return None
-
-            return ClusterOperationTargetData(
-                operation_uuid=result.operation_uuid,
-                operation_type=result.operation_type,
-                target_object_type=result.target_object_type.value,
-                target_uuid=result.target_uuid,
-                sequence_number=result.sequence_number,
-                created_at=result.created_at,
-                observational=result.observational
-            )
+            ).order_by(table.c.sequence_number)
+            return [
+                ClusterOperationTargetData(
+                    operation_uuid=r.operation_uuid,
+                    operation_type=r.operation_type,
+                    target_object_type=r.target_object_type.value,
+                    target_uuid=r.target_uuid,
+                    sequence_number=r.sequence_number,
+                    created_at=r.created_at,
+                    observational=r.observational
+                )
+                for r in conn.execute(stmt).fetchall()
+            ]
     except OperationalError as e:
         LOG.warning(
             f'MariaDB read failed for cluster_operation_targets '
             f'{operation_uuid}: {e}')
-        return None
+        return []
+
+
+def _direct_get_cluster_operation_target(
+    operation_uuid: str
+) -> Optional[ClusterOperationTargetData]:
+    """Read the first target row of a cluster operation.
+
+    A multi-target operation has more rows than this reports. Anything
+    deciding visibility reads them all with
+    _direct_get_cluster_operation_targets().
+    """
+    rows = _direct_get_cluster_operation_targets(operation_uuid)
+    return rows[0] if rows else None
 
 
 def _direct_get_cluster_operation_targets_for_object(
     target_object_type: ObjectType,
     target_uuid: str,
-    pending_only: bool = False
+    pending_only: bool = False,
+    raise_on_error: bool = False
 ) -> list[ClusterOperationTargetData]:
     """Get cluster operation targets for an object, ordered by sequence.
 
@@ -5305,6 +5326,12 @@ def _direct_get_cluster_operation_targets_for_object(
     With pending_only, only targets whose operation is in flight are
     returned, judged by the same object_states join as
     _direct_has_pending_cluster_operation_target.
+
+    A failed read returns no rows, unless raise_on_error, when it raises
+    DatabaseUnavailable. A caller which acts on the absence of rows, as
+    the instance delete does when it cancels what targets the instance,
+    must ask for the exception: an empty answer it cannot tell from
+    "nothing outstanding" is a fail-open.
     """
     engine = _get_engine()
     table = _get_cluster_operation_targets_table()
@@ -5343,6 +5370,10 @@ def _direct_get_cluster_operation_targets_for_object(
                 for r in results
             ]
     except OperationalError as e:
+        if raise_on_error:
+            raise exceptions.DatabaseUnavailable(
+                f'MariaDB read failed for cluster_operation_targets '
+                f'{target_object_type}/{target_uuid}: {e}') from e
         LOG.warning(
             f'MariaDB read failed for cluster_operation_targets '
             f'{target_object_type}/{target_uuid}: {e}')
@@ -5351,12 +5382,17 @@ def _direct_get_cluster_operation_targets_for_object(
 
 def _direct_get_latest_cluster_operation_target(
     target_object_type: ObjectType,
-    target_uuid: str
+    target_uuid: str,
+    raise_on_error: bool = False
 ) -> Optional[ClusterOperationTargetData]:
     """Get the most recent mutating cluster operation target for an object.
 
     Observational operations are excluded, so a background sweep cannot
     shadow the mutating operation a caller is waiting on.
+
+    A failed read returns None, unless raise_on_error, when it raises
+    DatabaseUnavailable, for the same reason as
+    _direct_get_cluster_operation_targets_for_object.
     """
     engine = _get_engine()
     table = _get_cluster_operation_targets_table()
@@ -5386,6 +5422,10 @@ def _direct_get_latest_cluster_operation_target(
                 observational=result.observational
             )
     except OperationalError as e:
+        if raise_on_error:
+            raise exceptions.DatabaseUnavailable(
+                f'MariaDB read failed for cluster_operation_targets '
+                f'{target_object_type}/{target_uuid}: {e}') from e
         LOG.warning(
             f'MariaDB read failed for cluster_operation_targets '
             f'{target_object_type}/{target_uuid}: {e}')
@@ -5393,10 +5433,11 @@ def _direct_get_latest_cluster_operation_target(
 
 
 # An operation is "in flight" if and only if its row in object_states has
-# one of these state values. Anything else (complete, abort, error,
-# deleted, ...) is terminal. Matches
-# _direct_delete_stale_cluster_operation_targets.
-_ACTIVE_OPERATION_STATES = ('queued', 'preflight', 'executing')
+# one of these state values. Anything else is terminal. The sets are
+# defined once, beside the operation schema, and shared with every other
+# reader (the stale target prune, the orphan reaper, is_outstanding() and
+# the mock database).
+_ACTIVE_OPERATION_STATES = ACTIVE_OPERATION_STATES
 
 
 def _direct_has_pending_cluster_operation_target(
@@ -5441,11 +5482,10 @@ def _direct_has_pending_cluster_operation_target(
         return True
 
 
-# Terminal states for cluster operations -- mirror the set used by the
-# operation state machine (shakenfist/operations/baseoperation.py). An op
-# in any of these states is no longer executing and is safe to consider
-# for cooldown / circuit-breaker queries.
-_TERMINAL_OPERATION_STATES = ('complete', 'abort', 'deleted', 'error')
+# Terminal states for cluster operations. An op in any of these states is
+# no longer executing and is safe to consider for cooldown / circuit-breaker
+# queries.
+_TERMINAL_OPERATION_STATES = TERMINAL_OPERATION_STATES
 
 
 def _direct_get_recent_terminal_op_states_for_target(
@@ -5582,14 +5622,10 @@ def _direct_delete_stale_cluster_operation_targets(
     table = _get_cluster_operation_targets_table()
     states_table = _get_object_states_table()
 
-    # States that mean an operation is still in flight. Anything else
-    # (complete, abort, error, deleted, ...) is considered terminal.
-    active_states = ['queued', 'preflight', 'executing']
-
     try:
         with engine.connect() as conn:
             active_subq = sa.select(states_table.c.object_uuid).where(
-                states_table.c.state_value.in_(active_states)
+                states_table.c.state_value.in_(_ACTIVE_OPERATION_STATES)
             )
             stmt = sa.delete(table).where(
                 sa.and_(
@@ -5625,30 +5661,44 @@ def _target_from_proto(
     )
 
 
-def _grpc_get_cluster_operation_target(
+def _grpc_get_cluster_operation_targets(
     operation_uuid: str
-) -> Optional[ClusterOperationTargetData]:
-    """Read a single cluster operation target via the database microservice."""
+) -> list[ClusterOperationTargetData]:
+    """Read every target row of a cluster operation via the database
+    microservice."""
     try:
         stub = _get_database_stub()
         request = database_pb2.GetClusterOperationTargetRequest(
             operation_uuid=operation_uuid
         )
         reply = _grpc_call(stub.GetClusterOperationTarget, request)
-        if not reply.found:
-            return None
-        return _target_from_proto(reply.target)
+        if reply.targets:
+            return [_target_from_proto(t) for t in reply.targets]
+        if reply.found:
+            # An sf-database older than the targets field reports one row.
+            return [_target_from_proto(reply.target)]
+        return []
     except grpc.RpcError as e:
         LOG.error(
             f'gRPC GetClusterOperationTarget failed for '
             f'{operation_uuid}: {e}')
-        return None
+        return []
+
+
+def _grpc_get_cluster_operation_target(
+    operation_uuid: str
+) -> Optional[ClusterOperationTargetData]:
+    """Read the first target row of a cluster operation via the database
+    microservice."""
+    rows = _grpc_get_cluster_operation_targets(operation_uuid)
+    return rows[0] if rows else None
 
 
 def _grpc_get_cluster_operation_targets_for_object(
     target_object_type: ObjectType,
     target_uuid: str,
-    pending_only: bool = False
+    pending_only: bool = False,
+    raise_on_error: bool = False
 ) -> list[ClusterOperationTargetData]:
     """Get cluster operation targets for an object via gRPC."""
     try:
@@ -5663,6 +5713,10 @@ def _grpc_get_cluster_operation_targets_for_object(
         reply = _grpc_call(stub.GetClusterOperationTargetsForObject, request)
         return [_target_from_proto(t) for t in reply.targets]
     except grpc.RpcError as e:
+        if raise_on_error:
+            raise exceptions.DatabaseUnavailable(
+                f'gRPC GetClusterOperationTargetsForObject failed for '
+                f'{target_object_type}/{target_uuid}: {e}') from e
         LOG.error(
             f'gRPC GetClusterOperationTargetsForObject failed for '
             f'{target_object_type}/{target_uuid}: {e}')
@@ -5671,7 +5725,8 @@ def _grpc_get_cluster_operation_targets_for_object(
 
 def _grpc_get_latest_cluster_operation_target(
     target_object_type: ObjectType,
-    target_uuid: str
+    target_uuid: str,
+    raise_on_error: bool = False
 ) -> Optional[ClusterOperationTargetData]:
     """Get the most recent cluster operation target via gRPC."""
     try:
@@ -5687,6 +5742,10 @@ def _grpc_get_latest_cluster_operation_target(
             return None
         return _target_from_proto(reply.target)
     except grpc.RpcError as e:
+        if raise_on_error:
+            raise exceptions.DatabaseUnavailable(
+                f'gRPC GetLatestClusterOperationTarget failed for '
+                f'{target_object_type}/{target_uuid}: {e}') from e
         LOG.error(
             f'gRPC GetLatestClusterOperationTarget failed for '
             f'{target_object_type}/{target_uuid}: {e}')
@@ -5805,10 +5864,29 @@ def _grpc_delete_stale_cluster_operation_targets(max_age: float) -> int:
 
 # Public API functions for cluster operation targets
 
+def get_cluster_operation_targets(
+    operation_uuid: str
+) -> list[ClusterOperationTargetData]:
+    """Every target row of a cluster operation, in sequence order.
+
+    This is what decides who may see an operation: the caller must own
+    every object it targets. An operation with no rows cannot be
+    verified. An sf-database older than the ``targets`` reply field
+    reports one row, so during a rolling upgrade a multi-target operation
+    is judged on its first row, as every reader was before the field.
+
+    Returns:
+        The target rows, empty if there are none or the read failed.
+    """
+    if _use_database_service():
+        return _grpc_get_cluster_operation_targets(operation_uuid)
+    return _direct_get_cluster_operation_targets(operation_uuid)
+
+
 def get_cluster_operation_target(
     operation_uuid: str
 ) -> Optional[ClusterOperationTargetData]:
-    """Get a cluster operation target by operation UUID.
+    """Get the first target row of a cluster operation.
 
     Returns:
         The target data, or None if not found.
@@ -5821,7 +5899,8 @@ def get_cluster_operation_target(
 def get_cluster_operation_targets_for_object(
     target_object_type: ObjectType,
     target_uuid: str,
-    pending_only: bool = False
+    pending_only: bool = False,
+    raise_on_error: bool = False
 ) -> list[ClusterOperationTargetData]:
     """Get cluster operation targets for an object, ordered by sequence.
 
@@ -5831,33 +5910,41 @@ def get_cluster_operation_targets_for_object(
     sf-database older than the field ignores it and returns every row, so
     callers must still check each operation's state.
 
+    A failed read returns no rows, which a caller cannot tell from an
+    object with nothing outstanding. A caller which acts on that absence
+    passes raise_on_error and gets DatabaseUnavailable instead.
+
     Returns:
         List of target data ordered by sequence_number ascending.
     """
     if _use_database_service():
         return _grpc_get_cluster_operation_targets_for_object(
-            target_object_type, target_uuid, pending_only)
+            target_object_type, target_uuid, pending_only, raise_on_error)
     return _direct_get_cluster_operation_targets_for_object(
-        target_object_type, target_uuid, pending_only)
+        target_object_type, target_uuid, pending_only, raise_on_error)
 
 
 def get_latest_cluster_operation_target(
     target_object_type: ObjectType,
-    target_uuid: str
+    target_uuid: str,
+    raise_on_error: bool = False
 ) -> Optional[ClusterOperationTargetData]:
     """Get the most recent mutating cluster operation target for an object.
 
     Observational operations (every task only observes the target) are
     excluded, so a background sweep cannot shadow last_cluster_operation.
 
+    A failed read returns None, or raises DatabaseUnavailable with
+    raise_on_error, as get_cluster_operation_targets_for_object does.
+
     Returns:
         The most recent mutating target data, or None if there is none.
     """
     if _use_database_service():
         return _grpc_get_latest_cluster_operation_target(
-            target_object_type, target_uuid)
+            target_object_type, target_uuid, raise_on_error)
     return _direct_get_latest_cluster_operation_target(
-        target_object_type, target_uuid)
+        target_object_type, target_uuid, raise_on_error)
 
 
 def has_pending_cluster_operation_target(
@@ -24072,7 +24159,7 @@ def _orphaned_cluster_operations_stmt(threshold_seconds: float) -> Any:
                 cluster_ops_table.c.operation_type == ot.value,
                 states_table.c.object_type == ot)
             for ot in op_object_types]))
-        .where(states_table.c.state_value.in_(['queued', 'executing']))
+        .where(states_table.c.state_value.in_(_ACTIVE_OPERATION_STATES))
         .where(states_table.c.update_time <= cutoff)
         .where(~_work_queue_references_op_clause(
             states_table.c.object_uuid))

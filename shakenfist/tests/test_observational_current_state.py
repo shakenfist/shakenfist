@@ -495,3 +495,118 @@ class ObservationalOnTheWireTestCase(base.ShakenFistTestCase):
             target_object_type=ObjectType.INSTANCE.proto_id,
             target_uuid=INSTANCE_UUID)
         self.assertFalse(request.pending_only)
+
+
+class OperationTargetRowsTestCase(
+        ClusterOperationTablesFixture, base.ShakenFistTestCase):
+    """Every target row of an operation is readable, in sequence order.
+
+    A multi-target operation has one row per target. The singular
+    readers report the first row; the API's visibility rule reads them
+    all (issue 4674). The sf-database reply carries both.
+    """
+
+    TARGETS = [(ObjectType.INSTANCE, INSTANCE_UUID),
+               (ObjectType.BLOB, BLOB_UUID)]
+
+    def _enqueue_two_targets(self):
+        servicer = database_main.DatabaseService.__new__(
+            database_main.DatabaseService)
+        servicer.monitor = mock.MagicMock()
+        request = database_pb2.CreateAndEnqueueClusterOperationRequest(
+            uuid=MIXED_OP,
+            operation_type='node_inst_op',
+            created_at=1000.0,
+            queue_name=f'{NODE_UUID}-clusteroperation-user_facing',
+            delay=0.0,
+            metadata_json=json.dumps({
+                'uuid': MIXED_OP, 'node_uuid': NODE_UUID,
+                'instance_uuid': INSTANCE_UUID, 'priority': 'user_facing',
+                'tasks': ['instance_delete']}),
+            targets=[
+                database_pb2.CreateAndEnqueueClusterOperationTarget(
+                    target_object_type=t.proto_id, target_uuid=u)
+                for t, u in self.TARGETS])
+        reply = servicer.CreateAndEnqueueClusterOperation(
+            request, mock.MagicMock())
+        self.assertTrue(reply.success, reply.error)
+        return servicer
+
+    def test_direct_readers(self):
+        self._enqueue_two_targets()
+
+        rows = mariadb._direct_get_cluster_operation_targets(MIXED_OP)
+        self.assertEqual(
+            [(t.value, u) for t, u in self.TARGETS],
+            [(r.target_object_type, r.target_uuid) for r in rows])
+        self.assertEqual(
+            [r.sequence_number for r in rows],
+            sorted(r.sequence_number for r in rows))
+
+        first = mariadb._direct_get_cluster_operation_target(MIXED_OP)
+        self.assertEqual(rows[0], first)
+        self.assertEqual(rows, mariadb.get_cluster_operation_targets(MIXED_OP))
+
+    def test_unknown_operation_has_no_rows(self):
+        self.assertEqual(
+            [], mariadb._direct_get_cluster_operation_targets(OBSERVING_OP))
+        self.assertIsNone(
+            mariadb._direct_get_cluster_operation_target(OBSERVING_OP))
+
+    def test_servicer_reply_carries_every_row(self):
+        servicer = self._enqueue_two_targets()
+        reply = servicer.GetClusterOperationTarget(
+            database_pb2.GetClusterOperationTargetRequest(
+                operation_uuid=MIXED_OP),
+            mock.MagicMock())
+        self.assertTrue(reply.found)
+        self.assertEqual(
+            [(t.proto_id, u) for t, u in self.TARGETS],
+            [(t.target_object_type, t.target_uuid) for t in reply.targets])
+        self.assertEqual(reply.targets[0], reply.target)
+
+        reply = servicer.GetClusterOperationTarget(
+            database_pb2.GetClusterOperationTargetRequest(
+                operation_uuid=OBSERVING_OP),
+            mock.MagicMock())
+        self.assertFalse(reply.found)
+        self.assertEqual(0, len(reply.targets))
+
+
+class GrpcOperationTargetRowsTestCase(base.ShakenFistTestCase):
+    """The gRPC client reads every row, and falls back to the single
+    ``target`` field an older sf-database reports."""
+
+    def _row(self, uuid_):
+        return database_pb2.ClusterOperationTargetProto(
+            operation_uuid=MIXED_OP, operation_type='node_inst_op',
+            target_object_type=ObjectType.INSTANCE.proto_id,
+            target_uuid=uuid_, sequence_number=1, created_at=1.0)
+
+    def _call(self, reply):
+        with mock.patch('shakenfist.mariadb._get_database_stub'), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply):
+            return (mariadb._grpc_get_cluster_operation_targets(MIXED_OP),
+                    mariadb._grpc_get_cluster_operation_target(MIXED_OP))
+
+    def test_every_row_is_read(self):
+        reply = database_pb2.GetClusterOperationTargetReply(
+            found=True, target=self._row('a'),
+            targets=[self._row('a'), self._row('b')])
+        rows, first = self._call(reply)
+        self.assertEqual(['a', 'b'], [r.target_uuid for r in rows])
+        self.assertEqual('a', first.target_uuid)
+
+    def test_older_service_reports_one_row(self):
+        reply = database_pb2.GetClusterOperationTargetReply(
+            found=True, target=self._row('a'))
+        rows, first = self._call(reply)
+        self.assertEqual(['a'], [r.target_uuid for r in rows])
+        self.assertEqual('a', first.target_uuid)
+
+    def test_not_found_is_no_rows(self):
+        rows, first = self._call(
+            database_pb2.GetClusterOperationTargetReply(found=False))
+        self.assertEqual([], rows)
+        self.assertIsNone(first)

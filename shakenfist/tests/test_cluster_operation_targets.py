@@ -2,6 +2,9 @@
 import time
 from unittest import mock
 
+import grpc
+
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObjectWithOperations
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
@@ -38,7 +41,7 @@ class LastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
             'op_uuid': OP_UUID
         })
         mock_get_latest.assert_called_once_with(
-            d.object_type, TEST_UUID)
+            d.object_type, TEST_UUID, raise_on_error=False)
 
     @mock.patch('shakenfist.mariadb.get_latest_cluster_operation_target',
                 return_value=None)
@@ -47,7 +50,7 @@ class LastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
         result = d.last_cluster_operation
         self.assertIsNone(result)
         mock_get_latest.assert_called_once_with(
-            d.object_type, TEST_UUID)
+            d.object_type, TEST_UUID, raise_on_error=False)
 
 
 class HardDeleteWithTargetsTestCase(base.ShakenFistTestCase):
@@ -1410,3 +1413,108 @@ class PublicListClusterOperationsForTargetTestCase(
             'network', LIST_TARGET_UUID)
         self.assertEqual([], result)
         mock_grpc.assert_called_once_with('network', LIST_TARGET_UUID)
+
+
+class TargetReadsRaiseOnErrorTestCase(base.ShakenFistTestCase):
+    """The by-object target readers fail open by default and closed on
+    request.
+
+    Instance.enqueue_delete() acts on an empty listing, so it asks for
+    the exception (issue 4671). Every other reader keeps the quiet
+    answer.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from shakenfist.config import BaseSettings
+
+        class _FakeConfig(BaseSettings):
+            MARIADB_GATEWAY_HOSTS: list[str] = ['192.168.1.1']
+            MARIADB_GATEWAY_PORT: int = 13005
+            MARIADB_HOST: str = 'localhost'
+            NODE_NAME: str = 'testnode'
+
+        self.config_patch = mock.patch(
+            'shakenfist.mariadb.config', _FakeConfig())
+        self.config_patch.start()
+        self.addCleanup(self.config_patch.stop)
+
+    def _failing_engine(self):
+        from sqlalchemy.exc import OperationalError
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.side_effect = OperationalError(
+            'stmt', {}, Exception('boom'))
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        return mock_engine
+
+    @mock.patch('shakenfist.mariadb._get_object_states_table')
+    @mock.patch('shakenfist.mariadb._get_cluster_operation_targets_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_direct_listing(self, mock_get_engine, mock_get_table,
+                            mock_get_states):
+        import sqlalchemy as sa
+        metadata = sa.MetaData()
+        mock_get_table.return_value = sa.Table(
+            'cluster_operation_targets', metadata,
+            sa.Column('operation_uuid', sa.String(36), primary_key=True),
+            sa.Column('target_object_type', sa.String(32)),
+            sa.Column('target_uuid', sa.String(36)),
+            sa.Column('sequence_number', sa.Integer()),
+            sa.Column('observational', sa.Boolean()))
+        mock_get_states.return_value = sa.Table(
+            'object_states', metadata,
+            sa.Column('object_uuid', sa.String(36)),
+            sa.Column('state_value', sa.String(32)))
+        mock_get_engine.return_value = self._failing_engine()
+
+        self.assertEqual(
+            [], mariadb._direct_get_cluster_operation_targets_for_object(
+                'instance', TEST_UUID, pending_only=True))
+        with self.assertRaises(exceptions.DatabaseUnavailable):
+            mariadb._direct_get_cluster_operation_targets_for_object(
+                'instance', TEST_UUID, pending_only=True,
+                raise_on_error=True)
+
+        self.assertIsNone(
+            mariadb._direct_get_latest_cluster_operation_target(
+                'instance', TEST_UUID))
+        with self.assertRaises(exceptions.DatabaseUnavailable):
+            mariadb._direct_get_latest_cluster_operation_target(
+                'instance', TEST_UUID, raise_on_error=True)
+
+    @mock.patch('shakenfist.mariadb._grpc_call', side_effect=grpc.RpcError())
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_grpc_listing(self, mock_stub, mock_call):
+        self.assertEqual(
+            [], mariadb._grpc_get_cluster_operation_targets_for_object(
+                ObjectType.INSTANCE, TEST_UUID, pending_only=True))
+        with self.assertRaises(exceptions.DatabaseUnavailable):
+            mariadb._grpc_get_cluster_operation_targets_for_object(
+                ObjectType.INSTANCE, TEST_UUID, pending_only=True,
+                raise_on_error=True)
+
+        self.assertIsNone(
+            mariadb._grpc_get_latest_cluster_operation_target(
+                ObjectType.INSTANCE, TEST_UUID))
+        with self.assertRaises(exceptions.DatabaseUnavailable):
+            mariadb._grpc_get_latest_cluster_operation_target(
+                ObjectType.INSTANCE, TEST_UUID, raise_on_error=True)
+
+    @mock.patch('shakenfist.mariadb._direct_get_cluster_operation_targets_for_object',
+                return_value=[])
+    @mock.patch('shakenfist.mariadb._direct_get_latest_cluster_operation_target',
+                return_value=None)
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    def test_public_readers_pass_the_flag(
+            self, mock_use_svc, mock_latest, mock_listing):
+        mariadb.get_cluster_operation_targets_for_object(
+            'instance', TEST_UUID, pending_only=True, raise_on_error=True)
+        mock_listing.assert_called_once_with(
+            'instance', TEST_UUID, True, True)
+        mariadb.get_latest_cluster_operation_target(
+            'instance', TEST_UUID, raise_on_error=True)
+        mock_latest.assert_called_once_with('instance', TEST_UUID, True)

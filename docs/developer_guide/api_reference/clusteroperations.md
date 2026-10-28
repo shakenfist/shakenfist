@@ -30,11 +30,15 @@ networks.
 The per-object sub-resources are `/artifacts/{artifact_ref}/clusteroperations`,
 `/instances/{instance_ref}/clusteroperations` and
 `/networks/{network_ref}/clusteroperations`. Each lists the operations which
-target that object, newest first. An operation which only targets another
-object is not listed, even if one of this object's operations waits for it: a
-network reconcile an instance start waits on appears in the network's list, not
-the instance's, and `GET /clusteroperations/{op_uuid}/chain` traces what an
-operation waits on. Every entry carries an `observational` boolean, as
+target that object, newest first, and each is an owner's route: the caller's
+namespace must own the object, or be system. Sharing an artifact, or trusting
+a namespace, makes the artifact readable but not its operations, because a
+fetch operation names the instance whose boot caused it. An operation which
+only targets another object is not listed, even if one of this object's
+operations waits for it: a network reconcile an instance start waits on appears
+in the network's list, not the instance's, and
+`GET /clusteroperations/{op_uuid}/chain` traces what an operation waits on.
+Every entry carries an `observational` boolean, as
 described below. By default only operations which are queued, in preflight or
 executing are listed. With `all=true` the list also includes finished
 operations which have not yet been removed. Finished operations are
@@ -50,6 +54,10 @@ a bounded window onto recent work and not a history.
       Retrieve a single cluster operation by its type and uuid. This is the
       polling endpoint a client uses to wait for an asynchronous operation
       (returned in the body of a 202 response) to reach a terminal state.
+      Namespace-scoped: a non-admin caller must own every object the
+      operation targets, and receives HTTP 403 for an operation which
+      targets an object in another namespace, an object with no namespace
+      (a blob, an interface or a node), or no recorded object at all.
     * [GET /clusteroperations/{op_uuid}/chain](https://openapi.shakenfist.com/#/clusteroperations/get_clusteroperations__op_uuid__chain):
       Return the transitive `depends_on` ancestor closure for an operation,
       ordered newest-first. Useful for tracing which step in a chained

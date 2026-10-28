@@ -30,6 +30,7 @@ from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.instance_attributes import InstanceAttributesData
 from shakenfist.schema.instance_data import InstanceData
 from shakenfist.schema.object_filter import ObjectFilterCriteria
+from shakenfist.schema.operations.baseclusteroperation import ACTIVE_OPERATION_STATES
 from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.artifact_index import ArtifactIndexData
 from shakenfist.schema.dnsmasq import DnsMasqData
@@ -1006,6 +1007,13 @@ class MockMariaDB():
         self.mariadb_get_cluster_operation_target.start()
         self.test_obj.addCleanup(
             self.mariadb_get_cluster_operation_target.stop)
+
+        self.mariadb_get_cluster_operation_targets = mock.patch(
+            'shakenfist.mariadb.get_cluster_operation_targets',
+            side_effect=self._mariadb_get_cluster_operation_targets)
+        self.mariadb_get_cluster_operation_targets.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_cluster_operation_targets.stop)
 
         self.mariadb_get_cluster_operation_targets_for_object = mock.patch(
             'shakenfist.mariadb.get_cluster_operation_targets_for_object',
@@ -3502,11 +3510,16 @@ class MockMariaDB():
         this is called by the create_and_enqueue mock and by tests that
         need to seed rows directly. ``observational`` defaults to False,
         the column's server default.
+
+        The store is keyed as the real table's UNIQUE constraint is, on
+        (operation_uuid, target_object_type, target_uuid), so an
+        operation with several declared targets holds several rows.
         """
         from shakenfist.schema.cluster_operation_target import (
             ClusterOperationTargetData)
 
-        if operation_uuid in self.cluster_operation_targets:
+        key = (operation_uuid, str(target_object_type), target_uuid)
+        if key in self.cluster_operation_targets:
             # Keep the first row, as the real UNIQUE constraint does.
             self._trace(
                 f'MockMariaDB.seed_cluster_operation_target'
@@ -3514,7 +3527,7 @@ class MockMariaDB():
             return True
 
         seq = next(self._cot_sequence)
-        self.cluster_operation_targets[operation_uuid] = (
+        self.cluster_operation_targets[key] = (
             ClusterOperationTargetData(
                 operation_uuid=operation_uuid,
                 operation_type=str(operation_type),
@@ -3529,26 +3542,42 @@ class MockMariaDB():
             f'({operation_uuid}): created seq={seq}')
         return True
 
+    def get_cluster_operation_targets(self, operation_uuid):
+        """Every target row of an operation, in sequence order."""
+        rows = [
+            d for d in self.cluster_operation_targets.values()
+            if d.operation_uuid == operation_uuid]
+        rows.sort(key=lambda d: d.sequence_number or 0)
+        return rows
+
+    def _mariadb_get_cluster_operation_targets(self, operation_uuid):
+        """Mock implementation of mariadb.get_cluster_operation_targets()"""
+        rows = self.get_cluster_operation_targets(operation_uuid)
+        self._trace(
+            f'MockMariaDB.get_cluster_operation_targets'
+            f'({operation_uuid}): {len(rows)} found')
+        return rows
+
     def _mariadb_get_cluster_operation_target(
             self, operation_uuid):
         """Mock implementation of mariadb.get_cluster_operation_target()"""
-        data = self.cluster_operation_targets.get(operation_uuid)
+        rows = self.get_cluster_operation_targets(operation_uuid)
         self._trace(
             f'MockMariaDB.get_cluster_operation_target'
             f'({operation_uuid}): '
-            f'{"found" if data else "not found"}')
-        return data
+            f'{"found" if rows else "not found"}')
+        return rows[0] if rows else None
 
     def _cot_is_pending(self, d):
         """True if the operation behind a target row is queued, in preflight
         or executing, as the real query's object_states join does."""
         state = self.mariadb_states.get(
             f'{d.operation_type}/{d.operation_uuid}')
-        return bool(state and state['state_value'] in (
-            'queued', 'preflight', 'executing'))
+        return bool(state and state['state_value'] in ACTIVE_OPERATION_STATES)
 
     def _mariadb_get_cluster_operation_targets_for_object(
-            self, target_object_type, target_uuid, pending_only=False):
+            self, target_object_type, target_uuid, pending_only=False,
+            raise_on_error=False):
         """Mock implementation of mariadb.get_cluster_operation_targets_for_object()"""
         results = [
             d for d in self.cluster_operation_targets.values()
@@ -3564,7 +3593,7 @@ class MockMariaDB():
         return results
 
     def _mariadb_get_latest_cluster_operation_target(
-            self, target_object_type, target_uuid):
+            self, target_object_type, target_uuid, raise_on_error=False):
         """Mock implementation of mariadb.get_latest_cluster_operation_target()
 
         Skips observational rows, as the real query does.
@@ -3594,8 +3623,11 @@ class MockMariaDB():
     def _mariadb_delete_cluster_operation_target(
             self, operation_uuid):
         """Mock implementation of mariadb.delete_cluster_operation_target()"""
-        if operation_uuid in self.cluster_operation_targets:
-            del self.cluster_operation_targets[operation_uuid]
+        keys = [k for k in self.cluster_operation_targets
+                if k[0] == operation_uuid]
+        if keys:
+            for k in keys:
+                del self.cluster_operation_targets[k]
             self._trace(
                 f'MockMariaDB.delete_cluster_operation_target'
                 f'({operation_uuid}): deleted')
@@ -3624,14 +3656,13 @@ class MockMariaDB():
     def _mariadb_delete_stale_cluster_operation_targets(
             self, max_age):
         """Mock implementation of mariadb.delete_stale_cluster_operation_targets()"""
-        active_states = ('queued', 'preflight', 'executing')
         cutoff = time.time() - max_age
 
         # Operation UUIDs that are still active in any object_states row.
         active_operation_uuids = {
             data['object_uuid']
             for data in self.mariadb_states.values()
-            if data['state_value'] in active_states
+            if data['state_value'] in ACTIVE_OPERATION_STATES
         }
 
         to_delete = [
@@ -4064,7 +4095,7 @@ class MockMariaDB():
         for data in self.mariadb_states.values():
             if data['object_type'] not in OPERATION_NAMES_TO_CLASSES:
                 continue
-            if data['state_value'] not in ('queued', 'executing'):
+            if data['state_value'] not in ACTIVE_OPERATION_STATES:
                 continue
             if now - data['update_time'] < threshold_seconds:
                 continue

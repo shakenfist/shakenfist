@@ -8313,18 +8313,30 @@ class GetClusterOperationTargetReply(_message.Message):
 
     FOUND_FIELD_NUMBER: _builtins.int
     TARGET_FIELD_NUMBER: _builtins.int
+    TARGETS_FIELD_NUMBER: _builtins.int
     found: _builtins.bool
     @_builtins.property
-    def target(self) -> Global___ClusterOperationTargetProto: ...
+    def target(self) -> Global___ClusterOperationTargetProto:
+        """The first target row, kept for clients which predate ``targets``."""
+
+    @_builtins.property
+    def targets(self) -> _containers.RepeatedCompositeFieldContainer[Global___ClusterOperationTargetProto]:
+        """Every target row of the operation, in sequence order. An operation
+        with several declared targets (a hot plug targets its instance,
+        network and interface) has one row per target. An older sf-database
+        leaves this empty and reports only ``target``.
+        """
+
     def __init__(
         self,
         *,
         found: _builtins.bool = ...,
         target: Global___ClusterOperationTargetProto | None = ...,
+        targets: _abc.Iterable[Global___ClusterOperationTargetProto] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["target", b"target"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["found", b"found", "target", b"target"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["found", b"found", "target", b"target", "targets", b"targets"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

@@ -1590,6 +1590,37 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
         self.assertFalse(self.mock_delete_files.called)
         self.assertEqual([], _test_undefined_domains)
 
+    def test_delete_wait_unreadable_operations_skips_this_pass(self):
+        """enqueue_delete() refuses to enqueue when the operations which
+        target the instance cannot be read (issue 4671). That is a
+        per-domain error: the pass moves on, the attempt is spent, and the
+        next enqueueing attempt tries again."""
+        inst_uuid = self._inactive_instance(
+            state=instance.Instance.STATE_DELETE_WAIT)
+        other = self._inactive_instance(
+            state=instance.Instance.STATE_DELETE_WAIT)
+        self._after_grace()
+
+        with mock.patch.object(
+                instance.Instance, 'enqueue_delete',
+                side_effect=exceptions.DatabaseUnavailable('boom')) \
+                as mock_enqueue:
+            add_event = self._run()
+
+        self.assertEqual(2, mock_enqueue.call_count)
+        self.assertEqual(
+            sorted([inst_uuid, other]), sorted(self.locks.locked_uuids()))
+        self.assertEqual(
+            [], self._events(
+                add_event, 'stray powered off instance delete enqueued'))
+        for uuid_ in (inst_uuid, other):
+            self.assertEqual(
+                instance.Instance.STATE_DELETE_WAIT, self._state(uuid_))
+            self.assertEqual(
+                1, instance.Instance.from_db(uuid_).enforced_deletes['count'])
+        self.assertFalse(self.mock_delete_files.called)
+        self.assertEqual([], _test_undefined_domains)
+
     def test_delete_wait_within_grace_is_left_alone(self):
         self._inactive_instance(state=instance.Instance.STATE_DELETE_WAIT)
 

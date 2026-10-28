@@ -292,6 +292,14 @@ The power management actions available are:
 
     * [DELETE /instances/{instance_ref}](https://openapi.shakenfist.com/#/instances/delete_instances__instance_ref_): Delete an instance.
     * [DELETE /instances/](https://openapi.shakenfist.com/#/instances/delete_instances): Delete all instances in a namespace.
+
+    Both deletes answer 503 when an instance's outstanding operations
+    cannot be read, and enqueue nothing for that instance: a delete which
+    has not seen them would cancel nothing and wait for no snapshot. Retry
+    the request. The delete all works through the namespace in turn, so
+    the deletes it enqueued before the 503 stand; a retry enqueues them
+    again, which supersedes the earlier delete and is harmless.
+
     * [POST ​/instances​/{instance_ref}​/rebootsoft](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__rebootsoft): Soft (ACPI) reboot the instance.
     * [POST ​/instances​/{instance_ref}​/reboothard](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__reboothard): Hard (reset switch) reboot the instance.
     * [POST /instances/{instance_ref}/poweron](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__poweron): Power the instance on.

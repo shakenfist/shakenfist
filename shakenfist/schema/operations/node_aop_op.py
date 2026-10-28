@@ -23,7 +23,10 @@ LOG, HANDLER = logs.setup(__name__)
 
 object_type = ObjectType.NODE_AOP_OP
 initial_version = 1
-current_version = 1
+# Version 2 added instance_uuid, so that the preflight targets the instance
+# its agent operation runs on and is cancelled when that instance is
+# deleted.
+current_version = 2
 
 
 # All tasks mutate: it promotes, expires or fails an agent operation.
@@ -32,13 +35,20 @@ class model_tasks(Enum):
 
 
 class model(BaseModel):
+    # The instance is a target as well as the agent operation. A delete
+    # walks the operations targeting the instance to cancel them, and a
+    # preflight which was not among them ran against an instance being
+    # deleted. instance_uuid is optional only for rows written before
+    # version 2; create_and_enqueue() always sets it.
     target_fields: ClassVar[dict[str, ObjectType]] = {
         'agentoperation_uuid': ObjectType.AGENTOPERATION,
+        'instance_uuid': ObjectType.INSTANCE,
     }
 
     uuid: UUID4
     node_uuid: UUID4
     agentoperation_uuid: UUID4
+    instance_uuid: Optional[UUID4]
     priority: PRIORITY
     request_id: Optional[str]
     tasks: List[model_tasks]
@@ -55,8 +65,9 @@ class model(BaseModel):
         return [t.name for t in tasks]
 
 
-def create_and_enqueue(node_uuid, agentoperation_uuid, tasks, priority,
-                       request_id=None, depends_on=None, runs_after=None):
+def create_and_enqueue(node_uuid, agentoperation_uuid, instance_uuid, tasks,
+                       priority, request_id=None, depends_on=None,
+                       runs_after=None):
     operation_uuid = str(uuid4())
 
     try:
@@ -65,6 +76,7 @@ def create_and_enqueue(node_uuid, agentoperation_uuid, tasks, priority,
             uuid=operation_uuid,
             node_uuid=node_uuid,
             agentoperation_uuid=agentoperation_uuid,
+            instance_uuid=instance_uuid,
             priority=priority,
             request_id=request_id,
             tasks=tasks,
@@ -77,6 +89,7 @@ def create_and_enqueue(node_uuid, agentoperation_uuid, tasks, priority,
             'uuid': operation_uuid,
             'node_uuid': node_uuid,
             'agentoperation_uuid': agentoperation_uuid,
+            'instance_uuid': instance_uuid,
             'priority': priority,
             'request_id': request_id,
             'tasks': tasks,
