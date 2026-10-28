@@ -30,7 +30,10 @@ networks.
 The per-object sub-resources are `/artifacts/{artifact_ref}/clusteroperations`,
 `/instances/{instance_ref}/clusteroperations` and
 `/networks/{network_ref}/clusteroperations`. Each lists the operations which
-target that object, newest first. An operation which only targets another
+target that object, newest first, and each is an owner's route: the caller's
+namespace must own the object, or be system. Sharing an artifact, or trusting
+a namespace, makes the artifact readable but not its operations, because a
+fetch operation names the instance whose boot caused it. An operation which only targets another
 object is not listed, even if one of this object's operations waits for it: a
 network reconcile an instance start waits on appears in the network's list, not
 the instance's, and `GET /clusteroperations/{op_uuid}/chain` traces what an

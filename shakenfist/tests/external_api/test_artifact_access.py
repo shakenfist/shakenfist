@@ -27,6 +27,7 @@ from unittest import mock
 
 from shakenfist import mariadb
 from shakenfist.artifact import Artifact
+from shakenfist.baseobject import TargetedOperation
 from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
 from shakenfist.namespace_key import NamespaceKey
@@ -214,7 +215,9 @@ class ArtifactSubresourceAccessTestCase(ArtifactAccessFixture):
     routes hanging off it leaks the same information more slowly.
     """
 
-    SUBRESOURCES = ['', '/events', '/versions', '/clusteroperations']
+    # /clusteroperations is not here: it is an owner's route, tested in
+    # ArtifactClusterOperationsAccessTestCase below.
+    SUBRESOURCES = ['', '/events', '/versions']
 
     def setUp(self):
         super().setUp()
@@ -251,6 +254,71 @@ class ArtifactSubresourceAccessTestCase(ArtifactAccessFixture):
         for path in self.SUBRESOURCES:
             with self.subTest(path=path or '/'):
                 self.assertEqual(200, self._get('stranger', path).status_code)
+
+
+class ArtifactClusterOperationsAccessTestCase(ArtifactAccessFixture):
+    """`/clusteroperations` is an owner's route, not a reader's.
+
+    The listing returns every operation targeting the artifact, and an
+    `artifact_fetch_op` names the namespace and instance whose boot caused
+    the fetch. On a shared system image that is every tenant's instance
+    uuids and boot times, so the read rule leaked them to any namespace
+    the artifact was shared with or whose owner trusted it (issue 4666).
+    The by-target listing already refused the same callers.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        fetch = mock.MagicMock()
+        fetch.external_view.return_value = {
+            'operation_type': 'artifact_fetch_op',
+            'namespace': 'owner',
+            'instance_uuid': 'the-owners-instance',
+        }
+        patcher = mock.patch(
+            'shakenfist.baseobject.DatabaseBackedObjectWithOperations'
+            '.get_cluster_operations',
+            return_value=[TargetedOperation(fetch, False)])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _assert_listed(self, namespace):
+        resp = self._get(namespace, '/clusteroperations')
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(
+            'the-owners-instance', resp.get_json()[0]['instance_uuid'])
+
+    def _assert_refused(self, namespace):
+        resp = self._get(namespace, '/clusteroperations')
+        # The ownership refusal is a 404, as it is on every other owner's
+        # route, so that a refusal does not confirm the uuid.
+        self.assertEqual(404, resp.status_code)
+        self.assertNotIn(b'the-owners-instance', resp.data)
+
+    def test_the_owner_lists_the_operations(self):
+        self._assert_listed('owner')
+
+    def test_system_lists_the_operations(self):
+        self._assert_listed('system')
+
+    def test_a_trusted_namespace_is_refused(self):
+        self._assert_refused('trusted')
+
+    def test_a_stranger_is_refused(self):
+        self._assert_refused('stranger')
+
+    def test_sharing_does_not_open_the_listing(self):
+        self._share()
+        self._assert_refused('stranger')
+        self._assert_refused('trusted')
+
+    def test_sharing_still_opens_the_artifact_itself(self):
+        # The control: the read routes are unchanged, so a refusal above is
+        # the ownership test and not a broken fixture.
+        self._share()
+        self.assertEqual(200, self._get('stranger').status_code)
+        self.assertEqual(200, self._get('trusted', '/versions').status_code)
 
 
 class ArtifactAccessComposesWithScopesTestCase(ArtifactAccessFixture):
