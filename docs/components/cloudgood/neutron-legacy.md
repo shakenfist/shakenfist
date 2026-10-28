@@ -148,7 +148,7 @@ Neutron supports several router types, selected by a combination of feature
 flags:
 
 | `distributed` | `ha` | Router type | Class |
-|:-:|:-:|---|---|
+| :-: | :-: | --- | --- |
 | false | false | Legacy | `LegacyRouter` |
 | false | true | HA (keepalived) | `HaRouter` |
 | true | false | Distributed (DVR) | `DvrLocalRouter` / `DvrEdgeRouter` |
@@ -216,7 +216,7 @@ which does two things:
 2. **Configures sysctl parameters** inside the namespace:
 
 | sysctl | Value | Purpose |
-|--------|-------|---------|
+| -------- | ------- | --------- |
 | `net.ipv4.ip_forward` | 1 | Enable IPv4 packet forwarding (essential for routing) |
 | `net.ipv4.conf.all.arp_ignore` | 1 | Only respond to ARP for addresses on the receiving interface |
 | `net.ipv4.conf.all.arp_announce` | 2 | Always use the best local address for ARP source |
@@ -507,7 +507,7 @@ not tenant-facing. Several of Neutron's own features are implemented as
 L3 agent extensions:
 
 | Extension | What it does | iptables table |
-|-----------|-------------|----------------|
+| ----------- | ------------- | ---------------- |
 | Port forwarding | Per-port DNAT on floating IPs | `nat` |
 | Conntrack helper | Protocol-specific conntrack (FTP, TFTP) | `raw` |
 | NDP proxy | IPv6 neighbor discovery proxying | `filter` |

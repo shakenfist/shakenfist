@@ -446,6 +446,12 @@ make -C rust/kerbside-proxy test    # cargo test
 make -C rust/kerbside-proxy lint    # cargo fmt --check + clippy -D warnings
 ```
 
+Add `FEATURES=transcode` to any of them to include the experimental
+transcoding display channel, which is off by default and never in release
+wheels; see
+[Transcoding the display channel](/components/kerbside/proxy-architecture/#transcoding-the-display-channel-experimental).
+Its first build compiles openh264 from source.
+
 The Docker base sets the floor the *built binary* needs, not just the
 build: the Makefile writes `target/` back to the host, and
 `proxy_supervisor.find_proxy_bin()` then execs it on your own machine.
@@ -494,6 +500,9 @@ Three things about it only matter while developing:
   property. `find_proxy_bin()` still prefers `KERBSIDE_PROXY_BIN` and
   the cargo build tree for local work, and the daemon compares the
   binary's gRPC contract hash against its own at launch either way.
+  A change to `kerbside/rpc/kerbside.proto` therefore means the daemon
+  and the proxy binary are upgraded together: a binary built from a
+  different proto is refused at launch.
 - **`rust.yml` verifies wheel stamping on pull requests as a packaging
   guard** (`tools/verify-wheel-stamping.sh`: an unstamped tree must
   produce a dev-versioned wheel, or the release's own version when it
@@ -589,7 +598,11 @@ is open and that the last nightly ran on or after the commit you are
 tagging. If not, dispatch `functional-tests.yml` on `develop` with both
 cloud targets selected and tag once it passes. A merge
 that bypassed the queue has no merge queue run, so it cannot be
-released until a later commit has gone through the queue. A gate
+released until a later non-docs queue entry has gone through the queue:
+one that changes something outside `docs/`, so the code lanes run. A
+docs-only entry skips those lanes yet still concludes successfully, so
+it would pass the gate without the queue ever having tested the
+bypassed code. A gate
 failure means nothing was signed or published, so every failure is
 recoverable: the release template's
 [recovery table](https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure)

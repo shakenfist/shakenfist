@@ -243,7 +243,7 @@ internal register layout is standardized by the VIRTIO specification. From the
 base address, the registers are:
 
 | Offset | Name | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | 0x000 | MagicValue | Always 0x74726976 ("virt" in little-endian) |
 | 0x004 | Version | VIRTIO version (1 or 2) |
 | 0x008 | DeviceID | Type of device (1=net, 2=block, etc.) |
@@ -355,7 +355,7 @@ blocks the access and can raise a fault.
 This creates a complete isolation picture:
 
 | Access type | Translation mechanism | Controls |
-|-------------|----------------------|----------|
+| ------------- | ---------------------- | ---------- |
 | Guest CPU → Memory | EPT/NPT | Hypervisor controls guest physical memory |
 | Guest CPU → Device MMIO | EPT/NPT | Hypervisor maps real device into guest |
 | Device DMA → Memory | IOMMU | Hypervisor restricts device to guest memory |
@@ -434,10 +434,10 @@ and storage I/O is critical.
 The reason passthrough fits naturally into this discussion is that it's the
 same MMIO mechanism, just with different EPT/NPT mappings:
 
-| Scenario | EPT/NPT mapping | Result |
-|----------|-----------------|--------|
-| Emulated device | MMIO region unmapped | VM exit, hypervisor emulates |
-| Passthrough device | MMIO region maps to real hardware | Direct hardware access |
+| Scenario           | EPT/NPT mapping                   | Result                       |
+|--------------------|-----------------------------------|------------------------------|
+| Emulated device    | MMIO region unmapped              | VM exit, hypervisor emulates |
+| Passthrough device | MMIO region maps to real hardware | Direct hardware access       |
 
 The guest code doesn't need to know the difference. It writes to an MMIO
 address either way. The hypervisor's choice of EPT/NPT configuration determines
@@ -539,7 +539,7 @@ high-performance storage in VMs.
 ### When to use which approach
 
 | Device type | Passthrough method | Guest hardware access? | Use case |
-|-------------|-------------------|----------------------|----------|
+| ------------- | ------------------- | ---------------------- | ---------- |
 | GPU | VFIO/PCI | Yes | Gaming VMs, GPU compute |
 | NVMe SSD | VFIO/PCI | Yes | High-performance storage |
 | NIC | VFIO/PCI or SR-IOV | Yes | Low-latency networking |
@@ -673,7 +673,7 @@ lifecycle, restart handling, and crash recovery.
 We can now see the full picture of how devices can be provided to guests:
 
 | Approach | Who handles I/O? | Performance | Flexibility |
-|----------|-----------------|-------------|-------------|
+| ---------- | ----------------- | ------------- | ------------- |
 | Full emulation | VMM process | Lowest | Highest |
 | vhost-kernel | Host kernel | Medium | Medium |
 | vhost-user | Separate userspace process | High | Medium |

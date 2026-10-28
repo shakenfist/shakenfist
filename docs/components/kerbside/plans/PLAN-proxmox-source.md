@@ -137,9 +137,11 @@ settled by
 [the phase 2 plan](/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/)
 (decisions 1 and 4), and are kept here with their answers
 because the reasoning is what later phases build on. Question
-5 is settled by
+3 is settled by
+[the phase 3b plan](/components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport/)
+(decision 1), and question 5 by
 [the phase 1b plan](/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/).
-The rest are open.
+Question 4 is open.
 
 **1. Where does the CONNECT live — ryll or kerbside?** Either
 `ConnectionConfig` grows an optional proxy, and
@@ -189,6 +191,10 @@ serves only as SNI.
 Either way it is a proto change, and proto changes carry the
 contract-hash handshake from PLAN-proxy-dev-releases phase 3,
 so the daemon and the proxy binary have to ship together.
+**Settled: a sub-message.** `Target` gains a `Tunnel` holding
+the proxy URI and the connect host. A message field has
+presence, so "is this tunnelled" is one check, and the TLS
+port stays in `secure_port`.
 
 **4. What is the least-privileged API account?** The
 prototype deployment uses `PVEVMUser` on `/vms` plus
@@ -404,7 +410,7 @@ phase plan links are tracked under *Execution*.
 | 1b. CI substrate | A Proxmox deployment action in shakenfist/actions with its own lane, and a ryll lane on it that replaces phase 2's operator-assisted step 2f. Kerbside's lane follows on the same action |
 | 2. Tunnelled transport in ryll | CONNECT support on the backend dial, with the `ServerName` and no-`host_subject` refusal decided and tested both ways |
 | 3a. Minting at connect time | Minting moved into the authorize path through a source-driver hook, with one ticket per session held on the session's token row in the shared database, and `ovirt.py` converted to request a short explicit expiry and stop persisting the ticket on the `Console` row. Settles the supersession behaviour above first. Not Proxmox-only, and needs nothing from ryll |
-| 3b. Tunnel transport | `Target`/proto change (open question 3), an Alembic migration giving the `Console` row somewhere to record the node and the `spiceproxy` URL (the columns it has today assume a direct address), and `backend.rs` passing the tunnel through. `build_config` (`backend.rs:183`) builds `ConnectionConfig` by struct literal with `tls_port: None` and escalates to TLS only on `NEED_SECURED`, but phase 2 refuses a tunnel without a TLS port, so a tunnelled target must set `tls_port` from the start. Needs phase 2 merged and the pin bumped |
+| 3b. Tunnel transport | `Target`/proto change (open question 3), the session token row and the minting hook carrying the tunnel, and `backend.rs` dialling it. The proxy URL, the CONNECT host and the TLS port all arrive with each mint, so they live on the session's token row beside its ticket, not on the `Console` row, whose `hypervisor` column already names the node. `build_config` (`backend.rs:202`) builds `ConnectionConfig` with `tls_port: None` and escalates to TLS only on `NEED_SECURED`, but phase 2 refuses a tunnel without a TLS port, so a tunnelled target must set `tls_port` from the start. The ryll pin already contains phase 2 |
 | 4. The source driver | `kerbside/sources/proxmox.py`: discovery over `/nodes/{node}/qemu`, console details over `spiceproxy`, CA and subject handling, and the direct `.vv` handler refusing Proxmox sources |
 | 5. CI lane | A lane that proves an end-to-end proxied session, per open question 5 |
 | 6. Docs | The use-case page PLAN-use-case-docs.md has been holding a row for, plus `console-sources.md` |
@@ -418,9 +424,10 @@ against a source that already exists before Proxmox depends
 on it.
 
 Phase 1b lands in `shakenfist/actions` and ryll, and its ryll
-half lands inside phase 2's pull request. Whether kerbside's
-first Proxmox lane lands in phase 3b (a tunnel-dial lane) or
-phase 5 (the end-to-end lane) is settled when 3b is planned.
+half lands inside phase 2's pull request. Kerbside's first
+Proxmox lane is phase 5's end-to-end lane. Phase 3b proves the
+tunnel against a CONNECT proxy in the direct-qemu lane, since
+it has no driver to mint with (3b decision 6).
 
 Phase 1 was carried out against a deployment rather than in
 this repository. Phase 2 lands in `shakenfist/ryll`, and a
@@ -453,8 +460,8 @@ and cited from phase 2's *Outcome*.
 | 1. Ticket semantics | | Complete | |
 | 1b. CI substrate | [PLAN-proxmox-source-phase-01b-ci-substrate.md](/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/) | Complete | actions 5399c4f (#96) |
 | 2. Tunnelled transport in ryll | [PLAN-proxmox-source-phase-02-ryll-connect.md](/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/) | Complete | ryll ea4bf67 (#402) |
-| 3a. Minting at connect time | [PLAN-proxmox-source-phase-03a-connect-time-minting.md](/components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting/) | In progress | |
-| 3b. Tunnel transport | | Not started | |
+| 3a. Minting at connect time | [PLAN-proxmox-source-phase-03a-connect-time-minting.md](/components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting/) | Complete | 696f5aa |
+| 3b. Tunnel transport | [PLAN-proxmox-source-phase-03b-tunnel-transport.md](/components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport/) | In progress | |
 | 4. The source driver | | Not started | |
 | 5. CI lane | | Not started | |
 | 6. Docs | | Not started | |
@@ -476,8 +483,9 @@ and cited from phase 2's *Outcome*.
 
 ## Status
 
-In progress. Phases 1, 1b and 2 are complete: CI can build a
-Proxmox VE node on demand, and ryll tunnels through
+In progress. Phases 1, 1b, 2 and 3a are complete: CI can
+build a Proxmox VE node on demand, ryll tunnels through
 `spiceproxy`, proven against a real node on every ryll pull
-request that touches the tunnel. Phase 3a is being
-implemented.
+request that touches the tunnel, and kerbside mints console
+tickets when a channel connects, one per session, which the
+oVirt source now uses. Phase 3b is in progress.

@@ -248,6 +248,44 @@ this node and pushing them, and the TTL reaper — is covered by the
 `kerbside/tests/unit` suite, and the full daemon+API+MariaDB path by
 the direct-qemu CI lane's `verify-terminate-live.sh`.
 
+## Running the transcoding display channel
+
+The experimental transcoding display channel (see
+[Proxy Architecture](/components/kerbside/proxy-architecture/#transcoding-the-display-channel-experimental))
+needs a binary built with the `transcode` feature and started with
+`--transcode-display`. `verify-rust-proxy.sh` takes no extra proxy flags,
+so point `RUST_PROXY_BINARY` at a small wrapper that adds them:
+
+```sh
+make -C rust/kerbside-proxy build FEATURES=transcode
+cp rust/kerbside-proxy/target/debug/kerbside-proxy /tmp/kerbside-proxy-transcode
+printf '#!/bin/bash\nexec /tmp/kerbside-proxy-transcode "$@" --transcode-display\n' \
+    > /tmp/kerbside-proxy-transcode.sh
+chmod +x /tmp/kerbside-proxy-transcode.sh
+
+export MOCK_GRPC_PYTHON="$PWD/.tox/py3/bin/python" PYTHONPATH="$PWD"
+export RUST_PROXY_BINARY=/tmp/kerbside-proxy-transcode.sh
+tools/direct-qemu/verify-rust-proxy.sh up
+remote-viewer /tmp/kerbside-rust-proxy-verify/console.vv
+tools/direct-qemu/verify-rust-proxy.sh down
+```
+
+Add `--transcode-ack-window 20` (or another window) to the wrapper to pace
+on a SPICE ACK window instead of the client socket, for comparing the two.
+
+The proxy log shows `transcoding display channel starting` and `sending the
+client a new primary surface` for the display channel, while the other
+channels log `relay starting` as usual, and the debug lines from ryll's
+renderer show the backend's draws arriving as `type=Some(Lz4)`. Any client
+works: remote-viewer, or ryll headless as described at the top of
+`verify-rust-proxy.sh`. Use ryll 0.2.0 or later: older releases cannot
+decode the LZ4 images the transcoder sends.
+
+qemu's spice-server serves one client at a time, so a second client
+connecting straight to qemu disconnects the transcoded session. The Sextant
+fixture also shuts its guest down a few minutes after boot, after which the
+backend connect fails until the harness is brought up again.
+
 ## Caveat: unix socket path length (SUN_LEN)
 
 The gRPC control socket is an `AF_UNIX` path, limited to ~108 bytes

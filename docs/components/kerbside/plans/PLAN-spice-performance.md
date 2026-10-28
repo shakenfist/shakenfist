@@ -129,6 +129,16 @@ visible.
   byte- or RTT-aware ACK pacing, either in Kerbside (which
   relays the client's ACKs) or upstream. See
   `docs/performance/proxy-backpressure.md`.
+  - *Observed 2026-10-28* (phase 3 step 2,
+    `docs/performance/ack-window.md`): the relay now follows the
+    window. The backlog bound holds exactly, with the relay's
+    in-flight count peaking at 81 (2W+1, W=40) and never higher.
+    The throughput cap does not: at 80 ms / 50 Mbit the busy
+    activity delivers about 93% of the messages the guest offers,
+    and is at the window's limit only about a third of the time.
+    What keeps the bitrate low is small JPEG draws, because
+    spice-server judges any 80 ms link slow, which also sets W to
+    40.
 - **Finding 2 was right about fragmentation and wrong about
   its shape.**
   - `RED_STREAM_MIN_SIZE` is an *area* (96x96 pixels), not a
@@ -277,7 +287,7 @@ first phase.
 |-------|------|--------|--------|
 | 1. Proxy backpressure and a WAN baseline | [PLAN-spice-performance-phase-01-proxy-backpressure.md](/components/kerbside/plans/PLAN-spice-performance-phase-01-proxy-backpressure/) | Complete | 52046167f8 (#478) |
 | 2. qemu damage path: prototype and measure; carry qemu, submit the kernel fix | | In progress | kerbside-patches b53aa39c7e (#1748) |
-| 3. Display transcoding in Kerbside: feasibility spike | [PLAN-spice-performance-phase-03-transcoding.md](/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/) | In progress | 2e19d737aa (#489), ryll fdb5ead5b4 (#406), eab2c572cf (#494) |
+| 3. Display transcoding in Kerbside: feasibility spike | [PLAN-spice-performance-phase-03-transcoding.md](/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/) | In progress | 2e19d737aa (#489), ryll fdb5ead5b4 (#406), eab2c572cf (#494), 9d1b64d6 (#505), 13e9e2eb (#581) |
 | 4. Son of SPICE: D-Bus display feasibility spike | | Not started | |
 | 5. Small spice-server patches (item 9, and item 4 if still wanted) | | Not started | |
 | 6. Push audit of phases 1-5 (kerbside and kerbside-patches) | | Not started | |
@@ -609,6 +619,22 @@ four places:
   sits behind a build feature that the release wheels do not
   enable.
 
+**Re-surveyed on 2026-10-28**, when ryll's RDP phase 1
+unblocked step 3b (the phase plan's *Re-survey* section has
+the detail). Two claims above no longer hold:
+- "The new code beyond that is the half that emits a SPICE
+  display channel to the client" is mostly built. shakenfist/andris,
+  a Rust SPICE server exporting an X11 desktop, has a
+  damage-driven, paced display output with JPEG and a lossless
+  refresh. Step 3b adapts it rather than writing one.
+- Step 3a is complete without a pull request of its own.
+  Andris's phases 2 and 3 put server-role wire types and the
+  LZ4 and JPEG encoders into ryll, and ryll's RDP phase 1
+  added the slim renderer and its damage accumulator.
+
+The spike's remaining steps are 2 (observe the ACK window), 3b,
+4, 5 and 6.
+
 **Phase 4** is a time-boxed spike, with three steps:
 1. confirm that D-Bus `Update` rectangles for virtio-gpu
    arrive promptly and precisely, which is not yet traced
@@ -618,7 +644,13 @@ four places:
 3. compare it against in-qemu SPICE on the phase 2 workload.
 
 If phase 3 says go, the helper reuses phase 3's output half
-rather than growing its own encoder. Its output is a go or
+rather than growing its own encoder. Step 2 is largely done
+already, outside this plan: andris (2026-10-28) is a Rust
+SPICE server on Ryll's protocol crate with main, display,
+inputs, cursor, LZ4, JPEG, H.264 streams, an agent and audio.
+Its input is an X11 display rather than D-Bus, so phase 4's
+planning should start by asking whether the helper is andris
+with a D-Bus input. Its output is a go or
 no-go recommendation, with a proposal for a separate master
 plan if the answer is go.
 

@@ -76,7 +76,7 @@ Kerbside's `VDI_*_PORT` values out of the range in that case.
 
 | Destination | From | Purpose |
 |-------------|------|---------|
-| Hypervisor SPICE, **plaintext and TLS** ports, per console | Rust proxy | The backend leg. The proxy dials the plaintext port first and escalates to TLS only when the hypervisor answers `NEED_SECURED` and the console has a TLS port (`rust/kerbside-proxy/src/backend.rs`). So both ports must be reachable, and a hypervisor that accepts plaintext is relayed in plaintext. |
+| Hypervisor SPICE, **plaintext and TLS** ports, per console | Rust proxy | The backend leg. The proxy dials the plaintext port first and escalates to TLS only when the hypervisor answers `NEED_SECURED` and the console has a TLS port (`rust/kerbside-proxy/src/backend.rs`). So both ports must be reachable, and a hypervisor that accepts plaintext is relayed in plaintext. A console that carries a tunnel is the exception: the proxy dials only the HTTP CONNECT proxy it names, over TLS. |
 | MariaDB/MySQL (`SQL_URL`, usually 3306) | API and daemon | The shared state and the only cross-node bus. The proxy never talks to the database. |
 | Cloud APIs named in `sources.yaml` | daemon, and the API | Console discovery (Shaken Fist, oVirt engine HTTPS). The API also calls out on the exchange paths: Keystone and Nova for OpenStack, and a single key refetch from Shaken Fist on an unknown key id. |
 

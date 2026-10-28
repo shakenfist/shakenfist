@@ -411,10 +411,10 @@ through its own set of page tables.
 Just as EPT creates a layer of address translation for guest CPUs, the IOMMU
 creates a layer for device DMA:
 
-| Access Path     | Translation                              | Protection Unit |
-|-----------------|------------------------------------------|-----------------|
-| Guest CPU       | Guest-virtual → Guest-physical → Host-physical | EPT/NPT        |
-| Device DMA      | Device-physical → Host-physical          | IOMMU           |
+| Access Path | Translation                                    | Protection Unit |
+|-------------|------------------------------------------------|-----------------|
+| Guest CPU   | Guest-virtual → Guest-physical → Host-physical | EPT/NPT         |
+| Device DMA  | Device-physical → Host-physical                | IOMMU           |
 
 When a device is assigned to a VM ("device passthrough"), the hypervisor
 configures the IOMMU so that the device can only DMA to memory belonging to
@@ -671,13 +671,13 @@ What it explicitly excludes:
 
 **The benefits:**
 
-| Aspect         | Traditional VM          | Unikernel              |
-|----------------|-------------------------|------------------------|
-| Image size     | Hundreds of MB to GB    | Tens of KB to a few MB |
-| Boot time      | Seconds to minutes      | Milliseconds           |
-| Memory footprint| Hundreds of MB minimum | Single-digit MB possible|
-| Attack surface | Full kernel + services  | Application-specific   |
-| Maintenance    | OS updates + app updates| Single artifact        |
+| Aspect           | Traditional VM           | Unikernel                |
+|------------------|--------------------------|--------------------------|
+| Image size       | Hundreds of MB to GB     | Tens of KB to a few MB   |
+| Boot time        | Seconds to minutes       | Milliseconds             |
+| Memory footprint | Hundreds of MB minimum   | Single-digit MB possible |
+| Attack surface   | Full kernel + services   | Application-specific     |
+| Maintenance      | OS updates + app updates | Single artifact          |
 
 The security story is interesting. While the unikernel still runs inside a
 VM (so the hypervisor trust boundary discussion still applies), the attack

@@ -46,7 +46,7 @@ as a hexadecimal string. A network assigned VXLAN ID 14823439 becomes
 `e2300f` in hex, and all associated interfaces include this identifier:
 
 | Interface | Purpose |
-|-----------|---------|
+| ----------- | --------- |
 | `vxlan-e2300f` | VXLAN tunnel interface (kernel-native) |
 | `br-vxlan-e2300f` | Linux bridge for this network |
 | `veth-e2300f-o` | Outer end of veth to network namespace |
@@ -284,7 +284,7 @@ The distinction between the network node and hypervisor nodes is the
 most important architectural boundary in Shaken Fist networking:
 
 | | Network node | Hypervisor node |
-|---|---|---|
+| --- | --- | --- |
 | Bridge | Yes (`br-vxlan-*`) | Yes (`br-vxlan-*`) |
 | VXLAN interface | Yes | Yes |
 | Network namespace | Yes (one per network) | No |

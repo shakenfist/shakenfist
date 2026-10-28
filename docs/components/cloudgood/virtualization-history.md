@@ -281,7 +281,7 @@ This performance gap is what drove the development of hardware-assisted virtuali
 Even qemu doesn't support every possible x86 chipset -- it supports just two: i440fx, and q35. Most OpenStack workloads are using i440fx by default. The differences between the two are:
 
 | Attribute | i440fx | q35 |
-|-----------|--------|-----|
+| ----------- | -------- | ----- |
 | Hardware release | 1996 | 2007 |
 | Chipset | ISA and PIIX4 | Northbridge: MCH, Southbridge: ICH9 |
 | PCI | Yes | |
@@ -466,7 +466,7 @@ QEMU itself has a "microvm" machine type that strips down the device model signi
 The choice between traditional VMs, microVMs, and containers depends on your requirements:
 
 | Workload | Best fit | Why |
-|----------|----------|-----|
+| ---------- | ---------- | ----- |
 | Running arbitrary guest OSes | Traditional VM (QEMU/KVM) | Full hardware emulation for compatibility |
 | Long-running server workloads | Traditional VM or microVM | Boot time less critical, flexibility may matter |
 | Serverless functions | MicroVM (Firecracker) | Sub-second boot, strong isolation, high density |
@@ -545,7 +545,7 @@ Nitro is not something you can deploy in your own data center -- it's proprietar
 ### Comparison of approaches
 
 | Approach | How it reduces overhead | Trade-offs |
-|----------|------------------------|------------|
+| ---------- | ------------------------ | ------------ |
 | Hardware-assisted virtualization (VT-x) | CPU handles VM traps efficiently | Still need software for devices |
 | Paravirtualization (virtio) | Efficient software protocol | Need guest drivers |
 | MicroVMs (Firecracker) | Minimal software device model | Limited flexibility |
@@ -589,7 +589,7 @@ The BlueField can operate in different modes. In "DPU mode," the ARM cores on th
 Modern DPUs can handle:
 
 | Function | What it means |
-|----------|---------------|
+| ---------- | --------------- |
 | OVS offload | Move Open vSwitch packet processing to hardware |
 | VXLAN/Geneve | Tunnel encapsulation/decapsulation in hardware |
 | Connection tracking | Stateful firewall processing |
@@ -679,7 +679,7 @@ We've covered a lot of history and technology. But what are you actually likely 
 If you're running virtual machines on Linux servers, you're almost certainly using KVM with QEMU. The open source cloud and virtualization platforms have converged on this stack:
 
 | Platform | Hypervisor | Management Layer |
-|----------|------------|------------------|
+| ---------- | ------------ | ------------------ |
 | OpenStack | KVM/QEMU | libvirt + Nova |
 | oVirt | KVM/QEMU | libvirt + VDSM |
 | Proxmox VE | KVM/QEMU | libvirt + custom tools |
