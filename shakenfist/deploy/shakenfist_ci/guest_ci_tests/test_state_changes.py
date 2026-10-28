@@ -123,6 +123,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
         self.assertNotIn(last_boot, [None, 0])
 
+        self._flush_guest_writes(inst['uuid'])
         self.test_client.delete_console_data(inst['uuid'])
         self.test_client.reboot_instance(inst['uuid'], hard=True)
         self._await_instance_not_ready(inst['uuid'])
@@ -161,6 +162,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.assertNotIn(last_boot, [None, 0])
 
         # Power off
+        self._flush_guest_writes(inst['uuid'])
         self.test_client.power_off_instance(inst['uuid'])
         self._assert_power_state(inst['uuid'], 'off', 'after power off')
         # Once the API returns the libvirt has powered off the instance or an
@@ -214,6 +216,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             'sf-cleaner.service should be ordered After libvirt-guests.service, '
             'got: %s' % stdout)
 
+        self._flush_guest_writes(inst['uuid'])
         self.test_client.power_off_instance(inst['uuid'])
         self._assert_power_state(inst['uuid'], 'off', 'after power off')
         self.assertFalse(
@@ -369,6 +372,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         disk_path = self._domain_root_disk_path(node, inst['uuid'])
         aside_path = disk_path + '.moved-aside'
 
+        self._flush_guest_writes(inst['uuid'])
         self.test_client.power_off_instance(inst['uuid'])
         self._assert_power_state(inst['uuid'], 'off', 'after power off')
 
@@ -585,6 +589,7 @@ class TestDetectReboot(base.BaseNamespacedTestCase):
 
         # Hard reboot
         LOG.info('Instance Hard reboot')
+        self._flush_guest_writes(inst['uuid'])
         self.test_client.reboot_instance(inst['uuid'], hard=True)
         self._await_instance_not_ready(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
