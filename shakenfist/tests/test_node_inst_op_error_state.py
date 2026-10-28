@@ -11,8 +11,12 @@ removal op). The handler must use the same suffix-then-fallback
 pattern as ``Instance.enqueue_delete_due_error`` and must not touch
 instances that are already deleted.
 
-Observational tasks (see ``model.observational_tasks``) must fail their
-operation without changing the instance's state at all (issue 4585).
+Observational operations (every task in ``model.observational_tasks``)
+must fail without changing the instance's state at all (issue 4585). The
+rule is asked of the whole operation, as ``is_observational()`` asks it: an
+operation which puts a measurement ahead of a mutating task is mutating,
+and a failed measurement ends it before the mutating task runs, so the
+instance must be errored (issue 4670).
 """
 
 from unittest import mock
@@ -21,9 +25,11 @@ from uuid import uuid4
 from shakenfist import exceptions
 from shakenfist.operations.node_inst_op import NodeInstOp
 from shakenfist.schema.object_state import State
+from shakenfist.schema.operations import node_inst_op as nio_schema
 from shakenfist.schema.operations.node_inst_op import create_and_enqueue
 from shakenfist.schema.operations.node_inst_op import model_tasks
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.schema.operations.util import is_observational
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -132,4 +138,41 @@ class DispatchTaskErrorStateTestCase(base.ShakenFistTestCase):
         op = self._dispatch_failing_delete(inst)
 
         self.assertEqual(NodeInstOp.STATE_ERROR, op.state.value)
+        self.assertEqual(['created-error'], inst.state_sets)
+
+    def test_failed_probe_in_mutating_op_errors_instance(self):
+        # [health_check_kvm_process, instance_delete] is a mutating
+        # operation: is_observational() says so, and its target row is
+        # stamped mutating. When the probe raises, execute() stops at the
+        # error state and the delete never runs, so the instance has to
+        # show that. Sparing it, because the task which happened to fail
+        # was a probe, left a mutating operation that failed without
+        # erroring its object (issue 4670).
+        tasks = [model_tasks.health_check_kvm_process,
+                 model_tasks.instance_delete]
+        self.assertFalse(is_observational(nio_schema.model, tasks))
+
+        _, op_uuid = create_and_enqueue(
+            node_uuid=str(uuid4()), instance_uuid=str(uuid4()),
+            tasks=tasks, priority=PRIORITY.user_facing)
+        op = NodeInstOp.from_db(op_uuid)
+        self.assertIsNotNone(op)
+
+        inst = FakeInstance('created')
+        instance_delete = mock.MagicMock()
+        with mock.patch(
+                'shakenfist.operations.node_inst_op.util_exceptions.'
+                'ignore_exception'), \
+                mock.patch(
+                    'shakenfist.operations.node_inst_op.Instance.from_db',
+                    return_value=inst), \
+                mock.patch.object(
+                    NodeInstOp, '_health_check_kvm_process',
+                    side_effect=RuntimeError('boom')), \
+                mock.patch.object(
+                    NodeInstOp, '_instance_delete', instance_delete):
+            op.execute()
+
+        self.assertEqual(NodeInstOp.STATE_ERROR, op.state.value)
+        instance_delete.assert_not_called()
         self.assertEqual(['created-error'], inst.state_sets)

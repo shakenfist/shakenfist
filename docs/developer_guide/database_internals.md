@@ -326,11 +326,14 @@ Two practical traps:
   error anywhere.
 - Marking a task observational also changes what a failing task does. When
   a `node_inst_op` task raises, `NodeInstOp.dispatch_task()` marks the
-  operation errored, and for a mutating task it moves the instance to an
-  error state too. For an observational task it leaves the instance alone,
-  because a failure to measure a guest says nothing about the guest. So a
-  mutating task marked observational would also stop erroring its instance
-  when it fails.
+  operation errored, and for a mutating operation it moves the instance to
+  an error state too. For an observational operation it leaves the instance
+  alone, because a failure to measure a guest says nothing about the guest.
+  The question is asked of the whole operation, with `is_observational()`,
+  not of the task which failed: an operation which runs a probe ahead of a
+  mutating task is mutating, and a failed probe ends it before the mutating
+  task runs, so the instance is errored. So a mutating task marked
+  observational would also stop erroring its instance when it fails.
 
 The classification of every task is pinned by
 `shakenfist/tests/schema/operations/test_observational_tasks.py`. It holds a
