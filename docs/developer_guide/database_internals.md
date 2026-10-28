@@ -575,7 +575,12 @@ and the sit after each redelivery -- which is what distinguishes a lane
 that is genuinely backed up from one whose operations are waiting on a
 dependency. Both are documented, with their caveats, under
 [networking observability](../operator_guide/networking/overview.md),
-where they sit next to the other queue tooling.
+where they sit next to the other queue tooling. Their parsers are
+checked against the emitter by
+`shakenfist/tests/test_queue_tooling_round_trip.py`, which has a real
+`NetOp` emit each event through the real event echo and the real JSON
+formatter, so renaming a field in `execution_duration_extra()` or
+`defer()` fails the suite rather than quietly emptying a report.
 
 ## Coalescible Operations
 
