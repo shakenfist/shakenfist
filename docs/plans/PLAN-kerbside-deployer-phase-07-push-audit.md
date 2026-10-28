@@ -1241,3 +1241,19 @@ and sets phase 7 and the plan to Complete.
   floor, not advice to upgrade to 0.6.0.
 * Issues were filed on 2026-10-28 after the operator approved the graded
   table and the blocking grade for SF-1, as the back brief required.
+* 2026-10-29 (UTC). The record merged as `0c4b19c520` (#4712). The
+  follow-up pull request, cut from `develop` in its own worktree as the
+  disposition says, fixes #4697 and makes the twelve corrections. One
+  departure from #4697's suggested fix: the trailing-slash refusal and
+  the every-node comparison went into `site.yml`'s cluster shape play,
+  not `kerbside_source.yml`. `kerbside_source` runs only on Kerbside
+  hosts, so a bring-your-own Kerbside, where the operator sets the
+  audience by hand to the documented verbatim value, would have kept the
+  defect; the shape play runs for every topology, before any host is
+  changed, and judges the value from the Shaken Fist nodes which render
+  it. `kerbside_source`'s own comparison of each Kerbside host against
+  the first Shaken Fist node is unchanged and now complete, since the
+  shape play has proven the Shaken Fist nodes agree. The wiring test's
+  own valid URL carried a trailing slash, which the new check refuses;
+  it no longer does. SF-14's `redact_vv` moved to the shared `vdi`
+  module so the direct `.vv` fetch can use it too.
