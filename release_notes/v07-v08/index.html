@@ -16809,9 +16809,10 @@
   host pattern, ignoring: kerbside</code> warning, which an empty <code>kerbside:</code> group
   in your inventory silences. If <code>kerbside_public_fqdn</code> is an IP address, the
   proxy certificate now carries it as an IP SAN rather than a DNS SAN. The
-  <code>debian-13-slim-tier</code> merge row deploys Kerbside on a hypervisor against a
-  real cluster, and proves the deploy, migrations, restart-on-change across a
-  no-op redeploy, readiness, the token exchange and the proxy's TLS endpoint.
+  <code>debian-13-slim-tier</code> lane, run weekly, deploys Kerbside on a hypervisor
+  against a real cluster, and proves the deploy, migrations, restart-on-change
+  across a no-op redeploy, readiness, the token exchange and the proxy's TLS
+  endpoint.
   See <a href="../../operator_guide/kerbside/">Running Kerbside beside a cluster</a>
   for where to place Kerbside, the network it needs and load balancing.
   See the <a href="/developer_guide/ci/#deploy-profiles">CI developer guide</a> and the

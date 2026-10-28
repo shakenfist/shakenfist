@@ -16458,7 +16458,7 @@ are:</p>
 </tr>
 <tr>
 <td><code>kerbside_url</code></td>
-<td>Base URL of an operator-deployed Kerbside VDI console proxy. Optional; empty leaves the proxied-console integration off. See the <a href="../vdi_console_tokens/">VDI console tokens operator guide</a>.</td>
+<td>Base URL of an operator-deployed Kerbside VDI console proxy, with no trailing slash: it is the console token audience, byte for byte, and the deploy refuses one ending in <code>/</code>. Optional; empty leaves the proxied-console integration off. See the <a href="../vdi_console_tokens/">VDI console tokens operator guide</a>.</td>
 </tr>
 <tr>
 <td><code>kerbside_token_duration</code></td>
