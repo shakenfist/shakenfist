@@ -16,6 +16,7 @@ from shakenfist.constants import get_object_class
 from shakenfist.constants import NoSuchObject
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.exceptions import DatabaseUnavailable
+from shakenfist.exceptions import HardDeleteBatchUnavailable
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
@@ -45,9 +46,18 @@ INSTANCE_CHECKS_QUEUE = queue.Queue()
 # The deleted-object sweep's work, held per object type. A single queue
 # filled type by type let one large backlog take every pass's whole budget,
 # so the types behind it were never reached at all. Instead the drain takes
-# one entry from each type that has work in turn, in the order of
-# OBJECT_NAMES_TO_CLASSES, so a type with thirty objects gets the same share
-# of the budget as one with hundreds of thousands.
+# a turn of up to DELETED_OBJECT_BATCH_SIZE entries from each type that has
+# work in turn, in the order of OBJECT_NAMES_TO_CLASSES, so a type with
+# thirty objects gets the same share of the pass as one with hundreds of
+# thousands. The share is counted in entries rather than time: a type whose
+# turn is one cheap batch delete must not crowd out one whose objects are
+# hard deleted one at a time.
+#
+# A pass stops at DELETED_OBJECT_SWEEP_MAX_OBJECTS entries or at its time
+# budget, whichever comes first. With batches the time budget alone would
+# let a pass hard delete thousands of objects, which is a write load on the
+# database tier that should be chosen rather than fallen into, so the entry
+# cap is what sets the drain rate and the time budget is a ceiling.
 #
 # Each type holds at most one page of uuids, read in primary key order: an
 # ORDER BY on anything else would sort the type's whole final-state range
@@ -78,18 +88,34 @@ _DELETED_OBJECT_WORK: dict[str, collections.deque[str]] = {}
 _DELETED_OBJECT_CURSOR: dict[str, str] = {}
 _DELETED_OBJECT_RECHECK_AT: dict[str, float] = {}
 _DELETED_OBJECT_NEXT_TYPE: int = 0
+# 'skipped' is an entry of a batch which the batch's own eligibility check
+# left alone: it was gone, no longer in a final state, or too young, and a
+# batch cannot say which. 'gone', 'not_final' and 'too_young' are counted
+# only for an object hard deleted on its own; 'hard_deleted' and 'failed'
+# either way.
 DELETED_OBJECT_OUTCOMES = (
-    'gone', 'not_final', 'too_young', 'hard_deleted', 'failed')
+    'gone', 'not_final', 'too_young', 'skipped', 'hard_deleted', 'failed')
 
 # What the deleted-object sweep costs and how far behind it is (#4473).
-# The histogram is per dequeued entry; the RPCs inside each entry are timed
-# separately by mariadb.rpc_timing_scope(), so the difference between the two
-# is time spent outside the database. Both are leader-only, like the streak
+# The entry histogram is per dequeued entry, and an entry of a batch is
+# observed with an equal share of the batch's wall time, so its counts and
+# sums mean the same whichever way a type is hard deleted. The batch
+# histogram observes each batch call, which with the entry counts gives a
+# batch's latency against its size. The RPCs are timed separately by
+# mariadb.rpc_timing_scope(), so the difference between those and these is
+# time spent outside the database. All are leader-only, like the streak
 # gauge below.
 CLUSTER_DELETED_OBJECT_SECONDS = Histogram(
     'cluster_deleted_object_seconds',
     'Wall time spent on one entry of the per-deleted-object queue, by '
-    'object type and how the entry ended.', ['object_type', 'outcome'],
+    'object type and how the entry ended. An entry hard deleted in a batch '
+    'is observed with an equal share of the batch\'s wall time.',
+    ['object_type', 'outcome'],
+    buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10))
+CLUSTER_DELETED_OBJECT_BATCH_SECONDS = Histogram(
+    'cluster_deleted_object_batch_seconds',
+    'Wall time of one batch hard delete call by the deleted-object sweep, '
+    'by object type.', ['object_type'],
     buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10))
 CLUSTER_DELETED_OBJECT_BACKLOG = Gauge(
     'cluster_deleted_object_backlog',
@@ -174,7 +200,7 @@ class WorkList(NamedTuple):
     applies to one type's reply, and the other types are still
     readable), so that caller should move on to the next type. A
     ``DatabaseUnavailable`` is tier-wide, and asking the same dead tier
-    27 more times buys nothing while costing a full ``_grpc_call``
+    28 more times buys nothing while costing a full ``_grpc_call``
     retry budget each time -- see ``_fill_deleted_object_work``.
     """
     uuids: Optional[list[str]]
@@ -1016,7 +1042,7 @@ def _fill_deleted_object_work(now: float, deadline: float) -> bool:
         if _DELETED_OBJECT_RECHECK_AT.get(objtype, 0.0) > now:
             continue
 
-        # Each read is cheap while MariaDB walks the primary key, but 28 of
+        # Each read is cheap while MariaDB walks the primary key, but 29 of
         # them back to back are not if it ever chooses to sort instead, and
         # the pass is meant to fit its budget whichever it does. Resuming
         # at this type rather than starting from the top again means a run
@@ -1049,15 +1075,15 @@ def _fill_deleted_object_work(now: float, deadline: float) -> bool:
         #   plus sleeps, so about 93s. This is the shape the early return is
         #   sized for.
         #
-        # There are 28 object types here and _run_due_scheduled_jobs()
+        # There are 29 object types here and _run_due_scheduled_jobs()
         # pets the watchdog only between jobs, while sf-cluster runs at
         # WatchdogSec=300s. In the slow shape continuing past the fourth
         # failure already exceeds the window and a full pass would take
-        # some 43 minutes; even the fast shape burns most of the window
+        # some 45 minutes; even the fast shape burns most of the window
         # learning nothing. Either way it risks SIGABRTing the elected
         # maintainer and costing a lock failover, where before it merely
         # skipped a pass. Nothing is gained by asking a tier that is not
-        # there 27 more times. This function has blown the watchdog
+        # there 28 more times. This function has blown the watchdog
         # window once already (issue 3533).
         with mariadb.rpc_timing_scope('per_deleted_object_fill', objtype):
             page = _sweep_work_page(
@@ -1136,10 +1162,85 @@ def _hard_delete_deleted_object(
             outcomes[outcome] += 1
 
 
+def _hard_delete_deleted_object_batch(
+        objtype: str, obj_uuids: list[str],
+        outcomes: Optional[collections.Counter[str]] = None) -> None:
+    """Hard delete a batch of one type's objects still final and old enough.
+
+    The eligibility check is made by the database in the same transaction as
+    the delete, so nothing is read first. If ``outcomes`` is given, the
+    outcome of each entry -- 'hard_deleted', 'skipped' or 'failed' -- is
+    counted in it.
+
+    Raises DatabaseUnavailable, HardDeleteBatchUnavailable and ValueError
+    (a request refused whole, such as one naming a malformed uuid) having
+    deleted nothing and counted nothing, for the caller to put the batch
+    back or hard delete it another way.
+    """
+    batch_start = time.monotonic()
+    try:
+        with mariadb.rpc_timing_scope('per_deleted_object', objtype):
+            deleted = mariadb.hard_delete_objects(
+                ObjectType(objtype), obj_uuids,
+                state_values=FINAL_OBJECT_STATES,
+                updated_before=time.time() - _deleted_object_delay(objtype))
+        CLUSTER_DELETED_OBJECT_BATCH_SECONDS.labels(objtype).observe(
+            time.monotonic() - batch_start)
+    except (DatabaseUnavailable, HardDeleteBatchUnavailable, ValueError):
+        raise
+    except Exception as e:
+        deleted = None
+        util_exceptions.ignore_exception(
+            f'hard delete of {len(obj_uuids)} {objtype} objects', e)
+
+    deleted_uuids = set(deleted or [])
+    share = (time.monotonic() - batch_start) / len(obj_uuids)
+    for obj_uuid in obj_uuids:
+        if deleted is None:
+            # The batch rolled back, so this entry is left for the next walk
+            # of its type, after the recheck, to find again.
+            outcome = 'failed'
+        elif obj_uuid in deleted_uuids:
+            outcome = 'hard_deleted'
+            eventlog.add_event(
+                EVENT_TYPE_AUDIT, objtype, obj_uuid, 'hard deleted object')
+        else:
+            # No longer final, or not yet old enough. An entry the database
+            # deleted on an earlier attempt whose reply was lost, such as one
+            # _grpc_call() retried after a deadline, also lands here, and
+            # its audit event is never written.
+            outcome = 'skipped'
+        CLUSTER_DELETED_OBJECT_SECONDS.labels(objtype, outcome).observe(share)
+        if outcomes is not None:
+            outcomes[outcome] += 1
+
+
+def _hard_delete_deleted_objects_singly(
+        objtype: str, work: collections.deque[str], count: int,
+        deadline: float,
+        outcomes: Optional[collections.Counter[str]] = None) -> int:
+    """Take up to ``count`` entries from ``work`` one at a time.
+
+    No entry is started after ``deadline``, a time.time() value. Returns
+    how many entries were taken.
+    """
+    taken = 0
+    while taken < count and work and time.time() <= deadline:
+        _hard_delete_deleted_object(objtype, work.popleft(), outcomes)
+        taken += 1
+    return taken
+
+
 def _drain_deleted_object_work(
         execution_limit: float,
         outcomes: Optional[collections.Counter[str]] = None) -> int:
-    """Take one entry from each type with work in turn, within a time limit.
+    """Take a turn from each type with work in turn, within the pass's limits.
+
+    A turn is up to DELETED_OBJECT_BATCH_SIZE entries of one type: one batch
+    hard delete for a type which can be deleted in batches, and one object
+    at a time otherwise. The pass stops at ``execution_limit`` seconds or
+    DELETED_OBJECT_SWEEP_MAX_OBJECTS entries, whichever comes first, and a
+    turn never takes more entries than the cap has left.
 
     Returns how many entries were taken. If ``outcomes`` is given it is
     filled with how many entries ended in each of DELETED_OBJECT_OUTCOMES.
@@ -1149,9 +1250,14 @@ def _drain_deleted_object_work(
     object_types = list(OBJECT_NAMES_TO_CLASSES)
     processed = 0
     start_time = time.time()
+    deadline = start_time + execution_limit
+    batch_unavailable = False
     while True:
-        # Limit how long we spend in this loop
-        if time.time() - start_time > execution_limit:
+        # Limit how long we spend in this loop, and how much we take
+        if time.time() > deadline:
+            return processed
+        remaining = config.DELETED_OBJECT_SWEEP_MAX_OBJECTS - processed
+        if remaining <= 0:
             return processed
 
         # The first type at or after the rotation's position which has
@@ -1166,9 +1272,58 @@ def _drain_deleted_object_work(
         if objtype is None:
             return processed
 
-        obj_uuid = _DELETED_OBJECT_WORK[objtype].popleft()
-        processed += 1
-        _hard_delete_deleted_object(objtype, obj_uuid, outcomes)
+        work = _DELETED_OBJECT_WORK[objtype]
+        count = min(config.DELETED_OBJECT_BATCH_SIZE, remaining)
+
+        # A type whose hard delete does more than delete rows -- an instance
+        # releases its placement, a namespace cascades to what it owns -- is
+        # hard deleted one object at a time by its own code.
+        if (batch_unavailable or
+                ObjectType(objtype) not in mariadb.HARD_DELETE_BATCH_FUNCTIONS):
+            processed += _hard_delete_deleted_objects_singly(
+                objtype, work, count, deadline, outcomes)
+            continue
+
+        batch = [work.popleft() for _ in range(min(count, len(work)))]
+        try:
+            _hard_delete_deleted_object_batch(objtype, batch, outcomes)
+        except DatabaseUnavailable as e:
+            # As with the fill, every further call would spend a whole
+            # _grpc_call retry budget against a tier which has just failed
+            # one, so the pass ends. The batch goes back where it was rather
+            # than waiting for the next walk; anything in it the database did
+            # delete before the reply was lost is skipped next time.
+            work.extendleft(reversed(batch))
+            LOG.with_fields({'object_type': objtype}).warning(
+                f'Stopping per-deleted-object drain, database unavailable: '
+                f'{e}')
+            return processed
+        except HardDeleteBatchUnavailable:
+            # An sf-database which predates the batch. Each object's own
+            # hard delete falls back to one delete at a time against it, and
+            # the client remembers the answer for a while, so this and every
+            # later turn of the pass go that way rather than asking again.
+            work.extendleft(reversed(batch))
+            LOG.warning(
+                'Database service cannot hard delete in batches, hard '
+                'deleting deleted objects one at a time for this pass')
+            batch_unavailable = True
+            processed += _hard_delete_deleted_objects_singly(
+                objtype, work, count, deadline, outcomes)
+            continue
+        except ValueError as e:
+            # The request was refused whole, most likely for one malformed
+            # uuid. Left as a batch it would fail every entry in it on every
+            # walk, so this turn goes one object at a time and only the bad
+            # entry fails.
+            work.extendleft(reversed(batch))
+            LOG.with_fields({'object_type': objtype}).warning(
+                f'Batch hard delete refused, hard deleting this turn one '
+                f'object at a time: {e}')
+            processed += _hard_delete_deleted_objects_singly(
+                objtype, work, len(batch), deadline, outcomes)
+            continue
+        processed += len(batch)
 
 
 # Orphan reconciliation (issue 3534). Zombie repair is excluded for nodes

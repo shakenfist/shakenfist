@@ -789,3 +789,27 @@ would bring back exactly the premature completion it replaces.
 `ClaimCoalescibleSiblingsV2` keeps its old behaviour for clients
 which predate the fold and has no caller in this tree; retiring it,
 with the V1 pair, is #4639.
+
+## Batched hard deletes
+
+The deleted-object sweep hard deletes most object types through the
+`HardDeleteObjects` RPC, which deletes up to 1000 objects of one type in a
+single transaction. A call is either guarded, naming the states and the age
+an object must still have, with the check made in the same transaction as
+the delete, or unconditional, for a caller which has already decided (this
+is what `DatabaseBackedObject.hard_delete()` sends for one object). The
+rows a type loses are declared in one place, `HARD_DELETE_BATCH_FUNCTIONS`
+in `mariadb.py`, which lists the public delete functions run for the type
+before `delete_state`, `delete_object_metadata` and `delete_object_events`;
+`HARD_DELETE_STATEMENTS` maps each name to its many-object statement and to
+a call of the public function. Instances, namespaces, namespace claims and
+nodes are absent because their hard delete does more than delete rows. An
+`sf-database` which predates the RPC makes `hard_delete_objects()` raise
+`HardDeleteBatchUnavailable`, and callers fall back to
+`hard_delete_objects_per_call()`, the same deletes as separate commits. The
+client remembers that answer for `HARD_DELETE_BATCH_RECHECK_SECONDS` (five
+minutes) and raises without asking again until then, so a rolling upgrade
+does not cost every hard delete a refused round trip and a warning.
+`shakenfist/tests/test_hard_delete_batch_parity.py` checks the mapping
+against each class's own deletes, so its `EXPECTED_DELETES` literal must
+change whenever the mapping does.

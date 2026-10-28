@@ -383,7 +383,7 @@ and 3's scope to match.
 
 ## Risks and mitigations
 
-- **Series count.** `database_client_rpc_seconds` has up to 28 types
+- **Series count.** `database_client_rpc_seconds` has up to 29 types
   times the RPCs each type's hard delete makes. A realistic estimate is
   under 200 label sets, times 12 series each (ten buckets, `_sum`,
   `_count`), so about 2,400 series, all on one node. That is

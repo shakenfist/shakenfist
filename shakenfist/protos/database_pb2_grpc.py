@@ -194,6 +194,11 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.CountObjectsByStateRequest.SerializeToString,
                 response_deserializer=database__pb2.CountObjectsByStateReply.FromString,
                 _registered_method=True)
+        self.HardDeleteObjects = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/HardDeleteObjects',
+                request_serializer=database__pb2.HardDeleteObjectsRequest.SerializeToString,
+                response_deserializer=database__pb2.HardDeleteObjectsReply.FromString,
+                _registered_method=True)
         self.DeleteOrphanedObjectStates = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteOrphanedObjectStates',
                 request_serializer=database__pb2.DeleteOrphanedObjectStatesRequest.SerializeToString,
@@ -1433,6 +1438,13 @@ class DatabaseServiceServicer:
 
     def CountObjectsByState(self, request, context):
         """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def HardDeleteObjects(self, request, context):
+        """Hard deletes a batch of one type's objects in one transaction.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -2958,6 +2970,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.CountObjectsByState,
                     request_deserializer=database__pb2.CountObjectsByStateRequest.FromString,
                     response_serializer=database__pb2.CountObjectsByStateReply.SerializeToString,
+            ),
+            'HardDeleteObjects': grpc.unary_unary_rpc_method_handler(
+                    servicer.HardDeleteObjects,
+                    request_deserializer=database__pb2.HardDeleteObjectsRequest.FromString,
+                    response_serializer=database__pb2.HardDeleteObjectsReply.SerializeToString,
             ),
             'DeleteOrphanedObjectStates': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteOrphanedObjectStates,
@@ -4849,6 +4866,33 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/CountObjectsByState',
             database__pb2.CountObjectsByStateRequest.SerializeToString,
             database__pb2.CountObjectsByStateReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def HardDeleteObjects(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/HardDeleteObjects',
+            database__pb2.HardDeleteObjectsRequest.SerializeToString,
+            database__pb2.HardDeleteObjectsReply.FromString,
             options,
             channel_credentials,
             insecure,

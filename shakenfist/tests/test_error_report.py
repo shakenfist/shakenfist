@@ -9,6 +9,7 @@ from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
 from shakenfist.config import BaseSettings
+from shakenfist.constants import get_object_class
 from shakenfist.exceptions import AddFloatingIPFailed
 from shakenfist.exceptions import CannotAssignFloatingGateway
 from shakenfist.exceptions import CongestedNetwork
@@ -17,10 +18,12 @@ from shakenfist.exceptions import CreateVXLANInterfaceFailed
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import EnableNATFailed
 from shakenfist.exceptions import EnsureMeshFailed
+from shakenfist.exceptions import HardDeleteBatchUnavailable
 from shakenfist.exceptions import ListingInterfaceAddressesFailed
 from shakenfist.exceptions import RemoveFloatingIPFailed
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.operations.error_report import _EXCEPTION_CODE_REGISTRY
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 
 
@@ -402,53 +405,80 @@ class PublicClusterOperationErrorTestCase(base.ShakenFistTestCase):
 
 
 class BaseClusterOperationHardDeleteTestCase(base.ShakenFistTestCase):
-    """``BaseClusterOperation.hard_delete`` cleans up sibling tables.
+    """A cluster operation's hard delete cleans up sibling tables.
 
     Verifies the cleanup chain that the cluster cleaner triggers when a
     cluster operation reaches terminal state. The ``cluster_operations``
     row and any ``cluster_operation_errors`` row must both be removed
-    so neither table grows unbounded over time.
+    so neither table grows unbounded over time. They go in the batch
+    hard delete, or one call at a time against a database service
+    which predates it.
     """
 
-    @mock.patch('shakenfist.operations.baseoperation.mariadb'
-                '.delete_cluster_operation_target')
-    @mock.patch('shakenfist.operations.baseoperation.mariadb'
-                '.delete_cluster_operation_error')
-    @mock.patch('shakenfist.operations.baseoperation.mariadb'
-                '.delete_cluster_operation')
-    @mock.patch('shakenfist.baseobject.mariadb.delete_state')
-    @mock.patch('shakenfist.baseobject.mariadb.delete_object_metadata')
-    @mock.patch('shakenfist.baseobject.mariadb.delete_object_events')
-    def test_hard_delete_removes_error_and_operation_rows(
-            self, mock_delete_events, mock_delete_metadata, mock_delete_state,
-            mock_delete_op, mock_delete_error, mock_delete_target):
-        from shakenfist.operations.baseoperation import BaseClusterOperation
+    OP_UUID = '00000000-0000-0000-0000-000000000001'
 
-        # A concrete subclass is required because ``super().hard_delete()``
-        # in the production code resolves through the MRO. We do NOT call
-        # the constructor — that would need a full static-values dict
-        # and schema. Instead we build an instance via ``__new__`` and
-        # set the only attribute the production method reads.
-        op_uuid = '00000000-0000-0000-0000-000000000001'
-
-        class _ConcreteOp(BaseClusterOperation):
-            pass
-
-        op = _ConcreteOp.__new__(_ConcreteOp)
+    def _op(self):
+        # We do NOT call the constructor -- that would need a full
+        # static-values dict and schema. Instead we build an instance
+        # via ``__new__`` and set the only attribute the production
+        # method reads.
+        op = get_object_class(ObjectType.NODE_INST_OP).__new__(
+            get_object_class(ObjectType.NODE_INST_OP))
         # ``uuid`` is a read-only property backed by the
         # name-mangled ``_DatabaseBackedObject__uuid`` attribute.
-        op._DatabaseBackedObject__uuid = uuid.UUID(op_uuid)
+        op._DatabaseBackedObject__uuid = uuid.UUID(self.OP_UUID)
         # Stub out add_event (called by the inherited hard_delete).
         op.add_event = mock.Mock()
+        return op
 
-        op.hard_delete()
+    @mock.patch('shakenfist.mariadb.delete_cluster_operation_target')
+    @mock.patch('shakenfist.mariadb.delete_cluster_operation_error')
+    @mock.patch('shakenfist.mariadb.delete_cluster_operation')
+    @mock.patch('shakenfist.mariadb.delete_state')
+    @mock.patch('shakenfist.mariadb.delete_object_metadata')
+    @mock.patch('shakenfist.mariadb.delete_object_events')
+    @mock.patch('shakenfist.mariadb.hard_delete_objects')
+    def test_hard_delete_removes_error_and_operation_rows(
+            self, mock_batch, mock_delete_events, mock_delete_metadata,
+            mock_delete_state, mock_delete_op, mock_delete_error,
+            mock_delete_target):
+        mock_batch.return_value = [self.OP_UUID]
 
-        mock_delete_target.assert_called_once_with(op_uuid)
-        mock_delete_error.assert_called_once_with(op_uuid)
-        mock_delete_op.assert_called_once_with(op_uuid)
-        # ``super().hard_delete()`` walks up to DatabaseBackedObject,
-        # which deletes state and object_metadata. Verify the chain
-        # reached the base class.
+        self._op().hard_delete()
+
+        # One batch for this operation, which deletes its targets, error
+        # and operation rows, then its state and metadata rows.
+        mock_batch.assert_called_once_with(
+            ObjectType.NODE_INST_OP, [self.OP_UUID], unconditional=True)
+        self.assertEqual(
+            ('delete_cluster_operation_target',
+             'delete_cluster_operation_error',
+             'delete_cluster_operation'),
+            mariadb.HARD_DELETE_BATCH_FUNCTIONS[ObjectType.NODE_INST_OP])
+        for m in (mock_delete_target, mock_delete_error, mock_delete_op,
+                  mock_delete_state, mock_delete_metadata,
+                  mock_delete_events):
+            m.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb.delete_cluster_operation_target')
+    @mock.patch('shakenfist.mariadb.delete_cluster_operation_error')
+    @mock.patch('shakenfist.mariadb.delete_cluster_operation')
+    @mock.patch('shakenfist.mariadb.delete_state')
+    @mock.patch('shakenfist.mariadb.delete_object_metadata')
+    @mock.patch('shakenfist.mariadb.delete_object_events')
+    @mock.patch('shakenfist.mariadb.hard_delete_objects',
+                side_effect=HardDeleteBatchUnavailable('too old'))
+    def test_hard_delete_without_the_batch_removes_the_same_rows(
+            self, mock_batch, mock_delete_events, mock_delete_metadata,
+            mock_delete_state, mock_delete_op, mock_delete_error,
+            mock_delete_target):
+        self._op().hard_delete()
+
+        mock_delete_target.assert_called_once_with(self.OP_UUID)
+        mock_delete_error.assert_called_once_with(self.OP_UUID)
+        mock_delete_op.assert_called_once_with(self.OP_UUID)
+        # The fallback walks on to what every type deletes: state and
+        # object_metadata. Verify the chain reached them.
         mock_delete_state.assert_called_once()
         mock_delete_metadata.assert_called_once()
 

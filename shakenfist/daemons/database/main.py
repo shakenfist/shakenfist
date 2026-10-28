@@ -888,6 +888,58 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.CountObjectsByStateReply(count=0)
 
+    def HardDeleteObjects(
+        self,
+        request: database_pb2.HardDeleteObjectsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.HardDeleteObjectsReply:
+        """Hard delete a batch of one type's objects in one transaction.
+
+        The reply names the objects deleted, so no failure may be
+        answered with an empty one: a caller would read that as "none was
+        eligible". INVALID_ARGUMENT is a request which can never succeed,
+        refused for the same reasons hard_delete_objects() refuses it.
+        ABORTED is a transaction which failed and rolled back, deleting
+        nothing. It is not UNAVAILABLE because the direct path has
+        already retried the contention MariaDB asks to be retried, so the
+        client reports it as a failed call, as the direct path does,
+        rather than running it again. INTERNAL is an unexpected
+        exception.
+        """
+        try:
+            self.monitor.counters['hard_delete_objects'].inc()
+            object_type = ObjectType.from_proto_id(request.object_type)
+            if object_type is None:
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details(
+                    f'unknown object type id {request.object_type}')
+                return database_pb2.HardDeleteObjectsReply()
+            object_uuids = list(request.object_uuids)
+            state_values = list(request.state_values)
+            updated_before = request.updated_before or None
+            error = mariadb.hard_delete_objects_request_error(
+                object_type, object_uuids, state_values, updated_before,
+                request.unconditional)
+            if error:
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details(error)
+                return database_pb2.HardDeleteObjectsReply()
+            deleted = mariadb.hard_delete_objects(
+                object_type, object_uuids, state_values=state_values,
+                updated_before=updated_before,
+                unconditional=request.unconditional)
+            if deleted is None:
+                context.set_code(grpc.StatusCode.ABORTED)
+                context.set_details('hard delete transaction failed')
+                return database_pb2.HardDeleteObjectsReply()
+            return database_pb2.HardDeleteObjectsReply(deleted_uuids=deleted)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database HardDeleteObjects failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.HardDeleteObjectsReply()
+
     def DeleteOrphanedObjectStates(
         self,
         request: database_pb2.DeleteOrphanedObjectStatesRequest,
@@ -6584,6 +6636,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',
             'get_objects_by_state', 'count_objects_by_state',
+            'hard_delete_objects',
             # Orphan reconciliation
             'delete_orphaned_object_states', 'get_stateless_object_uuids',
             'delete_orphaned_artifact_attributes',

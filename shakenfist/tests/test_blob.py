@@ -565,20 +565,36 @@ class BlobDeleteReferencesTestCase(base.ShakenFistTestCase):
         self.db.remove_all_references_from.assert_called_once_with(
             ObjectType.BLOB, self.blob.uuid)
 
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.hard_delete')
+    def test_hard_delete_batch_removes_references_held(self):
+        # The backstop for blobs deleted before the transition removed
+        # references, which the deleted-object sweep reaches eventually.
+        # The sweep batches blobs through hard_delete_objects() without
+        # calling Blob.hard_delete(), so the backstop has to be one of
+        # the batch's deletes rather than a Blob override.
+        self.assertIn(
+            'remove_all_references_from',
+            mariadb.HARD_DELETE_BATCH_FUNCTIONS[ObjectType.BLOB])
+
+    @mock.patch('shakenfist.blob.Blob.add_event')
+    @mock.patch('shakenfist.mariadb.delete_object_events')
+    @mock.patch('shakenfist.mariadb.delete_object_metadata')
+    @mock.patch('shakenfist.mariadb.delete_state')
     @mock.patch('shakenfist.mariadb.delete_blob')
     @mock.patch('shakenfist.mariadb.delete_blob_attributes')
     @mock.patch('shakenfist.mariadb.delete_blob_transfers_for_blob')
     @mock.patch('shakenfist.mariadb.delete_blob_hashes')
-    def test_hard_delete_removes_references_held(
-            self, mock_hashes, mock_transfers, mock_attributes, mock_delete,
-            mock_super_hard_delete):
-        # The backstop for blobs deleted before the transition removed
-        # references, which the deleted-object sweep reaches eventually.
+    @mock.patch('shakenfist.mariadb.hard_delete_objects',
+                side_effect=exceptions.HardDeleteBatchUnavailable('too old'))
+    def test_hard_delete_per_call_removes_references_held(
+            self, mock_batch, mock_hashes, mock_transfers, mock_attributes,
+            mock_delete, mock_delete_state, mock_metadata, mock_events,
+            mock_add_event):
+        # Against an sf-database without the batch, the per-call fallback
+        # makes the same removal.
         self.blob.hard_delete()
 
         self.db.remove_all_references_from.assert_called_once_with(
-            ObjectType.BLOB, self.blob.uuid)
+            ObjectType.BLOB, str(self.blob.uuid))
         mock_delete.assert_called_once_with(self.blob.uuid)
 
 

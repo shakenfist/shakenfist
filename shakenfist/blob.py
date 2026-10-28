@@ -1047,16 +1047,6 @@ class Blob(dbo):
             return False
         return True
 
-    def hard_delete(self) -> None:
-        # Backstop for blobs deleted before references were removed on the
-        # transition to deleted, or whose removal failed then (issue 4558).
-        self._remove_references_held()
-        mariadb.delete_blob_hashes(str(self.uuid))
-        mariadb.delete_blob_transfers_for_blob(str(self.uuid))
-        mariadb.delete_blob_attributes(self.uuid)
-        mariadb.delete_blob(self.uuid)
-        super().hard_delete()
-
     def verify_checksum(self, hash: Optional[str] = None, urgent: bool = True) -> bool:
         # This method is focussed on sha512 hashes at the moment, but I also
         # want it to be able to do other hash types later -- for example OVA

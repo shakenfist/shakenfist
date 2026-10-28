@@ -78,7 +78,7 @@ All references are to `develop` at 46142d9d66.
   sfcbr means a deploy.
 - **The fill is unbounded.** `_fill_per_deleted_object_queue()`
   (`:822-878`) asks `get_objects_by_state()` for *every* final-state
-  uuid of each of the 28 types older than the delay, and the reply
+  uuid of each of the 29 types older than the delay, and the reply
   size has no bound but gRPC's message size limit. That is the defect
   class [Bound gRPC reply sizes](PLAN-grpc-bounded-replies.md) exists
   for, and its phase 2 (bounded pages for sweep callers) touches the
@@ -228,6 +228,85 @@ sf-cleaner's reads, and #4399 stays open. Phase 4's drain is a natural
 experiment: if sf-cleaner's rate falls as the backlog drains, the
 backlog was the cause.
 
+### What phase 2 measured
+
+Phase 2 (merged in dd5723c3db) went live on sfcbr on 2026-10-22, a few
+minutes before 09:10Z. The numbers below are the 24 hour window ending
+2026-10-23T09:10Z, from brief 2g's queries against the 33fl Prometheus.
+They were recorded while phase 3 was being planned.
+
+**Throughput.** The sweep hard deleted 76,840 objects, against phase
+1's 2,048. A further 241 entries were `gone`. None were `not_final`,
+`too_young` or `failed`. The backlog stood at 1,744,910 and fell by
+about 39k a day. Arrivals were therefore about 38k a day, which agrees
+with phase 1's 40k.
+
+**Fairness.** Every type with a backlog was served. Each type still
+holding one got the same share, about 5,100 objects a day. Seven types
+drained to nothing or nearly nothing: `node_inst_net_iface_op` (4,678
+to 0), `ipam` (3,780 to 15), `instance` (2,045 to 23), `node_inst_snap_op`,
+`artifact_fetch_op`, `net_ip_op` and `dhcp`. An equal share is not
+enough for the two busiest types. Over the window:
+
+| Type | Arrivals | Hard deleted | Backlog change |
+|---|---|---|---|
+| `namespace` | 8,705 | 5,111 | +3,594 |
+| `node_inst_op` | 7,441 | 5,085 | +2,356 |
+| `net_op` | 5,134 | 5,085 | +49 |
+| `namespace_key` | 4,804 | 5,111 | -307 |
+| `node_net_op` | 3,106 | 5,085 | -1,979 |
+
+The other seven large types each fell by 3,600 to 4,700. "Arrivals"
+here is the backlog change plus the hard deletes.
+
+**Cadence.** The sweep spent 13,585 seconds in 24 hours. That is 20
+seconds every 128 seconds, not every 60. The maintenance loop runs due
+jobs once a minute, and `schedule` sets a job's next run from the
+moment it finishes, so a 20 second job registered every minute misses
+every other pass. Phase 3's D19 fixes this.
+
+**Where the time goes.** Phase 1's per-commit reading holds, and the
+floor is lower on a quieter tier. The mean milliseconds per RPC, as the
+sweep sees them:
+
+| RPC | Mean ms |
+|---|---|
+| reads (`Get*`), `ReleaseInstancePlacement` | 1.6-2.1 |
+| `DeleteClusterOperationError`, `DeleteObjectMetadata` (usually delete nothing) | 2.0-3.2 |
+| `DeleteClusterOperationTarget` | 7.2 |
+| `DeleteClusterOperationTargetsForObject` | 21.5 |
+| `DeleteObjectState`, `DeleteClusterOperation`, `DeleteNetwork`, `DeleteInstance`, `DeleteNamespace` and the other single-row deletes | 38-49 |
+| `DeleteObjectEvents` | 57.8 |
+| `DeleteAgentOperation` | 75.7 |
+
+An operation's hard delete costs 0.133 to 0.146 seconds. That is three
+writing commits: the state, the events and the operation row.
+`namespace` costs 0.25 seconds, `instance` 0.44 and `blob` 3.6. The
+fill's paged reads cost 2 to 11 ms a page for every type. The hourly
+backlog count costs about 7.7 seconds in all, 3.1 of them for
+`node_inst_op`.
+
+**Database load.** sf-database served 195.7 requests a second, up
+from 182.9 the day before, and committed 21.9 a second, up from 17.9.
+sf-cluster's requests went from 21.4 a second to 29.6, so it accounts
+for 8.2 of the 12.8 a second rise. sf-cluster's `GetObjectState` went
+from 2.54 a second to 4.01, against a budget of 1.986 plus 0.016 per
+instance with a tolerance of twice that. The sweep's per-object delete
+RPCs now run at 0.06 to 0.9 a second each, which is above the
+unbudgeted ceiling.
+
+**#4399.** sf-cleaner's `GetObjectState` rate was 2.88 a second,
+against 3.16 the day before and 2.69 three days before. The small
+types that drained have not moved it. The large backlogs that remain
+are operations, so phase 4's drain is still the experiment that can
+answer #4399.
+
+**What it means.** Fairness worked, and the cost per object did not
+change. At three commits an operation, keeping every type ahead of its
+arrivals means more commits a day, not fewer. Phase 3 changes the cost:
+one commit for a batch rather than three for each object. It also fixes
+the cadence.
+
 ### Why it matters
 
 - **Database load.** Anything that lists including deleted objects
@@ -356,7 +435,11 @@ recommends today.
    object. Phase 1's numbers strengthen the case. If the cost is a
    per-commit flush, which is the likeliest reading, then deleting a
    batch in one transaction pays that cost once per batch, not three or
-   four times per object.
+   four times per object. **Answered while planning phase 3: batch
+   the pure-delete types, which turn out to be 25 of the 29.** Blobs
+   are among them: their transfer rows are a delete keyed on the blob,
+   not a cascade. Instances, namespaces, namespace claims and nodes stay
+   per object. See phase 3's D14-D16.
 
 5. **How should sfcbr's backlog be drained?** (Phase 4.) At the
    target throughput, 1.6M objects is still days of work, and a drain
@@ -424,8 +507,8 @@ shape of phases 2 and 3, so only their scope is fixed here.
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Measure the sweep | [PLAN-deleted-object-sweep-phase-01-measure.md](PLAN-deleted-object-sweep-phase-01-measure.md) | Complete | 6537966c00 |
-| 2. A fair, bounded drain | [PLAN-deleted-object-sweep-phase-02-fair-drain.md](PLAN-deleted-object-sweep-phase-02-fair-drain.md) | In progress | — |
-| 3. Cheaper hard deletes | PLAN-deleted-object-sweep-phase-03-throughput.md | Not started | — |
+| 2. A fair, bounded drain | [PLAN-deleted-object-sweep-phase-02-fair-drain.md](PLAN-deleted-object-sweep-phase-02-fair-drain.md) | Complete | dd5723c3db |
+| 3. Cheaper hard deletes | [PLAN-deleted-object-sweep-phase-03-batched-deletes.md](PLAN-deleted-object-sweep-phase-03-batched-deletes.md) | In progress | — |
 | 4. Drain sfcbr and keep it drained | PLAN-deleted-object-sweep-phase-04-drain.md | Not started | — |
 | 5. Push audit | - | Not started | — |
 
@@ -514,9 +597,30 @@ operation's cost. The cascades that release capacity (instance
 placement, namespace claims) keep their per-object semantics, and
 their existing unit tests must still pass unchanged.
 
-Definition of done: the measured per-object cost on sfcbr, against
-phase 1's baseline, is low enough that the arrival rate (Situation)
-plus the backlog can be absorbed within phase 4's planned drain time.
+*Revised while planning phase 3* (see "What phase 2 measured"):
+
+- Phase 2's numbers confirm the per-commit reading as far as numbers
+  short of a batch can. Every delete that removes a row costs 40 to
+  50 ms, whatever it removes, and a delete of nothing costs what a
+  read does.
+- **Hydration is dropped after all, for the batched types,** for a
+  reason the paragraph above did not weigh: each read is a request
+  against the load budget, and sf-cluster's `GetObjectState` is
+  already near its tolerance. The batch moves the state and age
+  re-check into its own transaction instead (phase 3's D14).
+- Phase 2's sweep runs every other maintenance pass, not every
+  minute. Phase 3 fixes that (D19).
+- Phase 3 adds a cap on objects per pass and defaults it near today's
+  rate, so that this phase changes what a hard delete costs and phase
+  4 changes how fast the backlog drains (D18).
+- The batchable classes' own `hard_delete()` moves onto the batch as
+  well, so each type's table list exists once and every caller's hard
+  delete of those types is one commit (phase 3's D15, decided at its
+  back brief). The capacity cascades keep their code. Where a
+  namespace cascade test asserted a batchable child's individual
+  deletes, it now asserts the child's batch call, so "their existing
+  unit tests must still pass unchanged" holds for the cascades' own
+  behaviour and not for those assertions.
 
 ### Phase 4: drain sfcbr and keep it drained
 
@@ -524,7 +628,11 @@ Planning effort: medium.
 
 - Drain the existing backlog with the production sweep, throttled
   (open question 5), watching sf-database load with the `sf-db-load`
-  skill while it runs.
+  skill while it runs. The throttle is phase 3's
+  `DELETED_OBJECT_SWEEP_MAX_OBJECTS`, which phase 3 defaults to about
+  phase 2's rate. Raising it is this phase's job.
+- Add load-budget entries for the sweep's pairs once the drain rate
+  is settled (phase 3's D23).
 - Add a regression guard so that, once drained, a sweep falling
   behind is reported rather than discovered: an entry in the 33fl
   infra report reading phase 2's backlog gauge, or an alert,
@@ -1042,6 +1150,12 @@ chosen to defer to here, so that we do not forget them.
   claims carry the same argument and are not released until
   `Namespace.hard_delete()`. A faster sweep shortens that window but
   does not remove it. File it as its own issue.
+- **Drop `hard_delete()`'s per-call fallback.** Phase 3 moves the
+  batchable classes' `hard_delete()` onto the batch RPC and keeps a
+  fallback that calls the old per-table functions when sf-database
+  does not serve it (phase 3's D15). Once every supported
+  sf-database serves the RPC, the fallback and the per-table public
+  functions it alone calls can go.
 - **Retention policy.** If phase 1 shows the 30 second `*_op` delay
   or the hour for everything else is itself a cost, record it here
   rather than changing it in this plan.

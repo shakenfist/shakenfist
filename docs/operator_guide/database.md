@@ -989,8 +989,33 @@ default.
   (default `20`). Reading the sweep's work counts against it: no read
   starts once the budget is spent, and the next pass begins with the types
   this one did not reach. It caps the work rather than spending it, so a
-  pass with nothing to delete finishes at once. Lower it to reduce the
-  load the sweep puts on the database tier, at the cost of a slower drain.
+  pass with nothing to delete finishes at once. It is a ceiling for a slow
+  database tier rather than the way to set the drain rate.
+- **`DELETED_OBJECT_SWEEP_MAX_OBJECTS`** — the most objects one pass takes
+  (default `100`). With a pass every minute this is the drain rate knob:
+  raise it to drain a large backlog faster, watching the load on the
+  database tier as you do, and lower it to reduce that load. An object
+  taken is either hard deleted or found no longer eligible.
+- **`DELETED_OBJECT_BATCH_SIZE`** — how many objects of one type the sweep
+  takes at a time (default `25`, at most `1000`). Larger batches mean fewer
+  commits for the same number of objects, but longer transactions. The
+  sweep moves on to the next type with work after each batch.
+
+A pass is registered every 30 seconds but the cluster maintenance loop
+runs due jobs once a minute, so in practice a pass runs on every
+maintenance pass, once a minute.
+
+Twenty-five object types are hard deleted in batches, many to a single
+database transaction. The same RPC carries every other hard delete of
+those types too, such as a namespace's keys going with it, one
+transaction per object rather than one commit per table. Instances,
+namespaces, namespace claims and nodes are hard deleted one at a time,
+because their hard delete does more than remove rows keyed on the object
+(an instance releases its placement, and a namespace cascades to what it
+owns). An older `sf-database` which does not have the batch RPC still
+works: each daemon notices, logs a warning, and hard deletes one object
+at a time, asking again every five minutes. That is slower, which is why
+`sf-database` should be upgraded before `sf-cluster`.
 
 The sweep's work is a list of uuids per object type. Each list is a page
 of up to 500 uuids, read in primary key order with the age filter applied
@@ -1071,8 +1096,20 @@ object costs. All are published by the elected cluster maintainer only.
     entry was reached, so it was left alone.
   - `too_young`: the object is in a final state but has not yet been
     there for its grace period.
+  - `skipped`: an entry of a batch which was left alone. A batch checks
+    eligibility in the same transaction as the delete and cannot say
+    whether the object was gone, no longer in a final state or too young.
+    `gone`, `not_final` and `too_young` are therefore seen only for types
+    hard deleted one at a time.
   - `hard_deleted`: the object was hard deleted.
   - `failed`: an exception was raised, which costs only that one entry.
+  An entry of a batch is observed with an equal share of the batch's wall
+  time, so the counts and sums mean the same whichever way a type is
+  deleted.
+- **`cluster_deleted_object_batch_seconds`** — a histogram on the same
+  port, labelled by `object_type`: the wall time of each batch hard
+  delete call. Dividing the entries observed by the number of batches
+  gives the mean batch size.
 - **`database_client_rpc_seconds`** — a histogram from the shared
   database client, labelled by `sweep`, `object_type` and `operation`
   (the RPC name). It is observed only while a timing scope is active,
