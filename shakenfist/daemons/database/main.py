@@ -5798,19 +5798,23 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.GetClusterOperationTargetRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.GetClusterOperationTargetReply:
-        """Get a single cluster operation target by operation UUID."""
+        """Get the target rows of a cluster operation by operation UUID.
+
+        ``targets`` carries every row; ``target`` repeats the first of
+        them for clients which predate ``targets``.
+        """
         try:
             self.monitor.counters[
                 'get_cluster_operation_target'].inc()
-            data = (
-                mariadb._direct_get_cluster_operation_target(
-                    request.operation_uuid))
-            if data is None:
+            rows = mariadb._direct_get_cluster_operation_targets(
+                request.operation_uuid)
+            if not rows:
                 return database_pb2.GetClusterOperationTargetReply(
                     found=False)
             return database_pb2.GetClusterOperationTargetReply(
                 found=True,
-                target=self._target_to_proto(data))
+                target=self._target_to_proto(rows[0]),
+                targets=[self._target_to_proto(r) for r in rows])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database GetClusterOperationTarget failed',

@@ -83,6 +83,41 @@ def _namespace_for_target(target_object_type, target_uuid):
     return getattr(obj, 'namespace', None)
 
 
+# Why a caller outside the system namespace may not see an operation.
+HIDDEN_UNRECORDED = 'unrecorded'
+HIDDEN_CLUSTER_SCOPED = 'cluster-scoped'
+HIDDEN_FOREIGN = 'foreign'
+
+
+def _why_hidden(op_uuid, caller_namespace):
+    """Why ``caller_namespace`` may not see ``op_uuid``, or None if it may.
+
+    The caller must own every object the operation targets, so every
+    target row is read and the first that refuses decides. An operation
+    with no recorded target (written by a path that bypassed
+    ``enqueue_cluster_operation``, or whose target has since been hard
+    deleted, taking its rows with it) cannot be verified and is
+    HIDDEN_UNRECORDED. A target with no namespace, such as a blob, an
+    interface or a node, is HIDDEN_CLUSTER_SCOPED. A target another
+    namespace owns is HIDDEN_FOREIGN.
+
+    The single-operation endpoint used to read one row with no ORDER BY,
+    so for a multi-target operation the database's choice of row decided
+    the answer, and it admitted a target with no namespace.
+    """
+    targets = mariadb.get_cluster_operation_targets(op_uuid)
+    if not targets:
+        return HIDDEN_UNRECORDED
+    for target in targets:
+        target_namespace = _namespace_for_target(
+            target.target_object_type, target.target_uuid)
+        if target_namespace is None:
+            return HIDDEN_CLUSTER_SCOPED
+        if target_namespace != caller_namespace:
+            return HIDDEN_FOREIGN
+    return None
+
+
 def _hydrate_op(op_uuid):
     """Load a cluster operation by uuid, returning the dbo instance or None.
 
@@ -132,22 +167,24 @@ class ClusterOperationEndpoint(api_base.Resource):
         # operation_type / state / tasks. The leak is small (no
         # payload) but it lets a tenant probe cross-namespace
         # activity and confirm op uuids surfaced in error messages.
-        # Mirrors the gate in ``ClusterOperationChainEndpoint.get``
-        # below; we fail closed (403) for non-admins when the op has
-        # no recorded target, since cluster-scoped ancestors should
-        # not be exposed without proof of ownership.
+        # The same rule as ``ClusterOperationChainEndpoint.get`` below:
+        # the caller must own every target, and an operation with no
+        # recorded target, or one targeting an object with no namespace
+        # (a blob, an interface, a node), is refused.
         caller_namespace = request_namespace()
         if caller_namespace != 'system':
-            target = mariadb.get_cluster_operation_target(operation_uuid)
-            if target is None:
+            hidden = _why_hidden(operation_uuid, caller_namespace)
+            if hidden == HIDDEN_UNRECORDED:
                 return sf_api.error(
                     403,
                     'cluster operation has no recorded target; '
                     'namespace cannot be verified')
-            target_namespace = _namespace_for_target(
-                target.target_object_type, target.target_uuid)
-            if (target_namespace is not None and
-                    target_namespace != caller_namespace):
+            if hidden == HIDDEN_CLUSTER_SCOPED:
+                return sf_api.error(
+                    403,
+                    'cluster operation targets a cluster-scoped object '
+                    'you cannot see')
+            if hidden == HIDDEN_FOREIGN:
                 return sf_api.error(
                     403,
                     'cluster operation belongs to a foreign namespace')
@@ -209,7 +246,7 @@ class ClusterOperationChainEndpoint(api_base.Resource):
 
             # Namespace check: every visited op must be in the caller's
             # namespace (or the caller must be admin). We resolve the
-            # op's namespace via its cluster_operation_targets row.
+            # op's namespace via its cluster_operation_targets rows.
             #
             # If no target row exists (older ops written before the
             # target table existed, or ops created by a code path that
@@ -219,21 +256,18 @@ class ClusterOperationChainEndpoint(api_base.Resource):
             # exposing the chain regardless would leak cluster-scoped
             # ancestor uuids.
             if not is_admin:
-                target = mariadb.get_cluster_operation_target(current_uuid)
-                if target is None:
+                hidden = _why_hidden(current_uuid, caller_namespace)
+                if hidden == HIDDEN_UNRECORDED:
                     return sf_api.error(
                         403,
                         'cluster operation chain includes an op with no '
                         'recorded target; namespace cannot be verified')
-                target_namespace = _namespace_for_target(
-                    target.target_object_type, target.target_uuid)
-                if (target_namespace is not None and
-                        target_namespace != caller_namespace):
+                if hidden == HIDDEN_FOREIGN:
                     return sf_api.error(
                         403,
                         'cluster operation chain crosses into a '
                         'namespace you cannot see')
-                if target_namespace is None:
+                if hidden == HIDDEN_CLUSTER_SCOPED:
                     # Cluster-scoped target (e.g. node, blob) -- only
                     # admins can see ops touching these.
                     return sf_api.error(

@@ -1008,6 +1008,13 @@ class MockMariaDB():
         self.test_obj.addCleanup(
             self.mariadb_get_cluster_operation_target.stop)
 
+        self.mariadb_get_cluster_operation_targets = mock.patch(
+            'shakenfist.mariadb.get_cluster_operation_targets',
+            side_effect=self._mariadb_get_cluster_operation_targets)
+        self.mariadb_get_cluster_operation_targets.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_cluster_operation_targets.stop)
+
         self.mariadb_get_cluster_operation_targets_for_object = mock.patch(
             'shakenfist.mariadb.get_cluster_operation_targets_for_object',
             side_effect=self._mariadb_get_cluster_operation_targets_for_object)
@@ -3503,11 +3510,16 @@ class MockMariaDB():
         this is called by the create_and_enqueue mock and by tests that
         need to seed rows directly. ``observational`` defaults to False,
         the column's server default.
+
+        The store is keyed as the real table's UNIQUE constraint is, on
+        (operation_uuid, target_object_type, target_uuid), so an
+        operation with several declared targets holds several rows.
         """
         from shakenfist.schema.cluster_operation_target import (
             ClusterOperationTargetData)
 
-        if operation_uuid in self.cluster_operation_targets:
+        key = (operation_uuid, str(target_object_type), target_uuid)
+        if key in self.cluster_operation_targets:
             # Keep the first row, as the real UNIQUE constraint does.
             self._trace(
                 f'MockMariaDB.seed_cluster_operation_target'
@@ -3515,7 +3527,7 @@ class MockMariaDB():
             return True
 
         seq = next(self._cot_sequence)
-        self.cluster_operation_targets[operation_uuid] = (
+        self.cluster_operation_targets[key] = (
             ClusterOperationTargetData(
                 operation_uuid=operation_uuid,
                 operation_type=str(operation_type),
@@ -3530,15 +3542,31 @@ class MockMariaDB():
             f'({operation_uuid}): created seq={seq}')
         return True
 
+    def get_cluster_operation_targets(self, operation_uuid):
+        """Every target row of an operation, in sequence order."""
+        rows = [
+            d for d in self.cluster_operation_targets.values()
+            if d.operation_uuid == operation_uuid]
+        rows.sort(key=lambda d: d.sequence_number or 0)
+        return rows
+
+    def _mariadb_get_cluster_operation_targets(self, operation_uuid):
+        """Mock implementation of mariadb.get_cluster_operation_targets()"""
+        rows = self.get_cluster_operation_targets(operation_uuid)
+        self._trace(
+            f'MockMariaDB.get_cluster_operation_targets'
+            f'({operation_uuid}): {len(rows)} found')
+        return rows
+
     def _mariadb_get_cluster_operation_target(
             self, operation_uuid):
         """Mock implementation of mariadb.get_cluster_operation_target()"""
-        data = self.cluster_operation_targets.get(operation_uuid)
+        rows = self.get_cluster_operation_targets(operation_uuid)
         self._trace(
             f'MockMariaDB.get_cluster_operation_target'
             f'({operation_uuid}): '
-            f'{"found" if data else "not found"}')
-        return data
+            f'{"found" if rows else "not found"}')
+        return rows[0] if rows else None
 
     def _cot_is_pending(self, d):
         """True if the operation behind a target row is queued, in preflight
@@ -3594,8 +3622,11 @@ class MockMariaDB():
     def _mariadb_delete_cluster_operation_target(
             self, operation_uuid):
         """Mock implementation of mariadb.delete_cluster_operation_target()"""
-        if operation_uuid in self.cluster_operation_targets:
-            del self.cluster_operation_targets[operation_uuid]
+        keys = [k for k in self.cluster_operation_targets
+                if k[0] == operation_uuid]
+        if keys:
+            for k in keys:
+                del self.cluster_operation_targets[k]
             self._trace(
                 f'MockMariaDB.delete_cluster_operation_target'
                 f'({operation_uuid}): deleted')

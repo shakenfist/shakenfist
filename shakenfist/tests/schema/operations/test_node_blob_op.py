@@ -139,8 +139,9 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
         )
 
         # And the resulting cluster_operation_targets row names the blob
-        target = self.mock_mariadb.cluster_operation_targets.get(op_uuid)
-        self.assertIsNotNone(target)
+        targets = self.mock_mariadb.get_cluster_operation_targets(op_uuid)
+        self.assertEqual(1, len(targets))
+        target = targets[0]
         self.assertEqual('node_blob_op', target.operation_type)
         self.assertEqual('blob', target.target_object_type)
         self.assertEqual(blob_uuid, target.target_uuid)

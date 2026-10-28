@@ -50,6 +50,10 @@ a bounded window onto recent work and not a history.
       Retrieve a single cluster operation by its type and uuid. This is the
       polling endpoint a client uses to wait for an asynchronous operation
       (returned in the body of a 202 response) to reach a terminal state.
+      Namespace-scoped: a non-admin caller must own every object the
+      operation targets, and receives HTTP 403 for an operation which
+      targets an object in another namespace, an object with no namespace
+      (a blob, an interface or a node), or no recorded object at all.
     * [GET /clusteroperations/{op_uuid}/chain](https://openapi.shakenfist.com/#/clusteroperations/get_clusteroperations__op_uuid__chain):
       Return the transitive `depends_on` ancestor closure for an operation,
       ordered newest-first. Useful for tracing which step in a chained
