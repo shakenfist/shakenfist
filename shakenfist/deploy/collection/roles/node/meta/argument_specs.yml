@@ -211,9 +211,11 @@ argument_specs:
             SHAKENFIST_KERBSIDE_URL on every node when set; empty, the
             default, leaves the proxied-console integration off and makes
             the kerbside_preflight and kerbside_credentials entry points do
-            nothing. The value is used verbatim as the console token
-            audience, so it must equal the Kerbside deployment's
-            SF_CONSOLE_TOKEN_AUDIENCE exactly.
+            nothing. The value, without a trailing slash, is the console
+            token audience, so it must equal the Kerbside deployment's
+            SF_CONSOLE_TOKEN_AUDIENCE exactly; the cluster shape play
+            refuses a value which ends in a slash, or which differs between
+            Shaken Fist's nodes.
           - >-
             When set, kerbside_credentials ensures the console token signing
             key exists with sf-ctl ensure-kerbside-signing-key, and

@@ -161,6 +161,44 @@
           No database-tier node answered this deploy. At least one must be
           reachable to bootstrap and serve the cluster database.
 
+    # kerbside_url is rendered as KERBSIDE_URL on every Shaken Fist node, and
+    # it is the audience Kerbside accepts on a console token, whether this
+    # playbook deploys Kerbside or an operator brought their own. So every
+    # node must see one value, and that value must be the audience byte for
+    # byte: sf-api strips a trailing slash before it mints the audience, and
+    # Kerbside takes the value verbatim, so a kerbside_url ending in a slash
+    # passes every other check and then fails every exchange. Both are judged
+    # here, before any host is changed, from the inventory alone. URLs are not
+    # secrets, so the messages name the values.
+    - name: Fail if a Shaken Fist node sees kerbside_url differently from the first
+      ansible.builtin.assert:
+        that: kerbside_url_on_this_sf_node == kerbside_url_on_first_sf_node
+        fail_msg: >-
+          {{ item }} sees kerbside_url as
+          {{ kerbside_url_on_this_sf_node | default('nothing', true) }}, but
+          {{ groups['allsf'][0] }} sees
+          {{ kerbside_url_on_first_sf_node | default('nothing', true) }}.
+          Every node renders it as KERBSIDE_URL, and it is Kerbside's token
+          audience, so set it once, where every allsf host reads it, for
+          example in group_vars/all.
+        quiet: true
+      loop: "{{ groups['allsf'] }}"
+      vars:
+        kerbside_url_on_this_sf_node: "{{ hostvars[item].kerbside_url | default('') | string }}"
+        kerbside_url_on_first_sf_node: "{{ hostvars[groups['allsf'][0]].kerbside_url | default('') | string }}"
+
+    - name: Fail if kerbside_url ends in a slash
+      ansible.builtin.assert:
+        that: not kerbside_url_on_first_sf_node.endswith('/')
+        fail_msg: >-
+          kerbside_url is {{ kerbside_url_on_first_sf_node }}, which ends in a
+          slash. sf-api mints console tokens for the audience without it, and
+          Kerbside accepts the value as written, so every token would be
+          refused. Remove the trailing slash.
+        quiet: true
+      vars:
+        kerbside_url_on_first_sf_node: "{{ hostvars[groups['allsf'][0]].kerbside_url | default('') | string }}"
+
 
 # ---------------------------------------------------------------------------
 # Refuse a Kerbside configuration which cannot work, before any host is

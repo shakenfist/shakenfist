@@ -210,7 +210,7 @@ when the `kerbside` group has members.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `kerbside_url` | `""` | Kerbside's base URL, rendered into `/etc/sf/config` and used as the token audience. When set, the deploy ensures the console token signing key exists before any daemon restarts. |
+| `kerbside_url` | `""` | Kerbside's base URL, with no trailing slash, rendered into `/etc/sf/config` and used as the token audience. When set, the deploy ensures the console token signing key exists before any daemon restarts. |
 | `kerbside_token_duration` | `300` | Lifetime in seconds of a minted console token. Must be positive. |
 | `kerbside_system_key` | `""` | The key Kerbside authenticates with, minted as the `kerbside` key in the system namespace on every deploy. A secret; requires `kerbside_url`, at least 16 characters, different from `system_key`. |
 
