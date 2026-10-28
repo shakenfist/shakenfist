@@ -4074,11 +4074,14 @@ class MockMariaDB():
                 return False
         return True
 
-    def _work_queue_row_references_op(self, op_uuid):
+    def _work_queue_row_references_op(self, op_uuid, due_by=None):
         """Mirror of mariadb._work_queue_references_op_clause."""
         for row in self.work_queue_store:
-            if (row.get('payload') or {}).get('operation_uuid') == op_uuid:
-                return True
+            if (row.get('payload') or {}).get('operation_uuid') != op_uuid:
+                continue
+            if due_by is not None and row.get('scheduled_at', 0.0) > due_by:
+                continue
+            return True
         return False
 
     def _mariadb_list_orphaned_cluster_operations(self, threshold_seconds):
@@ -4157,8 +4160,13 @@ class MockMariaDB():
                 continue
             # Mirrors the real query's work_queue EXISTS guard: an op
             # with no work_queue row can never run, so it is never
-            # reused (issue 4303).
-            if not self._work_queue_row_references_op(op_uuid):
+            # reused (issue 4303), and one whose row is scheduled past
+            # the adoption margin is backing off, so it is not reused
+            # either (#4643).
+            if not self._work_queue_row_references_op(
+                    op_uuid,
+                    due_by=(time.time()
+                            + mariadb.COALESCIBLE_ADOPT_SCHEDULE_MARGIN_SECONDS)):
                 continue
             candidates.append(
                 (op_row.get('created_at', 0.0), op_uuid))

@@ -700,6 +700,22 @@ on an operation which has already been dequeued, so a survivor at any
 priority is about to do the work immediately; the queue a folded
 sibling was sitting on no longer matters.
 
+### The enqueue-side dedup will not adopt an op which is backing off
+
+Nor will it adopt a queued op whose `work_queue` row is scheduled
+more than `COALESCIBLE_ADOPT_SCHEDULE_MARGIN_SECONDS` into the
+future. A queued op with a row due later than that is backing off
+after a defer: it is still live, so the orphan guard above does not
+exclude it, but adopting it hands the caller the 15, 30 or 60 second
+delay the defer asked for, and the spent `defer_count` with it, when
+a fresh op would have run at once (#4643). The margin is the
+dispatcher's idle poll, `IDLE_POLL_MAX_SECONDS`, because a row due
+within it runs no later than a fresh row would. Nothing is lost
+either way: if the lookup declines, a new op is inserted, and the
+worker-side fold catches the duplicate once both are dequeued. The
+orphan reaper passes no bound, because a row scheduled for later is
+still a row.
+
 ### Both guards are key-aware *and* family-aware
 
 `cluster_operations` has no queue column, so the key is the only

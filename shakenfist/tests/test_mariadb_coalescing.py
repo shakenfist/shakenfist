@@ -43,6 +43,7 @@ from unittest import mock
 import grpc
 import sqlalchemy as sa
 
+from shakenfist.daemons import daemon
 from shakenfist.daemons.database import main as database_main
 from shakenfist.daemons.network import maintain as network_maintain
 from shakenfist.daemons.network import workitem as network_workitem
@@ -93,7 +94,8 @@ class CoalescingTables(dbfixture.MariaDBTableFixture):
 
     def _insert_op(self, conn, op_uuid, tasks=(TASK,), state='queued',
                    created_at=100.0, node_uuid=None,
-                   priority='user_facing', with_work_queue_row=True):
+                   priority='user_facing', with_work_queue_row=True,
+                   scheduled_at=None):
         """Insert one cluster operation and its state row.
 
         The two rows deliberately go in the way production writes them:
@@ -108,6 +110,10 @@ class CoalescingTables(dbfixture.MariaDBTableFixture):
         ``node_uuid`` defaults to ``None`` -- a cluster-wide op -- so
         every caller written before the multi-column key still gets the
         same row it always did.
+
+        ``scheduled_at`` defaults to ``created_at``, which is what the
+        enqueue writes; a defer writes a later time, which is the shape
+        the backing-off tests need.
         """
         ops = mariadb._get_cluster_operations_table()
         states = mariadb._get_object_states_table()
@@ -133,7 +139,8 @@ class CoalescingTables(dbfixture.MariaDBTableFixture):
             conn.execute(sa.insert(work_queue).values(
                 id=self._work_queue_id,
                 queue_name='networknode-net-user_facing',
-                scheduled_at=created_at,
+                scheduled_at=(created_at if scheduled_at is None
+                              else scheduled_at),
                 claimed_at=None,
                 claimed_by=None,
                 attempts=0,
@@ -228,6 +235,69 @@ class CoalescingSQLTestCase(CoalescingTables, base.ShakenFistTestCase):
             SIBLING_UUID,
             mariadb._direct_find_existing_coalescible_op(
                 'net_op', [('network_uuid', NETWORK_UUID)], TASK))
+
+    @mock.patch('shakenfist.mariadb.time.time', return_value=1000.0)
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_ignores_an_op_which_is_backing_off(
+            self, mock_get_engine, mock_time):
+        # Issue #4643: the op is queued and its work_queue row is there,
+        # but a defer scheduled that row thirty seconds out. Adopting it
+        # would hand the caller that delay when a fresh op would run at
+        # once.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, scheduled_at=1030.0)
+            conn.commit()
+
+        self.assertIsNone(
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
+
+    @mock.patch('shakenfist.mariadb.time.time', return_value=1000.0)
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_adopts_an_op_due_within_the_margin(
+            self, mock_get_engine, mock_time):
+        # A row due inside the dispatcher's idle poll runs no later than
+        # a fresh one would, so it is still worth adopting.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        margin = mariadb.COALESCIBLE_ADOPT_SCHEDULE_MARGIN_SECONDS
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID,
+                            scheduled_at=1000.0 + margin / 2)
+            conn.commit()
+
+        self.assertEqual(
+            SIBLING_UUID,
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
+
+    @mock.patch('shakenfist.mariadb.time.time', return_value=1000.0)
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_skips_a_backing_off_op_for_a_due_sibling(
+            self, mock_get_engine, mock_time):
+        # Oldest first still holds among the ops which are due: the
+        # older op is backing off, so the newer, due one is adopted.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SURVIVOR_UUID, created_at=50.0,
+                            scheduled_at=1060.0)
+            self._insert_op(conn, SIBLING_UUID, created_at=150.0)
+            conn.commit()
+
+        self.assertEqual(
+            SIBLING_UUID,
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
+
+    def test_the_adoption_margin_is_the_idle_poll(self):
+        # The two constants are kept equal by hand because daemon.py
+        # imports mariadb.py; this is what stops them drifting.
+        self.assertEqual(
+            daemon.IDLE_POLL_MAX_SECONDS,
+            mariadb.COALESCIBLE_ADOPT_SCHEDULE_MARGIN_SECONDS)
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_find_existing_ignores_a_non_queued_op(self, mock_get_engine):

@@ -23640,6 +23640,16 @@ def _direct_work_queue_delete_row(row_id: int) -> bool:
 _COALESCIBLE_TARGET_COLUMNS = frozenset({
     'network_uuid', 'instance_uuid', 'node_uuid'})
 
+# How far into the future a queued operation's work_queue row may be
+# scheduled and still be adopted by the enqueue-side dedup. A row due
+# within the dispatcher's idle poll runs no later than a fresh row would,
+# so adopting it costs nothing; a row due later than that is backing off
+# after a defer, and adopting it hands the caller that delay and the
+# spent defer_count with it (#4643). Kept equal to IDLE_POLL_MAX_SECONDS
+# in shakenfist/daemons/daemon.py by hand, because that module imports
+# this one; a test in test_mariadb_coalescing.py holds the two together.
+COALESCIBLE_ADOPT_SCHEDULE_MARGIN_SECONDS = 2.0
+
 
 def _coalescible_key_description(
         keys: 'list[tuple[str, Optional[str]]]') -> str:
@@ -23792,7 +23802,8 @@ def _coalescible_key_clause(
     return key_column == value
 
 
-def _work_queue_references_op_clause(dashed_op_uuid: Any) -> Any:
+def _work_queue_references_op_clause(
+        dashed_op_uuid: Any, due_by: Optional[float] = None) -> Any:
     """An EXISTS predicate: some work_queue row references this op.
 
     Every live cluster operation is referenced by exactly one
@@ -23808,13 +23819,24 @@ def _work_queue_references_op_clause(dashed_op_uuid: Any) -> Any:
     unchanged; a query with only cluster_operations in scope would
     pass ``_dashed_uuid_expr(cluster_operations.uuid)``, because that
     column is undashed CHAR(32).
+
+    With ``due_by``, a unix timestamp, the row must also be scheduled
+    to run by then. The enqueue-side dedup passes one so it does not
+    adopt an operation whose row is backing off into the future
+    (#4643); the orphan reaper passes none, because a row scheduled for
+    later is still a row, and the operation it references is not
+    stranded. ``scheduled_at`` is written from the enqueuing process's
+    clock, so the bound is compared on that clock too rather than the
+    database's.
     """
     work_queue_table = _get_work_queue_table()
-    return sa.exists(
-        sa.select(work_queue_table.c.id).where(
-            sa.func.json_unquote(sa.func.json_extract(
-                work_queue_table.c.payload, '$.operation_uuid'))
-            == dashed_op_uuid))
+    stmt = sa.select(work_queue_table.c.id).where(
+        sa.func.json_unquote(sa.func.json_extract(
+            work_queue_table.c.payload, '$.operation_uuid'))
+        == dashed_op_uuid)
+    if due_by is not None:
+        stmt = stmt.where(work_queue_table.c.scheduled_at <= due_by)
+    return sa.exists(stmt)
 
 
 def _direct_find_existing_coalescible_op(
@@ -23835,6 +23857,11 @@ def _direct_find_existing_coalescible_op(
     * is currently in state ``queued`` (not yet picked up)
     * is still referenced by a work_queue row, so a dispatcher can
       actually run it -- see ``_work_queue_references_op_clause``
+    * has that row due now, or within
+      ``COALESCIBLE_ADOPT_SCHEDULE_MARGIN_SECONDS``. A row scheduled
+      further out is backing off after a defer; adopting the operation
+      would hand the caller that delay, and the spent ``defer_count``
+      with it, when a fresh operation would run at once (#4643)
     * carries one of ``priorities``, when the caller supplies them
 
     ``priorities`` holds ``PRIORITY`` member names and exists because
@@ -23910,8 +23937,16 @@ def _direct_find_existing_coalescible_op(
                 # errors the dead op out separately. The joined states
                 # row already carries the dashed uuid the payload
                 # stores, so no per-row transformation is needed.
+                #
+                # Nor adopt an op which is backing off: its row is
+                # there, but scheduled into the future by a defer, and
+                # a caller which adopts it waits out that delay when a
+                # fresh op would run at once (#4643). The dedup is an
+                # optimisation; the fold catches the duplicate later.
                 .where(_work_queue_references_op_clause(
-                    states_table.c.object_uuid))
+                    states_table.c.object_uuid,
+                    due_by=(time.time()
+                            + COALESCIBLE_ADOPT_SCHEDULE_MARGIN_SECONDS)))
                 .order_by(cluster_ops_table.c.created_at.asc())
                 .limit(1)
             )
