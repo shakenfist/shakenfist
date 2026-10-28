@@ -5317,7 +5317,8 @@ def _direct_get_cluster_operation_target(
 def _direct_get_cluster_operation_targets_for_object(
     target_object_type: ObjectType,
     target_uuid: str,
-    pending_only: bool = False
+    pending_only: bool = False,
+    raise_on_error: bool = False
 ) -> list[ClusterOperationTargetData]:
     """Get cluster operation targets for an object, ordered by sequence.
 
@@ -5325,6 +5326,12 @@ def _direct_get_cluster_operation_targets_for_object(
     With pending_only, only targets whose operation is in flight are
     returned, judged by the same object_states join as
     _direct_has_pending_cluster_operation_target.
+
+    A failed read returns no rows, unless raise_on_error, when it raises
+    DatabaseUnavailable. A caller which acts on the absence of rows, as
+    the instance delete does when it cancels what targets the instance,
+    must ask for the exception: an empty answer it cannot tell from
+    "nothing outstanding" is a fail-open.
     """
     engine = _get_engine()
     table = _get_cluster_operation_targets_table()
@@ -5363,6 +5370,10 @@ def _direct_get_cluster_operation_targets_for_object(
                 for r in results
             ]
     except OperationalError as e:
+        if raise_on_error:
+            raise exceptions.DatabaseUnavailable(
+                f'MariaDB read failed for cluster_operation_targets '
+                f'{target_object_type}/{target_uuid}: {e}') from e
         LOG.warning(
             f'MariaDB read failed for cluster_operation_targets '
             f'{target_object_type}/{target_uuid}: {e}')
@@ -5371,12 +5382,17 @@ def _direct_get_cluster_operation_targets_for_object(
 
 def _direct_get_latest_cluster_operation_target(
     target_object_type: ObjectType,
-    target_uuid: str
+    target_uuid: str,
+    raise_on_error: bool = False
 ) -> Optional[ClusterOperationTargetData]:
     """Get the most recent mutating cluster operation target for an object.
 
     Observational operations are excluded, so a background sweep cannot
     shadow the mutating operation a caller is waiting on.
+
+    A failed read returns None, unless raise_on_error, when it raises
+    DatabaseUnavailable, for the same reason as
+    _direct_get_cluster_operation_targets_for_object.
     """
     engine = _get_engine()
     table = _get_cluster_operation_targets_table()
@@ -5406,6 +5422,10 @@ def _direct_get_latest_cluster_operation_target(
                 observational=result.observational
             )
     except OperationalError as e:
+        if raise_on_error:
+            raise exceptions.DatabaseUnavailable(
+                f'MariaDB read failed for cluster_operation_targets '
+                f'{target_object_type}/{target_uuid}: {e}') from e
         LOG.warning(
             f'MariaDB read failed for cluster_operation_targets '
             f'{target_object_type}/{target_uuid}: {e}')
@@ -5677,7 +5697,8 @@ def _grpc_get_cluster_operation_target(
 def _grpc_get_cluster_operation_targets_for_object(
     target_object_type: ObjectType,
     target_uuid: str,
-    pending_only: bool = False
+    pending_only: bool = False,
+    raise_on_error: bool = False
 ) -> list[ClusterOperationTargetData]:
     """Get cluster operation targets for an object via gRPC."""
     try:
@@ -5692,6 +5713,10 @@ def _grpc_get_cluster_operation_targets_for_object(
         reply = _grpc_call(stub.GetClusterOperationTargetsForObject, request)
         return [_target_from_proto(t) for t in reply.targets]
     except grpc.RpcError as e:
+        if raise_on_error:
+            raise exceptions.DatabaseUnavailable(
+                f'gRPC GetClusterOperationTargetsForObject failed for '
+                f'{target_object_type}/{target_uuid}: {e}') from e
         LOG.error(
             f'gRPC GetClusterOperationTargetsForObject failed for '
             f'{target_object_type}/{target_uuid}: {e}')
@@ -5700,7 +5725,8 @@ def _grpc_get_cluster_operation_targets_for_object(
 
 def _grpc_get_latest_cluster_operation_target(
     target_object_type: ObjectType,
-    target_uuid: str
+    target_uuid: str,
+    raise_on_error: bool = False
 ) -> Optional[ClusterOperationTargetData]:
     """Get the most recent cluster operation target via gRPC."""
     try:
@@ -5716,6 +5742,10 @@ def _grpc_get_latest_cluster_operation_target(
             return None
         return _target_from_proto(reply.target)
     except grpc.RpcError as e:
+        if raise_on_error:
+            raise exceptions.DatabaseUnavailable(
+                f'gRPC GetLatestClusterOperationTarget failed for '
+                f'{target_object_type}/{target_uuid}: {e}') from e
         LOG.error(
             f'gRPC GetLatestClusterOperationTarget failed for '
             f'{target_object_type}/{target_uuid}: {e}')
@@ -5869,7 +5899,8 @@ def get_cluster_operation_target(
 def get_cluster_operation_targets_for_object(
     target_object_type: ObjectType,
     target_uuid: str,
-    pending_only: bool = False
+    pending_only: bool = False,
+    raise_on_error: bool = False
 ) -> list[ClusterOperationTargetData]:
     """Get cluster operation targets for an object, ordered by sequence.
 
@@ -5879,33 +5910,41 @@ def get_cluster_operation_targets_for_object(
     sf-database older than the field ignores it and returns every row, so
     callers must still check each operation's state.
 
+    A failed read returns no rows, which a caller cannot tell from an
+    object with nothing outstanding. A caller which acts on that absence
+    passes raise_on_error and gets DatabaseUnavailable instead.
+
     Returns:
         List of target data ordered by sequence_number ascending.
     """
     if _use_database_service():
         return _grpc_get_cluster_operation_targets_for_object(
-            target_object_type, target_uuid, pending_only)
+            target_object_type, target_uuid, pending_only, raise_on_error)
     return _direct_get_cluster_operation_targets_for_object(
-        target_object_type, target_uuid, pending_only)
+        target_object_type, target_uuid, pending_only, raise_on_error)
 
 
 def get_latest_cluster_operation_target(
     target_object_type: ObjectType,
-    target_uuid: str
+    target_uuid: str,
+    raise_on_error: bool = False
 ) -> Optional[ClusterOperationTargetData]:
     """Get the most recent mutating cluster operation target for an object.
 
     Observational operations (every task only observes the target) are
     excluded, so a background sweep cannot shadow last_cluster_operation.
 
+    A failed read returns None, or raises DatabaseUnavailable with
+    raise_on_error, as get_cluster_operation_targets_for_object does.
+
     Returns:
         The most recent mutating target data, or None if there is none.
     """
     if _use_database_service():
         return _grpc_get_latest_cluster_operation_target(
-            target_object_type, target_uuid)
+            target_object_type, target_uuid, raise_on_error)
     return _direct_get_latest_cluster_operation_target(
-        target_object_type, target_uuid)
+        target_object_type, target_uuid, raise_on_error)
 
 
 def has_pending_cluster_operation_target(

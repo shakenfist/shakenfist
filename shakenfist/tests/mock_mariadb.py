@@ -3576,7 +3576,8 @@ class MockMariaDB():
         return bool(state and state['state_value'] in ACTIVE_OPERATION_STATES)
 
     def _mariadb_get_cluster_operation_targets_for_object(
-            self, target_object_type, target_uuid, pending_only=False):
+            self, target_object_type, target_uuid, pending_only=False,
+            raise_on_error=False):
         """Mock implementation of mariadb.get_cluster_operation_targets_for_object()"""
         results = [
             d for d in self.cluster_operation_targets.values()
@@ -3592,7 +3593,7 @@ class MockMariaDB():
         return results
 
     def _mariadb_get_latest_cluster_operation_target(
-            self, target_object_type, target_uuid):
+            self, target_object_type, target_uuid, raise_on_error=False):
         """Mock implementation of mariadb.get_latest_cluster_operation_target()
 
         Skips observational rows, as the real query does.

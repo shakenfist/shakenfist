@@ -807,10 +807,21 @@ class TargetedOperation(NamedTuple):
 class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
     @property
     def last_cluster_operation(self):
+        return self.latest_cluster_operation()
+
+    def latest_cluster_operation(self, raise_on_error: bool = False):
+        """The newest mutating operation targeting this object, as a
+        ``{'op_type': ..., 'op_uuid': ...}`` pointer, or None.
+
+        ``last_cluster_operation`` is this with the default. A read that
+        fails answers None, which a caller cannot tell from "nothing has
+        ever targeted this object"; a caller which acts on None passes
+        raise_on_error and gets DatabaseUnavailable instead.
+        """
         if self.in_memory_only:
             return None
         latest = mariadb.get_latest_cluster_operation_target(
-            self.object_type, str(self.uuid))
+            self.object_type, str(self.uuid), raise_on_error=raise_on_error)
         if latest is not None:
             return {
                 'op_type': latest.operation_type,
@@ -832,7 +843,8 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
             self.object_type, str(self.uuid))
 
     def get_cluster_operations(
-            self, outstanding_only: bool = True) -> list[TargetedOperation]:
+            self, outstanding_only: bool = True,
+            raise_on_error: bool = False) -> list[TargetedOperation]:
         """Every cluster operation which targets this object, newest first.
 
         Each operation is paired with the observational flag stored on its
@@ -840,12 +852,18 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
         what they depend on or run after is not followed, so an op on a
         network that an instance op waits for is in the network's list and
         not the instance's.
+
+        A listing that cannot be read is empty, which a reader cannot tell
+        from an object with nothing outstanding. A caller which acts on
+        that emptiness, as the instance delete does, passes raise_on_error
+        and gets DatabaseUnavailable instead.
         """
         if self.in_memory_only:
             return []
 
         rows = mariadb.get_cluster_operation_targets_for_object(
-            self.object_type, str(self.uuid), pending_only=outstanding_only)
+            self.object_type, str(self.uuid), pending_only=outstanding_only,
+            raise_on_error=raise_on_error)
 
         # All ``from_db`` lookups here are best-effort: an op can be
         # hard-deleted between when we read its target row and when we
