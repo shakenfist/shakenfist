@@ -454,6 +454,22 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
         self.assertEqual(None, resp.get_json())
         self.assertEqual(200, resp.status_code)
 
+    def test_delete_instance_unreadable_operations_is_503(self):
+        # The delete refuses to enqueue when the operations targeting the
+        # instance cannot be read (issue 4671), and the client retries.
+        self.mock_mariadb.create_instance('banana')
+        with mock.patch('shakenfist.instance.Instance.enqueue_delete',
+                        side_effect=exceptions.DatabaseUnavailable('boom')) \
+                as enqueue_delete:
+            resp = self.client.delete(
+                '/instances/12345678-1234-4321-8234-000000000001',
+                headers={'Authorization': self.auth_token})
+
+        self.assertEqual(503, resp.status_code)
+        self.assertEqual('database unavailable, please retry',
+                         resp.get_json()['error'])
+        enqueue_delete.assert_called_once_with()
+
     def test_delete_network_metadata(self):
         self.mock_mariadb.create_network('banana', namespace='foo',
                                          metadata={'foo': 'bar', 'real': 'smart'})
@@ -545,6 +561,37 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                           '847b0327-9b17-4148-b4ed-be72b6722c17'],
                          resp.get_json())
         self.assertEqual(200, resp.status_code)
+
+    @mock.patch('shakenfist.mariadb.enqueue_work_item')
+    @mock.patch('shakenfist.instance.Instances',
+                return_value=[
+                    FakeInstance(
+                        namespace='system',
+                        uuid='6a973b82-31b3-4780-93e4-04d99ae49f3f',
+                        state=[dbo.STATE_CREATED]),
+                    FakeInstance(
+                        namespace='system',
+                        uuid='847b0327-9b17-4148-b4ed-be72b6722c17',
+                        state=[dbo.STATE_CREATED])])
+    @mock.patch('shakenfist.locks.ClusterLock')
+    def test_delete_all_instances_stops_at_unreadable_operations(
+            self, mock_db_get_lock, mock_get_instances, mock_enqueue):
+        # The second instance's outstanding operations cannot be read, so
+        # its delete is refused (issue 4671). The first delete stands, and
+        # the caller is told to retry.
+        with mock.patch.object(
+                FakeInstance, 'enqueue_delete',
+                side_effect=[None, exceptions.DatabaseUnavailable('boom')]) \
+                as enqueue_delete:
+            resp = self.client.delete('/instances',
+                                      headers={'Authorization': self.auth_token},
+                                      data=json.dumps({
+                                          'confirm': True,
+                                          'namespace': 'system'
+                                      }))
+
+        self.assertEqual(503, resp.status_code)
+        self.assertEqual(2, enqueue_delete.call_count)
 
     def test_post_instance_no_disk(self):
         # `disk` is sent as an explicit null here, and `disk` is
