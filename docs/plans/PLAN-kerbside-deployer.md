@@ -567,7 +567,7 @@ spelling above is the one to write.
 | 4. A merge-queue lane with the feature on | [PLAN-kerbside-deployer-phase-04-ci.md](PLAN-kerbside-deployer-phase-04-ci.md) | Complete | `0016c5dad` (#4479) |
 | 5. The `kerbside` role moves into Kerbside, and Kerbside's sf-e2e lane deploys through it | [PLAN-kerbside-deployer-phase-05-role-to-kerbside.md](PLAN-kerbside-deployer-phase-05-role-to-kerbside.md) | Complete | `48849831c` (#4591); kerbside `2093f2ed5` (#580), `89f199456` (#587); actions `17ea1889e` (#181), `31139125c` (#195) |
 | 6. Documentation and close-out | [PLAN-kerbside-deployer-phase-06-docs.md](PLAN-kerbside-deployer-phase-06-docs.md) | Complete | `54fed79bcf` (#4616); kerbside `ea44e9364` (#592) |
-| 7. Push audit | PLAN-kerbside-deployer-phase-07-push-audit.md | Proposed | — |
+| 7. Push audit | [PLAN-kerbside-deployer-phase-07-push-audit.md](PLAN-kerbside-deployer-phase-07-push-audit.md) | In progress | — |
 
 The `Merged` column records what put each phase on `develop`: the
 merge commit of its pull request, or an explicit `first..last`
@@ -957,12 +957,26 @@ Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in
 this plan, not over the last phase alone. The phases here touch
 the same files from different directions:
 
-- phases 1 and 3 both edit `site.yml`'s certificate plays;
+- phases 2 to 5 all edit `site.yml`'s Kerbside plays, and phase 5
+  rewrote most of what phase 3 added there when the role moved;
+- phase 1 taught `internal_ca` to issue a certificate to any host,
+  and phase 3 was its first caller outside `allsf`;
 - phases 2 and 3 both decide what happens when `kerbside_url` is
   set and the group is empty.
 
 That interaction is exactly where the tokens plan's three
 "feature-off" defects lived.
+
+Planning this phase found that none of the five pull requests
+which landed phases 5 and 6 in Kerbside and actions was audited
+there, so there is no audit to cite and the phase reads those
+five ranges too, under their own runbooks. It also found that
+#4653 moved the Kerbside lane from the merge queue to the weekly
+run on 2026-10-25, which falsifies the success criterion below
+that names the merge queue, and that #4598, a `401 invalid token
+signature` from Kerbside inside the lane, is open and undiagnosed.
+The phase plan records the survey, and the audit reads the
+signing-key seam with #4598 in hand. Planned at medium effort.
 
 By the time this phase runs, its predecessors will have merged,
 and a diff against `develop` would be empty and read as clean.
@@ -1053,8 +1067,8 @@ codebase, can be planned at medium effort.
 !!! note "In this project"
 
     Phases 1 to 5 are planned at high effort, for the reasons
-    given in each phase's section. Phase 6 is planned at medium
-    effort.
+    given in each phase's section. Phases 6 and 7 are planned at
+    medium effort.
 
 ### Step-level guidance
 
