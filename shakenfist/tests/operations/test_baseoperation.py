@@ -2,6 +2,7 @@
 from unittest import mock
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist import exceptions
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import CannotDeferUnqueued
@@ -247,6 +248,63 @@ class AbandonDependencyWaitTestCase(base.ShakenFistTestCase):
         self.mock_state_update.assert_called_once_with(
             BaseClusterOperation.STATE_ABORT)
 
+    def test_an_ending_event_is_recorded_for_the_timeline_tool(self):
+        # Issue 4640: the abandoned operation never emits 'execution
+        # duration', so without this tools/operation-timeline.py counted
+        # it as "ran after the window, or not yet", which hid exactly
+        # the six-minute-tail population the tool exists to explain.
+        op = self._make_op()
+        op._BaseClusterOperation__created_at = 100.0
+        op.queue_name = 'a-queue'
+        with mock.patch('shakenfist.operations.baseoperation.time.time',
+                        return_value=160.0):
+            op.abandon_dependency_wait(self._make_dep_op())
+
+        self.mock_add_event.assert_called_once_with(
+            EVENT_TYPE_USAGE, 'ended without executing',
+            extra={
+                'outcome': 'abandoned',
+                'defer_count': DEPENDENCY_DEFER_BUDGET,
+                'reason': (
+                    f'gave up waiting for dependency net_op {DEP_UUID}, '
+                    f'which was still {BaseClusterOperation.STATE_QUEUED}'),
+                'wait_seconds': 60.0,
+                'queue_name': 'a-queue',
+            })
+
+    def test_the_ending_event_follows_the_state_write(self):
+        # Recorded once the operation has actually ended, so a failed
+        # write (below) leaves no event claiming it did.
+        op = self._make_op()
+        self.mock_state_update.side_effect = (
+            lambda state: self.mock_add_event.assert_not_called())
+        op.abandon_dependency_wait(self._make_dep_op())
+        self.mock_add_event.assert_called_once()
+
+    def test_no_ending_event_for_an_operation_which_already_started(self):
+        # A redelivery after a crash: the operation ran, or started to,
+        # so it is not one which never executed.
+        self.mock_get_state.return_value = State(
+            value=BaseClusterOperation.STATE_EXECUTING, update_time=0)
+        op = self._make_op()
+        op.abandon_dependency_wait(self._make_dep_op())
+
+        self.mock_state_update.assert_called_once_with(
+            BaseClusterOperation.STATE_ABORT)
+        self.mock_add_event.assert_not_called()
+
+    def test_queue_fields_omitted_without_created_at(self):
+        # As for execution_duration_extra: an operation constructed
+        # outside the dispatch path has no enqueue time to wait from.
+        op = self._make_op()
+        extra = op.ended_without_executing_extra('abandoned', 'why')
+
+        self.assertEqual('abandoned', extra['outcome'])
+        self.assertEqual('why', extra['reason'])
+        self.assertEqual(DEPENDENCY_DEFER_BUDGET, extra['defer_count'])
+        self.assertNotIn('wait_seconds', extra)
+        self.assertNotIn('queue_name', extra)
+
     def test_failed_abort_is_recorded_not_raised(self):
         self.mock_state_update.side_effect = exceptions.InvalidStateException(
             'no such transition')
@@ -340,10 +398,14 @@ class AbandonDependencyWaitTestCase(base.ShakenFistTestCase):
 
         self.mock_state_update.assert_called_once_with(
             BaseClusterOperation.STATE_ABORT)
-        self.mock_add_event.assert_called_once_with(
+        self.mock_add_event.assert_any_call(
             EVENT_TYPE_AUDIT,
             'failed to tell targets the operation will never run',
             extra={'error': 'moved'})
+        # The op ended all the same, so the ending is still recorded.
+        self.assertEqual(
+            ('ended without executing',),
+            self.mock_add_event.call_args_list[-1].args[1:])
 
     def test_started_operation_does_not_tell_targets(self):
         """Only a queued op has never run. One already executing, or
@@ -410,14 +472,24 @@ class DependencyFailedTestCase(base.ShakenFistTestCase):
         op.abort_for_unsuitable_dependency(
             self._make_dep_op(BaseClusterOperation.STATE_ERROR))
 
-        self.mock_add_event.assert_called_once_with(
-            EVENT_TYPE_AUDIT,
-            'aborting operation, as dependency is unsuitable',
-            extra={
-                'dep_object_type': 'net_op',
-                'dep_object_uuid': DEP_UUID,
-                'dep_object_state': BaseClusterOperation.STATE_ERROR
-            })
+        self.assertEqual(
+            [mock.call(
+                EVENT_TYPE_AUDIT,
+                'aborting operation, as dependency is unsuitable',
+                extra={
+                    'dep_object_type': 'net_op',
+                    'dep_object_uuid': DEP_UUID,
+                    'dep_object_state': BaseClusterOperation.STATE_ERROR
+                }),
+             mock.call(
+                EVENT_TYPE_USAGE, 'ended without executing',
+                extra={
+                    'outcome': 'aborted',
+                    'defer_count': 0,
+                    'reason': (f'dependency net_op {DEP_UUID} is '
+                               f'{BaseClusterOperation.STATE_ERROR}'),
+                })],
+            self.mock_add_event.call_args_list)
         self.mock_state_update.assert_called_once_with(
             BaseClusterOperation.STATE_ABORT)
         self.mock_failed.assert_called_once_with(
@@ -441,13 +513,22 @@ class DependencyFailedTestCase(base.ShakenFistTestCase):
         op.cancel_for_missing_dependency(
             {'op_type': 'net_op', 'op_uuid': DEP_UUID})
 
-        self.mock_add_event.assert_called_once_with(
-            EVENT_TYPE_AUDIT,
-            'cancelling operation, as dependency does not exist',
-            extra={
-                'dep_object_type': 'net_op',
-                'dep_object_uuid': DEP_UUID
-            })
+        self.assertEqual(
+            [mock.call(
+                EVENT_TYPE_AUDIT,
+                'cancelling operation, as dependency does not exist',
+                extra={
+                    'dep_object_type': 'net_op',
+                    'dep_object_uuid': DEP_UUID
+                }),
+             mock.call(
+                EVENT_TYPE_USAGE, 'ended without executing',
+                extra={
+                    'outcome': 'cancelled',
+                    'defer_count': 0,
+                    'reason': f'dependency net_op {DEP_UUID} does not exist',
+                })],
+            self.mock_add_event.call_args_list)
         self.mock_state_update.assert_called_once_with(
             BaseClusterOperation.STATE_ERROR)
         self.mock_failed.assert_called_once_with(

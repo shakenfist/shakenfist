@@ -116,6 +116,35 @@ def execution_line(timestamp, uuid=OP_UUID,
     return json.dumps(record)
 
 
+def ended_line(timestamp, uuid=OP_UUID,
+               operation_type='node_inst_netdesc_op', outcome='abandoned',
+               defer_count=30, wait=400.0, queue_name=QUEUE,
+               program='sf-queues'):
+    """Build an 'ended without executing' echo the way eventlog.py ships one."""
+    extra = {
+        'outcome': outcome,
+        'defer_count': defer_count,
+        'reason': f'gave up waiting for dependency artifact_fetch_op {DEP_UUID}',
+    }
+    if wait is not None:
+        extra['wait_seconds'] = wait
+        extra['queue_name'] = queue_name
+    record = {
+        'logger_name': 'shakenfist.eventlog',
+        'ts': timestamp,
+        'level': 'INFO',
+        'module': 'eventlog',
+        'function': 'add_event_multi',
+        'message': 'ended without executing',
+        'event_type': 'usage',
+        'duration': None,
+        'extra': extra,
+        operation_type: uuid,
+        'program': program,
+    }
+    return json.dumps(record)
+
+
 def entries(*lines, skew=0.0):
     """Wrap log lines as (loki nanosecond timestamp, line) pairs.
 
@@ -190,6 +219,38 @@ class TimelineParseTestCase(base.ShakenFistTestCase):
         self.assertIsNone(operation)
         self.assertEqual(timeline.DROP_NO_WAIT, reason)
 
+    def test_reads_an_ending(self):
+        ending, reason = timeline.parse_ended_line(
+            ended_line('2026-08-29T10:06:41.000Z', outcome='abandoned',
+                       defer_count=30, wait=401.5))
+        self.assertIsNone(reason)
+        self.assertEqual(OP_UUID, ending.uuid)
+        self.assertEqual('node_inst_netdesc_op', ending.operation_type)
+        self.assertEqual('abandoned', ending.outcome)
+        self.assertEqual(30, ending.defer_count)
+        self.assertEqual(401.5, ending.wait)
+        self.assertEqual(QUEUE, ending.queue_name)
+
+    def test_an_ending_without_a_wait_is_still_an_ending(self):
+        # An operation ended outside the dispatch path carries no
+        # created_at, so no wait; it is still counted by outcome.
+        ending, reason = timeline.parse_ended_line(
+            ended_line('2026-08-29T10:06:41.000Z', outcome='cancelled',
+                       defer_count=0, wait=None))
+        self.assertIsNone(reason)
+        self.assertEqual('cancelled', ending.outcome)
+        self.assertIsNone(ending.wait)
+
+    def test_an_ending_is_not_an_execution_and_vice_versa(self):
+        operation, reason = timeline.parse_execution_line(
+            ended_line('2026-08-29T10:06:41.000Z'))
+        self.assertIsNone(operation)
+        self.assertEqual(timeline.DROP_NOT_AN_EVENT, reason)
+        ending, reason = timeline.parse_ended_line(
+            execution_line('2026-08-29T10:00:03.500Z'))
+        self.assertIsNone(ending)
+        self.assertEqual(timeline.DROP_NOT_AN_EVENT, reason)
+
     def test_tolerates_prefixed_lines(self):
         line = execution_line('2026-08-29T10:00:10.000Z')
         journal = f'Aug 29 10:00:10 sf-3 sf-queues[1903915]: {line}'
@@ -260,6 +321,60 @@ class TimelineJoinTestCase(base.ShakenFistTestCase):
             entries(execution_line('2026-08-29T10:00:03.500Z')))
         self.assertEqual(1, join.uuids_without_execution)
         self.assertEqual(1, join.defers_without_execution)
+
+    def test_an_abandoned_operation_is_its_own_row_not_an_unknown(self):
+        # Issue 4640: an operation which spent the defer budget emits
+        # its defer events and then an ending, never an execution. It
+        # used to be counted as "ran after the window, or not yet",
+        # and dropped from every table.
+        defers = [
+            defer_line(f'2026-08-29T10:00:{second:02d}.000Z',
+                       uuid=OTHER_UUID, delay=1.0, defer_count=n + 1)
+            for n, second in enumerate((1, 3, 5))]
+        join = timeline.join_streams(
+            entries(*defers),
+            entries(execution_line('2026-08-29T10:00:03.500Z')),
+            entries(ended_line('2026-08-29T10:00:08.000Z', uuid=OTHER_UUID,
+                               defer_count=3, wait=7.5)))
+
+        self.assertEqual(0, join.uuids_without_execution)
+        self.assertEqual(0, join.defers_without_execution)
+        self.assertEqual(1, join.uuids_ended_without_execution)
+        self.assertEqual(3, join.defers_ended_without_execution)
+        self.assertEqual(1, len(join.endings))
+        ending = join.endings[0]
+        self.assertEqual(OTHER_UUID, ending.uuid)
+        self.assertEqual('abandoned', ending.outcome)
+        self.assertEqual(3, len(ending.defers))
+        # The execution event is untouched by the third stream.
+        self.assertEqual([OP_UUID], [o.uuid for o in join.operations])
+
+    def test_an_ending_claims_only_the_defers_which_preceded_it(self):
+        join = timeline.join_streams(
+            entries(defer_line('2026-08-29T10:00:01.000Z', uuid=OTHER_UUID),
+                    defer_line('2026-08-29T10:00:09.000Z', uuid=OTHER_UUID,
+                               defer_count=2)),
+            [],
+            entries(ended_line('2026-08-29T10:00:08.000Z', uuid=OTHER_UUID,
+                               defer_count=1)))
+        self.assertEqual(1, len(join.endings[0].defers))
+
+    def test_endings_honour_the_program_filter(self):
+        join = timeline.join_streams(
+            [], [],
+            entries(ended_line('2026-08-29T10:00:08.000Z', program='sf-net'),
+                    ended_line('2026-08-29T10:00:09.000Z', uuid=OTHER_UUID,
+                               program='sf-queues')),
+            program='sf-queues')
+        self.assertEqual([OTHER_UUID], [e.uuid for e in join.endings])
+
+    def test_unusable_ended_lines_are_counted(self):
+        record = json.loads(ended_line('2026-08-29T10:00:08.000Z'))
+        del record['extra']['outcome']
+        join = timeline.join_streams([], [], [(0, json.dumps(record))])
+        self.assertEqual([], join.endings)
+        self.assertEqual(
+            1, join.dropped_ended_lines[timeline.DROP_NOT_AN_EVENT])
 
     def test_the_program_filter_reads_the_parsed_field(self):
         # 'program' is a field inside the JSON and not a Loki stream label,
@@ -450,6 +565,47 @@ class TimelineMainTestCase(base.ShakenFistTestCase):
         self.assertIn('Defer redelivery fidelity', output)
         self.assertIn('Tail by what it was waiting on', output)
         self.assertNotIn('not self consistent', output)
+
+    def test_reports_the_operations_which_ended_without_executing(self):
+        lines = entries(
+            execution_line('2026-08-29T00:00:04.000Z', wait=0.75),
+            defer_line('2026-08-29T00:00:01.000Z', uuid=OTHER_UUID,
+                       delay=15.0, defer_count=1),
+            ended_line('2026-08-29T00:00:20.000Z', uuid=OTHER_UUID,
+                       defer_count=1, wait=19.5),
+            ended_line('2026-08-29T00:00:21.000Z', uuid=DEP_UUID,
+                       outcome='cancelled', defer_count=0, wait=0.5))
+        code, output = self._run(
+            StubLoki(lines),
+            ['--start', '2026-08-29T00:00:00Z',
+             '--end', '2026-08-29T00:30:00Z'])
+        self.assertEqual(0, code)
+        self.assertIn(timeline.ENDED_SELECTOR, output)
+        self.assertIn('2 operations ended without executing (1 abandoned, '
+                      '1 cancelled); 1 of them had deferred (1 defer events)',
+                      output)
+        self.assertIn('Operations which ended without executing (n=2)',
+                      output)
+        self.assertIn(timeline.ENDED_OUTCOMES['abandoned'], output)
+        self.assertIn(timeline.ENDED_OUTCOMES['cancelled'], output)
+        # The abandoned operation is no longer "ran after it, or not yet".
+        self.assertNotIn('have no execution event in the window', output)
+
+    def test_endings_are_reported_even_when_nothing_ran(self):
+        # A window in which every operation was ended by a dependency
+        # is a finding, not an empty window.
+        lines = entries(
+            ended_line('2026-08-29T00:00:20.000Z', defer_count=30,
+                       wait=400.0))
+        code, output = self._run(
+            StubLoki(lines),
+            ['--start', '2026-08-29T00:00:00Z',
+             '--end', '2026-08-29T00:30:00Z'])
+        self.assertEqual(0, code)
+        self.assertIn('No operations with a decomposable wait', output)
+        self.assertIn('Operations which ended without executing (n=1)',
+                      output)
+        self.assertIn(timeline.ENDED_OUTCOMES['abandoned'], output)
 
     def test_every_operation_incomplete_exits_cleanly(self):
         # One execution event recording two defers, with only one defer

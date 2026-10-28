@@ -26,7 +26,9 @@ from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist import eventlog
 from shakenfist import logship
 from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
 from shakenfist.operations.net_op import NetOp
+from shakenfist.schema.object_state import State
 from shakenfist.schema.operations import net_op as net_op_schema
 from shakenfist.tests import base
 
@@ -126,6 +128,24 @@ class EmitterRoundTripTestCase(base.ShakenFistTestCase):
             op.defer(waiting_on=[_make_net_op(DEP_UUID)], delay=delay)
         return self._only_line()
 
+    def _emit_ending(self, op):
+        dep_op = _make_net_op(DEP_UUID)
+        with mock.patch.object(BaseClusterOperation, '_state_update'), \
+                mock.patch.object(NetOp, '_dependency_failed'), \
+                mock.patch('shakenfist.mariadb.get_state',
+                           return_value=State(
+                               value=BaseClusterOperation.STATE_QUEUED,
+                               update_time=0)), \
+                mock.patch('shakenfist.operations.baseoperation.time.time',
+                           return_value=ENDED_AT):
+            op.abandon_dependency_wait(dep_op)
+        # The abandon mirrors an audit event onto the targets first; the
+        # ending is the usage event which follows the state write.
+        lines = [line for line in self.handler.lines
+                 if json.loads(line)['event_type'] == EVENT_TYPE_USAGE]
+        self.assertEqual(1, len(lines), self.handler.lines)
+        return lines[0]
+
     def test_the_echo_has_the_shape_the_tools_assume(self):
         op = _make_net_op()
         _, line = self._emit_execution(op)
@@ -197,6 +217,25 @@ class EmitterRoundTripTestCase(base.ShakenFistTestCase):
         self.assertEqual(3, defer.defer_count)
         self.assertEqual({'net_op'}, defer.waiting_on_types)
         self.assertIsNotNone(defer.timestamp)
+
+    def test_an_ending_round_trips_through_the_timeline_tool(self):
+        op = _make_net_op()
+        op.current_defer_count = DEPENDENCY_DEFER_BUDGET
+        line = self._emit_ending(op)
+
+        ending, reason = timeline.parse_ended_line(line)
+        self.assertIsNone(reason)
+        self.assertEqual(OP_UUID, ending.uuid)
+        self.assertEqual('net_op', ending.operation_type)
+        self.assertEqual('abandoned', ending.outcome)
+        self.assertEqual(DEPENDENCY_DEFER_BUDGET, ending.defer_count)
+        self.assertEqual(ENDED_AT - CREATED_AT, ending.wait)
+        self.assertEqual(QUEUE, ending.queue_name)
+        # And it is nothing else to either tool.
+        self.assertIsNone(report.parse_line(line))
+        self.assertEqual(
+            timeline.DROP_NOT_AN_EVENT,
+            timeline.parse_execution_line(line)[1])
 
     def test_each_tool_ignores_the_other_tools_event(self):
         # The selectors overlap in nothing: a defer event is not a
