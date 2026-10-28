@@ -350,7 +350,9 @@ history:
   terminal state.
 - **`has_pending_cluster_operation()` (method)**: returns `True` if any
   non-observational target row's operation is in
-  `{queued, preflight, executing}`. Consumed by `Network.is_okay()` and
+  `{queued, preflight, executing}`, the `ACTIVE_OPERATION_STATES` set in
+  `schema/operations/baseclusteroperation.py` which every reader of the
+  in-flight and terminal sets shares. Consumed by `Network.is_okay()` and
   any future history-aware gate. The query
   joins `cluster_operation_targets` against `object_states`, so a later
   terminal operation cannot mask an earlier in-flight one.

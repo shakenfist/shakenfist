@@ -30,6 +30,7 @@ from shakenfist.schema.artifact_attributes import ArtifactAttributesData
 from shakenfist.schema.instance_attributes import InstanceAttributesData
 from shakenfist.schema.instance_data import InstanceData
 from shakenfist.schema.object_filter import ObjectFilterCriteria
+from shakenfist.schema.operations.baseclusteroperation import ACTIVE_OPERATION_STATES
 from shakenfist.schema.artifact_data import ArtifactData
 from shakenfist.schema.artifact_index import ArtifactIndexData
 from shakenfist.schema.dnsmasq import DnsMasqData
@@ -3544,8 +3545,7 @@ class MockMariaDB():
         or executing, as the real query's object_states join does."""
         state = self.mariadb_states.get(
             f'{d.operation_type}/{d.operation_uuid}')
-        return bool(state and state['state_value'] in (
-            'queued', 'preflight', 'executing'))
+        return bool(state and state['state_value'] in ACTIVE_OPERATION_STATES)
 
     def _mariadb_get_cluster_operation_targets_for_object(
             self, target_object_type, target_uuid, pending_only=False):
@@ -3624,14 +3624,13 @@ class MockMariaDB():
     def _mariadb_delete_stale_cluster_operation_targets(
             self, max_age):
         """Mock implementation of mariadb.delete_stale_cluster_operation_targets()"""
-        active_states = ('queued', 'preflight', 'executing')
         cutoff = time.time() - max_age
 
         # Operation UUIDs that are still active in any object_states row.
         active_operation_uuids = {
             data['object_uuid']
             for data in self.mariadb_states.values()
-            if data['state_value'] in active_states
+            if data['state_value'] in ACTIVE_OPERATION_STATES
         }
 
         to_delete = [
@@ -4064,7 +4063,7 @@ class MockMariaDB():
         for data in self.mariadb_states.values():
             if data['object_type'] not in OPERATION_NAMES_TO_CLASSES:
                 continue
-            if data['state_value'] not in ('queued', 'executing'):
+            if data['state_value'] not in ACTIVE_OPERATION_STATES:
                 continue
             if now - data['update_time'] < threshold_seconds:
                 continue

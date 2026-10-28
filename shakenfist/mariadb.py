@@ -102,6 +102,8 @@ from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_state import clip_state_message
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.operations.baseclusteroperation import ACTIVE_OPERATION_STATES
+from shakenfist.schema.operations.baseclusteroperation import TERMINAL_OPERATION_STATES
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.sqlalchemy import get_table_columns
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
@@ -5393,10 +5395,11 @@ def _direct_get_latest_cluster_operation_target(
 
 
 # An operation is "in flight" if and only if its row in object_states has
-# one of these state values. Anything else (complete, abort, error,
-# deleted, ...) is terminal. Matches
-# _direct_delete_stale_cluster_operation_targets.
-_ACTIVE_OPERATION_STATES = ('queued', 'preflight', 'executing')
+# one of these state values. Anything else is terminal. The sets are
+# defined once, beside the operation schema, and shared with every other
+# reader (the stale target prune, the orphan reaper, is_outstanding() and
+# the mock database).
+_ACTIVE_OPERATION_STATES = ACTIVE_OPERATION_STATES
 
 
 def _direct_has_pending_cluster_operation_target(
@@ -5441,11 +5444,10 @@ def _direct_has_pending_cluster_operation_target(
         return True
 
 
-# Terminal states for cluster operations -- mirror the set used by the
-# operation state machine (shakenfist/operations/baseoperation.py). An op
-# in any of these states is no longer executing and is safe to consider
-# for cooldown / circuit-breaker queries.
-_TERMINAL_OPERATION_STATES = ('complete', 'abort', 'deleted', 'error')
+# Terminal states for cluster operations. An op in any of these states is
+# no longer executing and is safe to consider for cooldown / circuit-breaker
+# queries.
+_TERMINAL_OPERATION_STATES = TERMINAL_OPERATION_STATES
 
 
 def _direct_get_recent_terminal_op_states_for_target(
@@ -5582,14 +5584,10 @@ def _direct_delete_stale_cluster_operation_targets(
     table = _get_cluster_operation_targets_table()
     states_table = _get_object_states_table()
 
-    # States that mean an operation is still in flight. Anything else
-    # (complete, abort, error, deleted, ...) is considered terminal.
-    active_states = ['queued', 'preflight', 'executing']
-
     try:
         with engine.connect() as conn:
             active_subq = sa.select(states_table.c.object_uuid).where(
-                states_table.c.state_value.in_(active_states)
+                states_table.c.state_value.in_(_ACTIVE_OPERATION_STATES)
             )
             stmt = sa.delete(table).where(
                 sa.and_(
@@ -24072,7 +24070,7 @@ def _orphaned_cluster_operations_stmt(threshold_seconds: float) -> Any:
                 cluster_ops_table.c.operation_type == ot.value,
                 states_table.c.object_type == ot)
             for ot in op_object_types]))
-        .where(states_table.c.state_value.in_(['queued', 'executing']))
+        .where(states_table.c.state_value.in_(_ACTIVE_OPERATION_STATES))
         .where(states_table.c.update_time <= cutoff)
         .where(~_work_queue_references_op_clause(
             states_table.c.object_uuid))
