@@ -16,6 +16,7 @@ from shakenfist import instance
 from shakenfist.operations.baseoperation import BaseClusterOperation as bco
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.schema.operations import node_aop_op
 from shakenfist.schema.operations import node_inst_net_iface_op
 from shakenfist.schema.operations import node_inst_op
 from shakenfist.schema.operations import node_inst_snap_op
@@ -220,6 +221,11 @@ class InstanceEnqueueDeleteSqlTestCase(
             NODE_UUID, NETWORK_UUID,
             [node_net_op.model_tasks.network_apply_create_hypervisor],
             PRIORITY.user_facing)
+        _, preflight = node_aop_op.create_and_enqueue(
+            NODE_UUID, str(uuid4()), INSTANCE_UUID,
+            [node_aop_op.model_tasks.preflight], PRIORITY.user_facing)
+        # The hot plug is enqueued last, so it stays the newest mutating
+        # operation the delete also waits for.
         _, hot_plug = node_inst_net_iface_op.create_and_enqueue(
             NODE_UUID, INSTANCE_UUID, NETWORK_UUID, INTERFACE_UUID,
             HOT_PLUG_TASKS, PRIORITY.user_facing,
@@ -242,6 +248,9 @@ class InstanceEnqueueDeleteSqlTestCase(
         self.assertEqual('queued', self._op_state(snap))
         self.assertEqual('abort', self._op_state(hot_plug))
         self.assertEqual('abort', self._op_state(sweep))
+        # The agent operation preflight targets the instance since issue
+        # 4672, so it is found by the walk and cancelled.
+        self.assertEqual('abort', self._op_state(preflight))
         self.assertEqual('queued', self._op_state(net))
 
         self.assertEqual(

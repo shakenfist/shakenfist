@@ -311,6 +311,26 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         self.assertDeadlineIsSecondsFromNow(new, 45)
         self.assertEqual(15.0, new.call_args.kwargs['progress_timeout'])
 
+    def test_put_preflight_targets_the_instance(self):
+        # The preflight is a cluster operation targeting the agent
+        # operation and the instance it runs on, so that deleting the
+        # instance cancels it (issue 4672). The mock database runs the
+        # real enqueue path, so the rows are what sf-database would hold.
+        resp, new = self._put()
+        self.assertEqual(200, resp.status_code, resp.get_json())
+
+        preflights = [
+            op_uuid for op_uuid, row in
+            self.mock_mariadb.cluster_operations_store.items()
+            if row['operation_type'] == 'node_aop_op']
+        self.assertEqual(1, len(preflights))
+        self.assertEqual(
+            [('agentoperation', new.return_value.uuid),
+             ('instance', self.instance_uuid)],
+            [(t.target_object_type, t.target_uuid)
+             for t in self.mock_mariadb.get_cluster_operation_targets(
+                 preflights[0])])
+
     def test_put_applies_the_progress_default_when_omitted(self):
         # This is what pins put's progress_capable argument. The three
         # handlers call the helper separately with near-identical code,

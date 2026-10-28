@@ -41,14 +41,29 @@ class NodeAgentopOp(BaseClusterOperation):
 
         self.__node_uuid = static_values['node_uuid']
         self.__agentoperation_uuid = static_values['agentoperation_uuid']
+        self.__instance_uuid = static_values['instance_uuid']
 
         self.log = LOG.with_fields({
             'operation_type': self.object_type,
             'operation_uuid': self.uuid,
             'node_uuid': self.node_uuid,
             'agentoperation_uuid': self.agentoperation_uuid,
+            'instance_uuid': self.instance_uuid,
             'tasks': self.tasks
         })
+
+    @classmethod
+    def _upgrade_step_1_to_2(cls, static_values):
+        # Version 2 added instance_uuid, so that the preflight targets the
+        # instance its agent operation runs on and a delete of that
+        # instance cancels it. Target rows are written at enqueue, so a
+        # version 1 row gains no instance target here; the value is
+        # recovered from the agent operation so that the view is
+        # truthful, and is None if the agent operation has gone.
+        aop = AgentOperation.from_db(
+            static_values['agentoperation_uuid'], suppress_failure_audit=True)
+        static_values['instance_uuid'] = (
+            str(aop.instance_uuid) if aop else None)
 
     # Static values
     @property
@@ -59,12 +74,17 @@ class NodeAgentopOp(BaseClusterOperation):
     def agentoperation_uuid(self):
         return self.__agentoperation_uuid
 
+    @property
+    def instance_uuid(self):
+        return self.__instance_uuid
+
     # API
     def external_view(self):
         retval = super().external_view()
         retval.update({
             'node_uuid': self.node_uuid,
-            'agentoperation_uuid': self.agentoperation_uuid
+            'agentoperation_uuid': self.agentoperation_uuid,
+            'instance_uuid': self.instance_uuid
         })
         return retval
 

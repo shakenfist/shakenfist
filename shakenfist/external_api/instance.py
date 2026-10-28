@@ -2331,6 +2331,7 @@ class InstanceAgentPutEndpoint(api_base.Resource):
         o.state = AgentOperation.STATE_PREFLIGHT
         na_create_and_enqueue(
             instance_from_db.placement['node'], o.uuid,
+            str(instance_from_db.uuid),
             [na_tasks.preflight],
             PRIORITY.user_facing,
             request_id=util_general.get_request_id())
