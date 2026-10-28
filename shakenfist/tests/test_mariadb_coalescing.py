@@ -35,6 +35,7 @@
 #   invariant that makes it safe is enforced at enqueue time instead, and
 #   is tested in shakenfist/tests/schema/test_net_op_coalescing.py.
 
+import inspect
 import uuid
 from typing import Any, Optional
 from unittest import mock
@@ -54,6 +55,7 @@ from shakenfist.operations.error_report import ErrorReport
 from shakenfist.operations.net_op import NetOp
 from shakenfist.operations.net_op import NoSuchNetwork
 from shakenfist.protos import database_pb2
+from shakenfist.protos import database_pb2_grpc
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations import net_op as net_op_schema
@@ -1512,3 +1514,40 @@ class FoldServicerTestCase(CoalescingTables, base.ShakenFistTestCase):
             ValueError, mariadb._direct_claim_coalescible_siblings,
             'net_op', [('network_uuid', NETWORK_UUID)], [TASK],
             SURVIVOR_UUID, folded_state='queued')
+
+
+class RetiredSingleColumnRpcsTestCase(base.ShakenFistTestCase):
+    """The single-column coalescing RPCs are gone (#4639).
+
+    ``ClaimCoalescibleSiblings`` and ``FindExistingCoalescibleOp`` took
+    one (column, uuid) pair, and their handlers accepted any task name
+    with it, so a client could fold ``network_ensure_mesh`` across nodes
+    through them. No release ever carried them (every tagged release
+    predates NetOp), so nothing can still send them. The V2 names stay,
+    because the suffix is what stops an old server folding on the first
+    column of a wider key.
+    """
+
+    def test_the_proto_no_longer_carries_them(self):
+        methods = database_pb2.DESCRIPTOR.services_by_name[
+            'DatabaseService'].methods_by_name
+        for name in ('ClaimCoalescibleSiblings', 'FindExistingCoalescibleOp'):
+            self.assertNotIn(name, methods)
+            self.assertFalse(
+                hasattr(database_pb2_grpc.DatabaseServiceServicer, name), name)
+        for message in ('ClaimCoalescibleSiblingsRequest',
+                        'FindExistingCoalescibleOpRequest'):
+            self.assertFalse(hasattr(database_pb2, message), message)
+        self.assertIn('ClaimCoalescibleSiblingsV2', methods)
+        self.assertIn('FindExistingCoalescibleOpV2', methods)
+        self.assertIn('FoldCoalescibleSiblings', methods)
+
+    def test_the_servicer_and_its_counters_no_longer_carry_them(self):
+        for name in ('ClaimCoalescibleSiblings', 'FindExistingCoalescibleOp'):
+            self.assertFalse(
+                hasattr(database_main.DatabaseService, name), name)
+        source = inspect.getsource(database_main.Monitor.__init__)
+        self.assertNotIn("'claim_coalescible_siblings'", source)
+        self.assertNotIn("'find_existing_coalescible_op'", source)
+        self.assertIn("'claim_coalescible_siblings_v2'", source)
+        self.assertIn("'find_existing_coalescible_op_v2'", source)

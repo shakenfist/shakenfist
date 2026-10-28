@@ -41,15 +41,18 @@ class DatabaseServiceStub:
     ClearWorkQueueClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClearWorkQueueClaimRequest, _database_pb2.StatusReply]
     DeleteWorkQueueRow: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteWorkQueueRowRequest, _database_pb2.StatusReply]
     ListOrphanedClusterOperations: _grpc.UnaryUnaryMultiCallable[_database_pb2.ListOrphanedClusterOperationsRequest, _database_pb2.ListOrphanedClusterOperationsReply]
-    ClaimCoalescibleSiblings: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsRequest, _database_pb2.ClaimCoalescibleSiblingsReply]
-    FindExistingCoalescibleOp: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpRequest, _database_pb2.FindExistingCoalescibleOpReply]
     ClaimCoalescibleSiblingsV2: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsV2Request, _database_pb2.ClaimCoalescibleSiblingsReply]
-    """V2 of the two coalescing RPCs, taking a multi-column key. The V1
-    pair above is retained unmodified for one release so a rolling
-    upgrade can still serve old clients. A new client never falls back
-    to V1: an old server would ignore the extra key columns and fold on
-    the first column alone, which is exactly the cross-node corruption
-    the new names exist to prevent.
+    """The two coalescing RPCs take a multi-column key. They carry a V2
+    suffix because they replaced a single-column pair
+    (ClaimCoalescibleSiblings, FindExistingCoalescibleOp) under new
+    names: a repeated field on the old messages would have been
+    wire-compatible, and an old server would then have ignored the
+    extra key columns and folded on the first column alone, which is
+    exactly the cross-node corruption the wider key exists to prevent.
+    The old pair was removed in #4639. No release ever carried it, so
+    no client can still send it, and its server side could not tell
+    one node's work from another's. An old server answers these with
+    UNIMPLEMENTED, which a client treats as "coalescing unavailable".
     """
     FindExistingCoalescibleOpV2: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpV2Request, _database_pb2.FindExistingCoalescibleOpReply]
     FoldCoalescibleSiblings: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsV2Request, _database_pb2.ClaimCoalescibleSiblingsReply]
@@ -471,15 +474,18 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     ClearWorkQueueClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.ClearWorkQueueClaimRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     DeleteWorkQueueRow: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteWorkQueueRowRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     ListOrphanedClusterOperations: _aio.UnaryUnaryMultiCallable[_database_pb2.ListOrphanedClusterOperationsRequest, _database_pb2.ListOrphanedClusterOperationsReply]  # type: ignore[assignment]
-    ClaimCoalescibleSiblings: _aio.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsRequest, _database_pb2.ClaimCoalescibleSiblingsReply]  # type: ignore[assignment]
-    FindExistingCoalescibleOp: _aio.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpRequest, _database_pb2.FindExistingCoalescibleOpReply]  # type: ignore[assignment]
     ClaimCoalescibleSiblingsV2: _aio.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsV2Request, _database_pb2.ClaimCoalescibleSiblingsReply]  # type: ignore[assignment]
-    """V2 of the two coalescing RPCs, taking a multi-column key. The V1
-    pair above is retained unmodified for one release so a rolling
-    upgrade can still serve old clients. A new client never falls back
-    to V1: an old server would ignore the extra key columns and fold on
-    the first column alone, which is exactly the cross-node corruption
-    the new names exist to prevent.
+    """The two coalescing RPCs take a multi-column key. They carry a V2
+    suffix because they replaced a single-column pair
+    (ClaimCoalescibleSiblings, FindExistingCoalescibleOp) under new
+    names: a repeated field on the old messages would have been
+    wire-compatible, and an old server would then have ignored the
+    extra key columns and folded on the first column alone, which is
+    exactly the cross-node corruption the wider key exists to prevent.
+    The old pair was removed in #4639. No release ever carried it, so
+    no client can still send it, and its server side could not tell
+    one node's work from another's. An old server answers these with
+    UNIMPLEMENTED, which a client treats as "coalescing unavailable".
     """
     FindExistingCoalescibleOpV2: _aio.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpV2Request, _database_pb2.FindExistingCoalescibleOpReply]  # type: ignore[assignment]
     FoldCoalescibleSiblings: _aio.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsV2Request, _database_pb2.ClaimCoalescibleSiblingsReply]  # type: ignore[assignment]
@@ -954,31 +960,22 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     ) -> _typing.Union[_database_pb2.ListOrphanedClusterOperationsReply, _abc.Awaitable[_database_pb2.ListOrphanedClusterOperationsReply]]: ...
 
     @_abc_1.abstractmethod
-    def ClaimCoalescibleSiblings(
-        self,
-        request: _database_pb2.ClaimCoalescibleSiblingsRequest,
-        context: _ServicerContext,
-    ) -> _typing.Union[_database_pb2.ClaimCoalescibleSiblingsReply, _abc.Awaitable[_database_pb2.ClaimCoalescibleSiblingsReply]]: ...
-
-    @_abc_1.abstractmethod
-    def FindExistingCoalescibleOp(
-        self,
-        request: _database_pb2.FindExistingCoalescibleOpRequest,
-        context: _ServicerContext,
-    ) -> _typing.Union[_database_pb2.FindExistingCoalescibleOpReply, _abc.Awaitable[_database_pb2.FindExistingCoalescibleOpReply]]: ...
-
-    @_abc_1.abstractmethod
     def ClaimCoalescibleSiblingsV2(
         self,
         request: _database_pb2.ClaimCoalescibleSiblingsV2Request,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.ClaimCoalescibleSiblingsReply, _abc.Awaitable[_database_pb2.ClaimCoalescibleSiblingsReply]]:
-        """V2 of the two coalescing RPCs, taking a multi-column key. The V1
-        pair above is retained unmodified for one release so a rolling
-        upgrade can still serve old clients. A new client never falls back
-        to V1: an old server would ignore the extra key columns and fold on
-        the first column alone, which is exactly the cross-node corruption
-        the new names exist to prevent.
+        """The two coalescing RPCs take a multi-column key. They carry a V2
+        suffix because they replaced a single-column pair
+        (ClaimCoalescibleSiblings, FindExistingCoalescibleOp) under new
+        names: a repeated field on the old messages would have been
+        wire-compatible, and an old server would then have ignored the
+        extra key columns and folded on the first column alone, which is
+        exactly the cross-node corruption the wider key exists to prevent.
+        The old pair was removed in #4639. No release ever carried it, so
+        no client can still send it, and its server side could not tell
+        one node's work from another's. An old server answers these with
+        UNIMPLEMENTED, which a client treats as "coalescing unavailable".
         """
 
     @_abc_1.abstractmethod

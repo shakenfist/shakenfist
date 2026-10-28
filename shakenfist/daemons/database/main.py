@@ -273,70 +273,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.ListOrphanedClusterOperationsReply(
                 operations=[])
 
-    def FindExistingCoalescibleOp(
-        self,
-        request: database_pb2.FindExistingCoalescibleOpRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.FindExistingCoalescibleOpReply:
-        """Read-only enqueue-side dedup lookup.
-
-        Returns the uuid of an existing pending coalescible op on
-        the same target, or an empty string when there's no match.
-        See ``mariadb._direct_find_existing_coalescible_op``.
-
-        Retained for one release so a rolling upgrade can still serve
-        clients which predate ``FindExistingCoalescibleOpV2``. Its
-        single (column, uuid) pair is simply a one-element key, and it
-        can never mean NULL: a V1 client has no way to say so, and one
-        which sent an empty target_uuid meant "unset", which the
-        preflight's uuid coercion rejects.
-        """
-        try:
-            self.monitor.counters['find_existing_coalescible_op'].inc()
-            uuid = mariadb._direct_find_existing_coalescible_op(
-                request.operation_type,
-                [(request.target_column, request.target_uuid)],
-                request.task_name)
-            return database_pb2.FindExistingCoalescibleOpReply(
-                op_uuid=uuid or '')
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database FindExistingCoalescibleOp failed', e)
-            return database_pb2.FindExistingCoalescibleOpReply(op_uuid='')
-
-    def ClaimCoalescibleSiblings(
-        self,
-        request: database_pb2.ClaimCoalescibleSiblingsRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.ClaimCoalescibleSiblingsReply:
-        """Fold sibling pending coalescible ops.
-
-        Transitions every matching sibling's ``object_states`` row
-        to ``complete`` in a single statement and returns the
-        affected uuids. See
-        ``mariadb._direct_claim_coalescible_siblings`` for the
-        safety guards.
-
-        Retained for one release so a rolling upgrade can still serve
-        clients which predate ``ClaimCoalescibleSiblingsV2``. Its
-        single (column, uuid) pair is simply a one-element key, and it
-        can never mean NULL -- see ``FindExistingCoalescibleOp``.
-        """
-        try:
-            self.monitor.counters['claim_coalescible_siblings'].inc()
-            folded = mariadb._direct_claim_coalescible_siblings(
-                request.operation_type,
-                [(request.target_column, request.target_uuid)],
-                list(request.task_names),
-                request.exclude_op_uuid)
-            return database_pb2.ClaimCoalescibleSiblingsReply(
-                folded_op_uuids=folded)
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database ClaimCoalescibleSiblings failed', e)
-            return database_pb2.ClaimCoalescibleSiblingsReply(
-                folded_op_uuids=[])
-
+    # The coalescing RPCs carry a V2 suffix because they replaced a
+    # single-column pair under new names, so that an old server could
+    # not silently fold on the first key column alone. That pair was
+    # removed in #4639: no release ever carried it, and its handlers
+    # accepted any task name with a single key column, so a client
+    # could have folded network_ensure_mesh across nodes through it.
     def FindExistingCoalescibleOpV2(
         self,
         request: database_pb2.FindExistingCoalescibleOpV2Request,
@@ -344,13 +286,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
     ) -> database_pb2.FindExistingCoalescibleOpReply:
         """Read-only enqueue-side dedup lookup, multi-column key.
 
-        As ``FindExistingCoalescibleOp``, but the caller supplies a
-        list of ``(column, uuid)`` pairs which must all match rather
-        than a single pair. The V1 method is retained for one release
-        so a rolling upgrade can still serve old clients; a new client
-        never falls back to it, because folding on the first column
-        alone is the cross-node corruption this method exists to
-        prevent. See ``mariadb._direct_find_existing_coalescible_op``.
+        Returns the uuid of an existing pending coalescible op matching
+        every ``(column, uuid)`` pair the caller supplies, or an empty
+        string when there is no match. See
+        ``mariadb._direct_find_existing_coalescible_op``.
 
         A pair with ``is_null`` set means that column must be NULL --
         proto3 has no null of its own, and an empty ``uuid`` string is
@@ -385,9 +324,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
     ) -> database_pb2.ClaimCoalescibleSiblingsReply:
         """Fold sibling pending coalescible ops, multi-column key.
 
-        As ``ClaimCoalescibleSiblings``, but the caller supplies a
-        list of ``(column, uuid)`` pairs which must all match rather
-        than a single pair. A pair with ``is_null`` set means that
+        Transitions every sibling matching every ``(column, uuid)``
+        pair the caller supplies to ``complete`` in a single statement
+        and returns the affected uuids. A pair with ``is_null`` set means that
         column must be NULL, which proto3 cannot express any other way
         and which is a narrower key rather than a missing one -- see
         ``FindExistingCoalescibleOpV2``. See
@@ -396,8 +335,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
 
         Siblings still go to ``complete`` here, before the survivor has
         done their work, because that is what clients predating
-        ``FoldCoalescibleSiblings`` expect. No current client calls it;
-        its retirement is #4639.
+        ``FoldCoalescibleSiblings`` expect. No current client calls it,
+        and no release ever carried it either, so it can go the way the
+        single-column pair went in #4639.
         """
         try:
             self.monitor.counters['claim_coalescible_siblings_v2'].inc()
@@ -6626,8 +6566,6 @@ class Monitor(daemon.WorkerPoolDaemon):
             'restart_queue', 'list_stuck_work_queue_rows',
             'clear_work_queue_claim', 'delete_work_queue_row',
             'list_orphaned_cluster_operations',
-            'claim_coalescible_siblings',
-            'find_existing_coalescible_op',
             'claim_coalescible_siblings_v2',
             'find_existing_coalescible_op_v2',
             'fold_coalescible_siblings',

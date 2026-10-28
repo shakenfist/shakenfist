@@ -763,19 +763,24 @@ reading that let #3878 sit undetected for three months:
 ### The V2 gRPC methods
 
 `ClaimCoalescibleSiblingsV2` and `FindExistingCoalescibleOpV2` take a
-`repeated CoalescibleKeyPair keys` in place of the V1 RPCs' scalar
-`target_column`/`target_uuid`, as new RPC names rather than a new
-field on the existing messages. A repeated field would be
-wire-compatible but unsafe across a rolling upgrade: an old
-`sf-database` would silently ignore the extra columns and fold on
-the network alone, which is exactly the cross-node corruption the
-wider key exists to prevent. An old server answers a V2 call with
-`UNIMPLEMENTED`, and the client treats that as "coalescing
-unavailable" and skips the fold rather than falling back to V1 -- a
-loud, temporary loss of an optimisation instead of a quiet
-correctness failure. "Loud" means the `coalescing_unavailable`
-outcome above, not merely a log line. The V1 RPCs are unchanged and
-stay for one release.
+`repeated CoalescibleKeyPair keys`. They carry the suffix because they
+replaced a single-column pair (`ClaimCoalescibleSiblings`,
+`FindExistingCoalescibleOp`, with a scalar `target_column` and
+`target_uuid`) as new RPC names rather than a new field on the
+existing messages. A repeated field would be wire-compatible but
+unsafe across a rolling upgrade: an old `sf-database` would silently
+ignore the extra columns and fold on the network alone, which is
+exactly the cross-node corruption the wider key exists to prevent. An
+old server answers a V2 call with `UNIMPLEMENTED`, and the client
+treats that as "coalescing unavailable" and skips the fold -- a loud,
+temporary loss of an optimisation instead of a quiet correctness
+failure. "Loud" means the `coalescing_unavailable` outcome above, not
+merely a log line. The single-column pair was removed in #4639: no
+release ever carried it (every tagged release predates `NetOp`), so
+no client can still send it, and its handlers accepted any task name
+with a single key column, which is the cross-node fold the V2 names
+exist to refuse. There is nothing for a client to fall back to, and
+`shakenfist/tests/test_mariadb_coalescing.py` checks that stays so.
 
 `FindExistingCoalescibleOpV2` additionally carries `repeated string
 priorities`, the priority filter described above. Unlike a key
@@ -792,8 +797,9 @@ siblings up front. A client which gets `UNIMPLEMENTED` from it skips
 the fold and never falls back to `ClaimCoalescibleSiblingsV2`, which
 would bring back exactly the premature completion it replaces.
 `ClaimCoalescibleSiblingsV2` keeps its old behaviour for clients
-which predate the fold and has no caller in this tree; retiring it,
-with the V1 pair, is #4639.
+which predate the fold and has no caller in this tree. No release
+carried it either, so it can be retired the way the single-column
+pair was.
 
 ## Batched hard deletes
 

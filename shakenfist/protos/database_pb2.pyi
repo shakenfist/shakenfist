@@ -419,60 +419,14 @@ class ListOrphanedClusterOperationsReply(_message.Message):
 Global___ListOrphanedClusterOperationsReply: _TypeAlias = ListOrphanedClusterOperationsReply  # noqa: Y015
 
 @_typing.final
-class ClaimCoalescibleSiblingsRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
-
-    OPERATION_TYPE_FIELD_NUMBER: _builtins.int
-    TARGET_COLUMN_FIELD_NUMBER: _builtins.int
-    TARGET_UUID_FIELD_NUMBER: _builtins.int
-    TASK_NAMES_FIELD_NUMBER: _builtins.int
-    EXCLUDE_OP_UUID_FIELD_NUMBER: _builtins.int
-    operation_type: _builtins.str
-    """The op_type, target column (e.g. "network_uuid"), target uuid
-    and uuid of the surviving op together identify "other ops on
-    the same target object whose work the survivor is about to do."
-    The server folds anything matching by transitioning its state
-    to ``complete`` -- the worker that eventually picks that row
-    up out of the queue will see the terminal state and skip it
-    cleanly (see workitem.py terminal-state branch).
-    """
-    target_column: _builtins.str
-    target_uuid: _builtins.str
-    exclude_op_uuid: _builtins.str
-    @_builtins.property
-    def task_names(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
-        """Tasks the survivor is about to run that are flagged
-        coalescible. Only sibling ops whose entire task list is exactly
-        one of these names are folded -- multi-task siblings might
-        also carry non-coalescible work and must be left alone.
-        """
-
-    def __init__(
-        self,
-        *,
-        operation_type: _builtins.str = ...,
-        target_column: _builtins.str = ...,
-        target_uuid: _builtins.str = ...,
-        task_names: _abc.Iterable[_builtins.str] | None = ...,
-        exclude_op_uuid: _builtins.str = ...,
-    ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["exclude_op_uuid", b"exclude_op_uuid", "operation_type", b"operation_type", "target_column", b"target_column", "target_uuid", b"target_uuid", "task_names", b"task_names"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
-
-Global___ClaimCoalescibleSiblingsRequest: _TypeAlias = ClaimCoalescibleSiblingsRequest  # noqa: Y015
-
-@_typing.final
 class ClaimCoalescibleSiblingsReply(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     FOLDED_OP_UUIDS_FIELD_NUMBER: _builtins.int
     @_builtins.property
     def folded_op_uuids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
-        """Op uuids whose state was transitioned: to ``complete`` for the two
-        ClaimCoalescibleSiblings RPCs, to ``executing`` for
+        """Op uuids whose state was transitioned: to ``complete`` for
+        ClaimCoalescibleSiblingsV2, to ``executing`` for
         FoldCoalescibleSiblings.
         """
 
@@ -488,39 +442,6 @@ class ClaimCoalescibleSiblingsReply(_message.Message):
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___ClaimCoalescibleSiblingsReply: _TypeAlias = ClaimCoalescibleSiblingsReply  # noqa: Y015
-
-@_typing.final
-class FindExistingCoalescibleOpRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
-
-    OPERATION_TYPE_FIELD_NUMBER: _builtins.int
-    TARGET_COLUMN_FIELD_NUMBER: _builtins.int
-    TARGET_UUID_FIELD_NUMBER: _builtins.int
-    TASK_NAME_FIELD_NUMBER: _builtins.int
-    operation_type: _builtins.str
-    """Read-only lookup used by enqueue-side dedup: "is there already
-    a pending op on the same target whose entire task list is just
-    this one coalescible task?" -- if so the caller returns that
-    op's uuid to its caller instead of inserting a duplicate.
-    """
-    target_column: _builtins.str
-    target_uuid: _builtins.str
-    task_name: _builtins.str
-    def __init__(
-        self,
-        *,
-        operation_type: _builtins.str = ...,
-        target_column: _builtins.str = ...,
-        target_uuid: _builtins.str = ...,
-        task_name: _builtins.str = ...,
-    ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["operation_type", b"operation_type", "target_column", b"target_column", "target_uuid", b"target_uuid", "task_name", b"task_name"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
-
-Global___FindExistingCoalescibleOpRequest: _TypeAlias = FindExistingCoalescibleOpRequest  # noqa: Y015
 
 @_typing.final
 class FindExistingCoalescibleOpReply(_message.Message):
@@ -590,11 +511,14 @@ class ClaimCoalescibleSiblingsV2Request(_message.Message):
     TASK_NAMES_FIELD_NUMBER: _builtins.int
     EXCLUDE_OP_UUID_FIELD_NUMBER: _builtins.int
     operation_type: _builtins.str
-    """As ClaimCoalescibleSiblingsRequest, but the single
-    target_column/target_uuid pair is replaced by a list of them. Every
-    pair must match for an op to be folded, so a key of
-    (network_uuid, node_uuid) can distinguish two hypervisors' work on
-    the same network where the V1 key could not.
+    """The op_type, coalescing key and uuid of the surviving op together
+    identify "other ops on the same target whose work the survivor is
+    about to do". Every key pair must match for an op to be folded,
+    so a key of (network_uuid, node_uuid) can distinguish two
+    hypervisors' work on the same network where a single column
+    could not. Only sibling ops whose entire task list is exactly one
+    of task_names are folded -- a multi-task sibling might also carry
+    non-coalescible work and must be left alone.
     """
     exclude_op_uuid: _builtins.str
     @_builtins.property
@@ -626,8 +550,11 @@ class FindExistingCoalescibleOpV2Request(_message.Message):
     TASK_NAME_FIELD_NUMBER: _builtins.int
     PRIORITIES_FIELD_NUMBER: _builtins.int
     operation_type: _builtins.str
-    """As FindExistingCoalescibleOpRequest, but with the multi-column key
-    described on ClaimCoalescibleSiblingsV2Request.
+    """Read-only lookup used by enqueue-side dedup: "is there already a
+    pending op matching this key whose entire task list is just this
+    one coalescible task?" -- if so the caller returns that op's uuid
+    to its caller instead of inserting a duplicate. The key is the
+    one described on ClaimCoalescibleSiblingsV2Request.
     """
     task_name: _builtins.str
     @_builtins.property

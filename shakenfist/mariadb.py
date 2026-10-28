@@ -22831,11 +22831,14 @@ def _coalescible_key_pairs(
 # FoldCoalescibleSiblings, all of which carry the whole multi-column key.
 # An sf-database from before an RPC existed answers UNIMPLEMENTED, and
 # the *only* correct response to that is to behave as though coalescing
-# is unavailable. Falling back to the V1 RPC would send just the first
-# key column, and the server would happily fold every operation matching
-# it -- during a rolling upgrade that is a survivor on one hypervisor
-# marking another hypervisor's genuinely different work complete, which
-# is the cross-node corruption the separate RPC names exist to prevent.
+# is unavailable. The V2 suffix exists because these replaced a
+# single-column pair under new names (removed in #4639, never released):
+# a fallback which sent just the first key column would have the server
+# happily fold every operation matching it -- during a rolling upgrade
+# that is a survivor on one hypervisor marking another hypervisor's
+# genuinely different work complete, which is the cross-node corruption
+# the separate RPC names exist to prevent. There is nothing to fall
+# back to now, and that is the point.
 # Falling back from the fold to V2 is wrong too, for a different reason:
 # V2 marks siblings complete before the survivor has done their work
 # (#4638). Losing an optimisation loudly for the length of an upgrade is
@@ -23962,8 +23965,8 @@ def _direct_claim_coalescible_siblings(
     state is therefore always a real outcome. The state message names
     the survivor, so an operator can see which operation absorbed it.
 
-    ``complete``, the default, is the behaviour the two
-    ``ClaimCoalescibleSiblings`` RPCs keep for clients which predate
+    ``complete``, the default, is the behaviour
+    ``ClaimCoalescibleSiblingsV2`` keeps for clients which predate
     the fold RPC. It releases everything waiting on a sibling before
     the survivor has done the work, and an error the survivor then hits
     is never seen by them (#4638).

@@ -15,14 +15,17 @@ service DatabaseService {
   rpc ClearWorkQueueClaim (ClearWorkQueueClaimRequest) returns (StatusReply) {}
   rpc DeleteWorkQueueRow (DeleteWorkQueueRowRequest) returns (StatusReply) {}
   rpc ListOrphanedClusterOperations (ListOrphanedClusterOperationsRequest) returns (ListOrphanedClusterOperationsReply) {}
-  rpc ClaimCoalescibleSiblings (ClaimCoalescibleSiblingsRequest) returns (ClaimCoalescibleSiblingsReply) {}
-  rpc FindExistingCoalescibleOp (FindExistingCoalescibleOpRequest) returns (FindExistingCoalescibleOpReply) {}
-  // V2 of the two coalescing RPCs, taking a multi-column key. The V1
-  // pair above is retained unmodified for one release so a rolling
-  // upgrade can still serve old clients. A new client never falls back
-  // to V1: an old server would ignore the extra key columns and fold on
-  // the first column alone, which is exactly the cross-node corruption
-  // the new names exist to prevent.
+  // The two coalescing RPCs take a multi-column key. They carry a V2
+  // suffix because they replaced a single-column pair
+  // (ClaimCoalescibleSiblings, FindExistingCoalescibleOp) under new
+  // names: a repeated field on the old messages would have been
+  // wire-compatible, and an old server would then have ignored the
+  // extra key columns and folded on the first column alone, which is
+  // exactly the cross-node corruption the wider key exists to prevent.
+  // The old pair was removed in #4639. No release ever carried it, so
+  // no client can still send it, and its server side could not tell
+  // one node's work from another's. An old server answers these with
+  // UNIMPLEMENTED, which a client treats as "coalescing unavailable".
   rpc ClaimCoalescibleSiblingsV2 (ClaimCoalescibleSiblingsV2Request) returns (ClaimCoalescibleSiblingsReply) {}
   rpc FindExistingCoalescibleOpV2 (FindExistingCoalescibleOpV2Request) returns (FindExistingCoalescibleOpReply) {}
   // As ClaimCoalescibleSiblingsV2, but each folded sibling is moved to
@@ -542,41 +545,11 @@ message ListOrphanedClusterOperationsReply {
   repeated OrphanedClusterOperation operations = 1;
 }
 
-message ClaimCoalescibleSiblingsRequest {
-  // The op_type, target column (e.g. "network_uuid"), target uuid
-  // and uuid of the surviving op together identify "other ops on
-  // the same target object whose work the survivor is about to do."
-  // The server folds anything matching by transitioning its state
-  // to ``complete`` -- the worker that eventually picks that row
-  // up out of the queue will see the terminal state and skip it
-  // cleanly (see workitem.py terminal-state branch).
-  string operation_type = 1;
-  string target_column = 2;
-  string target_uuid = 3;
-  // Tasks the survivor is about to run that are flagged
-  // coalescible. Only sibling ops whose entire task list is exactly
-  // one of these names are folded -- multi-task siblings might
-  // also carry non-coalescible work and must be left alone.
-  repeated string task_names = 4;
-  string exclude_op_uuid = 5;
-}
-
 message ClaimCoalescibleSiblingsReply {
-  // Op uuids whose state was transitioned: to ``complete`` for the two
-  // ClaimCoalescibleSiblings RPCs, to ``executing`` for
+  // Op uuids whose state was transitioned: to ``complete`` for
+  // ClaimCoalescibleSiblingsV2, to ``executing`` for
   // FoldCoalescibleSiblings.
   repeated string folded_op_uuids = 1;
-}
-
-message FindExistingCoalescibleOpRequest {
-  // Read-only lookup used by enqueue-side dedup: "is there already
-  // a pending op on the same target whose entire task list is just
-  // this one coalescible task?" -- if so the caller returns that
-  // op's uuid to its caller instead of inserting a duplicate.
-  string operation_type = 1;
-  string target_column = 2;
-  string target_uuid = 3;
-  string task_name = 4;
 }
 
 message FindExistingCoalescibleOpReply {
@@ -603,11 +576,14 @@ message CoalescibleKeyPair {
 }
 
 message ClaimCoalescibleSiblingsV2Request {
-  // As ClaimCoalescibleSiblingsRequest, but the single
-  // target_column/target_uuid pair is replaced by a list of them. Every
-  // pair must match for an op to be folded, so a key of
-  // (network_uuid, node_uuid) can distinguish two hypervisors' work on
-  // the same network where the V1 key could not.
+  // The op_type, coalescing key and uuid of the surviving op together
+  // identify "other ops on the same target whose work the survivor is
+  // about to do". Every key pair must match for an op to be folded,
+  // so a key of (network_uuid, node_uuid) can distinguish two
+  // hypervisors' work on the same network where a single column
+  // could not. Only sibling ops whose entire task list is exactly one
+  // of task_names are folded -- a multi-task sibling might also carry
+  // non-coalescible work and must be left alone.
   string operation_type = 1;
   repeated CoalescibleKeyPair keys = 2;
   repeated string task_names = 3;
@@ -615,8 +591,11 @@ message ClaimCoalescibleSiblingsV2Request {
 }
 
 message FindExistingCoalescibleOpV2Request {
-  // As FindExistingCoalescibleOpRequest, but with the multi-column key
-  // described on ClaimCoalescibleSiblingsV2Request.
+  // Read-only lookup used by enqueue-side dedup: "is there already a
+  // pending op matching this key whose entire task list is just this
+  // one coalescible task?" -- if so the caller returns that op's uuid
+  // to its caller instead of inserting a duplicate. The key is the
+  // one described on ClaimCoalescibleSiblingsV2Request.
   string operation_type = 1;
   repeated CoalescibleKeyPair keys = 2;
   string task_name = 3;
