@@ -15861,6 +15861,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#hard-power-events-in-the-functional-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hard power events in the functional suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#deploy-profiles" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16600,6 +16611,24 @@ tests planned in
 <a href="../../plans/PLAN-ci-cloud-sizing/">PLAN-ci-cloud-sizing</a> are expected to
 need the marker too, to assert that a genuinely full cluster refuses
 rather than have the refusal waited away.</p>
+<h2 id="hard-power-events-in-the-functional-suite">Hard power events in the functional suite<a class="headerlink" href="#hard-power-events-in-the-functional-suite" title="Permanent link">&para;</a></h2>
+<p>A hard reboot (<code>reset()</code>) and a power off (<code>destroy()</code>) are both a pulled
+plug from the guest's point of view, and Linux holds dirty pages for about
+30 seconds before writing them back. Functional tests usually make these
+calls within seconds of the guest's first boot finishing, when cloud-init has
+only just written the ssh host keys and the rendered network configuration.
+A reset in that window brings the guest back with zero length host keys
+(<code>Failed to start ssh.service</code>), no network, and a two minute stall in
+<code>systemd-networkd-wait-online</code> -- issue 4407, which looked like under-cloud
+contention for weeks because the agent, talking over vsock, still came back.</p>
+<p>So a test which hard reboots or powers off a guest and then boots it again
+calls <code>self._flush_guest_writes()</code> (in <code>base.py</code>) first, which runs <code>sync</code> in
+the guest through the agent. The test is about Shaken Fist's power
+plumbing, not the guest's crash consistency. Tests which only assert that the
+instance went off, and never boot it again, do not need it.</p>
+<p>When a ping which was expected to succeed fails, <code>_test_ping()</code> also asks the
+agent for the guest's addresses, routes, failed units and ssh host key sizes,
+since the console tail rarely says why a guest is unreachable.</p>
 <h2 id="deploy-profiles">Deploy profiles<a class="headerlink" href="#deploy-profiles" title="Permanent link">&para;</a></h2>
 <p>A cluster job can deploy more than the default stack without that change
 living in <code>shakenfist/actions</code>. It names a deploy profile, a Jinja2 template
