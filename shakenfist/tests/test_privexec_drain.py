@@ -16,6 +16,8 @@ import threading
 import time
 from unittest import mock
 
+import jinja2
+
 from shakenfist.daemons.privexec import main as privexec_main
 from shakenfist.protos import common_pb2
 from shakenfist.protos import privexec_pb2
@@ -174,3 +176,14 @@ class PrivExecStopBudgetTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, len(timeouts))
         total = privexec_main.STOP_GRACE + privexec_main.TERM_GRACE + privexec_main.KILL_GRACE
         self.assertLessEqual(total + 2, int(timeouts[0]))
+
+    def test_only_privexec_itself_is_signalled_when_it_stops(self):
+        # Its commands, and the dnsmasqs which daemonise from it, are in its
+        # control group: the default KillMode SIGTERMed them all at the start
+        # of the stop, before the drain could let them finish (#4508).
+        with open(UNIT_TEMPLATE) as f:
+            template = jinja2.Template(f.read())
+        for item, expected in (('privexec', ['process']), ('net', []), ('queues', [])):
+            with self.subTest(item):
+                unit = template.render(item=item)
+                self.assertEqual(expected, re.findall(r'^KillMode=(\w+)$', unit, re.MULTILINE))

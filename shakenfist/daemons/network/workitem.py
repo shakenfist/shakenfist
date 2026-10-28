@@ -1,3 +1,4 @@
+import collections
 import queue as queue_module
 import threading
 import time
@@ -32,11 +33,33 @@ DEFER_DELAY_MULTIPLIER = 2.0
 BACKOFF_MAP_CAP = 1000
 
 # Maximum jobs claimed per dequeue round trip. Chosen so the worst-
-# case orphan window on worker crash (BATCH_SIZE items sitting with
-# claimed_at set until the stuck-row reaper finds them) stays small,
+# case orphan window on a crash (BATCH_SIZE items sitting with
+# claimed_at set until sf-net starts again and clears them, or the
+# stuck-row reaper finds them) stays small,
 # while the per-iteration dequeue cost is amortised across enough
 # work to matter under load.
 BATCH_SIZE = 10
+
+# How often a dispatcher which is waiting for its workers to finish before it
+# exits says what it is waiting for.
+WORKER_STOP_LOG_INTERVAL = 30
+
+
+def dispatcher_queue_names(node_uuid):
+    """The queues this node's network dispatcher drains, highest priority first.
+
+    Each queue is drained by exactly one dispatcher (see the safety invariant
+    in Job). Per-node queues ({node_uuid}-network-*) are only drained by this
+    node's net-worker, so they are always included. The cluster-wide
+    networknode-* queues are only drained on the elected network node, so they
+    are added conditionally -- adding them on every node would cause multiple
+    dispatchers to race over the same queue and break the ordering and
+    coalescing guarantees the invariant describes.
+    """
+    queue_names = list(get_node_network_queues(node_uuid))
+    if config.NODE_IS_NETWORK_NODE:
+        queue_names += get_all_network_queues()
+    return queue_names
 
 
 class Job(util_concurrency.Job):
@@ -169,7 +192,10 @@ class Job(util_concurrency.Job):
         # process: per-node {node_uuid}-network-* queues only by that node's
         # net-worker, and the cluster-wide networknode-* queues only by the
         # elected network node (the `if config.NODE_IS_NETWORK_NODE` guard
-        # in execute()).
+        # in dispatcher_queue_names()). And one dispatcher's workers at a
+        # time: a dispatcher which exits first waits for its workers to stop
+        # (_stop_workers()), so the one the monitor restarts never runs
+        # alongside them.
         #
         # DO NOT change the routing so ops for one target can reach two
         # workers, and DO NOT let two nodes drain the same queue, without
@@ -215,22 +241,20 @@ class Job(util_concurrency.Job):
     def _drop_defer_entry(self, op_uuid, defer_delays):
         defer_delays.pop(op_uuid, None)
 
-    def _worker_loop(self, index, worker_queue):
+    def _worker_loop(self, index, worker_queue, stop):
         """One partition of the network worker pool.
 
         Drains its own FIFO queue of pre-routed (queue_name, jobname, op,
-        batch_size) tuples. Exits on the None sentinel or when the abort
-        path fires; any items still claimed at that point are recovered
-        by the stuck-row reaper, exactly as for a worker crash.
+        batch_size) tuples. Exits once stop is set or the abort path
+        fires, finishing the operation it is running first; the dispatcher
+        gives back the claims on whatever is still in its queue.
         """
         defer_delays: dict[str, float] = {}
-        while daemon.check_abort_path(self.abort_path):
+        while not stop.is_set() and daemon.check_abort_path(self.abort_path):
             try:
                 item = worker_queue.get(timeout=0.5)
             except queue_module.Empty:
                 continue
-            if item is None:
-                return
 
             queue_name, jobname, op, batch_size = item
             util_concurrency.set_thread_name(jobname)
@@ -270,21 +294,114 @@ class Job(util_concurrency.Job):
                             f'reaper')
                 util_concurrency.set_thread_name(f'net-worker-{index}')
 
+    def _stop_workers(self, stop, worker_threads):
+        """Stop the workers, and wait for every one of them to exit.
+
+        The dispatcher must not exit while a worker it started still runs.
+        The monitor restarts a dispatcher which has exited, and the new one
+        starts its own workers, so an old worker still running would execute
+        a network's operations alongside the new pool's worker for that
+        network. That breaks link (iv) of the safety invariant above, and
+        per-target ordering with it. The old workers used to be asked to stop
+        with a sentinel skipped when their queue was full, and joined for
+        five seconds (#4645). So wait without a limit: a worker finishes the
+        operation it is running and exits. At process exit the daemon
+        abandons this thread after its own stop grace, and the workers go
+        with the process.
+
+        The cost is liveness: a worker wedged in an operation keeps this
+        dispatcher from exiting, so no network on the node is dispatched
+        until sf-net restarts, which recovers through reset_network_queues.
+        The warning below repeats every WORKER_STOP_LOG_INTERVAL until then.
+        """
+        stop.set()
+        for t in worker_threads:
+            t.join(WORKER_STOP_LOG_INTERVAL)
+            while t.is_alive():
+                LOG.with_fields({'thread': t.name}).warning(
+                    'Waiting for a network worker to finish its operation '
+                    'before the dispatcher exits')
+                t.join(WORKER_STOP_LOG_INTERVAL)
+
+    def _release_claims(self, unrouted, worker_queues):
+        """Give back the claims on work items this dispatcher will not run.
+
+        Those are the items it claimed but had not yet routed, and those
+        still waiting in a worker queue when the workers stopped. Left
+        claimed, nothing ran them until the cluster's stuck-row reaper found
+        them CLUSTER_OP_STUCK_THRESHOLD (30 minutes) later. Every request for
+        the same work in the meantime, sf-net's own startup restore included,
+        was deduplicated onto the stranded operation and waited with it
+        (#4660). Must only be called once the workers have exited.
+        """
+        jobs = [(queue_name, jobname) for queue_name, jobname, _ in unrouted]
+        for worker_queue in worker_queues:
+            while True:
+                try:
+                    queue_name, jobname, _, _ = worker_queue.get_nowait()
+                except queue_module.Empty:
+                    break
+                jobs.append((queue_name, jobname))
+
+        # Never raises: this runs on the dispatcher's way out, where an
+        # exception would replace the one it is failing with, and abandon the
+        # claims not yet given back. sf-net's next start, or the stuck-row
+        # reaper, frees any claim left here.
+        released = []
+        not_released = []
+        remaining = collections.deque(jobname for _, jobname in jobs)
+        while remaining:
+            jobname = remaining.popleft()
+            try:
+                # False means the claim was not cleared: the database
+                # reported an error, or the row was already resolved or
+                # reaped.
+                if mariadb.clear_work_queue_claim(int(jobname)):
+                    released.append(jobname)
+                else:
+                    not_released.append(jobname)
+            except DatabaseUnavailable:
+                # Each call has already waited out its retries, so do not
+                # make the rest wait in turn and delay the restart.
+                not_released.append(jobname)
+                not_released.extend(remaining)
+                remaining.clear()
+            except Exception as e:
+                util_exceptions.ignore_exception(
+                    f'releasing the claim on network work item {jobname}', e)
+                not_released.append(jobname)
+        if jobs:
+            LOG.with_fields({
+                'released': released,
+                'not_released': not_released
+            }).info('Released claims on network work items not run')
+
+    def _route_item(self, queue_name, jobname, workitem, batch_size,
+                    worker_count):
+        """Load a claimed work item's operation and pick its worker.
+
+        Returns the worker index and the item to queue for it, or None for
+        an operation which no longer exists, whose work item is resolved.
+        """
+        op_type = workitem.get('operation_type')
+        op_uuid = workitem.get('operation_uuid')
+        op = get_object_class(op_type).from_db(op_uuid)
+        if not op:
+            LOG.with_fields({
+                'operation_type': op_type,
+                'operation_uuid': op_uuid,
+            }).error('Operation not found')
+            mariadb.resolve_work_item(queue_name, jobname)
+            return None
+
+        op.current_defer_count = workitem.get('defer_count', 0)
+        index = zlib.crc32(self._routing_key(op).encode()) % worker_count
+        return index, (queue_name, jobname, op, batch_size)
+
     def execute(self):
         LOG.info('Starting network worker')
         was_previously_idle = False
-
-        # Safety property: each queue must be drained by exactly one
-        # dispatcher. Per-node queues ({node_uuid}-network-*) are only
-        # drained by this node's net-worker, so they are always included
-        # here. The cluster-wide networknode-* queues are only drained on
-        # the elected network node, so they are added conditionally —
-        # adding them on every node would cause multiple dispatchers to
-        # race over the same queue and break the ordering and coalescing
-        # guarantees described in the safety invariant above.
-        queue_names = list(get_node_network_queues(config.NODE_UUID))
-        if config.NODE_IS_NETWORK_NODE:
-            queue_names += get_all_network_queues()
+        queue_names = dispatcher_queue_names(config.NODE_UUID)
 
         # A partitioned worker pool: this thread claims and routes work,
         # the workers execute it. Ops are partitioned by target so ops
@@ -299,13 +416,21 @@ class Job(util_concurrency.Job):
         worker_queues: list[queue_module.Queue] = [
             queue_module.Queue(maxsize=BATCH_SIZE * 2)
             for _ in range(worker_count)]
+        stop_workers = threading.Event()
         worker_threads = []
         for i in range(worker_count):
             t = threading.Thread(
-                target=self._worker_loop, args=(i, worker_queues[i]),
+                target=self._worker_loop,
+                args=(i, worker_queues[i], stop_workers),
                 name=f'net-worker-{i}', daemon=True)
             t.start()
             worker_threads.append(t)
+
+        # Items claimed from the database and not yet handed to a worker.
+        # Kept across iterations, so that items a database outage
+        # interrupted are routed once it is back rather than left claimed.
+        unrouted: collections.deque = collections.deque()
+        batch_size = 0
 
         try:
             # The queue names list is constant for the dispatcher's
@@ -324,52 +449,66 @@ class Job(util_concurrency.Job):
                     # (1 instead of len(queue_names)) and that
                     # lower-priority queues spill in once the higher ones
                     # are exhausted within a single batch.
-                    items = mariadb.dequeue_work_items(
-                        queue_names, limit=BATCH_SIZE)
+                    if not unrouted:
+                        items = mariadb.dequeue_work_items(
+                            queue_names, limit=BATCH_SIZE)
 
-                    if not items:
-                        if not was_previously_idle:
-                            util_concurrency.set_thread_name('idle')
-                            LOG.debug('This network thread is now idle')
-                            was_previously_idle = True
-                        # Sleep the backoff interval in short chunks so
-                        # shutdown stays responsive even at the cap.
-                        remaining = poll_backoff.next_empty_interval()
-                        while (remaining > 0
-                               and daemon.check_abort_path(self.abort_path)):
-                            chunk = min(0.2, remaining)
-                            time.sleep(chunk)
-                            remaining -= chunk
-                        continue
-
-                    poll_backoff.reset()
-                    if was_previously_idle:
-                        util_concurrency.set_thread_name('net-dispatcher')
-                        was_previously_idle = False
-                    batch_size = len(items)
-                    for queue_name, jobname, workitem in items:
-                        op_type = workitem.get('operation_type')
-                        op_uuid = workitem.get('operation_uuid')
-                        op = get_object_class(op_type).from_db(op_uuid)
-
-                        if not op:
-                            LOG.with_fields({
-                                'operation_type': op_type,
-                                'operation_uuid': op_uuid,
-                            }).error('Operation not found')
-                            mariadb.resolve_work_item(queue_name, jobname)
+                        if not items:
+                            if not was_previously_idle:
+                                util_concurrency.set_thread_name('idle')
+                                LOG.debug('This network thread is now idle')
+                                was_previously_idle = True
+                            # Sleep the backoff interval in short chunks so
+                            # shutdown stays responsive even at the cap.
+                            remaining = poll_backoff.next_empty_interval()
+                            while (remaining > 0
+                                   and daemon.check_abort_path(
+                                       self.abort_path)):
+                                chunk = min(0.2, remaining)
+                                time.sleep(chunk)
+                                remaining -= chunk
                             continue
 
-                        op.current_defer_count = workitem.get('defer_count', 0)
-                        index = (zlib.crc32(self._routing_key(op).encode())
-                                 % worker_count)
-                        item = (queue_name, jobname, op, batch_size)
+                        poll_backoff.reset()
+                        if was_previously_idle:
+                            util_concurrency.set_thread_name('net-dispatcher')
+                            was_previously_idle = False
+                        batch_size = len(items)
+                        unrouted.extend(items)
+
+                    while unrouted:
+                        queue_name, jobname, workitem = unrouted[0]
+                        try:
+                            routed = self._route_item(
+                                queue_name, jobname, workitem, batch_size,
+                                worker_count)
+                        except DatabaseUnavailable:
+                            raise
+                        except Exception as e:
+                            # Skip an item which cannot be loaded or routed,
+                            # and leave it claimed: the stuck-row reaper
+                            # retries it, and errors it after
+                            # CLUSTER_OP_MAX_ATTEMPTS. Letting this end the
+                            # dispatcher would hand the claim back on the way
+                            # out, so the next dispatcher would claim it first
+                            # and end too.
+                            util_exceptions.ignore_exception(
+                                f'routing network work item {jobname}', e)
+                            unrouted.popleft()
+                            continue
+
+                        if not routed:
+                            unrouted.popleft()
+                            continue
+
+                        index, item = routed
                         # A blocking put with a timeout so shutdown stays
                         # responsive while a full worker queue applies
                         # backpressure.
                         while daemon.check_abort_path(self.abort_path):
                             try:
                                 worker_queues[index].put(item, timeout=1)
+                                unrouted.popleft()
                                 break
                             except queue_module.Full:
                                 continue
@@ -382,22 +521,15 @@ class Job(util_concurrency.Job):
                     # The database will come back; pause dispatch rather
                     # than letting this thread die and churn through
                     # supervisor restarts. Items claimed but not yet
-                    # routed when a mid-batch failure struck are
-                    # recovered by the stuck-row reaper, exactly as for
-                    # a worker crash.
+                    # routed when a mid-batch failure struck stay in
+                    # unrouted, and are routed once it is back.
                     LOG.warning(
                         'Database service unavailable, pausing network '
                         'work dispatch')
                     time.sleep(5)
         finally:
-            for wq in worker_queues:
-                try:
-                    wq.put_nowait(None)
-                except queue_module.Full:
-                    # The worker will notice the abort path instead.
-                    pass
-            for t in worker_threads:
-                t.join(timeout=5)
+            self._stop_workers(stop_workers, worker_threads)
+            self._release_claims(unrouted, worker_queues)
 
     def _cluster_operation_execute(self, queue_name, op, batch_size,
                                    defer_delays):

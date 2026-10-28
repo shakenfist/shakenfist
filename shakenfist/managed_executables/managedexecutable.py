@@ -20,6 +20,15 @@ from shakenfist.schema.object_types import ObjectType
 LOG, _ = logs.setup(__name__)
 
 
+# How long _send_signal() waits for a process it has sent SIGKILL to. The
+# managed executables are started through sf-privexec and daemonise, so they
+# are never children of the process signalling them, and waitpid() on one
+# returns at once. dnsmasq's hard restart then started the replacement while
+# the old process still held its sockets, and the new one failed to bind its
+# DHCP port 13ms after the kill (#4472).
+KILL_WAIT_TIMEOUT = 5
+
+
 class ManagedExecutable(dbo):
     object_type = ObjectType.UNKNOWN_MANAGED_EXECUTABLE
 
@@ -134,12 +143,22 @@ class ManagedExecutable(dbo):
                                'signal': sig
                            })
             if sig == signal.SIGKILL:
-                try:
-                    os.waitpid(pid, 0)
-                except ChildProcessError:
-                    pass
+                self._wait_for_exit(pid)
             return True
         return False
+
+    def _wait_for_exit(self, pid: int) -> None:
+        """Wait for a process we have killed, child or not, to be gone."""
+        try:
+            psutil.Process(pid).wait(timeout=KILL_WAIT_TIMEOUT)
+        except psutil.NoSuchProcess:
+            pass
+        except psutil.TimeoutExpired:
+            LOG.with_fields({
+                'pid': pid,
+                'object_type': self.object_type,
+                'object_uuid': self.uuid
+            }).warning(f'Process still running {KILL_WAIT_TIMEOUT} seconds after SIGKILL')
 
     def subst_dict(self) -> dict[str, Any]:
         return {

@@ -60,6 +60,24 @@ SuccessExitStatus=SIGTERM 143
 RestartPreventExitStatus=SIGTERM
 RuntimeDirectory=sf
 RuntimeDirectoryPreserve=yes
+{% if item == "privexec" %}
+# Stopping sf-privexec signals only sf-privexec itself. Everything it runs is
+# in its control group, so systemd's default sent SIGTERM to all of it at the
+# start of every stop: the hash a caller was waiting on, which it then read as
+# a checksum failure (#4508), and every dnsmasq the node runs, which daemonise
+# from it, leaving each network without DHCP or DNS until sf-net noticed and
+# started it again. sf-privexec drains its own in-flight requests on SIGTERM,
+# and ends the commands still running when the drain's grace runs out (see
+# STOP_GRACE in shakenfist/daemons/privexec/main.py). A daemonised dnsmasq
+# outlives the restart, as it would have outlived an ordinary command.
+#
+# So stopping sf-privexec does not stop dnsmasq, which sf-net starts and stops
+# with its networks; nothing should stop sf-privexec to get rid of it. Nor does
+# a SIGKILL after TimeoutStopSec reach the commands still running. Both stay in
+# the control group, and systemd's "Found left-over process" warnings when
+# sf-privexec next starts are expected.
+KillMode=process
+{% endif %}
 {% if item == "cluster" %}
 # sf-cluster is the elected cluster maintainer. Its maintenance pass
 # (schedule.run_pending() plus _cluster_wide_cleanup) scales with cluster size

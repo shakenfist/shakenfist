@@ -45,6 +45,29 @@ def node_job_classes():
     return classes
 
 
+def reset_network_queues(node_uuid):
+    """Clear the claims this node's previous sf-net left on its queues.
+
+    A stopping sf-net gives back the claims on work it had not started, but
+    one which crashed, or was killed while an operation ran, cannot. Those
+    claims were left for the cluster's stuck-row reaper, which only acts once
+    they are CLUSTER_OP_STUCK_THRESHOLD (30 minutes) old, and every request
+    for the same work in the meantime was deduplicated onto the stranded
+    operation (#4660). Only this node's sf-net drains these queues, and its
+    dispatcher has not started yet, so a claim on one belongs to a process
+    which has stopped. sf-net re-runs an operation it dequeues in executing,
+    so clearing the claim is all an interrupted one needs.
+
+    Best effort: a queue which cannot be reset is left to the reaper.
+    """
+    for queue_name in workitem.dispatcher_queue_names(node_uuid):
+        try:
+            mariadb.restart_work_queue(queue_name)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'resetting network work queue {queue_name}', e)
+
+
 class Monitor(daemon.WorkerPoolDaemon):
     def _run_inner(self):
         last_defer_message = 0
@@ -161,6 +184,13 @@ def main():
             util_concurrency.execute(
                 'iptables -w 10 -t nat -A POSTROUTING '
                 '-o %(egress_nic)s -j MASQUERADE' % subst)
+
+    # The dispatcher names its queues from config.NODE_UUID, which the
+    # monitor would otherwise only resolve once it starts. Resolve it here,
+    # so that the queues reset are the ones the dispatcher drains.
+    if not config.NODE_UUID:
+        config.NODE_UUID = str(n.uuid)
+    reset_network_queues(config.NODE_UUID)
 
     duration = time.time() - start_time
     LOG.info(f'Startup tasks took {duration:.2f} seconds')

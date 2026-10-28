@@ -177,24 +177,26 @@ class _DrainerThread(threading.Thread):
         self._stop_event.set()
 
     def run(self) -> None:
-        try:
-            while not self._stop_event.is_set():
+        while not self._stop_event.is_set():
+            try:
                 drained = self._drain_one_batch()
-                if drained:
-                    # More work might be ready; loop hot.
-                    continue
-                self._stop_event.wait(DRAIN_POLL_INTERVAL)
-        except Exception as e:
-            # Catch-all so an unexpected exception doesn't
-            # silently kill the drainer thread and leave the
-            # spool growing forever. Log and exit; the atexit
-            # hook will then drain synchronously on process
-            # exit, and orphan recovery on the next startup
-            # picks up whatever's left.
-            LOG.with_fields({
-                'error': str(e),
-                'error_type': type(e).__name__,
-            }).error('Eventlog drainer thread exited unexpectedly')
+            except Exception as e:
+                # A failed pass must not end the thread. Nothing restarts
+                # it, so draining stopped for the life of the process and
+                # the spool grew until the next deploy; a database outage
+                # was enough to do it (#3431). The batch is still in the
+                # spool, because rows are only deleted once written, so
+                # retry it after the same backoff a failed write gets.
+                LOG.with_fields({
+                    'error': str(e),
+                    'error_type': type(e).__name__,
+                }).warning('Eventlog drainer pass failed, retrying')
+                self._on_rpc_failure(f'{type(e).__name__}: {e}')
+                continue
+            if drained:
+                # More work might be ready; loop hot.
+                continue
+            self._stop_event.wait(DRAIN_POLL_INTERVAL)
 
     def drain_until_empty(
             self, deadline_seconds: float = SHUTDOWN_DRAIN_TIMEOUT
