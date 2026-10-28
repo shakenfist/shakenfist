@@ -47,6 +47,9 @@ erDiagram
         integer expires "epoch seconds"
         string backend_ticket "nullable, minting sources only"
         integer backend_ticket_expires "nullable, epoch seconds"
+        string backend_proxy_uri "nullable, tunnelled consoles only"
+        string backend_connect_host "nullable, secret"
+        integer backend_port "nullable, TLS port through the tunnel"
     }
 
     consoletokens ||--o{ proxychannels: "consoletokens authenticate proxychannels"
@@ -214,6 +217,9 @@ Time-limited access tokens for console connections.
 | expires | integer | Token expiration time (epoch seconds) |
 | backend_ticket | string | Nullable; the session's minted SPICE ticket |
 | backend_ticket_expires | integer | Nullable; when that ticket expires (epoch seconds) |
+| backend_proxy_uri | string | Nullable; the HTTP CONNECT proxy minted with the ticket |
+| backend_connect_host | string | Nullable; the signed host to ask that proxy for |
+| backend_port | integer | Nullable; the console's TLS port through the tunnel |
 
 There is one row per session: the `.vv` file a user is issued carries
 the token, and every channel of the session presents it to the proxy.
@@ -245,6 +251,19 @@ and is included. The maintenance pass's
 `db.clear_expired_backend_tickets()` nulls both columns once the ticket
 has expired or the token has, since after either no channel can use it.
 Both columns are `NULL` for sources that do not mint tickets.
+
+Some sources hand out consoles that are only reachable through an HTTP
+CONNECT proxy, and mint the tunnel along with the ticket:
+`backend_proxy_uri` is the proxy to dial, `backend_connect_host` is the
+opaque host to ask it for, and `backend_port` is the console's TLS port
+behind it. The connect host is signed by the source, so it is a
+credential like the ticket: it is in `db.CONSOLE_TOKEN_SECRET_FIELDS`,
+while the proxy and the port are exported. The three columns are
+written with the ticket by `db.session_ticket()`, reused with it, and
+cleared with it by `db.clear_expired_backend_tickets()`. A ticket
+minted without a tunnel stores `NULL` in all three, so a session whose
+ticket is re-minted never keeps a stale tunnel, and a stored ticket
+whose `backend_connect_host` is `NULL` is dialled directly.
 
 ### proxychannels
 

@@ -12,6 +12,154 @@ risks stand unless this plan says otherwise. What follows
 grounds it in the code as of 2026-09-26 and changes the
 design where the code disagreed with the sketch.
 
+## Re-survey, 2026-10-28
+
+The spike paused after step 1b, waiting on ryll's
+`PLAN-rdp-frontend.md` phase 1 (kerbside #581). That has
+merged, and so has a month of work in two other plans that
+built pieces of this one. Before resuming, steps 2 to 6 were
+re-checked against kerbside develop 694d565, ryll develop
+f5b67e3 and andris develop e29929fa88. Planning effort: high.
+
+### Where the steps stand
+
+| Step | State | Evidence |
+|------|-------|----------|
+| 1a | Complete | ryll fdb5ead5b4 (#406) |
+| 1b | Complete | kerbside eab2c572cf (#494), review follow-ups 9d1b64d (#505); #477 closed |
+| 2 | Not started | `relay.rs` has no ACK tracking; neither performance page reports an observed window |
+| 3a | Complete, delivered by other plans | see below |
+| 3b | Not started, now unblocked | |
+| 4, 5, 6 | Not started | |
+
+### What the survey found
+
+1. **Step 3a was built by andris and by ryll's RDP plan,
+   item for item.** shakenfist/andris is a Rust SPICE server
+   exporting an X11 desktop, and its phases 2 and 3 were ryll
+   pull requests for server-role wire types and image
+   encoders:
+   - **Serialisers.** ryll 3763158 (#477, andris phase 2) gave
+     every display message a `WireType` with `read` and
+     `write` (`shakenfist-spice-protocol/src/messages/mod.rs:33`).
+     `SurfaceCreate`, `SurfaceDestroy`, `DrawCopy` (with a
+     `DrawCopyBuilder`), `DisplayMonitorsConfig`,
+     `DisplayInit`, `PreferredCompression`,
+     `PreferredVideoCodecType`, `StreamDestroy` and `SetAck`
+     all have both. MARK, RESET, INVAL_ALL_PIXMAPS,
+     INVAL_ALL_PALETTES and STREAM_DESTROY_ALL have empty
+     bodies and need only their opcodes, which
+     `constants.rs:313-324` defines.
+   - **Encoders.** ryll 6895658 and 8dc590b (#487, andris
+     phase 3) added `encode_spice_lz4` and `encode_spice_jpeg`
+     to the compression crate (`src/encode/mod.rs:142,204`).
+     The JPEG encoder is the pure-Rust `jpeg-encoder`, not the
+     `mozjpeg` wrapper the brief asked for; it produces what
+     spice-gtk decodes, which andris has shown in production.
+   - **Configurable compression.** ryll 82786ae made
+     `DisplayChannel::new` take the `PREFERRED_COMPRESSION`
+     value (`channels/display.rs:1044-1057`).
+   - **Slim renderer and damage.** ryll 4696a95 (#595, RDP
+     phase 1) made audio, usbredir, webdav, the H.264 encoder,
+     H.264 decode and mozjpeg optional features of the
+     renderer, checked by `make lint`, and added a bounded
+     `DamageRegion` to `DisplaySurface` with `take_damage()`
+     (`display/damage.rs`, at most 32 rectangles).
+2. **Suppressing the codec preference is unnecessary.** Brief
+   3a asked for a way not to send
+   `PREFERRED_VIDEO_CODEC_TYPE`. spice-server's
+   `dcc_create_video_encoder` skips every preferred codec whose
+   cap a `MULTI_CODEC` client lacks, and falls back to MJPEG
+   only if `CODEC_MJPEG` is set
+   (`server/video-stream.cpp:801-835`). The backend caps alone
+   suppress streams; the preference message changes nothing.
+3. **Andris already has step 3b's client half.** Its
+   `server/updates/` module is a damage-driven display output
+   that does what brief 3b describes, and its phase 5 measured
+   the thresholds:
+   - a shadow of what the client holds, diffed against new
+     pixels in tiles, so a change is sent once however often
+     it was drawn;
+   - JPEG for rectangles its classifier calls photographic,
+     tracked as lossy and re-sent as LZ4 after 500 ms without
+     damage (`lossy.rs`, `encode.rs`);
+   - at most 32 rectangles per frame, collapsing to row spans
+     and then bands, and splitting any rectangle over 4 MiB raw
+     to stay under kerbside's 16 MiB message cap;
+   - under backpressure, damage is merged into the pending
+     region rather than queued, and fresh pixels are read when
+     the frame starts.
+
+   The difference is the pacing signal: andris paces on the
+   SPICE ACK window, and this plan paces on the client socket
+   with no SET_ACK. That difference is the thing the spike
+   exists to measure, so it stays.
+4. **Andris cannot be a dependency of kerbside-proxy.** It is
+   one crate, `andris`, whose library depends unconditionally
+   on x11rb, opus, clap and tokio "full", and its update
+   pipeline takes andris's own `platform::Capture` and `Patch`
+   types.
+5. **Ryll's `--rdp` display handler is the pacing precedent.**
+   `shakenfist-spice-rdp/src/display.rs` serves a
+   `SurfaceMirror` to a client that pulls: it takes the mirror's
+   damage only when the previous update has been written, so a
+   slow client never causes a queue and superseded pixels are
+   never sent. That is the pull loop brief 3b asks for, built on
+   the same renderer and the same damage type.
+6. **The JPEG and LZ4 encoders still bring openh264.**
+   ryll#499 asked for openh264 to be optional. The decode half
+   is now (`h264-decode`), but the compression crate's `encode`
+   feature still bundles the LZ4 and JPEG encoders with the
+   H.264 encoder and `openh264-sys2`. A transcoder that never
+   emits H.264 therefore builds Cisco's codec from source.
+   That is acceptable behind a non-default feature, which this
+   plan already requires. It is not acceptable in a productised
+   wheel, so it becomes a productising prerequisite (brief 6).
+7. **Kerbside's ryll pin is 109 commits behind.** It is
+   4c91b13 (2026-10-22). Step 3b needs the renderer at the
+   same revision as the protocol crate, so it bumps both.
+8. **Step 2's brief points at a metrics page that does not
+   exist.** The proxy's metrics are listed in
+   `docs/configuration.md:103-130` and defined in
+   `rust/kerbside-proxy/src/metrics.rs`; brief 2 now says so.
+9. **#505 and #581 were missing from the master plan's
+   `Merged` cell.** Both changed this phase on develop. They
+   are recorded now.
+
+The false or stale claims in the master plan's phase 3 and 4
+sections and in `docs/plans/index.md` were corrected at source
+in the same commit as this section; later steps need not redo
+that.
+
+### Decisions taken in the re-survey
+
+1. **Step 3a is closed as delivered, and its brief is kept
+   only as a map** from each item to the commit that delivered
+   it. Andris and ryll's RDP plan audit that work under their
+   own push audits; it is not added to this phase's `Merged`
+   cell, so phase 6 does not audit it twice.
+2. **Step 3b adapts andris's update pipeline rather than
+   writing one.** It is copied into the transcode module at a
+   named andris commit, and only the input side is replaced:
+   the renderer's `SurfaceMirror` and `DamageRegion` in place of
+   andris's X11 capture and damage. This is the decision most
+   likely to be argued with, because it creates a second copy.
+   The alternative is to extract the pipeline into a shared
+   crate first, which means a ryll pull request, an andris
+   pull request moving onto the crate during andris's
+   packaging phase, and a pin bump in both consumers, all for a
+   spike whose answer may be no. A copy costs nothing if the
+   answer is no. If it is yes, extracting the crate is the
+   first productising step (brief 6), and the copy is what gets
+   deleted.
+3. **Pacing stays on the client socket, with no SET_ACK.**
+   Andris's ACK-window pacing is the comparison, not the
+   default (finding 3). Step 4 reports both, by also running the
+   transcoder with a SET_ACK window on the client leg.
+4. **The backend leg sends no extra codec message.** Finding 2
+   makes it redundant; the backend dial already advertises
+   `MULTI_CODEC` with no `CODEC_*` bits.
+
 ## Situation
 
 Sources read on 2026-09-26: kerbside develop 764183f, ryll
@@ -307,22 +455,21 @@ ryll's through its own Makefile, never with a host toolchain.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
-| 1a | high | opus | none | ryll: per-connection link caps in `shakenfist-spice-protocol`. See brief notes. |
-| 1b | high | opus | none | kerbside: bump the ryll pin, forward client caps, per-channel-type reply caps, handshake tests. Fixes #477. See brief notes. |
-| 2 | high | opus | none | kerbside: observe the ACK window from the relay, then measure it on the shaped-link rig. See brief notes. |
-| 3a | high | opus | none | ryll: server-role display serialisers and a configurable display channel. The slim renderer feature set moved to ryll's `PLAN-rdp-frontend.md` phase 1. See brief notes. |
-| 3b | high | opus | worktree | kerbside: the transcoding display channel behind a feature and a flag. See brief notes. |
+| 1a | high | opus | none | Complete (ryll #406). ryll: per-connection link caps in `shakenfist-spice-protocol`. See brief notes. |
+| 1b | high | opus | none | Complete (#494, #505). kerbside: bump the ryll pin, forward client caps, per-channel-type reply caps, handshake tests. Fixes #477. See brief notes. |
+| 2 | high | opus | none | Complete (see Execution notes). kerbside: observe the ACK window from the relay, then measure it on the shaped-link rig. Commit: "Observe the display ACK window in the relay." See brief notes. |
+| 3a | high | opus | none | Complete, delivered by andris phases 2-3 and ryll's RDP phase 1 (Re-survey, finding 1). No work remains. |
+| 3b | high | opus | worktree | Complete (see Execution notes). kerbside: the transcoding display channel behind a feature and a flag, on andris's update pipeline. Commit: "Add a transcoding display channel." See brief notes. |
 | 4 | high | opus | none | Measure transcoding against the re-baseline, including sub-10 Mbit links, CPU and image quality. See brief notes. |
 | 5 | high | opus | worktree | Test moving a live session between relay and transcoding. See brief notes. |
 | 6 | high | opus | none | Write up the spike with a go or no-go recommendation. See brief notes. |
 
-Steps 1a and 1b come first. Step 2 depends only on the relay
-and can run beside 1a. Step 3a can start once 1a has merged,
-and 3b needs 1b, 3a and phase 1 of ryll's
-`PLAN-rdp-frontend.md` (the slim feature set and the
-renderer's damage accumulator). Steps 4 and 5 need 3b. The management
-session reviews and commits each step, and records each merge
-in this plan.
+Steps 1a, 1b and 3a are complete. Steps 2 and 3b are
+independent and can run in parallel: 2 touches only the relay
+and the rig, 3b only the backend seam and a new module. Steps
+4 and 5 need 3b, and step 4 also uses step 2's observation.
+The management session reviews and commits each step, and
+records each merge in this plan.
 
 Brief notes for 1a:
 
@@ -395,7 +542,9 @@ Brief notes for 2:
   in-flight count is messages sent minus ACKs times the window.
   spice-server blocks once in-flight exceeds twice the window.
   Expose it as a Prometheus metric or at debug level (choose,
-  and justify against the metrics conventions in `docs/`), and
+  and justify against the existing metrics, listed in
+  `docs/configuration.md:103-130` and defined in
+  `rust/kerbside-proxy/src/metrics.rs`), and
   count how often in-flight reaches the block threshold.
 - **Keep the relay byte-exact.** This is observation only; it
   must not change what is forwarded.
@@ -410,7 +559,20 @@ Brief notes for 2:
   saying whether the mechanism is confirmed. A refutation is a
   result, and it weakens transcoding's case: say so.
 
-Brief notes for 3a:
+Brief notes for 3a (complete; kept as a map, per the
+re-survey's decision 1):
+
+- Serialisers: ryll 3763158 (#477), every display message a
+  `WireType`; empty-bodied messages need only their opcodes.
+- Readers for DISPLAY_INIT and PREFERRED_*: the same change.
+- LZ4 encoding: ryll 6895658. JPEG encoding: ryll 8dc590b,
+  through `jpeg-encoder` rather than `mozjpeg`.
+- Configurable display channel: ryll 82786ae for
+  PREFERRED_COMPRESSION; the codec preference needs no switch
+  (re-survey finding 2).
+- Slim features: ryll 4696a95 (#595).
+
+The original brief follows, unchanged.
 
 - **Serialisers.** Add writers, in the protocol crate, for the
   display server messages the transcoder emits: SURFACE_CREATE,
@@ -442,18 +604,47 @@ Brief notes for 3a:
 
 Brief notes for 3b:
 
+- **Read first** (re-survey findings 3 to 7): andris's
+  `andris/src/server/updates/` and its phase 5 plan
+  (`docs/plans/PLAN-x11-desktop-phase-05-damage.md`,
+  decisions 6, 7 and 9), and ryll's
+  `shakenfist-spice-rdp/src/display.rs` for the pull loop.
+- **Pin bump.** Bump the ryll rev in
+  `rust/kerbside-proxy/Cargo.toml` from 4c91b13 to current
+  develop, and add `shakenfist-spice-renderer` and
+  `shakenfist-spice-compression` at the same rev, optional,
+  with `default-features = false`. The renderer needs no
+  features; the compression crate needs `encode`, `lz4` and
+  `jpeg`. Keep the exact `rev` pin, for the reason the comment
+  above it gives. Review what the 109 commits change in the
+  protocol crate before trusting the bump, and run the handshake
+  tests from 1b.
+- **The update pipeline is adapted from andris.** Copy
+  `server/updates/` (shadow, tile diff, lossy tracking, the
+  encode classifier, rectangle limits) into the transcode
+  module, with the geometry types it takes from andris's
+  `platform`. Name the andris commit in a header comment, and
+  say what was changed. Drop `stream.rs` and `heat.rs`: no
+  streams in this spike. Replace the input side only: a
+  "capture" is the renderer's `SurfaceMirror` primary surface,
+  and its damage comes from `take_damage()`, which then says
+  where the shadow diff should look. Keep andris's 4 MiB split
+  and its 32-rectangle cap.
 - **Feature and flag.** A `transcode` cargo feature, off by
-  default, gates the renderer dependency and the new module.
-  `--transcode-display` (process-wide, off by default) enables
-  it at run time. Confirm the release wheel build does not
-  enable the feature.
+  default, gates the renderer and compression dependencies and
+  the new module. `--transcode-display` (process-wide, off by
+  default) enables it at run time. Confirm the release wheel
+  build does not enable the feature: `encode` builds openh264
+  from source (re-survey finding 6).
 - **Seam.** In `backend::run`, before dialling: a display
   channel in transcode mode dials with MULTI_CODEC and no
   CODEC_* bits, no STREAM_REPORT, and otherwise the client's
   caps. Everything else goes to `relay::run` unchanged.
 - **Backend half.** Hand the backend `SpiceStream` to ryll's
-  `DisplayChannel`, configured to send PREFERRED_COMPRESSION LZ4
-  and no codec preference. Apply its events to a
+  `DisplayChannel`, configured to send PREFERRED_COMPRESSION
+  LZ4. Its codec preference message is harmless, because the
+  backend caps carry no `CODEC_*` bits (re-survey finding 2).
+  Apply its events to a
   `SurfaceMirror`, and accumulate damage rectangles from the
   events, using the damage accumulator that phase 1 of ryll's
   `PLAN-rdp-frontend.md` adds to the renderer rather than
@@ -467,11 +658,15 @@ Brief notes for 3b:
   channel.
 - **Pacing.** Write only when the client socket's unsent bytes
   are under the low-water mark; otherwise keep accumulating
-  damage. When writable, send the damaged region: JPEG if it
-  changed within the last interval, LZ4 once it has been quiet
-  for that interval (make both the interval and the JPEG
-  quality flags). Coalesce overlapping rectangles, and bound the
-  number of rectangles per flush.
+  damage. This is ryll `--rdp`'s pull loop, and andris's
+  "merge rather than queue" with the socket in place of its ACK
+  window. When writable, run the adapted pipeline over the
+  damage: JPEG for what its classifier calls photographic, and
+  an LZ4 refresh once a lossy area has been quiet (make the
+  quiet interval and the JPEG quality flags, defaulting to
+  andris's 500 ms and 85). Also add a debug-only option that
+  paces on a SET_ACK window instead, as andris does, so step 4
+  can compare the two (re-survey decision 3).
 - **Surface changes.** Resize and surface destroy from the
   backend are forwarded as a new SURFACE_CREATE and a full draw.
 - **Lifecycle.** Honour the session's `CancellationToken`, emit
@@ -491,11 +686,19 @@ Brief notes for 4:
 - **Matrix.** Reuse the shaped-link rig and the re-baseline's
   cells, and add sub-10 Mbit profiles (for example 80 ms / 5
   Mbit and 150 ms / 2 Mbit). Compare relay with
-  `streaming-video=off`, relay with `all`, and transcode.
+  `streaming-video=off`, relay with `all`, transcode paced on
+  the socket, and transcode paced on a SET_ACK window.
 - **Per session, record:**
   - keypress-to-draw latency, p50 and p95;
   - CPU on the Kerbside host, including an unshaped LAN run
     (the always-transcode cost);
+  - resident memory per transcoded session, against relay. Each
+    one holds the renderer's pixmap cache (sized at 256 MiB), a
+    GLZ dictionary (64 MiB), the mirror's RGBA surface and the
+    BGRX shadow, and the guest chooses the resolution, so this
+    sets how many sessions a node can carry. Record how full the
+    pixmap cache gets, and shrink it if spice-server barely uses
+    it on these guests;
   - image quality: SSIM and PSNR of the client's final frame
     against a lossless capture of the same workload, taken at
     the same instants. Say how the capture was made and aligned;
@@ -532,7 +735,19 @@ Brief notes for 6:
   answer to the master plan's Open question 4.
 - If go: draft phase plans for productising SPICE-out (the
   per-session carrier, the sandboxed worker, capacity, codec
-  licensing, the out-of-scope list) and for WebRTC out.
+  licensing, the out-of-scope list) and for WebRTC out. Two
+  prerequisites come first: extract the update pipeline that
+  3b copied from andris into a shared crate both use, deleting
+  the copy; and split the compression crate's `encode` feature
+  so the image encoders build without openh264 (ryll#499,
+  re-survey finding 6). The sandboxed worker is not optional
+  either: a transcoded backend leg skips the relay's L0/L1
+  inspection and its 16 MiB framing cap, so ryll's renderer
+  limits are all that bound guest-influenced decode inside the
+  process that holds every session.
+- Say what this spike's output half means for phase 4. Andris
+  is already most of the Son of SPICE helper, with an X11
+  input where phase 4 wants D-Bus.
 - If no-go: say what would change the answer.
 - Update the master plan: the phase 3 row, Open question 4, and
   Future work items this changes.
@@ -553,3 +768,116 @@ Brief notes for 6:
 - The spike's write-up gives a go or no-go, and the master
   plan's Execution row records every merge (ryll and kerbside)
   in `Merged`.
+- The transcode module's copy of andris's pipeline names its
+  source commit, and `grep -rn 'andris' rust/kerbside-proxy/src/`
+  finds that header.
+- `tools/build-proxy-wheel.sh` builds without the `transcode`
+  feature, and the built wheel's binary contains no openh264
+  symbols (`nm -D` or `strings` finds no `WelsCreate`).
+
+## Execution notes
+
+- **2026-10-28 (AEDT), back brief.** Mikal chose to run steps 2
+  and 3b in this pull request and stop before step 4; the
+  management session signs off 3b's andris gate; the session
+  may push and open the pull request. Steps 2 and 3b ran in
+  sequence rather than in parallel, because 3b's Docker builds
+  would load the host while step 2's rig was timing keypresses.
+- **Step 2.** The relay follows the window, exported as
+  `kerbside_proxy_ack_window_*` Prometheus metrics labelled by
+  channel (and by window, limited to 20, 40 or other), with a
+  per-channel summary logged at the end of each relay. Metrics
+  rather than per-message debug logging, because the rig already
+  scrapes `/metrics` and a log line per message would perturb the
+  timing. Result: the backlog bound is confirmed (in-flight
+  peaked at exactly 81 in 14 of 16 runs at 80 ms), and phase 1's
+  throughput-cap reading is refuted. The master plan's *What the
+  first measurements changed* and
+  `docs/performance/proxy-backpressure.md` carry the correction.
+  Two rig notes: `ryll-surface-drawn-rect.patch` no longer
+  applies to ryll develop, so the rig built ryll at 0d140b3 with
+  its own `RYLL_REF` option; and the side finding that every
+  80 ms link gets W=40 and JPEG draws means step 4's
+  image-quality baseline for relay is already lossy.
+- **Step 3b ran in the phase worktree, not an isolated one.** The
+  sub-agent worktree option branches from the default branch,
+  not from this phase branch, so the step worked in place; its
+  output was reviewed uncommitted, as for every step.
+- **Step 3b's gate.** The management session approved the cut
+  on 2026-10-28: andris's `updates/` (shadow, tile diff, lossy
+  tracking, encode classifier) and its geometry types, copied
+  at e29929f; streams, heat, the scrub and the platform traits
+  dropped; an adapter that reads the mirror's damaged
+  rectangles as a capture, converting RGBA to BGRX.
+- **Step 3b departed from its brief in these places,** each
+  argued at the gate:
+  - The backend display channel is dialled with a fixed set of
+    caps that describes ryll's renderer (LZ4,
+    PREF_COMPRESSION, MULTI_CODEC with no CODEC_* bits,
+    PREF_VIDEO_CODEC_TYPE, MONITORS_CONFIG), not the client's.
+    The backend's reader is the renderer, and a client without
+    LZ4 would otherwise push the backend to QUIC, then JPEG.
+  - MONITORS_CONFIG goes to the client only if the client
+    advertised it. The brief keyed it on the reply, which
+    always advertises it.
+  - Relay fallback happens only at connect: a display channel
+    other than id 0 is relayed. Draws and images the renderer
+    cannot handle arrive after the client holds the
+    transcoder's surface, so they are logged once, counted in
+    `kerbside_proxy_transcode_unsupported_total{kind}`, and
+    leave a stale region.
+  - The ACK-window pacing option is a hidden run-time flag
+    (`--transcode-ack-window`), not a debug build, because
+    step 4 measures release builds.
+  - The client leg has no idle-read timeout: a socket-paced
+    client is silent after DISPLAY_INIT. TCP keepalive catches
+    a dead client. A live client that stops reading is caught by
+    a bound on the writes instead: one that makes no progress
+    for the relay's idle timeout (15 minutes) ends the channel.
+    The first review of #616 found that gap.
+  - The ryll pin is b33dea4, 117 commits past 4c91b13. The
+    protocol crate's source is unchanged across them.
+- **Step 3b verification.** 92 tests without the feature, 173
+  with it, and lint clean in both, reproduced by the management
+  session. A default release build has no openh264 symbols. End
+  to end in the direct-qemu harness, headless ryll matched a
+  direct-to-qemu screenshot pixel for pixel (apart from the
+  guest's changing QR code), and remote-viewer (spice-gtk
+  0.42) drew correctly. Not tested: a guest resize end to end.
+  Ryll releases up to 0.1.5 cannot decode the LZ4 draws the
+  transcoder sends, and the harness doc says so.
+- **Not done here: CI does not build the `transcode` feature,**
+  so it can rot unnoticed until step 4 builds it. A lane would
+  build openh264 on every run. Left for the productising
+  decision rather than added to a spike.
+
+## Risks added by the re-survey
+
+- **The andris copy drifts.** Andris keeps fixing its pipeline
+  while the spike runs. The header comment names the commit, so
+  step 6 can diff the copy against andris develop and say what
+  the spike missed. The management session checks the header
+  exists when reviewing 3b.
+- **Andris's thresholds were tuned for an X11 desktop, not a
+  qemu guest.** The classifier was measured on real desktop
+  screens, so it should transfer, but a guest's console text is
+  sharper than a remote desktop's. Step 4's legibility check is
+  where this would show; if it does, step 4 says so rather than
+  re-tuning silently.
+- **The pin bump brings unrelated ryll changes.** 109 commits
+  touch the protocol crate as well as the renderer. 3b's brief
+  makes reviewing them and rerunning 1b's handshake tests part
+  of the step.
+
+## Back brief
+
+Before executing any step of this plan, back brief the
+operator on your understanding of the plan and how the work
+you intend to do aligns with it.
+
+Gate for step 3b: before copying any andris code, the
+implementing agent reports which andris files and types it
+will take, what it will drop, and the shape of the adapter
+from `SurfaceMirror` to andris's capture input. The management
+session agrees that shape before editing starts, because a
+wrong cut here is cheap to propose and expensive to redo.

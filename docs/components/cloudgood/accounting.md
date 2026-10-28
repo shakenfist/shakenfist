@@ -170,7 +170,7 @@ This is almost exactly analogous to how userspace process accounting
 works. The key parallel:
 
 | Scenario | Code runs in | Interrupted by | Returns to |
-|----------|-------------|----------------|------------|
+| ---------- | ------------- | ---------------- | ------------ |
 | Userspace process | Ring 3 | Timer interrupt | Ring 0 (kernel) |
 | KVM guest vCPU | VMX non-root | Timer interrupt (VM exit) | VMX root (host kernel) |
 

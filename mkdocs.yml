@@ -103,6 +103,7 @@ nav:
             - "Code review tracking": components/development/code-review-tracking.md
             - "Consistency audits": components/development/consistency-audits.md
             - "Release Automation": components/development/release-automation.md
+            - "Retiring finished plans": components/development/plan-retirement.md
             - Audits:
                 - "Audit: Agent instruction file naming": components/development/audits/llm-doc-naming.md
                 - "Audit: AGENTS.md / ARCHITECTURE.md structure": components/development/audits/llm-doc-structure.md
@@ -169,6 +170,7 @@ nav:
                 - "Bot bypass identity": components/development/plans/PLAN-bot-bypass-identity.md
                 - "Consistency audits v2": components/development/plans/PLAN-consistency-audits-v2.md
                 - "Plan references in code": components/development/plans/PLAN-plan-references-in-code.md
+                - "Plan retirement": components/development/plans/PLAN-plan-retirement.md
                 - "Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation": components/development/plans/PLAN-scope-coverage.md
                 - "Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md": components/development/plans/PLAN-llm-doc-structure.md
                 - "Plan: give the pre-push audit a trigger": components/development/plans/PLAN-push-audit-phase.md
@@ -311,8 +313,11 @@ nav:
             - "The direct-qemu mock harness": components/kerbside/direct-qemu-harness.md
             - Deployment:
                 - "By hand": components/kerbside/deployment/manual.md
+                - "Kolla-Ansible": components/kerbside/deployment/kolla-ansible.md
+                - "Containers": components/kerbside/deployment/containers.md
             - Performance:
                 - "Proxy backpressure on a shaped client link": components/kerbside/performance/proxy-backpressure.md
+                - "spice-server's ACK window, observed from the proxy": components/kerbside/performance/ack-window.md
                 - "Streaming and the qemu damage series on a shaped link": components/kerbside/performance/streaming-rebaseline.md
             - Plans:
                 - "Plans index": components/kerbside/plans/index.md
@@ -329,6 +334,8 @@ nav:
                 - "Deployment options": components/kerbside/plans/PLAN-deployment-options.md
                 - "Deployment options phase 1: survey, matrix and scaffolding": components/kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding.md
                 - "Deployment options phase 2: by hand, with pip, a venv and systemd": components/kerbside/plans/PLAN-deployment-options-phase-02-manual.md
+                - "Deployment options phase 3: OpenStack, by Kolla-Ansible and in front of it": components/kerbside/plans/PLAN-deployment-options-phase-03-openstack.md
+                - "Deployment options phase 4: containers": components/kerbside/plans/PLAN-deployment-options-phase-04-containers.md
                 - "Host subject phase 1: subject pinning in shakenfist-spice-protocol": components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier.md
                 - "Host subject phase 2: kerbside adoption, CI proof, docs": components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption.md
                 - "Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange.md
@@ -360,6 +367,7 @@ nav:
                 - "Proxmox source phase 1b: a Proxmox node in CI": components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate.md
                 - "Proxmox source phase 2: HTTP CONNECT in shakenfist-spice-protocol": components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect.md
                 - "Proxmox source phase 3a: minting at connect time": components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting.md
+                - "Proxmox source phase 3b: tunnel transport": components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport.md
                 - "Proxy dev releases phase 1: the publish workflow": components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow.md
                 - "Proxy dev releases phase 2: the committed dev specifier": components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier.md
                 - "Proxy dev releases phase 3: the contract handshake": components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake.md

@@ -356,7 +356,7 @@ alternative.
 Modern GPUs have evolved into genuinely general-purpose parallel processors:
 
 | Characteristic | CPU | GPU |
-|---------------|-----|-----|
+| --------------- | ----- | ----- |
 | Design philosophy | Minimize latency (fast single-thread) | Maximize throughput (aggregate parallel) |
 | Core count | 8-64 sophisticated cores | 10,000+ simple cores |
 | Control logic | Branch prediction, out-of-order execution, speculation | Minimal per-core |
@@ -366,7 +366,7 @@ Modern GPUs have evolved into genuinely general-purpose parallel processors:
 The transistor counts tell the story of this complexity explosion:
 
 | Year | GPU | Transistors |
-|------|-----|-------------|
+| ------ | ----- | ------------- |
 | 1999 | GeForce 256 | 17 million |
 | 2006 | GeForce 8800 | 681 million |
 | 2020 | NVIDIA A100 | 54 billion |
@@ -508,7 +508,7 @@ and potentially handle interrupts for completion notifications.
 The complexity difference is stark:
 
 | Aspect | VGA Mode 13h | QXL bare-metal |
-|--------|--------------|----------------|
+| -------- | -------------- | ---------------- |
 | Device discovery | Not needed (fixed address) | PCI enumeration required |
 | Memory addresses | Hardcoded `0xA0000` | Dynamic BAR discovery |
 | Draw a pixel | `mem[offset] = color` | Allocate command, fill structure, submit to ring, notify device |
@@ -548,7 +548,7 @@ echo 0x1f > /sys/module/drm/parameters/debug
 The bit values control different categories of debug output:
 
 | Bit | Value | Category |
-|-----|-------|----------|
+| ----- | ------- | ---------- |
 | 0 | 0x01 | DRM core |
 | 1 | 0x02 | Driver-specific |
 | 2 | 0x04 | KMS (mode setting) |
@@ -585,7 +585,7 @@ qemu-system-x86_64 ... \
 Available QXL trace events include:
 
 | Category | Events | What they show |
-|----------|--------|----------------|
+| ---------- | -------- | ---------------- |
 | Ring operations | `qxl_ring_command_get`, `qxl_ring_cursor_get` | Commands submitted by guest |
 | Mode changes | `qxl_enter_vga_mode`, `qxl_exit_vga_mode`, `qxl_set_mode` | Display mode transitions |
 | Surface management | `qxl_create_guest_primary`, `qxl_destroy_primary` | Framebuffer allocation |
@@ -628,7 +628,7 @@ particularly for high-resolution or multi-monitor setups.
 #### The four memory parameters
 
 | Parameter | PCI BAR | Default | Purpose |
-|-----------|---------|---------|---------|
+| ----------- | --------- | --------- | --------- |
 | **vgamem** | (within BAR 0) | 16 MB | The VGA framebuffer -- must be sized for your maximum resolution |
 | **ram** | BAR 0 | 64 MB | Contains vgamem plus command rings and rendering data |
 | **vram** | BAR 1 (32-bit) | 64 MB | Off-screen surface storage |
@@ -680,7 +680,7 @@ The general recommendations are:
 - For 64-bit guests with high resolutions, set `vram64` larger than `vram`
 
 | Resolution | vgamem | ram | vram | Notes |
-|------------|--------|-----|------|-------|
+| ------------ | -------- | ----- | ------ | ------- |
 | 1920×1080 (1080p) | 16 MB | 64 MB | 32 MB | Comfortable defaults |
 | 2560×1440 (QHD) | 16 MB | 64 MB | 64 MB | |
 | 3840×2160 (4K) | 32 MB | 128 MB | 64 MB | Consider vram64=128 MB |
@@ -721,7 +721,7 @@ rather than being derived from the values you set.
 From the QEMU source (`hw/display/qxl.c`), the defaults are:
 
 | Parameter | QEMU property | Default |
-|-----------|---------------|---------|
+| ----------- | --------------- | --------- |
 | vgamem | `vgamem_mb` | 16 MB |
 | ram (BAR 0) | `ram_size` | 64 MB |
 | vram (BAR 1) | `vram_size` | 64 MB |
@@ -749,7 +749,7 @@ maximum framebuffer resolution.
 The practical consequence:
 
 | What you configure in OpenStack | What QEMU uses |
-|--------------------------------|----------------|
+| -------------------------------- | ---------------- |
 | `hw_video_ram=128` | vram = 128 MB |
 | (nothing) | vgamem = **16 MB (default)** |
 | (nothing) | ram = **64 MB (default)** |
@@ -887,7 +887,7 @@ performance degradation.
 QEMU provides several virtio-gpu variants:
 
 | Device | VGA Compatible | 3D Support | Notes |
-|--------|---------------|------------|-------|
+| -------- | --------------- | ------------ | ------- |
 | `virtio-gpu-pci` | No | Optional | Modern guests, reduced attack surface |
 | `virtio-vga` | Yes | No | x86 systems needing VGA boot |
 | `virtio-vga-gl` | Yes | VirGL | 3D acceleration with VGA fallback |
@@ -932,7 +932,7 @@ production-ready.
 ### Architectural differences
 
 | Aspect | QXL | virtio-gpu |
-|--------|-----|------------|
+| -------- | ----- | ------------ |
 | **Memory model** | Dedicated VRAM BARs | Uses guest system memory |
 | **Acceleration** | 2D (rendered on SPICE client) | 3D (rendered on host GPU) |
 | **Display protocol** | Tightly coupled with SPICE | Protocol-agnostic |

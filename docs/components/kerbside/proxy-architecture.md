@@ -60,6 +60,18 @@ hostname verification, so a mis-issued or substituted backend certificate is
 rejected. When the console has no `host_subject`, the CA chain is the only
 identity check. The rustls `ring` crypto provider is installed at startup.
 
+A console whose `Target` carries a `tunnel` takes a different route. The
+proxy reaches qemu's TLS port only through the HTTP CONNECT proxy named by
+`tunnel.proxy_uri`, asking it for `tunnel.connect_host`, and dials nothing
+else: neither `hypervisor_ip` nor `insecure_port` is touched. There is one
+TLS attempt and no plaintext attempt or `need_secured` retry. A tunnel
+needs a `host_subject`; the ryll client refuses one without it, and the
+refusal is recorded as a failed connect. An empty connect host, an unusable
+`secure_port` or a proxy URI ryll cannot parse is refused before any dial.
+The connect host is a credential, so the proxy never logs it and its
+errors name the field, not the value; its log lines say only whether the
+target was tunnelled.
+
 The console's `ca_cert` is the *only* trust anchor for the backend leg when
 it is set: the public web roots are not consulted, so a hypervisor
 certificate must chain to that CA and nothing else will do. Without a
@@ -125,7 +137,9 @@ Each accepted connection runs this sequence (`session.rs`, `backend.rs`,
 4. **Backend connect.** The proxy opens the backend leg to the hypervisor's
    SPICE port (honouring a `need_secured` retry to the TLS port) and completes
    the server-side handshake with the backend ticket, advertising the
-   client's capabilities rather than the proxy's own.
+   client's capabilities rather than the proxy's own. For a tunnelled
+   target it instead makes a single TLS connection through the target's
+   HTTP CONNECT proxy (see "TLS Configuration").
 5. **Relay.** Traffic is relayed in both directions until either side closes,
    the idle-read timeout fires, the firewall issues a terminating verdict, or
    the control plane terminates the session.
@@ -195,14 +209,113 @@ The proxy models the standard SPICE channels: `main`, `display`, `inputs`,
 allowlist (`rust/kerbside-proxy/src/allowlist.rs`) is derived per channel and
 direction from the ryll `shakenfist-spice-protocol` message-type tables.
 
+## Transcoding the display channel (experimental)
+
+By default the proxy relays every channel. An experimental alternative
+terminates the display channel instead: the proxy decodes what the
+hypervisor sends and re-encodes it for the client, sending only what changed,
+as JPEG where the picture is photographic and losslessly otherwise, at the
+pace the client's link can take. It exists to measure whether that beats
+relaying on slow links; it is not for production.
+
+It needs two things, both off by default:
+
+- **The `transcode` cargo feature.** It pulls in ryll's renderer and the
+  compression crate's image encoders, whose `encode` feature also builds
+  openh264 from source. Release wheels never enable it
+  (`tools/build-proxy-wheel.sh` builds with default features), so a released
+  `kerbside-proxy` has neither the flags below nor openh264. Build it with
+  `make -C rust/kerbside-proxy build FEATURES=transcode`.
+- **`--transcode-display`.** A process-wide proxy flag: every session's first
+  display channel is transcoded. The daemon does not pass it, so run such a
+  build directly (see
+  [the direct-qemu harness](/components/kerbside/direct-qemu-harness/#running-the-transcoding-display-channel)).
+
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--transcode-display` | off | Transcode each session's first display channel. |
+| `--transcode-jpeg-quality` | 85 | JPEG quality (1 to 100) for areas judged photographic; 0 sends everything losslessly. |
+| `--transcode-lossless-delay-ms` | 500 | How long an area sent as JPEG must go without change before it is sent again losslessly. |
+| `--transcode-notsent-lowat-bytes` | 65536 | `TCP_NOTSENT_LOWAT` on the transcoded channel's client socket: how far ahead of the link the transcoder may write. |
+| `--transcode-ack-window` | 0 | A measurement option, hidden from `--help`: pace on a SPICE ACK window of this many messages, as spice-server does, instead of on the client socket. 0 paces on the socket. |
+
+How a transcoded display channel works (`rust/kerbside-proxy/src/transcode/`):
+
+- **Backend leg.** The display channel is dialled with fixed capabilities
+  that describe ryll's renderer rather than the client: LZ4 and a
+  compression preference, so draws stay lossless and never become QUIC (which
+  spice-server turns into JPEG on a link its bandwidth test calls slow);
+  `MULTI_CODEC` with no codec bits, so spice-server creates no video stream;
+  and nothing the renderer cannot draw. ryll's renderer reads the channel,
+  answers spice-server's flow control at LAN speed, and decodes each draw
+  into a mirror of the guest's primary surface that records where each draw
+  landed.
+- **Client leg.** The proxy answers as a display server: it waits for the
+  client's `DISPLAY_INIT`, then sends `SURFACE_CREATE` for the primary
+  surface, a full lossless draw, `MONITORS_CONFIG` if the client has that
+  capability, and `MARK`. After that each frame is the draws that bring the
+  client up to date, then `MARK`. A resize from the guest becomes
+  `SURFACE_DESTROY` and the same start sequence. No video stream is ever
+  sent, and no image asks the client to cache it. The client's messages pass
+  through the same L0 and L1 firewall as the relay's, and its bytes count in
+  `kerbside_proxy_bytes_relayed_total`. Unlike the relay, the client leg has
+  no idle-read timeout, because once initialised a client paced on the
+  socket has nothing to say. TCP keepalive ends a client that has gone. A
+  client that stays connected but stops reading (a zero window, or no ACKs
+  under ACK pacing) is ended, logged at info, once a write to it has made
+  no progress for 15 minutes, the relay's idle-read timeout.
+  A slow link is not a stall: the bound is on progress, not on how long a
+  frame takes.
+- **What a frame sends.** The surface's damage says where to look; each
+  damaged 64-pixel tile is compared with a shadow of what the client already
+  holds, and only tiles that differ are sent. Tiles are merged into at most
+  32 rectangles a frame, and a rectangle over 4 MiB raw is split, keeping
+  every message far below the proxy's 16 MiB cap. A rectangle that compresses
+  poorly with LZ4 (more than half its raw size) is tried as JPEG, the rest go
+  as LZ4. JPEG is used only if the client leaves the compression choice to
+  the server. This update pipeline is copied from
+  [andris](https://github.com/shakenfist/andris), whose thresholds were
+  measured on real desktop screens.
+- **Pacing.** One frame is written at a time, and the next starts only once
+  the kernel has taken the last, which `TCP_NOTSENT_LOWAT` holds back until
+  the link has nearly drained it. Meanwhile damage merges in the mirror, so a
+  slow client is sent the screen as it is when it can take more, never the
+  frames it missed. No `SET_ACK` is sent, so the client sends no ACKs.
+
+What it does not do:
+
+- Only a session's first display channel (channel id 0) is transcoded. A
+  second display channel is relayed, and the proxy logs that it did so.
+- The choice between relaying and transcoding is made when the channel
+  connects, and cannot change while it runs.
+- The backend leg is not firewalled. The server-to-client messages of a
+  transcoded display channel skip the L0 and L1 policy and the relay's
+  16 MiB framing cap, and go straight to ryll's renderer, which frames them
+  and decompresses guest-influenced LZ4, GLZ, QUIC and JPEG data inside the
+  proxy process. Only the renderer's own limits bound that decode, so a
+  decoder panic or an allocation the guest can drive is reachable from the
+  guest, in the process that carries every other session. Only the
+  client's messages are firewalled.
+- Its scope is a virtio-gpu or std-vga guest, whose display reaches
+  spice-server as bitmap draws on the primary surface. A guest running the
+  QXL driver can send draws ryll's renderer does not implement (ROP3, stroke,
+  text and composite draws, palette, surface and JPEG-with-alpha images, and
+  draws on off-screen surfaces). The transcoder logs the first of each kind
+  in a session and counts every one in
+  `kerbside_proxy_transcode_unsupported_total{kind}`. It cannot fall back to
+  the relay by then, because the client already holds the transcoder's
+  surface, so the client shows a stale region wherever such a draw landed.
+
 ## Metrics
 
 The proxy exposes a Rust-native Prometheus `/metrics` endpoint
 (`metrics.rs`), bound to `--metrics-address` (default loopback, config
 `PROMETHEUS_METRICS_ADDRESS`) rather than the public VDI address, since the
 endpoint is unauthenticated. Metrics cover accepted/authorized connections,
-active connections/channels, bytes relayed per direction, and firewall
-verdicts.
+active connections/channels, bytes relayed per direction, firewall
+verdicts, spice-server's ACK window, and what a transcoded display channel
+could not draw. [Configuration](/components/kerbside/configuration/#logging-and-monitoring-settings)
+lists them.
 
 ## Error Handling
 

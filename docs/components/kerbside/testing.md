@@ -94,7 +94,7 @@ change.
 | `direct-qemu-functional.yml` | pull_request, merge_group, nightly | smoke |
 | `sf-e2e-functional.yml` | pull_request, merge_group, nightly | smoke |
 | `rust.yml` | push and pull_request, path-filtered to `rust/**` and the proto | neither (advisory) |
-| `demo-compose.yml` | push and pull_request, path-filtered to `demo/**`, `tools/demo/**`, the migrations, `pyproject.toml` and `docs/installation.md` | neither (advisory) |
+| `demo-compose.yml` | push and pull_request, path-filtered to `demo/**`, `tools/demo/**`, the migrations, the proto, `pyproject.toml` and `docs/installation.md` | neither (advisory) |
 | `mermaid-lint.yml` | pull_request, path-filtered to `**.md` excluding `REVIEWS.md`; workflow_dispatch | neither (advisory) |
 | `dev-proxy-wheel.yml` | push to develop, path-filtered to the proxy binary's inputs; workflow_dispatch (dry-run by default) | neither |
 | `codeql-analysis.yml` | push, pull_request, weekly | neither |
@@ -152,6 +152,15 @@ The script is idempotent, so adding docker to the runner image — or
 installing the distribution's packages into it — would make it a
 no-op rather than a conflict. It also configures the daemon and
 builds for the runner's proxy, which neither inherits on its own.
+
+The demo lane installs the newest dev `kerbside-proxy` wheel
+published from develop rather than building the proxy, except when
+that wheel speaks a different gRPC contract from the checkout, as it
+does for any change to `kerbside/rpc/kerbside.proto` until the change
+merges and a new dev wheel is published. `tools/demo/pair-proxy.sh`
+compares the published binary's `--contract-hash` with the checkout's
+proto and, when they differ, builds the proxy from the checkout and
+passes it to the image build as `KERBSIDE_PROXY`.
 
 Two behaviours only matter when driving CI by hand: on a
 `workflow_dispatch` run of `functional-tests.yml` an unselected target
@@ -438,8 +447,9 @@ touches the guest's key box instead. That needs a `rect` field on
 `surface_drawn` which the control socket protocol does not have yet;
 `build-ryll.sh` patches it in. What the rig has measured, and how to
 rerun it, is in
-[performance/proxy-backpressure.md](/components/kerbside/performance/proxy-backpressure/)
-and [performance/streaming-rebaseline.md](/components/kerbside/performance/streaming-rebaseline/).
+[performance/proxy-backpressure.md](/components/kerbside/performance/proxy-backpressure/),
+[performance/streaming-rebaseline.md](/components/kerbside/performance/streaming-rebaseline/)
+and [performance/ack-window.md](/components/kerbside/performance/ack-window/).
 
 ## Testing the SPICE console of an oVirt VM
 
@@ -553,6 +563,38 @@ password must get a display once the expiry is lifted. That runs last
 because spice-server drops its current client when a new one links.
 The new password lives only in an owner-only file in the lane's
 working directory; it is never on a command line or in a log.
+
+### Tunnelled backend connections
+
+`run-tunnel-checks.sh` runs on the Rust leg after the host-subject
+checks. A `Target` with a `tunnel` makes the proxy reach qemu's TLS port
+only through an HTTP CONNECT proxy, so the lane runs
+`connect-proxy.py`, which stands in for Proxmox's `spiceproxy`: it
+accepts a CONNECT only when the request line and the `Host:` header both
+name the expected connect host and port, relays it to qemu's TLS
+listener, answers anything else `401`, and writes counts of tunnels
+opened and requests refused to a status file. The mock hands out a
+`hypervisor_ip` of `192.0.2.1` (TEST-NET-1, which nothing answers), so a
+session that comes up can only have come through the tunnel. Three
+modes each run in their own working directory:
+
+- `match`: the correct `host_subject`. The client gets a session, and the
+  CONNECT proxy opened at least one tunnel per relayed channel and
+  refused none.
+- `no-subject`: no `host_subject`. The session fails, the mock's audit
+  log holds a `Hypervisor connection failed` event naming
+  `host_subject`, and the CONNECT proxy was never asked for anything.
+  This proves a tunnel without a pin is refused and that the refusal is
+  audited.
+- `mismatch`: a wrong `host_subject`. The session fails at the TLS
+  handshake through the tunnel.
+
+The connect host is a random sentinel per mode, kept in an owner-only
+file so it is never on a command line. Afterwards every collected
+artifact is searched for each mode's sentinel, along with a copy of the
+script's own output, which is what the public step log shows. A file
+holding one is removed and the run fails, because the connect host is a
+credential that must not reach a log.
 
 ### The latency loadtest
 

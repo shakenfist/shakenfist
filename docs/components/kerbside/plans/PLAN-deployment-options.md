@@ -65,7 +65,7 @@ keeps the option of a second one without redeploying.
 | Shaken Fist's ansible collection | A `kerbside` role exists and is the most complete deployer Kerbside has: about 2000 lines, two systemd units, validation plays, and co-located or dedicated hosts. It writes exactly one `type: shakenfist` source (`templates/sources.yaml`). It also has a bring-your-own-Kerbside path: set `kerbside_url` with an empty `kerbside` group, and Shaken Fist is configured for a Kerbside it does not deploy. | `shakenfist/deploy/collection/roles/kerbside/`; being built by `PLAN-kerbside-deployer.md`, phases 1 to 3 merged, phase 4 open as shakenfist#4479 |
 | Kolla-Ansible | The Kolla image build merged upstream (kolla 975495). The deployment (kolla-ansible 976889) and four CI and enablement changes are still open. | `kerbside-patches`; `docs/use-cases/openstack.md` "Deployment" |
 | Docker compose | Demo only, and labelled that way. Builds its image locally. | `demo/`; `installation.md` "Try it: the demo stack" |
-| A first-party container image | None. Kolla's image is the only published Kerbside image, and it is built around Kolla's `config.json` and `kolla_start` conventions. | - |
+| A first-party container image | None. Kolla publishes `kerbside-api` and `kerbside-proxy` images on quay.io (`openstack.kolla`), built from Kerbside's `develop` branch rather than a release, and started through Kolla's `config.json` and `kolla_start` conventions. They are the only published Kerbside images. (Phase 4's survey corrected this row, which had not said where they are published or what they are built from.) | - |
 | Kubernetes / Helm | Nothing. | - |
 
 ### The Kolla-Ansible patch set changes role
@@ -96,14 +96,15 @@ Open question 1 asks whether that is the line between "keep
 pushing gently" and "rebase only".
 
 "Kept alive by rebase" has a running cost that should be
-explicit. Kerbside's merge-queue Kolla lane deploys from
-`kerbside-patches` (`.github/workflows/functional-tests.yml`,
-`openstack_matrix`), so a stale rebase breaks Kerbside's own
-merges. The lane itself is currently reliable. Phase 1 counted 32
+explicit. Kerbside's Kolla lane deploys from `kerbside-patches`
+(`.github/workflows/functional-tests.yml`, `openstack_matrix`), so
+a stale rebase breaks it. When this plan was written the lane ran
+in the merge queue, where that would have blocked Kerbside's own
+merges. Since #605 (2026-10-25) it runs nightly, and a stale
+rebase files a nightly-failure issue instead; phase 3's survey
+corrected this. The lane itself was reliable: phase 1 counted 32
 successes and no failures across the 40 most recent merge runs;
 the other 8 never started the job.
-The three open flake issues against it (#293, #308, #312) date
-from mid-August.
 
 ### Gaps the pages will expose
 
@@ -177,6 +178,12 @@ front-door deployment actually needs from Kolla. Phase 3
 documents the split, and `kerbside-patches` should record it
 too.
 
+Phase 3's survey found that the line cannot take effect as the
+changes stand. 967801 is stacked on 976889 in Gerrit, so it
+cannot merge first until it is restacked onto master. No change
+exists yet for the Keystone account. kerbside-patches#1859 is
+still open.
+
 ### 2. Does the Kolla lane stay in Kerbside's merge queue?
 
 It is the only end-to-end OpenStack coverage Kerbside has. When
@@ -192,6 +199,13 @@ most recent merge runs (2026-09-28 to 2026-10-09) that started
 it, with no failures; phase 1's survey accounts for the other 8.
 If a stale rebase ever breaks it, the remedy is to rebase, not
 to demote the lane.
+
+**Overtaken by #605 (2026-10-25).** Both cloud lanes moved to
+nightly. The reasons were runner capacity and duplicate runs
+dispatched from kerbside-patches, not flakiness. An OpenStack
+regression now surfaces the morning after it merges, unless the
+author dispatches the lane on the pull request. Phase 3's survey
+recorded this.
 
 ### 3. Does Kerbside ship example systemd units?
 
@@ -241,9 +255,9 @@ would creep back in. **Recommendation: yes.** Extend
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Survey, matrix and scaffolding | [PLAN-deployment-options-phase-01-survey-and-scaffolding.md](/components/kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/) | Complete | 200d6b3 |
-| 2. By hand: pip, venv and systemd | [PLAN-deployment-options-phase-02-manual.md](/components/kerbside/plans/PLAN-deployment-options-phase-02-manual/) | In progress | |
-| 3. OpenStack: Kolla-Ansible, and Kerbside in front of OpenStack | | Not started | |
-| 4. Containers: compose beyond the demo, and Kubernetes | | Not started | |
+| 2. By hand: pip, venv and systemd | [PLAN-deployment-options-phase-02-manual.md](/components/kerbside/plans/PLAN-deployment-options-phase-02-manual/) | Complete | b10f2ac |
+| 3. OpenStack: Kolla-Ansible, and Kerbside in front of OpenStack | [PLAN-deployment-options-phase-03-openstack.md](/components/kerbside/plans/PLAN-deployment-options-phase-03-openstack/) | Complete | d159d17 |
+| 4. Containers: compose beyond the demo, and Kubernetes | [PLAN-deployment-options-phase-04-containers.md](/components/kerbside/plans/PLAN-deployment-options-phase-04-containers/) | In progress | |
 | 5. Ansible: the `kerbside` role | | Not started | |
 | 6. Installation hand-off and closeout | | Not started | |
 | 7. Push audit | | Not started | |
@@ -275,13 +289,17 @@ effort.
 
 **Phase 3: OpenStack.** `docs/deployment/kolla-ansible.md`:
 what `kerbside-patches` gives you, its upstream status, and the
-maintained-by-rebase stance stated plainly. It also documents
-the front-door path, Kerbside deployed by any other mechanism in
-front of OpenStack. That path covers the Nova configuration
-`spice-direct` needs, the routable console address, and the
-Keystone service account an operator creates by hand when Kolla
-is not doing it. `use-cases/openstack.md`'s "Deployment" section
-shrinks to a link. Planned at high effort: the front-door path
+maintained-by-rebase stance stated plainly. The phase also
+documents the front-door path, Kerbside deployed by any other
+mechanism in front of OpenStack. That path covers the Nova
+configuration `spice-direct` needs, the routable console address,
+and the Keystone service account an operator creates by hand when
+Kolla is not doing it. Phase 3 puts the front-door path in
+`use-cases/openstack.md`'s "How to set it up", because it is the
+same however Kerbside is deployed. `openstack.md` has no
+"Deployment" section; its **Deployment** paragraph and upstream
+status table move to the new page, leaving a link. Phase 3's
+survey corrected this. Planned at high effort: the front-door path
 has never been written down, and nothing in CI exercises it.
 
 **Phase 4: containers.** `docs/deployment/containers.md`: what

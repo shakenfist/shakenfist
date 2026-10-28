@@ -61,7 +61,7 @@ Compute node with two networks
 ## Naming conventions
 
 | Interface | Convention | Example |
-|-----------|-----------|---------|
+| ----------- | ----------- | --------- |
 | Bridge | `brq<network-id[:11]>` | `brq8fe8a32f-e6` |
 | VM TAP device | `tap<port-id[:11]>` | `tap5e3f1a22-b7` |
 | VXLAN interface | `vxlan-<VNI>` | `vxlan-101` |
@@ -79,7 +79,7 @@ architecture -- bridge per network, kernel VXLAN, iptables -- but
 they differ in what sits *above* the bridge layer:
 
 | Aspect | Linux bridge agent | Shaken Fist |
-|--------|-------------------|-------------|
+| -------- | ------------------- | ------------- |
 | Bridge topology | One per network (same) | One per network (same) |
 | VXLAN | Kernel-native (same) | Kernel-native (same) |
 | DHCP | Separate `qdhcp-*` namespace per network, managed by Neutron's DHCP agent | Namespace per network with dnsmasq (same concept, different management) |
@@ -197,7 +197,7 @@ agent tested and current.
 ## The deprecation timeline
 
 | Release | Status |
-|---------|--------|
+| --------- | -------- |
 | Wallaby (2021) | Marked experimental; required `[experimental] linuxbridge = True` to use |
 | 2023.1 (Antelope) | Experimental status reiterated; no new features |
 | 2025.1 (Epoxy) | Fully removed from codebase; migration to OVS or OVN required |

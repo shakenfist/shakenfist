@@ -128,7 +128,7 @@ the same Linux primitives but makes different trade-offs in complexity,
 performance, and capability.
 
 | Chapter | Approach | Status |
-|---------|----------|--------|
+| --------- | ---------- | -------- |
 | [Shaken Fist networking](/components/cloudgood/networking-shakenfist/) | Bridge per network, kernel VXLAN, single network node | In production |
 | [Neutron with Linux bridge](/components/cloudgood/neutron-linuxbridge/) | Bridge per network, kernel VXLAN, within OpenStack | Removed in 2025.1 |
 | [Neutron legacy routers (OVS)](/components/cloudgood/neutron-legacy/) | Shared OVS bridges, OpenFlow, centralized routing | Supported |

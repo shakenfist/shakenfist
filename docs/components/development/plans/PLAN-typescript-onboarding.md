@@ -264,8 +264,8 @@ Nothing else in the plan writes to that repository.
 | 4. Static runners gain node | Complete | 33fl bc50c52a, deployed; b86f2bb (#127) |
 | 5. hunkydory CI and the fleet workflows | Complete | hunkydory 3d556a6 (#7) |
 | 6. Human review onboarding | Complete | hunkydory e216f93 (#8), onto `develop` via 3d556a6 (#7) |
-| 7. Marketplace release | In progress | 7a: hunkydory 6da49c1 (#9) |
-| 8. Push audit | In progress | |
+| 7. Marketplace release | Complete | 7a: hunkydory 6da49c1 (#9); 7b: hunkydory 5f6f447 (#25), 19e97a2 (#28); d4afdf7 (#162) |
+| 8. Push audit | Complete | 254bb83 (#137), 44c503a (#149); findings afec707 (#150), hunkydory 43beb85 (#17), 12a58c7 (#18) |
 
 Phase 4 was blocked on D5 and was released on 2026-09-13; see that
 decision for what changed. Phase 5 depended on phase 4, because a CI
@@ -280,6 +280,13 @@ Phase 7 was marked `Blocked` on the publisher account and
 prerequisite is still unmet, and split the phase accordingly: D7.1
 takes the half that does not need the account and lands it now, and
 holds the half that does. The phase section carries the split.
+
+7b then landed on 2026-09-21 and 2026-09-22, once the operator stood
+up the Entra credential; *What 7b found* in the phase section records
+it. Neither phase 7 nor phase 8 was closed out when it finished -- the
+plan file was not touched between 2026-09-21 and 2026-10-28 -- so
+both rows above were set to `Complete` together on 2026-10-28, from
+the GitHub record rather than from memory.
 
 ### 1. Register hunkydory in the audit scope
 
@@ -746,11 +753,11 @@ criterion would be written against a single example.
 Steps 7a.1 to 7a.4 are done; see *What implementation found*. 7a
 merged on 2026-09-14, and 7a.5 and 7a.6 both ran on 2026-09-16, so
 all of 7a is now done. 7b.0 was answered on 2026-09-21 -- Entra,
-and the publish job into a pinned container -- so nothing waits on
-a decision any more. **7b.1 is code and is next**; 7b.2 is the
-operator work that follows it, and 7b.3 the tag. See *Decided:
-Entra, and the publish job moves into a container* for what those
-two answers turned out to mean.
+and the publish job into a pinned container -- so nothing waited on
+a decision any more. 7b.1, 7b.2 and 7b.3 all then ran on 2026-09-21
+and 2026-09-22, and `v0.1.0` is on the Marketplace: see *What 7b
+found* below. *Decided: Entra, and the publish job moves into a
+container* remains the authority on what the two answers meant.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
@@ -761,9 +768,9 @@ two answers turned out to mean.
 | 7a.5 | low | sonnet | none | Dispatch `release.yml` on `develop` once 7a has merged. Confirm the `build` job produces the `.vsix` artifact on `[self-hosted, static]`, that `vscode:prepublish` compiles on a real runner with a real `npm_config_cache`, and that both publishing jobs correctly decline to run. Record the run URL here. This is the run D7.1's argument rests on, and it cannot answer the publish-lane question above, because the guard stops a dispatch reaching that job by design. |
 | 7a.6 | low | sonnet | none | **Measure whether `[self-hosted, vm, debian-13, s]` carries node, and record the answer in *Answered: the publish lane has neither node nor npm*.** Add a dispatch-only throwaway workflow to hunkydory -- `permissions: {}`, **no `environment:` key**, so it can reach no secret -- whose single job runs on that lane and executes `node --version; npm --version; command -v node npm` without `set -e` stopping at the first absence. `secret-scan.yml` already uses this lane and `workflow_dispatch`, so no new actionlint label is needed. Dispatch it, record the output and the run URL, then delete the workflow in the same PR chain: it is a probe, not a fixture. The point is to reduce 7b.0's question (b) from a three-way guess to either "nothing to do" or "option 2". Do not fold this into `release.yml`'s publish job -- the dispatch guard means that job cannot run until 7b, which is the whole reason the question is open. |
 | 7b.0 | -- | operator | -- | **Done, 2026-09-21.** Both questions answered: (a) **Entra, and no PAT is ever minted** -- a PAT bought now lasts about ten weeks against the 1 December 2026 global-PAT retirement, and the Entra path has to be walked either way, so the setup cost is paid once rather than twice; (b) **option 2**, the `debian-13-docker` lane with a pinned `node:22` container, which settles the `engines.node` risk in the same move and needs no work in another repository. Reading the pinned vsce rather than trusting the flag's description then changed the mechanism both answers imply: see *Decided: Entra, and the publish job moves into a container*, which is the authority on what 7b.1 and 7b.2 execute. |
-| 7b.1 | medium | opus | worktree | **The repair 7b.0's answers carry, in hunkydory, before any account exists.** `release.yml`'s publish job runs `npm ci` on a lane with neither node nor npm, and carries a comment claiming "this runner carries Debian 13's node 20, so that's satisfied today" -- a defect in merged code, not a gap in future work. Move the job to `[self-hosted, vm, debian-13-docker, s]`, declare that label in `.github/actionlint.yaml` (7a.2's brief deliberately withheld it pending this decision), add `id-token: write` to the job's `permissions`, and drop `VSCE_PAT` from the workflow entirely. The install and the publish move into `tools/publish-marketplace.sh`, per the fleet's CI-script rule (`AGENTS.md` in this repository: anything longer than about five lines goes in `tools/` and is called from the workflow), pinning `node:22-trixie-slim` **by digest as well as tag** the way `tools/mermaid-lint.sh` pins mermaid-cli. Use `docker run` from that script rather than a job-level `container:` key, matching mermaid-lint, and note the consequence the comparison hides: a job-level `container:` would inherit the runner's environment, while `docker run` does not, so the script must pass `-e ACTIONS_ID_TOKEN_REQUEST_URL -e ACTIONS_ID_TOKEN_REQUEST_TOKEN -e AZURE_CLIENT_ID -e AZURE_TENANT_ID` explicitly. Both the exchange and the publish run inside the container, because the host lane has no node to run them with. The token comes from the client-assertion exchange set out in *Decided* and reaches vsce through the `VSCE_PAT` environment variable rather than `-p`, keeping it out of the process table; that is a different thing from `secrets.VSCE_PAT`, which goes. Say in the script's header why the flag is not used, and put the next-vsce-bump warning in `renovate.json` as a `prBodyNotes` entry on `@vscode/vsce` as well as in the header -- a bump touches `package.json`, not `tools/`, so a header comment is read by nobody at the moment it matters. Add a `customManagers` entry there too, for the image digest, which none of Renovate's stock managers read out of a shell script. Order inside the container matters and is the falsifiable part: mint **before** installing, into an unexported shell variable, `::add-mask::` the result immediately, then strip `ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKEN_REQUEST_TOKEN` from the environment of both the install and the publish. The pair mints publishing tokens for the life of the job, so the code to keep it away from is vsce's dependency tree, not `npm ci --ignore-scripts`, which runs no package code at all. `RELEASE-SETUP.md` is rewritten for the Entra path: the PAT steps go, because leaving them as an alternative is how an operator stands up the architecture 7b.0 just declined. **Nothing here is reachable by CI** -- the job is gated on a tag and the `release` environment -- so verify what can be verified locally (the container runs `npm ci --ignore-scripts` and `vsce --version`; actionlint and pre-commit pass) and say plainly in the pull request that the exchange itself is unexercised until 7b.3. Commit subject: `Publish through Entra, in a pinned container.` |
-| 7b.2 | -- | operator | -- | **Hold.** Nothing in a repository can do this. Create the Entra app registration; add a **federated** credential on it with issuer `https://token.actions.githubusercontent.com`, subject `repo:shakenfist/hunkydory:environment:release` and audience `api://AzureADTokenExchange` -- the portal's GitHub Actions scenario fills the issuer in, `az ad app federated-credential create` and the Graph API do not, and getting it wrong surfaces as an opaque Entra rejection during a real release; add that identity as a member of the `shakenfist` Marketplace publisher; create the `release` environment restricted to `v*` tags, carrying `AZURE_CLIENT_ID` and `AZURE_TENANT_ID` as environment **variables** (neither is a secret). While in the repository settings, also add the two missing token secrets that hunkydory #22 is about -- `prune-reviews.yml` and `renovate.yml` have never succeeded without them, and HD-9 has no other owner. And resolve hunkydory #21, by adding a ruleset restricting `v*` tag creation -- that is the work, and closing the issue is its consequence. It matters more than its `high` grading suggests: with the environment's tag rule it is one of only two things standing between a push and a publish. `RELEASE-SETUP.md` as rewritten by 7b.1 is the step-by-step. |
-| 7b.3 | low | sonnet | none | Once 7b.2 is done, and **before pushing the tag**, check the environment 7b.2 built rather than trusting it: `gh api repos/shakenfist/hunkydory/environments/release/secrets` must report `total_count: 0`, and the matching `/variables` call must report exactly `AZURE_CLIENT_ID` and `AZURE_TENANT_ID`. A secret added by hand is the regression this architecture exists to remove, and catching it after the tag is too late, because recovery is a version bump. Then tag `v0.1.0`, watch the run, and record the outcome in this section -- either the Marketplace listing URL, or what failed. If the account never arrives, record that instead and cite the attached `.vsix`. **If it fails, the recovery is a version bump, not a re-tag**: `43b7f59`'s build job asserts the tag matches `package.json`, and the Marketplace rejects a republished version, so a deleted and re-pushed `v0.1.0` either fails the same way or is refused on the far side. Bump to `0.1.1` and tag that. The jobs can also disagree -- `github-release` needs `publish-marketplace`, so Marketplace-succeeded-and-release-failed is the only split possible, and it is repaired by attaching the `.vsix` to the existing release by hand rather than by re-running anything. Add both to `RELEASE-SETUP.md`'s troubleshooting while the reasoning is fresh. |
+| 7b.1 | medium | opus | worktree | **Done, 2026-09-21: hunkydory #25 `5f6f447`.** **The repair 7b.0's answers carry, in hunkydory, before any account exists.** `release.yml`'s publish job runs `npm ci` on a lane with neither node nor npm, and carries a comment claiming "this runner carries Debian 13's node 20, so that's satisfied today" -- a defect in merged code, not a gap in future work. Move the job to `[self-hosted, vm, debian-13-docker, s]`, declare that label in `.github/actionlint.yaml` (7a.2's brief deliberately withheld it pending this decision), add `id-token: write` to the job's `permissions`, and drop `VSCE_PAT` from the workflow entirely. The install and the publish move into `tools/publish-marketplace.sh`, per the fleet's CI-script rule (`AGENTS.md` in this repository: anything longer than about five lines goes in `tools/` and is called from the workflow), pinning `node:22-trixie-slim` **by digest as well as tag** the way `tools/mermaid-lint.sh` pins mermaid-cli. Use `docker run` from that script rather than a job-level `container:` key, matching mermaid-lint, and note the consequence the comparison hides: a job-level `container:` would inherit the runner's environment, while `docker run` does not, so the script must pass `-e ACTIONS_ID_TOKEN_REQUEST_URL -e ACTIONS_ID_TOKEN_REQUEST_TOKEN -e AZURE_CLIENT_ID -e AZURE_TENANT_ID` explicitly. Both the exchange and the publish run inside the container, because the host lane has no node to run them with. The token comes from the client-assertion exchange set out in *Decided* and reaches vsce through the `VSCE_PAT` environment variable rather than `-p`, keeping it out of the process table; that is a different thing from `secrets.VSCE_PAT`, which goes. Say in the script's header why the flag is not used, and put the next-vsce-bump warning in `renovate.json` as a `prBodyNotes` entry on `@vscode/vsce` as well as in the header -- a bump touches `package.json`, not `tools/`, so a header comment is read by nobody at the moment it matters. Add a `customManagers` entry there too, for the image digest, which none of Renovate's stock managers read out of a shell script. Order inside the container matters and is the falsifiable part: mint **before** installing, into an unexported shell variable, `::add-mask::` the result immediately, then strip `ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKEN_REQUEST_TOKEN` from the environment of both the install and the publish. The pair mints publishing tokens for the life of the job, so the code to keep it away from is vsce's dependency tree, not `npm ci --ignore-scripts`, which runs no package code at all. `RELEASE-SETUP.md` is rewritten for the Entra path: the PAT steps go, because leaving them as an alternative is how an operator stands up the architecture 7b.0 just declined. **Nothing here is reachable by CI** -- the job is gated on a tag and the `release` environment -- so verify what can be verified locally (the container runs `npm ci --ignore-scripts` and `vsce --version`; actionlint and pre-commit pass) and say plainly in the pull request that the exchange itself is unexercised until 7b.3. Commit subject: `Publish through Entra, in a pinned container.` |
+| 7b.2 | -- | operator | -- | **Done, 2026-09-22; see *What 7b found*.** Nothing in a repository can do this. Create the Entra app registration; add a **federated** credential on it with issuer `https://token.actions.githubusercontent.com`, subject `repo:shakenfist/hunkydory:environment:release` and audience `api://AzureADTokenExchange` -- the portal's GitHub Actions scenario fills the issuer in, `az ad app federated-credential create` and the Graph API do not, and getting it wrong surfaces as an opaque Entra rejection during a real release; add that identity as a member of the `shakenfist` Marketplace publisher; create the `release` environment restricted to `v*` tags, carrying `AZURE_CLIENT_ID` and `AZURE_TENANT_ID` as environment **variables** (neither is a secret). While in the repository settings, also add the two missing token secrets that hunkydory #22 is about -- `prune-reviews.yml` and `renovate.yml` have never succeeded without them, and HD-9 has no other owner. And resolve hunkydory #21, by adding a ruleset restricting `v*` tag creation -- that is the work, and closing the issue is its consequence. It matters more than its `high` grading suggests: with the environment's tag rule it is one of only two things standing between a push and a publish. `RELEASE-SETUP.md` as rewritten by 7b.1 is the step-by-step. |
+| 7b.3 | low | sonnet | none | **Done, 2026-09-21: run 35657864461 published `v0.1.0`.** Once 7b.2 is done, and **before pushing the tag**, check the environment 7b.2 built rather than trusting it: `gh api repos/shakenfist/hunkydory/environments/release/secrets` must report `total_count: 0`, and the matching `/variables` call must report exactly `AZURE_CLIENT_ID` and `AZURE_TENANT_ID`. A secret added by hand is the regression this architecture exists to remove, and catching it after the tag is too late, because recovery is a version bump. Then tag `v0.1.0`, watch the run, and record the outcome in this section -- either the Marketplace listing URL, or what failed. If the account never arrives, record that instead and cite the attached `.vsix`. **If it fails, the recovery is a version bump, not a re-tag**: `43b7f59`'s build job asserts the tag matches `package.json`, and the Marketplace rejects a republished version, so a deleted and re-pushed `v0.1.0` either fails the same way or is refused on the far side. Bump to `0.1.1` and tag that. The jobs can also disagree -- `github-release` needs `publish-marketplace`, so Marketplace-succeeded-and-release-failed is the only split possible, and it is repaired by attaching the `.vsix` to the existing release by hand rather than by re-running anything. Add both to `RELEASE-SETUP.md`'s troubleshooting while the reasoning is fresh. |
 
 #### Risks and mitigations
 
@@ -1406,6 +1413,75 @@ Note that `release-process` as written measures a Python package and
 will stay not applicable; whether it grows a TypeScript arm is future
 work rather than part of this plan.
 
+#### What 7b found
+
+Written at close-out on 2026-10-28, from the GitHub record, because
+the plan file was not updated while 7b ran. Dates are merge dates and
+issue-closure dates, not the moments the operator acted.
+
+**7b.1 landed as hunkydory #25 (`5f6f447`) on 2026-09-21**, with the
+subject the brief asked for. Its pull request body reports what could
+be verified without an account: the container runs `npm ci
+--ignore-scripts` end to end with no `EBADENGINE`, the Entra request
+shape was exercised against the real token endpoint and rejected only
+on the deliberately fake assertion, and each host-stage guard fails
+with its own message. It said plainly that the exchange itself was
+unexercised until 7b.3. #28 (`19e97a2`) followed the same day,
+fixing the two `RELEASE-SETUP.md` steps an operator could not
+actually follow: the identifier that adds the app registration to
+the Marketplace publisher is its Azure DevOps profile id rather than
+any Entra id, and `tools/marketplace-profile-id.sh` now resolves it.
+
+**7b.2 was done by the operator by 2026-09-22**, and the three
+checks 7b.3's brief asks for were re-run on 2026-10-28 rather than
+trusted: `gh api repos/shakenfist/hunkydory/environments/release/secrets`
+reports `total_count: 0`, the matching `/variables` call reports
+exactly `AZURE_CLIENT_ID` and `AZURE_TENANT_ID`, and the repository
+carries two active rulesets, *Release tags* on tags and *Develop
+branch* on the branch, where the phase 8 audit had found none. The
+two missing token secrets went in alongside, and `prune-reviews.yml`
+and `renovate.yml` have succeeded on every run since. hunkydory #20,
+#21 and #22 -- HD-1, HD-2 and HD-9 -- closed on 2026-09-22.
+
+**7b.3 published `v0.1.0` on 2026-09-21**, from
+https://github.com/shakenfist/hunkydory/actions/runs/35657864461,
+which succeeded on the first tag: the client-assertion exchange
+worked as *Decided* set it out, and neither of the two recovery
+paths the brief wrote into `RELEASE-SETUP.md` was needed. The
+listing is
+https://marketplace.visualstudio.com/items?itemName=shakenfist.hunkydory.
+A second release, `v0.2.0`, followed on 2026-10-16 (hunkydory #94,
+run 38971921790), so the path has been proven twice and the
+success criterion "hunkydory appears on the VS Code Marketplace"
+holds by measurement.
+
+**Three follow-ups the step table did not plan** landed in hunkydory
+on 2026-09-22 and 2026-09-23, each closing an issue the phase 8
+audit had filed. #31 (`4aa98e6`) moved the `build` job's `npm ci`
+into the same pinned container, so no job runs npm on the shared
+static pool any more (closes #23, HD-12). #35 (`5767c81`) took
+`github-release` off the static pool too, pinned the Release asset
+to the built `.vsix` by digest, and gave the two container scripts
+the tests nothing had ever run (closes #32 and #33). #42
+(`e93f94c`) corrected four more release setup defects. They are
+hunkydory's own work rather than steps of this plan, and are
+recorded here because they are why four of the seven deferred
+findings in *Future work* are now struck through.
+
+**7b was not push-audited, and phase 8 said it would be.** Phase
+8's scope put 7b out of its range on the understanding that "if 7b
+later lands, it is audited in its own pull request against
+hunkydory's `develop`". #25's body carries the verification table
+above, and #28, #31, #35 and #42 carry their own, but none of the
+five records a run of hunkydory's `PUSH-AUDIT.md`. That is D8.3's
+finding -- fleet work landing in hunkydory without the audit the
+shared block expects -- recurring in the first phase planned after
+D8.3 was written. This close-out records it and does not run the
+audit: the plan is complete on every other count, and an audit of
+those five pull requests is a hunkydory pull request on its own,
+listed under *Future work* so that it is a choice rather than an
+omission.
+
 #### Back brief gate
 
 The gate before 7a.2 has been passed. What was agreed and built is
@@ -1448,8 +1524,9 @@ the accumulated diff of the whole plan, not of any one phase.
 run -- D7.1 split the phase precisely so that this one would not be
 "hostage to an Azure DevOps signup". If 7b later lands, it is
 audited in its own pull request against hunkydory's `develop`, and
-this section is not reopened. Also out: fixing anything the audit
-finds. Findings land as their own pull request, per the shared
+this section is not reopened. (7b landed on 2026-09-21 and was not
+audited that way; phase 7's *What 7b found* records it.) Also out:
+fixing anything the audit finds. Findings land as their own pull request, per the shared
 block.
 
 #### What the survey found
@@ -2204,8 +2281,11 @@ been superseded.
   like the rest of the fleet's. Phase 7 decided a three-job shape
   without considering the template's `sign-tag` job; the omission is
   recorded in `release.yml`'s header as an open question.
-* **hunkydory's merged `release.yml` cannot publish, and says the
-  opposite.** Its `publish-marketplace` job ran `npm ci
+* ~~**hunkydory's merged `release.yml` cannot publish, and says the
+  opposite.**~~ Resolved: 7b.1 landed as hunkydory #25 (`5f6f447`)
+  on 2026-09-21 and `v0.1.0` published through it the same day, so
+  the fallback below was never needed. Kept for the record of why
+  it was written. Its `publish-marketplace` job ran `npm ci
   --ignore-scripts` on `[self-hosted, vm, debian-13, s]`, which
   7a.6 measured as carrying neither node nor npm, under a comment
   asserting "this runner carries Debian 13's node 20, so that's
@@ -2238,9 +2318,19 @@ fixing them in 8.10 or 8.11, because each needs an operator
 decision, a repository setting, or a change wider than this plan.
 Each names the repository its issue belongs against, which is the
 one carrying the defect rather than the one carrying this plan.
+None of the seven is still open at close-out on 2026-10-28. HD-1,
+HD-2, HD-9 and HD-12 were resolved within three days by 7b.2 and by
+hunkydory's own follow-ups (see phase 7's *What 7b found*); DEV-16
+was fixed in development#170; DEV-14 and HD-11 were closed in
+favour of `PLAN-workflow-ref-trust.md`, which carries both
+questions as phases of its own. Each is struck through below rather
+than deleted, with where it went.
 
-* **DEV-14: `templates/mermaid-lint/` has no staleness mechanism**
-  (`shakenfist/development`). `templates/shared-blocks/*.md` carry a
+* ~~**DEV-14: `templates/mermaid-lint/` has no staleness mechanism**~~
+  (`shakenfist/development`). development#151 was closed on
+  2026-10-13 and folded into `PLAN-workflow-ref-trust.md` phase 5
+  (development#250), whose answer is to turn shared templates into
+  caller stubs rather than to version the copies. `templates/shared-blocks/*.md` carry a
   `shared-block: <name> vN` marker and `validate_shared_blocks()`
   measures adopting repositories against it. The mermaid-lint
   template has nothing equivalent: `MermaidLintCi` checks presence
@@ -2249,8 +2339,11 @@ one carrying the defect rather than the one carrying this plan.
   `tools/mermaid-lint.sh` and the template copy are byte-identical
   today with nothing enforcing it, and phase 8 had to check that by
   hand.
-* **DEV-16: one dangling symlink kills the whole audit for a
-  repository** (`shakenfist/development`).
+* ~~**DEV-16: one dangling symlink kills the whole audit for a
+  repository**~~ (`shakenfist/development`). Fixed in
+  development#170 (`0b10d30`, 2026-09-22), which also contained
+  per-check failures so one raising criterion no longer costs all
+  55; development#152 closed.
   `scripts/audit/checks/docs_content.py:183` opens files bare inside
   an `os.walk`, and `registry.run_check` has no handler, so a
   committed `*.md` symlink to a missing target raises
@@ -2258,8 +2351,10 @@ one carrying the defect rather than the one carrying this plan.
   It predates this plan (`c46afd5`, before `decaa4d~1`) and so is
   outside the audit range, which is the only reason it is here
   rather than in 8.10.
-* **HD-1: the `release` environment does not exist**
-  (`shakenfist/hunkydory`). `release.yml` declares `environment:
+* ~~**HD-1: the `release` environment does not exist**~~
+  (`shakenfist/hunkydory`). Resolved by 7b.2; hunkydory #20 closed
+  2026-09-22. The environment exists with the `v*` tag rule, two
+  variables and no secrets, re-checked 2026-10-28. `release.yml` declares `environment:
   release`, `gh api .../environments` returns `total_count: 0`, and
   no secrets are set. GitHub auto-creates a referenced environment
   **unprotected** on first use, so the first tag push creates
@@ -2273,8 +2368,10 @@ one carrying the defect rather than the one carrying this plan.
   arbitrary content under the `shakenfist` publisher id. Creating
   the environment with its tag rule is 7b.2's, and the issue remains
   so that an abandoned 7b leaves a record.
-* **HD-2: the repository has no branch protection and no rulesets**
-  (`shakenfist/hunkydory`). `develop` is unprotected (the
+* ~~**HD-2: the repository has no branch protection and no rulesets**~~
+  (`shakenfist/hunkydory`). Resolved by 7b.2; hunkydory #21 closed
+  2026-09-22. Two rulesets are active, one on `v*` tags and one on
+  `develop`. `develop` is unprotected (the
   branch-protection API answers 404), there are zero rulesets, and
   the repository is public, so any `v*` tag on any ref starts a
   publish under the `shakenfist` publisher id. This is a repository
@@ -2285,27 +2382,42 @@ one carrying the defect rather than the one carrying this plan.
   the authority to publish. The entry stays because 7b may never
   run, and because the setting is worth making whether or not the
   Marketplace account ever exists.
-* **HD-9: `prune-reviews.yml` and `renovate.yml` have never
-  succeeded** (`shakenfist/hunkydory`). Six of six runs and four of
+* ~~**HD-9: `prune-reviews.yml` and `renovate.yml` have never
+  succeeded**~~ (`shakenfist/hunkydory`). Resolved by 7b.2; hunkydory
+  #22 closed 2026-09-22, and both workflows have succeeded since. Six of six runs and four of
   four runs have failed since 2026-09-15, both for missing token
   secrets. Review pruning and dependency updates have been inert
   since they were installed, which is also why `REVIEWS.md` still
   attests a file #17 deleted. Needs an operator to add the secrets.
-* **HD-11: reusable workflows at `@main` with `secrets: inherit`**
-  (`shakenfist/development`). `release.yml`'s `github-release` job
+* ~~**HD-11: reusable workflows at `@main` with `secrets: inherit`**~~
+  (`shakenfist/development`). development#153 was closed on
+  2026-10-03 when `PLAN-workflow-ref-trust.md` (development#209)
+  took the question on; that plan's phase 4 records the settled
+  policy on which references may move. `release.yml`'s `github-release` job
   calls a reusable workflow at a moving ref while inheriting every
   secret, and third-party actions are unpinned. This is fleet
   convention rather than a hunkydory choice -- the templates here
   are where it comes from -- so fixing it in one repository would
   diverge without improving the fleet.
-* **HD-12: a bare `npm ci` on the shared static pool**
-  (`shakenfist/hunkydory`). The `build` job runs it on
+* ~~**HD-12: a bare `npm ci` on the shared static pool**~~
+  (`shakenfist/hunkydory`). Resolved by hunkydory #31 (`4aa98e6`),
+  which moved the `build` job into the pinned container; #23 closed
+  2026-09-22. The `build` job runs it on
   `[self-hosted, static]`, the persistent pool serving both
   `shakenfist` and `mach33labs`. The publish token is not present
   in that job, but the `.vsix` the publish job later signs and
   ships is produced there. Tightening it needs the devDependency
   install-script question settled first, which is a decision rather
   than a patch.
+* **7b was never push-audited** (`shakenfist/hunkydory`). Phase 8
+  excluded 7b on the understanding that it would be audited in the
+  pull request that landed it, and hunkydory #25, #28, #31, #35 and
+  #42 carry verification tables but no `PUSH-AUDIT.md` record. The
+  publish path has since been proven by two real releases, so the
+  audit's fails-closed question is answered; what has not been read
+  with the runbook's eyes is the token-minting script and the
+  container scripts. If wanted, it is one hunkydory pull request
+  reading those five merges against `develop`.
 
 ### Bugs fixed during this work
 
