@@ -16390,13 +16390,13 @@ every phase has been completed, abandoned or superseded.</p>
 <tr>
 <td>6. Documentation and close-out</td>
 <td><a href="../PLAN-kerbside-deployer-phase-06-docs/">PLAN-kerbside-deployer-phase-06-docs.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>54fed79bcf</code> (#4616); kerbside <code>ea44e9364</code> (#592)</td>
 </tr>
 <tr>
 <td>7. Push audit</td>
-<td>PLAN-kerbside-deployer-phase-07-push-audit.md</td>
-<td>Proposed</td>
+<td><a href="../PLAN-kerbside-deployer-phase-07-push-audit/">PLAN-kerbside-deployer-phase-07-push-audit.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 </tbody>
@@ -16750,12 +16750,44 @@ database. The release note has its Kerbside bullets. What remains:</p>
 this plan, not over the last phase alone. The phases here touch
 the same files from different directions:</p>
 <ul>
-<li>phases 1 and 3 both edit <code>site.yml</code>'s certificate plays;</li>
+<li>phases 2 to 5 all edit <code>site.yml</code>'s Kerbside plays, and phase 5
+  rewrote most of what phase 3 added there when the role moved;</li>
+<li>phase 1 taught <code>internal_ca</code> to issue a certificate to any host,
+  and phase 3 was its first caller outside <code>allsf</code>;</li>
 <li>phases 2 and 3 both decide what happens when <code>kerbside_url</code> is
   set and the group is empty.</li>
 </ul>
 <p>That interaction is exactly where the tokens plan's three
 "feature-off" defects lived.</p>
+<p>Planning this phase found that none of the five pull requests
+which landed phases 5 and 6 in Kerbside and actions was audited
+there, so there is no audit to cite and the phase reads those
+five ranges too, under their own runbooks. It also found that</p>
+<h1 id="4653-moved-the-kerbside-lane-from-the-merge-queue-to-the-weekly">4653 moved the Kerbside lane from the merge queue to the weekly<a class="headerlink" href="#4653-moved-the-kerbside-lane-from-the-merge-queue-to-the-weekly" title="Permanent link">&para;</a></h1>
+<p>run on 2026-10-25, which falsifies the success criterion below
+that names the merge queue, and that #4598, a <code>401 invalid token
+signature</code> from Kerbside inside the lane, is open and undiagnosed.
+The phase plan records the survey, and the audit reads the
+signing-key seam with #4598 in hand. Planned at medium effort.</p>
+<h4 id="audit-of-phases-1-to-6">Audit of phases 1 to 6<a class="headerlink" href="#audit-of-phases-1-to-6" title="Permanent link">&para;</a></h4>
+<p>Run on 2026-10-28 over eleven ranges: the six merges here and five in
+Kerbside and actions. Wave 1 passed in all three repositories (16
+hooks and 6336 unit tests here, 13 hooks and 571 tests in Kerbside, 11
+hooks and 787 tests in actions, plus gitleaks through its container).
+Seven judgment headings pooled 29 findings and four seeds. One is
+blocking: a trailing slash on <code>kerbside_url</code> passes every deploy-time
+check and then has Kerbside refuse every console token, because the
+audience is stripped on one side and compared verbatim on the other
+(#4697). The security review graded <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/444" title="GitHub Issue: shakenfist/kerbside #444">kerbside#444</a> as medium and worse
+than documented: the scrape key is unscoped cluster admin and
+Kerbside's database holds it in plaintext (#4698). The seam lens
+re-read #4598 and found the issue's stale-key reading is not what the
+code produces; the message also covers a token whose <code>iat</code> is ahead of
+the Kerbside host's clock (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/619" title="GitHub Issue: shakenfist/kerbside #619">kerbside#619</a>). Fourteen issues were filed
+here, eight in Kerbside and two in actions; the phase plan's
+Disposition table has each. A follow-up pull request fixes #4697 and
+the twelve cheap documentation and comment corrections, and closes the
+plan.</p>
 <p>By the time this phase runs, its predecessors will have merged,
 and a diff against <code>develop</code> would be empty and read as clean.
 The baseline is therefore the <code>Merged</code> column above. Phases that
@@ -16836,8 +16868,8 @@ codebase, can be planned at medium effort.</p>
 <div class="admonition note">
 <p class="admonition-title">In this project</p>
 <p>Phases 1 to 5 are planned at high effort, for the reasons
-given in each phase's section. Phase 6 is planned at medium
-effort.</p>
+given in each phase's section. Phases 6 and 7 are planned at
+medium effort.</p>
 </div>
 <h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
 <!-- shared-block: subagent-step-guidance v1 -->
@@ -17024,9 +17056,13 @@ because the following statements will be true:</p>
   Kerbside) gets the signing key minted and the capability
   advertised, with no <code>sf-ctl</code> command run by hand.</li>
 <li>A second <code>site.yml</code> run with nothing changed restarts nothing.</li>
-<li>SF's merge queue runs a job in which the capability is
-  advertised, a token is minted, Kerbside exchanges it, and the
-  proxy's TLS endpoint verifies against the CA in the <code>.vv</code>.</li>
+<li>SF's CI runs a job in which the capability is advertised, a token
+  is minted, Kerbside exchanges it, and the proxy's TLS endpoint
+  verifies against the CA in the <code>.vv</code>. That job is the
+  <code>debian-13-slim-tier</code> lane: in the merge queue when phase 4
+  landed, and weekly since #4653 moved it on 2026-10-25, so a
+  Kerbside regression is caught within a week rather than on the
+  merge that caused it.</li>
 <li>Kerbside's sf-e2e lane deploys through the collection, and
   <code>deploy-kerbside-on-shakenfist</code> is retired.</li>
 <li>SPICE certificates renew before they expire.</li>
@@ -17067,7 +17103,7 @@ chosen to defer to here, so that we do not forget them.</p>
   JWT from the seed, as the sf-e2e driver does. The tokens
   plan's Future work also points at convergence with SF's
   OIDC and auth-federation work.</li>
-<li><strong>A least-privilege credential for the scrape.</strong> It needs an
+<li><strong>A least-privilege credential for the scrape</strong> (#4698). It needs an
   <code>sf-ctl</code> option to mint a scoped <code>system</code> key, and a verified
   scope set. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/444" title="GitHub Issue: shakenfist/kerbside #444">kerbside#444</a>, on non-<code>system</code> namespaces, was closed on
   2026-10-17 by a documentation change (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/569" title="GitHub Issue: shakenfist/kerbside #569">kerbside#569</a>). The
@@ -17081,8 +17117,8 @@ chosen to defer to here, so that we do not forget them.</p>
 <li>~~<strong>Ship the systemd units from Kerbside</strong>, and switch the
   collection to them (open question 2).~~ Taken into phase 5,
   which moves the whole role, units included, to Kerbside.</li>
-<li><strong>Automated signing-key rotation</strong>, carried over from the
-  tokens plan.</li>
+<li><strong>Automated signing-key rotation</strong> (#4710), carried over from the
+  tokens plan; the audit found that no lane rotates and then exchanges.</li>
 <li><strong>Every develop commit restarts every daemon</strong> (#4483, open).
   The node role's restart-on-change hash covers <code>_version.py</code>, which
   setuptools_scm rewrites on every commit, so a docs-only commit
@@ -17090,9 +17126,11 @@ chosen to defer to here, so that we do not forget them.</p>
   Phase 4's trial found it beside the <code>build-collection.py</code> dirty-tree
   bug, which phase 4 fixed. Whether to keep the behaviour and fix the
   comment, or exclude the file from the hash, is the operator's call.</li>
-<li><strong>More than one Kerbside host, tested</strong>, behind a TCP
-  passthrough load balancer.</li>
-<li><strong>Homelab adoption.</strong> sfcbr, the report that prompted this
+<li><strong>More than one Kerbside host, tested</strong> (#4705), behind a TCP
+  passthrough load balancer; the audit found that no lane deploys even
+  one dedicated host.</li>
+<li><strong>Homelab adoption</strong> (no issue: it is tracked in the operator's own
+  repository, as the next sentence says). sfcbr, the report that prompted this
   plan, picks the feature up in the operator's own
   infrastructure repository once phase 3 is released. That
   repository, not this plan, tracks the work.</li>
