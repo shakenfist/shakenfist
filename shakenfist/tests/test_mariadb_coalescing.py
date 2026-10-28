@@ -1551,3 +1551,103 @@ class RetiredSingleColumnRpcsTestCase(base.ShakenFistTestCase):
         self.assertNotIn("'find_existing_coalescible_op'", source)
         self.assertIn("'claim_coalescible_siblings_v2'", source)
         self.assertIn("'find_existing_coalescible_op_v2'", source)
+
+
+class CoalescingUnimplementedTestCase(base.ShakenFistTestCase):
+    """UNIMPLEMENTED from an older sf-database raises, with no fallback.
+
+    The multi-column key is only safe across a rolling upgrade if a V2
+    call answered UNIMPLEMENTED by an older service is treated as
+    "coalescing unavailable". The wrapper must raise, not return the
+    empty result it returns on every other failure (which reads as "no
+    sibling" and would let an enqueue or a fold proceed as though it had
+    checked), and it must not try any other RPC, because an older
+    server could only fold on the first column alone. These tests start
+    from the RPC answer rather than from the exception, which is where
+    the existing coverage started (#4641).
+    """
+
+    KEYS = [('network_uuid', NETWORK_UUID), ('node_uuid', NODE_A_UUID)]
+
+    def _call(self, wrapper, code):
+        stub = mock.MagicMock()
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=stub), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           side_effect=FakeRpcError(code)) as mock_call:
+            try:
+                result = wrapper()
+            except exceptions.CoalescingUnavailable as e:
+                result = e
+        return stub, mock_call, result
+
+    def _assert_one_attempt_on(self, stub, mock_call, method_name):
+        # One RPC was attempted, it was the V2 or fold method, and
+        # nothing else on the stub was called afterwards.
+        self.assertEqual(1, mock_call.call_count)
+        self.assertIs(getattr(stub, method_name),
+                      mock_call.call_args.args[0])
+        self.assertEqual([], stub.mock_calls)
+
+    def test_find_existing_raises_on_unimplemented(self):
+        stub, mock_call, result = self._call(
+            lambda: mariadb._grpc_find_existing_coalescible_op(
+                'net_op', self.KEYS, TASK, ['user_facing']),
+            grpc.StatusCode.UNIMPLEMENTED)
+        self.assertIsInstance(result, exceptions.CoalescingUnavailable)
+        self._assert_one_attempt_on(
+            stub, mock_call, 'FindExistingCoalescibleOpV2')
+
+    def test_claim_siblings_raises_on_unimplemented(self):
+        stub, mock_call, result = self._call(
+            lambda: mariadb._grpc_claim_coalescible_siblings(
+                'net_op', self.KEYS, [TASK], SURVIVOR_UUID),
+            grpc.StatusCode.UNIMPLEMENTED)
+        self.assertIsInstance(result, exceptions.CoalescingUnavailable)
+        self._assert_one_attempt_on(
+            stub, mock_call, 'ClaimCoalescibleSiblingsV2')
+
+    def test_fold_siblings_raises_on_unimplemented(self):
+        stub, mock_call, result = self._call(
+            lambda: mariadb._grpc_fold_coalescible_siblings(
+                'net_op', self.KEYS, [TASK], SURVIVOR_UUID),
+            grpc.StatusCode.UNIMPLEMENTED)
+        self.assertIsInstance(result, exceptions.CoalescingUnavailable)
+        self._assert_one_attempt_on(
+            stub, mock_call, 'FoldCoalescibleSiblings')
+
+    def test_any_other_failure_is_an_empty_result(self):
+        # The contrast: a transient failure is "nothing matched", which
+        # the enqueue and the fold both already tolerate. Only the
+        # upgrade window gets the loud outcome.
+        _, _, found = self._call(
+            lambda: mariadb._grpc_find_existing_coalescible_op(
+                'net_op', self.KEYS, TASK),
+            grpc.StatusCode.UNAVAILABLE)
+        self.assertIsNone(found)
+        _, _, folded = self._call(
+            lambda: mariadb._grpc_fold_coalescible_siblings(
+                'net_op', self.KEYS, [TASK], SURVIVOR_UUID),
+            grpc.StatusCode.UNAVAILABLE)
+        self.assertEqual([], folded)
+
+    def test_the_public_wrappers_let_it_through(self):
+        # Nothing between the RPC and create_and_enqueue, or
+        # BaseClusterOperation.execute, may swallow it.
+        stub = mock.MagicMock()
+        with mock.patch('shakenfist.mariadb._use_database_service',
+                        return_value=True), \
+                mock.patch('shakenfist.mariadb._get_database_stub',
+                           return_value=stub), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           side_effect=FakeRpcError(
+                               grpc.StatusCode.UNIMPLEMENTED)):
+            self.assertRaises(
+                exceptions.CoalescingUnavailable,
+                mariadb.find_existing_coalescible_op,
+                operation_type='net_op', keys=self.KEYS, task_name=TASK,
+                priorities=['user_facing'])
+            self.assertRaises(
+                exceptions.CoalescingUnavailable,
+                mariadb.fold_coalescible_siblings,
+                'net_op', self.KEYS, [TASK], SURVIVOR_UUID)
