@@ -63,8 +63,8 @@ extra_vars:
   kerbside_sql_url: 'mysql://kerbside:{{ kerbside_db_password }}@{{ nodes.primary.mesh_ip }}/kerbside'
 
 # Run once with sudo mariadb on the primary, before the first deploy. It is
-# idempotent all the same, as Kerbside's own tools/sf-e2e/deploy-kerbside.sh
-# is, so a rerun of the step cannot fail on it.
+# idempotent all the same, as the same statements in Kerbside's own sf-e2e
+# deploy profile are, so a rerun of the step cannot fail on it.
 mariadb_sql: |
   CREATE DATABASE IF NOT EXISTS kerbside;
   CREATE USER IF NOT EXISTS 'kerbside'@'%' IDENTIFIED BY '{{ kerbside_db_password }}';
