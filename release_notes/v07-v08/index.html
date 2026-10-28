@@ -17528,6 +17528,28 @@ details.</p>
 </ul>
 <h2 id="minor-changes">Minor changes<a class="headerlink" href="#minor-changes" title="Permanent link">&para;</a></h2>
 <ul>
+<li>Restarting a daemon no longer loses or doubles the work it had in flight:</li>
+<li>Restarting <code>sf-privexec</code> no longer stops every <code>dnsmasq</code> on the node.
+    Each network was without DHCP and DNS until <code>sf-net</code> noticed and started
+    its <code>dnsmasq</code> again, which took between 20 seconds and five minutes. The
+    unit now sets <code>KillMode=process</code>, so systemd signals only <code>sf-privexec</code>
+    itself. It finishes its in-flight requests before it exits, so a blob
+    hash in progress at the restart is no longer killed and reported as a
+    checksum failure.</li>
+<li>A stopping <code>sf-net</code> gives back the network work it had claimed but not
+    started, and a starting <code>sf-net</code> clears the claims its previous process
+    left on its own queues. Before, that work waited 30 minutes for the
+    stuck work item reaper, and every request for it in the meantime waited
+    too: after one routine deploy, a network's VXLAN mesh stayed empty for
+    17 minutes.</li>
+<li>When <code>sf-net</code>'s network work dispatcher fails, its replacement no longer
+    starts until every worker of the old one has stopped. For a few seconds
+    two workers could run one network's operations at once, or out of order.</li>
+<li>A <code>dnsmasq</code> hard restart waits for the old process to exit before
+    starting the new one, which could otherwise fail to bind its DHCP port.</li>
+<li>The event log drainer survives a failed pass, such as one during a
+    database outage. Before, its thread exited, and events stayed in the
+    node's local spool until the daemon restarted.</li>
 <li>Attribute updates on instances, networks and artifacts now write only the
   columns named in the update, instead of rewriting the whole attribute row.
   This fixes a lost-update race where two daemons concurrently updating
