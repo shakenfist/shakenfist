@@ -31,9 +31,12 @@ def redact_vv(vv_text):
     """A .vv file with its password removed, for the test log.
 
     The password is a live console credential: Kerbside's for a minute, a
-    hypervisor's for as long as the instance keeps it.
+    hypervisor's for as long as the instance keeps it. Matches every line
+    _parse_vv's configparser reads as the password key: whitespace before
+    the '=' is stripped there, so it must not be relied on being absent,
+    while an indented line is a continuation of the value above, not a key.
     """
-    return re.sub(r'(?m)^password=.*$', 'password=<redacted>', vv_text)
+    return re.sub(r'(?m)^password\s*=.*$', 'password=<redacted>', vv_text)
 
 
 class BaseVDIConsoleTestCase(base.BaseNamespacedTestCase):

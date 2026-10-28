@@ -806,6 +806,7 @@ case_7_site_validation_runs() {
 
     CURRENT_CASE="case 7: site.yml passes two Shaken Fist nodes which agree on kerbside_url"
     reset_site_vars
+    SF_NODES=$'sf-1\nsf-2' site_inventory kb-1
     run_site_head "${WITH}" || fail 'the cluster shape play refused two nodes with one kerbside_url'
     assert_task_ok 'Fail if a Shaken Fist node sees kerbside_url differently from the first' localhost
     assert_task_ok 'Fail if kerbside_url ends in a slash' localhost
