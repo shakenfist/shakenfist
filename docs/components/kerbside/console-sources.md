@@ -6,6 +6,9 @@ Kerbside can connect to the following platforms:
 - [oVirt](https://www.ovirt.org), an Open Source Red Hat supported
   virtualization system
 - [OpenStack](https://www.openstack.org), an Open Source cloud compute platform
+- [Proxmox VE](https://www.proxmox.com/en/proxmox-virtual-environment/overview),
+  an Open Source virtualization platform
+- A fixed list of QEMU targets, for CI and debugging (the `static` source)
 
 The connection to each platform (a source of consoles, so "console sources") is
 defined in the `sources.yaml` configuration file in YAML format. The path to
@@ -18,6 +21,11 @@ Kerbside handles different source types in different ways:
 - **oVirt**: These sources are queried regularly (once a minute) for a list of
   available consoles. The consoles are stored in the database and presented in
   the Kerbside administrative interface.
+
+- **Proxmox VE**: Proxmox sources are scraped the same way, once a minute. The
+  scrape never touches a VM's console password; a ticket is minted when a
+  session's first channel connects. See the [Proxmox VE](#proxmox-ve) section
+  below.
 
 - **Shaken Fist**: Shaken Fist sources are also scraped regularly, but with a
   `system` credential, so the scrape covers the whole cluster rather than a
@@ -80,7 +88,7 @@ deletes it and its consoles on the next pass.
 
 Shaken Fist sources are periodically scraped for their available consoles, but
 both the scrape and the console-access flow differ from the other scraped
-source (oVirt), so they are described here in full.
+sources (oVirt and Proxmox VE), so they are described here in full.
 
 **Cluster-wide scrape.** The source's `username` must be `system`, and Kerbside
 scrapes the *entire* cluster in one pass: every namespace's instances are
@@ -224,8 +232,8 @@ channel (`console ticket unavailable`) and is audited with the
 exception's class name. A successful mint is audited with its
 lifetime. An unreachable engine therefore breaks connection setup as
 well as discovery. Direct consoles (`/console/direct`, administrators
-only) mint through the same deadline with a lifetime of
-`CONSOLE_TOKEN_DURATION`; an errored source answers 404 and any other
+only; oVirt, not Proxmox) mint through the same deadline with a lifetime
+of `CONSOLE_TOKEN_DURATION`; an errored source answers 404 and any other
 failure 502.
 
 Only one client is served per VM at a time: when a second session
@@ -237,6 +245,123 @@ reachability to every hypervisor, and oVirt's own SPICE proxy
 (`SpiceProxyDefault`) is not in the path. See
 [Kerbside for oVirt](/components/kerbside/use-cases/ovirt/) for the deployment architecture,
 the network prerequisites, and what is and is not proven.
+
+## Proxmox VE
+
+The following options are used to configure a Proxmox VE console source
+(`type: proxmox`).
+
+| Option | Description |
+|--------|-------------|
+| source | The name of the source (used as an identifier) |
+| type | The type of the source: `proxmox` |
+| url | The URL of the API of one node of the cluster, on port 8006 (e.g., `https://pve1.example.org:8006`). Its host is also the CONNECT proxy for every console in the source, so it must be a node, or something which forwards ports 8006 and 3128 to one |
+| username | The ID of an API token, in the form `user@realm!tokenid` (e.g., `kerbside@pve!console`). A password login is not supported |
+| password | The token's secret |
+| ca_cert | Required: the cluster's CA certificate, inline PEM text, not a path. It is `/etc/pve/pve-root-ca.pem` on any node. Kerbside uses it to validate the API, and as the CA for the TLS connection to each VM's SPICE server, which the same CA signed |
+
+The URL must use a name the node's certificate was issued for, and that name
+must resolve from the Kerbside host.
+
+### Proxmox VE account
+
+The token needs only the `VM.Audit` and `VM.Console` privileges on `/vms`.
+Create a role holding exactly those, a user to own the token, and a
+privilege-separated token, and give both the role on `/vms`:
+
+```shell
+pveum role add KerbsideConsole --privs "VM.Audit VM.Console"
+pveum user add kerbside@pve
+pveum acl modify /vms --roles KerbsideConsole --users kerbside@pve
+pveum user token add kerbside@pve console --privsep 1
+pveum acl modify /vms --roles KerbsideConsole --tokens 'kerbside@pve!console'
+```
+
+`pveum user token add` prints the token's secret once. A privilege-separated
+token holds only the privileges that both it and its user have, so the user
+needs the role as well as the token. Giving the user the role does not let the
+token do more than the token's own ACL allows. The token ID,
+`kerbside@pve!console`, is the source's `username`.
+
+### Proxmox VE network
+
+The Kerbside broker must reach the host in the source's `url` on both 8006
+(the API) and 3128 (the node's SPICE proxy). Kerbside asks Proxmox to name that
+same host as the proxy for each console, so the nodes' own names never need to
+resolve from the broker. Kerbside reaches a VM's SPICE server only through
+that proxy, with an HTTP CONNECT.
+
+### Which VMs are listed
+
+Each scrape lists the cluster's VMs in one request, and then reads the
+configuration of those that are candidates. A VM becomes a console only when
+it is:
+
+- a running QEMU VM, not a container and not a template;
+- configured with a `qxl`, `qxl2`, `qxl3` or `qxl4` display, or any `virtio`
+  display. The default `std` display has no SPICE server, so such a VM is
+  skipped;
+- configured with an SMBIOS UUID. A VM created with `qm create` or the web
+  interface has one; a VM without one is skipped, and the scrape logs its VM
+  ID at info level.
+
+Kerbside reads each VM's running configuration, not changes still pending
+until its next restart.
+
+Each node's SPICE certificate subject is read once per scrape and pinned for
+that node's consoles. A node which answers but has no `pve-ssl.pem` subject
+yields no consoles, and the scrape logs a warning. If any request fails, for
+the VM list, a node's certificates or one VM's configuration, the source is
+marked errored for that scrape and keeps every console it had. A scrape that
+finished without those consoles would remove them, and with them the tokens
+of any session using them. While a source is errored, no new consoles are
+discovered in it.
+
+A VM which migrates to another node still mints on its new node, but its
+console keeps the old node's pinned subject until the next scrape, so for up
+to a minute after a migration the backend connection fails its subject check
+and the console cannot be reached.
+
+### Proxmox VE console uuid
+
+A Proxmox console's `uuid` has the form `<vmid>-<smbios uuid>`, with the SMBIOS
+UUID lower-cased (e.g., `101-0b3c9d6a-1f4e-4c8a-9d52-7a1e5f0c2b44`). Proxmox
+hands out the lowest free VM ID, so a deleted VM's ID is reused by the next VM
+created. A VM ID alone would give two different machines one console, one audit
+trail and one set of tokens. The SMBIOS UUID tells them apart, and the VM ID
+lets Kerbside find the VM without reading every VM's configuration. A mint
+checks that the VM still has the SMBIOS UUID the console was discovered with,
+and refuses if it does not.
+
+### Proxmox VE console tickets
+
+Kerbside asks Proxmox for a SPICE ticket when the first channel of a session
+connects, not when the `.vv` file is downloaded, and shares it between the
+session's channels as described for [oVirt](#ovirt-console-tickets). A Proxmox
+ticket lasts 30 seconds from the mint, a length Proxmox does not let a caller
+choose, so `CONSOLE_TOKEN_DURATION` does not change it. A session's channels
+reuse the ticket until 10 seconds before it expires, and a channel which
+connects after that mints a fresh one. Minting a ticket replaces the VM's
+password, which does not disconnect clients already connected.
+
+A mint reads the VM list and the VM's configuration before it asks for the
+ticket, and each request is bounded at 5 seconds. A failure denies the channel
+(`console ticket unavailable`) and is audited with the exception's class name.
+An unreachable API therefore breaks connection setup as well as discovery.
+
+The API's response also names a CA. Kerbside ignores it and verifies the
+connection against the source's `ca_cert`, so the API cannot choose what the
+connection is checked against.
+
+### Proxmox VE has no direct consoles
+
+A Proxmox console is proxied only. There is no direct `.vv` file for it: a
+30 second ticket is too short for a file to be downloaded and opened, and only
+Kerbside can make the CONNECT the ticket is for. A request to
+`/console/direct/<source>/<uuid>/console.vv` for a Proxmox console is answered
+with 409, `this source offers proxied consoles only`. The refusal is made
+before the source's secrets are read or a ticket is minted, and is audited. The
+consoles page does not offer *Direct* for these consoles.
 
 ## OpenStack
 
@@ -395,6 +520,16 @@ An example configuration follows:
   type: ovirt
   url: https://ovirt.example.org/ovirt-engine
   username: kerbside@internal
+  password: ...omitted...
+  ca_cert: |
+    -----BEGIN CERTIFICATE-----
+    ...
+    -----END CERTIFICATE-----
+
+- source: pve
+  type: proxmox
+  url: https://pve1.example.org:8006
+  username: kerbside@pve!console
   password: ...omitted...
   ca_cert: |
     -----BEGIN CERTIFICATE-----

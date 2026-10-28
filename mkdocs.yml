@@ -319,6 +319,9 @@ nav:
                 - "Proxy backpressure on a shaped client link": components/kerbside/performance/proxy-backpressure.md
                 - "spice-server's ACK window, observed from the proxy": components/kerbside/performance/ack-window.md
                 - "Streaming and the qemu damage series on a shaped link": components/kerbside/performance/streaming-rebaseline.md
+                - "Switching a display channel between relaying and transcoding": components/kerbside/performance/transcoding-switching.md
+                - "The transcoding display channel on a shaped link": components/kerbside/performance/transcoding-measurements.md
+                - "Transcoding the display channel: the spike's verdict": components/kerbside/performance/transcoding-spike.md
             - Plans:
                 - "Plans index": components/kerbside/plans/index.md
                 - "A working installation path: the compose demo": components/kerbside/plans/PLAN-demo-install.md
@@ -368,6 +371,7 @@ nav:
                 - "Proxmox source phase 2: HTTP CONNECT in shakenfist-spice-protocol": components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect.md
                 - "Proxmox source phase 3a: minting at connect time": components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting.md
                 - "Proxmox source phase 3b: tunnel transport": components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport.md
+                - "Proxmox source phase 4: the source driver": components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver.md
                 - "Proxy dev releases phase 1: the publish workflow": components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow.md
                 - "Proxy dev releases phase 2: the committed dev specifier": components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier.md
                 - "Proxy dev releases phase 3: the contract handshake": components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake.md

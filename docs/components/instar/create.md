@@ -59,7 +59,7 @@ The full flag surface is reported by `instar create --help`.
 | qcow2  | n/a                    | Yes      | info-equivalent (modulo refcount_bits, compat, zstd) |
 | vmdk   | monolithicSparse, streamOptimized, monolithicFlat | Yes (not monolithicFlat) | info-equivalent |
 | vpc    | dynamic, fixed         | Yes (dynamic only) | info-equivalent (modulo CHS virtual_size rounding) |
-| vhdx   | dynamic                | Yes      | info-equivalent (modulo default block_size when unspecified) |
+| vhdx   | dynamic                | Yes      | info-equivalent |
 
 A "No" in the *Backing?* column means the format cannot be created
 *as a child* at all: `-b` / `-o backing_file` is rejected. Raw is the
@@ -218,7 +218,25 @@ Accepted but no size effect:
 ### vhdx
 
 Honoured:
-- `size`, `block_size` (1 MiB..256 MiB power of two)
+- `size`, at most 64 TiB (70368744177664 bytes), the largest VHDX
+  qemu-img creates. A larger size is refused before the output file is
+  opened, so nothing is left behind (qemu-img leaves an empty file):
+
+  ```
+  $ instar create -f vhdx big.vhdx 65T
+  Error: "create: virtual size 71468255805440 exceeds the VHDX maximum of 64 TiB (70368744177664 bytes)"
+  ```
+
+  A size taken from a backing file is checked in the guest and refused
+  with `backing file's virtual size exceeds the VHDX maximum of 64 TiB`.
+  A size that is not a multiple of 512 is rounded up to one, as qemu-img
+  does, because `VirtualDiskSize` must be a multiple of the logical
+  sector size: `1073741825` records `1073742336`, and the `Created:`
+  line reports the recorded size.
+- `block_size` (1 MiB..256 MiB power of two). Unset, it is qemu-img's
+  default for the size: 8 MiB up to 1 GiB, 16 MiB up to 100 GiB, 32 MiB
+  up to 32 TiB, then 64 MiB. The `Created:` line's `unit_size` reports
+  the block size the image records.
 - `preallocation` (off|falloc|full; `falloc` and `full` are no-ops, `metadata` is refused)
 - `backing_file`, `backing_fmt` — a VHDX child with a parent sets the
   `HasParent` file-parameter bit and writes a populated parent
@@ -417,10 +435,10 @@ the newly appended region (see [format-coverage.md](/components/instar/format-co
 ## Known divergences from `qemu-img create`
 
 The cross-version baseline matrix passes for the bulk of supported
-options, but five categories of writer divergence are documented and
+options, but four categories of writer divergence are documented and
 tracked as future work. The canonical list (with per-case rationale)
-for the first four is `KNOWN_WRITER_DIVERGENCES` in
-`tests/test_create.py`; the fifth has no entry there because there is
+for the first three is `KNOWN_WRITER_DIVERGENCES` in
+`tests/test_create.py`; the fourth has no entry there because there is
 no baseline to skip — qemu-img cannot produce the output at all.
 
 - **VHD `virtual_size`**: qemu-img rounds up to the next CHS-aligned
@@ -434,10 +452,6 @@ no baseline to skip — qemu-img cannot produce the output at all.
   encoder when zstd is requested. The cluster data itself is empty in
   a fresh image so the field-only divergence has no functional
   impact, but `qemu-img info` reports the discrepancy.
-- **vhdx default `block_size`**: at virtual sizes ≤ 1 GiB instar
-  defaults to 8 MiB; qemu-img always defaults to 32 MiB. Pass
-  `-o block_size=...` (or `--block-size`) explicitly to match.
-  Explicit block sizes round-trip cleanly.
 - **vpc / vhdx differencing children**: instar can create a
   differencing VHD or VHDX (`-b` with `-f vpc` / `-f vhdx`); qemu-img
   refuses to create either ("Backing file not supported for file
@@ -457,8 +471,6 @@ through `instar check` and match `qemu-img` (instar #365).
 - qcow2 `compat=0.10` honouring.
 - zstd-aware qcow2 create (drop the accept-ignore; emit the zstd
   header bit).
-- vhdx default `block_size` matching qemu's 32 MiB at all virtual
-  sizes.
 - The split VMDK subformats (`twoGbMaxExtentSparse`,
   `twoGbMaxExtentFlat`).
 - qemu's DDB lines (`ddb.virtualHWVersion`, `ddb.geometry.*`,
@@ -509,8 +521,16 @@ Create a 16 MiB fixed VHD (footer-only metadata at end of file):
 instar create -f vpc -o subformat=fixed disk.vhd 16M
 ```
 
-Create a vhdx with an explicit 32 MiB block size (matches qemu-img's
-default and avoids the `vhdx` default-block-size divergence):
+Create a 1 GiB vhdx. With no `block_size` it gets qemu-img's default
+for the size, 8 MiB here; the default rises to 16 MiB above 1 GiB,
+32 MiB above 100 GiB and 64 MiB above 32 TiB (see
+[quirks.md](/components/instar/quirks/#vhdx-default-block_size-scales-with-the-size-as-qemu-imgs-does)):
+
+```
+instar create -f vhdx disk.vhdx 1G
+```
+
+Create a vhdx with an explicit 32 MiB block size:
 
 ```
 instar create -f vhdx -o block_size=32M disk.vhdx 1G

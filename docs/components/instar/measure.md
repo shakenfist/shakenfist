@@ -123,6 +123,15 @@ Accepted but no size effect:
 Honoured:
 - `subformat` (dynamic), `block_size`
 
+The virtual size is at most 64 TiB (70368744177664 bytes), the largest
+VHDX qemu-img creates. A larger `--size` is refused before the guest
+runs (`measure: virtual size N exceeds the VHDX maximum of 64 TiB
+(70368744177664 bytes)`). A larger source is read, and then refused with
+`measure failed: source virtual size exceeds the VHDX maximum of 64 TiB
+(70368744177664 bytes)` (`MeasureResult::ERROR_TOO_LARGE`), not as an
+unsupported source format. A size that is not a multiple of 512 is
+measured rounded up to one, as convert and create record it.
+
 Accepted but no size effect:
 - `log_size`, `block_state_zero`
 

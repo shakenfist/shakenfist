@@ -210,8 +210,8 @@ twoGbMaxExtent subformats.
 8. **VMDK / VHD / VHDX `resize` and VMDK `rebase` — instar-only** — qemu-img
  refuses these on every shipped version ("Image format driver does not
  support resize / rebase"); instar performs them (monolithicSparse for
- vmdk, dynamic for vhdx). See the Resize and Rebase Format Support tables below. Measured
- 2026-07-20.
+ vmdk, dynamic for vhdx). See the Resize and Rebase Format Support tables
+ below. Measured 2026-07-20.
 9. **VHD `check` — instar-only** — instar runs full VHD footer/BAT validation
  (rc 0); qemu-img refuses `check` on vpc ("This image format does not
  support checks", exit 63). Measured 2026-07-20.
@@ -333,7 +333,7 @@ The `instar convert` operation supports writing output in the following formats:
 | **qcow2** | Supported | QCOW2 v3, 16-bit refcounts, configurable cluster size (512B-64KB), optional zlib compression (`-c`) |
 | **vmdk** | Supported | monolithicSparse (default), streamOptimized with `-c`, monolithicFlat with `--subformat monolithicFlat` (also from `instar create`, written on the host; the extent is named as qemu-img names it), configurable grain size (4KB-64KB via `--grain-size`) for sparse/streamOptimized |
 | **vpc** (VHD) | Supported | Dynamic VHD, configurable block size (512KB+ via `--block-size`, default 2MB), BAT-based allocation |
-| **vhdx** | Supported | Dynamic VHDX, configurable block size (1MB-256MB via `--block-size`, default 32MB), CRC-32C checksums |
+| **vhdx** | Supported | Dynamic VHDX, configurable block size (1MB-256MB via `--block-size`, default qemu-img's for the size: 8MB up to 1GB, 16MB up to 100GB, 32MB up to 32TB, then 64MB), CRC-32C checksums |
 
 ### Input Format Support for Conversion
 
@@ -492,7 +492,7 @@ dense output. Per-format output support:
 | qcow2         | Supported | `round_up(window, 512)` | Byte- and size-identical |
 | vmdk          | Supported | `round_up(window, 512)` | Byte- and size-identical |
 | vpc (VHD)     | Supported | CHS geometry rounding (may be larger; e.g. 3000-byte window ⇒ 34816) | Byte- and size-identical |
-| vhdx          | Supported | `round_up(window, 512)` | Data/virtual-size identical; block-size metadata differs (instar 32 MiB, qemu 8 MiB for small images) |
+| vhdx          | Supported | `round_up(window, 512)` | Data/virtual-size identical; block size identical (qemu-img's default for the size) |
 
 All input formats supported by `instar convert` are also accepted
 as `dd` input. `-O` defaults to **raw** (not the input format).
@@ -500,8 +500,7 @@ Window semantics: `bs` (default 512), `count` (clamps down;
 `count=0` ⇒ empty), `skip` (subtracts from front; skip-past-EOF
 ⇒ empty, exit 0). Output is always dense.
 
-Known divergences from `qemu-img dd`: vhdx default block size
-(data and virtual size still match); `count=0 -O vmdk` (qemu-img
+Known divergences from `qemu-img dd`: `count=0 -O vmdk` (qemu-img
 itself exits 1); `count=0 -O vhdx` (instar's empty vhdx is
 rejected by `qemu-img info`). See [docs/dd.md](/components/instar/dd/) for the
 full reference.
@@ -843,8 +842,9 @@ qcow2-luks).
 14. **VHDX Input/Output Support** - Convert supports VHDX as both input
     and output format. Input: dynamic VHDX (64-bit BAT with interleaved
     sector bitmap entries, GUID-based metadata, CRC-32C header/region
-    validation). Output: dynamic VHDX with 32 MiB blocks, 1MB-aligned
-    structures, and skip-zeros support.
+    validation). Output: dynamic VHDX with qemu-img's default block
+    size for the size (8 MiB up to 1 GiB), 1MB-aligned structures, and
+    skip-zeros support.
 
 15. **VHDX Structural Integrity Check** - Full validation in check
     operation: dual header CRC-32C validation with active header

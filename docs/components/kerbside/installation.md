@@ -95,6 +95,7 @@ what you use into the same virtual environment as Kerbside:
 | An `ovirt` source | `ovirt-engine-sdk-python` | The source is marked errored and ignored, and the daemon logs why. |
 | An `openstack` source (token exchange) | `openstacksdk`, `keystoneauth1` and `python-keystoneclient` | The API answers 500 to the token exchange request and logs the import failure. |
 | Interactive login, whatever your sources | `keystoneauth1` and `python-keystoneclient` | The API answers 500 to login and logs the import failure. |
+| A `proxmox` source | Nothing: it uses `requests`, which Kerbside already needs | |
 | Only `static` sources | Nothing | |
 
 Login is Keystone-only today (issue
@@ -169,7 +170,7 @@ viewer refuses the connection and the error does not explain itself.
 **A console source.** Kerbside proxies consoles it has discovered, so
 it needs at least one source in the file named by `SOURCES_PATH`,
 conventionally `/etc/kerbside/sources.yaml`. The drivers are Shaken
-Fist, oVirt, OpenStack, and `static` for fixed targets — see
+Fist, oVirt, OpenStack, Proxmox VE, and `static` for fixed targets — see
 [console-sources.md](/components/kerbside/console-sources/).
 
 **The minimum configuration set.** Configuration is an INI file at

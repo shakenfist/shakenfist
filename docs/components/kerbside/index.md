@@ -168,8 +168,8 @@ Guides for deploying and configuring Kerbside:
   cannot be skipped
 
 - [Console Sources](/components/kerbside/console-sources/) - Configuring console sources
-  (sources.yaml) for Shaken Fist, oVirt, OpenStack, and the static driver,
-  including the Shaken Fist offline token exchange
+  (sources.yaml) for Shaken Fist, oVirt, OpenStack, Proxmox VE, and the
+  static driver, including the Shaken Fist offline token exchange
 
 - [Database Schema](/components/kerbside/schema/) - Database tables, columns, and relationships
 
@@ -204,6 +204,18 @@ Guides for working on Kerbside itself:
   The relay's observation of the display ACK window on the same rig:
   it bounds the slow-link backlog at 2W+1 messages, but does not cap
   throughput on a long, fast link
+
+- [The transcoding display channel on a shaped link](/components/kerbside/performance/transcoding-measurements/) -
+  The experimental transcoder against relaying, with and without streaming,
+  on links down to 2 Mbit: latency, proxy CPU and memory, and image quality
+
+- [Switching a display channel between relaying and transcoding](/components/kerbside/performance/transcoding-switching/) -
+  Moving a live session's display channel between the two modes: what a
+  switch costs, and what breaks in remote-viewer and Ryll
+
+- [Transcoding the display channel: the spike's verdict](/components/kerbside/performance/transcoding-spike/) -
+  Why the transcoder is not being productised, what it costs per
+  session, and what would change the answer
 
 ### Architecture Documentation
 

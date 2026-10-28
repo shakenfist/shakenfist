@@ -50,7 +50,9 @@ instar convert -O vmdk --grain-size 4096 input.raw output.vmdk
 # Specify VHD block size (524288+, default: 2097152)
 instar convert -O vpc --block-size 1048576 input.raw output.vhd
 
-# Specify VHDX block size (1048576 to 268435456, default: 33554432)
+# Specify VHDX block size (1048576 to 268435456, default: qemu-img's for
+# the size, 8388608 up to 1 GiB, 16777216 up to 100 GiB, 33554432 up to
+# 32 TiB, then 67108864)
 instar convert -O vhdx --block-size 4194304 input.raw output.vhdx
 
 # Progress reporting
@@ -93,8 +95,15 @@ The default can also be set via `convert.sparse` in the config file.
   [quirks.md](/components/instar/quirks/#vmdk-flat-extent-names-must-fit-the-descriptor)).
 - **vpc** - VHD dynamic output, configurable block size (512KB+,
   default 2MB via `--block-size`)
-- **vhdx** - VHDX dynamic output, configurable block size (1MB-256MB,
-  default 32MB via `--block-size`)
+- **vhdx** - VHDX dynamic output, configurable block size (1MB-256MB
+  via `--block-size`; by default qemu-img's for the size: 8MB up to 1GB,
+  16MB up to 100GB, 32MB up to 32TB, then 64MB). The virtual size is at
+  most 64 TiB (70368744177664 bytes), the largest VHDX qemu-img creates:
+  a larger source is refused before the output file is opened, with
+  `convert: virtual size N exceeds the VHDX maximum of 64 TiB
+  (70368744177664 bytes)`, and no output file is left behind. A size
+  that is not a multiple of 512 is recorded rounded up to one, as
+  qemu-img does.
 
 ## Differencing images
 

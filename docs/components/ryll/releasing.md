@@ -267,6 +267,20 @@ the tag, then `publish-crates` and `github-release` run. Once
 after a partial failure does not hard-error on a file already
 published.
 
+Once `sign-tag` has run, anyone can check the tag's signature:
+
+```bash
+git fetch --tags --force origin
+gitsign verify-tag vX.Y.Z \
+  --certificate-identity-regexp '^https://github\.com/shakenfist/ryll/\.github/workflows/release\.yml@refs/tags/v[0-9]' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+The pattern names `release.yml` running for a version tag, `v` and a
+digit: a pattern that stops at the repository would accept a signature
+from any of its workflows. [gitsign](https://github.com/sigstore/gitsign)
+has install instructions.
+
 ## The release gate
 
 The first job, `ci-gate`, uses

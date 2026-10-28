@@ -68,23 +68,49 @@ The workflow-safety rules, where there is a `release.yml`:
   rather than use `runner.temp`.
 * **A release waits for CI.** Exactly one job runs
   `shakenfist/actions/require-ci-success`, which fails unless the
-  named CI workflows succeeded on the tagged commit. Every job that
-  names an environment is downstream of it through `needs:`, because
-  those are the jobs that sign and publish, and an environment's
-  reviewer checks that a release is wanted, not that it was tested.
-  Being downstream is not enough when a job's `if:` uses `always()` or
-  `!cancelled()`: such a job runs whatever became of the jobs it
-  needs. So every job between the gate and an environment that uses
-  either one also requires `needs.<job>.result == 'success'` for each
-  job it needs.
-  The template's `build` guard also lets a skipped gate through, so
-  that a `workflow_dispatch` dry run still builds. That is accepted
-  only where it cannot reach a release. The condition must also say
-  `github.event_name != 'push'`, and every environment job below it
-  must be confined to a pushed tag. A pushed tag is the one event on
-  which the gate always runs. The conditions are not parsed as
-  boolean expressions, so these clauses are looked for rather than
-  proved to be joined by `&&`.
+  named CI workflows succeeded on the tagged commit.
+  - **The gate's failure is recorded as one.** The gate job has no
+    `continue-on-error`, and neither has the gate step: either records
+    a failed gate as a success, so the jobs waiting for it run anyway.
+    The gate step has no `if:`, which could skip it while the job
+    succeeds; the job's own `if:` is where the gate is confined to a
+    pushed tag. Any value fails, `false` included, because the
+    template has neither key and leaving them out is the one spelling
+    that needs no reading.
+  - **The gate checks the commit being released.** The gate step
+    passes no `sha:`. Its default is the commit the workflow runs on,
+    which is the only right answer in a release, so even an explicit
+    `${{ github.sha }}` fails: allowing that one value would mean
+    deciding which spellings of it are the same expression, and a
+    mistake there lets the gate approve one commit while the release
+    builds another.
+  - **Everything that acts outside the run waits for the gate.** Every
+    job that names an environment, attaches a GitHub release, or holds
+    any write scope (any access but `read` or `none`, and `write-all`)
+    is downstream of the gate through `needs:`. An environment's
+    reviewer checks that a release is wanted, not that it was tested;
+    `github-release` and a job that pushes an image with
+    `packages: write` have no reviewer at all.
+  - **A failed gate is not let through.** Being downstream is not
+    enough when a job's `if:` calls a status function: `success()`,
+    `failure()`, `cancelled()` or `always()`, in any case and with or
+    without `!`. Any one of them replaces the implicit `success()`
+    GitHub otherwise adds, and `(success() || failure())` runs after a
+    failed gate as surely as `always()` does. So every job between the
+    gate and a job that must wait for it, and calling one, also
+    requires `needs.<job>.result == 'success'` for each job it needs.
+  - The template's `build` guard also lets a skipped gate through, so
+    that a `workflow_dispatch` dry run still builds. That is accepted
+    only where it cannot reach a release. The condition must also say
+    `github.event_name != 'push'`, and every job below it that must
+    wait for the gate must be confined to a pushed tag. A pushed tag
+    is the one event on which the gate always runs.
+
+  The conditions are not parsed as boolean expressions, so these
+  clauses are looked for rather than proved to be joined by `&&`.
+  Strings are compared without regard to case, as GitHub compares
+  them: `needs.ci-gate.result == 'Skipped'` admits a skipped gate, and
+  `== 'SUCCESS'` is the success clause.
   A `needs:` that names a job which does not exist, or a set of jobs
   that need each other in a loop, is reported as a finding. GitHub
   will not run such a workflow, and which jobs wait for CI cannot be
@@ -132,6 +158,11 @@ The workflow-safety rules, where there is a `release.yml`:
   `path:` (`dist/` by default) names the directory each upload reads,
   compared as the distribution paths above are.
 
+Each rule recognises an action by its `uses:` line, with or without a
+trailing comment. Renovate pins a digest and records the release after
+it (`uses: owner/action@<sha>  # v3.0.0`), and that step is the same
+action as one pinned to the tag.
+
 What these rules cannot see:
 
 * **A named workflow whose runs conclude `skipped`.** The gate counts
@@ -156,10 +187,11 @@ What these rules cannot see:
 
 [`templates/release-automation-rust/README.md`](https://github.com/shakenfist/development/blob/main/templates/release-automation-rust/README.md#invariants)
 lists, under "Invariants", what every Rust release keeps. It is the
-authority: the rules read its three guards as exact strings, so a guard
-spelled any other way fails, even where it would be safe. A respelling
-is fixed in the repository, or in the README and then the rule, never
-by loosening the rule alone.
+authority: the rules read the push and tag guard and the skipped-gate
+guard as exact strings, and the build-job guard as exactly its clauses
+in any order (see below), so a guard spelled any other way fails, even
+where it would be safe. A respelling is fixed in the repository, or in
+the README and then the rule, never by loosening the rule alone.
 
 Each invariant is checked once. Where a workflow-safety rule above
 already checks part of one, the Rust rule checks only the rest. It
@@ -175,7 +207,7 @@ invariant the table does not list.
 | 1 | `rust_trigger_issues` |
 | 2 | `rust_permissions_issues` |
 | 3 | `rust_concurrency_issues` |
-| 4 | `rust_ci_gate_issues`; one gate job, `release_ci_gate_issues`; the named workflows exist, `release_ci_trigger_issues` |
+| 4 | `rust_ci_gate_issues`; one gate job, and no `continue-on-error`, step `if:` or `sha:` on it, `release_ci_gate_issues`; the named workflows exist, `release_ci_trigger_issues` |
 | 5 | `rust_check_version_issues`, `rust_build_root_issues`; waiting for the gate, `release_ci_gate_issues` |
 | 6 | `rust_build_guard_issues`; a status override without the success clauses, `release_ci_gate_issues` |
 | 7 | `rust_effect_guard_issues`; a publishing job a dispatch reaches, `release_dispatch_guard_issues` |
@@ -198,12 +230,13 @@ How the rules read what the README leaves open:
 * **"No `branches`" on the push trigger** rules out `branches-ignore`
   as well. Either one makes a push to a branch start a run.
 * **A job with an effect outside the run** (invariant 7) names an
-  environment, holds `contents: write` or `id-token: write` (or
-  `write-all`), or reads a secret other than `GITHUB_TOKEN`, including
-  through `secrets['...']` or `secrets: inherit`. Such a job needs
-  `sign-tag`, and so does `github-release`. Needing `sign-tag` covers
-  invariant 5's need for `check-version` too, so a job that needs
-  neither is told about `sign-tag` alone.
+  environment, holds any write scope (`contents: write`,
+  `id-token: write`, `packages: write`, any access but `read` or
+  `none`, or `write-all`), or reads a secret other than `GITHUB_TOKEN`,
+  including through `secrets['...']` or `secrets: inherit`. Such a job
+  needs `sign-tag`, and so does `github-release`. Needing `sign-tag`
+  covers invariant 5's need for `check-version` too, so a job that
+  needs neither is told about `sign-tag` alone.
 * **Executable** (invariant 14) is the owner's execute bit in the
   checkout, which a clone takes from the mode git records.
 * **The per-repository section** of `propose-release.sh` and

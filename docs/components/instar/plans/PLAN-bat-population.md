@@ -712,8 +712,8 @@ rather than merge requests.
 | 1. Pin qemu's behaviour across the 80 static builds, build the structural VHDX comparator, correct `docs/create.md` | [PLAN-bat-population-phase-01-pin.md](/components/instar/plans/PLAN-bat-population-phase-01-pin/) | Complete | `fef62417` (#809) |
 | 2. Fixed VHDX fixtures (instar-testdata + instar) | [PLAN-bat-population-phase-02-fixtures.md](/components/instar/plans/PLAN-bat-population-phase-02-fixtures/) | Complete | instar-testdata `d2f9467719` (direct to `main`); instar `5c5bba75` (#819) |
 | 3. Host-only create: non-qcow2 preallocation parity and monolithicFlat | [PLAN-bat-population-phase-03-host-create.md](/components/instar/plans/PLAN-bat-population-phase-03-host-create/) | Complete | `a8d2f4ca` (#824) |
-| 4. Read side: BAT entry count (#626), partial last block, `LeaveBlocksAllocated` and `resize` | [PLAN-bat-population-phase-04-read-side.md](/components/instar/plans/PLAN-bat-population-phase-04-read-side/) | In progress | |
-| 5. VHDX geometry: default block size (#645), 64 TiB ceiling, one shared layout | PLAN-bat-population-phase-05-geometry.md | Not started | |
+| 4. Read side: BAT entry count (#626), partial last block, `LeaveBlocksAllocated` and `resize` | [PLAN-bat-population-phase-04-read-side.md](/components/instar/plans/PLAN-bat-population-phase-04-read-side/) | Complete | `d140aa04` (#835) |
+| 5. VHDX geometry: default block size (#645), 64 TiB ceiling, one shared layout | [PLAN-bat-population-phase-05-geometry.md](/components/instar/plans/PLAN-bat-population-phase-05-geometry/) | In progress | |
 | 6. Streaming BAT emitter and the fixed `plan_vhdx` | PLAN-bat-population-phase-06-emitter.md | Not started | |
 | 7. `create -f vhdx -o subformat=fixed`: guest streaming and host CLI | PLAN-bat-population-phase-07-create.md | Not started | |
 | 8. `convert -O vhdx --subformat fixed` | PLAN-bat-population-phase-08-convert.md | Not started | |
@@ -832,8 +832,24 @@ phase 1 sweep confirmed; and the 64 TiB ceiling. #645 changes the
 default layout of every VHDX `create` and `convert` without
 `block_size`, so `KNOWN_WRITER_DIVERGENCES` loses its three vhdx
 entries in the same pull request, and the stale comments in
-`tests/test_create.py`, `generate-baselines.py` and the differential
-fuzzer's picker are corrected with it.
+`tests/test_create.py` and the differential fuzzer's picker are
+corrected with it.
+
+Its survey found the layout written out a sixth time, in create's
+`target_can_address`, and that dd writes through `convert_to_vhdx`,
+so #645 changes dd's output too and `KNOWN_DD_DIVERGENCES` loses two
+entries. `measure` cannot take the default from its config, because
+it fixes the target unit size before it scans the source and only
+the scan learns the source's size, so the guest resolves the unit
+inside each format arm. qemu rounds the size up to 512 before
+anything else, and instar's create does not (#843), so the layout
+rounds. The host's convert capacity estimate assumed a pre-payload
+area under 10 MiB, which is too small at 1 MiB blocks from about
+896 GiB, so it is sized from the layout. `generate-baselines.py`'s
+only VHDX comment ("qemu defaults match") becomes true when this
+phase lands, so the phase needs no instar-testdata commit. Readers
+keep no ceiling, because qemu enforces 64 TiB only on create (see
+the phase 5 plan).
 
 **Phase 6** is crate-only: the streaming BAT filler (fill one buffer
 with the entries for an index range, given the layout and a state)
@@ -847,7 +863,9 @@ without a VM, the guest phase is not. Phase 4's survey found a
 structural divergence this phase has to settle before the first
 success criterion can hold: `build_region_table` writes the Required
 bit as 1 for the BAT and metadata regions, and every pinned qemu
-build writes 0.
+build writes 0. Phase 5's survey found a second: instar writes a
+physical sector size of 4096 and every pinned qemu case records 512.
+Phase 5 moves the value into the shared layout unchanged.
 
 **Phase 7** wires create end to end: the guest streams the BAT
 through one slot and extends the file to `data_start +
@@ -880,7 +898,11 @@ warning about qemu-unreadable partial-last-block sizes applies to
 phase 8 too. Phase 9 also corrects `docs/quirks.md`'s measure entry
 for VHDX sources, which says instar treats every BAT block as fully
 allocated. The reverse is true: qemu counts every block, and instar
-counts no `ZERO` block (measured in phase 4's survey).
+counts no `ZERO` block (measured in phase 4's survey). The same
+backwards claim sits in the comment on
+`KNOWN_SOURCE_SCANNER_DIVERGENCES['qemu-vhdx']` in
+`tests/test_measure.py` ("VHDX scanner treats every block as fully
+allocated"), reported by phase 4's implementing session.
 
 **Phase 10** is the cross-version matrix for everything above:
 create and convert fixed cases across every profile (including the
@@ -1540,7 +1562,8 @@ where one exists, for directly related issues that we should
 either resolve as part of this master plan or at least be aware of
 while planning it.
 
-None fixed yet. Found while planning, and assigned to phases above:
+Fixed so far: #626, #797 and #798 (phase 4), and #820 (phase 3).
+Found while planning, and assigned to phases above:
 
 * `docs/create.md:395` says VHDX `subformat=fixed` is "not emitted by
   qemu-img either". It is, on every version measured (Situation).
@@ -1572,6 +1595,19 @@ None fixed yet. Found while planning, and assigned to phases above:
   is the operator's call.
 * `build_region_table` writes the region table's Required bit as 1;
   qemu writes 0. Phase 6.
+* instar writes a VHDX physical sector size of 4096; qemu writes 512.
+  Phase 6.
+* `instar create -f vhdx` records a virtual size that is not a
+  multiple of 512, which SPEC(VHDX) forbids and qemu-img rounds away
+  (#843). Phase 5.
+* The host's VHDX convert capacity estimate is too small for a fully
+  allocated source at 1 MiB blocks from about 896 GiB. Phase 5.
+* Found by phase 5 and filed, outside this plan's scope: `resize`
+  accepts a size that is not a multiple of 512 on every format, where
+  qemu-img refuses (#844).
+* Not instar's: qemu-img's zero-size VHDX has a 64 MiB BAT region,
+  because `vhdx_calc_bat_entries` underflows at zero blocks. instar
+  does not copy it. Reporting it upstream is the operator's call.
 * `docs/quirks.md`'s measure entry for VHDX sources states the
   divergence backwards. Phase 9.
 * Found by phase 3 and filed, outside this plan's scope: `convert`

@@ -220,6 +220,15 @@ The create-side carry-forwards are listed in
  child alone would leave it claiming sectors its parent cannot
  describe, so neither can be supported until the parent-locator update
  path exists.
+- A VHDX target size above 64 TiB (70368744177664 bytes), the largest
+ VHDX qemu-img creates: refused on the host before the image is opened
+ for writing (`resize: virtual size N exceeds the VHDX maximum of 64 TiB
+ (70368744177664 bytes)`), and the file is left untouched. A VHDX
+ already above the limit is still read by `info` and `check`, as
+ qemu-img opens one, but a no-op or `--shrink` of it is refused with the
+ same message: resize stages at most a 2 MiB BAT region, and above
+ 64 TiB even 256 MiB blocks need 3 MiB, so it could not resize one in
+ any direction (#850).
 - Fixed VHDX as a resize target: refused for every request, grow,
  no-op and `--shrink` alike (`ResizeResult::ERROR_FIXED_VHDX`,
  "refusing to resize a fixed VHDX"), and the file is left untouched.

@@ -124,7 +124,7 @@ Supported output formats:
 | `qcow2` | QCOW2 | Default driver options (64 KiB cluster size, v3 compat). Virtual size = `round_up(out_vsize, 512)`. |
 | `vmdk` | VMware VMDK | Default driver options (64 KiB grain size, monolithicSparse). Virtual size = `round_up(out_vsize, 512)`. |
 | `vpc` | VHD/VPC | Virtual size is set via CHS geometry rounding (see below) — always ≥ `round_up(out_vsize, 512)` and potentially much larger. |
-| `vhdx` | VHDX | Default driver options (32 MiB block size). Virtual size = `round_up(out_vsize, 512)`. See Known divergences for the block-size difference from `qemu-img`. |
+| `vhdx` | VHDX | Default driver options (qemu-img's block size for the size: 8 MiB up to 1 GiB, 16 MiB up to 100 GiB, 32 MiB up to 32 TiB, then 64 MiB). Virtual size = `round_up(out_vsize, 512)`, at most 64 TiB (70368744177664 bytes): a larger `out_vsize` is refused before the output file is opened (`dd: virtual size N exceeds the VHDX maximum of 64 TiB ...`), as `qemu-img dd` refuses to create it. |
 
 ### VHD CHS geometry rounding
 
@@ -171,17 +171,6 @@ for structured formats. This is verified by the integration test suite
 versions 6.0.0 through 10.2.0.
 
 ## Known divergences from `qemu-img dd`
-
-### vhdx default block size
-
-`instar dd -O vhdx` emits 32 MiB data blocks for all virtual sizes.
-`qemu-img dd` uses 8 MiB blocks for small images (below approximately
-1 GiB). This is a pre-existing instar vhdx-writer default, the same
-divergence documented for `instar create -O vhdx`. The data and declared
-virtual size are identical between the two tools; only the `cluster-size`
-field in `qemu-img info` output differs (32 MiB vs 8 MiB). This
-divergence is recorded in `KNOWN_DD_DIVERGENCES` in
-`tests/test_dd_baselines.py` and does not cause a test failure.
 
 ### `count=0 -O vmdk`
 
