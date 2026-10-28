@@ -566,8 +566,8 @@ spelling above is the one to write.
 | 3. A `kerbside` role and the `kerbside` group in `site.yml` | [PLAN-kerbside-deployer-phase-03-kerbside-role.md](PLAN-kerbside-deployer-phase-03-kerbside-role.md) | Complete | `b85005f0e` (#4465) |
 | 4. A merge-queue lane with the feature on | [PLAN-kerbside-deployer-phase-04-ci.md](PLAN-kerbside-deployer-phase-04-ci.md) | Complete | `0016c5dad` (#4479) |
 | 5. The `kerbside` role moves into Kerbside, and Kerbside's sf-e2e lane deploys through it | [PLAN-kerbside-deployer-phase-05-role-to-kerbside.md](PLAN-kerbside-deployer-phase-05-role-to-kerbside.md) | Complete | `48849831c` (#4591); kerbside `2093f2ed5` (#580), `89f199456` (#587); actions `17ea1889e` (#181), `31139125c` (#195) |
-| 6. Documentation and close-out | [PLAN-kerbside-deployer-phase-06-docs.md](PLAN-kerbside-deployer-phase-06-docs.md) | In progress | — |
-| 7. Push audit | PLAN-kerbside-deployer-phase-07-push-audit.md | Proposed | — |
+| 6. Documentation and close-out | [PLAN-kerbside-deployer-phase-06-docs.md](PLAN-kerbside-deployer-phase-06-docs.md) | Complete | `54fed79bcf` (#4616); kerbside `ea44e9364` (#592) |
+| 7. Push audit | [PLAN-kerbside-deployer-phase-07-push-audit.md](PLAN-kerbside-deployer-phase-07-push-audit.md) | In progress | — |
 
 The `Merged` column records what put each phase on `develop`: the
 merge commit of its pull request, or an explicit `first..last`
@@ -957,12 +957,47 @@ Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in
 this plan, not over the last phase alone. The phases here touch
 the same files from different directions:
 
-- phases 1 and 3 both edit `site.yml`'s certificate plays;
+- phases 2 to 5 all edit `site.yml`'s Kerbside plays, and phase 5
+  rewrote most of what phase 3 added there when the role moved;
+- phase 1 taught `internal_ca` to issue a certificate to any host,
+  and phase 3 was its first caller outside `allsf`;
 - phases 2 and 3 both decide what happens when `kerbside_url` is
   set and the group is empty.
 
 That interaction is exactly where the tokens plan's three
 "feature-off" defects lived.
+
+Planning this phase found that none of the five pull requests
+which landed phases 5 and 6 in Kerbside and actions was audited
+there, so there is no audit to cite and the phase reads those
+five ranges too, under their own runbooks. It also found that
+#4653 moved the Kerbside lane from the merge queue to the weekly
+run on 2026-10-25, which falsifies the success criterion below
+that names the merge queue, and that #4598, a `401 invalid token
+signature` from Kerbside inside the lane, is open and undiagnosed.
+The phase plan records the survey, and the audit reads the
+signing-key seam with #4598 in hand. Planned at medium effort.
+
+#### Audit of phases 1 to 6
+
+Run on 2026-10-28 over eleven ranges: the six merges here and five in
+Kerbside and actions. Wave 1 passed in all three repositories (16
+hooks and 6336 unit tests here, 13 hooks and 571 tests in Kerbside, 11
+hooks and 787 tests in actions, plus gitleaks through its container).
+Seven judgment headings pooled 29 findings and four seeds. One is
+blocking: a trailing slash on `kerbside_url` passes every deploy-time
+check and then has Kerbside refuse every console token, because the
+audience is stripped on one side and compared verbatim on the other
+(#4697). The security review graded kerbside#444 as medium and worse
+than documented: the scrape key is unscoped cluster admin and
+Kerbside's database holds it in plaintext (#4698). The seam lens
+re-read #4598 and found the issue's stale-key reading is not what the
+code produces; the message also covers a token whose `iat` is ahead of
+the Kerbside host's clock (kerbside#619). Fourteen issues were filed
+here, eight in Kerbside and two in actions; the phase plan's
+Disposition table has each. A follow-up pull request fixes #4697 and
+the twelve cheap documentation and comment corrections, and closes the
+plan.
 
 By the time this phase runs, its predecessors will have merged,
 and a diff against `develop` would be empty and read as clean.
@@ -1053,8 +1088,8 @@ codebase, can be planned at medium effort.
 !!! note "In this project"
 
     Phases 1 to 5 are planned at high effort, for the reasons
-    given in each phase's section. Phase 6 is planned at medium
-    effort.
+    given in each phase's section. Phases 6 and 7 are planned at
+    medium effort.
 
 ### Step-level guidance
 
@@ -1229,9 +1264,13 @@ because the following statements will be true:
   Kerbside) gets the signing key minted and the capability
   advertised, with no `sf-ctl` command run by hand.
 * A second `site.yml` run with nothing changed restarts nothing.
-* SF's merge queue runs a job in which the capability is
-  advertised, a token is minted, Kerbside exchanges it, and the
-  proxy's TLS endpoint verifies against the CA in the `.vv`.
+* SF's CI runs a job in which the capability is advertised, a token
+  is minted, Kerbside exchanges it, and the proxy's TLS endpoint
+  verifies against the CA in the `.vv`. That job is the
+  `debian-13-slim-tier` lane: in the merge queue when phase 4
+  landed, and weekly since #4653 moved it on 2026-10-25, so a
+  Kerbside regression is caught within a week rather than on the
+  merge that caused it.
 * Kerbside's sf-e2e lane deploys through the collection, and
   `deploy-kerbside-on-shakenfist` is retired.
 * SPICE certificates renew before they expire.
@@ -1275,7 +1314,7 @@ chosen to defer to here, so that we do not forget them.
   JWT from the seed, as the sf-e2e driver does. The tokens
   plan's Future work also points at convergence with SF's
   OIDC and auth-federation work.
-- **A least-privilege credential for the scrape.** It needs an
+- **A least-privilege credential for the scrape** (#4698). It needs an
   `sf-ctl` option to mint a scoped `system` key, and a verified
   scope set. kerbside#444, on non-`system` namespaces, was closed on
   2026-10-17 by a documentation change (kerbside#569). The
@@ -1289,8 +1328,8 @@ chosen to defer to here, so that we do not forget them.
 - ~~**Ship the systemd units from Kerbside**, and switch the
   collection to them (open question 2).~~ Taken into phase 5,
   which moves the whole role, units included, to Kerbside.
-- **Automated signing-key rotation**, carried over from the
-  tokens plan.
+- **Automated signing-key rotation** (#4710), carried over from the
+  tokens plan; the audit found that no lane rotates and then exchanges.
 - **Every develop commit restarts every daemon** (#4483, open).
   The node role's restart-on-change hash covers `_version.py`, which
   setuptools_scm rewrites on every commit, so a docs-only commit
@@ -1298,9 +1337,11 @@ chosen to defer to here, so that we do not forget them.
   Phase 4's trial found it beside the `build-collection.py` dirty-tree
   bug, which phase 4 fixed. Whether to keep the behaviour and fix the
   comment, or exclude the file from the hash, is the operator's call.
-- **More than one Kerbside host, tested**, behind a TCP
-  passthrough load balancer.
-- **Homelab adoption.** sfcbr, the report that prompted this
+- **More than one Kerbside host, tested** (#4705), behind a TCP
+  passthrough load balancer; the audit found that no lane deploys even
+  one dedicated host.
+- **Homelab adoption** (no issue: it is tracked in the operator's own
+  repository, as the next sentence says). sfcbr, the report that prompted this
   plan, picks the feature up in the operator's own
   infrastructure repository once phase 3 is released. That
   repository, not this plan, tracks the work.
