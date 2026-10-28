@@ -4358,17 +4358,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#vhdx-default-block-size" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        vhdx default block size
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#count0-o-vmdk" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8063,6 +8052,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9449,6 +9522,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16330,17 +16431,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#vhdx-default-block-size" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        vhdx default block size
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#count0-o-vmdk" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16636,7 +16726,7 @@ always <strong>raw</strong>, regardless of the input format. This matches
 <tr>
 <td><code>vhdx</code></td>
 <td>VHDX</td>
-<td>Default driver options (32 MiB block size). Virtual size = <code>round_up(out_vsize, 512)</code>. See Known divergences for the block-size difference from <code>qemu-img</code>.</td>
+<td>Default driver options (qemu-img's block size for the size: 8 MiB up to 1 GiB, 16 MiB up to 100 GiB, 32 MiB up to 32 TiB, then 64 MiB). Virtual size = <code>round_up(out_vsize, 512)</code>, at most 64 TiB (70368744177664 bytes): a larger <code>out_vsize</code> is refused before the output file is opened (<code>dd: virtual size N exceeds the VHDX maximum of 64 TiB ...</code>), as <code>qemu-img dd</code> refuses to create it.</td>
 </tr>
 </tbody>
 </table>
@@ -16711,15 +16801,6 @@ for structured formats. This is verified by the integration test suite
 (<code>tests/test_dd.py</code>, <code>tests/test_dd_baselines.py</code>) across qemu-img
 versions 6.0.0 through 10.2.0.</p>
 <h2 id="known-divergences-from-qemu-img-dd">Known divergences from <code>qemu-img dd</code><a class="headerlink" href="#known-divergences-from-qemu-img-dd" title="Permanent link">&para;</a></h2>
-<h3 id="vhdx-default-block-size">vhdx default block size<a class="headerlink" href="#vhdx-default-block-size" title="Permanent link">&para;</a></h3>
-<p><code>instar dd -O vhdx</code> emits 32 MiB data blocks for all virtual sizes.
-<code>qemu-img dd</code> uses 8 MiB blocks for small images (below approximately
-1 GiB). This is a pre-existing instar vhdx-writer default, the same
-divergence documented for <code>instar create -O vhdx</code>. The data and declared
-virtual size are identical between the two tools; only the <code>cluster-size</code>
-field in <code>qemu-img info</code> output differs (32 MiB vs 8 MiB). This
-divergence is recorded in <code>KNOWN_DD_DIVERGENCES</code> in
-<code>tests/test_dd_baselines.py</code> and does not cause a test failure.</p>
 <h3 id="count0-o-vmdk"><code>count=0 -O vmdk</code><a class="headerlink" href="#count0-o-vmdk" title="Permanent link">&para;</a></h3>
 <p><code>qemu-img dd</code> itself exits non-zero (exit 1) when <code>count=0 -O vmdk</code>
 because the monolithicSparse VMDK format cannot represent a zero-

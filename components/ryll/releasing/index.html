@@ -7820,6 +7820,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9206,6 +9290,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16798,6 +16910,16 @@ the tag, then <code>publish-crates</code> and <code>github-release</code> run. O
 <code>release</code> environment. It passes <code>skip-existing</code>, so a re-run
 after a partial failure does not hard-error on a file already
 published.</p>
+<p>Once <code>sign-tag</code> has run, anyone can check the tag's signature:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>fetch<span class="w"> </span>--tags<span class="w"> </span>--force<span class="w"> </span>origin
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>gitsign<span class="w"> </span>verify-tag<span class="w"> </span>vX.Y.Z<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--certificate-identity-regexp<span class="w"> </span><span class="s1">'^https://github\.com/shakenfist/ryll/\.github/workflows/release\.yml@refs/tags/v[0-9]'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--certificate-oidc-issuer<span class="w"> </span>https://token.actions.githubusercontent.com
+</code></pre></div>
+<p>The pattern names <code>release.yml</code> running for a version tag, <code>v</code> and a
+digit: a pattern that stops at the repository would accept a signature
+from any of its workflows. <a href="https://github.com/sigstore/gitsign">gitsign</a>
+has install instructions.</p>
 <h2 id="the-release-gate">The release gate<a class="headerlink" href="#the-release-gate" title="Permanent link">&para;</a></h2>
 <p>The first job, <code>ci-gate</code>, uses
 <a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success"><code>require-ci-success</code></a>
@@ -16854,9 +16976,9 @@ recovery depends on why it failed:</p>
 gets a queue run, in which <code>check_paths</code> skips the builds and the
 run succeeds, so such a commit can be tagged.</p>
 <p>To move the tag:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>:refs/tags/v0.2.0<span class="w">   </span><span class="c1"># needs the tag ruleset's bypass</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>tag<span class="w"> </span>-d<span class="w"> </span>v0.2.0
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>tools/tag-release.sh<span class="w"> </span><span class="m">0</span>.2.0<span class="w"> </span>&lt;commit<span class="w"> </span>that<span class="w"> </span>went<span class="w"> </span>through<span class="w"> </span>the<span class="w"> </span>queue&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>:refs/tags/v0.2.0<span class="w">   </span><span class="c1"># needs the tag ruleset's bypass</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>git<span class="w"> </span>tag<span class="w"> </span>-d<span class="w"> </span>v0.2.0
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>tools/tag-release.sh<span class="w"> </span><span class="m">0</span>.2.0<span class="w"> </span>&lt;commit<span class="w"> </span>that<span class="w"> </span>went<span class="w"> </span>through<span class="w"> </span>the<span class="w"> </span>queue&gt;
 </code></pre></div>
 <p>The
 <a href="https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure">template README</a>
@@ -16950,10 +17072,10 @@ the <code>propose-release</code> → <code>tag-release</code> flow, since <code>
 runs the same checks against the commit before tagging it. If it
 does (for example after a manual tag push), nothing has been
 signed or published:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>:refs/tags/v0.2.0<span class="w">   </span><span class="c1"># needs the tag ruleset's bypass</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>git<span class="w"> </span>tag<span class="w"> </span>-d<span class="w"> </span>v0.2.0
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># fix the workspace version on develop via a new release PR,</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># then re-run make tag-release X.Y.Z.</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>:refs/tags/v0.2.0<span class="w">   </span><span class="c1"># needs the tag ruleset's bypass</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>git<span class="w"> </span>tag<span class="w"> </span>-d<span class="w"> </span>v0.2.0
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># fix the workspace version on develop via a new release PR,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># then re-run make tag-release X.Y.Z.</span>
 </code></pre></div>
 <h3 id="cratesio-publish-fails">crates.io publish fails<a class="headerlink" href="#cratesio-publish-fails" title="Permanent link">&para;</a></h3>
 <p>A <code>publish-crates</code> job failure does not roll back the earlier
@@ -17014,10 +17136,10 @@ credentials:</p>
 <p>If <code>HOMEBREW_TAP_TOKEN</code> is missing or expired the tap update
 job fails but the release and the crates.io publishes still
 succeed. Update the formula manually:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">cd</span><span class="w"> </span>homebrew-tap
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># update version and sha256 in Formula/ryll.rb</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>git<span class="w"> </span>commit<span class="w"> </span>-am<span class="w"> </span><span class="s2">"Update ryll to 0.2.0"</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>git<span class="w"> </span>push
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">cd</span><span class="w"> </span>homebrew-tap
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># update version and sha256 in Formula/ryll.rb</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>git<span class="w"> </span>commit<span class="w"> </span>-am<span class="w"> </span><span class="s2">"Update ryll to 0.2.0"</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>git<span class="w"> </span>push
 </code></pre></div>
 
 

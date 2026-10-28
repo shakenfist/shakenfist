@@ -7968,6 +7968,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9354,6 +9438,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16535,6 +16647,15 @@ The create-side carry-forwards are listed in
  child alone would leave it claiming sectors its parent cannot
  describe, so neither can be supported until the parent-locator update
  path exists.</li>
+<li>A VHDX target size above 64 TiB (70368744177664 bytes), the largest
+ VHDX qemu-img creates: refused on the host before the image is opened
+ for writing (<code>resize: virtual size N exceeds the VHDX maximum of 64 TiB
+ (70368744177664 bytes)</code>), and the file is left untouched. A VHDX
+ already above the limit is still read by <code>info</code> and <code>check</code>, as
+ qemu-img opens one, but a no-op or <code>--shrink</code> of it is refused with the
+ same message: resize stages at most a 2 MiB BAT region, and above
+ 64 TiB even 256 MiB blocks need 3 MiB, so it could not resize one in
+ any direction (#850).</li>
 <li>Fixed VHDX as a resize target: refused for every request, grow,
  no-op and <code>--shrink</code> alike (<code>ResizeResult::ERROR_FIXED_VHDX</code>,
  "refusing to resize a fixed VHDX"), and the file is left untouched.

@@ -6176,10 +6176,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vhdx-default-block_size-differs-from-qemu-img" class="md-nav__link">
+  <a href="#vhdx-default-block_size-scales-with-the-size-as-qemu-imgs-does" class="md-nav__link">
     <span class="md-ellipsis">
       
-        vhdx default block_size differs from qemu-img
+        vhdx default block_size scales with the size, as qemu-img's does
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-vhdx-is-at-most-64-tib-and-its-size-is-a-multiple-of-512" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A VHDX is at most 64 TiB, and its size is a multiple of 512
       
     </span>
   </a>
@@ -11846,6 +11857,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13232,6 +13327,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -21259,10 +21382,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vhdx-default-block_size-differs-from-qemu-img" class="md-nav__link">
+  <a href="#vhdx-default-block_size-scales-with-the-size-as-qemu-imgs-does" class="md-nav__link">
     <span class="md-ellipsis">
       
-        vhdx default block_size differs from qemu-img
+        vhdx default block_size scales with the size, as qemu-img's does
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-vhdx-is-at-most-64-tib-and-its-size-is-a-multiple-of-512" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A VHDX is at most 64 TiB, and its size is a multiple of 512
       
     </span>
   </a>
@@ -25212,14 +25346,76 @@ has no functional impact — the discrepancy only surfaces in
 field. Future work: drop the accept-ignore and emit the zstd
 header bit so a subsequent convert / write into the image can
 emit zstd-compressed clusters.</p>
-<h3 id="vhdx-default-block_size-differs-from-qemu-img">vhdx default <code>block_size</code> differs from qemu-img<a class="headerlink" href="#vhdx-default-block_size-differs-from-qemu-img" title="Permanent link">&para;</a></h3>
-<p>At virtual sizes ≤ 1 GiB, <code>instar create -f vhdx</code> defaults to
-an 8 MiB block size; <code>qemu-img create -f vhdx</code> always defaults
-to 32 MiB. Specifying <code>-o block_size=...</code> (or <code>--block-size</code>)
-explicitly avoids the divergence — the matrix
-demonstrates clean round-trip for explicit block-size cases
-(<code>1G-block-16M</code>, <code>1G-block-32M</code>). Future work is to match
-qemu's 32 MiB default at all virtual sizes.</p>
+<h3 id="vhdx-default-block_size-scales-with-the-size-as-qemu-imgs-does">vhdx default <code>block_size</code> scales with the size, as qemu-img's does<a class="headerlink" href="#vhdx-default-block_size-scales-with-the-size-as-qemu-imgs-does" title="Permanent link">&para;</a></h3>
+<p>With no <code>-o block_size</code> (or <code>--block-size</code>), <code>instar create -f vhdx</code>,
+<code>convert -O vhdx</code>, <code>dd -O vhdx</code> and <code>measure -O vhdx</code> choose the block
+size qemu-img does, from the virtual size rounded up to 512 bytes, each
+threshold a strict <code>&gt;</code> (<code>vhdx_co_create</code>, qemu 7.0.0 <code>block/vhdx.c</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Virtual size</th>
+<th>Block size</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>up to 1 GiB</td>
+<td>8 MiB</td>
+</tr>
+<tr>
+<td>above 1 GiB, up to 100 GiB</td>
+<td>16 MiB</td>
+</tr>
+<tr>
+<td>above 100 GiB, up to 32 TiB</td>
+<td>32 MiB</td>
+</tr>
+<tr>
+<td>above 32 TiB, up to the 64 TiB limit</td>
+<td>64 MiB</td>
+</tr>
+</tbody>
+</table>
+<p><code>tests/golden/qemu-create-pins.json</code> records each side of every threshold
+on all 80 pinned qemu-img builds (6.0.0 to 10.2.0), and every build
+agrees. instar used 32 MiB at every size until #645, so a VHDX it wrote
+then has larger blocks than qemu-img would give it below 100 GiB, and
+smaller ones above 32 TiB. Both are valid; only <code>qemu-img info</code>'s
+<code>cluster-size</code> shows the difference. <code>measure -O vhdx</code> of a source image
+chooses from the source's virtual size, as <code>convert</code> does.</p>
+<h3 id="a-vhdx-is-at-most-64-tib-and-its-size-is-a-multiple-of-512">A VHDX is at most 64 TiB, and its size is a multiple of 512<a class="headerlink" href="#a-vhdx-is-at-most-64-tib-and-its-size-is-a-multiple-of-512" title="Permanent link">&para;</a></h3>
+<p>qemu-img creates no VHDX larger than 64 TiB (70368744177664 bytes):
+<code>vhdx_co_create</code> (qemu 7.0.0, <code>block/vhdx.c</code>) refuses a larger size with
+"Image size too large; max of 64TB", a strict <code>&gt;</code>, so 64 TiB itself is
+accepted. instar applies the same limit to every VHDX it writes, in
+<code>create</code>, <code>convert</code>, <code>dd</code>, <code>measure -O vhdx</code> and <code>resize</code>. Where the
+host knows the size it refuses with <code>&lt;op&gt;: virtual size N exceeds the
+VHDX maximum of 64 TiB (70368744177664 bytes)</code> before it opens or creates
+the output; a size learnt only in the guest (a <code>create -b</code> that takes
+its size from the parent, a source <code>measure</code> reads) is refused there,
+by the shared VHDX layout, before anything is written.</p>
+<p>The one difference is what a refusal leaves behind. qemu-img creates the
+output file before the VHDX driver checks the size, so a refused
+<code>create</code> leaves a zero-length file (measured with qemu-img 10.0.13, and
+with the 6.0.0 and 10.2.0 static builds); instar leaves nothing, whether
+the host refuses or, for <code>create -b</code>, the guest does. <code>convert</code> and <code>dd</code>
+also check the size in the guest, after the host has created the output,
+but from a size no larger than the one the host has already accepted, so
+that check refuses nothing from the command line; were it to, it would
+leave the empty output, as any convert the guest fails does (#849).</p>
+<p>The limit is a rule for creating an image, not for opening one: qemu
+does not check it on open, and nor do instar's readers. <code>info</code>, <code>check</code>
+and <code>measure -O qcow2</code> read a VHDX that claims more than 64 TiB, and
+<code>convert</code> to another format does not refuse one.</p>
+<p>qemu-img also rounds a requested size up to a multiple of 512
+(<code>vhdx_co_create_opts</code>, "Silently round up sizes"), because
+<code>VirtualDiskSize</code> must be a multiple of the logical sector size. instar
+does the same in <code>create</code> (<code>1073741825</code> records <code>1073742336</code>) and sizes
+<code>measure -O vhdx</code> from the rounded size, which is what <code>convert</code> and
+<code>dd</code> already declared. The thresholds of the limit and of qemu's
+default block size are all multiples of 512, so rounding never changes
+which side of one a size falls.</p>
 <h3 id="vhd-fixed-subformat-carries-footer-only-metadata">VHD fixed subformat carries footer-only metadata<a class="headerlink" href="#vhd-fixed-subformat-carries-footer-only-metadata" title="Permanent link">&para;</a></h3>
 <p><code>instar create -f vpc -o subformat=fixed FILENAME SIZE</code> produces
 a file of <code>SIZE + 512</code> bytes — zero data plus a 512-byte footer
@@ -25244,9 +25440,10 @@ Same shortcut and rationale as <code>create</code>.</p>
 <code>qemu-img: Image format driver does not support resize</code> on
 every qemu-img version from 6.0.0 through 10.2.0 (which the
 matrix exercises). instar resizes all three, except a fixed or a
-differencing VHDX, which it refuses too (see <a href="/components/instar/resize/">resize.md</a>). The baselines record qemu's rejection verbatim, both as
-documentation of the cross-tool gap and as a tripwire for the
-day qemu adds support. The <code>TestResizeConsistency</code>
+differencing VHDX, which it refuses too (see
+<a href="/components/instar/resize/">resize.md</a>). The baselines record qemu's rejection
+verbatim, both as documentation of the cross-tool gap and as a
+tripwire for the day qemu adds support. The <code>TestResizeConsistency</code>
 covers vmdk/vhd/vhdx via an <code>instar create → resize → info →
 check</code> round-trip rather than a cross-tool diff. If
 <code>vmdkinfo</code> / <code>vhdiinfo</code> (libyal) ever gain resize support,
@@ -28019,7 +28216,8 @@ the host resolves when it walks the chain for them; see
 <a href="/components/instar/chain-discovery/#known-limitations">chain-discovery.md</a>.</p>
 <p><strong>A child's block size is independent of its parent's, deliberately.</strong>
 instar gives a differencing child the same defaults as any other new
-image — 2 MiB blocks for VHD, 32 MiB for VHDX — rather than inheriting
+image — 2 MiB blocks for VHD, and for VHDX qemu-img's default for the
+virtual size (8 MiB up to 1 GiB) — rather than inheriting
 the parent's, and for VHDX the chunk ratio can differ too. This is
 legal and it is what Hyper-V tolerates: composition resolves a read by
 <em>virtual offset</em>, not by block index, so the two images need only agree

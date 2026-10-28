@@ -8151,6 +8151,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9537,6 +9621,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16853,8 +16965,8 @@ deployed in front of the clouds rather than by one of them, because
 </li>
 <li>
 <p><a href="/components/kerbside/console-sources/">Console Sources</a> - Configuring console sources
-  (sources.yaml) for Shaken Fist, oVirt, OpenStack, and the static driver,
-  including the Shaken Fist offline token exchange</p>
+  (sources.yaml) for Shaken Fist, oVirt, OpenStack, Proxmox VE, and the
+  static driver, including the Shaken Fist offline token exchange</p>
 </li>
 <li>
 <p><a href="/components/kerbside/schema/">Database Schema</a> - Database tables, columns, and relationships</p>
@@ -16896,6 +17008,21 @@ deployed in front of the clouds rather than by one of them, because
   The relay's observation of the display ACK window on the same rig:
   it bounds the slow-link backlog at 2W+1 messages, but does not cap
   throughput on a long, fast link</p>
+</li>
+<li>
+<p><a href="/components/kerbside/performance/transcoding-measurements/">The transcoding display channel on a shaped link</a> -
+  The experimental transcoder against relaying, with and without streaming,
+  on links down to 2 Mbit: latency, proxy CPU and memory, and image quality</p>
+</li>
+<li>
+<p><a href="/components/kerbside/performance/transcoding-switching/">Switching a display channel between relaying and transcoding</a> -
+  Moving a live session's display channel between the two modes: what a
+  switch costs, and what breaks in remote-viewer and Ryll</p>
+</li>
+<li>
+<p><a href="/components/kerbside/performance/transcoding-spike/">Transcoding the display channel: the spike's verdict</a> -
+  Why the transcoder is not being productised, what it costs per
+  session, and what would change the answer</p>
 </li>
 </ul>
 <h3 id="architecture-documentation">Architecture Documentation<a class="headerlink" href="#architecture-documentation" title="Permanent link">&para;</a></h3>

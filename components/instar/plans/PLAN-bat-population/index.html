@@ -8037,6 +8037,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9423,6 +9507,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -17237,13 +17349,13 @@ rather than merge requests.</p>
 <tr>
 <td>4. Read side: BAT entry count (#626), partial last block, <code>LeaveBlocksAllocated</code> and <code>resize</code></td>
 <td><a href="/components/instar/plans/PLAN-bat-population-phase-04-read-side/">PLAN-bat-population-phase-04-read-side.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>d140aa04</code> (#835)</td>
 </tr>
 <tr>
 <td>5. VHDX geometry: default block size (#645), 64 TiB ceiling, one shared layout</td>
-<td>PLAN-bat-population-phase-05-geometry.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-bat-population-phase-05-geometry/">PLAN-bat-population-phase-05-geometry.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -17400,8 +17512,23 @@ phase 1 sweep confirmed; and the 64 TiB ceiling. #645 changes the
 default layout of every VHDX <code>create</code> and <code>convert</code> without
 <code>block_size</code>, so <code>KNOWN_WRITER_DIVERGENCES</code> loses its three vhdx
 entries in the same pull request, and the stale comments in
-<code>tests/test_create.py</code>, <code>generate-baselines.py</code> and the differential
-fuzzer's picker are corrected with it.</p>
+<code>tests/test_create.py</code> and the differential fuzzer's picker are
+corrected with it.</p>
+<p>Its survey found the layout written out a sixth time, in create's
+<code>target_can_address</code>, and that dd writes through <code>convert_to_vhdx</code>,
+so #645 changes dd's output too and <code>KNOWN_DD_DIVERGENCES</code> loses two
+entries. <code>measure</code> cannot take the default from its config, because
+it fixes the target unit size before it scans the source and only
+the scan learns the source's size, so the guest resolves the unit
+inside each format arm. qemu rounds the size up to 512 before
+anything else, and instar's create does not (#843), so the layout
+rounds. The host's convert capacity estimate assumed a pre-payload
+area under 10 MiB, which is too small at 1 MiB blocks from about
+896 GiB, so it is sized from the layout. <code>generate-baselines.py</code>'s
+only VHDX comment ("qemu defaults match") becomes true when this
+phase lands, so the phase needs no instar-testdata commit. Readers
+keep no ceiling, because qemu enforces 64 TiB only on create (see
+the phase 5 plan).</p>
 <p><strong>Phase 6</strong> is crate-only: the streaming BAT filler (fill one buffer
 with the entries for an index range, given the layout and a state)
 and a fixed subformat in <code>plan_vhdx</code> that returns the structure
@@ -17414,7 +17541,9 @@ without a VM, the guest phase is not. Phase 4's survey found a
 structural divergence this phase has to settle before the first
 success criterion can hold: <code>build_region_table</code> writes the Required
 bit as 1 for the BAT and metadata regions, and every pinned qemu
-build writes 0.</p>
+build writes 0. Phase 5's survey found a second: instar writes a
+physical sector size of 4096 and every pinned qemu case records 512.
+Phase 5 moves the value into the shared layout unchanged.</p>
 <p><strong>Phase 7</strong> wires create end to end: the guest streams the BAT
 through one slot and extends the file to <code>data_start +
 virtual_size</code>, exactly as <code>emit_qcow2_l2_and_extend</code> does for qcow2
@@ -17445,7 +17574,11 @@ warning about qemu-unreadable partial-last-block sizes applies to
 phase 8 too. Phase 9 also corrects <code>docs/quirks.md</code>'s measure entry
 for VHDX sources, which says instar treats every BAT block as fully
 allocated. The reverse is true: qemu counts every block, and instar
-counts no <code>ZERO</code> block (measured in phase 4's survey).</p>
+counts no <code>ZERO</code> block (measured in phase 4's survey). The same
+backwards claim sits in the comment on
+<code>KNOWN_SOURCE_SCANNER_DIVERGENCES['qemu-vhdx']</code> in
+<code>tests/test_measure.py</code> ("VHDX scanner treats every block as fully
+allocated"), reported by phase 4's implementing session.</p>
 <p><strong>Phase 10</strong> is the cross-version matrix for everything above:
 create and convert fixed cases across every profile (including the
 vhdx fixed cases in <code>generate-baselines.py</code>'s <code>CREATE_CASES</code> and
@@ -18095,7 +18228,8 @@ that we fixed. You should also scan the project's issue tracker,
 where one exists, for directly related issues that we should
 either resolve as part of this master plan or at least be aware of
 while planning it.</p>
-<p>None fixed yet. Found while planning, and assigned to phases above:</p>
+<p>Fixed so far: #626, #797 and #798 (phase 4), and #820 (phase 3).
+Found while planning, and assigned to phases above:</p>
 <ul>
 <li><code>docs/create.md:395</code> says VHDX <code>subformat=fixed</code> is "not emitted by
   qemu-img either". It is, on every version measured (Situation).
@@ -18129,6 +18263,19 @@ while planning it.</p>
   is the operator's call.</li>
 <li><code>build_region_table</code> writes the region table's Required bit as 1;
   qemu writes 0. Phase 6.</li>
+<li>instar writes a VHDX physical sector size of 4096; qemu writes 512.
+  Phase 6.</li>
+<li><code>instar create -f vhdx</code> records a virtual size that is not a
+  multiple of 512, which SPEC(VHDX) forbids and qemu-img rounds away
+  (#843). Phase 5.</li>
+<li>The host's VHDX convert capacity estimate is too small for a fully
+  allocated source at 1 MiB blocks from about 896 GiB. Phase 5.</li>
+<li>Found by phase 5 and filed, outside this plan's scope: <code>resize</code>
+  accepts a size that is not a multiple of 512 on every format, where
+  qemu-img refuses (#844).</li>
+<li>Not instar's: qemu-img's zero-size VHDX has a 64 MiB BAT region,
+  because <code>vhdx_calc_bat_entries</code> underflows at zero blocks. instar
+  does not copy it. Reporting it upstream is the operator's call.</li>
 <li><code>docs/quirks.md</code>'s measure entry for VHDX sources states the
   divergence backwards. Phase 9.</li>
 <li>Found by phase 3 and filed, outside this plan's scope: <code>convert</code>

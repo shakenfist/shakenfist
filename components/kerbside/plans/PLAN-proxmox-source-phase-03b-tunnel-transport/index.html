@@ -16,7 +16,7 @@
         <link rel="prev" href="../PLAN-proxmox-source-phase-03a-connect-time-minting/">
       
       
-        <link rel="next" href="../PLAN-proxy-dev-releases-phase-01-publish-workflow/">
+        <link rel="next" href="../PLAN-proxmox-source-phase-04-source-driver/">
       
       
         
@@ -7822,6 +7822,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9397,6 +9481,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -16729,7 +16841,7 @@ three.</p>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>tools/check-backend-tls-claims.py</code> passes, and no page
       under <code>docs/</code> says the backend leg always dials the
       hypervisor directly or always tries plaintext first.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The master plan's Execution table records this phase's
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The master plan's Execution table records this phase's
       merge commit, set by the next phase's close-out.</li>
 </ul>
 <h2 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h2>
@@ -16740,6 +16852,12 @@ three.</p>
   tunnel fields too: a proxy URI and port from the management
   plane flow into the dial unchecked, just as the address
   fields do.</li>
+<li>The direct path still narrows <code>insecure_port</code> and
+  <code>secure_port</code> with <code>as u16</code> in <code>build_config</code> and
+  <code>connect_direct</code>, so 65536 becomes port 0. The tunnel path
+  refuses out-of-range ports. Review declined the direct path's
+  casts as predating this phase; they belong with #138's
+  connect-target validation.</li>
 </ul>
 <h2 id="execution-notes">Execution notes<a class="headerlink" href="#execution-notes" title="Permanent link">&para;</a></h2>
 <p>Implementation began 2026-10-26 (AEDT). At the back brief the

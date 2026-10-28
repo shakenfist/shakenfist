@@ -7822,6 +7822,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -8892,6 +8976,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#readying-steps-4-to-6-2026-10-28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Readying steps 4 to 6, 2026-10-28
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Readying steps 4 to 6, 2026-10-28">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-check-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the check found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#situation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9412,6 +9535,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16253,6 +16404,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#readying-steps-4-to-6-2026-10-28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Readying steps 4 to 6, 2026-10-28
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Readying steps 4 to 6, 2026-10-28">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-check-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the check found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#situation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16563,6 +16753,111 @@ that.</p>
 <li><strong>The backend leg sends no extra codec message.</strong> Finding 2
    makes it redundant; the backend dial already advertises
    <code>MULTI_CODEC</code> with no <code>CODEC_*</code> bits.</li>
+</ol>
+<h2 id="readying-steps-4-to-6-2026-10-28">Readying steps 4 to 6, 2026-10-28<a class="headerlink" href="#readying-steps-4-to-6-2026-10-28" title="Permanent link">&para;</a></h2>
+<p>Steps 2 and 3b merged as bba71155 (#616). Before steps 4 to 6
+ran, their briefs were re-checked against kerbside develop
+ff3f7e6, the shaped-link rig, and ryll 0d140b3 (the client the
+rig last built). Planning effort: high.</p>
+<h3 id="what-the-check-found">What the check found<a class="headerlink" href="#what-the-check-found" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>The rig cannot run a transcoded case.</strong> <code>CONFIGS</code> is
+   <code>name:notsent_lowat:backend_rcvbuf</code>
+   (<code>tools/shaped-link/run-matrix.sh:33</code>), so there is nowhere
+   to pass <code>--transcode-display</code> or the flags beside it.
+   <code>PROXY_BIN</code> defaults to an in-tree release build without the
+   <code>transcode</code> feature.</li>
+<li><strong>The rig records neither CPU nor memory.</strong> It samples <code>ss</code>
+   and the proxy's <code>/metrics</code>. Nothing reads <code>/proc</code> for the
+   proxy or qemu, although the rig already keeps <code>proxy.pid</code>.</li>
+<li><strong>There is no image-quality capture, but the pieces exist.</strong></li>
+<li>Ryll's control socket has a <code>screenshot</code> verb that returns
+     the client's surface as PNG or raw RGBA
+     (<code>shakenfist-spice-renderer/src/control/server.rs:1033</code>
+     at 0d140b3), which is a lossless copy of what the client
+     shows.</li>
+<li>The guest's activity is deterministic: frame <code>f</code> is a
+     function of <code>f</code> alone, and its noise comes from a fixed
+     xorshift seed (<code>tools/shaped-link/guest/keydraw.c:276-301</code>).
+     The background "text" is painted once from a fixed LCG
+     (<code>:238-245</code>).</li>
+<li>But the activity never stops, so there is no instant at
+     which two runs show the same picture.</li>
+<li><strong>The rig's ryll patch no longer applies to ryll develop.</strong>
+   <code>ryll-surface-drawn-rect.patch</code> adds the <code>rect</code> field the
+   rig times keypresses by. Ryll develop still lacks the field
+   (it was never upstreamed; see Future work in the master
+   plan), and the file the patch touches has moved. At 0d140b3
+   the patch applies, and that commit already decodes the LZ4
+   draws the transcoder sends (it contains ryll df2f06b). Step 2
+   built it with <code>RYLL_REF=0d140b3</code>.</li>
+<li><strong>Relay is already lossy on every 80 ms link</strong> (step 2's side
+   finding). spice-server judges any 80 ms link slow, so it
+   sends JPEG draws. A lossless reference therefore has to come
+   from an unshaped run, where spice-server judges the link
+   fast.</li>
+<li><strong><code>streaming-video</code> does not affect a transcoded case.</strong> The
+   transcoder dials the backend with no codec caps, so
+   spice-server never streams to it. Transcode needs one column
+   per pacing mode, not one per streaming setting.</li>
+<li><strong>Nothing can switch a live session.</strong> The relay-or-transcode
+   choice is made in <code>backend::run</code> before the backend is
+   dialled (<code>rust/kerbside-proxy/src/backend.rs</code>, the
+   <code>crate::transcode::choose</code> call). Step 5 needs a way to
+   trigger a switch mid-session.</li>
+<li><strong>Brief 6 omits something the master plan asks of it.</strong> Its
+   <em>RDP out</em> future-work item asks the write-up to say whether
+   renderer accuracy and CPU per session would support RDP out
+   in Kerbside.</li>
+</ol>
+<p>The master plan's <code>Merged</code> cell and the index row were updated
+in the close-out commit before this one.</p>
+<h3 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Quality is measured against an unshaped, relayed
+   reference.</strong> That run has streaming off, and spice-server
+   judges the link fast, so every draw is lossless (QUIC and
+   LZ are lossless; only JPEG is not). The reference is taken
+   twice, and the two captures must be byte-identical before
+   any comparison is believed. Comparing against a frame
+   computed off-line from <code>keydraw.c</code> was rejected: it would
+   depend on <code>sinf</code> giving identical results in a host build
+   and the static guest build.</li>
+<li><strong>A guest knob freezes the activity.</strong> <code>kd.frames=N</code> stops
+   the activity after frame N, leaving a deterministic final
+   picture. Quality is then measured two ways:</li>
+<li><strong>Legibility during animation:</strong> while the activity runs,
+     compare the static background (everything outside the
+     activity rectangle) against the reference. It should be
+     exact, and anything less means JPEG or merging has spread
+     loss onto text.</li>
+<li><strong>Eventual quality:</strong> after the freeze, and after more
+     than the transcoder's lossless delay, compare the whole
+     frame by SSIM and PSNR. The transcoder should converge to
+     exact; relay on a slow link keeps its JPEG.</li>
+<li><strong>The rig gains per-config proxy flags, and <code>RYLL_REF</code>
+   defaults to 0d140b3.</strong> Pinning the client makes the
+   measurement reproducible and avoids refreshing a patch that
+   should be upstreamed instead. That stays a Future work item,
+   not this phase's work.</li>
+<li><strong>The matrix is bounded to about four hours.</strong> Profiles:
+   0:0 (the LAN cost), 20:50, 80:50, 80:10, 80:5 and 150:2.
+   Configs: relay with streaming off, relay with <code>all</code>,
+   transcode paced on the socket, and transcode paced on a
+   SET_ACK window of 40. Activities: busy and heavy, plus idle
+   on 0:0 and 80:10 only, for the floor. Two repeats. If the
+   estimate goes over four hours, drop <code>heavy</code> on 20:50 first,
+   because the re-baseline already shows it at the idle floor.</li>
+<li><strong>Step 5 switches with a hidden flag.</strong>
+   <code>--transcode-switch-after-secs N</code> flips a session's display
+   channel to the other mode N seconds after it starts. This is
+   an experiment trigger, behind the feature, not a product
+   interface. Steps 4 and 5 run in sequence, because step 4
+   measures a binary built before step 5 changes the proxy.</li>
+<li><strong>The CI lane question is answered in step 6, not before.</strong>
+   The write-up says whether a productised transcoder needs a
+   feature lane. Until then, step 4 building the feature is
+   what exercises it.</li>
 </ol>
 <h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
 <p>Sources read on 2026-09-26: kerbside develop 764183f, ryll
@@ -16897,34 +17192,44 @@ ryll's through its own Makefile, never with a host toolchain.</p>
 <td>Complete (see Execution notes). kerbside: the transcoding display channel behind a feature and a flag, on andris's update pipeline. Commit: "Add a transcoding display channel." See brief notes.</td>
 </tr>
 <tr>
-<td>4</td>
+<td>4a</td>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td>Measure transcoding against the re-baseline, including sub-10 Mbit links, CPU and image quality. See brief notes.</td>
+<td>Complete (d2f3d01). The rig: per-config proxy flags, CPU and RSS sampling, the <code>kd.frames</code> freeze, screenshots and a quality script, <code>RYLL_REF</code> pinned. Commit: "Teach the shaped-link rig to measure transcoding." See brief notes for 4.</td>
+</tr>
+<tr>
+<td>4b</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Complete (see Execution notes). Run the matrix and write the results page. Commit: "Measure the transcoder on the shaped-link rig." See brief notes for 4.</td>
 </tr>
 <tr>
 <td>5</td>
 <td>high</td>
 <td>opus</td>
-<td>worktree</td>
-<td>Test moving a live session between relay and transcoding. See brief notes.</td>
+<td>none</td>
+<td>Complete (see Execution notes). Test moving a live session between relay and transcoding. Commit: "Test switching a display channel mid-session." See brief notes.</td>
 </tr>
 <tr>
 <td>6</td>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td>Write up the spike with a go or no-go recommendation. See brief notes.</td>
+<td>Complete (see Execution notes). Write up the spike with a go or no-go recommendation. Commit: "Write up the transcoding spike." See brief notes.</td>
 </tr>
 </tbody>
 </table>
-<p>Steps 1a, 1b and 3a are complete. Steps 2 and 3b are
-independent and can run in parallel: 2 touches only the relay
-and the rig, 3b only the backend seam and a new module. Steps
-4 and 5 need 3b, and step 4 also uses step 2's observation.
-The management session reviews and commits each step, and
-records each merge in this plan.</p>
+<p>Steps 1a to 3b are complete. The remaining steps run strictly
+in sequence: 4a, 4b, 5, 6. 4b measures what 4a built, 5 must
+not change the proxy before 4b's binary is measured, and 6
+needs all of it. Step 5 ran with worktree isolation in the
+original table; it now runs in the phase worktree, because the
+sub-agent worktree option branches from the default branch,
+and its output is reviewed uncommitted like every step's. The
+management session reviews and commits each step, and records
+each merge in this plan.</p>
 <p>Brief notes for 1a:</p>
 <ul>
 <li>Add <code>perform_link_with_caps(stream, connection_id,
@@ -17135,11 +17440,43 @@ re-survey's decision 1):</p>
   (fall back to relay, and log) on anything else: a second
   display channel, or an unimplemented draw or image type.</li>
 </ul>
-<p>Brief notes for 4:</p>
+<p>Brief notes for 4 (read <em>Readying steps 4 to 6</em> first;
+findings 1 to 6 and decisions 1 to 4 are the design):</p>
 <ul>
+<li><strong>4a, the rig.</strong> In <code>tools/shaped-link/</code>, keeping every
+  existing variable working as it does today:</li>
+<li>extend <code>CONFIGS</code> with an optional field of extra proxy
+    flags, so a config can add <code>--transcode-display</code> and its
+    companions. Document the separator;</li>
+<li>sample the proxy's and qemu's CPU time (<code>/proc/&lt;pid&gt;/stat</code>
+    utime plus stime) and RSS (<code>VmRSS</code>) at the <code>ss</code> cadence, and
+    have <code>summarise.py</code> report CPU as cores used over the
+    key-press window, and peak and mean RSS;</li>
+<li>add <code>kd.frames=N</code> to <code>guest/keydraw.c</code> (stop the activity
+    after frame N; 0, the default, never stops), rebuildable
+    with <code>build-guest.sh</code>;</li>
+<li>take ryll <code>screenshot</code>s through its control socket at fixed
+    instants (mid-animation, and after the freeze plus a settle
+    longer than the lossless delay), saved as PNG per case;</li>
+<li>write <code>quality.py</code>: the static-background comparison and
+    whole-frame SSIM and PSNR against a reference PNG. Run it
+    in a temporary venv with numpy and Pillow; implement SSIM
+    directly rather than pulling in scikit-image, and test it
+    on two identical images and one known perturbation;</li>
+<li>default <code>RYLL_REF</code> in <code>build-ryll.sh</code> to 0d140b3, with a
+    comment saying why;</li>
+<li>add a way to log how full the renderer's pixmap cache gets,
+    if the transcoder can expose it cheaply (a debug log line
+    at channel end is enough). If it cannot, say so.</li>
+<li><strong>4b, the run.</strong> Build the proxy with
+  <code>make -C rust/kerbside-proxy release FEATURES=transcode</code> and
+  record the commit. Take the reference twice and check the two
+  captures are identical. Then run the matrix from decision 4,
+  with an estimate before starting, and stop and report if it is
+  over four hours after the stated cut.</li>
 <li><strong>Matrix.</strong> Reuse the shaped-link rig and the re-baseline's
-  cells, and add sub-10 Mbit profiles (for example 80 ms / 5
-  Mbit and 150 ms / 2 Mbit). Compare relay with
+  cells, and add sub-10 Mbit profiles (80 ms / 5 Mbit and
+  150 ms / 2 Mbit). Compare relay with
   <code>streaming-video=off</code>, relay with <code>all</code>, transcode paced on
   the socket, and transcode paced on a SET_ACK window.</li>
 <li><strong>Per session, record:</strong></li>
@@ -17153,19 +17490,29 @@ re-survey's decision 1):</p>
     sets how many sessions a node can carry. Record how full the
     pixmap cache gets, and shrink it if spice-server barely uses
     it on these guests;</li>
-<li>image quality: SSIM and PSNR of the client's final frame
-    against a lossless capture of the same workload, taken at
-    the same instants. Say how the capture was made and aligned;</li>
+<li>image quality, as decision 2 defines it: the static
+    background during animation, and SSIM and PSNR of the
+    frozen frame, both against the unshaped reference;</li>
 <li>whether text is legible during animation, with a
     screenshot;</li>
-<li>the guest's damage path (atomic damage clips or DIRTYFB).</li>
+<li>the guest's damage path. The rig's guest uses DIRTYFB; say
+    so, and don't build an atomic-damage guest.</li>
 <li><strong>Clients.</strong> Ryll headless for timing. Remote-viewer for
-  correctness only, since it reports no timings.</li>
+  correctness only, since it reports no timings. If it can't run
+  inside the rig's network namespace (it needs the X server's
+  socket), check it unshaped in the direct-qemu harness as step
+  3b did, and say which you did.</li>
 <li><strong>Output.</strong> A page under <code>docs/performance/</code> with the
   procedure and results, in the style of the re-baseline.</li>
 </ul>
 <p>Brief notes for 5:</p>
 <ul>
+<li><strong>Trigger.</strong> A hidden flag, <code>--transcode-switch-after-secs N</code>
+  (decision 5), behind the <code>transcode</code> feature, flips a
+  session's display channel to the other mode N seconds after it
+  starts. The relay side needs a cancellable seam to hand over
+  from; keep the change inside the feature as far as the
+  relay's structure allows, and say what leaked out of it.</li>
 <li><strong>Relay to transcode.</strong> With a session in relay whose backend
   was dialled lossless and non-GLZ (as in 3b), close and
   reconnect the backend display channel in transcode mode, then
@@ -17202,6 +17549,13 @@ re-survey's decision 1):</p>
 <li>Say what this spike's output half means for phase 4. Andris
   is already most of the Son of SPICE helper, with an X11
   input where phase 4 wants D-Bus.</li>
+<li>Say whether renderer accuracy and CPU per session would
+  support moving RDP out into Kerbside (master plan, Future
+  work, <em>RDP out</em>).</li>
+<li>Diff the transcode module's andris copy against andris
+  develop, and say what the spike missed (the drift risk).</li>
+<li>Answer whether a productised transcoder needs a CI lane for
+  its feature (readying decision 6).</li>
 <li>If no-go: say what would change the answer.</li>
 <li>Update the master plan: the phase 3 row, Open question 4, and
   Future work items this changes.</li>
@@ -17229,6 +17583,18 @@ re-survey's decision 1):</p>
 <li><code>tools/build-proxy-wheel.sh</code> builds without the <code>transcode</code>
   feature, and the built wheel's binary contains no openh264
   symbols (<code>nm -D</code> or <code>strings</code> finds no <code>WelsCreate</code>).</li>
+<li>The rig's existing invocation still works: <code>run-matrix.sh</code>
+  with step 2's variables and no new ones produces the same
+  files as before, plus the new samples.</li>
+<li><code>quality.py</code> scores two identical PNGs as SSIM 1.0 with
+  infinite (or capped) PSNR, and a known perturbation lower;
+  its test does both.</li>
+<li>The two reference captures are byte-identical (<code>cmp</code>), and
+  the results page says so.</li>
+<li>The results page reports, for every profile and config,
+  latency p50 and p95, proxy CPU in cores, proxy peak RSS, the
+  static-background match and frozen-frame SSIM and PSNR, and
+  names the proxy commit and the ryll commit it measured.</li>
 </ul>
 <h2 id="execution-notes">Execution notes<a class="headerlink" href="#execution-notes" title="Permanent link">&para;</a></h2>
 <ul>
@@ -17301,10 +17667,154 @@ re-survey's decision 1):</p>
   0.42) drew correctly. Not tested: a guest resize end to end.
   Ryll releases up to 0.1.5 cannot decode the LZ4 draws the
   transcoder sends, and the harness doc says so.</li>
+<li><strong>2026-10-28 (AEDT), back brief for steps 4 to 6.</strong> Mikal chose
+  to run 4a, 4b, 5 and 6 through to the verdict in one pull
+  request, which the session may push and open.</li>
+<li><strong>Step 4a departed from readying decision 2 in one place.</strong>
+  Besides <code>kd.frames=N</code>, an F12 key press makes the guest draw
+  frame N at once and stop. A frame count fixed at boot cannot
+  know how long a case's key presses take, so it would either
+  freeze in the middle of the latency samples or leave dead
+  time. The animation index now counts drawn frames rather than
+  loop passes (identical with <code>kd.delay=0</code>), and the noise
+  generator jumps ahead, so frame N is the same however it was
+  reached. That was checked: frame 30 reached by F12 is
+  byte-identical to frame 30 reached frame by frame. The rig
+  presses F12 only after the last latency sample, and drops a
+  case's latency if the freeze came early.</li>
+<li><strong>Step 4a smoke run.</strong> The two unshaped reference captures are
+  byte-identical (checked again with <code>cmp</code> by the management
+  session), so readying decision 1 holds. The renderer's pixmap
+  cache peaked at 0 bytes: qemu's display path never asks for an
+  image to be cached. Early sign for 4b: while the activity
+  runs, the transcoder's JPEG reaches background tiles next to
+  it, and the frozen frame converges to exact.</li>
 <li><strong>Not done here: CI does not build the <code>transcode</code> feature,</strong>
   so it can rot unnoticed until step 4 builds it. A lane would
   build openh264 on every run. Left for the productising
   decision rather than added to a spike.</li>
+<li><strong>Step 4b ran on a loaded host and ran the slow links
+  twice.</strong> Other sessions held the load average above the
+  host's 16 threads for a third of the run, and the first pass
+  lost every 150 ms / 2 Mbit repeat. The agent reran the
+  unshaped, 20 ms / 50 Mbit, 80 ms / 50 Mbit and
+  150 ms / 2 Mbit links in full (72 cases), the last with
+  <code>ACTIVITY_DELAY=12 WARMUP=14</code>, and pooled both runs; about
+  4 h 20 min of measuring in all. No cut of the matrix was
+  needed, and the rig needed no fixes.</li>
+<li><strong>Step 4b excluded 18 of 184 repeats in which Ryll stopped
+  reading its display socket</strong> (the proxy's client socket
+  <code>rwnd_limited</code> over 50%). It hit relay and transcode alike,
+  so it is a client problem, not the proxy's; its cause is not
+  established. The results page says so.</li>
+<li>
+<p><strong>Step 4b review.</strong> The management session re-ran <code>cmp</code> on
+  the three pairs of reference captures (identical), recomputed
+  four cells' p50 from the per-press CSVs (80 ms / 10 Mbit heavy
+  relay 2047 and socket-paced 335, 150 ms / 2 Mbit heavy
+  socket-paced 1459, 80 ms / 10 Mbit busy ACK 40 531; all
+  match), confirmed the pixmap-cache peak of 0 bytes in all 83
+  transcoded channel-end log lines, and checked the qemu CPU
+  figures against the raw summary. It reworded the qemu CPU
+  sentence, which read backwards, and attributed the
+  connect-time crash to spice-server rather than qemu.</p>
+</li>
+<li>
+<p><strong>Step 5 ran on its own copy of the rig's topology,</strong> not on
+  <code>run-matrix.sh</code>: Ryll's control socket takes one client, so the rig's
+  key-press driver and a <code>surface_drawn</code> logger could not share it, and
+  remote-viewer needed a screen capture. The one-case script, the draw
+  logger and the analysis stayed in the step's scratch directory; the
+  results page describes them. The direct-qemu harness was not used.</p>
+</li>
+<li><strong>Step 5 departed from its brief in these places:</strong></li>
+<li>The flag switches repeatedly, every N seconds, not once, so that one
+    session exercises both directions and a relay after a transcode
+    after a relay.</li>
+<li>The relay is kept off GLZ by rewriting the client's
+    <code>PREFERRED_COMPRESSION</code> (GLZ to LZ) and by asking for <code>auto-lz</code> at
+    the start of each relay spell. The brief assumed the transcoder's
+    backend capabilities made the relay non-GLZ; they do not, because
+    spice-server picks GLZ from the compression preference. The
+    measurement that forced it: with GLZ, remote-viewer died of a
+    division by zero in its GLZ window about 4 s after every transcode
+    to relay switch.</li>
+<li>After a relay, the transcoder draws over the client's existing
+    surface when it is the right size, with no <code>SURFACE_CREATE</code> or
+    <code>MONITORS_CONFIG</code>. The client leg follows the surface size in what is
+    written to the client. This was meant to stop remote-viewer showing a
+    black display on relay to transcode; it did not, and the cause of
+    that black display is not established.</li>
+<li>Ryll 0d140b3 freezes after every transcode to relay switch, because
+    it does not restart its ACK count on <code>SET_ACK</code> and spice-server's
+    unsigned window then wraps. The proxy does not work around it. A
+    one-line Ryll change, in scratch, confirmed the cause; the ryll fix
+    is not filed here and belongs in a ryll pull request.</li>
+<li><strong>What step 5 changed outside the <code>transcode</code> feature:</strong></li>
+<li><code>relay::run</code> is generic over its client and backend stream types,
+    so the switch can relay through wrappers and keep the client leg.
+    Without the feature it is used only with <code>SpiceStream</code>, as before.</li>
+<li><code>backend::run</code>'s connect, <code>need_secured</code> retry, receive-buffer cap,
+    capability logging and audit events moved, unchanged, into a private
+    <code>backend::dial</code>, which the switch calls once per spell. The
+    feature-gated early return for a switching channel sits at the top
+    of <code>backend::run</code>.</li>
+<li>Nothing else: the flag, <code>Options</code> and <code>main.rs</code>'s changes are all
+    behind the feature, and a default release build neither recognises
+    <code>--transcode-switch-after-secs</code> nor contains <code>WelsCreate</code>.</li>
+<li><strong>Step 5 result.</strong> 164 switches, 56 in the final runs; spice-server
+  refused none, so the "duplicate channel" race was never seen. On a LAN
+  the proxy has the new mode running 22 to 37 ms after a switch, and the
+  client misses a frame or two. At 80 ms / 10 Mbit the screen is stale
+  for 1.3 s (to transcode) or 0.97 s (to relay): one full-screen redraw.
+  The mode could follow the link only between transcoding and a relay
+  without GLZ or streams, with clients fixed; choosing at connect is the
+  recommendation the page makes.</li>
+<li><strong>Step 6 verdict: no-go</strong> (<code>docs/performance/transcoding-spike.md</code>).
+  Transcoding wins clearly only on incompressible activity with
+  streaming off on links of 10 Mbit or less, and beats streaming relay
+  in one cell (150 ms / 2 Mbit heavy, 1459 against 7328 ms). Relay with
+  <code>streaming-video=all</code> is level or two to five times faster elsewhere,
+  at 0.011 to 0.025 proxy cores against 0.27 to 0.29 on a LAN. The
+  image-quality case did not hold during motion, and switching works
+  only against a weakened relay. The strongest argument for go is
+  spice-server 0.15.2's connect crash, which keeps cautious deployments
+  on streaming off; the write-up argues that fixing or avoiding the
+  crash is far cheaper than productising. No draft phase plans were
+  written, because the verdict is no-go; the write-up lists what
+  productising would need and what would reopen the question.</li>
+<li><strong>Step 6, the andris drift diff.</strong> andris develop at 568a43bfc0 has
+  14 commits past e29929fa88, none touching <code>andris/src/</code> (<code>git log</code>
+  and <code>git diff --stat</code> over the range, after <code>git fetch origin</code>; no
+  remote branch touches the copied files either). <code>diff -u</code> of each
+  copied <code>updates/</code> file against develop shows only the changes the
+  headers list, and every function in <code>geometry.rs</code> exists in andris's
+  platform files. So the copy has not drifted. What it left out on
+  purpose matters more: andris's heat map and H.264 stream path, which
+  is exactly what beat the transcoder on smooth activity, and which the
+  spike could not take as it is (openh264 licensing, the client clock).</li>
+<li><strong>Step 6, the CI-lane answer (readying decision 6).</strong> No separate
+  lane. A productised transcoder would first split ryll's <code>encode</code>
+  feature (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/499" title="GitHub Issue: shakenfist/ryll #499">ryll#499</a>) and then ride the release build, so the existing
+  <code>Rust proxy</code> job covers it. While the experiment is kept
+  unproductised, adding <code>--features transcode</code> clippy and test steps
+  to that job is the cheap guard against rot; recorded as Future work
+  in the master plan, not done here.</li>
+<li><strong>Step 6, the master plan.</strong> The phase 3 row's description, the
+  phase 3, 4 and 5 prose, Open question 4's answer, and the Future work
+  items on ACK pacing, the <code>streaming-video</code> recommendation, the
+  spice-server crash and RDP out were updated. New Future work items
+  record the Ryll <code>SET_ACK</code> fix (the step 5 patch; ryll develop at
+  e49ddce, a local ref, still lacks it in the display and cursor
+  channels), the Ryll display-socket stall, andris's pacing and JPEG
+  fringe, and the CI step. The phase's <code>Status</code> and <code>Merged</code> cells are
+  left for the close-out after this pull request merges.</li>
+<li><strong>The first review round added the CI steps after all.</strong> The
+  review pointed out that the pull request adds the switching code and
+  its tests to a feature no CI job built. The Rust proxy job now runs
+  clippy and the tests with <code>--features transcode</code>, which supersedes
+  the earlier "not done here" notes for steps 4a and 6; the spike page
+  and the master plan's Future work item say so.</li>
 </ul>
 <h2 id="risks-added-by-the-re-survey">Risks added by the re-survey<a class="headerlink" href="#risks-added-by-the-re-survey" title="Permanent link">&para;</a></h2>
 <ul>
@@ -17323,6 +17833,23 @@ re-survey's decision 1):</p>
   touch the protocol crate as well as the renderer. 3b's brief
   makes reviewing them and rerunning 1b's handshake tests part
   of the step.</li>
+</ul>
+<h2 id="risks-added-when-readying-steps-4-to-6">Risks added when readying steps 4 to 6<a class="headerlink" href="#risks-added-when-readying-steps-4-to-6" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>The matrix runs for hours, and host load skews it.</strong> The
+  re-baseline and step 2 ran on this shared host. 4b runs
+  nothing else concurrently (decision 5's sequencing), and the
+  management session starts no builds during it. The results
+  page names the host and its load.</li>
+<li><strong>The freeze changes the workload being measured.</strong> Latency
+  samples are taken before the freeze, so they keep the
+  re-baseline's workload; only the quality capture uses the
+  frozen frame. The management session checks this when
+  reviewing 4a.</li>
+<li><strong>A switch can crash qemu.</strong> spice-server 0.15.2 crashes when
+  a client connects while streams exist. Step 5's relay leg
+  must run with <code>streaming-video=off</code>, so no stream exists when
+  the transcoder reconnects.</li>
 </ul>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, back brief the

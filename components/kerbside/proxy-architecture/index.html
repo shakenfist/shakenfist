@@ -8230,6 +8230,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9616,6 +9700,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16871,6 +16983,10 @@ always a free choice:</p>
   trust changes nothing for them. A hypervisor whose SPICE certificate
   was replaced with one from another CA will now fail the backend
   connect.</li>
+<li><strong>Proxmox VE.</strong> <code>ca_cert</code> is required and is the cluster CA, which
+  verifies the API and is also the trust anchor for the backend leg, since
+  that CA signs each node's SPICE certificate. It is not compared with
+  anything the API reports, and the <code>ca</code> in a minted ticket is ignored.</li>
 <li><strong>Static and OpenStack.</strong> <code>ca_cert</code> is only the VDI trust anchor
   (see <a href="/components/kerbside/console-sources/">Console Sources</a>). A deployment whose
   hypervisors present publicly issued certificates must leave it empty
@@ -16903,11 +17019,11 @@ default. See <a href="/components/kerbside/console-sources/#shaken-fist">Console
 <li><strong>Ticket decryption / authorization.</strong> The client's RSA-encrypted ticket is
    decrypted and sent to the control plane via the <code>AuthorizeConnection</code> RPC,
    which resolves it to a hypervisor <code>Target</code> (host, port, backend ticket,
-   <code>host_subject</code>, <code>session_id</code>, and the firewall policy) or returns <code>Denied</code>.
-   A denial closes the connection. For a source whose driver mints tickets
-   (oVirt), the control plane may call that source's API while authorizing
-   (see "Minting a backend ticket during authorization" below), and denies
-   the channel if it cannot.</li>
+   <code>host_subject</code>, <code>session_id</code>, and the firewall policy) or returns
+   <code>Denied</code>. A denial closes the connection. For a source whose driver
+   mints tickets (oVirt and Proxmox VE), the control plane may call that
+   source's API while authorizing (see "Minting a backend ticket during
+   authorization" below), and denies the channel if it cannot.</li>
 <li><strong>Backend connect.</strong> The proxy opens the backend leg to the hypervisor's
    SPICE port (honouring a <code>need_secured</code> retry to the TLS port) and completes
    the server-side handshake with the backend ticket, advertising the
@@ -17009,7 +17125,9 @@ terminates the display channel instead: the proxy decodes what the
 hypervisor sends and re-encodes it for the client, sending only what changed,
 as JPEG where the picture is photographic and losslessly otherwise, at the
 pace the client's link can take. It exists to measure whether that beats
-relaying on slow links; it is not for production.</p>
+relaying on slow links; it is not for production, and
+<a href="/components/kerbside/performance/transcoding-spike/">the spike's verdict</a> recommends against
+productising it.</p>
 <p>It needs two things, both off by default:</p>
 <ul>
 <li><strong>The <code>transcode</code> cargo feature.</strong> It pulls in ryll's renderer and the
@@ -17057,6 +17175,11 @@ relaying on slow links; it is not for production.</p>
 <td>0</td>
 <td>A measurement option, hidden from <code>--help</code>: pace on a SPICE ACK window of this many messages, as spice-server does, instead of on the client socket. 0 paces on the socket.</td>
 </tr>
+<tr>
+<td><code>--transcode-switch-after-secs</code></td>
+<td>0</td>
+<td>An experiment, hidden from <code>--help</code>: move each session's first display channel between relaying and transcoding this many seconds after it starts, and again each time that long has passed in the new mode. It starts transcoded with <code>--transcode-display</code> and relayed without. 0 never switches. See <a href="/components/kerbside/performance/transcoding-switching/">switching a display channel</a>.</td>
+</tr>
 </tbody>
 </table>
 <p>How a transcoded display channel works (<code>rust/kerbside-proxy/src/transcode/</code>):</p>
@@ -17101,13 +17224,26 @@ relaying on slow links; it is not for production.</p>
   the link has nearly drained it. Meanwhile damage merges in the mirror, so a
   slow client is sent the screen as it is when it can take more, never the
   frames it missed. No <code>SET_ACK</code> is sent, so the client sends no ACKs.</li>
+<li><strong>Memory.</strong> Each transcoded channel holds ryll's pixmap cache (up to
+  256 MiB) and GLZ dictionary (up to 64 MiB) besides the mirror and the
+  shadow. When the channel ends the proxy logs, at info, how full the pixmap
+  cache got (<code>pixmap_cache_peak_bytes</code>, <code>pixmap_cache_peak_entries</code>) and
+  how many entries it evicted. The shaped-link rig's <code>summarise.py</code> reports
+  the peak.</li>
 </ul>
 <p>What it does not do:</p>
 <ul>
 <li>Only a session's first display channel (channel id 0) is transcoded. A
   second display channel is relayed, and the proxy logs that it did so.</li>
 <li>The choice between relaying and transcoding is made when the channel
-  connects, and cannot change while it runs.</li>
+  connects. Only the hidden <code>--transcode-switch-after-secs</code> experiment
+  changes it while the channel runs: it keeps the client leg, closes the
+  backend display channel and dials it again for the other mode, and keeps
+  GLZ out of the relay, because GLZ does not survive the switch. Both modes
+  dial with the transcoder's capabilities, so its relay assumes a client
+  that takes LZ4 and <code>MONITORS_CONFIG</code>.
+  <a href="/components/kerbside/performance/transcoding-switching/">Switching a display channel</a>
+  has what that costs, and what breaks in each client.</li>
 <li>The backend leg is not firewalled. The server-to-client messages of a
   transcoded display channel skip the L0 and L1 policy and the relay's
   16 MiB framing cap, and go straight to ryll's renderer, which frames them
@@ -17172,9 +17308,10 @@ different surfaces:</p>
 </ul>
 <h3 id="minting-a-backend-ticket-during-authorization">Minting a backend ticket during authorization<a class="headerlink" href="#minting-a-backend-ticket-during-authorization" title="Permanent link">&para;</a></h3>
 <p>For a static source, <code>AuthorizeConnection</code> returns the ticket stored on the
-console. For a source whose driver sets <code>MINTS_TICKETS</code> (oVirt) there is no
-stored ticket: the first channel of a session to be authorized mints one
-from the source, and the rest reuse it. The sequence is:</p>
+console. For a source whose driver sets <code>MINTS_TICKETS</code> (oVirt and Proxmox
+VE) there is no stored ticket: the first channel of a session to be
+authorized mints one from the source, and the rest reuse it. The sequence
+is:</p>
 <ol>
 <li>The lifetime asked for is the token's remaining life plus 30 seconds
    (<code>TICKET_SLACK</code> in <code>kerbside/rpc/servicer.py</code>), since no channel is

@@ -7968,6 +7968,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9354,6 +9438,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16304,7 +16416,7 @@ discrepancies, the source code in <code>config.py</code> is authoritative.</p>
 <tr>
 <td>CONSOLE_TOKEN_DURATION</td>
 <td>Integer (default 1)</td>
-<td>The number of minutes a console access token should be valid for. It also bounds the lifetime of the hypervisor tickets Kerbside mints for oVirt: a proxied session's ticket is asked to live for the token's remaining life plus 30 seconds, and a direct console's for this many minutes.</td>
+<td>The number of minutes a console access token should be valid for. It also bounds the lifetime of the hypervisor tickets Kerbside mints for oVirt (a Proxmox VE ticket always lasts 30 seconds): a proxied session's ticket is asked to live for the token's remaining life plus 30 seconds, and a direct console's for this many minutes.</td>
 </tr>
 <tr>
 <td>AUTH_SECRET_SEED</td>
@@ -16404,7 +16516,7 @@ discrepancies, the source code in <code>config.py</code> is authoritative.</p>
 <tr>
 <td>KEYSTONE_ADMIN_GROUP</td>
 <td>String (default empty)</td>
-<td>The Keystone group whose members are Kerbside administrators. Only administrators may fetch a direct console file from <code>/console/direct/&lt;source&gt;/&lt;uuid&gt;/console.vv</code>, which points the client at the hypervisor with the hypervisor's own SPICE ticket and so bypasses the proxy's firewall, session tracking and termination; everyone else receives a 403, and is not shown the Direct button. Empty means nobody is an administrator. Before this setting existed every logged in user could fetch a direct file, so a deployment that relies on direct access must set it when upgrading. Membership is checked at login and carried in the session, so removing a user from the group takes effect only when their current session expires (<code>API_TOKEN_DURATION</code>) and they log in again; until then they can still fetch direct files. Issued and refused direct requests are recorded in the console's audit events. A configured group that does not exist in Keystone is logged as an error and makes nobody an administrator.</td>
+<td>The Keystone group whose members are Kerbside administrators. Only administrators may fetch a direct console file from <code>/console/direct/&lt;source&gt;/&lt;uuid&gt;/console.vv</code>, which points the client at the hypervisor with the hypervisor's own SPICE ticket and so bypasses the proxy's firewall, session tracking and termination; everyone else receives a 403, and is not shown the Direct button. A Proxmox VE console has no direct file, and even an administrator's request for one receives a 409. Empty means nobody is an administrator. Before this setting existed every logged in user could fetch a direct file, so a deployment that relies on direct access must set it when upgrading. Membership is checked at login and carried in the session, so removing a user from the group takes effect only when their current session expires (<code>API_TOKEN_DURATION</code>) and they log in again; until then they can still fetch direct files. Issued and refused direct requests are recorded in the console's audit events. A configured group that does not exist in Keystone is logged as an error and makes nobody an administrator.</td>
 </tr>
 </tbody>
 </table>

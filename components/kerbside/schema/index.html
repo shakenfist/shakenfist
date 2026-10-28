@@ -8007,6 +8007,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9393,6 +9477,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16448,7 +16560,7 @@
 <tr>
 <td>type</td>
 <td>string</td>
-<td>Source type: <code>shakenfist</code>, <code>ovirt</code>, or <code>openstack</code></td>
+<td>Source type: <code>shakenfist</code>, <code>ovirt</code>, <code>openstack</code>, <code>proxmox</code> or <code>static</code></td>
 </tr>
 <tr>
 <td>last_seen</td>
@@ -16478,7 +16590,7 @@
 <tr>
 <td>username</td>
 <td>string</td>
-<td>Authentication username</td>
+<td>Authentication username, or a Proxmox VE API token ID (<code>user@realm!tokenid</code>); up to 255 characters</td>
 </tr>
 <tr>
 <td>password</td>
@@ -16549,7 +16661,7 @@ could plausibly have gone the other way:</p>
 <tr>
 <td>uuid</td>
 <td>string</td>
-<td>Primary key with source; VM UUID</td>
+<td>Primary key with source; the source's identifier for the VM, up to 255 characters. Usually the VM's UUID; a Proxmox VE console's is <code>&lt;vmid&gt;-&lt;SMBIOS UUID&gt;</code></td>
 </tr>
 <tr>
 <td>discovered</td>
@@ -16606,12 +16718,12 @@ for this console, and it gets the same treatment as a source's
 fields in <code>db.CONSOLE_PUBLIC_FIELDS</code> unless a caller opts in with
 <code>include_secrets=True</code>, so it reaches neither the REST API nor the web
 UI. Only static sources keep a ticket here: it is the console password
-from the source's configuration, persisted at enumeration time and
-valid indefinitely. oVirt consoles have an empty <code>ticket</code>. An oVirt
-ticket is minted when the first channel of a session connects, and held
-on that session's <code>consoletokens</code> row until it expires (see below), so
-it is never shared between sessions and never outlives its session's
-token by long.</p>
+from the source's configuration, persisted at enumeration time and valid
+indefinitely. oVirt and Proxmox consoles have an empty <code>ticket</code>. A
+minted ticket is requested when the first channel of a session connects,
+and held on that session's <code>consoletokens</code> row until it expires (see
+below), so it is never shared between sessions and never outlives its
+session's token by long.</p>
 <p>There are exactly two callers entitled to read a console's ticket back
 out of the database, and <code>git grep include_secrets</code> finds them
 alongside the source ones: the static branch of the direct <code>.vv</code>
@@ -16715,8 +16827,8 @@ what maps a session back to its console.
 <code>db.reap_expired_tokens()</code> deletes it once it has expired and the
 session's last channel has closed.</p>
 <p><code>backend_ticket</code> holds the SPICE password for a source that mints
-tickets, which oVirt does. Each mint revokes the previous ticket for
-new connections, so channels of one session minting independently
+tickets, which oVirt and Proxmox VE do. Each mint revokes the previous
+ticket for new connections, so channels of one session minting independently
 would lock each other out. Instead a session mints once and shares the
 result with every channel, on every proxy node.
 <code>db.session_ticket()</code> selects the row <code>FOR UPDATE</code>: the first channel

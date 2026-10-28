@@ -7814,6 +7814,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9200,6 +9284,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16602,9 +16714,12 @@ work sits beside 4a's in <code>src/crates/vhdx/src/lib.rs</code>. Every brief al
   each at high effort.</li>
 <li><strong>4a.</strong> Converting the 131041M fixture to qcow2 takes about 61 s,
   inside the 300 s tool timeout, and it was kept. 324 <code>test_measure</code>
-  skips are "no baseline meta": instar-testdata's 10.0.0 measure
-  profile is missing those files. The skip depends only on the file
-  existing, not on this change. The agent once ran its mutants at the
+  skips are "no baseline meta". The skip depends only on the baseline
+  file existing, not on this change. (Corrected by phase 5's
+  management session: this note first blamed a missing 10.0.0 measure
+  profile, but every version holds the same files. The cause is
+  fixtures with no measure baseline at any version, #845.) The agent
+  once ran its mutants at the
   same time as <code>make test-rust</code>, which compiled a mutant into the test
   build. It reran cleanly, and the later briefs forbade running the
   two together.</li>
@@ -16635,8 +16750,8 @@ work sits beside 4a's in <code>src/crates/vhdx/src/lib.rs</code>. Every brief al
   flat VMDK, and each failed with "convert operation failed" or
   "write to output device failed". Replayed alone (<code>--concurrency
   1</code>), all 12 pass (Ran: 12, 0 failed), so they are host contention,
-  not this change. Of the 414 skips, 324 are the instar-testdata
-  measure-profile gap noted under 4a. Most of the other 90 are
+  not this change. Of the 414 skips, 324 are the missing measure
+  baselines noted under 4a (#845). Most of the other 90 are
   existing, documented skips: known writer and scanner divergences,
   "qemu-img cannot resize", raw has no check, and missing libvhdi
   tools or ZSTD support. So the definition of done's "only

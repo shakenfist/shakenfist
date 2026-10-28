@@ -8030,6 +8030,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9416,6 +9500,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16487,6 +16599,11 @@ what you use into the same virtual environment as Kerbside:</p>
 <td>The API answers 500 to login and logs the import failure.</td>
 </tr>
 <tr>
+<td>A <code>proxmox</code> source</td>
+<td>Nothing: it uses <code>requests</code>, which Kerbside already needs</td>
+<td></td>
+</tr>
+<tr>
 <td>Only <code>static</code> sources</td>
 <td>Nothing</td>
 <td></td>
@@ -16552,7 +16669,7 @@ viewer refuses the connection and the error does not explain itself.</p>
 <p><strong>A console source.</strong> Kerbside proxies consoles it has discovered, so
 it needs at least one source in the file named by <code>SOURCES_PATH</code>,
 conventionally <code>/etc/kerbside/sources.yaml</code>. The drivers are Shaken
-Fist, oVirt, OpenStack, and <code>static</code> for fixed targets — see
+Fist, oVirt, OpenStack, Proxmox VE, and <code>static</code> for fixed targets — see
 <a href="/components/kerbside/console-sources/">console-sources.md</a>.</p>
 <p><strong>The minimum configuration set.</strong> Configuration is an INI file at
 <code>/etc/kerbside/kerbside.ini</code>; that path is hardcoded, and environment

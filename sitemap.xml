@@ -741,6 +741,10 @@
          <lastmod>2026-10-28</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-bat-population-phase-05-geometry/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bat-population/</loc>
          <lastmod>2026-10-28</lastmod>
     </url>
@@ -1665,6 +1669,18 @@
          <lastmod>2026-10-28</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/performance/transcoding-measurements/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/performance/transcoding-spike/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/performance/transcoding-switching/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/kerbside/plans/</loc>
          <lastmod>2026-10-28</lastmod>
     </url>
@@ -1790,6 +1806,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/</loc>
          <lastmod>2026-10-28</lastmod>
     </url>
     <url>

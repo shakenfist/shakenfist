@@ -8074,6 +8074,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9460,6 +9544,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -18871,7 +18983,7 @@ deliberately broken emitter is not guarding what its name says it
 guards. See the VHD and VHDX notes in
 <a href="/components/instar/chain-config/#format-specific-notes">chain-config.md</a> for the
 composing path being guarded.</p>
-<p>There are <strong>126 cases</strong>, in ten groups.</p>
+<p>There are <strong>130 cases</strong>, in eleven groups.</p>
 <p>Twenty-seven cover the writer. Fifteen mutate a library crate
 (<code>create</code>, <code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip
 test; twelve are caught by a Python integration test through the real
@@ -19083,7 +19195,7 @@ writing a data device unmarked, and passing an info operation's flags
 through with the mark intact. Both are caught by a <code>vmm</code> unit test that
 reads the host's config back as the guest's own type and checks it
 against the same rule.</p>
-<p>The last group is <strong>8 data-file entry cases</strong>, guarding the fix for
+<p>Then <strong>8 data-file entry cases</strong>, guarding the fix for
 issue #803. qemu applies two rules to the L2 entries of an image with
 an external data file, after an entry has classified as valid: a
 compressed entry is refused, and so is a host cluster offset that is
@@ -19100,6 +19212,28 @@ classic <code>measure</code> walk and the extended <code>map</code> walk, caught
 test of the metadata walkers. The last two are the host's half: the
 <code>vmm</code> decoder no longer captures the refusal, or the run loops no longer
 see it, and the reason falls back to the generic failure text.</p>
+<p>The last group is <strong>4 partial-last-block cases</strong>, guarding how <code>check</code>
+sizes a VHDX's partial last block (#797) and how many BAT entries a
+VHDX without a parent has (#626). When the virtual size is not a
+multiple of the block size, the last payload block holds only the
+remainder, and qemu allocates a fixed image's partial last block only
+that far. <code>check</code> bounds that block by its short length against the
+end of the file, but tests it against the declared regions as a whole
+block, because its slot is still a whole block and a dynamic grow
+makes the block whole in place. One case clamps the block to the
+whole block size, which calls qemu's own fixed image truncated. One
+takes the length from the BAT index instead of the payload index;
+the two agree inside the first chunk only, so it is caught by the
+image whose partial block lies past the first chunk, which the host
+<code>qemu-img</code> writes at test time. One sizes the overlap test by the
+short length, caught by a copy of the 17 MiB fixture whose region
+tables declare a region in the unused tail of the slot. These three
+run through the real binary and are caught by <code>TestVhdxFixedReads</code>
+in <code>tests/test_vhdx_fixed_fixtures.py</code>. The fourth counts
+<code>n + n / chunk_ratio</code> entries for <code>n</code> payload blocks instead of
+<code>n + (n - 1) / chunk_ratio</code>, one too many whenever the blocks exactly
+fill their last chunk, and is caught by the <code>vhdx</code> crate's test at
+each group edge.</p>
 <p>Most of the reader cases name a test in the <code>qcow2</code> crate and run it
 with the full input-format feature list, because the
 arms are behind <code>vhd-input</code> and <code>vhdx-input</code> and a run without those

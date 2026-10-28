@@ -8063,6 +8063,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9449,6 +9533,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16532,7 +16644,7 @@ file, so it always needs <code>SIZE</code>.</p>
 <td>vhdx</td>
 <td>dynamic</td>
 <td>Yes</td>
-<td>info-equivalent (modulo default block_size when unspecified)</td>
+<td>info-equivalent</td>
 </tr>
 </tbody>
 </table>
@@ -16689,7 +16801,22 @@ length as both <code>metadata_bytes_written</code> and <code>file_size_after</co
 - <code>force_size</code></p>
 <h3 id="vhdx">vhdx<a class="headerlink" href="#vhdx" title="Permanent link">&para;</a></h3>
 <p>Honoured:
-- <code>size</code>, <code>block_size</code> (1 MiB..256 MiB power of two)
+- <code>size</code>, at most 64 TiB (70368744177664 bytes), the largest VHDX
+  qemu-img creates. A larger size is refused before the output file is
+  opened, so nothing is left behind (qemu-img leaves an empty file):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>$ instar create -f vhdx big.vhdx 65T
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Error: "create: virtual size 71468255805440 exceeds the VHDX maximum of 64 TiB (70368744177664 bytes)"
+</code></pre></div>
+<p>A size taken from a backing file is checked in the guest and refused
+  with <code>backing file's virtual size exceeds the VHDX maximum of 64 TiB</code>.
+  A size that is not a multiple of 512 is rounded up to one, as qemu-img
+  does, because <code>VirtualDiskSize</code> must be a multiple of the logical
+  sector size: <code>1073741825</code> records <code>1073742336</code>, and the <code>Created:</code>
+  line reports the recorded size.
+- <code>block_size</code> (1 MiB..256 MiB power of two). Unset, it is qemu-img's
+  default for the size: 8 MiB up to 1 GiB, 16 MiB up to 100 GiB, 32 MiB
+  up to 32 TiB, then 64 MiB. The <code>Created:</code> line's <code>unit_size</code> reports
+  the block size the image records.
 - <code>preallocation</code> (off|falloc|full; <code>falloc</code> and <code>full</code> are no-ops, <code>metadata</code> is refused)
 - <code>backing_file</code>, <code>backing_fmt</code> — a VHDX child with a parent sets the
   <code>HasParent</code> file-parameter bit and writes a populated parent
@@ -16820,8 +16947,8 @@ both covered in full in the "VHD/VHDX differencing" section of
   <code>ERROR_PARENT_NAME_TOO_LONG</code>.</li>
 </ul>
 <p>A <strong>differencing VHD or VHDX is refused as a backing file</strong>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>create failed: backing file is a differencing VHD or VHDX; create does
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>not support stacking a backing file on one
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>create failed: backing file is a differencing VHD or VHDX; create does
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>not support stacking a backing file on one
 </code></pre></div>
 <p>This has its own error code (<code>ERROR_BACKING_DIFFERENCING</code>) rather than
 the generic <code>ERROR_BACKING_PARSE_FAILED</code>, because the backing header
@@ -16893,10 +17020,10 @@ in <code>block/file-posix.c</code>), and instar refuses it too, with
 the newly appended region (see <a href="/components/instar/format-coverage/">format-coverage.md</a>).</p>
 <h2 id="known-divergences-from-qemu-img-create">Known divergences from <code>qemu-img create</code><a class="headerlink" href="#known-divergences-from-qemu-img-create" title="Permanent link">&para;</a></h2>
 <p>The cross-version baseline matrix passes for the bulk of supported
-options, but five categories of writer divergence are documented and
+options, but four categories of writer divergence are documented and
 tracked as future work. The canonical list (with per-case rationale)
-for the first four is <code>KNOWN_WRITER_DIVERGENCES</code> in
-<code>tests/test_create.py</code>; the fifth has no entry there because there is
+for the first three is <code>KNOWN_WRITER_DIVERGENCES</code> in
+<code>tests/test_create.py</code>; the fourth has no entry there because there is
 no baseline to skip — qemu-img cannot produce the output at all.</p>
 <ul>
 <li><strong>VHD <code>virtual_size</code></strong>: qemu-img rounds up to the next CHS-aligned
@@ -16910,10 +17037,6 @@ no baseline to skip — qemu-img cannot produce the output at all.</p>
   encoder when zstd is requested. The cluster data itself is empty in
   a fresh image so the field-only divergence has no functional
   impact, but <code>qemu-img info</code> reports the discrepancy.</li>
-<li><strong>vhdx default <code>block_size</code></strong>: at virtual sizes ≤ 1 GiB instar
-  defaults to 8 MiB; qemu-img always defaults to 32 MiB. Pass
-  <code>-o block_size=...</code> (or <code>--block-size</code>) explicitly to match.
-  Explicit block sizes round-trip cleanly.</li>
 <li><strong>vpc / vhdx differencing children</strong>: instar can create a
   differencing VHD or VHDX (<code>-b</code> with <code>-f vpc</code> / <code>-f vhdx</code>); qemu-img
   refuses to create either ("Backing file not supported for file
@@ -16932,8 +17055,6 @@ through <code>instar check</code> and match <code>qemu-img</code> (instar #365).
 <li>qcow2 <code>compat=0.10</code> honouring.</li>
 <li>zstd-aware qcow2 create (drop the accept-ignore; emit the zstd
   header bit).</li>
-<li>vhdx default <code>block_size</code> matching qemu's 32 MiB at all virtual
-  sizes.</li>
 <li>The split VMDK subformats (<code>twoGbMaxExtentSparse</code>,
   <code>twoGbMaxExtentFlat</code>).</li>
 <li>qemu's DDB lines (<code>ddb.virtualHWVersion</code>, <code>ddb.geometry.*</code>,
@@ -16959,35 +17080,40 @@ through <code>instar check</code> and match <code>qemu-img</code> (instar #365).
 applied during JSON comparison, see <code>tests/helpers/info_json.py</code>.</p>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Create a 1 GiB qcow2 with default options:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar create -f qcow2 disk.qcow2 1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar create -f qcow2 disk.qcow2 1G
 </code></pre></div>
 <p>Same but with a 4 KiB cluster size and extended L2:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar create -f qcow2 -o cluster_size=4k,extended_l2=on disk.qcow2 1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar create -f qcow2 -o cluster_size=4k,extended_l2=on disk.qcow2 1G
 </code></pre></div>
 <p>Create a vmdk with the stream-optimised subformat:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar create -f vmdk -o subformat=streamOptimized disk.vmdk 1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar create -f vmdk -o subformat=streamOptimized disk.vmdk 1G
 </code></pre></div>
 <p>Create a 16 MiB fixed VHD (footer-only metadata at end of file):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar create -f vpc -o subformat=fixed disk.vhd 16M
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar create -f vpc -o subformat=fixed disk.vhd 16M
 </code></pre></div>
-<p>Create a vhdx with an explicit 32 MiB block size (matches qemu-img's
-default and avoids the <code>vhdx</code> default-block-size divergence):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar create -f vhdx -o block_size=32M disk.vhdx 1G
+<p>Create a 1 GiB vhdx. With no <code>block_size</code> it gets qemu-img's default
+for the size, 8 MiB here; the default rises to 16 MiB above 1 GiB,
+32 MiB above 100 GiB and 64 MiB above 32 TiB (see
+<a href="/components/instar/quirks/#vhdx-default-block_size-scales-with-the-size-as-qemu-imgs-does">quirks.md</a>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar create -f vhdx disk.vhdx 1G
+</code></pre></div>
+<p>Create a vhdx with an explicit 32 MiB block size:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>instar create -f vhdx -o block_size=32M disk.vhdx 1G
 </code></pre></div>
 <p>Create a qcow2 child image with a backing reference (virtual_size
 defaults from the parent):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar create -f qcow2 -b parent.qcow2 -F qcow2 child.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>instar create -f qcow2 -b parent.qcow2 -F qcow2 child.qcow2
 </code></pre></div>
 <p>Create a differencing VHD child (the parent's identity is read off the
 parent and the virtual size defaults from it):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>instar create -f vpc -b parent.vhd -F vpc child.vhd
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>instar create -f vpc -b parent.vhd -F vpc child.vhd
 </code></pre></div>
 <p>Create a raw image with <code>falloc</code> preallocation (reserves blocks
 without writing them):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>instar create -f raw --preallocation falloc disk.raw 1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>instar create -f raw --preallocation falloc disk.raw 1G
 </code></pre></div>
 <p>JSON output for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>instar create -f qcow2 --output json disk.qcow2 1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>instar create -f qcow2 --output json disk.qcow2 1G
 </code></pre></div>
 
 

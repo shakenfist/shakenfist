@@ -7736,6 +7736,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#values-fit-their-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Values fit their columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#live-termination" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8173,6 +8184,90 @@
     
   
     Streaming and the qemu damage series on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
   
 
     
@@ -9572,6 +9667,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16536,6 +16659,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#values-fit-their-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Values fit their columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#live-termination" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -17178,11 +17312,60 @@ the first draw after a key press is almost always an activity frame,
 so <code>keydraw-latency.py</code> pairs each press with the first draw that
 touches the guest's key box instead. That needs a <code>rect</code> field on
 <code>surface_drawn</code> which the control socket protocol does not have yet;
-<code>build-ryll.sh</code> patches it in. What the rig has measured, and how to
-rerun it, is in
+<code>build-ryll.sh</code> patches it in, and builds ryll at a fixed commit
+(<code>RYLL_REF</code>, default 0d140b3) because the patch no longer applies to ryll
+develop. What the rig has measured, and how to rerun it, is in
 <a href="/components/kerbside/performance/proxy-backpressure/">performance/proxy-backpressure.md</a>,
 <a href="/components/kerbside/performance/streaming-rebaseline/">performance/streaming-rebaseline.md</a>
-and <a href="/components/kerbside/performance/ack-window/">performance/ack-window.md</a>.</p>
+and <a href="/components/kerbside/performance/ack-window/">performance/ack-window.md</a>. The header
+of <code>run-matrix.sh</code> documents every variable.</p>
+<p>Beyond latency, the rig can measure the
+<a href="/components/kerbside/proxy-architecture/#transcoding-the-display-channel-experimental">transcoding display channel</a>
+against the relay:</p>
+<ul>
+<li><strong>Proxy flags per config.</strong> A <code>CONFIGS</code> entry takes two optional
+  fields after its socket settings, <code>name:lowat:rcvbuf:flags:displays</code>.
+  <code>flags</code> are extra proxy flags separated by commas, each <code>--flag</code> or
+  <code>--flag=value</code>; <code>displays</code> limits the config to the named <code>DISPLAYS</code>
+  entries. For example, with <code>DISPLAYS</code> naming <code>off</code> and <code>all</code>
+  displays, <code>tx:0:0:--transcode-display:off</code> runs the transcoder only
+  with streaming off, since it never streams whatever qemu allows. The
+  proxy must be built with
+  <code>make -C rust/kerbside-proxy release FEATURES=transcode</code>.</li>
+<li><strong>CPU and memory.</strong> Every case samples the proxy's and qemu's CPU
+  time and RSS from <code>/proc</code> into <code>proc.txt</code>, every 0.5 s. <code>summarise.py</code>
+  reports cores used over the key presses, mean and peak RSS, and a
+  transcoded channel's pixmap cache peak from the proxy's log.</li>
+<li><strong>Image quality.</strong> <code>QUALITY=1</code> adds screenshots, taken through
+  Ryll's control socket <code>screenshot</code> verb, which returns a lossless PNG
+  of what the client holds. Once every latency sample is taken,
+  <code>capture-quality.py</code> saves <code>mid.png</code> while the guest's activity still
+  runs, then presses F12. The keydraw guest (<code>kd.frames</code>, rebuilt with
+  <code>build-guest.sh</code>) then draws its final activity frame and stops. Frame
+  n is a function of n alone, so that picture is the same in every run.
+  After <code>QUALITY_SETTLE_MIN</code> seconds (default 2, longer than the
+  transcoder's 500 ms lossless delay) it waits for two identical
+  screenshots a second apart, with nothing unacknowledged on the
+  proxy's client sockets, and saves the last as <code>frozen.png</code>. An
+  activity that froze on its own before the last key press
+  (<code>QUALITY_FREEZE_FRAME</code>, default 36000 frames) marks the case
+  <code>froze-early</code>, and its latency samples are dropped.</li>
+<li><strong>Scoring.</strong> <code>quality.sh cases --reference REF.png WORKDIR</code> scores
+  every case's screenshots with <code>quality.py</code> and writes <code>quality.json</code>
+  beside them; <code>summarise.py</code> then adds a quality table. The reference
+  is the <code>frozen.png</code> of an unshaped (<code>PROFILES=0:0</code>), relayed case
+  with streaming off, where spice-server sends only lossless draws.
+  Take it twice and check with <code>cmp</code> that the two are byte-identical
+  before believing any comparison. <code>mid.png</code> is compared over the static
+  background only, which should match exactly; <code>frozen.png</code> over the
+  whole frame, by SSIM and PSNR. The guest's key box is left out,
+  because its colour depends on how many presses arrived.</li>
+<li><strong>The venv.</strong> <code>quality.py</code> needs numpy and Pillow, which nothing else
+  in Kerbside does, so <code>quality.sh</code> keeps them in a venv of their own at
+  <code>QUALITY_VENV</code> (default <code>${TMPDIR:-/tmp}/kerbside-shaped-link-venv</code>),
+  made on first use and safe to delete. <code>quality.sh test</code> runs
+  <code>test_quality.py</code>.</li>
+</ul>
 <h2 id="testing-the-spice-console-of-an-ovirt-vm">Testing the SPICE console of an oVirt VM<a class="headerlink" href="#testing-the-spice-console-of-an-ovirt-vm" title="Permanent link">&para;</a></h2>
 <p><code>tools/test-ovirt-console.py</code> is Kerbside's oVirt SPICE console probe.
 It connects to the oVirt engine API, finds the booted test VM (by
@@ -17250,8 +17433,20 @@ with the migrations, so the daemon's <code>kerbside</code> database is untouched
 It is skipped unless <code>KERBSIDE_TEST_SQL_URL</code> is set, and runs locally
 against any MariaDB the URL's user may create that database on:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">KERBSIDE_TEST_SQL_URL</span><span class="o">=</span>mysql://kerbside:kerbside@127.0.0.1/kerbside_locktest<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>-v<span class="w"> </span>kerbside.tests.functional.test_session_ticket_lock
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>-v<span class="w"> </span>kerbside.tests.functional.test_session_ticket_lock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span>kerbside.tests.functional.test_column_widths
 </code></pre></div>
+<h3 id="values-fit-their-columns">Values fit their columns<a class="headerlink" href="#values-fit-their-columns" title="Permanent link">&para;</a></h3>
+<p>SQLite ignores a <code>VARCHAR</code>'s length, so a value too long for its
+column passes every unit test and then fails on MariaDB with "Data
+too long", or is silently cut short without strict mode. The same
+script runs <code>kerbside/tests/functional/test_column_widths.py</code>, in the
+same database and the same way, which stores a console under the
+longest uuid the Proxmox VE driver produces (a nine digit vmid and an
+SMBIOS UUID, 46 characters), with a console token and an audit event
+for it, and a source with a 100 character username, and reads each
+back unchanged. <code>kerbside/tests/functional/sql_database.py</code> holds the
+setup both modules share.</p>
 <h3 id="live-termination">Live termination<a class="headerlink" href="#live-termination" title="Permanent link">&para;</a></h3>
 <p><code>verify-terminate-live.sh</code> (Rust leg only) runs on an isolated lane:
 it POSTs the REST terminate endpoint and asserts the in-flight

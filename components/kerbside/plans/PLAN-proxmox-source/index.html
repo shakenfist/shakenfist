@@ -7822,6 +7822,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9395,6 +9479,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16465,7 +16577,8 @@ because the reasoning is what later phases build on. Question
 <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport/">the phase 3b plan</a>
 (decision 1), and question 5 by
 <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/">the phase 1b plan</a>.
-Question 4 is open.</p>
+Question 4 is answered from source and awaits phase 5's
+proof.</p>
 <p><strong>1. Where does the CONNECT live — ryll or kerbside?</strong> Either
 <code>ConnectionConfig</code> grows an optional proxy, and
 <code>connect_channel</code> performs the CONNECT before the TLS wrap;
@@ -16518,7 +16631,12 @@ port stays in <code>secure_port</code>.</p>
 prototype deployment uses <code>PVEVMUser</code> on <code>/vms</code> plus
 <code>PVEAuditor</code> on <code>/</code>, with a <code>privsep=0</code> API token. That works;
 it is not proven minimal, and the same honesty the oVirt
-use-case page applies to <code>SuperUser</code> applies here.</p>
+use-case page applies to <code>SuperUser</code> applies here. <strong>Answered
+from PVE's source by
+<a href="/components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/">the phase 4 plan</a>
+(survey finding 7), not yet proven:</strong> <code>VM.Audit</code> and
+<code>VM.Console</code> on <code>/vms</code> cover every call the driver makes.
+Phase 5's lane proves it with a token holding only those.</p>
 <p><strong>5. Where does a CI lane get a node?</strong> <strong>Settled by phase
 1b.</strong> A composite action in <code>shakenfist/actions</code>,
 <code>deploy-proxmox-on-shakenfist</code>, builds a node inside the
@@ -16532,7 +16650,11 @@ PVE derives the node certificate from it, and every ticket
 carries both a <code>proxy</code> URL naming it and a <code>host-subject</code> to
 pin against. A node whose domain does not resolve for the
 broker hands out a proxy address that cannot be dialled and a
-subject that will not match. Any lane must give its node a
+subject that will not match. The dial half no longer applies to
+kerbside: <code>spiceproxy</code> takes a <code>proxy</code> parameter, and the
+driver passes the API host it already reaches
+(<a href="/components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/">phase 4</a>,
+survey finding 4). The subject half does. Any lane must give its node a
 resolvable domain rather than an invented one — which is a
 bug the private deployment hit, and fixed, before it worked.
 Phase 1b asserts at deploy time that <code>hostname -f</code>, the node
@@ -16774,7 +16896,7 @@ phase plan links are tracked under <em>Execution</em>.</p>
 </tr>
 <tr>
 <td>4. The source driver</td>
-<td><code>kerbside/sources/proxmox.py</code>: discovery over <code>/nodes/{node}/qemu</code>, console details over <code>spiceproxy</code>, CA and subject handling, and the direct <code>.vv</code> handler refusing Proxmox sources</td>
+<td><code>kerbside/sources/proxmox.py</code>: discovery over <code>/cluster/resources</code>, which names each VM's node in one call, minting over <code>spiceproxy</code>, CA and subject handling, and the direct <code>.vv</code> handler refusing Proxmox sources. Also the source's configuration reference in <code>console-sources.md</code>, since a source type is unusable without one</td>
 </tr>
 <tr>
 <td>5. CI lane</td>
@@ -16782,7 +16904,7 @@ phase plan links are tracked under <em>Execution</em>.</p>
 </tr>
 <tr>
 <td>6. Docs</td>
-<td>The use-case page PLAN-use-case-docs.md has been holding a row for, plus <code>console-sources.md</code></td>
+<td>The use-case page PLAN-use-case-docs.md has been holding a row for. <code>console-sources.md</code> gains its Proxmox section in phase 4</td>
 </tr>
 <tr>
 <td>7. Push audit</td>
@@ -16859,13 +16981,13 @@ and cited from phase 2's <em>Outcome</em>.</p>
 <tr>
 <td>3b. Tunnel transport</td>
 <td><a href="/components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport/">PLAN-proxmox-source-phase-03b-tunnel-transport.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>c435ea3</td>
 </tr>
 <tr>
 <td>4. The source driver</td>
-<td></td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/">PLAN-proxmox-source-phase-04-source-driver.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16903,12 +17025,15 @@ and cited from phase 2's <em>Outcome</em>.</p>
   is why a <code>Target</code> change couples the daemon and the binary.</li>
 </ul>
 <h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>In progress. Phases 1, 1b, 2 and 3a are complete: CI can
-build a Proxmox VE node on demand, ryll tunnels through
-<code>spiceproxy</code>, proven against a real node on every ryll pull
-request that touches the tunnel, and kerbside mints console
-tickets when a channel connects, one per session, which the
-oVirt source now uses. Phase 3b is in progress.</p>
+<p>In progress. Phases 1, 1b, 2, 3a and 3b are complete.
+- CI can build a Proxmox VE node on demand.
+- ryll tunnels through <code>spiceproxy</code>, proven against a real node
+  on every ryll pull request that touches the tunnel.
+- kerbside mints console tickets when a channel connects, one
+  per session, which the oVirt source now uses.
+- kerbside's proxy dials a minted tunnel over TLS only, proven
+  against a CONNECT proxy in the direct-qemu lane.</p>
+<p>Phase 4, the source driver, is in progress.</p>
 
 
 

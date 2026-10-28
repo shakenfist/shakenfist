@@ -8029,6 +8029,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9415,6 +9499,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -16508,6 +16620,14 @@ values are overridden by matching <code>-o</code> keys when both are specified.<
 <h3 id="vhdx">vhdx<a class="headerlink" href="#vhdx" title="Permanent link">&para;</a></h3>
 <p>Honoured:
 - <code>subformat</code> (dynamic), <code>block_size</code></p>
+<p>The virtual size is at most 64 TiB (70368744177664 bytes), the largest
+VHDX qemu-img creates. A larger <code>--size</code> is refused before the guest
+runs (<code>measure: virtual size N exceeds the VHDX maximum of 64 TiB
+(70368744177664 bytes)</code>). A larger source is read, and then refused with
+<code>measure failed: source virtual size exceeds the VHDX maximum of 64 TiB
+(70368744177664 bytes)</code> (<code>MeasureResult::ERROR_TOO_LARGE</code>), not as an
+unsupported source format. A size that is not a multiple of 512 is
+measured rounded up to one, as convert and create record it.</p>
 <p>Accepted but no size effect:
 - <code>log_size</code>, <code>block_state_zero</code></p>
 <p>Rejected (future work):

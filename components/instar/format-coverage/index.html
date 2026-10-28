@@ -8490,6 +8490,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-switching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching a display channel between relaying and transcoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The transcoding display channel on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/transcoding-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcoding the display channel: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9876,6 +9960,34 @@
     
   
     Proxmox source phase 3b: tunnel transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 4: the source driver
   
 
     
@@ -17948,8 +18060,8 @@ twoGbMaxExtent subformats.</p>
 <li><strong>VMDK / VHD / VHDX <code>resize</code> and VMDK <code>rebase</code> — instar-only</strong> — qemu-img
  refuses these on every shipped version ("Image format driver does not
  support resize / rebase"); instar performs them (monolithicSparse for
- vmdk, dynamic for vhdx). See the Resize and Rebase Format Support tables below. Measured
- 2026-07-20.</li>
+ vmdk, dynamic for vhdx). See the Resize and Rebase Format Support tables
+ below. Measured 2026-07-20.</li>
 <li><strong>VHD <code>check</code> — instar-only</strong> — instar runs full VHD footer/BAT validation
  (rc 0); qemu-img refuses <code>check</code> on vpc ("This image format does not
  support checks", exit 63). Measured 2026-07-20.</li>
@@ -18084,7 +18196,7 @@ above.</p>
 <tr>
 <td><strong>vhdx</strong></td>
 <td>Supported</td>
-<td>Dynamic VHDX, configurable block size (1MB-256MB via <code>--block-size</code>, default 32MB), CRC-32C checksums</td>
+<td>Dynamic VHDX, configurable block size (1MB-256MB via <code>--block-size</code>, default qemu-img's for the size: 8MB up to 1GB, 16MB up to 100GB, 32MB up to 32TB, then 64MB), CRC-32C checksums</td>
 </tr>
 </tbody>
 </table>
@@ -18436,7 +18548,7 @@ dense output. Per-format output support:</p>
 <td>vhdx</td>
 <td>Supported</td>
 <td><code>round_up(window, 512)</code></td>
-<td>Data/virtual-size identical; block-size metadata differs (instar 32 MiB, qemu 8 MiB for small images)</td>
+<td>Data/virtual-size identical; block size identical (qemu-img's default for the size)</td>
 </tr>
 </tbody>
 </table>
@@ -18445,8 +18557,7 @@ as <code>dd</code> input. <code>-O</code> defaults to <strong>raw</strong> (not 
 Window semantics: <code>bs</code> (default 512), <code>count</code> (clamps down;
 <code>count=0</code> ⇒ empty), <code>skip</code> (subtracts from front; skip-past-EOF
 ⇒ empty, exit 0). Output is always dense.</p>
-<p>Known divergences from <code>qemu-img dd</code>: vhdx default block size
-(data and virtual size still match); <code>count=0 -O vmdk</code> (qemu-img
+<p>Known divergences from <code>qemu-img dd</code>: <code>count=0 -O vmdk</code> (qemu-img
 itself exits 1); <code>count=0 -O vhdx</code> (instar's empty vhdx is
 rejected by <code>qemu-img info</code>). See <a href="/components/instar/dd/">docs/dd.md</a> for the
 full reference.</p>
@@ -19727,8 +19838,9 @@ qcow2-luks).</p>
 <p><strong>VHDX Input/Output Support</strong> - Convert supports VHDX as both input
     and output format. Input: dynamic VHDX (64-bit BAT with interleaved
     sector bitmap entries, GUID-based metadata, CRC-32C header/region
-    validation). Output: dynamic VHDX with 32 MiB blocks, 1MB-aligned
-    structures, and skip-zeros support.</p>
+    validation). Output: dynamic VHDX with qemu-img's default block
+    size for the size (8 MiB up to 1 GiB), 1MB-aligned structures, and
+    skip-zeros support.</p>
 </li>
 <li>
 <p><strong>VHDX Structural Integrity Check</strong> - Full validation in check
