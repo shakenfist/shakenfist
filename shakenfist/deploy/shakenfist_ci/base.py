@@ -644,6 +644,52 @@ class BaseTestCase(testtools.TestCase):
             '----------------------- end %s console -----------------------\n'
             % instance_uuid)
 
+    def _log_guest_diagnostics(self, instance_uuid):
+        """Log the guest's own view of its network and boot health.
+
+        The console tail rarely says why a guest is unreachable, but the
+        agent talks over vsock and so usually still answers when the guest
+        has no network at all. This is best effort: it must never replace
+        the failure being debugged, so agent failures are logged and
+        swallowed.
+        """
+        sys.stderr.write(
+            '----------------------- start %s guest diagnostics '
+            '-----------------------\n' % instance_uuid)
+        try:
+            _, data = self.system_client.await_agent_command(
+                instance_uuid,
+                'ip -4 addr; ip -4 route; systemctl --failed --no-legend; '
+                'ls -l /etc/ssh/ssh_host_*',
+                exit_codes=list(range(256)), ignore_stderr=True, timeout=60)
+            for line in data.split('\n'):
+                sys.stderr.write('Guest diagnostics: %s\n' % line)
+        except AGENT_OPERATION_FAILURES as e:
+            sys.stderr.write('Failed to gather guest diagnostics: %s\n' % e)
+        sys.stderr.write(
+            '----------------------- end %s guest diagnostics '
+            '-----------------------\n' % instance_uuid)
+
+    def _flush_guest_writes(self, instance_uuid):
+        """Flush the guest's page cache before a hard power event.
+
+        A hard reboot or power off is a pulled plug: whatever the guest has
+        not yet written back to its disk is lost, and Linux holds dirty
+        pages for about 30 seconds before writing them back. Tests make
+        these calls moments after first boot, when cloud-init has only just
+        written the guest's ssh host keys and network configuration, so
+        without this the guest came back with zero length host keys and no
+        network (issue 4407). Tests of SF's power plumbing should not depend
+        on the guest surviving that.
+        """
+        _, data = self.system_client.await_agent_command(
+            instance_uuid, 'sync && echo synced')
+        self.assertIn('synced', data)
+        self._emit_tracing_event({
+            'msg': 'Flushed guest writes',
+            'instance_uuid': instance_uuid
+        })
+
     def _log_instance_events(self, instance_uuid):
         # If we've failed, log all events and then raise an exception
         self._log_events(instance_uuid,
@@ -1665,6 +1711,9 @@ class BaseTestCase(testtools.TestCase):
 
         if failed:
             self._log_console(instance_uuid)
+            if expected:
+                # Only a guest expected to be up has an agent to ask.
+                self._log_guest_diagnostics(instance_uuid)
             self._log_instance_events(instance_uuid)
             self._log_netns()
             sys.stderr.write('Current time: '+time.ctime()+'\n')

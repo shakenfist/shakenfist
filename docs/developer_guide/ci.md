@@ -328,6 +328,28 @@ tests planned in
 need the marker too, to assert that a genuinely full cluster refuses
 rather than have the refusal waited away.
 
+## Hard power events in the functional suite
+
+A hard reboot (`reset()`) and a power off (`destroy()`) are both a pulled
+plug from the guest's point of view, and Linux holds dirty pages for about
+30 seconds before writing them back. Functional tests usually make these
+calls within seconds of the guest's first boot finishing, when cloud-init has
+only just written the ssh host keys and the rendered network configuration.
+A reset in that window brings the guest back with zero length host keys
+(`Failed to start ssh.service`), no network, and a two minute stall in
+`systemd-networkd-wait-online` -- issue 4407, which looked like under-cloud
+contention for weeks because the agent, talking over vsock, still came back.
+
+So a test which hard reboots or powers off a guest and then boots it again
+calls `self._flush_guest_writes()` (in `base.py`) first, which runs `sync` in
+the guest through the agent. The test is about Shaken Fist's power
+plumbing, not the guest's crash consistency. Tests which only assert that the
+instance went off, and never boot it again, do not need it.
+
+When a ping which was expected to succeed fails, `_test_ping()` also asks the
+agent for the guest's addresses, routes, failed units and ssh host key sizes,
+since the console tail rarely says why a guest is unreachable.
+
 ## Deploy profiles
 
 A cluster job can deploy more than the default stack without that change

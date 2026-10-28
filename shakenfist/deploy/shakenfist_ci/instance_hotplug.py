@@ -244,6 +244,7 @@ class InstanceHotplugTestsMixin:
 
         # Power instance off and then on again to force re-creation of the
         # config drive.
+        self._flush_guest_writes(inst['uuid'])
         self.test_client.power_off_instance(inst['uuid'])
         self._await_instance_not_ready(inst['uuid'])
         self._assert_power_state(inst['uuid'], 'off', 'after power off')
