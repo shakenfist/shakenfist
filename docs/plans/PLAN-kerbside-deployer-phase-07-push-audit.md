@@ -490,3 +490,235 @@ to get wrong:
   the blocking or advisory split decides whether a follow-up pull
   request exists at all, and in which repository. Both are easier to
   agree before filing than to unwind after.
+
+## Findings
+
+### Wave 1, this repository (7b)
+
+Run in this worktree on 2026-10-28 (UTC), at `$TIP` plus the two plan
+commits. Edited nothing; `git status --short` printed nothing afterwards.
+
+* `pre-commit run --all-files`: exit 0. All 16 hooks passed: Lint
+  GitHub Actions workflows, skillsaw, Lint Ansible playbooks, Test the
+  internal_ca role, Test the Kerbside cluster config, Test the Kerbside
+  wiring, flake8, unit tests, from_db_by_ref namespace scoping,
+  endpoints authenticate by default, API parameter locations,
+  documentation links and anchors, no plan phase numbers in docs,
+  signal handlers, plan statuses, mypy.
+* `tox`: exit 0. `py3` OK, `flake8` OK, `cover` OK. stestr ran 6336
+  tests in both `py3` and `cover`: 6181 passed, 155 skipped, 0 failed.
+* `tools/mermaid-lint.sh`: `$?` printed `0` directly after the call. It
+  rendered `ARCHITECTURE.md` and `docs/developer_guide/state_machine.md`
+  (`ok` for each).
+* genprotos: not run. `for s in <six>; do git diff --name-only $s^1 $s |
+  grep protos; done` printed nothing, so no range touches
+  `shakenfist/protos/`.
+
+The per-range commands, run once per range with `<sha>^1 <sha>` for
+`$RANGE`, were the four wave 1 style greps (lines over 120 characters,
+`print(`, `etcd`, untagged `mariadb.get_all_*(`), the five wave 2 sweep
+commands (TODO/FIXME/HACK/XXX, `# noqa`/`# type: ignore`/`pragma: no
+cover`, `--stat`, `def test_` count, docs name-only, `subprocess.`/
+`os.system`/`shell=True`), and the two ansible greps from the 7b brief
+(TODO in yml/yaml/j2/sh, and `shell:`/`command:` in yml/yaml/j2). Every
+command printed "no output" except those listed below; the `--stat`,
+`def test_` and docs listings always print and are given for each range.
+
+#### `12441652b` (#4430)
+
+* `--stat`: 17 files changed, 1493 insertions(+), 99 deletions(-).
+  `def test_`: 0. Docs touched: `docs/developer_guide/standards.md`,
+  `docs/release_notes/v07-v08.md`, the collection README, and the plan
+  files.
+* `shell|command:` in yml/yaml/j2:
+  ```
+  336:+  ansible.builtin.command:
+  393:+      ansible.builtin.command:
+  ```
+
+#### `80292df08` (#4442)
+
+* `--stat`: 23 files changed, 1794 insertions(+), 73 deletions(-).
+  `def test_`: 6. Docs touched: `standards.md`, `installation.md`,
+  `vdi_console_tokens.md`, `v07-v08.md`, the collection README, and the
+  plan files.
+* `shell|command:` in yml/yaml/j2:
+  ```
+  362:+  ansible.builtin.command: "{{ sf_ctl_path }} ensure-kerbside-signing-key"
+  372:+  ansible.builtin.command: "{{ sf_ctl_path }} bootstrap-system-key --key-from-stdin kerbside"
+  449:+      ansible.builtin.command: "{{ sf_ctl_path }} show-config"
+  ```
+
+#### `b85005f0e` (#4465)
+
+* `--stat`: 32 files changed, 4735 insertions(+), 95 deletions(-).
+  `def test_`: 7. Docs touched: `standards.md`, `installation.md`,
+  `vdi_console_tokens.md`, `v07-v08.md`, the collection README, and the
+  plan files.
+* `print(` in py: `349:+    print(json.dumps(out))` (the
+  `kerbside-ready.py` helper, whose JSON on stdout is the interface the
+  role parses; see 7c for the same line in Kerbside).
+* `shell|command:` in yml/yaml/j2:
+  ```
+  860:+    shell: /usr/sbin/nologin
+  876:+  ansible.builtin.command: python3 -m venv {{ kerbside_venv | quote }}
+  881:+  ansible.builtin.command: "{{ kerbside_venv }}/bin/pip install -U pip uv"
+  895:+  ansible.builtin.shell: >-
+  938:+  ansible.builtin.command: >-
+  949:+  ansible.builtin.shell:
+  1062:+  ansible.builtin.command:
+  1191:+      ansible.builtin.command:
+  1300:+  ansible.builtin.command: date +%s.%N
+  1352:+  ansible.builtin.command:
+  1460:+  ansible.builtin.command:
+  ```
+
+#### `0016c5dad` (#4479)
+
+* `--stat`: 24 files changed, 2323 insertions(+), 171 deletions(-).
+  `def test_`: 17. Docs touched: `docs/developer_guide/ci.md`,
+  `installation.md`, `v07-v08.md`, the collection README, and the plan
+  files.
+* `subprocess.` in py: `1266:+        subprocess.check_call([` (in
+  `tools/build-collection.py`).
+
+#### `48849831c` (#4591)
+
+* `--stat`: 42 files changed, 3377 insertions(+), 3611 deletions(-).
+  `def test_`: 1. Docs touched: `ci.md`, `standards.md`,
+  `installation.md`, `vdi_console_tokens.md`, `v07-v08.md`, the
+  collection README, and the plan files.
+* Every grep printed no output.
+
+#### `54fed79bcf` (#4616)
+
+* `--stat`: 11 files changed, 1170 insertions(+), 35 deletions(-).
+  `def test_`: 0. Docs touched: `ARCHITECTURE.md`, `installation.md`,
+  `kerbside.md`, `vdi_console_tokens.md`, `v07-v08.md`, the collection
+  README, and the plan files.
+* Every grep printed no output.
+
+### Wave 1, Kerbside and actions (7c)
+
+Run on 2026-10-28 (UTC) in the two main clones, each clean on its
+default branch before and after; `git status --short` printed nothing
+in both at the end. actions was fast-forwarded from `bf3c4ce` to
+`$ATIP` (one file, `.github/workflows/renovate.yml`). Kerbside's `HEAD`
+and `origin/develop` were both `$KTIP`. Kerbside's runbook has no rule
+for a plan-audit range; `AUDIT_RANGE="<sha>^1..<sha>"` was substituted
+anyway. Its `wave1.sh` exits at its first fatal check.
+
+**Kerbside, whole tree.** `pre-commit run --all-files`: exit 0, all 13
+hooks passed (workflow lint, shellcheck, skillsaw, no source
+line-number references in docs, whitespace, end of file, yaml, merge
+conflicts, large files, flake8, unit tests, ansible collection lint,
+ansible role test). `tools/audit/wave1.sh` with its default range and
+tox: exit 0; `tox -eflake8` OK; `tox -epy3` OK, 571 run, 571 passed, 0
+failed, 0 skipped; wave 1b printed PASS for raw print, bare except and
+mechanical.
+
+#### Kerbside `2093f2ed5` (kerbside#580)
+
+* `wave1.sh` with `AUDIT_SKIP_TOX=1`: exit 3.
+  ```
+  FAIL: raw print() added in non-test source:
+  +    print(json.dumps(out))
+  ```
+  The line is `ansible/roles/kerbside/files/kerbside-ready.py:69`, whose
+  JSON on stdout is parsed by the role; none of the four helper scripts
+  carries the `audit-allow-print` marker the script honours. Because
+  the script stopped there, its bare-except check was run by hand by
+  the management session: `git diff 2093f2ed5^1 2093f2ed5 -- '*.py'
+  ':!*/tests/*' | grep -nE '^\+[[:space:]]*except[[:space:]]*:'`
+  printed nothing. Recorded as finding W1 (disposition below).
+* `wave2-mechanical.sh`: TODO/FIXME none; `# noqa` none; new `test_`
+  functions 25 against 5 Python files changed; docs touched
+  `docs/index.md`, `docs/plans/index.md`; new broad `except Exception`
+  blocks at diff lines 64, 225, 561 and 607 (input to 7e and 7h); new
+  asserts none; dependency changes none; alembic revisions none.
+* TODO in yml/yaml/j2/sh: no output.
+* `shell|command:` in yml/yaml/j2:
+  ```
+  901:+    shell: /usr/sbin/nologin
+  917:+  ansible.builtin.command: python3 -m venv {{ kerbside_venv | quote }}
+  926:+  ansible.builtin.shell: >-
+  967:+  ansible.builtin.shell: >-
+  1013:+  ansible.builtin.command: >-
+  1024:+  ansible.builtin.shell:
+  1128:+  ansible.builtin.command:
+  1257:+      ansible.builtin.command:
+  1376:+  ansible.builtin.command: date +%s.%N
+  1428:+  ansible.builtin.command:
+  1549:+  ansible.builtin.command:
+  1676:+      ansible.builtin.command:
+  ```
+
+#### Kerbside `89f199456` (kerbside#587)
+
+* `wave1.sh`: exit 0, PASS on all three checks.
+* `wave2-mechanical.sh`: TODO none; `# noqa` none; new `test_` functions
+  0 against 2 Python files changed; docs touched `ARCHITECTURE.md`,
+  `docs/index.md`, `docs/testing.md`, `docs/use-cases/placement.md`,
+  `docs/use-cases/shakenfist.md`; broad excepts none; asserts none;
+  dependency changes none; alembic none.
+* TODO in yml/yaml/j2/sh and `shell|command:` greps: no output.
+
+#### Kerbside `ea44e9364` (kerbside#592)
+
+* `wave1.sh`: exit 0, PASS on all three checks.
+* `wave2-mechanical.sh`: TODO none; `# noqa` none; new `test_` 0 against
+  0 Python files; docs touched `docs/configuration.md`,
+  `docs/installation.md`, `docs/network-ports.md`,
+  `docs/use-cases/shakenfist.md`; broad excepts, asserts, dependency
+  and alembic changes none.
+
+**actions, whole tree.** `pre-commit run --all-files`: exit 0, all 11
+hooks passed (whitespace, end of file, merge conflicts, json, yaml,
+executable shebangs, workflow lint, shellcheck, skillsaw, flake8, unit
+tests). `python3 -m unittest discover -s tests -t .`: `Ran 787 tests`,
+OK. `tools/ansible-syntax-check.sh`: exit 0, 17 playbooks.
+`tools/gitleaks-scan.sh`: exit 1, `gitleaks not found`, since the binary
+is not installed on this host. The management session re-ran it with a
+wrapper that execs `ghcr.io/gitleaks/gitleaks:v8.21.2` in a container
+with the working directory and `/tmp` mounted at their own paths:
+positive control passed (both planted credentials reported), then
+`642 commits scanned`, `no leaks found`, exit 0.
+
+The per-range commands are actions' runbook's own: lines over 120
+characters in py; files over 800 lines among changed py/sh/yml;
+shellcheck over changed `*.sh` and `tools/run_remote`; removed
+top-level keys in `*/action.yml`; removed inputs in the four named
+reusable workflows; removed lines in `tools/ci-make-inventory.py`; new
+`secrets: inherit`; new `timeout-minutes` in actions; new `runs-on`;
+`REVIEWS.md` or `.vscode/` touched; TODO/FIXME; `# noqa`, `# type:
+ignore` or `shellcheck disable`; docs name-only.
+
+#### actions `17ea1889e` (actions#181)
+
+* shellcheck (binary resolved from the pre-commit cache):
+  ```
+  In tools/deploy-collection.sh line 67:
+  . /tmp/collection-venv/bin/activate
+    ^-- SC1091 (info): Not following: /tmp/collection-venv/bin/activate was not specified as input (see shellcheck -x).
+  ```
+* Docs touched: `docs/actions.md`, `docs/ci.md`, `docs/consuming.md`.
+* Every other grep printed no output.
+
+#### actions `31139125c` (actions#195)
+
+* Removed top-level keys in `*/action.yml` (the retired
+  `deploy-kerbside-on-shakenfist`):
+  ```
+  19:-  base_user:
+  23:-  primary:
+  26:-  system_key:
+  29:-  kerbside_public_fqdn:
+  37:-  token_duration:
+  41:-  kerbside_src:
+  44:-  proxy_wheel:
+  50:-  steps:
+  ```
+  Input to 7j's item 4.
+* Docs touched: `ARCHITECTURE.md`, `README.md`, `docs/actions.md`,
+  `docs/ci.md`.
+* Every other grep printed no output.
