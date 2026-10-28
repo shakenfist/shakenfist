@@ -1138,3 +1138,106 @@ that window: fixed since).
   cites the deleted `tools/sf-e2e/deploy-kerbside.sh`.
 * **S-1 (advisory).** `kerbside-slim-tier.yml.j2:68` cites the same
   deleted script (7e's A3).
+
+### Disposition (7k)
+
+Graded by the management session on 2026-10-28 (UTC) and presented to
+the operator before filing. Decision 9's duplicate searches were run
+in the owning repository with `gh issue list --state all --search` for:
+"trailing slash kerbside_url", "kerbside_system_key deploy key",
+"show-config redact numeric", "extra_config case",
+"ensure-kerbside-signing-key re-mint", "readiness wait signing keys",
+"dedicated Kerbside host lane", "scoped kerbside key", "api_url http
+kerbside", "kerbside_pki_dir collision", "redact_vv", "deploy profile
+schema copied", "renewal threshold test" (here);
+"ImmatureSignatureError", "invalid token signature iat", "sign-tag
+build-collection release", "audit-allow-print", "kerbside_pip_extra
+no_log", "deploy-kerbside.sh", "network-ports 5900 contend", "restart
+decision rootless", "sanity_checks nightly issue title" (Kerbside);
+"ci-deploy-profile.json", "ANSIBLE_COLLECTIONS_PATH static runner"
+(actions). None matched an existing issue; the hits were unrelated
+(#4095, #4096, #4460, kerbside#602, kerbside#284).
+
+| ID | Finding | From | Grade | Classification | Disposition |
+|----|---------|------|-------|----------------|-------------|
+| SF-1 | Trailing slash on `kerbside_url` passes validation, then every exchange is 401 (F3, L2) | 7i, 7h | **blocking** | finding at `$TIP` and `$KTIP`; the `rstrip` predates, the contract is this plan's | #4697, `automated-fix-attempted`; fixed in the follow-up pull request, which carries this phase's close-out |
+| SF-2 | Five plan references in code from #4479 (S4) | 7d, 7e, 7g | advisory | finding; a sixth fixed since by `f8d3736f1e` | fixed in the follow-up |
+| SF-3 | Stale citations: the deleted `deploy-kerbside.sh` in the CI profile, `config.py` line numbers in `kerbside_source.yml` | 7d, 7e, 7j | advisory | finding | fixed in the follow-up |
+| SF-4 | `kerbside.md:33`, `v07-v08.md:105` and the `functional-tests.yml:279` comment say merge queue; the master plan's success criterion (S2) | 7g, 7f | out of scope: #4653 | fixed in the follow-up; the criterion is rewritten in this pull request |
+| SF-5 | Collection README says the SPICE key is `0444` and #4416 open | 7d, 7g | out of scope: #4548 | fixed in the follow-up |
+| SF-6 | No page states the Kerbside 0.7.0 floor; `kerbside.md:158-160` `group_vars` wording | 7g | advisory | finding | fixed in the follow-up |
+| SF-7 | Scrape key is unscoped cluster admin; "no narrower key" stale (M1; S3 least-privilege) | 7h | advisory | finding at `$TIP`; the Kerbside database half predates | #4698; the doc sentence is fixed in the follow-up |
+| SF-8 | `http://` `api_url` allowed on a dedicated host; trust-store workaround unverified (M2) | 7h | advisory | finding at `$TIP` and `$KTIP` | #4699; the doc caveat in the follow-up |
+| SF-9 | Kerbside host's key never checked against the minted key (L1) | 7h | advisory | finding | #4700 |
+| SF-10a | Case-sensitive preflight guard, case-insensitive loader (L3) | 7h | advisory | finding | #4701 |
+| SF-10b | `SECRET_CONFIG_KEY_RE` is case-sensitive | 7h | predating | not a finding | #4702 |
+| SF-11 | Numeric secrets unredacted by `show-config` since #4442, logged by the deploy (L4) | 7h | advisory | finding | #4703 |
+| SF-12 | `ensure_signing_key` mints over the set on a swallowed read failure (F4) | 7i | advisory | finding | #4704 |
+| SF-13 | No lane deploys a dedicated Kerbside host or bring-your-own (F6; S3 multi-host) | 7i, 7f | advisory | finding | #4705 |
+| SF-14 | Exchange test keeps no diagnostics on a 401 (F7); direct `.vv` attached with its password (I4) | 7i, 7h | advisory | finding; the `.vv` behaviour predates #4479 | #4706; the redaction is fixed in the follow-up |
+| SF-15 | Copied contracts: ports twice, length floors, profile schema both ways, renewal threshold unpinned, `redeploy_check` unasserted (F8, F9, A11) | 7i, 7e, 7f | advisory | finding | #4707 |
+| SF-16 | `site.yml` structure: role defaults copied across the boundary, SAN choice, Jinja evaluator, comment proportion, four scaffolding copies (A5 to A9) | 7e | advisory | finding | #4708 |
+| SF-17 | Guards: newlines, proxy subject equal to a hypervisor's, `kerbside_pki_dir` equal to the SPICE directory (I1 to I3) | 7h | advisory | finding | #4709 |
+| SF-18 | Signing-key rotation neither automated nor exercised (S3; seam 3a) | 7i | advisory | finding | #4710 |
+| K-1 | `BadSignature` catch-all swallows a future `iat`; fixtures carry none (F1) | 7i, 7f | predating | not a finding; true at `$KTIP` | kerbside#619; recorded on #4598 (S1) |
+| K-2 | Readiness wait proves a fetch, not a usable key set (F5) | 7i | advisory | finding at `$KTIP` | kerbside#620 |
+| K-3 | `release.yml` publishes to PyPI when the collection build fails (K-1 of 7j) | 7j | advisory | finding | kerbside#621 |
+| K-4 | Three stale documentation statements (K-2 of 7j; 7g items 4 and 5) | 7g, 7j | advisory | finding | kerbside#622 |
+| K-5 | `kerbside-ready.py` lacks the `audit-allow-print` marker (W1, A12) | 7c, 7e | advisory | finding | kerbside#623 |
+| K-6 | `kerbside_pip_extra` in shell without `no_log` (L5) | 7h | advisory | finding | kerbside#624 |
+| K-7 | Rootless role test skips the restart decision | 7f | advisory | finding | kerbside#625 |
+| K-8 | Nightly sanity failures filed under the wrong titles (O-1) | 7j | predating | outside the ranges | kerbside#626 |
+| A-1 | `ci-deploy-profile.json` written and read by nothing (P1) | 7e | predating | not a finding | actions#211 |
+| A-2 | Profile collections persist on static runners (I5) | 7h | advisory | finding at `$ATIP` | actions#212 |
+
+Declined in writing: P2, the empty `/etc/pki/CA` directory
+`distribute_certificates.yml` creates, predates the plan and is not a
+defect; it stays as recorded here. A10, the three host-subject
+renderers, is already #4097 item 6 and gets no new issue. A13 (type
+hints in wholly untyped modules outside the mypy rollout) and A14 (file
+sizes) are recorded in 7e and not filed: neither is a defect, and the
+A9 scaffolding cut in #4708 is the first step for both.
+
+The seeds: S1 (#4598) received the 7i reading as a comment and is not
+refiled. S2 is the master plan's success criterion, rewritten in this
+pull request to say where the integration runs, and recorded in 7f and
+7i; the move itself was #4653's decision and is not a finding. S3's
+three Future work entries now point at #4698, #4710 and #4705. S4 is
+SF-2.
+
+Because SF-1 is blocking, phase 7 and the plan stay In progress. The
+follow-up pull request, cut from `develop` in its own worktree, fixes
+#4697 with a wiring case, makes the twelve cheap corrections above
+(SF-2 to SF-6, the doc sentences of SF-7 and SF-8, and SF-14's
+redaction), records this phase's merge commit in the `Merged` column,
+and sets phase 7 and the plan to Complete.
+
+## Execution notes
+
+* 2026-10-28 (UTC). Back brief answered before any step: wave 1 may run
+  in the shared Kerbside and actions clones; the weekly lane is not
+  dispatched (decision 13 stands); this session may push and open the
+  pull request once the record is committed.
+* 7b and 7c ran in parallel rather than 7c after 7b as the step table
+  says: they run in different repositories, so pre-commit's stash cannot
+  cross between them, and the gate after both is what the plan wanted.
+* actions' `gitleaks-scan.sh` could not run because the binary is not
+  installed on this host; the management session re-ran it through the
+  `ghcr.io/gitleaks/gitleaks:v8.21.2` container with the working
+  directory and `/tmp` mounted at their own paths, and the positive
+  control fired before the clean scan.
+* 7e, 7h and 7i could not write their report files (the harness refused
+  the write); their hand-backs were saved to the session's scratch
+  directory by the management session, verbatim, before grading.
+* 7j corrected two premises in its brief: kerbside#579 was filed by the
+  nightly job through `app/github-actions`, not by hand, and the `33fl`
+  checkout on this host could be grepped (zero hits); only the
+  operator's cloud deployment repositories could not.
+* Two of 7d's, two of 7e's, three of 7g's, three of 7j's, two of 7h's
+  and two of 7i's claims were reproduced against the tree by the
+  management session before the reports were accepted; every one held.
+  One of 7g's was softened in the record: the release note's 0.6.0
+  passage is about the cleanup defect, so the gap is the unstated 0.7.0
+  floor, not advice to upgrade to 0.6.0.
+* Issues were filed on 2026-10-28 after the operator approved the graded
+  table and the blocking grade for SF-1, as the back brief required.
