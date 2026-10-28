@@ -1245,15 +1245,64 @@ field. Future work: drop the accept-ignore and emit the zstd
 header bit so a subsequent convert / write into the image can
 emit zstd-compressed clusters.
 
-### vhdx default `block_size` differs from qemu-img
+### vhdx default `block_size` scales with the size, as qemu-img's does
 
-At virtual sizes ≤ 1 GiB, `instar create -f vhdx` defaults to
-an 8 MiB block size; `qemu-img create -f vhdx` always defaults
-to 32 MiB. Specifying `-o block_size=...` (or `--block-size`)
-explicitly avoids the divergence — the matrix
-demonstrates clean round-trip for explicit block-size cases
-(`1G-block-16M`, `1G-block-32M`). Future work is to match
-qemu's 32 MiB default at all virtual sizes.
+With no `-o block_size` (or `--block-size`), `instar create -f vhdx`,
+`convert -O vhdx`, `dd -O vhdx` and `measure -O vhdx` choose the block
+size qemu-img does, from the virtual size rounded up to 512 bytes, each
+threshold a strict `>` (`vhdx_co_create`, qemu 7.0.0 `block/vhdx.c`):
+
+| Virtual size | Block size |
+|--------------|------------|
+| up to 1 GiB | 8 MiB |
+| above 1 GiB, up to 100 GiB | 16 MiB |
+| above 100 GiB, up to 32 TiB | 32 MiB |
+| above 32 TiB, up to the 64 TiB limit | 64 MiB |
+
+`tests/golden/qemu-create-pins.json` records each side of every threshold
+on all 80 pinned qemu-img builds (6.0.0 to 10.2.0), and every build
+agrees. instar used 32 MiB at every size until #645, so a VHDX it wrote
+then has larger blocks than qemu-img would give it below 100 GiB, and
+smaller ones above 32 TiB. Both are valid; only `qemu-img info`'s
+`cluster-size` shows the difference. `measure -O vhdx` of a source image
+chooses from the source's virtual size, as `convert` does.
+
+### A VHDX is at most 64 TiB, and its size is a multiple of 512
+
+qemu-img creates no VHDX larger than 64 TiB (70368744177664 bytes):
+`vhdx_co_create` (qemu 7.0.0, `block/vhdx.c`) refuses a larger size with
+"Image size too large; max of 64TB", a strict `>`, so 64 TiB itself is
+accepted. instar applies the same limit to every VHDX it writes, in
+`create`, `convert`, `dd`, `measure -O vhdx` and `resize`. Where the
+host knows the size it refuses with `<op>: virtual size N exceeds the
+VHDX maximum of 64 TiB (70368744177664 bytes)` before it opens or creates
+the output; a size learnt only in the guest (a `create -b` that takes
+its size from the parent, a source `measure` reads) is refused there,
+by the shared VHDX layout, before anything is written.
+
+The one difference is what a refusal leaves behind. qemu-img creates the
+output file before the VHDX driver checks the size, so a refused
+`create` leaves a zero-length file (measured with qemu-img 10.0.13, and
+with the 6.0.0 and 10.2.0 static builds); instar leaves nothing, whether
+the host refuses or, for `create -b`, the guest does. `convert` and `dd`
+also check the size in the guest, after the host has created the output,
+but from a size no larger than the one the host has already accepted, so
+that check refuses nothing from the command line; were it to, it would
+leave the empty output, as any convert the guest fails does (#849).
+
+The limit is a rule for creating an image, not for opening one: qemu
+does not check it on open, and nor do instar's readers. `info`, `check`
+and `measure -O qcow2` read a VHDX that claims more than 64 TiB, and
+`convert` to another format does not refuse one.
+
+qemu-img also rounds a requested size up to a multiple of 512
+(`vhdx_co_create_opts`, "Silently round up sizes"), because
+`VirtualDiskSize` must be a multiple of the logical sector size. instar
+does the same in `create` (`1073741825` records `1073742336`) and sizes
+`measure -O vhdx` from the rounded size, which is what `convert` and
+`dd` already declared. The thresholds of the limit and of qemu's
+default block size are all multiples of 512, so rounding never changes
+which side of one a size falls.
 
 ### VHD fixed subformat carries footer-only metadata
 
@@ -1285,9 +1334,10 @@ Same shortcut and rationale as `create`.
 `qemu-img: Image format driver does not support resize` on
 every qemu-img version from 6.0.0 through 10.2.0 (which the
 matrix exercises). instar resizes all three, except a fixed or a
-differencing VHDX, which it refuses too (see [resize.md](/components/instar/resize/)). The baselines record qemu's rejection verbatim, both as
-documentation of the cross-tool gap and as a tripwire for the
-day qemu adds support. The `TestResizeConsistency`
+differencing VHDX, which it refuses too (see
+[resize.md](/components/instar/resize/)). The baselines record qemu's rejection
+verbatim, both as documentation of the cross-tool gap and as a
+tripwire for the day qemu adds support. The `TestResizeConsistency`
 covers vmdk/vhd/vhdx via an `instar create → resize → info →
 check` round-trip rather than a cross-tool diff. If
 `vmdkinfo` / `vhdiinfo` (libyal) ever gain resize support,
@@ -4463,7 +4513,8 @@ the host resolves when it walks the chain for them; see
 
 **A child's block size is independent of its parent's, deliberately.**
 instar gives a differencing child the same defaults as any other new
-image — 2 MiB blocks for VHD, 32 MiB for VHDX — rather than inheriting
+image — 2 MiB blocks for VHD, and for VHDX qemu-img's default for the
+virtual size (8 MiB up to 1 GiB) — rather than inheriting
 the parent's, and for VHDX the chunk ratio can differ too. This is
 legal and it is what Hyper-V tolerates: composition resolves a read by
 *virtual offset*, not by block index, so the two images need only agree

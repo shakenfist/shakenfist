@@ -16,7 +16,7 @@ implement `measure` for these targets).
 info-equivalent modulo `refcount_bits` / `compat` / `zstd`
 hardcodes), vmdk monolithicSparse + streamOptimized, vpc
 dynamic + fixed (modulo CHS `virtual_size` rounding), vhdx
-dynamic (modulo default `block_size` when unspecified).
+dynamic.
 Backing-file references supported on qcow2, vmdk, vpc, vhdx
 (matches qemu-img's permission set). See
 [docs/create.md](/components/instar/create/) for the user reference and

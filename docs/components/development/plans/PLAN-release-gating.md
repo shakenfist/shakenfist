@@ -439,7 +439,7 @@ Out of scope, each for a stated reason:
 | 2. Shared `require-ci-success` and `check-dist` actions | Complete | actions 69d4589 (#182) |
 | 3. Template and fleet adoption | Complete | development f3f8472 (#294), 8d032a5 (#295), 10e3145 (#299), d668b98 (#300), 3e0ced1 (#304); actions 658d767 (#184), e1e2c85 (#185); client-python-ova 4a8eeed (#29), 3b40144 (#30), 4b1764d (#31); library-utilities 0940cbe (#74); divergulent 70ae4c3 (#132); occystrap e9e66d9 (#163); client-python-k3s 6d40cee (#154); clingwrap f4966df (#145); hunkydory b421cef (#103); agent-python 65a1778 (#155); client-python d789e0b (#432); kerbside d30ff34 (#582); shakenfist b3dc0c6 (#4597), 6a3f307 (#4581), 1ec1a6c (#4607); ryll d70ff4d (#591), 20e3cd4 (#599); instar a31e0d1 (#796); andris 288aba3 (#34) |
 | 4. Release-flow and merge-queue criteria | Complete | development e7a34fc (#328); ryll f8b99b3 (#623); occystrap 199f5b8 (#174) |
-| 5. Push audit | In progress | |
+| 5. Push audit | Complete | development ebcab8b (#337) |
 
 Phases run in order. Phase 2 lands in `shakenfist/actions` and
 phase 3 lands in the template and in fourteen other repositories, so
@@ -2352,6 +2352,28 @@ Started on 2026-10-28 (AEDT).
   `scripts/audit-check.py` gave the same status for all 66 checks as
   on `main`, and a probe of the added text for addresses, private
   hostnames, tokens and email addresses found nothing.
+* **Review of #337.** A second session answered the first automated
+  review (636006f) while this one waited; the operator then handed
+  #337 back. Rounds two and three took one and two fix items, all of
+  them wording in this record, so no fourth round was asked for. #337
+  merged as ebcab8b.
+* **Issues.** The operator read the pre-plan list and the management
+  session filed all six, the three security items first.
+* **Fixes.** Each finding's fix is listed under *Fixes* below. D1 was
+  fixed by opus at high effort and the rest by sonnet at medium,
+  except the template documentation, opus at medium. D1's change
+  kills 23 of 23 mutants, and every check gives the same status and
+  details for all fourteen release repositories before and after.
+  #339's own review found that invariant 11 read a write scope more
+  narrowly than the new gate rule did, and #339 aligns them.
+* **instar's tag ruleset.** R3 said instar's `RELEASE-SETUP.md` asks
+  for a tag ruleset; instar has no `RELEASE-SETUP.md`, and the step
+  is the release template's. With the operator's yes, instar now has
+  a "Restrict releases" tag ruleset (26021750), copied from ryll's
+  14655450 and read back identical.
+* **Order.** #339 changes `sign-release-tag.sh`, so andris, instar
+  and ryll fail invariant 14 from its merge until their resync pull
+  requests merge. Each is held on #339 in plan-blockers.
 
 #### Phase 5 results
 
@@ -2492,8 +2514,9 @@ request per repository (decision 5.5).
 * **R3. instar:** `docs/development.md:543` assumes a tag ruleset
   that instar does not have, and `CHANGELOG.md` has no entry for the
   new release process. The operator decides whether to create the
-  "Release tags" ruleset that `RELEASE-SETUP.md` step 3 asks for, a
-  settings change.
+  tag ruleset the release template's `RELEASE-SETUP.md` recommends, a
+  settings change. (Corrected: instar has no `RELEASE-SETUP.md` of its
+  own.)
 * **R4. ryll:** `fuzz.yml:300-302` and
   `tools/report-fuzz-failure.sh:377-379` cite the version-mismatch
   issue step that #591 removed;
@@ -2507,6 +2530,19 @@ request per repository (decision 5.5).
   that reason. client-python's `functional-tests.yml:161-163` also says
   `smoke-cluster.yml`'s key lacks the re-run guard, which `actions`
   added before #432 merged.
+
+**Fixes.**
+
+| Finding | Pull request |
+|---|---|
+| D1, D2, D3, D4 (template), D5, D6 | development#339 |
+| D4 (kerbside) | kerbside#628 |
+| X1 | actions#214, which also fixes actions#213 |
+| R1, and D3's resync | andris#53 |
+| R2 | divergulent#137 |
+| R3, and D3's resync | instar#847, and the tag ruleset above |
+| R4, and D3's resync | ryll#657 |
+| R5 | client-python#443, clingwrap#148 |
 
 **Fixed since.** client-python-ova#29's aggregators used
 `!cancelled()`, so a cancelled run skipped them into a pass; #31

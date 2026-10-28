@@ -445,11 +445,60 @@ the first draw after a key press is almost always an activity frame,
 so `keydraw-latency.py` pairs each press with the first draw that
 touches the guest's key box instead. That needs a `rect` field on
 `surface_drawn` which the control socket protocol does not have yet;
-`build-ryll.sh` patches it in. What the rig has measured, and how to
-rerun it, is in
+`build-ryll.sh` patches it in, and builds ryll at a fixed commit
+(`RYLL_REF`, default 0d140b3) because the patch no longer applies to ryll
+develop. What the rig has measured, and how to rerun it, is in
 [performance/proxy-backpressure.md](/components/kerbside/performance/proxy-backpressure/),
 [performance/streaming-rebaseline.md](/components/kerbside/performance/streaming-rebaseline/)
-and [performance/ack-window.md](/components/kerbside/performance/ack-window/).
+and [performance/ack-window.md](/components/kerbside/performance/ack-window/). The header
+of `run-matrix.sh` documents every variable.
+
+Beyond latency, the rig can measure the
+[transcoding display channel](/components/kerbside/proxy-architecture/#transcoding-the-display-channel-experimental)
+against the relay:
+
+- **Proxy flags per config.** A `CONFIGS` entry takes two optional
+  fields after its socket settings, `name:lowat:rcvbuf:flags:displays`.
+  `flags` are extra proxy flags separated by commas, each `--flag` or
+  `--flag=value`; `displays` limits the config to the named `DISPLAYS`
+  entries. For example, with `DISPLAYS` naming `off` and `all`
+  displays, `tx:0:0:--transcode-display:off` runs the transcoder only
+  with streaming off, since it never streams whatever qemu allows. The
+  proxy must be built with
+  `make -C rust/kerbside-proxy release FEATURES=transcode`.
+- **CPU and memory.** Every case samples the proxy's and qemu's CPU
+  time and RSS from `/proc` into `proc.txt`, every 0.5 s. `summarise.py`
+  reports cores used over the key presses, mean and peak RSS, and a
+  transcoded channel's pixmap cache peak from the proxy's log.
+- **Image quality.** `QUALITY=1` adds screenshots, taken through
+  Ryll's control socket `screenshot` verb, which returns a lossless PNG
+  of what the client holds. Once every latency sample is taken,
+  `capture-quality.py` saves `mid.png` while the guest's activity still
+  runs, then presses F12. The keydraw guest (`kd.frames`, rebuilt with
+  `build-guest.sh`) then draws its final activity frame and stops. Frame
+  n is a function of n alone, so that picture is the same in every run.
+  After `QUALITY_SETTLE_MIN` seconds (default 2, longer than the
+  transcoder's 500 ms lossless delay) it waits for two identical
+  screenshots a second apart, with nothing unacknowledged on the
+  proxy's client sockets, and saves the last as `frozen.png`. An
+  activity that froze on its own before the last key press
+  (`QUALITY_FREEZE_FRAME`, default 36000 frames) marks the case
+  `froze-early`, and its latency samples are dropped.
+- **Scoring.** `quality.sh cases --reference REF.png WORKDIR` scores
+  every case's screenshots with `quality.py` and writes `quality.json`
+  beside them; `summarise.py` then adds a quality table. The reference
+  is the `frozen.png` of an unshaped (`PROFILES=0:0`), relayed case
+  with streaming off, where spice-server sends only lossless draws.
+  Take it twice and check with `cmp` that the two are byte-identical
+  before believing any comparison. `mid.png` is compared over the static
+  background only, which should match exactly; `frozen.png` over the
+  whole frame, by SSIM and PSNR. The guest's key box is left out,
+  because its colour depends on how many presses arrived.
+- **The venv.** `quality.py` needs numpy and Pillow, which nothing else
+  in Kerbside does, so `quality.sh` keeps them in a venv of their own at
+  `QUALITY_VENV` (default `${TMPDIR:-/tmp}/kerbside-shaped-link-venv`),
+  made on first use and safe to delete. `quality.sh test` runs
+  `test_quality.py`.
 
 ## Testing the SPICE console of an oVirt VM
 
@@ -530,8 +579,22 @@ against any MariaDB the URL's user may create that database on:
 
 ```bash
 KERBSIDE_TEST_SQL_URL=mysql://kerbside:kerbside@127.0.0.1/kerbside_locktest \
-    python -m unittest -v kerbside.tests.functional.test_session_ticket_lock
+    python -m unittest -v kerbside.tests.functional.test_session_ticket_lock \
+    kerbside.tests.functional.test_column_widths
 ```
+
+### Values fit their columns
+
+SQLite ignores a `VARCHAR`'s length, so a value too long for its
+column passes every unit test and then fails on MariaDB with "Data
+too long", or is silently cut short without strict mode. The same
+script runs `kerbside/tests/functional/test_column_widths.py`, in the
+same database and the same way, which stores a console under the
+longest uuid the Proxmox VE driver produces (a nine digit vmid and an
+SMBIOS UUID, 46 characters), with a console token and an audit event
+for it, and a source with a 100 character username, and reads each
+back unchanged. `kerbside/tests/functional/sql_database.py` holds the
+setup both modules share.
 
 ### Live termination
 

@@ -347,7 +347,7 @@ three.
 - [x] `tools/check-backend-tls-claims.py` passes, and no page
       under `docs/` says the backend leg always dials the
       hypervisor directly or always tries plaintext first.
-- [ ] The master plan's Execution table records this phase's
+- [x] The master plan's Execution table records this phase's
       merge commit, set by the next phase's close-out.
 
 ## Bugs fixed during this work
@@ -360,6 +360,12 @@ None yet.
   tunnel fields too: a proxy URI and port from the management
   plane flow into the dial unchecked, just as the address
   fields do.
+- The direct path still narrows `insecure_port` and
+  `secure_port` with `as u16` in `build_config` and
+  `connect_direct`, so 65536 becomes port 0. The tunnel path
+  refuses out-of-range ports. Review declined the direct path's
+  casts as predating this phase; they belong with #138's
+  connect-target validation.
 
 ## Execution notes
 

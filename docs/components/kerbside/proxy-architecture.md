@@ -95,6 +95,10 @@ always a free choice:
   trust changes nothing for them. A hypervisor whose SPICE certificate
   was replaced with one from another CA will now fail the backend
   connect.
+- **Proxmox VE.** `ca_cert` is required and is the cluster CA, which
+  verifies the API and is also the trust anchor for the backend leg, since
+  that CA signs each node's SPICE certificate. It is not compared with
+  anything the API reports, and the `ca` in a minted ticket is ignored.
 - **Static and OpenStack.** `ca_cert` is only the VDI trust anchor
   (see [Console Sources](/components/kerbside/console-sources/)). A deployment whose
   hypervisors present publicly issued certificates must leave it empty
@@ -129,11 +133,11 @@ Each accepted connection runs this sequence (`session.rs`, `backend.rs`,
 3. **Ticket decryption / authorization.** The client's RSA-encrypted ticket is
    decrypted and sent to the control plane via the `AuthorizeConnection` RPC,
    which resolves it to a hypervisor `Target` (host, port, backend ticket,
-   `host_subject`, `session_id`, and the firewall policy) or returns `Denied`.
-   A denial closes the connection. For a source whose driver mints tickets
-   (oVirt), the control plane may call that source's API while authorizing
-   (see "Minting a backend ticket during authorization" below), and denies
-   the channel if it cannot.
+   `host_subject`, `session_id`, and the firewall policy) or returns
+   `Denied`. A denial closes the connection. For a source whose driver
+   mints tickets (oVirt and Proxmox VE), the control plane may call that
+   source's API while authorizing (see "Minting a backend ticket during
+   authorization" below), and denies the channel if it cannot.
 4. **Backend connect.** The proxy opens the backend leg to the hypervisor's
    SPICE port (honouring a `need_secured` retry to the TLS port) and completes
    the server-side handshake with the backend ticket, advertising the
@@ -216,7 +220,9 @@ terminates the display channel instead: the proxy decodes what the
 hypervisor sends and re-encodes it for the client, sending only what changed,
 as JPEG where the picture is photographic and losslessly otherwise, at the
 pace the client's link can take. It exists to measure whether that beats
-relaying on slow links; it is not for production.
+relaying on slow links; it is not for production, and
+[the spike's verdict](/components/kerbside/performance/transcoding-spike/) recommends against
+productising it.
 
 It needs two things, both off by default:
 
@@ -238,6 +244,7 @@ It needs two things, both off by default:
 | `--transcode-lossless-delay-ms` | 500 | How long an area sent as JPEG must go without change before it is sent again losslessly. |
 | `--transcode-notsent-lowat-bytes` | 65536 | `TCP_NOTSENT_LOWAT` on the transcoded channel's client socket: how far ahead of the link the transcoder may write. |
 | `--transcode-ack-window` | 0 | A measurement option, hidden from `--help`: pace on a SPICE ACK window of this many messages, as spice-server does, instead of on the client socket. 0 paces on the socket. |
+| `--transcode-switch-after-secs` | 0 | An experiment, hidden from `--help`: move each session's first display channel between relaying and transcoding this many seconds after it starts, and again each time that long has passed in the new mode. It starts transcoded with `--transcode-display` and relayed without. 0 never switches. See [switching a display channel](/components/kerbside/performance/transcoding-switching/). |
 
 How a transcoded display channel works (`rust/kerbside-proxy/src/transcode/`):
 
@@ -281,13 +288,26 @@ How a transcoded display channel works (`rust/kerbside-proxy/src/transcode/`):
   the link has nearly drained it. Meanwhile damage merges in the mirror, so a
   slow client is sent the screen as it is when it can take more, never the
   frames it missed. No `SET_ACK` is sent, so the client sends no ACKs.
+- **Memory.** Each transcoded channel holds ryll's pixmap cache (up to
+  256 MiB) and GLZ dictionary (up to 64 MiB) besides the mirror and the
+  shadow. When the channel ends the proxy logs, at info, how full the pixmap
+  cache got (`pixmap_cache_peak_bytes`, `pixmap_cache_peak_entries`) and
+  how many entries it evicted. The shaped-link rig's `summarise.py` reports
+  the peak.
 
 What it does not do:
 
 - Only a session's first display channel (channel id 0) is transcoded. A
   second display channel is relayed, and the proxy logs that it did so.
 - The choice between relaying and transcoding is made when the channel
-  connects, and cannot change while it runs.
+  connects. Only the hidden `--transcode-switch-after-secs` experiment
+  changes it while the channel runs: it keeps the client leg, closes the
+  backend display channel and dials it again for the other mode, and keeps
+  GLZ out of the relay, because GLZ does not survive the switch. Both modes
+  dial with the transcoder's capabilities, so its relay assumes a client
+  that takes LZ4 and `MONITORS_CONFIG`.
+  [Switching a display channel](/components/kerbside/performance/transcoding-switching/)
+  has what that costs, and what breaks in each client.
 - The backend leg is not firewalled. The server-to-client messages of a
   transcoded display channel skip the L0 and L1 policy and the relay's
   16 MiB framing cap, and go straight to ryll's renderer, which frames them
@@ -362,9 +382,10 @@ different surfaces:
 ### Minting a backend ticket during authorization
 
 For a static source, `AuthorizeConnection` returns the ticket stored on the
-console. For a source whose driver sets `MINTS_TICKETS` (oVirt) there is no
-stored ticket: the first channel of a session to be authorized mints one
-from the source, and the rest reuse it. The sequence is:
+console. For a source whose driver sets `MINTS_TICKETS` (oVirt and Proxmox
+VE) there is no stored ticket: the first channel of a session to be
+authorized mints one from the source, and the rest reuse it. The sequence
+is:
 
 1. The lifetime asked for is the token's remaining life plus 30 seconds
    (`TICKET_SLACK` in `kerbside/rpc/servicer.py`), since no channel is

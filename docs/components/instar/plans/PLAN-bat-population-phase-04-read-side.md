@@ -401,9 +401,12 @@ work sits beside 4a's in `src/crates/vhdx/src/lib.rs`. Every brief also carries 
   each at high effort.
 * **4a.** Converting the 131041M fixture to qcow2 takes about 61 s,
   inside the 300 s tool timeout, and it was kept. 324 `test_measure`
-  skips are "no baseline meta": instar-testdata's 10.0.0 measure
-  profile is missing those files. The skip depends only on the file
-  existing, not on this change. The agent once ran its mutants at the
+  skips are "no baseline meta". The skip depends only on the baseline
+  file existing, not on this change. (Corrected by phase 5's
+  management session: this note first blamed a missing 10.0.0 measure
+  profile, but every version holds the same files. The cause is
+  fixtures with no measure baseline at any version, #845.) The agent
+  once ran its mutants at the
   same time as `make test-rust`, which compiled a mutant into the test
   build. It reran cleanly, and the later briefs forbade running the
   two together.
@@ -434,8 +437,8 @@ work sits beside 4a's in `src/crates/vhdx/src/lib.rs`. Every brief also carries 
   flat VMDK, and each failed with "convert operation failed" or
   "write to output device failed". Replayed alone (`--concurrency
   1`), all 12 pass (Ran: 12, 0 failed), so they are host contention,
-  not this change. Of the 414 skips, 324 are the instar-testdata
-  measure-profile gap noted under 4a. Most of the other 90 are
+  not this change. Of the 414 skips, 324 are the missing measure
+  baselines noted under 4a (#845). Most of the other 90 are
   existing, documented skips: known writer and scanner divergences,
   "qemu-img cannot resize", raw has no check, and missing libvhdi
   tools or ZSTD support. So the definition of done's "only

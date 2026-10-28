@@ -2269,7 +2269,7 @@ guards. See the VHD and VHDX notes in
 [chain-config.md](/components/instar/chain-config/#format-specific-notes) for the
 composing path being guarded.
 
-There are **126 cases**, in ten groups.
+There are **130 cases**, in eleven groups.
 
 Twenty-seven cover the writer. Fifteen mutate a library crate
 (`create`, `vhd`, `vhdx`) and are caught by a Rust unit or round-trip
@@ -2497,7 +2497,7 @@ through with the mark intact. Both are caught by a `vmm` unit test that
 reads the host's config back as the guest's own type and checks it
 against the same rule.
 
-The last group is **8 data-file entry cases**, guarding the fix for
+Then **8 data-file entry cases**, guarding the fix for
 issue #803. qemu applies two rules to the L2 entries of an image with
 an external data file, after an entry has classified as valid: a
 compressed entry is refused, and so is a host cluster offset that is
@@ -2514,6 +2514,29 @@ classic `measure` walk and the extended `map` walk, caught by a unit
 test of the metadata walkers. The last two are the host's half: the
 `vmm` decoder no longer captures the refusal, or the run loops no longer
 see it, and the reason falls back to the generic failure text.
+
+The last group is **4 partial-last-block cases**, guarding how `check`
+sizes a VHDX's partial last block (#797) and how many BAT entries a
+VHDX without a parent has (#626). When the virtual size is not a
+multiple of the block size, the last payload block holds only the
+remainder, and qemu allocates a fixed image's partial last block only
+that far. `check` bounds that block by its short length against the
+end of the file, but tests it against the declared regions as a whole
+block, because its slot is still a whole block and a dynamic grow
+makes the block whole in place. One case clamps the block to the
+whole block size, which calls qemu's own fixed image truncated. One
+takes the length from the BAT index instead of the payload index;
+the two agree inside the first chunk only, so it is caught by the
+image whose partial block lies past the first chunk, which the host
+`qemu-img` writes at test time. One sizes the overlap test by the
+short length, caught by a copy of the 17 MiB fixture whose region
+tables declare a region in the unused tail of the slot. These three
+run through the real binary and are caught by `TestVhdxFixedReads`
+in `tests/test_vhdx_fixed_fixtures.py`. The fourth counts
+`n + n / chunk_ratio` entries for `n` payload blocks instead of
+`n + (n - 1) / chunk_ratio`, one too many whenever the blocks exactly
+fill their last chunk, and is caught by the `vhdx` crate's test at
+each group edge.
 
 Most of the reader cases name a test in the `qcow2` crate and run it
 with the full input-format feature list, because the

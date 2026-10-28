@@ -704,8 +704,7 @@ provides a modular architecture with:
  qcow2 clusters (fixing a pre-existing sub-cluster data-loss bug
  in `convert`). Output is byte- and size-identical to `qemu-img
  dd` for all five output formats (raw, qcow2, vmdk, vpc, vhdx).
- Known divergences: vhdx default block size (32 MiB vs qemu's 8
- MiB for small images), count=0 vmdk/vhdx edge cases. See
+ Known divergences: count=0 vmdk/vhdx edge cases. See
  [docs/dd.md](/components/instar/dd/) for the full user reference.
 - **operations/bitmap/** - qcow2 persistent-dirty-bitmap management
  operation (PLAN-bitmap, qcow2 v3-only). The host side (`run_bitmap`

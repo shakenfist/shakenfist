@@ -280,6 +280,22 @@ first phase.
    keeps its first choice for its lifetime. The alternative,
    always transcoding with a near-lossless LAN mode, removes
    the choice at the cost of CPU on every session.
+   - *Answered 2026-10-28 by phase 3*
+     (`docs/performance/transcoding-spike.md`): once, at
+     connect. A session can move between modes (all 56 switches
+     in the final runs completed, the proxy ready in 22 to
+     37 ms), but only against a relay without GLZ or streams,
+     with clients that restart their ACK count on `SET_ACK`,
+     and at the price of a full redraw per switch (1.3 s at
+     80 ms / 10 Mbit). GLZ is out because spice-gtk's GLZ
+     window outlives the channel; streams because spice-server
+     0.15.2 crashes when a display channel connects while
+     streams exist. Always-transcode is ruled out: 0.27 to 0.29
+     cores per busy session on a LAN, for no visible gain. With
+     phase 3's no-go every session is relayed, so the choice
+     that matters is qemu's `streaming-video`, per hypervisor.
+     If transcoding is revisited, the mode belongs to operator
+     policy per source, carried in the authorisation reply.
 
 ## Execution
 
@@ -287,7 +303,7 @@ first phase.
 |-------|------|--------|--------|
 | 1. Proxy backpressure and a WAN baseline | [PLAN-spice-performance-phase-01-proxy-backpressure.md](/components/kerbside/plans/PLAN-spice-performance-phase-01-proxy-backpressure/) | Complete | 52046167f8 (#478) |
 | 2. qemu damage path: prototype and measure; carry qemu, submit the kernel fix | | In progress | kerbside-patches b53aa39c7e (#1748) |
-| 3. Display transcoding in Kerbside: feasibility spike | [PLAN-spice-performance-phase-03-transcoding.md](/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/) | In progress | 2e19d737aa (#489), ryll fdb5ead5b4 (#406), eab2c572cf (#494), 9d1b64d6 (#505), 13e9e2eb (#581) |
+| 3. Display transcoding in Kerbside: feasibility spike (verdict: no-go) | [PLAN-spice-performance-phase-03-transcoding.md](/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/) | In progress | 2e19d737aa (#489), ryll fdb5ead5b4 (#406), eab2c572cf (#494), 9d1b64d6 (#505), 13e9e2eb (#581), bba71155 (#616) |
 | 4. Son of SPICE: D-Bus display feasibility spike | | Not started | |
 | 5. Small spice-server patches (item 9, and item 4 if still wanted) | | Not started | |
 | 6. Push audit of phases 1-5 (kerbside and kerbside-patches) | | Not started | |
@@ -632,8 +648,32 @@ the detail). Two claims above no longer hold:
   LZ4 and JPEG encoders into ryll, and ryll's RDP phase 1
   added the slim renderer and its damage accumulator.
 
-The spike's remaining steps are 2 (observe the ACK window), 3b,
-4, 5 and 6.
+Steps 2 and 3b landed in #616. Steps 4 (measure), 5 (mode
+switching) and 6 (the write-up) followed.
+
+**Verdict, 2026-10-28: no-go** on productising transcoding for
+SPICE clients (`docs/performance/transcoding-spike.md`).
+- Transcoding wins clearly only on incompressible activity with
+  streaming off on links of 10 Mbit or less (heavy activity at
+  80 ms / 10 Mbit: 335 ms p50 against 2047 ms), and beats
+  streaming relay only at 150 ms / 2 Mbit heavy (1459 against
+  7328 ms).
+- Relay with `streaming-video=all` is level with it or two to
+  five times faster in every other cell, and costs the proxy
+  0.011 to 0.025 cores against 0.27 to 0.29 on a LAN.
+- The image-quality case did not hold: during motion the
+  transcoder's JPEG spills onto text next to the activity
+  (53248 pixels at about 28 dB, against streaming's 7680).
+  Both end exact once motion stops.
+- Switching mid-session works, but only against a relay
+  without GLZ or streams (Open question 4).
+
+The transcoder stays behind its build feature as an experiment.
+The effort moves to making `streaming-video=all` safe to
+recommend, whose obstacle is spice-server 0.15.2's connect crash
+(Future work). Nothing from the spike is extracted into a shared
+crate: andris's copy of the update pipeline stays the maintained
+one.
 
 **Phase 4** is a time-boxed spike, with three steps:
 1. confirm that D-Bus `Update` rectangles for virtio-gpu
@@ -643,8 +683,11 @@ The spike's remaining steps are 2 (observe the ACK window), 3b,
    LZ4, one client) on Ryll's protocol crate;
 3. compare it against in-qemu SPICE on the phase 2 workload.
 
-If phase 3 says go, the helper reuses phase 3's output half
-rather than growing its own encoder. Step 2 is largely done
+Phase 3 said no-go, so Kerbside contributes no output half; the
+helper's is andris's own, which phase 3 measured on qemu's
+display: it converges to the exact picture, and pacing on the
+client socket beat pacing on an ACK window by up to two times
+where the link was the limit. Step 2 is largely done
 already, outside this plan: andris (2026-10-28) is a Rust
 SPICE server on Ryll's protocol crate with main, display,
 inputs, cursor, LZ4, JPEG, H.264 streams, an agent and audio.
@@ -695,9 +738,11 @@ server-internal, in two parts:
   spice-server still encodes the LAN leg. It can start
   whenever there is capacity.
 - **Item 4, vendor-neutral hardware encoder probing, H.265
-  and 60 fps ceilings,** waits for phases 3 and 4, because a
-  go in either moves encoding for slow links out of
-  spice-server and reduces its value.
+  and 60 fps ceilings,** waits for phase 4, because a go there
+  moves encoding for slow links out of spice-server and reduces
+  its value. Phase 3's no-go leaves spice-server's streams as
+  the slow-link lever for relayed sessions, which raises item
+  4's value.
 
 **Phase 6** is the push audit for the plan as first written,
 phases 1-5, run before the QUIC work starts so that the two
@@ -898,22 +943,33 @@ Other deferred items:
   equivalent is a byte- or RTT-aware ACK window in
   spice-server. Either needs measuring on the shaped-link rig
   before it is believed, and throughput on high-BDP links is
-  the trade-off to watch. Phase 3's transcoding makes it moot
-  for transcoded sessions, so it matters only for sessions left
-  in relay mode.
+  the trade-off to watch. Phase 3's no-go means every session
+  stays relayed, but its step 2 narrowed the case: the window
+  bounds the backlog but does not cap throughput, and with
+  `streaming-video=all` the backlog is already near the idle
+  floor. ACK pacing therefore matters only for relay with
+  streaming off on slow links.
 - Recommend a `streaming-video` setting in the use-case pages
   and Ryll's libvirt recommendations, since qemu defaults it to
   off. The re-baseline favours `all` over `filter` for latency,
   but `all` makes animated text lossy and needs the spice-server
   0.15.2 connect crash fixed or avoided first, so the
-  recommendation should state both.
+  recommendation should state both. Phase 3's no-go makes this
+  the main slow-link lever. Before recommending `all`, measure it
+  with a client that decodes the streams: every `all` run so far
+  sent H.264 that Ryll did not decode (ryll#398), so
+  spice-server's stream rate control ran on reports from a client
+  that drew nothing.
 - Upstream the rig's small Ryll patch, which adds a `rect` to the
   control socket's `surface_drawn` event
   (`tools/shaped-link/ryll-surface-drawn-rect.patch`). Until
   then the rig carries it as a patch.
 - Report spice-server 0.15.2's crash when a client connects
   while streams already exist, once it has been reproduced
-  against spice-server's current master.
+  against spice-server's current master. Since phase 3's no-go
+  this is the main obstacle to recommending
+  `streaming-video=all`; it crashed qemu twice in phase 3's
+  measurements.
 - **RDP out.** `PLAN-rdp-gateway.md` (proposed 2026-09-27) is
   superseded by ryll's `PLAN-rdp-frontend.md` (2026-10-19),
   which builds RDP out as `ryll --rdp` first and moves it here
@@ -921,13 +977,44 @@ Other deferred items:
   does not wait for phase 3. Its phase 1 takes over step 3a's
   slim renderer feature set and adds a damage accumulator to
   ryll's renderer, both of which step 3b then builds on.
-  Phase 3's write-up should still say whether
-  renderer accuracy and CPU per session would support RDP out
-  in Kerbside, since that decides the eventual move.
+  Phase 3's write-up answers it
+  (`docs/performance/transcoding-spike.md`, "RDP out"): the
+  renderer is accurate enough for virtio-gpu and std-vga guests
+  (every transcoded repeat converged to the lossless reference)
+  but not for QXL guests, and about a quarter of a core per busy
+  session suits an opt-in gateway chosen by client protocol at
+  connect, not a default. The move inherits phase 3's
+  productising list: a shared crate for the update pipeline, the
+  openh264 split (ryll#499), a sandboxed worker per session, and
+  capacity planning per node.
+- **Ryll: restart the ACK count on `SET_ACK`** (phase 3 step 5).
+  Ryll counts ACKs from the last one it sent, so after a display
+  channel reconnect its first ACK comes early and spice-server's
+  unsigned count wraps, freezing the channel. The one-line fix,
+  `self.last_ack = self.message_count.saturating_sub(1);` in the
+  `SET_ACK` handler, was confirmed on ryll 0d140b3; display and
+  cursor channels both need it. It belongs in a ryll pull
+  request.
+- **Ryll: the display-socket stall.** In 18 of 184 phase 3
+  repeats Ryll stopped reading its display socket, relay and
+  transcode alike. The cause is not established.
+- **Andris: socket pacing and the JPEG fringe.** Phase 3 found
+  socket pacing beating an ACK window of 40 by up to two times
+  where the link was the limit (andris paces on a window of 20),
+  and that 64-pixel tiles which moving content only partly
+  covers send their text as JPEG. Both are andris's behaviour.
+- **The `transcode` feature's CI steps.** The Rust proxy job runs
+  clippy and the tests with `--features transcode` while the
+  experiment is kept; drop them if the experiment is removed. A
+  productised transcoder would need no separate lane once ryll#499
+  lets it build without openh264.
 
 ## Bugs fixed during this work
 
-None yet.
+- #477: the proxy advertised Ryll's capabilities to spice-server
+  rather than the client's. Fixed in phase 3 (#494, #505): client
+  caps now reach the backend, and the client-leg reply is per
+  channel type.
 
 ## Back brief
 

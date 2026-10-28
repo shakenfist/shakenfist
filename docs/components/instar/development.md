@@ -549,6 +549,25 @@ git tag -d v0.2.0
 tools/tag-release.sh 0.2.0 <commit that went through the queue>
 ```
 
+The "Restrict releases" tag ruleset lets only the repository's admin
+role create or delete a `v*` tag, so an admin runs `tag-release.sh`.
+It does not stop `sign-tag` replacing the tag it has just re-signed:
+ryll's identical ruleset let v0.3.0's `sign-tag` force-update its tag.
+
+Once `sign-tag` has run, anyone can check a release tag's signature:
+
+```bash
+git fetch --tags --force origin
+gitsign verify-tag v0.2.0 \
+  --certificate-identity-regexp '^https://github\.com/shakenfist/instar/\.github/workflows/release\.yml@refs/tags/v[0-9]' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+The pattern names `release.yml` running for a version tag, `v` and a
+digit: a pattern that stops at the repository would accept a signature
+from any of its workflows. [gitsign](https://github.com/sigstore/gitsign)
+has install instructions.
+
 Running `release.yml` by hand with `workflow_dispatch` is a dry run:
 it runs `check-version` and `build`, and skips `ci-gate`, `sign-tag`
 and `github-release`.
