@@ -11,6 +11,7 @@ cluster-ci.conf's test path, so stestr never runs it on its own.
 
 import configparser
 import json
+import re
 
 from testtools import content
 
@@ -24,6 +25,15 @@ from shakenfist_client import apiclient
 # must not carry one.
 CONSOLE_PORT_MIN = 30000
 CONSOLE_PORT_MAX = 50000
+
+
+def redact_vv(vv_text):
+    """A .vv file with its password removed, for the test log.
+
+    The password is a live console credential: Kerbside's for a minute, a
+    hypervisor's for as long as the instance keeps it.
+    """
+    return re.sub(r'(?m)^password=.*$', 'password=<redacted>', vv_text)
 
 
 class BaseVDIConsoleTestCase(base.BaseNamespacedTestCase):
@@ -102,5 +112,5 @@ class BaseVDIConsoleTestCase(base.BaseNamespacedTestCase):
         """Fetch and parse an instance's direct-to-hypervisor .vv file."""
         vv_text = self.test_client._request_url(
             'GET', '/instances/%s/vdiconsolehelper' % instance_uuid).text
-        self.addDetail(detail_name, content.text_content(vv_text))
+        self.addDetail(detail_name, content.text_content(redact_vv(vv_text)))
         return self._parse_vv(vv_text)
