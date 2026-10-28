@@ -125,6 +125,10 @@
          <lastmod>2026-10-28</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/plan-retirement/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/release-automation/</loc>
          <lastmod>2026-10-28</lastmod>
     </url>
@@ -406,6 +410,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-plan-references-in-code/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/development/plans/PLAN-plan-retirement/</loc>
          <lastmod>2026-10-28</lastmod>
     </url>
     <url>
@@ -1633,7 +1641,19 @@
          <lastmod>2026-10-28</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/deployment/containers/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/deployment/kolla-ansible/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/kerbside/deployment/manual/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/performance/ack-window/</loc>
          <lastmod>2026-10-28</lastmod>
     </url>
     <url>
@@ -1705,6 +1725,14 @@
          <lastmod>2026-10-28</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-deployment-options-phase-03-openstack/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-deployment-options-phase-04-containers/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-deployment-options/</loc>
          <lastmod>2026-10-28</lastmod>
     </url>
@@ -1758,6 +1786,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport/</loc>
          <lastmod>2026-10-28</lastmod>
     </url>
     <url>
