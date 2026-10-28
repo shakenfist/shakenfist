@@ -26,9 +26,6 @@ there) -- and checked against what can be checked offline:
 * for a profile which deploys Kerbside, that it installs shakenfist.kerbside
   in the range examples/_shared/requirements.yml pins, so the lane deploys the
   release an operator gets, and site.yml does not refuse it.
-
-docs/plans/PLAN-kerbside-deployer-phase-04-ci.md (D1, D2 and D6) is the
-design.
 """
 
 import glob

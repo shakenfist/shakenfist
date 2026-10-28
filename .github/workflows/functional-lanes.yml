@@ -113,8 +113,7 @@ jobs:
   # sf-* or kerbside-* unit restarted; and tells the suite to expect a VDI
   # console proxy. It adds processes, not instances, so the headroom gate's
   # shape is unchanged. The second deploy costs time inside the build step,
-  # not this timeout. See docs/plans/PLAN-kerbside-deployer-phase-04-ci.md
-  # (D5, D6).
+  # not this timeout.
   debian_13_tier:
     name: "Debian 13 tier (collection)"
     if: contains(fromJSON(inputs.lanes), 'debian-13-slim-tier')

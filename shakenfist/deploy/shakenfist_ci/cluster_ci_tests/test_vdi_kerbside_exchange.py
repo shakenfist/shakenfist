@@ -120,9 +120,6 @@ class TestVDIKerbsideExchange(vdi.BaseVDIConsoleTestCase):
     advertise the vdi-console-proxy capability, and fails instead when the
     deploy profile says Kerbside was expected
     (SF_CI_EXPECT_VDI_CONSOLE_PROXY=1, see base.kerbside_expected()).
-
-    docs/plans/PLAN-kerbside-deployer-phase-04-ci.md (D9, D10) is the
-    design.
     """
 
     def __init__(self, *args, **kwargs):
