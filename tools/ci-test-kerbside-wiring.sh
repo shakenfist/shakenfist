@@ -20,7 +20,9 @@
 # checker accepts, field by field, reserves the ports Shaken Fist uses, and
 # refuses an empty key, a CA which is not a PEM, a loopback api_url on a host
 # which is not a Shaken Fist node and a kerbside_url the two sides see
-# differently; that the validation play checks every Kerbside host with the
+# differently; that the cluster shape play refuses a kerbside_url which ends in
+# a slash, or which Shaken Fist's nodes see differently, before any host is
+# changed; that the validation play checks every Kerbside host with the
 # variables that host sees, and that a refusal on any host ends the run; that
 # without the collection it names the install command when there is a Kerbside
 # host, and does nothing when there is none; that it accepts a release in the
@@ -122,7 +124,7 @@ openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
     || fail 'openssl could not make the test CA'
 SF_CA_FILE="${WORK}/certs/sf-ca-cert.pem"
 
-URL='https://console.example.com:13002/kerbside/'
+URL='https://console.example.com:13002/kerbside'
 FQDN='console.example.com'
 API_URL='https://sf-api.example.com:13000'
 # The secrets. The seed is exactly 32 characters, Kerbside's minimum.
@@ -214,13 +216,15 @@ DEPLOY_PLAY='Deploy Kerbside'
 extract_plays "${WORK}/site/site-head.yml" "${PROBE_PLAY}" "${QUARANTINE_PLAY}" "${VALIDATE_PLAY}"
 
 # site_inventory KERBSIDE_HOST...: the test inventory, whose kerbside group is
-# the hosts given. sf-1 is the whole Shaken Fist cluster, and every host is
-# this machine. become fails, so a task which would change a host fails
-# instead.
+# the hosts given. The Shaken Fist cluster is SF_NODES (sf-1 alone unless a
+# case sets it), every one a hypervisor, with sf-1 the network and database
+# node, and every host is this machine. become fails, so a task which would
+# change a host fails instead.
+SF_NODES='sf-1'
 site_inventory() {
     {
-        printf '[allsf]\nsf-1\n[hypervisors]\nsf-1\n[network_node]\nsf-1\n'
-        printf '[database_node]\nsf-1\n[kerbside]\n'
+        printf '[allsf]\n%s\n[hypervisors]\n%s\n' "${SF_NODES}" "${SF_NODES}"
+        printf '[network_node]\nsf-1\n[database_node]\nsf-1\n[kerbside]\n'
         if [ $# -gt 0 ]; then
             printf '%s\n' "$@"
         fi
@@ -750,8 +754,8 @@ PYEOF
             "\"api_url\": \"http://${host}:13000\"" 'a loopback address, but localhost is not a Shaken Fist node'
     done
     source_refuses 'a kerbside_url the Shaken Fist nodes see differently' \
-        '"kerbside_url_on_sf_nodes": "https://other.example.com/"' \
-        "Shaken Fist's nodes render a different kerbside_url, https://other.example.com/."
+        '"kerbside_url_on_sf_nodes": "https://other.example.com"' \
+        "Shaken Fist's nodes render a different kerbside_url, https://other.example.com."
     source_refuses 'a kerbside_url the Shaken Fist nodes do not have' '"kerbside_url_on_sf_nodes": ""' \
         "Shaken Fist's nodes render no kerbside_url at all."
 
@@ -776,7 +780,39 @@ case_7_site_validation_runs() {
     assert_output_has 'fatal: [kb-1]: FAILED!'
     assert_later_play_did_not_run
 
+    # The cluster shape play judges kerbside_url from the Shaken Fist nodes'
+    # inventory, before the Kerbside validation play, with or without a
+    # Kerbside host.
+    CURRENT_CASE='case 7: site.yml refuses a kerbside_url which ends in a slash'
+    reset_site_vars
+    site_inventory
+    printf "kerbside_url: '%s/'\napi_url: %s\n" "${URL}" "${API_URL}" > "${WORK}/site/group_vars/all.yml"
+    run_site_head "${WITH}" && fail 'the cluster shape play passed a kerbside_url ending in a slash'
+    assert_output_has "kerbside_url is ${URL}/, which ends in a slash."
+    assert_output_has 'fatal: [localhost]: FAILED!'
+    assert_output_lacks "PLAY [${VALIDATE_PLAY}]"
+    assert_later_play_did_not_run
+
+    CURRENT_CASE="case 7: site.yml refuses a kerbside_url one Shaken Fist node sees differently"
+    reset_site_vars
+    SF_NODES=$'sf-1\nsf-2' site_inventory kb-1
+    echo "kerbside_url: 'https://other.example.com'" > "${WORK}/site/host_vars/sf-2.yml"
+    run_site_head "${WITH}" && fail "the cluster shape play passed a second Shaken Fist node's own kerbside_url"
+    assert_output_has 'failed: [localhost] (item=sf-2)'
+    assert_output_has "sf-2 sees kerbside_url as https://other.example.com, but sf-1 sees ${URL}."
+    assert_output_lacks 'failed: [localhost] (item=sf-1)'
+    assert_output_lacks "PLAY [${VALIDATE_PLAY}]"
+    assert_later_play_did_not_run
+
+    CURRENT_CASE="case 7: site.yml passes two Shaken Fist nodes which agree on kerbside_url"
+    reset_site_vars
+    run_site_head "${WITH}" || fail 'the cluster shape play refused two nodes with one kerbside_url'
+    assert_task_ok 'Fail if a Shaken Fist node sees kerbside_url differently from the first' localhost
+    assert_task_ok 'Fail if kerbside_url ends in a slash' localhost
+    assert_later_play_ran
+
     CURRENT_CASE="case 7: site.yml refuses the default, loopback, api_url on a dedicated Kerbside host"
+    site_inventory kb-1
     reset_site_vars
     echo "kerbside_url: '${URL}'" > "${WORK}/site/group_vars/all.yml"
     run_site_head "${WITH}" && fail 'the validation play passed it'

@@ -1,6 +1,5 @@
 # Copyright 2026 Michael Still and contributors
 import json
-import re
 import shlex
 import socket
 import ssl
@@ -47,14 +46,6 @@ DAEMON_UNIT_GLOB = 'sf-*.service'
 # Daemons #4097 names. Each must be among the units checked somewhere in the
 # cluster, so that a unit glob or a listing which matches nothing cannot pass.
 REQUIRED_DAEMON_UNITS = ('sf-api.service', 'sf-queues.service')
-
-
-def redact_vv(vv_text):
-    """A .vv file with its password removed, for the test log.
-
-    Kerbside's password is a live console credential for a minute.
-    """
-    return re.sub(r'(?m)^password=.*$', 'password=<redacted>', vv_text)
 
 
 def daemon_environ_script(patterns, unit_glob=DAEMON_UNIT_GLOB,
@@ -120,9 +111,6 @@ class TestVDIKerbsideExchange(vdi.BaseVDIConsoleTestCase):
     advertise the vdi-console-proxy capability, and fails instead when the
     deploy profile says Kerbside was expected
     (SF_CI_EXPECT_VDI_CONSOLE_PROXY=1, see base.kerbside_expected()).
-
-    docs/plans/PLAN-kerbside-deployer-phase-04-ci.md (D9, D10) is the
-    design.
     """
 
     def __init__(self, *args, **kwargs):
@@ -174,7 +162,7 @@ class TestVDIKerbsideExchange(vdi.BaseVDIConsoleTestCase):
             self.test_client, self.namespace)
 
         url, r = self._exchange(instance_uuid)
-        self.addDetail('kerbside_vv_file', content.text_content(redact_vv(r.text)))
+        self.addDetail('kerbside_vv_file', content.text_content(vdi.redact_vv(r.text)))
         proxy_vv = self._parse_vv(r.text)
         direct_vv = self._fetch_direct_vv(
             instance_uuid, detail_name='direct_vv_file')
@@ -249,7 +237,7 @@ class TestVDIKerbsideExchange(vdi.BaseVDIConsoleTestCase):
         self.assertEqual(
             401, r.status_code,
             'a second exchange of the same token was not refused: %s'
-            % redact_vv(r.text))
+            % vdi.redact_vv(r.text))
         self.assertIn(TOKEN_ALREADY_USED, r.text)
 
     def test_signing_key_absent_from_daemon_environments(self):

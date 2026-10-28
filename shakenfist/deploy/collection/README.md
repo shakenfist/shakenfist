@@ -134,8 +134,8 @@ and host key into `/etc/pki/libvirt-spice/` as `ca-cert.pem`, `server-cert.pem`
 and `server-key.pem`. The role can issue a certificate for any host: the
 parameters below choose the name, subject names, lifetime and install location.
 Certificates are issued with an explicit lifetime of `cert_expiration_days`,
-365 days by default. The SPICE private key is still installed mode `0444` by
-default (issue 4416 tracks changing that).
+365 days by default. The SPICE private key is installed mode `0440` by
+default.
 
 Renewal happens during a deploy (a `site.yml` run), and only then. A
 certificate is reissued when the control node's copy expires within
@@ -152,7 +152,7 @@ forgetting it. A cluster therefore needs a deploy at least once inside each
 renewal window: with the defaults, at least once in the last 90 days before a
 certificate expires.
 
-Until this release, renewal never worked (issue 4415), and certtool's default
+Before 0.8.0, renewal never worked (issue 4415), and certtool's default
 lifetime of 365 days applied silently, so every SPICE certificate the
 collection issued expired one year after the first deploy. The first deploy
 after upgrading reissues every host's certificate, with the same key and
@@ -210,7 +210,7 @@ when the `kerbside` group has members.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `kerbside_url` | `""` | Kerbside's base URL, rendered into `/etc/sf/config` and used as the token audience. When set, the deploy ensures the console token signing key exists before any daemon restarts. |
+| `kerbside_url` | `""` | Kerbside's base URL, with no trailing slash, rendered into `/etc/sf/config` and used as the token audience. When set, the deploy ensures the console token signing key exists before any daemon restarts. |
 | `kerbside_token_duration` | `300` | Lifetime in seconds of a minted console token. Must be positive. |
 | `kerbside_system_key` | `""` | The key Kerbside authenticates with, minted as the `kerbside` key in the system namespace on every deploy. A secret; requires `kerbside_url`, at least 16 characters, different from `system_key`. |
 

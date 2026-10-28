@@ -208,7 +208,7 @@ are:
 | `mariadb_host`, `mariadb_port`, `mariadb_user`, `mariadb_password`, `mariadb_database` | Connection details for your MariaDB server. Only database-tier nodes render these into `/etc/sf/config`. They must match what you provisioned with `tools/bootstrap-mariadb.sql`. |
 | `server_package`, `client_package` | The pip package references to install; default to the released `shakenfist` and `shakenfist-client` on PyPI. |
 | `loki_base_url`, `loki_tenant`, `loki_auth_header` | Optional log shipping to an operator-provided Loki. See [Logging](logging.md). |
-| `kerbside_url` | Base URL of an operator-deployed Kerbside VDI console proxy. Optional; empty leaves the proxied-console integration off. See the [VDI console tokens operator guide](vdi_console_tokens.md). |
+| `kerbside_url` | Base URL of an operator-deployed Kerbside VDI console proxy, with no trailing slash: it is the console token audience, byte for byte, and the deploy refuses one ending in `/`. Optional; empty leaves the proxied-console integration off. See the [VDI console tokens operator guide](vdi_console_tokens.md). |
 | `kerbside_token_duration` | Lifetime in seconds of a minted console token. Defaults to 300. Rendered only when `kerbside_url` is set. |
 | `kerbside_system_key` | The key Kerbside authenticates to Shaken Fist with, minted as the `kerbside` key in the system namespace on every deploy. Optional; requires `kerbside_url`, must differ from `system_key`, and must be at least 16 characters. Treat as a secret. |
 | `kerbside_public_fqdn` | Only to deploy Kerbside onto an optional `kerbside` inventory group. The name SPICE clients use to reach the proxy; also the proxy certificate's CN. An IPv4 or IPv6 address is given an IP SAN, and a name a DNS SAN. |

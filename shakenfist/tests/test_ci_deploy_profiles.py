@@ -26,9 +26,6 @@ there) -- and checked against what can be checked offline:
 * for a profile which deploys Kerbside, that it installs shakenfist.kerbside
   in the range examples/_shared/requirements.yml pins, so the lane deploys the
   release an operator gets, and site.yml does not refuse it.
-
-docs/plans/PLAN-kerbside-deployer-phase-04-ci.md (D1, D2 and D6) is the
-design.
 """
 
 import glob
@@ -289,10 +286,17 @@ class CiDeployProfilesTestCase(base.ShakenFistTestCase):
                 fqdn, urllib.parse.urlsplit(url).hostname,
                 "%s: kerbside_url's host is not kerbside_public_fqdn." % name)
 
+    def test_kerbside_url_has_no_trailing_slash(self):
+        # sf-api strips a trailing slash before minting the audience, and
+        # Kerbside takes kerbside_url verbatim, so the cluster shape play
+        # refuses one; a profile carrying it would fail half an hour in.
+        for name, _, profile, group in self._kerbside_profiles():
+            url = str(self._effective(profile, group, 'kerbside_url', ''))
+            self.assertFalse(url.endswith('/'), '%s: kerbside_url ends in a slash.' % name)
+
     def test_kerbside_api_url_is_not_loopback(self):
         # Co-located Kerbside hosts may legally use loopback, but then the
-        # scrape never leaves the host, which is not what the lane is for
-        # (the plan's S4).
+        # scrape never leaves the host, which is not what the lane is for.
         for name, _, profile, group in self._kerbside_profiles():
             api_url = str(self._effective(profile, group, 'api_url', ROLE_DEFAULT_API_URL))
             host = urllib.parse.urlsplit(api_url).hostname
