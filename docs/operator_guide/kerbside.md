@@ -26,11 +26,14 @@ cluster with are described in
 [VDI console tokens](vdi_console_tokens.md). `examples/_shared/site.yml`
 deploys Kerbside onto the hosts in an optional `kerbside` inventory group,
 using the `kerbside` role from Kerbside's `shakenfist.kerbside` collection.
+The role installs Kerbside 0.7.0 or newer, the first release whose API never
+returns a source's password; an older Kerbside cannot be deployed this way.
 
 ## Topologies
 
 Put Kerbside on a hypervisor unless you have a reason not to. That is the
-shape Shaken Fist's merge queue deploys, and it needs the fewest decisions.
+shape Shaken Fist's weekly CI lane deploys, and it needs the fewest
+decisions.
 A dedicated host is the next simplest. Bring your own Kerbside only if you
 already run one, because you then configure this cluster's source in it by
 hand.
@@ -157,7 +160,9 @@ to the host which issued it:
 
 Every host in the `kerbside` group gets the same configuration from the same
 inventory, and the deploy migrates the shared database once. Keep these the
-same on every host, which `group_vars/kerbside` does for you:
+same on every host. `group_vars/kerbside` does that for the settings only
+Kerbside reads; `kerbside_url` and `api_url` belong in `group_vars/all`,
+because Shaken Fist's nodes read them too:
 
 | Setting | Why every host needs the same value |
 |---------|-------------------------------------|
