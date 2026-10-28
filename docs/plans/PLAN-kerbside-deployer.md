@@ -567,7 +567,7 @@ spelling above is the one to write.
 | 4. A merge-queue lane with the feature on | [PLAN-kerbside-deployer-phase-04-ci.md](PLAN-kerbside-deployer-phase-04-ci.md) | Complete | `0016c5dad` (#4479) |
 | 5. The `kerbside` role moves into Kerbside, and Kerbside's sf-e2e lane deploys through it | [PLAN-kerbside-deployer-phase-05-role-to-kerbside.md](PLAN-kerbside-deployer-phase-05-role-to-kerbside.md) | Complete | `48849831c` (#4591); kerbside `2093f2ed5` (#580), `89f199456` (#587); actions `17ea1889e` (#181), `31139125c` (#195) |
 | 6. Documentation and close-out | [PLAN-kerbside-deployer-phase-06-docs.md](PLAN-kerbside-deployer-phase-06-docs.md) | Complete | `54fed79bcf` (#4616); kerbside `ea44e9364` (#592) |
-| 7. Push audit | [PLAN-kerbside-deployer-phase-07-push-audit.md](PLAN-kerbside-deployer-phase-07-push-audit.md) | Complete | `0c4b19c520` (#4712); the follow-up fixed #4697 |
+| 7. Push audit | [PLAN-kerbside-deployer-phase-07-push-audit.md](PLAN-kerbside-deployer-phase-07-push-audit.md) | Complete | `0c4b19c520` (#4712); `0b5d147477` (#4715, fixed #4697) |
 
 The `Merged` column records what put each phase on `develop`: the
 merge commit of its pull request, or an explicit `first..last`
