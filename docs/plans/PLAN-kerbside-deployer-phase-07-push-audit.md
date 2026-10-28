@@ -722,3 +722,419 @@ ignore` or `shellcheck disable`; docs name-only.
 * Docs touched: `ARCHITECTURE.md`, `README.md`, `docs/actions.md`,
   `docs/ci.md`.
 * Every other grep printed no output.
+
+### Style (7d)
+
+Read-only, sonnet at low effort. Checked the Python conventions in
+`config.py`, `client/ctl.py`, `util/vdi_tokens.py`,
+`deploy/shakenfist_ci/{spice_subject,vdi}.py`, `tools/build-collection.py`
+and the tests the six ranges add; every role entry point's
+`argument_specs.yml` entry in `internal_ca`, `node` and the Kerbside role
+at `$KTIP`; `no_log` on every task handling a secret; the restart-on-change
+contract (the Kerbside role's only handler is the systemd daemon reload,
+and restarts are driven solely by `register.yml`'s desired-state hash);
+and units (`KERBSIDE_TOKEN_DURATION` is seconds everywhere,
+`cert_expiration_days` and `cert_renew_days` are days everywhere). All
+passed. The findings are plan references and stale citations:
+
+* **Plan references added by #4479, still at `$TIP`** (S4 confirmed):
+  `.github/workflows/functional-lanes.yml:116-117` (moved there by
+  #4653), `deploy/shakenfist_ci/cluster_ci_tests/test_vdi_kerbside_exchange.py:124`,
+  `tests/test_ci_deploy_profiles.py:30` and `:295` ("the plan's S4"),
+  `tools/ci-deploy-profiles/kerbside-slim-tier.yml.j2:42`. A sixth, in
+  `test_headroom_gate_workflow_seams.py`, was fixed since by
+  `f8d3736f1e` (#4636).
+* `roles/node/tasks/kerbside_source.yml:138` (#4591) cites
+  `config.py:896-903` for the gateway ports; they are at 910-918 since
+  #4595. Advisory.
+* `shakenfist/deploy/collection/README.md:137-138` (#4430) says the SPICE
+  key is still installed `0444` and cites #4416 as open, while the same
+  file's table (`:189`) and `docs/operator_guide/upgrades.md:149` say
+  `0440`. #4548 changed the mode and missed these lines: out of scope,
+  but corrected in the follow-up because it is one sentence.
+
+### Code quality, 2a (7e)
+
+Read-only, opus at medium effort. The pushdown, cached-FK and
+three-layer rules do not apply: no range touches `mariadb.py`, the
+schema attribute models or protos. Nothing blocking; fourteen advisory
+findings, A1 to A14, four of them predating or fixed since. What was
+examined, by the six areas in the brief:
+
+1. `internal_ca`'s any-host path (`site.yml:981-1013`) and `allsf` path
+   (`:602-619`) are one implementation, parameterised through one YAML
+   anchor; #4548's group check and key mode serve both. The hard-coded
+   CA read at `site.yml:955` matches `external_api/admin.py:60-61`.
+2. The node role's three Kerbside entry points against the Kerbside
+   role's `validate.yml` and `register.yml` at `$KTIP`: checks on both
+   sides are layered, not duplicated (empty key, the `system` username,
+   `kerbside_url` equality here against non-emptiness there, ports built
+   here and validated there, CA shape stricter here). The only copies
+   are A4 and A11.
+3. `site.yml`'s Kerbside plays (validation 165-315, deploy 918-1023),
+   read with per-line blame: A5 to A8.
+4. Host-subject logic: A10.
+5. The rootless scripts: A9, A14. Kerbside's `tools/sf-e2e/*.sh` share no
+   scaffolding beyond `set -euo pipefail`.
+6. The deploy profile against actions' `ci-apply-deploy-profile.py`:
+   every key the profile writes is read, unknown keys are refused, and
+   `test_ci_deploy_profiles.py:78` pins the six top-level keys.
+
+Findings:
+
+* **A1, A2 (S4).** The five plan references 7d lists. Advisory, as the
+  queue-performance audit graded its A3; fixed in the follow-up.
+* **A3.** `kerbside-slim-tier.yml.j2:67-69` (#4479) says the SQL is
+  idempotent "as Kerbside's own tools/sf-e2e/deploy-kerbside.sh is";
+  kerbside#587 deleted that script. Advisory.
+* **A4.** The stale `config.py` line numbers 7d found, plus a
+  hand-written copy of five port defaults at `kerbside_source.yml:147-152`.
+* **A5.** `site.yml`'s header runs to 89 comment lines before the first
+  play, about 43 of them Kerbside (#4442, #4465, #4591). Lines 40-59
+  restate `docs/operator_guide/kerbside.md` and the collection README;
+  176-186 repeat `kerbside_source.yml:2-18`. Advisory: pointers.
+* **A6.** `site.yml:999-1004` (#4465, #4591) recomputes the Kerbside
+  role's defaults with literal fallbacks (`kerbside_pki_dir`, the three
+  certificate names, `kerbside_file_owner`, `kerbside_group`), which
+  live at `$KTIP` in `ansible/roles/kerbside/defaults/main.yml:64-77`.
+  A default change in Kerbside leaves the certificate where the role does
+  not look. Seam: `site.yml:976` already includes the role's `bootstrap`;
+  including it with `public: true`, as `:255` does for `validate`, puts
+  the role's defaults in scope. Advisory.
+* **A7.** `site.yml:989-998` (#4479) decides the IP-vs-DNS SAN in play
+  vars; it belongs in `internal_ca`'s `host_certificate` entry point.
+* **A8.** `site.yml:202-238` (#4591): 33 lines of Jinja reimplementing
+  Galaxy's version-range comparison, tested by the wiring script's case
+  9. Advisory, low.
+* **A9.** Four copies of the rootless-test scaffolding:
+  `tools/ci-test-internal-ca.sh` (#4430), `ci-test-kerbside-cluster-config.sh`
+  (#4442), `ci-test-kerbside-wiring.sh` (#4591) and Kerbside's
+  `tools/ci-test-ansible-role.sh` (kerbside#580). Seam: one sourced
+  helper here. Advisory.
+* **A10.** Three host-subject renderers (`node.py:44-53`,
+  `shakenfist_ci/spice_subject.py:27-60`, Kerbside's
+  `kerbside-host-subject.py:38-73`) and two tables, Kerbside's a fixture
+  generated once at `0016c5dad`. A rule change in `node.py` is caught
+  for `spice_subject.py` only. Already #4097 item 6.
+* **A11.** `test_ci_deploy_profiles.py:148-160` copies five loopback
+  regexes from `kerbside_source.yml:66-71`; `:269` and `:275` copy the
+  seed and key length floors. Advisory, low.
+* **A12.** `kerbside-ready.py:69` lacks the `audit-allow-print` marker
+  (finding W1 above). Advisory.
+* **A13.** Unannotated functions in `shakenfist_ci/base.py:137`,
+  `spice_subject.py:39`, `vdi.py` and Kerbside's four role scripts;
+  the surrounding modules are wholly untyped and outside the mypy
+  rollout. Python floor clean (both repositories `>=3.11`). Advisory,
+  low.
+* **A14.** Size candidates with seams, no split proposed: `site.yml`
+  (1023 lines), `ci-test-kerbside-wiring.sh` (1161), Kerbside's
+  `ci-test-ansible-role.sh` (1436). Cut the A9 scaffolding first.
+* **Predating or fixed since, not findings.** P1: actions'
+  `ci-apply-deploy-profile.py:141,383` writes `ci-deploy-profile.json`,
+  which nothing reads (from `b525592`, before actions#181). P2:
+  `internal_ca/tasks/distribute_certificates.yml:32-37` creates
+  `/etc/pki/CA`, which nothing reads, since before #4430. P3: the
+  world-readable key defaults #4430 kept, fixed since by `48b827faaa`.
+  P4: the sixth plan reference, fixed since by `f8d3736f1e`.
+* Mechanical sweep triaged: the one `subprocess.check_call` (#4479) is
+  argv-form on a temp copy; #4430's `umask 277 && certtool` needs a
+  shell for the umask; Kerbside's four `except Exception` blocks each
+  reduce the error to a type name and none swallows silently;
+  `kerbside-ready.py:89` closes its session on every path.
+* Context for 7h and 7i: #4591 changed the role's content as well as
+  its home. `diff -r` of `roles/kerbside/` at `48849831c^1` against
+  `ansible/roles/kerbside/` at `$KTIP` shows 1384 changed lines.
+
+### Tests, 2b (7f)
+
+Read-only, sonnet at medium effort. Nothing blocking. For each success
+criterion, the test that fails before and passes after, and where it
+runs today:
+
+| Criterion | Test | Runs |
+|-----------|------|------|
+| Full inventory yields a Kerbside-routed `.vv` | `test_vdi_kerbside_exchange.py` | `debian-13-slim-tier`, weekly since #4653 |
+| Bring-your-own mints the key with no `sf-ctl` by hand | `ci-test-kerbside-cluster-config.sh` against a stub `sf-ctl`; `test_ctl.py` mocked | every merge, rootless only; no real lane |
+| Second deploy restarts nothing | the profile's `redeploy_check`, comparing each unit's `InvocationID` after the whole second deploy | weekly |
+| Merge-queue job with the feature on | the same lane | weekly, not the merge queue (S2) |
+| Kerbside's sf-e2e lane deploys through the collection | `sf-e2e-functional.yml` | nightly; nine consecutive passes 2026-10-19 to 10-27 |
+| SPICE certificates renew before expiry | `ci-test-internal-ca.sh` | every merge, but a 1-day and a 365-day certificate cannot pin the 90-day threshold: any value from 2 to 364 passes |
+
+Findings, all advisory and still true at the owning tip:
+
+1. **#4598 (S1).** `401 invalid token signature` means the kid is
+   cached; a stale set gives "unknown signing key". Kerbside's
+   `sf_token.py:134-149` folds every other `PyJWTError`, including
+   `ImmatureSignatureError` for a future `iat` with leeway 0, into that
+   message. Shaken Fist mints `iat`; Kerbside's unit tokens carry none.
+   No test in either repository can tell stale from wrong, and the
+   exchange test logs only the status and body. Reasoned from the code,
+   not reproduced; a unit test with a future `iat` would confirm it.
+2. Kerbside's `ci-test-ansible-role.sh` `run_register` deletes the
+   deployed-state marker and skips the `kerbside-services` tag, so the
+   restart decision and "marker only after ready" have no rootless
+   coverage; only the nightly twice-deploy covers them.
+3. `test_ci_deploy_profiles.py` does not assert that the Kerbside
+   profile lists `kerbside-*.service` in `redeploy_check` or exports
+   `SF_CI_EXPECT_VDI_CONSOLE_PROXY=1`; dropping either leaves the lane
+   green.
+4. The renewal threshold is unpinned, as in the table.
+5. The bring-your-own path has no real lane.
+6. `sf-client instance vdiconsolefile` runs against a real cluster
+   nowhere (client-python).
+7. S2, as in the table.
+8. Kerbside's host-subject fixture is a recorded copy, not a live check
+   (#4097 item 6).
+
+The deploy-twice check cannot be fooled by a notified-but-unrun handler,
+since it compares after the whole second deploy; its holes are that a
+unit new on the second run is allowed and an unanswering host is
+skipped. Also noted: `functional-tests.yml:279-280` and the
+cluster-config script's header still say no cluster lane turns the
+feature on, which has been false since #4479.
+
+### Documentation, 2c (7g)
+
+Read-only, sonnet at medium effort. Nothing blocking; eight advisory
+gaps. Facts checked against the code and found consistent across every
+page: the token duration, the key length minimums, the 365-day lifetime
+and 90-day renewal, the certificate paths and modes, the ports, the
+collection version range, the install step, and the sf-e2e schedule.
+The ranges added no README growth, no `AGENTS.md` change and no ASCII
+diagram; `ARCHITECTURE.md` grew by 10 lines of summary and links. The
+master plan's Execution table agrees with `index.md`. Pages read: here,
+`docs/operator_guide/{kerbside,vdi_console_tokens,installation}.md`,
+the collection README, `docs/developer_guide/{ci,standards}.md`,
+`docs/release_notes/v07-v08.md`, `ARCHITECTURE.md`; in Kerbside,
+`docs/use-cases/shakenfist.md`,
+`docs/{installation,configuration,network-ports,testing}.md`,
+`ansible/README.md`, `demo/README.md`; in actions,
+`docs/{actions,ci,consuming}.md`.
+
+1. The collection README's `0444` contradiction (7d); `:155` "Until this
+   release" is time-relative. Out of scope (#4548), fixed in the
+   follow-up.
+2. `docs/release_notes/v07-v08.md:105` calls `debian-13-slim-tier` a
+   merge row; `ci.md:50` and the README say weekly. Out of scope
+   (#4653), fixed in the follow-up.
+3. `docs/operator_guide/kerbside.md:33` says Shaken Fist's merge queue
+   deploys that shape. Same.
+4. `kerbside.md:32` says put Kerbside on a hypervisor; Kerbside's
+   `docs/use-cases/shakenfist.md:323-327` still calls co-location a CI
+   expedient. kerbside#592 missed it. Finding at `$KTIP`.
+5. Kerbside's `docs/network-ports.md:66-73` says its 5900 and 5901
+   contend with hypervisor SPICE ports; Shaken Fist allocates console
+   ports from a higher range, and `kerbside.md:51-53` says the defaults
+   clear them. Finding at `$KTIP`.
+6. No Shaken Fist page states the Kerbside 0.7.0 floor the role's
+   `kerbside_package` default (`>=0.7.0`) enforces; the release note's
+   discussion of 0.6.0 is about the cleanup defect and reads as the
+   target. Finding.
+7. `functional-tests.yml:279-280` says no cluster lane turns Kerbside
+   on. False since #4479. Finding.
+8. `kerbside.md:158-160` says `group_vars/kerbside` keeps `kerbside_url`
+   the same on every host, then says to put it in `group_vars/all`, as
+   `installation.md:242-244` and `site.yml:44-46` require. Finding.
+
+### Security, 2d (7h)
+
+Read-only, opus at high effort; one probe run under the worktree's
+`.tox/py3` interpreter with `-B -I` and an empty environment, writing
+nothing. No critical or high finding; two medium, five low, five
+informational. The full examination per area is in the session's
+record; what matters here:
+
+* **Who can read `kerbside_system_key`.** At every step through the
+  deploy it is on stdin under `no_log`, hashed in Shaken Fist's
+  database, and `root:kerbside 0640` in `sources.yaml`. Every process
+  running as `kerbside` can read it, Kerbside's database stores it in
+  plaintext in `sources.password` on every scrape (predates the
+  ranges), and it crosses the network in `POST /auth` every 60 seconds.
+* **M1 (medium, advisory).** The key is minted with no scopes
+  (`namespace.py:285-286`), so it is cluster admin: a compromise of the
+  Kerbside host, the `kerbside` user or Kerbside's database is a
+  compromise of the cluster. kerbside#444 is graded here, and it is
+  worse than documented. Shaken Fist has enforced scopes since
+  `451a0ef2d0`, so `kerbside.md:351-356`'s "no narrower key" is stale,
+  and `bootstrap-system-key` has no scope option. kerbside#587's
+  adversarial driver depends on the key's write power.
+* **M2 (medium, advisory; low on a trusted backend network).** Nothing
+  refuses an `http://` `api_url` on a dedicated Kerbside host
+  (`kerbside_source.yml:52-81`), and the CI profile uses one. The
+  trust-store workaround in `kerbside.md:345-350` probably fails: the
+  venv's `requests` uses certifi, the venv has no system site-packages,
+  and the units set no `REQUESTS_CA_BUNDLE`. Not run on a deployed host;
+  reasoned from `bootstrap.yml:64-69,112-128`.
+* **L1.** A Kerbside host whose `kerbside_system_key` is the deploy key
+  passes every check and authenticates as `deploy`, because the equality
+  assert in `kerbside_credentials.yml:42-49` runs once with the database
+  host's variables and `kerbside_source.yml:27-34` checks non-emptiness
+  only.
+* **L2.** A trailing slash in `kerbside_url`, or a differing value on an
+  `allsf` host other than the first, passes validation; see 7i's F3.
+* **L3.** `kerbside_preflight.yml` compares exact uppercase names, but
+  `config.py:196` exports whatever name the row has and pydantic-settings
+  matches case-insensitively, so a lowercase `extra_config` row shadows
+  the variable unrefused. Confirmed with the probe. Predating and
+  separate: `SECRET_CONFIG_KEY_RE` is case-sensitive too.
+* **L4.** Since #4442 `show-config` exempts values by runtime type, and
+  `set-config` coerces all-digit values to `int`, so an all-numeric
+  secret is printed, and `site.yml:793-802` logs that output on every
+  deploy. Fix: exempt by the field's declared type.
+* **L5 (Kerbside).** `kerbside_pip_extra` goes into shell tasks without
+  `no_log` while the argument spec suggests `--index-url`.
+* **I1 to I5.** Newlines are not refused in `kerbside_url`, the FQDN,
+  the SQL URL or the seed before rendering; a `kerbside_public_fqdn`
+  equal to an `allsf` host name yields a key satisfying that
+  hypervisor's pinned subject; `kerbside_pki_dir` set to the SPICE
+  directory on a co-located hypervisor overwrites QEMU's key; CI attaches
+  the direct `.vv` with its password where the Kerbside one is redacted
+  (`vdi.py:101-106`); actions' `deploy-collection.sh` installs profile
+  collections with `--force` into a path that persists on static runners.
+* **Holds.** #4099: the live check exists at
+  `test_vdi_kerbside_exchange.py:255` and reads every `sf-*` main PID's
+  environment, failing on an empty one. #4416 fixed since by `48b827faaa`.
+  Certificates: newline and file-name validation in `internal_ca`
+  satisfies the path-traversal block; the proxy verifies backends
+  against the source CA and pinned subject. No injection or traversal:
+  every shell task is argv-form or quotes validated names, every script
+  uses `mktemp -d` with a trap, no argument comes from inventory, and
+  Kerbside's Galaxy publish passes its token only through `env`.
+
+### The seam lens (7i)
+
+Read-only, opus at high effort. Fifteen seams graded; the full table is
+in the session's record and summarised here.
+
+* **Covered (the mechanism named):** `kerbside_url` equality (the
+  wiring test on every merge, both lanes exchange); `kerbside_system_key`
+  (the fetch authenticates with it, so the wait fails if refused); the
+  public-key document's shape (the exchange in both lanes); the
+  readiness wait, for what it checks; the source `ca_cert` (the wiring
+  test compares bytes); proxy certificate placement (the wiring test
+  against the installed role; the weekly lane's TLS handshake);
+  `kerbside_sources` (the wiring test runs Kerbside's own checker from
+  the release); the reserved ports' shape; the version floor (the wiring
+  test installs the real release); the role interface; `test_env`;
+  Kerbside's `.vv`; the `collections` key's shape; the `kid`, `aud`,
+  `exp`, `sub` and `jti` claims; the host-subject rules by real message,
+  weekly only.
+* **Fixture-only:** the `iat` claim (Kerbside's test tokens carry none,
+  and the nightly lane mints and verifies on one host, so it cannot see
+  clock skew); a dedicated Kerbside host outside `allsf` (neither lane
+  deploys one); the host-subject rules offline (#4097 item 6); the
+  reserved-port values (hand-copied twice); the deploy-profile schema
+  offline (copied in both directions).
+* **Uncovered:** a trailing slash on `kerbside_url` (F3); signing-key
+  rotation or re-mint across the seam (no lane rotates and then
+  exchanges).
+* **What only the weekly lane exercises (S2):** the cross-host fetch and
+  verify, and so cross-host clocks; the Galaxy-form `collections` entry
+  and the release accept path; the IP-SAN certificate; the explicit
+  `.vv` and TLS checks. The strongest mechanism this plan built is the
+  wiring test's install of the released role, which turns most ansible
+  seams into contract tests against a real artifact on every merge.
+
+**#4598, read against the code.** The run's base `ce8d0641b7` predates
+#4591, so it deployed Shaken Fist's copy of the role; the wait task's
+semantics are unchanged at `$KTIP`. The wait proves that a credentialed
+`GET /admin/vditokenpubkey` returned 200 after the CA matched, and that
+the row was stored; it does not prove the set contains the active kid or
+that a token verifies. The key is minted before the first fetch by play
+order. A second `site.yml` run never rotates, but if the direct read
+fails `ensure_signing_key` mints over the stored set (F4). A stale set
+persists about one 60-second tick while fetches succeed and without
+bound while they fail. The 401 text is `BadSignature`, raised only when
+the kid is cached and every decode failed, which includes a future
+`iat` under leeway 0; a missing kid gives "unknown signing key". So the
+issue's key-freshness reading is not what this code produces for a
+stale set. The 401 is consistent with a cached key that did not verify
+or with a token judged not yet valid on sf2, a different VM from the
+minting host. The code cannot say which, the logs cannot distinguish
+them, and the single-host nightly lane cannot reproduce the second.
+
+Findings (grades proposed; the disposition decides):
+
+* **F3.** A trailing slash on `kerbside_url` deploys cleanly, then every
+  exchange returns 401 `token audience rejected`: `instance.py:2210`
+  strips it from the audience, `kerbside.ini:25` renders it verbatim
+  and `sf_token.py:67-75` compares exactly. The equality check passes
+  because both sides see the same string, and no deploy-time step mints
+  a token. The `rstrip` predates the plan; the single-variable contract
+  is this plan's. Candidate blocking.
+* **F4.** `_direct_get_cluster_config_value` returns `None` on
+  `OperationalError` (`mariadb.py:24502-24506`), `ensure_signing_key`
+  treats `None` as absent and mints over the stored set
+  (`vdi_tokens.py:157-166`), and `kerbside_credentials.yml:64-68` now
+  runs it on every deploy with `changed_when: false`. In-flight tokens
+  die; Kerbside recovers through the unknown-kid path. Advisory.
+* **F5.** The readiness wait proves a fetch, not a usable key set
+  (`register.yml:210-245`); a deploy passes with F3, with clock skew, or
+  with a set lacking the active kid. Advisory, Kerbside.
+* **F1.** `BadSignature` is a catch-all and the fixtures carry no `iat`.
+  Predating; Kerbside.
+* **F6.** No real lane deploys Kerbside on a dedicated host, so phase 1's
+  issuance to a host outside `allsf`, the reachability probe of such a
+  host and the non-co-located reserved ports are fixture-only. Advisory.
+* **F7.** The exchange test keeps no diagnostic evidence on a 401
+  (`test_vdi_kerbside_exchange.py:132-169`). Advisory.
+* **F8.** Shaken Fist's daemon ports are hand-copied twice into the
+  reserved list (`kerbside_source.yml:147-152`,
+  `ci-test-kerbside-wiring.sh:733`). Advisory.
+* **F9.** The deploy-profile schema is copied in both directions;
+  neither side reads the other's real file. Advisory.
+* Cheapest changes, per seam: refuse a trailing slash in
+  `kerbside_source.yml` with a wiring case (about 20 lines); rotate in
+  the nightly lane and make `ensure_signing_key` raise on a read failure
+  (about 35); have `kerbside-ready.py` print the cached kids and
+  `site.yml` assert the active kid is among them (about 25); catch
+  `ImmatureSignatureError` separately with a small leeway and add `iat`
+  to the fixtures (about 25), and record the unverified claims and
+  Kerbside's `Date` header on a failed exchange (about 15); a unit test
+  comparing the reserved ports with `SFConfig` (about 20); have the
+  wiring test validate the real profile with actions'
+  `ci-apply-deploy-profile.py` (about 10). A dedicated-host lane needs
+  an actions topology.
+
+### The cross-repository floor (7j)
+
+Read-only, opus at medium effort. Verdicts, five items by five ranges:
+
+| Item | kerbside#580 | kerbside#587 | kerbside#592 | actions#181 | actions#195 |
+|------|--------------|--------------|--------------|-------------|-------------|
+| 1. Landing form | pass | pass | pass | pass | pass |
+| 2. Unattended work reports failure | pass | pass | n/a | n/a | n/a |
+| 3. Secrets, hosts, addresses | pass | pass | pass | pass | pass |
+| 4. Removed names have no consumer | n/a | K-2, S-1 | n/a | n/a | pass |
+| 5. Broken change fails closed | K-1 | n/a | n/a | pass | pass |
+
+All five, and #4591, are two-parent merges and ancestors of their
+repository's tip. Item 2: kerbside#587's `sf-e2e-functional.yml` files
+an issue from the nightly job through `app/github-actions` (kerbside#579
+was filed that way, not by hand as the brief said), and the last five
+nightlies passed; outside these ranges, a failing nightly
+`sanity_checks` is filed under the oVirt and OpenStack issue titles
+(O-1, from `f303061`). Item 3: the greps for private-key headers,
+literal passwords, the private domain and RFC 1918 addresses printed
+only CI fixture values, three fixture passwords redacted in the record.
+Item 4: `git grep` for `deploy-kerbside-on-shakenfist`,
+`ci-test-kerbside-role`, `shakenfist.shakenfist.kerbside`,
+`roles/kerbside` and `deploy-kerbside.sh` across `shakenfist`,
+`kerbside`, `actions`, `client-python` and the `33fl` checkout on this
+host, excluding plans, the docs mirror and review-tracking files, found
+two stale citations and nothing executable; the operator's cloud
+deployment repositories could not be grepped. Item 5: `site.yml`'s
+version check refuses an out-of-range or unversioned collection and
+accepts a bad release inside the range, which is correct: the guard
+against a bad publish is the CI gate, which `5c73ecb` added after #580
+(as #580 left `release.yml` there was none, and v0.8.0 shipped inside
+that window: fixed since).
+
+* **K-1 (Kerbside, advisory).** `release.yml`'s `sign-tag` needs only
+  `build` and `build-proxy-wheels`, so a failed collection build still
+  publishes both packages to PyPI while Galaxy and the GitHub release are
+  skipped: a partial release, contrary to `sign-tag`'s own comment.
+* **K-2 (Kerbside, advisory).** `docs/use-cases/multi-cloud.md:161`
+  cites the deleted `tools/sf-e2e/deploy-kerbside.sh`.
+* **S-1 (advisory).** `kerbside-slim-tier.yml.j2:68` cites the same
+  deleted script (7e's A3).
