@@ -410,11 +410,15 @@ class HardDeleteObjectsLiveTestCase(base.ShakenFistTestCase):
                 self._assert_all(object_type, untouched, 1)
 
     def test_failure_part_way_rolls_everything_back(self):
-        # The third of the blob's four statements fails, after the state
-        # delete and the first two have run in the same transaction.
+        # The blob's attributes statement fails, after the state delete
+        # and the statements ahead of it have run in the same
+        # transaction. It is found by name, not position, so adding a
+        # statement to the blob's batch does not break the test.
         names = mariadb.HARD_DELETE_BATCH_FUNCTIONS[ObjectType.BLOB]
-        self.assertEqual('delete_blob_attributes', names[2])
-        broken = mariadb.HARD_DELETE_STATEMENTS[names[2]]._replace(
+        failing = 'delete_blob_attributes'
+        self.assertGreaterEqual(names.index(failing), 2)
+        self.assertLess(names.index(failing), len(names) - 1)
+        broken = mariadb.HARD_DELETE_STATEMENTS[failing]._replace(
             build=lambda t, u: sa.text(
                 'DELETE FROM blob_attributes WHERE no_such_column = 1'))
 
@@ -422,7 +426,7 @@ class HardDeleteObjectsLiveTestCase(base.ShakenFistTestCase):
             with self.subTest(unconditional=unconditional):
                 uuid = self._seed(ObjectType.BLOB, 'deleted', self.old)
                 with mock.patch.dict(mariadb.HARD_DELETE_STATEMENTS,
-                                     {names[2]: broken}), \
+                                     {failing: broken}), \
                         mock.patch('shakenfist.mariadb.LOG') as mock_log:
                     if unconditional:
                         deleted = mariadb.hard_delete_objects(
