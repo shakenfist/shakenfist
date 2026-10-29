@@ -27,17 +27,48 @@ CONSOLE_PORT_MIN = 30000
 CONSOLE_PORT_MAX = 50000
 
 
+# A line configparser reads as the password key, in any section: leading
+# whitespace, which it strips, the key in any case, since it lowercases keys,
+# and any horizontal whitespace before the '='. The rest of the line is the
+# value, up to but not including the line ending, so CRLF input keeps its CR.
+VV_PASSWORD_LINE = re.compile(r'(?mi)^([ \t]*)password[ \t]*=[^\r\n]*')
+VV_WITHHELD = '<.vv file withheld: a password survived redaction>'
+
+
+def _vv_parser():
+    """The parser a .vv file is read with, here and in _parse_vv.
+
+    Values are taken literally: no interpolation, and only '=' delimits,
+    since the ca and host-subject values carry ':' and ','.
+    """
+    return configparser.ConfigParser(delimiters=('=',), interpolation=None)
+
+
 def redact_vv(vv_text):
     """A .vv file with its password removed, for the test log.
 
     The password is a live console credential: Kerbside's for a minute, a
-    hypervisor's for as long as the instance keeps it. Matches every line
-    _parse_vv's configparser reads as the password key: the key in any
-    case, since configparser lowercases keys, and any horizontal whitespace
-    before the '=', which it strips. An indented line is a continuation of
-    the value above there, not a key, so it is left alone.
+    hypervisor's for as long as the instance keeps it, and the logs are
+    public. Every line configparser would read as the password key is
+    replaced, in any section, and then the result is read back with the
+    parser _parse_vv uses to prove it: if any section still carries a
+    password other than the marker, or the result does not parse, the
+    whole file is withheld rather than attached. That is what covers a
+    password whose value continues on an indented line, which no line
+    match can see. An indented line which merely continues another value
+    and happens to look like a password line is redacted too, which costs
+    nothing.
     """
-    return re.sub(r'(?mi)^password[ \t]*=.*$', 'password=<redacted>', vv_text)
+    redacted = VV_PASSWORD_LINE.sub(r'\1password=<redacted>', vv_text)
+    cp = _vv_parser()
+    try:
+        cp.read_string(redacted)
+    except configparser.Error:
+        return VV_WITHHELD
+    for section in [cp.default_section] + cp.sections():
+        if cp[section].get('password', '<redacted>') != '<redacted>':
+            return VV_WITHHELD
+    return redacted
 
 
 class BaseVDIConsoleTestCase(base.BaseNamespacedTestCase):
@@ -103,11 +134,9 @@ class BaseVDIConsoleTestCase(base.BaseNamespacedTestCase):
     def _parse_vv(self, vv_text):
         """Parse a .vv file and return its [virt-viewer] section.
 
-        The file must parse as an INI with a [virt-viewer] section. Values
-        are taken literally: no interpolation, and only '=' delimits, since
-        the ca and host-subject values carry ':' and ','.
+        The file must parse as an INI with a [virt-viewer] section.
         """
-        cp = configparser.ConfigParser(delimiters=('=',), interpolation=None)
+        cp = _vv_parser()
         cp.read_string(vv_text)
         self.assertIn('virt-viewer', cp.sections())
         return cp['virt-viewer']
