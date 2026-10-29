@@ -180,7 +180,9 @@ it sets `KERBSIDE_URL`, creates the signing key and a dedicated
 `kerbside` system key, and writes Kerbside's `sources.yaml` with the
 cluster CA. Shaken Fist's
 [Kerbside guide](https://shakenfist.com/operator_guide/kerbside/)
-describes that path. The steps below are what the deploy does, and
+describes that path, and
+[Deploying Kerbside with Ansible](/components/kerbside/deployment/ansible/) describes
+the role it runs. The steps below are what the deploy does, and
 the path for a Kerbside deployed another way.
 
 ### Shaken Fist side

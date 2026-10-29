@@ -62,7 +62,7 @@ keeps the option of a second one without redeploying.
 | Mechanism | State on 2026-10-10 | Where |
 |-----------|---------------------|-------|
 | By hand: pip, a venv, two processes | The pieces are documented; turning them into durable services is not. Kerbside ships no systemd units. (Since #580 the role, now in this repository, carries both units as Jinja templates; phase 2 found this and ships static copies.) | `docs/installation.md` "What a running Kerbside needs"; the CI scripts above are the nearest thing to a recipe |
-| Shaken Fist's ansible collection | A `kerbside` role exists and is the most complete deployer Kerbside has: about 2000 lines, two systemd units, validation plays, and co-located or dedicated hosts. It writes exactly one `type: shakenfist` source (`templates/sources.yaml`). It also has a bring-your-own-Kerbside path: set `kerbside_url` with an empty `kerbside` group, and Shaken Fist is configured for a Kerbside it does not deploy. | `shakenfist/deploy/collection/roles/kerbside/`; being built by `PLAN-kerbside-deployer.md`, phases 1 to 3 merged, phase 4 open as shakenfist#4479 |
+| The `shakenfist.kerbside` ansible collection | Its `kerbside` role is the most complete deployer Kerbside has: about 2400 lines, two systemd units, validation plays, and co-located or dedicated hosts. It writes a `kerbside_sources` list of any source type, but installs only the Shaken Fist client (#602) and writes fifteen fixed `kerbside.ini` settings. Shaken Fist's `site.yml` runs it, and has a bring-your-own-Kerbside path: set `kerbside_url` with an empty `kerbside` group, and Shaken Fist is configured for a Kerbside it does not deploy. (Phase 5's survey corrected this row, which still described the role as Shaken Fist's.) | `ansible/` in this repository, published to Galaxy since v0.8.0; `ansible/README.md`; Shaken Fist's `docs/operator_guide/kerbside.md` for the cluster side |
 | Kolla-Ansible | The Kolla image build merged upstream (kolla 975495). The deployment (kolla-ansible 976889) and four CI and enablement changes are still open. | `kerbside-patches`; `docs/use-cases/openstack.md` "Deployment" |
 | Docker compose | Demo only, and labelled that way. Builds its image locally. | `demo/`; `installation.md` "Try it: the demo stack" |
 | A first-party container image | None. Kolla publishes `kerbside-api` and `kerbside-proxy` images on quay.io (`openstack.kolla`), built from Kerbside's `develop` branch rather than a release, and started through Kolla's `config.json` and `kolla_start` conventions. They are the only published Kerbside images. (Phase 4's survey corrected this row, which had not said where they are published or what they are built from.) | - |
@@ -257,8 +257,8 @@ would creep back in. **Recommendation: yes.** Extend
 | 1. Survey, matrix and scaffolding | [PLAN-deployment-options-phase-01-survey-and-scaffolding.md](/components/kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/) | Complete | 200d6b3 |
 | 2. By hand: pip, venv and systemd | [PLAN-deployment-options-phase-02-manual.md](/components/kerbside/plans/PLAN-deployment-options-phase-02-manual/) | Complete | b10f2ac |
 | 3. OpenStack: Kolla-Ansible, and Kerbside in front of OpenStack | [PLAN-deployment-options-phase-03-openstack.md](/components/kerbside/plans/PLAN-deployment-options-phase-03-openstack/) | Complete | d159d17 |
-| 4. Containers: compose beyond the demo, and Kubernetes | [PLAN-deployment-options-phase-04-containers.md](/components/kerbside/plans/PLAN-deployment-options-phase-04-containers/) | In progress | |
-| 5. Ansible: the `kerbside` role | | Not started | |
+| 4. Containers: compose beyond the demo, and Kubernetes | [PLAN-deployment-options-phase-04-containers.md](/components/kerbside/plans/PLAN-deployment-options-phase-04-containers/) | Complete | 46a03a6 |
+| 5. Ansible: the `kerbside` role | [PLAN-deployment-options-phase-05-ansible.md](/components/kerbside/plans/PLAN-deployment-options-phase-05-ansible/) | In progress | |
 | 6. Installation hand-off and closeout | | Not started | |
 | 7. Push audit | | Not started | |
 
@@ -308,13 +308,14 @@ image is not a general-purpose image, and the status of
 Kubernetes. Links the image issue. Planned at medium effort.
 
 **Phase 5: Ansible.** `docs/deployment/ansible.md`. It describes
-the role wherever it lives at that point, and links to Shaken
-Fist's operator guide for the parts Shaken Fist owns. It also
-covers the bring-your-own-Kerbside path, which is how a Shaken
-Fist cluster joins a front-door Kerbside. The role move was
-accepted, so this phase documents a Kerbside-owned role that
-accepts several sources. The move has landed (see Dependencies
-on other plans), so this phase is unblocked. Phase 2 found that
+the role, which now lives in this repository's `ansible/`, and
+links to Shaken Fist's operator guide for the parts Shaken Fist
+owns. That guide (`docs/operator_guide/kerbside.md`, added
+2026-10-23) already covers the bring-your-own-Kerbside path, which
+is how a Shaken Fist cluster joins a front-door Kerbside, so this
+page links it rather than covering it; phase 5's survey corrected
+this. The collection's `ansible/README.md` is the role's variable
+reference, and the page links that too. Phase 2 found that
 the role installs no client library but `shakenfist-client`, so it
 cannot yet deploy a working oVirt or OpenStack source or a Keystone
 login (#602), and the index's sources cell for the role says so;
