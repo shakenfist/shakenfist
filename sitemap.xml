@@ -745,6 +745,10 @@
          <lastmod>2026-10-29</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-bat-population-phase-06-emitter/</loc>
+         <lastmod>2026-10-29</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bat-population/</loc>
          <lastmod>2026-10-29</lastmod>
     </url>
@@ -1665,6 +1669,14 @@
          <lastmod>2026-10-29</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/performance/dbus-display-spike/</loc>
+         <lastmod>2026-10-29</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/performance/dbus-helper-measurements/</loc>
+         <lastmod>2026-10-29</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/kerbside/performance/proxy-backpressure/</loc>
          <lastmod>2026-10-29</lastmod>
     </url>
@@ -1682,6 +1694,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/performance/transcoding-switching/</loc>
+         <lastmod>2026-10-29</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/performance/dbus-helper/summary/</loc>
          <lastmod>2026-10-29</lastmod>
     </url>
     <url>
@@ -1758,6 +1774,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-deployment-options-phase-06-installation/</loc>
+         <lastmod>2026-10-29</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-deployment-options-phase-07-push-audit/</loc>
          <lastmod>2026-10-29</lastmod>
     </url>
     <url>
@@ -1946,6 +1966,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/</loc>
+         <lastmod>2026-10-29</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike/</loc>
          <lastmod>2026-10-29</lastmod>
     </url>
     <url>

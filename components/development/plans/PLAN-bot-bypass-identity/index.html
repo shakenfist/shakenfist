@@ -8027,6 +8027,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/performance/dbus-helper-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A SPICE helper on qemu's D-Bus display, on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/dbus-display-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A SPICE helper on qemu's D-Bus display: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/performance/proxy-backpressure/" class="md-nav__link">
         
   
@@ -8183,6 +8239,89 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8_12_9" id="__nav_3_8_12_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dbus Helper
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Dbus Helper
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/dbus-helper/summary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pooled summary of the D-Bus helper measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -8734,6 +8873,34 @@
     
   
     Deployment options phase 6: installation hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-deployment-options-phase-07-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 7: push audit
   
 
     
@@ -9322,6 +9489,34 @@
     
   
     Phase 4: Port latency loadtest to control socket
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Son of SPICE, a D-Bus display feasibility spike
   
 
     
@@ -16866,7 +17061,7 @@ skipping review, required checks and the merge queue.</p>
 and <code>repos/shakenfist/&lt;r&gt;/collaborators/shakenfist-bot/permission</code>
 reports <code>admin</code> in all ten of shakenfist, kerbside, ryll, instar,
 hunkydory, client-python-k3s, actions, development, sfui and
-kerbside-client. (<code>sfconductor</code> is an ordinary member.) No ruleset
+kerbside-client, and in andris (checked 2026-10-30). (<code>sfconductor</code> is an ordinary member.) No ruleset
 names <code>OrganizationAdmin</code> or the admin repository role as a bypass
 actor today, so ownership does not bypass anything by itself. But a
 repository admin can rewrite the ruleset, and can widen an
@@ -16897,7 +17092,7 @@ one of the two in scope:</p>
 </tr>
 <tr>
 <td><code>DEPENDENCIES_TOKEN</code></td>
-<td><code>prune-reviews.yml</code> in actions, development, hunkydory, kerbside, kerbside-client, ryll, sfui</td>
+<td><code>prune-reviews.yml</code> in andris, hunkydory, kerbside, ryll (in actions, development, kerbside-client and sfui it resolves to nothing, so the push uses <code>github.token</code>)</td>
 <td><code>push</code>, <code>schedule</code>, <code>workflow_dispatch</code></td>
 </tr>
 <tr>
@@ -16933,12 +17128,23 @@ above, which the templates already say are guarded against forks
 and against accident, but not against a writer
 (<code>templates/pin-indirect-dependencies/pin-indirect-dependencies.yml:58-65</code>).</p>
 <p><strong>Where the secrets live is not visible to this repository.</strong>
-<code>actions</code> has no repository secrets at all, yet its
-<code>prune-reviews</code> pushed as <code>shakenfist-bot</code> 44 times in a quarter,
-so at least <code>DEPENDENCIES_TOKEN</code> is an organisation secret. Its
-visibility (all repositories, or selected ones) needs <code>admin:org</code>
-to read. If it is visible to every repository, a push of a new
-workflow to any branch of any of them reaches it.</p>
+<code>actions</code> has no repository secrets at all, and its
+<code>prune-reviews</code> commits are authored by <code>shakenfist-bot</code>, but that
+is <code>ci-prune-reviews.sh</code> setting <code>git config user.name</code>, not the
+token: its ruleset rule suites show those pushes made by
+<code>github-actions[bot]</code>, as are sfui's and kerbside-client's, while
+ryll's are made by <code>shakenfist-bot</code> (checked 2026-10-29). Checked
+with <code>repos/&lt;r&gt;/actions/secrets</code> and
+<code>repos/&lt;r&gt;/actions/organization-secrets</code> the same day:
+<code>DEPENDENCIES_TOKEN</code> is a repository secret in shakenfist,
+client-python, hunkydory, kerbside and ryll, and absent from
+actions, development, kerbside-client and sfui. andris lacked it
+until 2026-10-29 18:39 UTC, so its <code>prune-reviews</code> pushes, made by
+<code>github-actions[bot]</code>, were rejected by its ruleset (six times that
+month); since it was added they land as <code>shakenfist-bot</code>. The only
+organisation secrets those ten can see are <code>RENOVATE_TOKEN</code>, and
+<code>GITLAB_TESTDATA_TOKEN</code> in shakenfist. Their visibility beyond that
+needs <code>admin:org</code> to read.</p>
 <p><strong>Only one job needs the bypass.</strong> The ruleset rule-suite history
 for the last month shows what the bypass is actually used for:</p>
 <table>

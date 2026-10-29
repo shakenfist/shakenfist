@@ -7988,6 +7988,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/performance/dbus-helper-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A SPICE helper on qemu's D-Bus display, on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/dbus-display-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A SPICE helper on qemu's D-Bus display: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/performance/proxy-backpressure/" class="md-nav__link">
         
   
@@ -8144,6 +8200,89 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8_12_9" id="__nav_3_8_12_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dbus Helper
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Dbus Helper
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/dbus-helper/summary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pooled summary of the D-Bus helper measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -8695,6 +8834,34 @@
     
   
     Deployment options phase 6: installation hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-deployment-options-phase-07-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 7: push audit
   
 
     
@@ -9283,6 +9450,34 @@
     
   
     Phase 4: Port latency loadtest to control socket
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Son of SPICE, a D-Bus display feasibility spike
   
 
     
@@ -17467,13 +17662,13 @@ rather than merge requests.</p>
 <tr>
 <td>5. VHDX geometry: default block size (#645), 64 TiB ceiling, one shared layout</td>
 <td><a href="/components/instar/plans/PLAN-bat-population-phase-05-geometry/">PLAN-bat-population-phase-05-geometry.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>52518787</code> (#848)</td>
 </tr>
 <tr>
 <td>6. Streaming BAT emitter and the fixed <code>plan_vhdx</code></td>
-<td>PLAN-bat-population-phase-06-emitter.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-bat-population-phase-06-emitter/">PLAN-bat-population-phase-06-emitter.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -17656,6 +17851,22 @@ bit as 1 for the BAT and metadata regions, and every pinned qemu
 build writes 0. Phase 5's survey found a second: instar writes a
 physical sector size of 4096 and every pinned qemu case records 512.
 Phase 5 moves the value into the shared layout unchanged.</p>
+<p>Its own survey found three more: the metadata items' flags and their
+placement (Page 83 third, not last), both in the same builders, and
+dynamic <code>create</code>'s file length (4 MiB, where qemu extends to its data
+start). With the two above they are every field the structural
+comparator sees differ between instar's dynamic <code>create</code> and qemu's,
+apart from the BAT state open question 7 keeps. The file length stays,
+as Future work. The
+builders serve create, convert and resize alike, so fixing them
+changes the bytes of every VHDX instar writes. The phase does that,
+and its back brief puts the choice of qemu's values over those of
+the two non-qemu fixtures (Required 1, and in one a 4096-byte physical
+sector) to the operator. The crate tests compare against the qemu pins,
+copied in, not against the phase 2 fixtures, because <code>make test-rust</code>
+cannot see instar-testdata. The filler lives in the vhdx crate, beside
+the layout, because convert does not link the create crate (see the
+phase 6 plan).</p>
 <p><strong>Phase 7</strong> wires create end to end: the guest streams the BAT
 through one slot and extends the file to <code>data_start +
 virtual_size</code>, exactly as <code>emit_qcow2_l2_and_extend</code> does for qcow2
@@ -18298,7 +18509,11 @@ chosen to defer to here, so that we do not forget them.</p>
   sits right behind it), and extend the file. Until then <code>resize</code>
   refuses fixed VHDX (open question 6).</li>
 <li><code>block_state_zero</code> for dynamic VHDX, in create and convert (open
-  question 7), once someone needs the bytes to match.</li>
+  question 7), once someone needs the bytes to match. A byte match
+  also needs dynamic <code>create</code> to extend the file to qemu's data start
+  (<code>bat_offset + bat_region_len + 5 MiB</code>, 8 MiB at most sizes) rather
+  than stopping at the end of the metadata region (4 MiB); phase 6's
+  survey found it is the only other field in which the two differ.</li>
 <li><code>-o log_size</code> honoured rather than accept-ignored. It moves qemu's
   BAT, and so its data region, by the log's size.</li>
 <li><code>convert -O vpc</code> fixed output. instar converts to dynamic VHD only;
@@ -18377,6 +18592,11 @@ Found while planning, and assigned to phases above:</p>
   qemu writes 0. Phase 6.</li>
 <li>instar writes a VHDX physical sector size of 4096; qemu writes 512.
   Phase 6.</li>
+<li><code>build_metadata</code> flags the four per-virtual-disk metadata items
+  IsRequired alone (0x4), where qemu and both non-qemu fixtures write
+  IsRequired | IsVirtualDisk (0x6), and its comment says it writes
+  both bits. It also places the Page 83 item last, where qemu puts it
+  third. Phase 6.</li>
 <li><code>instar create -f vhdx</code> records a virtual size that is not a
   multiple of 512, which SPEC(VHDX) forbids and qemu-img rounds away
   (#843). Phase 5.</li>

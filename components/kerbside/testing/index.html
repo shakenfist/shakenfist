@@ -8159,6 +8159,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../performance/dbus-helper-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A SPICE helper on qemu's D-Bus display, on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/dbus-display-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A SPICE helper on qemu's D-Bus display: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../performance/proxy-backpressure/" class="md-nav__link">
         
   
@@ -8315,6 +8371,89 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8_12_9" id="__nav_3_8_12_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dbus Helper
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Dbus Helper
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/dbus-helper/summary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pooled summary of the D-Bus helper measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -8866,6 +9005,34 @@
     
   
     Deployment options phase 6: installation hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-deployment-options-phase-07-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 7: push audit
   
 
     
@@ -9454,6 +9621,34 @@
     
   
     Phase 4: Port latency loadtest to control socket
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-spice-performance-phase-04-dbus-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Son of SPICE, a D-Bus display feasibility spike
   
 
     
@@ -17509,6 +17704,37 @@ against the relay:</p>
   made on first use and safe to delete. <code>quality.sh test</code> runs
   <code>test_quality.py</code>.</li>
 </ul>
+<p>The rig can also put a SPICE server other than qemu's own in front of
+the guest, and change the guest's display device:</p>
+<ul>
+<li><strong>A SPICE helper on qemu's D-Bus display.</strong> A <code>DISPLAYS</code> entry
+  whose streaming field is <code>helper</code> runs qemu with
+  <code>-display dbus,p2p=on</code> and no <code>-spice</code>, and puts
+  <a href="https://github.com/shakenfist/andris">andris</a> in front of it with
+  its qemu platform (<code>--platform qemu --qmp &lt;socket&gt;</code>). andris listens
+  on the port and ticket spice-server would have used, so the mock
+  control plane and the proxy see an ordinary SPICE server. With
+  <code>RYLL_BIN</code> and the rest set as for any run:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>tools/shaped-link/build-andris.sh<span class="w"> </span>/tmp/sl<span class="w">   </span><span class="c1"># andris at ANDRIS_REF, in Docker</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nv">Q</span><span class="o">=</span>qemu-system-x86_64<span class="w"> </span><span class="nv">G</span><span class="o">=</span>/tmp/sl/guest
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nv">ANDRIS_BIN</span><span class="o">=</span>/tmp/sl/andris/target/release/andris<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nv">DISPLAYS</span><span class="o">=</span><span class="s2">"off:</span><span class="nv">$Q</span><span class="s2">:off:</span><span class="nv">$G</span><span class="s2"> helper:</span><span class="nv">$Q</span><span class="s2">:helper:</span><span class="nv">$G</span><span class="s2">"</span><span class="w"> </span><span class="nv">CONFIGS</span><span class="o">=</span>relay:0:0<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span>tools/shaped-link/run-matrix.sh
+</code></pre></div>
+<p><code>build-andris.sh</code> builds from a sibling <code>../andris</code> checkout when
+  there is one (<code>ANDRIS_SRC</code> overrides it), at a pinned commit
+  (<code>ANDRIS_REF</code>), with <code>make release FEATURES=qemu</code> in andris's own
+  Docker image. <code>ANDRIS_ARGS</code> passes extra andris flags. A helper case
+  adds andris's CPU time and RSS to <code>proc.txt</code> as a line of its own,
+  so <code>summarise.py</code> reports qemu and andris separately. It also writes
+  <code>andris.log</code>, and an <code>andris-died</code> marker if andris exited mid-case,
+  which counts like <code>qemu-died</code>. On the backend leg, the <code>ss</code> columns
+  that name qemu then describe andris's socket.
+- <strong>std-vga.</strong> <code>GUEST_VGA=std</code> gives every display in the run qemu's
+  std-vga in place of virtio-vga. The guest drives it with bochs-drm,
+  which <code>build-guest.sh</code> includes. std-vga has no <code>DIRTYFB</code>, so qemu
+  finds what changed by polling its dirty bitmap every 30 ms.</p>
 <h2 id="testing-the-spice-console-of-an-ovirt-vm">Testing the SPICE console of an oVirt VM<a class="headerlink" href="#testing-the-spice-console-of-an-ovirt-vm" title="Permanent link">&para;</a></h2>
 <p><code>tools/test-ovirt-console.py</code> is Kerbside's oVirt SPICE console probe.
 It connects to the oVirt engine API, finds the booted test VM (by
@@ -17516,10 +17742,10 @@ default any VM named <code>smoke-test-*</code>), checks that SPICE display is
 configured, and performs a SPICE protocol handshake against the
 console port. This is the Kerbside-specific check and lives here
 because we iterate on it alongside the proxy.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>tools/test-ovirt-console.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span>--url<span class="w"> </span>https://ovirt-engine.example/ovirt-engine/api<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span>--password<span class="w"> </span>secret<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span>--ca-file<span class="w"> </span>/path/to/ca.pem
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python<span class="w"> </span>tools/test-ovirt-console.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span>--url<span class="w"> </span>https://ovirt-engine.example/ovirt-engine/api<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span>--password<span class="w"> </span>secret<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span>--ca-file<span class="w"> </span>/path/to/ca.pem
 </code></pre></div>
 <p>The generic plumbing it builds on lives in the
 <a href="https://github.com/shakenfist/actions">shakenfist/actions</a> repo,
@@ -17575,9 +17801,9 @@ recreates its own database, <code>kerbside_locktest</code>, and builds the schem
 with the migrations, so the daemon's <code>kerbside</code> database is untouched.
 It is skipped unless <code>KERBSIDE_TEST_SQL_URL</code> is set, and runs locally
 against any MariaDB the URL's user may create that database on:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">KERBSIDE_TEST_SQL_URL</span><span class="o">=</span>mysql://kerbside:kerbside@127.0.0.1/kerbside_locktest<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>-v<span class="w"> </span>kerbside.tests.functional.test_session_ticket_lock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span>kerbside.tests.functional.test_column_widths
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">KERBSIDE_TEST_SQL_URL</span><span class="o">=</span>mysql://kerbside:kerbside@127.0.0.1/kerbside_locktest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>-v<span class="w"> </span>kerbside.tests.functional.test_session_ticket_lock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span>kerbside.tests.functional.test_column_widths
 </code></pre></div>
 <h3 id="values-fit-their-columns">Values fit their columns<a class="headerlink" href="#values-fit-their-columns" title="Permanent link">&para;</a></h3>
 <p>SQLite ignores a <code>VARCHAR</code>'s length, so a value too long for its
@@ -17910,7 +18136,7 @@ seconds, collects SPICE PING/PONG round-trip latency samples, and
 writes them to a CSV (one float per line, seconds). See the
 <a href="#ryll">Ryll section</a> above for a note on the metric definition.</p>
 <p>To build this OCI image, do this:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker build . -f loadtests/latency/Dockerfile -t kerbside-latency:latest
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>docker build . -f loadtests/latency/Dockerfile -t kerbside-latency:latest
 </code></pre></div>
 <p>For your convenience, there is also a version of this image at
 <a href="https://images.shakenfist.com/testimages/kerbside-latency.tar.gz">https://images.shakenfist.com/testimages/kerbside-latency.tar.gz</a></p>

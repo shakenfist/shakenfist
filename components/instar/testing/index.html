@@ -8025,6 +8025,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/performance/dbus-helper-measurements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A SPICE helper on qemu's D-Bus display, on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/dbus-display-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A SPICE helper on qemu's D-Bus display: the spike's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/performance/proxy-backpressure/" class="md-nav__link">
         
   
@@ -8181,6 +8237,89 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8_12_9" id="__nav_3_8_12_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dbus Helper
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Dbus Helper
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/performance/dbus-helper/summary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pooled summary of the D-Bus helper measurements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -8732,6 +8871,34 @@
     
   
     Deployment options phase 6: installation hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-07-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 7: push audit
   
 
     
@@ -9320,6 +9487,34 @@
     
   
     Phase 4: Port latency loadtest to control socket
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: Son of SPICE, a D-Bus display feasibility spike
   
 
     
@@ -19095,16 +19290,33 @@ deliberately broken emitter is not guarding what its name says it
 guards. See the VHD and VHDX notes in
 <a href="/components/instar/chain-config/#format-specific-notes">chain-config.md</a> for the
 composing path being guarded.</p>
-<p>There are <strong>130 cases</strong>, in eleven groups.</p>
-<p>Twenty-seven cover the writer. Fifteen mutate a library crate
+<p>There are <strong>139 cases</strong>, in eleven groups.</p>
+<p>Thirty-six cover the writer. Twenty-four mutate a library crate
 (<code>create</code>, <code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip
-test; twelve are caught by a Python integration test through the real
-binary. Ten of those twelve mutate the <code>create</code> guest operation, which
-is excluded from <code>cargo test --workspace</code>, so a unit test written
-beside that code would never run; the other two mutate the <code>create</code>
-crate but break something only an external parser can see. Going
-through the real binary means <code>make instar</code> before the test and again
-after the source is restored.</p>
+test. Two of those twenty-four guard the region table and metadata table
+every VHDX writer shares: one sets Required on the region entries
+again, and one flags a virtual-disk metadata item IsRequired alone,
+both of which qemu-img writes differently and no reader notices. Five
+more guard a fixed VHDX's data start and the filler that writes its
+BAT one buffer at a time: dropping the 5 MiB qemu-img leaves after the
+BAT region, interleaving sector bitmap slots every <code>chunk_ratio</code>
+entries instead of every <code>chunk_ratio + 1</code>, keeping a block offset on
+a <code>ZERO</code> entry, writing a payload entry into a sector bitmap slot, and
+writing one into the padding past the last entry. Each of those
+produces a BAT <code>qemu-img info</code> accepts, so only the pinned qemu-img
+structure and the forward map <code>p + p / chunk_ratio</code> catch them. Two
+more guard the File Parameters <code>LeaveBlocksAllocated</code> bit, which
+qemu-img sets for a fixed VHDX and only for one: setting it on a
+dynamic image, caught because a fixed plan's metadata must then
+differ from a dynamic one's by that bit alone, and clearing it on a
+fixed one, caught by reading a fixed image back against its pin. The
+remaining twelve writer cases are caught by a Python integration test
+through the real binary. Ten of those twelve mutate the <code>create</code> guest
+operation, which is excluded from <code>cargo test --workspace</code>, so a unit
+test written beside that code would never run; the other two mutate
+the <code>create</code> crate but break something only an external parser can
+see. Going through the real binary means <code>make instar</code> before the test
+and again after the source is restored.</p>
 <p>The other <strong>47 reader cases</strong> cover the reader — the VHD and VHDX arms of
 <code>read_chain_virtual_cluster</code>, the sector-bitmap helpers in the <code>vhd</code>
 and <code>vhdx</code> crates, and the per-chain judgement in <code>init_chain_states</code>
