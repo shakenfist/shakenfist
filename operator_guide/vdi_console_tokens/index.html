@@ -16796,8 +16796,12 @@ the first console is opened — for example so you can publish the public key to
 Kerbside before anyone opens a console — with the idempotent:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sf-ctl<span class="w"> </span>ensure-kerbside-signing-key
 </code></pre></div>
-<p>This prints the active key id and how many keys are published; it never
-prints private material and does nothing if a key already exists.</p>
+<p>This prints whether it created a key or found one already stored, the active
+key id and how many keys are published; it never prints private material and
+does nothing if a key already exists. If the stored key cannot be read -- the
+database is unreachable, say -- it exits non-zero rather than minting a
+replacement key over the stored set, which would invalidate every in-flight
+console token.</p>
 <div class="admonition warning">
 <p class="admonition-title">Provision the key before upgrading a cluster Kerbside already scrapes</p>
 <p>Do this <em>before</em> you roll the daemons, if Kerbside is already
