@@ -1,7 +1,7 @@
 # Installation
 
 This page takes you from nothing to a working, proxied SPICE console,
-and then points at the guide for the cloud you actually run. If you
+and then points at the pages on deploying Kerbside for real. If you
 would rather see Kerbside working before reading about it, skip to
 [Try it: the demo stack](#try-it-the-demo-stack).
 
@@ -359,18 +359,22 @@ each of these choices was made.
 
 ## Deploying for real
 
-Kerbside is deployed as a component of the cloud it serves, so the
-shape of a real deployment depends on which cloud that is. Start with
-the guide for yours:
+The default worth reaching for is a Kerbside deployed in front of the
+clouds rather than by one of them, so that one Kerbside can broker
+consoles from several sources and sit wherever its users are.
 
-| Deployment | Guide |
-|---|---|
-| oVirt | [use-cases/ovirt.md](/components/kerbside/use-cases/ovirt/) |
-| OpenStack | A sample Kolla-Ansible deployment lives in [kerbside-patches](https://github.com/shakenfist/kerbside-patches) |
-| Shaken Fist | [use-cases/shakenfist.md](/components/kerbside/use-cases/shakenfist/) |
-| Static targets | The demo above is the worked example |
+There is a page for each way of deploying it:
+[by hand, with pip, a venv and systemd](/components/kerbside/deployment/manual/), with
+[the Ansible role](/components/kerbside/deployment/ansible/), with
+[Kolla-Ansible from kerbside-patches](/components/kerbside/deployment/kolla-ansible/), or
+[in containers](/components/kerbside/deployment/containers/).
+[Deployment Options](/components/kerbside/index/#deployment-options) compares them: which
+sources each configures, and what Kerbside's CI tests.
 
-Whichever you pick, the pieces described in
+What each cloud needs from Kerbside, and what Kerbside needs from it,
+is in that cloud's page under [Use Cases](/components/kerbside/index/#use-cases).
+
+However you deploy it, the pieces described in
 [What a running Kerbside needs](#what-a-running-kerbside-needs) are
 the same, and two references apply throughout:
 [configuration.md](/components/kerbside/configuration/) for every setting, and

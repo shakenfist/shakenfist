@@ -341,6 +341,7 @@ nav:
                 - "Deployment options phase 3: OpenStack, by Kolla-Ansible and in front of it": components/kerbside/plans/PLAN-deployment-options-phase-03-openstack.md
                 - "Deployment options phase 4: containers": components/kerbside/plans/PLAN-deployment-options-phase-04-containers.md
                 - "Deployment options phase 5: the Ansible role": components/kerbside/plans/PLAN-deployment-options-phase-05-ansible.md
+                - "Deployment options phase 6: installation hand-off": components/kerbside/plans/PLAN-deployment-options-phase-06-installation.md
                 - "Host subject phase 1: subject pinning in shakenfist-spice-protocol": components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier.md
                 - "Host subject phase 2: kerbside adoption, CI proof, docs": components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption.md
                 - "Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange.md
@@ -374,6 +375,7 @@ nav:
                 - "Proxmox source phase 3a: minting at connect time": components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting.md
                 - "Proxmox source phase 3b: tunnel transport": components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport.md
                 - "Proxmox source phase 4: the source driver": components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver.md
+                - "Proxmox source phase 5: the CI lane": components/kerbside/plans/PLAN-proxmox-source-phase-05-ci-lane.md
                 - "Proxy dev releases phase 1: the publish workflow": components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow.md
                 - "Proxy dev releases phase 2: the committed dev specifier": components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier.md
                 - "Proxy dev releases phase 3: the contract handshake": components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake.md

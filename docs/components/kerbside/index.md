@@ -107,7 +107,7 @@ own.
 
 ### Use Cases
 
-One page per deployment permutation: what Kerbside is worth in that
+One page per cloud or topology: what Kerbside is worth in that
 setting, how the pieces fit together, and how to set it up. The last
 column names the CI lane that exercises the scenario end to end; see
 [testing.md](/components/kerbside/testing/) for what the lanes do and what the tiers mean.
@@ -146,16 +146,14 @@ deployed in front of the clouds rather than by one of them, because
 | [Kolla-Ansible (kerbside-patches)](/components/kerbside/deployment/kolla-ansible/) | Kerbside as a Kolla control-plane service, from patches carried in kerbside-patches while upstream review is open and maintained by rebase | OpenStack | `openstack_matrix`, nightly tier |
 | [Containers](/components/kerbside/deployment/containers/) | The `demo/` compose stack today, with no first-party image yet, so no production compose or Kubernetes support | Static (the compose demo) | `demo-compose`, advisory, path-filtered |
 
-Mechanisms whose name is not a link are planned rather than written; see
-[plans/PLAN-deployment-options.md](/components/kerbside/plans/PLAN-deployment-options/).
-
 ### Operator Documentation
 
 Guides for deploying and configuring Kerbside:
 
 - [Installation](/components/kerbside/installation/) - From `pip install` to a proxied
-  console: what a running Kerbside needs, the compose demo, and where to
-  go for your cloud. Its
+  console: what a running Kerbside needs, the compose demo, and a
+  pointer to the deployment pages: by hand, Ansible, Kolla-Ansible and
+  containers. Its
   [Upgrading](/components/kerbside/installation/#upgrading) section covers the upgrades
   which need an operator action, including the credential rotation
   required when coming from v0.6.0 or earlier

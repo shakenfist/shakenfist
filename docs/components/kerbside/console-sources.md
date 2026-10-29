@@ -342,7 +342,9 @@ ticket lasts 30 seconds from the mint, a length Proxmox does not let a caller
 choose, so `CONSOLE_TOKEN_DURATION` does not change it. A session's channels
 reuse the ticket until 10 seconds before it expires, and a channel which
 connects after that mints a fresh one. Minting a ticket replaces the VM's
-password, which does not disconnect clients already connected.
+password, which does not disconnect clients already connected. A second session
+to the same console does disconnect the first, because qemu's SPICE server
+serves one client at a time, as it does for any SPICE client.
 
 A mint reads the VM list and the VM's configuration before it asks for the
 ticket, and each request is bounded at 5 seconds. A failure denies the channel

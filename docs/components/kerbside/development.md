@@ -590,13 +590,15 @@ Pushing a `v*` tag triggers `release.yml`. Its jobs, in order:
 So tag a commit that is on `develop` and went through the merge queue,
 and wait for its `functional-tests.yml` run to finish first.
 
-The gate does not cover the oVirt and OpenStack cloud lanes, which run
+The gate does not cover the oVirt, OpenStack and Proxmox lanes, which run
 nightly rather than in the merge queue (see "CI tiers" in
 [testing.md](/components/kerbside/testing/#ci-tiers)). Before tagging, check that no
-`Nightly oVirt lane failing` or `Nightly OpenStack lane failing` issue
-is open and that the last nightly ran on or after the commit you are
-tagging. If not, dispatch `functional-tests.yml` on `develop` with both
-cloud targets selected and tag once it passes. A merge
+`Nightly oVirt lane failing`, `Nightly OpenStack lane failing` or
+`Nightly proxmox lane failing` issue is open and that the last nightly
+ran on or after the commit you are tagging. If not, dispatch
+`functional-tests.yml` on `develop` with both cloud targets selected,
+and `proxmox-functional.yml` on `develop` when its last nightly
+predates the commit, and tag once they pass. A merge
 that bypassed the queue has no merge queue run, so it cannot be
 released until a later non-docs queue entry has gone through the queue:
 one that changes something outside `docs/`, so the code lanes run. A
