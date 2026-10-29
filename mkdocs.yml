@@ -313,6 +313,7 @@ nav:
             - "The direct-qemu mock harness": components/kerbside/direct-qemu-harness.md
             - Deployment:
                 - "By hand": components/kerbside/deployment/manual.md
+                - "Ansible": components/kerbside/deployment/ansible.md
                 - "Kolla-Ansible": components/kerbside/deployment/kolla-ansible.md
                 - "Containers": components/kerbside/deployment/containers.md
             - Performance:
@@ -339,6 +340,7 @@ nav:
                 - "Deployment options phase 2: by hand, with pip, a venv and systemd": components/kerbside/plans/PLAN-deployment-options-phase-02-manual.md
                 - "Deployment options phase 3: OpenStack, by Kolla-Ansible and in front of it": components/kerbside/plans/PLAN-deployment-options-phase-03-openstack.md
                 - "Deployment options phase 4: containers": components/kerbside/plans/PLAN-deployment-options-phase-04-containers.md
+                - "Deployment options phase 5: the Ansible role": components/kerbside/plans/PLAN-deployment-options-phase-05-ansible.md
                 - "Host subject phase 1: subject pinning in shakenfist-spice-protocol": components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier.md
                 - "Host subject phase 2: kerbside adoption, CI proof, docs": components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption.md
                 - "Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange.md

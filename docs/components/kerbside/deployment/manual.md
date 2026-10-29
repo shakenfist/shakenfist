@@ -13,9 +13,8 @@ step below says what to create and why, so it translates into a Salt
 state, a Puppet manifest or a shell script as readily as into typing.
 
 If you can run Ansible, the role in Kerbside's `shakenfist.kerbside`
-collection
-([ansible/README.md](https://github.com/shakenfist/kerbside/blob/develop/ansible/README.md))
-is the tested way to get the same result: a CI lane deploys Kerbside
+collection ([Deploying Kerbside with Ansible](/components/kerbside/deployment/ansible/)) is the
+tested way to get the same result: a CI lane deploys Kerbside
 through it on every pull request. This page follows the role's tasks,
 and says so wherever it does something different.
 

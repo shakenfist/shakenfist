@@ -25,15 +25,23 @@ A plan is eligible for retirement when both of these hold:
 
 * its row in `docs/plans/index.md` has the status `Complete`,
   `Superseded` or `Abandoned`; and
-* no commit has touched the master plan, or any of its phase files,
-  for 90 days.
+* that status was reached more than 90 days ago: the clock starts
+  at the commit where the row last changed into a terminal status.
 
-The clock is the last commit rather than a date written into the
-plan, so plans do not have to start recording anything new, and a
-plan whose push-audit follow-ups are still landing is not yet
-eligible. `Superseded` and `Abandoned` plans retire on the same
-clock; for an abandoned plan, the reasoning worth keeping is usually
-why it was abandoned.
+The clock is the status change, read from the history of
+`docs/plans/index.md`, rather than the last commit touching the
+plan or a date written into it. Finished plans are edited all the
+time by changes that are not about them -- a sweep making links
+absolute, a template fix, and retirement itself rewriting pointers
+in other plans -- so a clock that restarts on every touch never runs
+out. A plan that is reopened and finished again starts a new clock.
+Only a change into a terminal status from one that is not starts
+the clock: a move from one terminal status to another, such as
+`Complete` to `Superseded`, and an edit that leaves the status
+alone, such as rewriting the row's link, do not.
+`Superseded` and `Abandoned` plans retire on the same clock; for an
+abandoned plan, the reasoning worth keeping is usually why it was
+abandoned.
 
 ## What retiring involves
 
