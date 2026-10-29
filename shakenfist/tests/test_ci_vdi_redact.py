@@ -142,6 +142,35 @@ class RedactVVTestCase(base.ShakenFistTestCase):
         self.assertNotIn('s3cret-two', out)
         self.assertEqual('<redacted>', self._password_of(out))
 
+    def test_tab_before_the_delimiter(self):
+        text = VV.replace('password=s3cret-one', 'password\t=s3cret-tab')
+        self.assertEqual('s3cret-tab', self._password_of(text))
+        out = vdi.redact_vv(text)
+        self.assertNotIn('s3cret-tab', out)
+        self.assertEqual('<redacted>', self._password_of(out))
+
+    def test_mixed_case_key(self):
+        # configparser lowercases keys, so these are the password too.
+        for line in ('Password=s3cret-three', 'PASSWORD = s3cret-four'):
+            text = VV.replace('password=s3cret-one', line)
+            self.assertEqual(line.split('=')[1].strip(),
+                             self._password_of(text))
+            out = vdi.redact_vv(text)
+            self.assertNotIn('s3cret-', out)
+            self.assertEqual('<redacted>', self._password_of(out))
+
+    def test_every_password_line_is_redacted(self):
+        text = VV + '[other]\npassword=s3cret-five\n'
+        cp = configparser.ConfigParser(delimiters=('=',), interpolation=None)
+        cp.read_string(text)
+        self.assertEqual('s3cret-five', cp['other']['password'])
+        out = vdi.redact_vv(text)
+        self.assertNotIn('s3cret-', out)
+        cp = configparser.ConfigParser(delimiters=('=',), interpolation=None)
+        cp.read_string(out)
+        self.assertEqual('<redacted>', cp['virt-viewer']['password'])
+        self.assertEqual('<redacted>', cp['other']['password'])
+
     def test_crlf_line_endings(self):
         text = VV.replace('\n', '\r\n')
         out = vdi.redact_vv(text)
@@ -153,8 +182,17 @@ class RedactVVTestCase(base.ShakenFistTestCase):
         # so it is not the password key and need not be touched.
         text = VV.replace('password=s3cret-one\n', '')
         text = text.replace('ca=-----BEGIN CERTIFICATE-----\n',
-                            'ca=-----BEGIN CERTIFICATE-----\n  password=notakey\n')
+                            'ca=-----BEGIN CERTIFICATE-----\n'
+                            '  password=notakey\n')
         self.assertRaises(KeyError, self._password_of, text)
+        self.assertEqual(text, vdi.redact_vv(text))
+
+    def test_newline_before_the_delimiter_is_not_a_key(self):
+        # Whitespace before the '=' is horizontal only: a bare key on one
+        # line and its '=' on the next is a parse error to configparser,
+        # not a password, so the two lines are not folded into one.
+        text = VV.replace('password=s3cret-one', 'password\n=s3cret-six')
+        self.assertRaises(configparser.ParsingError, self._password_of, text)
         self.assertEqual(text, vdi.redact_vv(text))
 
     def test_no_password_line_is_unchanged(self):

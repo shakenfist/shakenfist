@@ -32,11 +32,12 @@ def redact_vv(vv_text):
 
     The password is a live console credential: Kerbside's for a minute, a
     hypervisor's for as long as the instance keeps it. Matches every line
-    _parse_vv's configparser reads as the password key: whitespace before
-    the '=' is stripped there, so it must not be relied on being absent,
-    while an indented line is a continuation of the value above, not a key.
+    _parse_vv's configparser reads as the password key: the key in any
+    case, since configparser lowercases keys, and any horizontal whitespace
+    before the '=', which it strips. An indented line is a continuation of
+    the value above there, not a key, so it is left alone.
     """
-    return re.sub(r'(?m)^password\s*=.*$', 'password=<redacted>', vv_text)
+    return re.sub(r'(?mi)^password[ \t]*=.*$', 'password=<redacted>', vv_text)
 
 
 class BaseVDIConsoleTestCase(base.BaseNamespacedTestCase):
