@@ -5,6 +5,7 @@
 import json
 from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.daemons.database import main as daemons_database_main
 from shakenfist.protos import database_pb2
@@ -270,6 +271,33 @@ class DirectGetClusterConfigValueTestCase(base.ShakenFistTestCase):
         result = mariadb._direct_get_cluster_config_value('key')
         self.assertIsNone(result)
 
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_raises_on_error_when_asked(self, mock_engine):
+        # Issue 4704: a caller which acts on the absence of the row
+        # (the VDI signing key bootstrap mints over it) must be able to
+        # tell a failed read from "no row yet".
+        from sqlalchemy.exc import OperationalError
+        conn = _MockConnection()
+        conn.execute = mock.Mock(
+            side_effect=OperationalError('stmt', {}, Exception()))
+        mock_engine.return_value = _MockEngine(conn)
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb._direct_get_cluster_config_value,
+            'key', raise_on_error=True)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_absent_row_is_still_none_with_raise_on_error(self, mock_engine):
+        # raise_on_error distinguishes failure, not absence: a read
+        # that succeeds and finds no row still answers None.
+        conn = _MockConnection(result=_MockResult(rows=[]))
+        mock_engine.return_value = _MockEngine(conn)
+
+        result = mariadb._direct_get_cluster_config_value(
+            'MISSING', raise_on_error=True)
+        self.assertIsNone(result)
+
 
 class GrpcGetClusterConfigValueTestCase(base.ShakenFistTestCase):
     """Tests for _grpc_get_cluster_config_value (issue 4096)."""
@@ -311,6 +339,19 @@ class GrpcGetClusterConfigValueTestCase(base.ShakenFistTestCase):
         result = mariadb._grpc_get_cluster_config_value('MISSING')
         self.assertIsNone(result)
 
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_no_stub_raises_when_asked(self, mock_stub):
+        # Issue 4704: with raise_on_error, no reachable database service
+        # is a failure, not an absent row. (A failed RPC already raises
+        # from _grpc_call regardless.)
+        mock_stub.return_value = None
+
+        self.assertIsNone(mariadb._grpc_get_cluster_config_value('key'))
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb._grpc_get_cluster_config_value,
+            'key', raise_on_error=True)
+
 
 class PublicGetClusterConfigValueRoutingTestCase(base.ShakenFistTestCase):
     """Routing tests for the public get_cluster_config_value wrapper."""
@@ -326,7 +367,7 @@ class PublicGetClusterConfigValueRoutingTestCase(base.ShakenFistTestCase):
         result = mariadb.get_cluster_config_value('DNS_SERVER')
 
         self.assertEqual('8.8.8.8', result)
-        mock_direct.assert_called_once_with('DNS_SERVER')
+        mock_direct.assert_called_once_with('DNS_SERVER', False)
         mock_grpc.assert_not_called()
 
     @mock.patch('shakenfist.mariadb._use_database_service')
@@ -340,8 +381,21 @@ class PublicGetClusterConfigValueRoutingTestCase(base.ShakenFistTestCase):
         result = mariadb.get_cluster_config_value('DNS_SERVER')
 
         self.assertEqual('1.1.1.1', result)
-        mock_grpc.assert_called_once_with('DNS_SERVER')
+        mock_grpc.assert_called_once_with('DNS_SERVER', False)
         mock_direct.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._use_database_service')
+    @mock.patch('shakenfist.mariadb._direct_get_cluster_config_value')
+    @mock.patch('shakenfist.mariadb._grpc_get_cluster_config_value')
+    def test_get_value_passes_raise_on_error_through(
+            self, mock_grpc, mock_direct, mock_use_service):
+        mock_use_service.return_value = False
+        mariadb.get_cluster_config_value('DNS_SERVER', raise_on_error=True)
+        mock_direct.assert_called_once_with('DNS_SERVER', True)
+
+        mock_use_service.return_value = True
+        mariadb.get_cluster_config_value('DNS_SERVER', raise_on_error=True)
+        mock_grpc.assert_called_once_with('DNS_SERVER', True)
 
 
 class ServicerGetClusterConfigKeyedTestCase(base.ShakenFistTestCase):

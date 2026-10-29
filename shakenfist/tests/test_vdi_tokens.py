@@ -9,6 +9,7 @@ from unittest import mock
 
 import jwt
 
+from shakenfist import exceptions
 from shakenfist.tests import base
 from shakenfist.util import vdi_tokens
 
@@ -19,17 +20,31 @@ class _FakeClusterConfigStore:
     Backs mariadb.get_cluster_config_value/set_cluster_config so
     ensure_signing_key() and rotate_signing_key() round-trip through the
     same fake store, mirroring test_cluster_config.py's mocking style.
-    Records the keys requested so tests can assert the keyed-read
-    contract (issue 4096: no full-table reads from this module).
+    Records the keys requested, and whether the caller asked for a
+    failed read to raise, so tests can assert the keyed-read contract
+    (issue 4096: no full-table reads from this module) and the
+    fail-closed read contract (issue 4704: a failed read must not look
+    like an absent row). With fail_reads set, a read behaves as
+    mariadb.get_cluster_config_value does against an unreachable
+    database: it raises DatabaseUnavailable when asked to, and returns
+    None otherwise.
     """
 
     def __init__(self):
         self.values = {}
         self.set_calls = 0
         self.requested_keys = []
+        self.raise_on_error_asked = []
+        self.fail_reads = False
 
-    def get_cluster_config_value(self, name):
+    def get_cluster_config_value(self, name, raise_on_error=False):
         self.requested_keys.append(name)
+        self.raise_on_error_asked.append(raise_on_error)
+        if self.fail_reads:
+            if raise_on_error:
+                raise exceptions.DatabaseUnavailable(
+                    f'MariaDB get_cluster_config_value failed for {name}')
+            return None
         return self.values.get(name)
 
     def set_cluster_config(self, name, value):
@@ -68,6 +83,19 @@ class GetSigningMaterialTestCase(base.ShakenFistTestCase):
             [vdi_tokens.SIGNING_KEY_CONFIG_NAME],
             self.store.requested_keys)
 
+    def test_read_asks_for_failures_to_raise(self):
+        # Issue 4704: a failed read must raise, not read as an absent
+        # row, because ensure_signing_key() mints over absence. Pin
+        # that the read opts into raise_on_error.
+        vdi_tokens.get_signing_material()
+        self.assertEqual([True], self.store.raise_on_error_asked)
+
+    def test_failed_read_raises(self):
+        self.store.fail_reads = True
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            vdi_tokens.get_signing_material)
+
     def test_absent_row_returns_none(self):
         self.assertIsNone(vdi_tokens.get_signing_material())
 
@@ -90,13 +118,28 @@ class EnsureSigningKeyTestCase(base.ShakenFistTestCase):
         self.addCleanup(self.mariadb_patch.stop)
 
     def test_ensure_creates_then_is_idempotent(self):
-        first = vdi_tokens.ensure_signing_key()
+        first, first_created = vdi_tokens.ensure_signing_key()
         self.assertEqual(1, len(first['keys']))
         self.assertEqual(1, self.store.set_calls)
+        self.assertTrue(first_created)
 
-        second = vdi_tokens.ensure_signing_key()
+        second, second_created = vdi_tokens.ensure_signing_key()
         self.assertEqual(first['active_kid'], second['active_kid'])
         self.assertEqual(1, self.store.set_calls)
+        self.assertFalse(second_created)
+
+    def test_ensure_raises_on_failed_read_rather_than_minting(self):
+        # Issue 4704: with the stored set unreadable, minting a fresh
+        # one-key set would replace the active key and drop the two-key
+        # rotation window, invalidating every in-flight console token.
+        # The failure must surface, and nothing may be written.
+        self.store.values[vdi_tokens.SIGNING_KEY_CONFIG_NAME] = {
+            'active_kid': 'abcd1234', 'keys': []}
+        self.store.fail_reads = True
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable, vdi_tokens.ensure_signing_key)
+        self.assertEqual(0, self.store.set_calls)
 
 
 class RotateSigningKeyTestCase(base.ShakenFistTestCase):
@@ -116,8 +159,20 @@ class RotateSigningKeyTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             vdi_tokens.SigningKeyError, vdi_tokens.rotate_signing_key)
 
+    def test_rotate_raises_on_failed_read_rather_than_dropping_window(self):
+        # Issue 4704's sibling: a rotation against an unreadable stored
+        # set would write a one-key set, dropping the previous key that
+        # keeps in-flight tokens verifiable.
+        self.store.values[vdi_tokens.SIGNING_KEY_CONFIG_NAME] = {
+            'active_kid': 'abcd1234', 'keys': []}
+        self.store.fail_reads = True
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable, vdi_tokens.rotate_signing_key)
+        self.assertEqual(0, self.store.set_calls)
+
     def test_rotate_keeps_previous_and_caps_at_two(self):
-        ensured = vdi_tokens.ensure_signing_key()
+        ensured, _ = vdi_tokens.ensure_signing_key()
         first_kid = ensured['active_kid']
 
         rotated_once = vdi_tokens.rotate_signing_key()

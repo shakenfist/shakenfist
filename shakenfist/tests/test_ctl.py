@@ -619,16 +619,20 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
     def test_ensure_kerbside_signing_key_creates(self, mock_vdi_tokens):
         from shakenfist.client.ctl import ensure_kerbside_signing_key
 
-        mock_vdi_tokens.ensure_signing_key.return_value = {
+        mock_vdi_tokens.ensure_signing_key.return_value = ({
             'active_kid': 'abcd1234',
             'keys': [{'kid': 'abcd1234', 'private_pem': 'PRIVATE-1',
                       'public_pem': 'PUBLIC-1', 'created': 1}],
-        }
+        }, True)
 
         result = self.runner.invoke(ensure_kerbside_signing_key)
 
         self.assertEqual(result.exit_code, 0)
         mock_vdi_tokens.ensure_signing_key.assert_called_once()
+        # The first line distinguishes creation from a no-op, so the
+        # deployer's changed_when can be truthful (issue 4704).
+        self.assertIn('Created a new signing key.', result.output)
+        self.assertNotIn('Found an existing signing key.', result.output)
         self.assertIn('abcd1234', result.output)
         self.assertIn('1', result.output)
         self.assertNotIn('PRIVATE', result.output)
@@ -637,17 +641,19 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
     def test_ensure_kerbside_signing_key_idempotent(self, mock_vdi_tokens):
         from shakenfist.client.ctl import ensure_kerbside_signing_key
 
-        mock_vdi_tokens.ensure_signing_key.return_value = {
+        mock_vdi_tokens.ensure_signing_key.return_value = ({
             'active_kid': 'abcd1234',
             'keys': [{'kid': 'abcd1234', 'private_pem': 'PRIVATE-1',
                       'public_pem': 'PUBLIC-1', 'created': 1}],
-        }
+        }, False)
 
         first = self.runner.invoke(ensure_kerbside_signing_key)
         second = self.runner.invoke(ensure_kerbside_signing_key)
 
         self.assertEqual(first.exit_code, 0)
         self.assertEqual(second.exit_code, 0)
+        self.assertIn('Found an existing signing key.', first.output)
+        self.assertNotIn('Created a new signing key.', first.output)
         self.assertIn('abcd1234', first.output)
         self.assertIn('abcd1234', second.output)
         self.assertEqual(mock_vdi_tokens.ensure_signing_key.call_count, 2)

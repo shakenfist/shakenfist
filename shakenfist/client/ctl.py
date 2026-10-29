@@ -314,12 +314,19 @@ def ensure_kerbside_signing_key() -> None:
 
     Idempotent: safe to run repeatedly. The first invocation generates
     and stores a fresh signing key; every later invocation simply
-    reports the existing active key id without changing anything.
-    Never prints private key material.
+    reports the existing active key id without changing anything. The
+    first output line says which happened, so a deploy can report
+    changed truthfully. A failed read of the stored key exits non-zero
+    rather than minting a replacement over it (issue 4704). Never
+    prints private key material.
     """
-    material = vdi_tokens.ensure_signing_key()
+    material, created = vdi_tokens.ensure_signing_key()
     active_kid = material['active_kid']
     key_count = len(material['keys'])
+    if created:
+        click.echo('Created a new signing key.')
+    else:
+        click.echo('Found an existing signing key.')
     click.echo(f'Active kid: {active_kid}')
     click.echo(f'Published keys: {key_count}')
 
