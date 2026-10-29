@@ -95,6 +95,11 @@ The header of `run-matrix.sh` documents every knob. The whole matrix
 above, with two interleaved repeats of 40 key presses per case, takes
 about 1h45m.
 
+The rig has since learned to put andris, a standalone SPICE server, in
+front of qemu's D-Bus display in place of spice-server, and to give the
+guest std-vga in place of virtio-vga. Neither was used for this page;
+[Testing](/components/kerbside/testing/#shaped-link-latency-rig) describes both.
+
 The configurations compared:
 
 | Name | `--client-notsent-lowat-bytes` | `--backend-rcvbuf-bytes` |

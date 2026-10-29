@@ -259,8 +259,8 @@ would creep back in. **Recommendation: yes.** Extend
 | 3. OpenStack: Kolla-Ansible, and Kerbside in front of OpenStack | [PLAN-deployment-options-phase-03-openstack.md](/components/kerbside/plans/PLAN-deployment-options-phase-03-openstack/) | Complete | d159d17 |
 | 4. Containers: compose beyond the demo, and Kubernetes | [PLAN-deployment-options-phase-04-containers.md](/components/kerbside/plans/PLAN-deployment-options-phase-04-containers/) | Complete | 46a03a6 |
 | 5. Ansible: the `kerbside` role | [PLAN-deployment-options-phase-05-ansible.md](/components/kerbside/plans/PLAN-deployment-options-phase-05-ansible/) | Complete | c1f5938 |
-| 6. Installation hand-off and closeout | [PLAN-deployment-options-phase-06-installation.md](/components/kerbside/plans/PLAN-deployment-options-phase-06-installation/) | In progress | |
-| 7. Push audit | | Not started | |
+| 6. Installation hand-off | [PLAN-deployment-options-phase-06-installation.md](/components/kerbside/plans/PLAN-deployment-options-phase-06-installation/) | Complete | eebb1b2 |
+| 7. Push audit | [PLAN-deployment-options-phase-07-push-audit.md](/components/kerbside/plans/PLAN-deployment-options-phase-07-push-audit/) | In progress | |
 
 **Phase 1: survey, matrix and scaffolding.** Re-check the
 inventory above against the tree and against the Shaken Fist
@@ -322,7 +322,7 @@ login (#602), and the index's sources cell for the role says so;
 this page states the role's state on the day and updates that
 cell. Planned at medium effort.
 
-**Phase 6: installation hand-off and closeout.**
+**Phase 6: installation hand-off.**
 `installation.md`'s "Deploying for real" becomes a pointer to
 `docs/deployment/` rather than a table keyed by cloud. Reconcile
 `docs/index.md`, and touch README.md only if its curated links
@@ -332,6 +332,18 @@ prose: neither mentions `docs/deployment/`, and ARCHITECTURE.md's
 tree has no `ansible/`. Phase 6's survey corrected this paragraph,
 which had said they probably needed nothing. Planned at medium
 effort.
+
+Phase 6's title said "and closeout", which it did not do; phase 7's
+survey corrected the title. The plan is closed out by phase 7, or by
+the pull request that fixes phase 7's findings.
+
+**Phase 7: push audit.** `PUSH-AUDIT.md` over the seven merges that
+landed the plan: the six phases, and #589 (829c636), which changed
+only this plan to record that the role move had landed and so has no
+row above. Each merge is audited against its own first parent rather
+than as one range, because `tools/audit/plan-range.sh`'s single range
+would sweep in other plans' work over the same files (#491). Phase
+7's survey added this paragraph; the plan had none.
 
 Phases 2, 3 and 4 are independent, and can run in any order or
 in parallel once phase 1 has merged. Phase 5 waits on another

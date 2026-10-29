@@ -713,8 +713,8 @@ rather than merge requests.
 | 2. Fixed VHDX fixtures (instar-testdata + instar) | [PLAN-bat-population-phase-02-fixtures.md](/components/instar/plans/PLAN-bat-population-phase-02-fixtures/) | Complete | instar-testdata `d2f9467719` (direct to `main`); instar `5c5bba75` (#819) |
 | 3. Host-only create: non-qcow2 preallocation parity and monolithicFlat | [PLAN-bat-population-phase-03-host-create.md](/components/instar/plans/PLAN-bat-population-phase-03-host-create/) | Complete | `a8d2f4ca` (#824) |
 | 4. Read side: BAT entry count (#626), partial last block, `LeaveBlocksAllocated` and `resize` | [PLAN-bat-population-phase-04-read-side.md](/components/instar/plans/PLAN-bat-population-phase-04-read-side/) | Complete | `d140aa04` (#835) |
-| 5. VHDX geometry: default block size (#645), 64 TiB ceiling, one shared layout | [PLAN-bat-population-phase-05-geometry.md](/components/instar/plans/PLAN-bat-population-phase-05-geometry/) | In progress | |
-| 6. Streaming BAT emitter and the fixed `plan_vhdx` | PLAN-bat-population-phase-06-emitter.md | Not started | |
+| 5. VHDX geometry: default block size (#645), 64 TiB ceiling, one shared layout | [PLAN-bat-population-phase-05-geometry.md](/components/instar/plans/PLAN-bat-population-phase-05-geometry/) | Complete | `52518787` (#848) |
+| 6. Streaming BAT emitter and the fixed `plan_vhdx` | [PLAN-bat-population-phase-06-emitter.md](/components/instar/plans/PLAN-bat-population-phase-06-emitter/) | In progress | |
 | 7. `create -f vhdx -o subformat=fixed`: guest streaming and host CLI | PLAN-bat-population-phase-07-create.md | Not started | |
 | 8. `convert -O vhdx --subformat fixed` | PLAN-bat-population-phase-08-convert.md | Not started | |
 | 9. `measure -O vhdx -o subformat=fixed` | PLAN-bat-population-phase-09-measure.md | Not started | |
@@ -866,6 +866,23 @@ bit as 1 for the BAT and metadata regions, and every pinned qemu
 build writes 0. Phase 5's survey found a second: instar writes a
 physical sector size of 4096 and every pinned qemu case records 512.
 Phase 5 moves the value into the shared layout unchanged.
+
+Its own survey found three more: the metadata items' flags and their
+placement (Page 83 third, not last), both in the same builders, and
+dynamic `create`'s file length (4 MiB, where qemu extends to its data
+start). With the two above they are every field the structural
+comparator sees differ between instar's dynamic `create` and qemu's,
+apart from the BAT state open question 7 keeps. The file length stays,
+as Future work. The
+builders serve create, convert and resize alike, so fixing them
+changes the bytes of every VHDX instar writes. The phase does that,
+and its back brief puts the choice of qemu's values over those of
+the two non-qemu fixtures (Required 1, and in one a 4096-byte physical
+sector) to the operator. The crate tests compare against the qemu pins,
+copied in, not against the phase 2 fixtures, because `make test-rust`
+cannot see instar-testdata. The filler lives in the vhdx crate, beside
+the layout, because convert does not link the create crate (see the
+phase 6 plan).
 
 **Phase 7** wires create end to end: the guest streams the BAT
 through one slot and extends the file to `data_start +
@@ -1518,7 +1535,11 @@ chosen to defer to here, so that we do not forget them.
   sits right behind it), and extend the file. Until then `resize`
   refuses fixed VHDX (open question 6).
 * `block_state_zero` for dynamic VHDX, in create and convert (open
-  question 7), once someone needs the bytes to match.
+  question 7), once someone needs the bytes to match. A byte match
+  also needs dynamic `create` to extend the file to qemu's data start
+  (`bat_offset + bat_region_len + 5 MiB`, 8 MiB at most sizes) rather
+  than stopping at the end of the metadata region (4 MiB); phase 6's
+  survey found it is the only other field in which the two differ.
 * `-o log_size` honoured rather than accept-ignored. It moves qemu's
   BAT, and so its data region, by the log's size.
 * `convert -O vpc` fixed output. instar converts to dynamic VHD only;
@@ -1597,6 +1618,11 @@ Found while planning, and assigned to phases above:
   qemu writes 0. Phase 6.
 * instar writes a VHDX physical sector size of 4096; qemu writes 512.
   Phase 6.
+* `build_metadata` flags the four per-virtual-disk metadata items
+  IsRequired alone (0x4), where qemu and both non-qemu fixtures write
+  IsRequired | IsVirtualDisk (0x6), and its comment says it writes
+  both bits. It also places the Page 83 item last, where qemu puts it
+  third. Phase 6.
 * `instar create -f vhdx` records a virtual size that is not a
   multiple of 512, which SPEC(VHDX) forbids and qemu-img rounds away
   (#843). Phase 5.

@@ -2269,17 +2269,34 @@ guards. See the VHD and VHDX notes in
 [chain-config.md](/components/instar/chain-config/#format-specific-notes) for the
 composing path being guarded.
 
-There are **130 cases**, in eleven groups.
+There are **139 cases**, in eleven groups.
 
-Twenty-seven cover the writer. Fifteen mutate a library crate
+Thirty-six cover the writer. Twenty-four mutate a library crate
 (`create`, `vhd`, `vhdx`) and are caught by a Rust unit or round-trip
-test; twelve are caught by a Python integration test through the real
-binary. Ten of those twelve mutate the `create` guest operation, which
-is excluded from `cargo test --workspace`, so a unit test written
-beside that code would never run; the other two mutate the `create`
-crate but break something only an external parser can see. Going
-through the real binary means `make instar` before the test and again
-after the source is restored.
+test. Two of those twenty-four guard the region table and metadata table
+every VHDX writer shares: one sets Required on the region entries
+again, and one flags a virtual-disk metadata item IsRequired alone,
+both of which qemu-img writes differently and no reader notices. Five
+more guard a fixed VHDX's data start and the filler that writes its
+BAT one buffer at a time: dropping the 5 MiB qemu-img leaves after the
+BAT region, interleaving sector bitmap slots every `chunk_ratio`
+entries instead of every `chunk_ratio + 1`, keeping a block offset on
+a `ZERO` entry, writing a payload entry into a sector bitmap slot, and
+writing one into the padding past the last entry. Each of those
+produces a BAT `qemu-img info` accepts, so only the pinned qemu-img
+structure and the forward map `p + p / chunk_ratio` catch them. Two
+more guard the File Parameters `LeaveBlocksAllocated` bit, which
+qemu-img sets for a fixed VHDX and only for one: setting it on a
+dynamic image, caught because a fixed plan's metadata must then
+differ from a dynamic one's by that bit alone, and clearing it on a
+fixed one, caught by reading a fixed image back against its pin. The
+remaining twelve writer cases are caught by a Python integration test
+through the real binary. Ten of those twelve mutate the `create` guest
+operation, which is excluded from `cargo test --workspace`, so a unit
+test written beside that code would never run; the other two mutate
+the `create` crate but break something only an external parser can
+see. Going through the real binary means `make instar` before the test
+and again after the source is restored.
 
 The other **47 reader cases** cover the reader — the VHD and VHDX arms of
 `read_chain_virtual_cluster`, the sector-bitmap helpers in the `vhd`
