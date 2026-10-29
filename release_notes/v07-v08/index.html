@@ -17921,6 +17921,22 @@ details.</p>
 </ul>
 <h2 id="minor-changes">Minor changes<a class="headerlink" href="#minor-changes" title="Permanent link">&para;</a></h2>
 <ul>
+<li>The sf-database service no longer serves the single-column coalescing RPCs
+  <code>ClaimCoalescibleSiblings</code> and <code>FindExistingCoalescibleOp</code>. No release
+  carried them, and their handlers could fold one node's network work into
+  another's. The multi-column <code>V2</code> RPCs and <code>FoldCoalescibleSiblings</code> are
+  unchanged.</li>
+<li>An enqueue of a coalescible network task no longer adopts a queued
+  operation which is backing off after a defer. A <code>user_facing</code> mesh enqueue
+  could adopt an operation scheduled 15, 30 or 60 seconds out and inherit that
+  delay when a fresh operation would have run at once; a queued operation is
+  now only reused if it is due within the dispatcher's idle poll.</li>
+<li>A cluster operation which a <code>depends_on</code> dependency ends before it runs,
+  because the dependency wait defer budget was spent, the dependency failed or
+  it does not exist, now records an <code>ended without executing</code> event carrying
+  the outcome, the defer count and the wait. <code>tools/operation-timeline.py</code>
+  reports these operations in a table of their own instead of counting them
+  as not having run yet.</li>
 <li>Restarting a daemon no longer loses or doubles the work it had in flight:</li>
 <li>Restarting <code>sf-privexec</code> no longer stops every <code>dnsmasq</code> on the node.
     Each network was without DHCP and DNS until <code>sf-net</code> noticed and started

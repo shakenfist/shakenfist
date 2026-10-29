@@ -16276,6 +16276,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-enqueue-side-dedup-will-not-adopt-an-op-which-is-backing-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The enqueue-side dedup will not adopt an op which is backing off
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#both-guards-are-key-aware-and-family-aware" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16863,7 +16874,12 @@ and the sit after each redelivery -- which is what distinguishes a lane
 that is genuinely backed up from one whose operations are waiting on a
 dependency. Both are documented, with their caveats, under
 <a href="../../operator_guide/networking/overview/">networking observability</a>,
-where they sit next to the other queue tooling.</p>
+where they sit next to the other queue tooling. Their parsers are
+checked against the emitter by
+<code>shakenfist/tests/test_queue_tooling_round_trip.py</code>, which has a real
+<code>NetOp</code> emit each event through the real event echo and the real JSON
+formatter, so renaming a field in <code>execution_duration_extra()</code> or
+<code>defer()</code> fails the suite rather than quietly emptying a report.</p>
 <h2 id="coalescible-operations">Coalescible Operations<a class="headerlink" href="#coalescible-operations" title="Permanent link">&para;</a></h2>
 <p>Some operation tasks are idempotent reconciliation work whose effect
 depends only on current DB state, not on the count of pending ops
@@ -16971,6 +16987,20 @@ since before the mesh task became coalescible.</p>
 on an operation which has already been dequeued, so a survivor at any
 priority is about to do the work immediately; the queue a folded
 sibling was sitting on no longer matters.</p>
+<h3 id="the-enqueue-side-dedup-will-not-adopt-an-op-which-is-backing-off">The enqueue-side dedup will not adopt an op which is backing off<a class="headerlink" href="#the-enqueue-side-dedup-will-not-adopt-an-op-which-is-backing-off" title="Permanent link">&para;</a></h3>
+<p>Nor will it adopt a queued op whose <code>work_queue</code> row is scheduled
+more than <code>COALESCIBLE_ADOPT_SCHEDULE_MARGIN_SECONDS</code> into the
+future. A queued op with a row due later than that is backing off
+after a defer: it is still live, so the orphan guard above does not
+exclude it, but adopting it hands the caller the 15, 30 or 60 second
+delay the defer asked for, and the spent <code>defer_count</code> with it, when
+a fresh op would have run at once (#4643). The margin is the
+dispatcher's idle poll, <code>IDLE_POLL_MAX_SECONDS</code>, because a row due
+within it runs no later than a fresh row would. Nothing is lost
+either way: if the lookup declines, a new op is inserted, and the
+worker-side fold catches the duplicate once both are dequeued. The
+orphan reaper passes no bound, because a row scheduled for later is
+still a row.</p>
 <h3 id="both-guards-are-key-aware-and-family-aware">Both guards are key-aware <em>and</em> family-aware<a class="headerlink" href="#both-guards-are-key-aware-and-family-aware" title="Permanent link">&para;</a></h3>
 <p><code>cluster_operations</code> has no queue column, so the key is the only
 thing either primitive's SQL can use to confine a fold to the
@@ -17036,19 +17066,24 @@ reading that let #3878 sit undetected for three months:</p>
 </ul>
 <h3 id="the-v2-grpc-methods">The V2 gRPC methods<a class="headerlink" href="#the-v2-grpc-methods" title="Permanent link">&para;</a></h3>
 <p><code>ClaimCoalescibleSiblingsV2</code> and <code>FindExistingCoalescibleOpV2</code> take a
-<code>repeated CoalescibleKeyPair keys</code> in place of the V1 RPCs' scalar
-<code>target_column</code>/<code>target_uuid</code>, as new RPC names rather than a new
-field on the existing messages. A repeated field would be
-wire-compatible but unsafe across a rolling upgrade: an old
-<code>sf-database</code> would silently ignore the extra columns and fold on
-the network alone, which is exactly the cross-node corruption the
-wider key exists to prevent. An old server answers a V2 call with
-<code>UNIMPLEMENTED</code>, and the client treats that as "coalescing
-unavailable" and skips the fold rather than falling back to V1 -- a
-loud, temporary loss of an optimisation instead of a quiet
-correctness failure. "Loud" means the <code>coalescing_unavailable</code>
-outcome above, not merely a log line. The V1 RPCs are unchanged and
-stay for one release.</p>
+<code>repeated CoalescibleKeyPair keys</code>. They carry the suffix because they
+replaced a single-column pair (<code>ClaimCoalescibleSiblings</code>,
+<code>FindExistingCoalescibleOp</code>, with a scalar <code>target_column</code> and
+<code>target_uuid</code>) as new RPC names rather than a new field on the
+existing messages. A repeated field would be wire-compatible but
+unsafe across a rolling upgrade: an old <code>sf-database</code> would silently
+ignore the extra columns and fold on the network alone, which is
+exactly the cross-node corruption the wider key exists to prevent. An
+old server answers a V2 call with <code>UNIMPLEMENTED</code>, and the client
+treats that as "coalescing unavailable" and skips the fold -- a loud,
+temporary loss of an optimisation instead of a quiet correctness
+failure. "Loud" means the <code>coalescing_unavailable</code> outcome above, not
+merely a log line. The single-column pair was removed in #4639: no
+release ever carried it (every tagged release predates <code>NetOp</code>), so
+no client can still send it, and its handlers accepted any task name
+with a single key column, which is the cross-node fold the V2 names
+exist to refuse. There is nothing for a client to fall back to, and
+<code>shakenfist/tests/test_mariadb_coalescing.py</code> checks that stays so.</p>
 <p><code>FindExistingCoalescibleOpV2</code> additionally carries <code>repeated string
 priorities</code>, the priority filter described above. Unlike a key
 column, an old V2 server ignoring that field is only a lost
@@ -17063,8 +17098,9 @@ siblings up front. A client which gets <code>UNIMPLEMENTED</code> from it skips
 the fold and never falls back to <code>ClaimCoalescibleSiblingsV2</code>, which
 would bring back exactly the premature completion it replaces.
 <code>ClaimCoalescibleSiblingsV2</code> keeps its old behaviour for clients
-which predate the fold and has no caller in this tree; retiring it,
-with the V1 pair, is #4639.</p>
+which predate the fold and has no caller in this tree. No release
+carried it either, so it can be retired the way the single-column
+pair was.</p>
 <h2 id="batched-hard-deletes">Batched hard deletes<a class="headerlink" href="#batched-hard-deletes" title="Permanent link">&para;</a></h2>
 <p>The deleted-object sweep hard deletes most object types through the
 <code>HardDeleteObjects</code> RPC, which deletes up to 1000 objects of one type in a
