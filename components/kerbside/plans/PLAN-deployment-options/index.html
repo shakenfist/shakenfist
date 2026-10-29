@@ -8737,6 +8737,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-deployment-options-phase-06-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 6: installation hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
         
   
@@ -9641,6 +9669,34 @@
     
   
     Proxmox source phase 4: the source driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-proxmox-source-phase-05-ci-lane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 5: the CI lane
   
 
     
@@ -16958,13 +17014,13 @@ would creep back in. <strong>Recommendation: yes.</strong> Extend
 <tr>
 <td>5. Ansible: the <code>kerbside</code> role</td>
 <td><a href="/components/kerbside/plans/PLAN-deployment-options-phase-05-ansible/">PLAN-deployment-options-phase-05-ansible.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>c1f5938</td>
 </tr>
 <tr>
 <td>6. Installation hand-off and closeout</td>
-<td></td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-deployment-options-phase-06-installation/">PLAN-deployment-options-phase-06-installation.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -17034,9 +17090,12 @@ cell. Planned at medium effort.</p>
 <code>installation.md</code>'s "Deploying for real" becomes a pointer to
 <code>docs/deployment/</code> rather than a table keyed by cloud. Reconcile
 <code>docs/index.md</code>, and touch README.md only if its curated links
-change. Check whether ARCHITECTURE.md or AGENTS.md need anything
-(probably not: no component or convention changes). Planned at
-medium effort.</p>
+change. They do: the README has no link to the Deployment Options
+table. ARCHITECTURE.md and AGENTS.md need index fixes but no new
+prose: neither mentions <code>docs/deployment/</code>, and ARCHITECTURE.md's
+tree has no <code>ansible/</code>. Phase 6's survey corrected this paragraph,
+which had said they probably needed nothing. Planned at medium
+effort.</p>
 <p>Phases 2, 3 and 4 are independent, and can run in any order or
 in parallel once phase 1 has merged. Phase 5 waits on another
 repository. If that wait is long, phase 6 may run before phase

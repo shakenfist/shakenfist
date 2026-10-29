@@ -1757,6 +1757,10 @@
          <lastmod>2026-10-29</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-deployment-options-phase-06-installation/</loc>
+         <lastmod>2026-10-29</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-deployment-options/</loc>
          <lastmod>2026-10-29</lastmod>
     </url>
@@ -1818,6 +1822,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/</loc>
+         <lastmod>2026-10-29</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxmox-source-phase-05-ci-lane/</loc>
          <lastmod>2026-10-29</lastmod>
     </url>
     <url>

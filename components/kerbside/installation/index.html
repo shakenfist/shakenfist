@@ -8680,6 +8680,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-deployment-options-phase-06-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 6: installation hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
         
   
@@ -9584,6 +9612,34 @@
     
   
     Proxmox source phase 4: the source driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source-phase-05-ci-lane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 5: the CI lane
   
 
     
@@ -16558,7 +16614,7 @@
 
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
 <p>This page takes you from nothing to a working, proxied SPICE console,
-and then points at the guide for the cloud you actually run. If you
+and then points at the pages on deploying Kerbside for real. If you
 would rather see Kerbside working before reading about it, skip to
 <a href="#try-it-the-demo-stack">Try it: the demo stack</a>.</p>
 <h2 id="before-you-install-os-packages">Before you install: OS packages<a class="headerlink" href="#before-you-install-os-packages" title="Permanent link">&para;</a></h2>
@@ -16931,36 +16987,19 @@ is the reference for the stack itself: what each container is, how to
 build it against a checkout rather than the released package, and why
 each of these choices was made.</p>
 <h2 id="deploying-for-real">Deploying for real<a class="headerlink" href="#deploying-for-real" title="Permanent link">&para;</a></h2>
-<p>Kerbside is deployed as a component of the cloud it serves, so the
-shape of a real deployment depends on which cloud that is. Start with
-the guide for yours:</p>
-<table>
-<thead>
-<tr>
-<th>Deployment</th>
-<th>Guide</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>oVirt</td>
-<td><a href="/components/kerbside/use-cases/ovirt/">use-cases/ovirt.md</a></td>
-</tr>
-<tr>
-<td>OpenStack</td>
-<td>A sample Kolla-Ansible deployment lives in <a href="https://github.com/shakenfist/kerbside-patches">kerbside-patches</a></td>
-</tr>
-<tr>
-<td>Shaken Fist</td>
-<td><a href="/components/kerbside/use-cases/shakenfist/">use-cases/shakenfist.md</a></td>
-</tr>
-<tr>
-<td>Static targets</td>
-<td>The demo above is the worked example</td>
-</tr>
-</tbody>
-</table>
-<p>Whichever you pick, the pieces described in
+<p>The default worth reaching for is a Kerbside deployed in front of the
+clouds rather than by one of them, so that one Kerbside can broker
+consoles from several sources and sit wherever its users are.</p>
+<p>There is a page for each way of deploying it:
+<a href="/components/kerbside/deployment/manual/">by hand, with pip, a venv and systemd</a>, with
+<a href="/components/kerbside/deployment/ansible/">the Ansible role</a>, with
+<a href="/components/kerbside/deployment/kolla-ansible/">Kolla-Ansible from kerbside-patches</a>, or
+<a href="/components/kerbside/deployment/containers/">in containers</a>.
+<a href="/components/kerbside/index/#deployment-options">Deployment Options</a> compares them: which
+sources each configures, and what Kerbside's CI tests.</p>
+<p>What each cloud needs from Kerbside, and what Kerbside needs from it,
+is in that cloud's page under <a href="/components/kerbside/index/#use-cases">Use Cases</a>.</p>
+<p>However you deploy it, the pieces described in
 <a href="#what-a-running-kerbside-needs">What a running Kerbside needs</a> are
 the same, and two references apply throughout:
 <a href="/components/kerbside/configuration/">configuration.md</a> for every setting, and

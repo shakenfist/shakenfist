@@ -7835,6 +7835,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-proxmox-end-to-end-lane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Proxmox end-to-end lane
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#tempest-tests-against-a-kolla-ansible-deployment" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8847,6 +8858,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-deployment-options-phase-06-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 6: installation hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
         
   
@@ -9751,6 +9790,34 @@
     
   
     Proxmox source phase 4: the source driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source-phase-05-ci-lane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 5: the CI lane
   
 
     
@@ -16814,6 +16881,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-proxmox-end-to-end-lane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Proxmox end-to-end lane
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#tempest-tests-against-a-kolla-ansible-deployment" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16928,7 +17006,10 @@ into two tiers.</p>
   of which builds an entire cloud from scratch. These are the
   expensive lanes, and their failure modes are dominated by
   upstream environment churn rather than by Kerbside regressions,
-  so running them per PR bought little for what it cost.</li>
+  so running them per PR bought little for what it cost. The Proxmox
+  VE lane (<code>proxmox-functional.yml</code>) is in this tier too, but it also
+  runs on pull requests that touch the Proxmox source, as an advisory
+  check; see <a href="#the-proxmox-end-to-end-lane">the Proxmox lane</a>.</li>
 </ul>
 <p>The trade is deliberate, and it has been made twice. The cloud lanes
 first moved from pull requests to the merge queue. They then moved
@@ -16939,12 +17020,13 @@ to its develop, re-testing code its own merge queue had just
 deployed with Kolla. That came to some 200 OpenStack runs a month
 and about 80 oVirt runs, each holding a runner and a nested cloud on
 sfcbr for most of an hour. A cloud-specific breakage now surfaces
-the morning after it merges, as a <code>Nightly oVirt lane failing</code> or
-<code>Nightly OpenStack lane failing</code> issue filed by the run, rather than
-on the PR or in the queue. Nothing else exercises the oVirt and
-OpenStack sources end to end, so treat those issues as release
-blockers (see "Releasing" in <a href="/components/kerbside/development/">development.md</a>), and
-dispatch the lane on a pull request that changes a source driver.</p>
+the morning after it merges, as a <code>Nightly oVirt lane failing</code>,
+<code>Nightly OpenStack lane failing</code> or <code>Nightly proxmox lane failing</code>
+issue filed by the run, rather than on the PR or in the queue.
+Nothing else exercises those sources end to end, so treat those
+issues as release blockers (see "Releasing" in
+<a href="/components/kerbside/development/">development.md</a>), and dispatch the lane on a pull
+request that changes a source driver.</p>
 <p>Both tiers also skip entirely when a change touches only files no
 lane exercises: the review-tracking state (<code>REVIEWS.md</code> and the
 <code>.vscode</code> weaudit files) and <code>docs/</code>. Each gating
@@ -16995,6 +17077,11 @@ change.</p>
 <tr>
 <td><code>functional-tests.yml</code> (<code>ovirt_matrix</code>, <code>openstack_matrix</code>)</td>
 <td>nightly (04:30 UTC), workflow_dispatch</td>
+<td>nightly</td>
+</tr>
+<tr>
+<td><code>proxmox-functional.yml</code></td>
+<td>nightly (05:30 UTC), workflow_dispatch, and pull_request path-filtered to the Proxmox path; see "The Proxmox end-to-end lane" below (advisory, never in the merge queue)</td>
 <td>nightly</td>
 </tr>
 <tr>
@@ -17656,6 +17743,87 @@ broken parser as a security failure for two days. Any new
 log-derived oracle should draw the same distinction. Proxy log
 colouring is described in
 <a href="/components/kerbside/proxy-architecture/">proxy-architecture.md</a>.</p>
+<h2 id="the-proxmox-end-to-end-lane">The Proxmox end-to-end lane<a class="headerlink" href="#the-proxmox-end-to-end-lane" title="Permanent link">&para;</a></h2>
+<p><code>proxmox-functional.yml</code> proves the <code>type: proxmox</code> source
+(<code>kerbside/sources/proxmox.py</code>) against a real Proxmox VE node. It
+deploys a single-node PVE 9 with <code>shakenfist/actions</code>'
+<code>deploy-proxmox-on-shakenfist</code> action, deploys the PR's own kerbside
+(package plus the manylinux Rust proxy wheel) on the CI runner,
+registers a <code>type: proxmox</code> source against the node, and relays real
+SPICE sessions through kerbside's proxy and PVE's <code>spiceproxy</code>. The
+proxy wheel and ryll are built before the node is booked, so a
+compile error never spends a node.</p>
+<p>It runs nightly, on <code>workflow_dispatch</code>, and on pull requests that
+touch any of:</p>
+<ul>
+<li>the Proxmox source: <code>kerbside/sources/proxmox.py</code>, <code>base.py</code> and
+  <code>minting.py</code>, and the source-type registry in
+  <code>kerbside/sources/__init__.py</code>, which maps <code>type: proxmox</code> to it;</li>
+<li><code>kerbside/config.py</code>, whose <code>CONSOLE_TOKEN_DURATION</code> sets how long
+  the lane holds a session;</li>
+<li><code>kerbside/rpc/**</code>, which includes <code>kerbside.proto</code>;</li>
+<li>the proxy's backend leg and relay, <code>rust/kerbside-proxy/src/backend.rs</code>
+  and <code>relay.rs</code>, its <code>Cargo.toml</code> and <code>Cargo.lock</code>, which pin the ryll
+  crate whose log lines the lane reads, and <code>tools/build-proxy-wheel.sh</code>,
+  which builds the wheel the lane installs;</li>
+<li><code>docs/console-sources.md</code>, whose account block the lane runs;</li>
+<li>the workflow itself and <code>tools/proxmox-e2e/**</code>;</li>
+<li>the direct-qemu scripts the lane reuses:
+  <code>tools/direct-qemu/start-kerbside.sh</code>, <code>smoke-client.py</code>,
+  <code>setup-mariadb.sh</code> and <code>generate-tls.sh</code>.</li>
+</ul>
+<p><code>kerbside/api.py</code> and <code>kerbside/db.py</code> are exercised by the lane but
+left out of the filter: they change on most pull requests, and would
+book a PVE node for each. The nightly covers them.</p>
+<p>It has no <code>merge_group</code> trigger and is not a required check: a
+path-filtered required check never reports on other pull requests,
+which would block them forever. So a pull request that breaks it can
+merge red, and the nightly <code>Nightly proxmox lane failing</code> issue is
+what catches that. Pull requests from forks skip it, because its
+runner holds the CI mesh's SSH key.</p>
+<p>What it asserts, in short:</p>
+<ul>
+<li>the account in <code>docs/console-sources.md</code> works: the lane runs that
+  page's <code>pveum</code> block on the node (with the user renamed), and fails
+  if the commands are wrong or contain anything but the four commands
+  the account needs;</li>
+<li>both of the account's privileges are needed, not only sufficient:
+  tokens lacking <code>VM.Audit</code> and <code>VM.Console</code> are each refused with
+  403, and the documented token is refused <code>status/stop</code>;</li>
+<li>discovery lists exactly the one SPICE guest, and skips guests with
+  a <code>std</code> display, no SMBIOS UUID or a stopped state, and a template
+  when PVE accepts a diskless one;</li>
+<li>PVE's own access log shows the expected number of <code>spiceproxy</code>
+  mints at each checkpoint: none after the scrape and the refused
+  direct <code>.vv</code>, one once the first session's channels have connected
+  and still one after it is held, two once a second session's have,
+  and three after the lane's own mint and at the end. So a session's
+  channels share one ticket, on real PVE;</li>
+<li>the backend leg is tunnelled, TLS, and pinned to the node's
+  subject, and a session survives past its 30 second ticket and
+  <code>CONSOLE_TOKEN_DURATION</code>;</li>
+<li>the second session displaces the first, because qemu's SPICE
+  server serves one client at a time: the first session's ryll exits
+  and the proxy logs each of its relays ending, while the second
+  passes frames. Then the lane mints one ticket itself, as kerbside
+  does, and the second session still passes frames, which shows on
+  real PVE that a password change keeps a connected client.
+  Terminating the second session over REST drops it;</li>
+<li>no token secret, backend ticket, <code>.vv</code> password, API JWT, value
+  from the lane's own mint or <code>pvespiceproxy:</code> reaches an uploaded
+  artifact.</li>
+</ul>
+<p>Like the oVirt lane, its oracles keep a harness fault apart from a
+defect (see "Log-derived oracles" above), and the mint count adds a
+third verdict, a timing fault, for a channel that connected too late
+to reuse its session's ticket. Reading each session's backend ticket
+can give a timing fault too, when the harness was too slow to read it
+before it expired.</p>
+<p>The runner-side scripts, the topology, a diagram of the path proven,
+the mint-counting method, the security rules and what only the lane
+exercises are documented in <code>tools/proxmox-e2e/README.md</code>. Dispatch
+the lane on a pull request that changes the Proxmox driver in ways
+the path filter does not cover.</p>
 <h2 id="tempest-tests-against-a-kolla-ansible-deployment">Tempest tests against a Kolla-Ansible deployment<a class="headerlink" href="#tempest-tests-against-a-kolla-ansible-deployment" title="Permanent link">&para;</a></h2>
 <p>The <code>openstack_matrix</code> job deploys an all-in-one OpenStack on a
 single Shaken Fist guest and runs Tempest against it. That guest is

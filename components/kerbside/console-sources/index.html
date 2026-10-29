@@ -8713,6 +8713,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-deployment-options-phase-06-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 6: installation hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
         
   
@@ -9617,6 +9645,34 @@
     
   
     Proxmox source phase 4: the source driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source-phase-05-ci-lane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 5: the CI lane
   
 
     
@@ -17001,7 +17057,9 @@ ticket lasts 30 seconds from the mint, a length Proxmox does not let a caller
 choose, so <code>CONSOLE_TOKEN_DURATION</code> does not change it. A session's channels
 reuse the ticket until 10 seconds before it expires, and a channel which
 connects after that mints a fresh one. Minting a ticket replaces the VM's
-password, which does not disconnect clients already connected.</p>
+password, which does not disconnect clients already connected. A second session
+to the same console does disconnect the first, because qemu's SPICE server
+serves one client at a time, as it does for any SPICE client.</p>
 <p>A mint reads the VM list and the VM's configuration before it asks for the
 ticket, and each request is bounded at 5 seconds. A failure denies the channel
 (<code>console ticket unavailable</code>) and is audited with the exception's class name.

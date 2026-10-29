@@ -8774,6 +8774,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-deployment-options-phase-06-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 6: installation hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
         
   
@@ -9678,6 +9706,34 @@
     
   
     Proxmox source phase 4: the source driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source-phase-05-ci-lane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 5: the CI lane
   
 
     
@@ -17221,13 +17277,15 @@ time. The release runs it on the proxy wheels too.</p>
 </ol>
 <p>So tag a commit that is on <code>develop</code> and went through the merge queue,
 and wait for its <code>functional-tests.yml</code> run to finish first.</p>
-<p>The gate does not cover the oVirt and OpenStack cloud lanes, which run
+<p>The gate does not cover the oVirt, OpenStack and Proxmox lanes, which run
 nightly rather than in the merge queue (see "CI tiers" in
 <a href="/components/kerbside/testing/#ci-tiers">testing.md</a>). Before tagging, check that no
-<code>Nightly oVirt lane failing</code> or <code>Nightly OpenStack lane failing</code> issue
-is open and that the last nightly ran on or after the commit you are
-tagging. If not, dispatch <code>functional-tests.yml</code> on <code>develop</code> with both
-cloud targets selected and tag once it passes. A merge
+<code>Nightly oVirt lane failing</code>, <code>Nightly OpenStack lane failing</code> or
+<code>Nightly proxmox lane failing</code> issue is open and that the last nightly
+ran on or after the commit you are tagging. If not, dispatch
+<code>functional-tests.yml</code> on <code>develop</code> with both cloud targets selected,
+and <code>proxmox-functional.yml</code> on <code>develop</code> when its last nightly
+predates the commit, and tag once they pass. A merge
 that bypassed the queue has no merge queue run, so it cannot be
 released until a later non-docs queue entry has gone through the queue:
 one that changes something outside <code>docs/</code>, so the code lanes run. A
