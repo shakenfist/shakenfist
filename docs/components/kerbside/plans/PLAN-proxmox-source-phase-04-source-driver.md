@@ -383,7 +383,7 @@ Each one runs `tox`.
       `tools/check-backend-tls-claims.py` passes.
 - [x] `tox -epy3`, `tox -eflake8` and `pre-commit run
       --all-files` pass.
-- [ ] The master plan's Execution table records this phase's
+- [x] The master plan's Execution table records this phase's
       merge commit, set by the next phase's close-out.
 
 ## Bugs fixed during this work
@@ -470,9 +470,11 @@ None yet.
 
 All four steps landed on `proxmox-source-phase-04-source-driver`
 on 2026-10-28 (AEDT), one commit each, followed by two review
-rounds. 632 unit tests pass; the new MariaDB test,
-`test_column_widths`, passed on MariaDB 11.8 locally and runs in
-the direct-qemu lane.
+rounds. 633 unit tests pass. The new MariaDB test,
+`test_column_widths`, passed on MariaDB 11.8 locally and then in
+the direct-qemu lane on the pull request's final head
+([run 40650739032](https://github.com/shakenfist/kerbside/actions/runs/40650739032)).
+The pull request merged as `6519c3b` on 2026-10-29 (AEDT).
 
 Review round 1 found the one defect the plan missed: console
 uuid columns 36 characters wide, too narrow for the uuid scheme
