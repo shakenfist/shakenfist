@@ -1029,6 +1029,105 @@ sweep takes one object from each type in turn, remembering its place
 between passes, so neither a large backlog in one type nor a single
 failing object can stop the others.
 
+#### Draining a backlog
+
+A cluster which has never run the sweep at this pace, or which was down
+for a while, can have a large backlog. To tell whether you have one, set
+the backlog gauge beside the rate at which objects are being hard
+deleted. The first query is how many objects are waiting, by type (the
+gauge is published by the elected maintainer only, so read it with `max`,
+never `sum`); the second is how many the sweep removed over the last day:
+
+```
+max by (object_type) (cluster_deleted_object_backlog)
+sum by (object_type) (increase(cluster_deleted_object_seconds_count{outcome="hard_deleted"}[1d]))
+```
+
+A backlog many times larger than a day's hard deletes, and not shrinking,
+is one the default will not clear in useful time.
+
+To size the cap, work in a day. The sweep runs one pass a minute, so its
+capacity is `DELETED_OBJECT_SWEEP_MAX_OBJECTS` times the passes in a day,
+about 1,400 (a little under, as a pass can be skipped). Objects keep
+arriving while it works, so what drains the backlog is the capacity less
+the arrivals:
+
+* arrivals a day are the hard deletes in the day plus the change in the
+  backlog over the same day;
+* net drain a day is capacity minus arrivals;
+* days to drain is the backlog divided by the net drain.
+
+As an example only, one busy cluster had a backlog of 1.59 million and
+about 43,000 arrivals a day. At the default of 100, capacity was about
+140,000 a day, a net drain of about 97,000 and so some 16 days to drain.
+At 400 the capacity is 560,000 a day, a net drain of about 517,000, and
+the drain takes about three days. If the arrivals are higher than the
+capacity the backlog cannot shrink at all, whatever else you do.
+
+`DELETED_OBJECT_SWEEP_SECONDS` is the safety limit and not the knob. A
+pass that reaches it stops taking work, so if the database tier slows
+down the drain slows itself rather than piling load on it. Raise the cap
+in steps, for example doubling it, and hold each step for a day before
+the next. Apply a new value with:
+
+```
+sf-ctl set-config DELETED_OBJECT_SWEEP_MAX_OBJECTS 400
+```
+
+followed by a restart of `sf-cluster` on every node, because cluster
+configuration is read at start.
+
+While a step runs, watch for the database tier paying for it. Compare
+each reading with the same query before the change (add `offset 7d`, or
+whichever delay reaches back to before it):
+
+* Commits per second on MariaDB. A drain adds roughly one commit per
+  batch, so this should rise by a few a second rather than doubling:
+
+  ```
+  sum(rate(mysql_global_status_commands_total{command="commit"}[1d]))
+  ```
+
+* The wall time of a batch hard delete, by type, which should stay close
+  to its earlier value:
+
+  ```
+  sum by (object_type) (rate(cluster_deleted_object_batch_seconds_sum[1d]))
+    / sum by (object_type) (rate(cluster_deleted_object_batch_seconds_count[1d]))
+  ```
+
+* The cost of a single object, by type, which matters for the types hard
+  deleted one at a time (namespaces, instances, namespace claims and
+  nodes) and is the mean seconds per hard delete query given under
+  [Watching for sweeps that silently do nothing](#watching-for-sweeps-that-silently-do-nothing).
+* InnoDB row lock waits, which should not climb with the cap:
+
+  ```
+  sum(rate(mysql_global_status_innodb_row_lock_waits[1d]))
+  ```
+
+* Restarts of the database processes outside a deploy, in the last day.
+  Adjust the `job` label to however you scrape `sf-database`:
+
+  ```
+  changes(process_start_time_seconds{job="shakenfist-database"}[1d])
+  ```
+
+  A watchdog abort of a gateway in its log is the same signal.
+* The sweep's own time per pass, from the `elapsed_seconds` field of the
+  per-pass log line described below. If passes are regularly reaching
+  `DELETED_OBJECT_SWEEP_SECONDS`, the time budget and not the cap is
+  limiting the drain, and raising the cap further will not help.
+
+Also watch whatever alerting you already have on workloads which depend
+on the database tier. If any signal worsens, hold the cap where it is for
+another day, or put it back to the previous value, rather than raising
+it again.
+
+Once the backlog is gone, put the cap back. At steady state the sweep is
+bound by arrivals, not the cap, so a cap above the arrival rate changes
+nothing except how large a burst one pass will take.
+
 ### Watching for sweeps that silently do nothing
 
 Every sweep in the cluster daemon starts by reading a work list, and a
@@ -1141,6 +1240,26 @@ value means the sweep is falling further behind:
 
 ```
 deriv(sum(cluster_deleted_object_backlog)[1d:1h]) * 86400
+```
+
+Days behind, by object type: the backlog divided by a day's arrivals,
+where arrivals are the hard deletes over the day plus the change in the
+backlog over the same day. A type over 1.0 is behind the bound of a day,
+meaning it would take more than a day to clear what has built up even if
+arrivals stopped. The backlog is counted hourly, so a ratio taken from a
+type with very few arrivals a day means little, and a type missing from
+the result had no sample a day ago, which happens for the hour after a
+leadership change:
+
+```
+max by (object_type) (cluster_deleted_object_backlog)
+  / (
+      sum by (object_type) (increase(cluster_deleted_object_seconds_count{outcome="hard_deleted"}[1d]))
+      + (
+          max by (object_type) (cluster_deleted_object_backlog)
+          - max by (object_type) (cluster_deleted_object_backlog offset 1d)
+        )
+    )
 ```
 
 The RPCs which take the most total time, by object type:
