@@ -693,6 +693,23 @@ the live cluster afterwards and gate phase 5.
   match D25 and the text's own "hold each step for a day". The sixth
   signal is worded generically, since the CI flake alert is 33fl's.
   Every query was evaluated once against the 33fl Prometheus.
+- **4a, 2026-10-29T09:30Z.** Brief 3g re-run over the window ending
+  09:10Z and recorded in the master plan. Definition of done item 2:
+  Prometheus 130,663 hard deletes, Loki 131,026 over 1,325 passes,
+  within 0.3%. Arrivals read lower than the 16 hour estimate (37,000
+  a day against 43,000), and the drain time correspondingly longer at
+  the old cap (17 days); D24's arithmetic at 400 is unchanged in kind.
+- **4d step 1, 2026-10-29T09:35Z.** Mach33Labs/33fl#1094 merged at
+  08:45Z. sf-cluster restarted at 09:03Z (a new leader pid from
+  09:03:32Z) but every pass since still takes exactly 100 entries, so
+  the cap did not reach it. `rundaily.sh` is operator-run from a local
+  33fl checkout, so the likeliest cause is a checkout that predated
+  the merge; `cluster_config` on sfcbr could not be read from this
+  session (the production read was declined), so the clock for the
+  first D25 reading has not started. Next: confirm with `sf-ctl
+  show-config` on a database node and either wait for the next
+  nightly run or apply by hand with `sf-ctl set-config` and a restart
+  of sf-cluster.
 
 ## Back brief
 

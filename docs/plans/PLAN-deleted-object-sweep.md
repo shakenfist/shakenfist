@@ -310,23 +310,22 @@ the cadence.
 ### What phase 3 measured
 
 Phase 3 (merged in 1090771e64) went live on sfcbr at 2026-10-28T09:09Z,
-when the nightly deploy restarted sf-cluster and sf-4 was elected. It
-had run for 16.7 hours when phase 4 was planned, so the numbers below
-are a 16 hour window ending 2026-10-29T01:55Z from the 33fl Prometheus,
-cross-checked against the sweep's per-pass log lines in Loki for the
-same period. Phase 4's step 4a replaces them with the full first 24
-hours; every number here is a rate, so the reading does not change in
-kind.
+when the nightly deploy restarted sf-cluster and sf-4 was elected. The
+numbers below are its first 24 hours, the window ending
+2026-10-29T09:10Z, from the 33fl Prometheus, cross-checked against the
+sweep's per-pass log lines in Loki for the same period. (Phase 4 was
+planned against the first 16.7 hours; its step 4a replaced those
+numbers with these, and the reading did not change in kind.)
 
-**Throughput.** The sweep hard deleted 86,075 objects in 16 hours, a
-pace of about 129,000 a day against phase 2's 76,840. Every entry was
-`hard_deleted`: none was `skipped`, `failed`, `gone`, `not_final` or
-`too_young`. Loki agrees: 913 passes between 09:09:59Z and 01:51Z
-processed 90,134 entries, a mean of 98.7 a pass, and 891 of them took
-exactly the cap of 100. The backlog fell from 1,655,145 at 08:00Z to
-1,594,071 at 01:00Z the next day, 61,074 in 17 hours or about 86,000 a
-day, so arrivals were about 43,000 a day. At that rate the remaining
-1.59M takes about 18.5 days, which is phase 4's starting point.
+**Throughput.** The sweep hard deleted 130,663 objects in 24 hours
+against phase 2's 76,840. Every entry was `hard_deleted`: none was
+`skipped`, `failed`, `gone`, `not_final` or `too_young`. Loki agrees
+to within 0.3%: 1,325 passes in the window processed 131,026 entries,
+a mean of 98.9 a pass, and 1,296 of them took exactly the cap of 100.
+The backlog fell from 1,655,145 at 2026-10-28T08:00Z to 1,557,521 at
+2026-10-29T09:00Z, 97,624 in 25 hours or about 94,000 a day, so
+arrivals were about 37,000 a day. At that rate the remaining 1.56M
+takes about 17 days, which is phase 4's starting point.
 
 **Cost.** The per-commit reading holds. An operation now costs
 0.009-0.011 seconds of sweep wall time against 0.133-0.146 in phase 2,
@@ -334,43 +333,44 @@ a `namespace_key` 0.010 and an `interface` 0.016: thirteen times
 cheaper. A batch of about 25 operations takes 0.21-0.25 seconds, which
 is one commit plus about two milliseconds a row rather than 25 times
 0.135. The types whose cost did not move are the ones the batch did
-not touch: `namespace` 0.249 seconds and `instance` 0.56, hard deleted
+not touch: `namespace` 0.256 seconds and `instance` 0.56, hard deleted
 one at a time, and `blob` 3.3, whose batch of one is its
-event-reference delete. `network` costs 0.098 an object (2.3 seconds a
-batch) for the same reason. The sweep spent 3,898 seconds in 16 hours,
-about 5,850 a day against phase 2's 13,585, for 1.7 times the deletes.
+event-reference delete. `network` costs 0.103 an object (2.4 seconds a
+batch) for the same reason. The sweep spent 5,971 seconds in the day
+against phase 2's 13,585, for 1.7 times the deletes, in 5,713 batch
+calls.
 
-**Cadence.** 54.7 passes an hour rather than 60. A pass processes for
-4.6 seconds on average (median 3.2); 28 of 913 ran into the 20 second
+**Cadence.** 55 passes an hour rather than 60. A pass processes for
+4.6 seconds on average (median 3.2); 35 of 1,325 ran into the 20 second
 budget, with a turn of 25 namespaces or a blob batch inside them, and
 the longest processed for 33.8 seconds because the budget is checked
 between turns. Each overrun pushes the next pass out by a minute.
 
 **Fairness.** Thirteen types held a backlog and each was hard deleted
-about 8,000 times in the window, within 2% of each other: a pass serves
+about 12,000 times in the day, within 3% of each other: a pass serves
 four turns of 25, so the rotation completes every 3.25 passes and every
 type gets the cap divided by thirteen. Raising the cap raises every
 share equally until a type drains and its share passes to the rest.
 
-**Database load.** sf-database served 176.8 requests a second over the
-window against 182.0 in the 24 hours before the deploy, and committed
-14.8 a second against 18.1. sf-cluster made 23.6 requests a second
-against 26.2. So phase 3 removed 1.7 times as many objects for 3.3
-fewer commits a second. sf-cluster's `GetObjectState` was 2.55/s
-against a budget of 1.986 plus 0.016 for each of 22.4 standing
-instances, 2.34, inside the tolerance of twice that.
+**Database load.** sf-database served 171.2 requests a second over the
+day against 182.3 in the 24 hours before the deploy, and committed 14.4
+a second against 18.2. sf-cluster made 23.8 requests a second against
+26.3. So phase 3 removed 1.7 times as many objects for 3.8 fewer
+commits a second. sf-cluster's `GetObjectState` was 2.56/s against a
+budget of 1.986 plus 0.016 for each of 21.3 standing instances, 2.33,
+inside the tolerance of twice that.
 
 **The sweep's own pairs** are all under the unbudgeted ceiling of
-0.30/s on six nodes: `HardDeleteObjects` 0.088/s from sf-cluster and
-0.023/s from sf-api (every daemon's hard delete of a batched type now
-goes through it, phase 3's D15), the three base deletes 0.143/s each
-(the per-object types), `DeleteNamespace` 0.131/s, `GetObjectsByState`
-0.26/s against its budgeted 0.222/s, and the hourly
-`CountObjectsByState` 0.008/s. Phase 4's D27 decides whether any needs
+0.30/s on six nodes: `HardDeleteObjects` 0.092/s from sf-cluster and
+0.017/s from sf-api (every daemon's hard delete of a batched type now
+goes through it, phase 3's D15), the three base deletes 0.148/s each
+(the per-object types), `DeleteNamespace` 0.137/s, `GetObjectsByState`
+0.27/s against its budgeted 0.222/s, and the hourly
+`CountObjectsByState` 0.007/s. Phase 4's D27 decides whether any needs
 a budget entry from the rate it settles at after the drain.
 
-**#4399.** sf-cleaner's `GetObjectState` was 3.04/s against 2.77/s the
-day before, with 10% of the backlog gone. The natural experiment waits
+**#4399.** sf-cleaner's `GetObjectState` was 3.02/s against 2.77/s the
+day before, with 6% of the backlog gone. The natural experiment waits
 for the drain (phase 4's D29).
 
 **What it means.** The cost fell by the factor phase 3 predicted, the
