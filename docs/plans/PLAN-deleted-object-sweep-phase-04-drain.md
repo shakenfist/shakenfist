@@ -447,7 +447,9 @@ Files, all in 33fl:
    (a) a healthy cluster, nothing flagged, `days_to_drain` null;
    (b) one type behind (backlog 20,000, arrivals 5,000) and one
    growing (prior 100,000, now 112,000), both flagged, and a type with
-   backlog 40 and arrivals 30 not flagged despite `days_behind` 1.3;
+   backlog 390 and arrivals 300 not flagged despite `days_behind` 1.3
+   (the floor, not the arrivals minimum, is what spares it; a separate
+   case covers arrivals under 100 giving a null ratio);
    (c) a draining cluster: total 1,500,000, net -400,000, so
    `days_to_drain` is 3.75; (d) the gauge absent: the section is
    `unavailable` and has no `by_type`; (e) the prior sample missing
@@ -662,7 +664,35 @@ the live cluster afterwards and gate phase 5.
 
 ## Execution notes
 
-(Filled in as steps run.)
+- **Back brief, 2026-10-29 (UTC).** Michael kept D24 (400 then 800),
+  D26 (a report fact, not an alert) and D28 (seven clean nights under
+  50,000), and allowed this session to open the two 33fl pull requests
+  and to push and open this phase's shakenfist pull request once the
+  definition of done passes.
+- **4b, 4c and 4e ran in parallel**, each in its own worktree, because
+  none writes to another's tree. 4a waits for 2026-10-29T09:10Z.
+- **4c, 2026-10-29 (UTC).** Mach33Labs/33fl#1094. D28's soak was first
+  recorded with `--after-deploy sfcbr`, but an sfcbr deploy reports
+  only `shakenfist/shakenfist` and `shakenfist/client-python` as
+  shipped (33fl `sfcbr.yml`, `plan_blockers_shipped`), so a soak keyed
+  on a 33fl pull request would never start. It is recorded as ten
+  days after merge instead; the clock the plan cares about is the one
+  brief 4d starts from the pass log.
+- **4b, 2026-10-29 (UTC).** Mach33Labs/33fl#1095, also recorded as a
+  blocker because D28 reads the fact it adds. Brief 4b's test case (b)
+  as first written asked for a type with backlog 40 and arrivals 30 to
+  show the floor, but arrivals under 100 give a null ratio before the
+  floor is reached; the test uses 390 and 300, and the brief is
+  corrected above. The management session corrected the fact's
+  description of what the gauge counts (objects in a final state,
+  including those inside their grace period, not soft-deleted rows).
+  794 tests pass; the three mutants in the definition of done are each
+  killed (`scratchpad/p04/4b/mutate.sh` in this session's scratchpad).
+- **4e, 2026-10-29 (UTC).** The watch queries were written with one
+  hour windows and changed to one day by the management session, to
+  match D25 and the text's own "hold each step for a day". The sixth
+  signal is worded generically, since the CI flake alert is 33fl's.
+  Every query was evaluated once against the 33fl Prometheus.
 
 ## Back brief
 
