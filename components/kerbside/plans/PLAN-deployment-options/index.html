@@ -7634,6 +7634,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../deployment/ansible/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ansible
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../deployment/kolla-ansible/" class="md-nav__link">
         
   
@@ -8661,6 +8689,34 @@
     
   
     Deployment options phase 4: containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-deployment-options-phase-05-ansible/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 5: the Ansible role
   
 
     
@@ -16679,9 +16735,9 @@ keeps the option of a second one without redeploying.</p>
 <td><code>docs/installation.md</code> "What a running Kerbside needs"; the CI scripts above are the nearest thing to a recipe</td>
 </tr>
 <tr>
-<td>Shaken Fist's ansible collection</td>
-<td>A <code>kerbside</code> role exists and is the most complete deployer Kerbside has: about 2000 lines, two systemd units, validation plays, and co-located or dedicated hosts. It writes exactly one <code>type: shakenfist</code> source (<code>templates/sources.yaml</code>). It also has a bring-your-own-Kerbside path: set <code>kerbside_url</code> with an empty <code>kerbside</code> group, and Shaken Fist is configured for a Kerbside it does not deploy.</td>
-<td><code>shakenfist/deploy/collection/roles/kerbside/</code>; being built by <code>PLAN-kerbside-deployer.md</code>, phases 1 to 3 merged, phase 4 open as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4479" title="GitHub Issue: shakenfist/shakenfist #4479">shakenfist#4479</a></td>
+<td>The <code>shakenfist.kerbside</code> ansible collection</td>
+<td>Its <code>kerbside</code> role is the most complete deployer Kerbside has: about 2400 lines, two systemd units, validation plays, and co-located or dedicated hosts. It writes a <code>kerbside_sources</code> list of any source type, but installs only the Shaken Fist client (#602) and writes fifteen fixed <code>kerbside.ini</code> settings. Shaken Fist's <code>site.yml</code> runs it, and has a bring-your-own-Kerbside path: set <code>kerbside_url</code> with an empty <code>kerbside</code> group, and Shaken Fist is configured for a Kerbside it does not deploy. (Phase 5's survey corrected this row, which still described the role as Shaken Fist's.)</td>
+<td><code>ansible/</code> in this repository, published to Galaxy since v0.8.0; <code>ansible/README.md</code>; Shaken Fist's <code>docs/operator_guide/kerbside.md</code> for the cluster side</td>
 </tr>
 <tr>
 <td>Kolla-Ansible</td>
@@ -16896,13 +16952,13 @@ would creep back in. <strong>Recommendation: yes.</strong> Extend
 <tr>
 <td>4. Containers: compose beyond the demo, and Kubernetes</td>
 <td><a href="/components/kerbside/plans/PLAN-deployment-options-phase-04-containers/">PLAN-deployment-options-phase-04-containers.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>46a03a6</td>
 </tr>
 <tr>
 <td>5. Ansible: the <code>kerbside</code> role</td>
-<td></td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-deployment-options-phase-05-ansible/">PLAN-deployment-options-phase-05-ansible.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16961,13 +17017,14 @@ has never been written down, and nothing in CI exercises it.</p>
 image is not a general-purpose image, and the status of
 Kubernetes. Links the image issue. Planned at medium effort.</p>
 <p><strong>Phase 5: Ansible.</strong> <code>docs/deployment/ansible.md</code>. It describes
-the role wherever it lives at that point, and links to Shaken
-Fist's operator guide for the parts Shaken Fist owns. It also
-covers the bring-your-own-Kerbside path, which is how a Shaken
-Fist cluster joins a front-door Kerbside. The role move was
-accepted, so this phase documents a Kerbside-owned role that
-accepts several sources. The move has landed (see Dependencies
-on other plans), so this phase is unblocked. Phase 2 found that
+the role, which now lives in this repository's <code>ansible/</code>, and
+links to Shaken Fist's operator guide for the parts Shaken Fist
+owns. That guide (<code>docs/operator_guide/kerbside.md</code>, added
+2026-10-23) already covers the bring-your-own-Kerbside path, which
+is how a Shaken Fist cluster joins a front-door Kerbside, so this
+page links it rather than covering it; phase 5's survey corrected
+this. The collection's <code>ansible/README.md</code> is the role's variable
+reference, and the page links that too. Phase 2 found that
 the role installs no client library but <code>shakenfist-client</code>, so it
 cannot yet deploy a working oVirt or OpenStack source or a Keystone
 login (#602), and the index's sources cell for the role says so;

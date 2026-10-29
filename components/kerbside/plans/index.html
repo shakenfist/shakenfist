@@ -7634,6 +7634,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../deployment/ansible/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ansible
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../deployment/kolla-ansible/" class="md-nav__link">
         
   
@@ -8467,6 +8495,34 @@
     
   
     Deployment options phase 4: containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-deployment-options-phase-05-ansible/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 5: the Ansible role
   
 
     
@@ -16340,7 +16396,7 @@ repo root. For pre-push audits of our own work see
 <td><a href="/components/kerbside/plans/PLAN-deployment-options/">Deployment options</a></td>
 <td>A <code>docs/deployment/</code> section, one page per deployment mechanism (by hand, Kolla-Ansible, containers, the ansible role), with a table in <code>docs/index.md</code> of which sources each mechanism configures and what CI proves, so that how Kerbside is deployed stops being indexed by which cloud it fronts (#546). Written as Kolla-Ansible moves from actively upstreamed to maintained by rebase, and on the view that a front-door Kerbside deployed independently of any one cloud is the default worth documenting. Documentation only: the image, the role move and upstream Kolla work are filed or recorded against the plans that own them</td>
 <td>In progress</td>
-<td><a href="/components/kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/">phase 1</a> (complete, merged 200d6b3 -- survey, matrix and scaffolding. The survey corrected three master-plan claims at source: the Kolla merge lane passed in all 32 of the last 40 merge runs that started it, with no failures, rather than being flaky, so it stays in the merge queue; the Shaken Fist role is about 2000 lines, not 1000; and the role move, now accepted as shakenfist PLAN-kerbside-deployer phase 5, needs a Kerbside release after v0.6.0. It also found that a new docs directory needs an <code>order.yml</code> for site navigation, and that the TLS claim guard's scope literal is copied into its mutation tool, so the two have to change together. One review item was deferred because #555 was already queued, rewriting the by-hand and Ansible rows' CI cells; #587 overtook it, rewriting both when sf-e2e moved onto the role), <a href="/components/kerbside/plans/PLAN-deployment-options-phase-02-manual/">phase 2</a> (complete, merged b10f2ac -- the by-hand page, <code>docs/deployment/manual.md</code>, and example systemd units in <code>etc/systemd/</code>. The survey found the master plan's premise for question 3 overtaken: the role moved into this repository with #580, so the units already live here as Jinja templates, and the static copies are held to them by a unit test rather than left to drift. It also found that there are no state or log directories to create, that <code>etc/kerbside.conf.example</code> and the role disagree about who owns <code>kerbside.ini</code>, and that nothing installs the client libraries the oVirt and OpenStack sources and the Keystone login import, by hand or through the role, although the index says the role configures any source. The decision most likely to be argued with is binding the example API unit to loopback where the role binds every interface), <a href="/components/kerbside/plans/PLAN-deployment-options-phase-03-openstack/">phase 3</a> (complete, merged d159d17 -- <code>docs/deployment/kolla-ansible.md</code>, and the front-door path for Kerbside in front of any OpenStack, which goes in <code>use-cases/openstack.md</code> rather than on the Kolla-Ansible page because it is the same however Kerbside is deployed. The survey found that #605 moved the OpenStack lane to nightly, overtaking question 2 and leaving two stale merge-queue sentences in <code>openstack.md</code>; that the enablement change 967801 is stacked on the deployment change 976889, so question 1's split has not taken effect; that <code>openstack.md</code> has no Deployment section, only a paragraph; and that a Kerbside in front of a stock Kolla-Ansible cloud needs both Nova settings by configuration override), <a href="/components/kerbside/plans/PLAN-deployment-options-phase-04-containers/">phase 4</a> (in progress -- <code>docs/deployment/containers.md</code>, one short page saying there is no first-party image (#553), no production compose file and nothing for Kubernetes. The survey found that Kolla publishes <code>kerbside-api</code> and <code>kerbside-proxy</code> on quay.io, built from Kerbside's <code>develop</code> rather than a release, which the master plan's inventory and #553 did not say, and that <code>kolla-ansible.md</code> wrongly says Kerbside's images have to be built. The decision most likely to be argued with is shipping no production compose file, even as an example)</td>
+<td><a href="/components/kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/">phase 1</a> (complete, merged 200d6b3 -- survey, matrix and scaffolding. The survey corrected three master-plan claims at source: the Kolla merge lane passed in all 32 of the last 40 merge runs that started it, with no failures, rather than being flaky, so it stays in the merge queue; the Shaken Fist role is about 2000 lines, not 1000; and the role move, now accepted as shakenfist PLAN-kerbside-deployer phase 5, needs a Kerbside release after v0.6.0. It also found that a new docs directory needs an <code>order.yml</code> for site navigation, and that the TLS claim guard's scope literal is copied into its mutation tool, so the two have to change together. One review item was deferred because #555 was already queued, rewriting the by-hand and Ansible rows' CI cells; #587 overtook it, rewriting both when sf-e2e moved onto the role), <a href="/components/kerbside/plans/PLAN-deployment-options-phase-02-manual/">phase 2</a> (complete, merged b10f2ac -- the by-hand page, <code>docs/deployment/manual.md</code>, and example systemd units in <code>etc/systemd/</code>. The survey found the master plan's premise for question 3 overtaken: the role moved into this repository with #580, so the units already live here as Jinja templates, and the static copies are held to them by a unit test rather than left to drift. It also found that there are no state or log directories to create, that <code>etc/kerbside.conf.example</code> and the role disagree about who owns <code>kerbside.ini</code>, and that nothing installs the client libraries the oVirt and OpenStack sources and the Keystone login import, by hand or through the role, although the index says the role configures any source. The decision most likely to be argued with is binding the example API unit to loopback where the role binds every interface), <a href="/components/kerbside/plans/PLAN-deployment-options-phase-03-openstack/">phase 3</a> (complete, merged d159d17 -- <code>docs/deployment/kolla-ansible.md</code>, and the front-door path for Kerbside in front of any OpenStack, which goes in <code>use-cases/openstack.md</code> rather than on the Kolla-Ansible page because it is the same however Kerbside is deployed. The survey found that #605 moved the OpenStack lane to nightly, overtaking question 2 and leaving two stale merge-queue sentences in <code>openstack.md</code>; that the enablement change 967801 is stacked on the deployment change 976889, so question 1's split has not taken effect; that <code>openstack.md</code> has no Deployment section, only a paragraph; and that a Kerbside in front of a stock Kolla-Ansible cloud needs both Nova settings by configuration override), <a href="/components/kerbside/plans/PLAN-deployment-options-phase-04-containers/">phase 4</a> (complete, merged 46a03a6 -- <code>docs/deployment/containers.md</code>, one short page saying there is no first-party image (#553), no production compose file and nothing for Kubernetes. The survey found that Kolla publishes <code>kerbside-api</code> and <code>kerbside-proxy</code> on quay.io, built from Kerbside's <code>develop</code> rather than a release, which the master plan's inventory and #553 did not say, and that <code>kolla-ansible.md</code> wrongly says Kerbside's images have to be built. The decision most likely to be argued with is shipping no production compose file, even as an example), <a href="/components/kerbside/plans/PLAN-deployment-options-phase-05-ansible/">phase 5</a> (in progress -- <code>docs/deployment/ansible.md</code>, a short page that routes to the collection's README for the role's variables and to Shaken Fist's operator guide for placement beside a cluster, both of which the survey found already complete. The survey also found that <code>ansible/README.md</code> says the role works with any source type, which #602 makes untrue, and that the role writes fifteen fixed <code>kerbside.ini</code> settings with no pass-through, so a role-deployed Kerbside cannot have a Keystone login even once #602 is fixed; this phase files an issue for that. The decision most likely to be argued with is linking both references rather than restating either)</td>
 </tr>
 <tr>
 <td>2026-10-19</td>

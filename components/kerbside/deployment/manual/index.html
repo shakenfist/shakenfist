@@ -16,7 +16,7 @@
         <link rel="prev" href="../../direct-qemu-harness/">
       
       
-        <link rel="next" href="../kolla-ansible/">
+        <link rel="next" href="../ansible/">
       
       
         
@@ -7755,6 +7755,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../ansible/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ansible
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../kolla-ansible/" class="md-nav__link">
         
   
@@ -8517,6 +8545,34 @@
     
   
     Deployment options phase 4: containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-deployment-options-phase-05-ansible/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 5: the Ansible role
   
 
     
@@ -16335,9 +16391,8 @@ configuration manager and wants to know what to make it do. Every
 step below says what to create and why, so it translates into a Salt
 state, a Puppet manifest or a shell script as readily as into typing.</p>
 <p>If you can run Ansible, the role in Kerbside's <code>shakenfist.kerbside</code>
-collection
-(<a href="https://github.com/shakenfist/kerbside/blob/develop/ansible/README.md">ansible/README.md</a>)
-is the tested way to get the same result: a CI lane deploys Kerbside
+collection (<a href="/components/kerbside/deployment/ansible/">Deploying Kerbside with Ansible</a>) is the
+tested way to get the same result: a CI lane deploys Kerbside
 through it on every pull request. This page follows the role's tasks,
 and says so wherever it does something different.</p>
 <p>This page is about how Kerbside is installed and run, not about why.

@@ -7963,6 +7963,34 @@
   
   
     <li class="md-nav__item">
+      <a href="deployment/ansible/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ansible
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="deployment/kolla-ansible/" class="md-nav__link">
         
   
@@ -8725,6 +8753,34 @@
     
   
     Deployment options phase 4: containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plans/PLAN-deployment-options-phase-05-ansible/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 5: the Ansible role
   
 
     
@@ -16922,9 +16978,9 @@ deployed in front of the clouds rather than by one of them, because
 <td>Every lane except <code>sf-e2e</code>, by CI scripts rather than as a documented procedure</td>
 </tr>
 <tr>
-<td>Ansible role</td>
+<td><a href="/components/kerbside/deployment/ansible/">Ansible role</a></td>
 <td>The <code>kerbside</code> role in Kerbside's own <code>shakenfist.kerbside</code> ansible collection (<code>ansible/</code>, published to Ansible Galaxy with each release), on co-located or dedicated hosts, for any source type, with a bring-your-own-Kerbside path for a Kerbside it does not deploy</td>
-<td>Shaken Fist and static, until <a href="https://github.com/shakenfist/kerbside/issues/602">#602</a></td>
+<td>Shaken Fist, Proxmox and static; oVirt and OpenStack once <a href="https://github.com/shakenfist/kerbside/issues/602">#602</a> is fixed</td>
 <td>A rootless test of the role's entry points (<code>tools/ci-test-ansible-role.sh</code>) and a lint, release-build and <code>galaxy-importer</code> check in the sanity job. <code>sf-e2e</code>, smoke tier and nightly, deploys a pull request's Kerbside through its own role, co-located on a Shaken Fist node, and checks a second deploy restarts nothing</td>
 </tr>
 <tr>

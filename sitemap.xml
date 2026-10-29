@@ -1645,6 +1645,10 @@
          <lastmod>2026-10-29</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/deployment/ansible/</loc>
+         <lastmod>2026-10-29</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/kerbside/deployment/containers/</loc>
          <lastmod>2026-10-29</lastmod>
     </url>
@@ -1746,6 +1750,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-deployment-options-phase-04-containers/</loc>
+         <lastmod>2026-10-29</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-deployment-options-phase-05-ansible/</loc>
          <lastmod>2026-10-29</lastmod>
     </url>
     <url>
