@@ -718,6 +718,28 @@ is emitted by the enqueuing process, not by the dispatcher:
   three months. `tools/queue-wait-report.py` reports the
   distribution and the outcome counts.
 
+* **`ended without executing`** (`EVENT_TYPE_USAGE`). Emitted on an
+  op which a `depends_on` dependency ended before it ran, once the
+  op's terminal state is written. Such an op never emits
+  `execution duration`, so without this event it is indistinguishable
+  in the log stream from one which has not run yet. Carries in
+  `extra`:
+    * `outcome` — `abandoned` (the dependency never went terminal and
+      the dependency wait defer budget was spent), `aborted` (the
+      dependency errored, aborted or was deleted) or `cancelled` (the
+      dependency does not exist).
+    * `defer_count`, `wait_seconds` and `queue_name` — as on
+      `execution duration`, with `wait_seconds` measured from the
+      op's enqueue to the ending, so for an abandoned op it is the
+      whole of the budget's back-off ladder. The queue fields are
+      present only when the dispatcher loaded the op from the table.
+    * `reason` — the prose the op's state message carries.
+
+  `tools/operation-timeline.py` reads this stream and reports these
+  ops in a table of their own, by outcome, instead of counting them
+  as "ran after the window, or not yet". A `runs_after` wait which is
+  given up on does not emit it: the op still runs.
+
 * **`coalesced sibling ops`** (`EVENT_TYPE_STATUS`). Emitted on a
   surviving op, *and on the op's coalescing target*, when one or
   more *other* pending ops on the same target with the same single
@@ -875,7 +897,13 @@ dispatcher asked for, and how long it then sat after each redelivery.
 It also checks whether each rung of the back-off ladder was actually
 honoured, and reports whether any part of the window it read hit
 Loki's 5000 line query ceiling, since a truncated window otherwise
-looks exactly like a complete one:
+looks exactly like a complete one. Operations which a dependency ended
+before they ran, which never emit `execution duration`, are read from
+the `ended without executing` events and reported as their own table
+by outcome, with how many times each deferred and how long it waited;
+an operation which spent the dependency wait defer budget is the
+six-minute tail the tool was written to explain, and used to be
+reported as having run after the window:
 
 ```
 tools/operation-timeline.py --tenant sfcbr \

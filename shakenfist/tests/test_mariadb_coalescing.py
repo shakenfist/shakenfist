@@ -35,6 +35,7 @@
 #   invariant that makes it safe is enforced at enqueue time instead, and
 #   is tested in shakenfist/tests/schema/test_net_op_coalescing.py.
 
+import inspect
 import uuid
 from typing import Any, Optional
 from unittest import mock
@@ -42,6 +43,7 @@ from unittest import mock
 import grpc
 import sqlalchemy as sa
 
+from shakenfist.daemons import daemon
 from shakenfist.daemons.database import main as database_main
 from shakenfist.daemons.network import maintain as network_maintain
 from shakenfist.daemons.network import workitem as network_workitem
@@ -54,6 +56,7 @@ from shakenfist.operations.error_report import ErrorReport
 from shakenfist.operations.net_op import NetOp
 from shakenfist.operations.net_op import NoSuchNetwork
 from shakenfist.protos import database_pb2
+from shakenfist.protos import database_pb2_grpc
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations import net_op as net_op_schema
@@ -91,7 +94,8 @@ class CoalescingTables(dbfixture.MariaDBTableFixture):
 
     def _insert_op(self, conn, op_uuid, tasks=(TASK,), state='queued',
                    created_at=100.0, node_uuid=None,
-                   priority='user_facing', with_work_queue_row=True):
+                   priority='user_facing', with_work_queue_row=True,
+                   scheduled_at=None):
         """Insert one cluster operation and its state row.
 
         The two rows deliberately go in the way production writes them:
@@ -106,6 +110,10 @@ class CoalescingTables(dbfixture.MariaDBTableFixture):
         ``node_uuid`` defaults to ``None`` -- a cluster-wide op -- so
         every caller written before the multi-column key still gets the
         same row it always did.
+
+        ``scheduled_at`` defaults to ``created_at``, which is what the
+        enqueue writes; a defer writes a later time, which is the shape
+        the backing-off tests need.
         """
         ops = mariadb._get_cluster_operations_table()
         states = mariadb._get_object_states_table()
@@ -131,7 +139,8 @@ class CoalescingTables(dbfixture.MariaDBTableFixture):
             conn.execute(sa.insert(work_queue).values(
                 id=self._work_queue_id,
                 queue_name='networknode-net-user_facing',
-                scheduled_at=created_at,
+                scheduled_at=(created_at if scheduled_at is None
+                              else scheduled_at),
                 claimed_at=None,
                 claimed_by=None,
                 attempts=0,
@@ -226,6 +235,69 @@ class CoalescingSQLTestCase(CoalescingTables, base.ShakenFistTestCase):
             SIBLING_UUID,
             mariadb._direct_find_existing_coalescible_op(
                 'net_op', [('network_uuid', NETWORK_UUID)], TASK))
+
+    @mock.patch('shakenfist.mariadb.time.time', return_value=1000.0)
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_ignores_an_op_which_is_backing_off(
+            self, mock_get_engine, mock_time):
+        # Issue #4643: the op is queued and its work_queue row is there,
+        # but a defer scheduled that row thirty seconds out. Adopting it
+        # would hand the caller that delay when a fresh op would run at
+        # once.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, scheduled_at=1030.0)
+            conn.commit()
+
+        self.assertIsNone(
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
+
+    @mock.patch('shakenfist.mariadb.time.time', return_value=1000.0)
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_adopts_an_op_due_within_the_margin(
+            self, mock_get_engine, mock_time):
+        # A row due inside the dispatcher's idle poll runs no later than
+        # a fresh one would, so it is still worth adopting.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        margin = mariadb.COALESCIBLE_ADOPT_SCHEDULE_MARGIN_SECONDS
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID,
+                            scheduled_at=1000.0 + margin / 2)
+            conn.commit()
+
+        self.assertEqual(
+            SIBLING_UUID,
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
+
+    @mock.patch('shakenfist.mariadb.time.time', return_value=1000.0)
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_skips_a_backing_off_op_for_a_due_sibling(
+            self, mock_get_engine, mock_time):
+        # Oldest first still holds among the ops which are due: the
+        # older op is backing off, so the newer, due one is adopted.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SURVIVOR_UUID, created_at=50.0,
+                            scheduled_at=1060.0)
+            self._insert_op(conn, SIBLING_UUID, created_at=150.0)
+            conn.commit()
+
+        self.assertEqual(
+            SIBLING_UUID,
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
+
+    def test_the_adoption_margin_is_the_idle_poll(self):
+        # The two constants are kept equal by hand because daemon.py
+        # imports mariadb.py; this is what stops them drifting.
+        self.assertEqual(
+            daemon.IDLE_POLL_MAX_SECONDS,
+            mariadb.COALESCIBLE_ADOPT_SCHEDULE_MARGIN_SECONDS)
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_find_existing_ignores_a_non_queued_op(self, mock_get_engine):
@@ -1512,3 +1584,140 @@ class FoldServicerTestCase(CoalescingTables, base.ShakenFistTestCase):
             ValueError, mariadb._direct_claim_coalescible_siblings,
             'net_op', [('network_uuid', NETWORK_UUID)], [TASK],
             SURVIVOR_UUID, folded_state='queued')
+
+
+class RetiredSingleColumnRpcsTestCase(base.ShakenFistTestCase):
+    """The single-column coalescing RPCs are gone (#4639).
+
+    ``ClaimCoalescibleSiblings`` and ``FindExistingCoalescibleOp`` took
+    one (column, uuid) pair, and their handlers accepted any task name
+    with it, so a client could fold ``network_ensure_mesh`` across nodes
+    through them. No release ever carried them (every tagged release
+    predates NetOp), so nothing can still send them. The V2 names stay,
+    because the suffix is what stops an old server folding on the first
+    column of a wider key.
+    """
+
+    def test_the_proto_no_longer_carries_them(self):
+        methods = database_pb2.DESCRIPTOR.services_by_name[
+            'DatabaseService'].methods_by_name
+        for name in ('ClaimCoalescibleSiblings', 'FindExistingCoalescibleOp'):
+            self.assertNotIn(name, methods)
+            self.assertFalse(
+                hasattr(database_pb2_grpc.DatabaseServiceServicer, name), name)
+        for message in ('ClaimCoalescibleSiblingsRequest',
+                        'FindExistingCoalescibleOpRequest'):
+            self.assertFalse(hasattr(database_pb2, message), message)
+        self.assertIn('ClaimCoalescibleSiblingsV2', methods)
+        self.assertIn('FindExistingCoalescibleOpV2', methods)
+        self.assertIn('FoldCoalescibleSiblings', methods)
+
+    def test_the_servicer_and_its_counters_no_longer_carry_them(self):
+        for name in ('ClaimCoalescibleSiblings', 'FindExistingCoalescibleOp'):
+            self.assertFalse(
+                hasattr(database_main.DatabaseService, name), name)
+        source = inspect.getsource(database_main.Monitor.__init__)
+        self.assertNotIn("'claim_coalescible_siblings'", source)
+        self.assertNotIn("'find_existing_coalescible_op'", source)
+        self.assertIn("'claim_coalescible_siblings_v2'", source)
+        self.assertIn("'find_existing_coalescible_op_v2'", source)
+
+
+class CoalescingUnimplementedTestCase(base.ShakenFistTestCase):
+    """UNIMPLEMENTED from an older sf-database raises, with no fallback.
+
+    The multi-column key is only safe across a rolling upgrade if a V2
+    call answered UNIMPLEMENTED by an older service is treated as
+    "coalescing unavailable". The wrapper must raise, not return the
+    empty result it returns on every other failure (which reads as "no
+    sibling" and would let an enqueue or a fold proceed as though it had
+    checked), and it must not try any other RPC, because an older
+    server could only fold on the first column alone. These tests start
+    from the RPC answer rather than from the exception, which is where
+    the existing coverage started (#4641).
+    """
+
+    KEYS = [('network_uuid', NETWORK_UUID), ('node_uuid', NODE_A_UUID)]
+
+    def _call(self, wrapper, code):
+        stub = mock.MagicMock()
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=stub), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           side_effect=FakeRpcError(code)) as mock_call:
+            try:
+                result = wrapper()
+            except exceptions.CoalescingUnavailable as e:
+                result = e
+        return stub, mock_call, result
+
+    def _assert_one_attempt_on(self, stub, mock_call, method_name):
+        # One RPC was attempted, it was the V2 or fold method, and
+        # nothing else on the stub was called afterwards.
+        self.assertEqual(1, mock_call.call_count)
+        self.assertIs(getattr(stub, method_name),
+                      mock_call.call_args.args[0])
+        self.assertEqual([], stub.mock_calls)
+
+    def test_find_existing_raises_on_unimplemented(self):
+        stub, mock_call, result = self._call(
+            lambda: mariadb._grpc_find_existing_coalescible_op(
+                'net_op', self.KEYS, TASK, ['user_facing']),
+            grpc.StatusCode.UNIMPLEMENTED)
+        self.assertIsInstance(result, exceptions.CoalescingUnavailable)
+        self._assert_one_attempt_on(
+            stub, mock_call, 'FindExistingCoalescibleOpV2')
+
+    def test_claim_siblings_raises_on_unimplemented(self):
+        stub, mock_call, result = self._call(
+            lambda: mariadb._grpc_claim_coalescible_siblings(
+                'net_op', self.KEYS, [TASK], SURVIVOR_UUID),
+            grpc.StatusCode.UNIMPLEMENTED)
+        self.assertIsInstance(result, exceptions.CoalescingUnavailable)
+        self._assert_one_attempt_on(
+            stub, mock_call, 'ClaimCoalescibleSiblingsV2')
+
+    def test_fold_siblings_raises_on_unimplemented(self):
+        stub, mock_call, result = self._call(
+            lambda: mariadb._grpc_fold_coalescible_siblings(
+                'net_op', self.KEYS, [TASK], SURVIVOR_UUID),
+            grpc.StatusCode.UNIMPLEMENTED)
+        self.assertIsInstance(result, exceptions.CoalescingUnavailable)
+        self._assert_one_attempt_on(
+            stub, mock_call, 'FoldCoalescibleSiblings')
+
+    def test_any_other_failure_is_an_empty_result(self):
+        # The contrast: a transient failure is "nothing matched", which
+        # the enqueue and the fold both already tolerate. Only the
+        # upgrade window gets the loud outcome.
+        _, _, found = self._call(
+            lambda: mariadb._grpc_find_existing_coalescible_op(
+                'net_op', self.KEYS, TASK),
+            grpc.StatusCode.UNAVAILABLE)
+        self.assertIsNone(found)
+        _, _, folded = self._call(
+            lambda: mariadb._grpc_fold_coalescible_siblings(
+                'net_op', self.KEYS, [TASK], SURVIVOR_UUID),
+            grpc.StatusCode.UNAVAILABLE)
+        self.assertEqual([], folded)
+
+    def test_the_public_wrappers_let_it_through(self):
+        # Nothing between the RPC and create_and_enqueue, or
+        # BaseClusterOperation.execute, may swallow it.
+        stub = mock.MagicMock()
+        with mock.patch('shakenfist.mariadb._use_database_service',
+                        return_value=True), \
+                mock.patch('shakenfist.mariadb._get_database_stub',
+                           return_value=stub), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           side_effect=FakeRpcError(
+                               grpc.StatusCode.UNIMPLEMENTED)):
+            self.assertRaises(
+                exceptions.CoalescingUnavailable,
+                mariadb.find_existing_coalescible_op,
+                operation_type='net_op', keys=self.KEYS, task_name=TASK,
+                priorities=['user_facing'])
+            self.assertRaises(
+                exceptions.CoalescingUnavailable,
+                mariadb.fold_coalescible_siblings,
+                'net_op', self.KEYS, [TASK], SURVIVOR_UUID)

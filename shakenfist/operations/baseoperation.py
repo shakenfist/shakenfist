@@ -7,6 +7,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import mariadb
@@ -196,6 +197,36 @@ class BaseClusterOperation(BaseOperation):
             extra['coalesce_seconds'] = self.coalesce_seconds
         if self.coalesce_folded is not None:
             extra['coalesce_folded'] = self.coalesce_folded
+        return extra
+
+    def ended_without_executing_extra(
+            self, outcome: str, reason: str) -> dict[str, Any]:
+        """Build the ``extra`` payload for an operation a dependency ended.
+
+        An operation which a ``depends_on`` dependency ends before it
+        runs never emits ``execution duration``, so without this event
+        it is indistinguishable, in the log stream, from one which has
+        not run yet. ``tools/operation-timeline.py`` reads this event to
+        report those operations as their own row instead of counting
+        them as "ran after the window, or not yet", and the operations
+        which spend the dependency defer budget are exactly the
+        six-minute-tail population that tool exists to explain (#4640).
+
+        ``outcome`` is one of ``abandoned`` (the defer budget was spent),
+        ``aborted`` (the dependency errored, aborted or was deleted) or
+        ``cancelled`` (the dependency does not exist). The queue fields
+        follow ``execution_duration_extra``'s rule: present only when
+        the operation was loaded from the table, so that a wait can be
+        measured against its ``created_at``.
+        """
+        extra: dict[str, Any] = {
+            'outcome': outcome,
+            'defer_count': self.current_defer_count,
+            'reason': reason,
+        }
+        if self.created_at is not None:
+            extra['wait_seconds'] = time.time() - self.created_at
+            extra['queue_name'] = self.queue_name
         return extra
 
     def _coalescible_target_reference(
@@ -816,7 +847,8 @@ class BaseClusterOperation(BaseOperation):
         self._end_for_dependency(
             BaseClusterOperation.STATE_ABORT, 'failed to abort operation',
             f'gave up waiting for dependency {dep_op.object_type} '
-            f'{dep_op.uuid}, which was still {dep_op.state.value}')
+            f'{dep_op.uuid}, which was still {dep_op.state.value}',
+            outcome='abandoned')
 
     def abort_for_unsuitable_dependency(
             self, dep_op: 'BaseClusterOperation') -> None:
@@ -838,7 +870,8 @@ class BaseClusterOperation(BaseOperation):
         self._end_for_dependency(
             BaseClusterOperation.STATE_ABORT, 'failed to abort operation',
             f'dependency {dep_op.object_type} {dep_op.uuid} is '
-            f'{dep_op.state.value}')
+            f'{dep_op.state.value}',
+            outcome='aborted')
 
     def cancel_for_missing_dependency(self, dep: dict[str, Any]) -> None:
         """Error this operation because a dependency no longer exists.
@@ -857,14 +890,18 @@ class BaseClusterOperation(BaseOperation):
         self._end_for_dependency(
             BaseClusterOperation.STATE_ERROR,
             'failed to mark operation as errored',
-            f'dependency {dep["op_type"]} {dep["op_uuid"]} does not exist')
+            f'dependency {dep["op_type"]} {dep["op_uuid"]} does not exist',
+            outcome='cancelled')
 
     def _end_for_dependency(self, new_state: str, failure_message: str,
-                            reason: str) -> None:
+                            reason: str, outcome: str) -> None:
         """End this operation because of a ``depends_on`` dependency.
 
         Shared by the three helpers above. Only an operation still
-        queued has never run, so only then are its targets told. An
+        queued has never run, so only then are its targets told, and
+        only then is the ``ended without executing`` event recorded
+        once the state write succeeds (see
+        ``ended_without_executing_extra``). An
         operation the dispatcher sees again after it started (a worker
         crash, or a resolve the stuck-row reaper retries) did not fail
         to run, and an instance it already finished starting must not
@@ -884,9 +921,11 @@ class BaseClusterOperation(BaseOperation):
         prevent -- so it is recorded and the state write goes ahead.
 
         A transition which is no longer legal is recorded, not raised:
-        the operation has already ended some other way.
+        the operation has already ended some other way, and it is not
+        this call which ended it, so no ending event is recorded.
         """
-        if self.state.value == BaseClusterOperation.STATE_QUEUED:
+        was_queued = self.state.value == BaseClusterOperation.STATE_QUEUED
+        if was_queued:
             try:
                 self._dependency_failed(reason)
             except (exceptions.DatabaseUnavailable,
@@ -903,6 +942,12 @@ class BaseClusterOperation(BaseOperation):
             self.state = new_state  # type: ignore[misc]
         except exceptions.InvalidStateException:
             self.add_event(EVENT_TYPE_AUDIT, failure_message)
+            return
+
+        if was_queued:
+            self.add_event(
+                EVENT_TYPE_USAGE, 'ended without executing',
+                extra=self.ended_without_executing_extra(outcome, reason))
 
     def _dependency_failed(self, reason: str) -> None:
         """Tell this operation's targets that it will never run.

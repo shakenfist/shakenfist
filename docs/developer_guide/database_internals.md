@@ -575,7 +575,12 @@ and the sit after each redelivery -- which is what distinguishes a lane
 that is genuinely backed up from one whose operations are waiting on a
 dependency. Both are documented, with their caveats, under
 [networking observability](../operator_guide/networking/overview.md),
-where they sit next to the other queue tooling.
+where they sit next to the other queue tooling. Their parsers are
+checked against the emitter by
+`shakenfist/tests/test_queue_tooling_round_trip.py`, which has a real
+`NetOp` emit each event through the real event echo and the real JSON
+formatter, so renaming a field in `execution_duration_extra()` or
+`defer()` fails the suite rather than quietly emptying a report.
 
 ## Coalescible Operations
 
@@ -695,6 +700,22 @@ on an operation which has already been dequeued, so a survivor at any
 priority is about to do the work immediately; the queue a folded
 sibling was sitting on no longer matters.
 
+### The enqueue-side dedup will not adopt an op which is backing off
+
+Nor will it adopt a queued op whose `work_queue` row is scheduled
+more than `COALESCIBLE_ADOPT_SCHEDULE_MARGIN_SECONDS` into the
+future. A queued op with a row due later than that is backing off
+after a defer: it is still live, so the orphan guard above does not
+exclude it, but adopting it hands the caller the 15, 30 or 60 second
+delay the defer asked for, and the spent `defer_count` with it, when
+a fresh op would have run at once (#4643). The margin is the
+dispatcher's idle poll, `IDLE_POLL_MAX_SECONDS`, because a row due
+within it runs no later than a fresh row would. Nothing is lost
+either way: if the lookup declines, a new op is inserted, and the
+worker-side fold catches the duplicate once both are dequeued. The
+orphan reaper passes no bound, because a row scheduled for later is
+still a row.
+
 ### Both guards are key-aware *and* family-aware
 
 `cluster_operations` has no queue column, so the key is the only
@@ -763,19 +784,24 @@ reading that let #3878 sit undetected for three months:
 ### The V2 gRPC methods
 
 `ClaimCoalescibleSiblingsV2` and `FindExistingCoalescibleOpV2` take a
-`repeated CoalescibleKeyPair keys` in place of the V1 RPCs' scalar
-`target_column`/`target_uuid`, as new RPC names rather than a new
-field on the existing messages. A repeated field would be
-wire-compatible but unsafe across a rolling upgrade: an old
-`sf-database` would silently ignore the extra columns and fold on
-the network alone, which is exactly the cross-node corruption the
-wider key exists to prevent. An old server answers a V2 call with
-`UNIMPLEMENTED`, and the client treats that as "coalescing
-unavailable" and skips the fold rather than falling back to V1 -- a
-loud, temporary loss of an optimisation instead of a quiet
-correctness failure. "Loud" means the `coalescing_unavailable`
-outcome above, not merely a log line. The V1 RPCs are unchanged and
-stay for one release.
+`repeated CoalescibleKeyPair keys`. They carry the suffix because they
+replaced a single-column pair (`ClaimCoalescibleSiblings`,
+`FindExistingCoalescibleOp`, with a scalar `target_column` and
+`target_uuid`) as new RPC names rather than a new field on the
+existing messages. A repeated field would be wire-compatible but
+unsafe across a rolling upgrade: an old `sf-database` would silently
+ignore the extra columns and fold on the network alone, which is
+exactly the cross-node corruption the wider key exists to prevent. An
+old server answers a V2 call with `UNIMPLEMENTED`, and the client
+treats that as "coalescing unavailable" and skips the fold -- a loud,
+temporary loss of an optimisation instead of a quiet correctness
+failure. "Loud" means the `coalescing_unavailable` outcome above, not
+merely a log line. The single-column pair was removed in #4639: no
+release ever carried it (every tagged release predates `NetOp`), so
+no client can still send it, and its handlers accepted any task name
+with a single key column, which is the cross-node fold the V2 names
+exist to refuse. There is nothing for a client to fall back to, and
+`shakenfist/tests/test_mariadb_coalescing.py` checks that stays so.
 
 `FindExistingCoalescibleOpV2` additionally carries `repeated string
 priorities`, the priority filter described above. Unlike a key
@@ -792,8 +818,9 @@ siblings up front. A client which gets `UNIMPLEMENTED` from it skips
 the fold and never falls back to `ClaimCoalescibleSiblingsV2`, which
 would bring back exactly the premature completion it replaces.
 `ClaimCoalescibleSiblingsV2` keeps its old behaviour for clients
-which predate the fold and has no caller in this tree; retiring it,
-with the V1 pair, is #4639.
+which predate the fold and has no caller in this tree. No release
+carried it either, so it can be retired the way the single-column
+pair was.
 
 ## Batched hard deletes
 

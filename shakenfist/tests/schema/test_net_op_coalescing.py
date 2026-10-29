@@ -118,6 +118,24 @@ class NetOpCoalescingGuardTestCase(base.ShakenFistTestCase):
             PRIORITY.user_facing)
         self.mock_enqueue.assert_called_once()
 
+    def test_an_unavailable_dedup_inserts_a_fresh_op(self):
+        # A rolling upgrade against an sf-database predating the V2
+        # RPCs: the lookup raises rather than answering "no match", and
+        # the enqueue must insert a new operation exactly as a missed
+        # dedup would. Returning nothing, or an old op, would leave the
+        # caller waiting on work nobody enqueued.
+        self.mock_find.side_effect = exceptions.CoalescingUnavailable(
+            'FindExistingCoalescibleOpV2 is not implemented')
+
+        object_type, op_uuid = net_op.create_and_enqueue(
+            str(uuid4()), [model_tasks.network_apply_update_dnsmasq],
+            PRIORITY.user_facing)
+
+        self.mock_find.assert_called_once()
+        self.mock_enqueue.assert_called_once()
+        enqueued = self.mock_enqueue.call_args.args[1]
+        self.assertEqual(op_uuid, enqueued['uuid'])
+
 
 class NetOpReusablePrioritiesTestCase(base.ShakenFistTestCase):
     """Which pending ops an enqueue is allowed to be deduped onto.

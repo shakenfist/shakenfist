@@ -37,6 +37,15 @@ finds nothing).
   the field entirely.
 * ``execution duration`` from both dispatchers, whose ``extra`` carries
   ``wait_seconds``, ``seconds``, ``defer_count`` and ``queue_name``.
+* ``ended without executing`` from ``BaseClusterOperation``, for an
+  operation a ``depends_on`` dependency ended before it ran: the defer
+  budget was spent (``outcome`` ``abandoned``), the dependency failed
+  (``aborted``) or it does not exist (``cancelled``). Its ``extra`` carries
+  ``outcome``, ``defer_count``, ``wait_seconds`` and ``queue_name``. These
+  operations never emit ``execution duration``, and without this stream
+  they read exactly like operations which have not run yet. The
+  budget-exhausted ones are the six-minute tail this tool exists to
+  explain, so they get a table of their own rather than a footnote.
 
 The join key is the operation uuid, and finding it is the non-obvious part:
 an event names the objects it is about as *top level keys*, so the operation
@@ -156,9 +165,20 @@ MIN_CHUNK_SECONDS = 60
 
 DEFER_SELECTOR = '{job="shakenfist"} |= "Execution deferred"'
 EXECUTION_SELECTOR = '{job="shakenfist"} |= "execution duration"'
+ENDED_SELECTOR = '{job="shakenfist"} |= "ended without executing"'
 
 DEFER_MESSAGE_PREFIX = 'Execution deferred'
 EXECUTION_MESSAGE = 'execution duration'
+ENDED_MESSAGE = 'ended without executing'
+
+# The outcomes BaseClusterOperation records on an operation a dependency
+# ended, in the order they are reported. An outcome this tool does not
+# know is reported under its own name rather than dropped.
+ENDED_OUTCOMES = collections.OrderedDict([
+    ('abandoned', 'abandoned: dependency wait defer budget spent'),
+    ('aborted', 'aborted: dependency errored, aborted or deleted'),
+    ('cancelled', 'cancelled: dependency does not exist'),
+])
 
 # The delay as it appears in the defer event's message. Only used when
 # extra['delay'] is absent, which is every event emitted by a build predating
@@ -699,23 +719,87 @@ def parse_execution_line(line):
         defer_count=defer_count), None
 
 
+class Ending:
+    """One ``ended without executing`` observation."""
+
+    def __init__(self, timestamp, operation_type, uuid, outcome, defer_count,
+                 wait, queue_name, program):
+        self.timestamp = timestamp
+        self.operation_type = operation_type
+        self.uuid = uuid
+        self.outcome = outcome
+        self.defer_count = defer_count
+        self.wait = wait
+        self.queue_name = queue_name
+        self.program = program
+        self.defers = []
+
+
+def parse_ended_line(line):
+    """Return (Ending, None) or (None, reason)."""
+    record = load_json_object(line)
+    if record is None:
+        return None, DROP_NOT_AN_EVENT
+
+    if record.get('message') != ENDED_MESSAGE:
+        return None, DROP_NOT_AN_EVENT
+
+    extra = record.get('extra')
+    if not isinstance(extra, dict):
+        return None, DROP_NOT_AN_EVENT
+    outcome = extra.get('outcome')
+    if not isinstance(outcome, str) or not outcome:
+        return None, DROP_NOT_AN_EVENT
+
+    label = object_label_of(record)
+    if label is None:
+        return None, DROP_NO_OBJECT
+    timestamp = record_timestamp(record)
+    if timestamp is None:
+        return None, DROP_NO_TIMESTAMP
+
+    defer_count = extra.get('defer_count')
+    if not isinstance(defer_count, int) or isinstance(defer_count, bool):
+        defer_count = 0
+
+    # Absent on an operation constructed outside the dispatch path,
+    # which has no created_at to measure against.
+    wait = extra.get('wait_seconds')
+    if not isinstance(wait, (int, float)) or isinstance(wait, bool):
+        wait = None
+
+    return Ending(
+        timestamp=timestamp,
+        operation_type=label[0],
+        uuid=label[1],
+        outcome=outcome,
+        defer_count=defer_count,
+        wait=None if wait is None else float(wait),
+        queue_name=extra.get('queue_name'),
+        program=record.get('program') or 'unknown'), None
+
+
 class Join:
-    """The result of joining the two streams, and how well it went."""
+    """The result of joining the three streams, and how well it went."""
 
     def __init__(self):
         self.operations = []
         self.defers = []
+        self.endings = []
         self.defers_without_execution = 0
         self.uuids_without_execution = 0
+        self.uuids_ended_without_execution = 0
+        self.defers_ended_without_execution = 0
         self.multi_execution_uuids = 0
         self.delays_from_message = 0
         self.delays_unknown = 0
         self.skews = []
         self.dropped_defer_lines = collections.Counter()
         self.dropped_execution_lines = collections.Counter()
+        self.dropped_ended_lines = collections.Counter()
 
 
-def join_streams(defer_lines, execution_lines, program=None):
+def join_streams(defer_lines, execution_lines, ended_lines=(), program=None):
     join = Join()
 
     by_uuid = collections.defaultdict(list)
@@ -767,10 +851,33 @@ def join_streams(defer_lines, execution_lines, program=None):
             if d.timestamp <= operation.started_at]
         join.operations.append(operation)
 
+    # An operation a dependency ended never executes, so it is not one
+    # which "ran after the window, or not yet": it has its own row, and
+    # its defer events belong to it.
+    ended = set()
+    for stamp, line in ended_lines:
+        ending, reason = parse_ended_line(line)
+        if ending is None:
+            join.dropped_ended_lines[reason] += 1
+            continue
+        if program and ending.program != program:
+            continue
+        join.skews.append(ending.timestamp - stamp / 1e9)
+        ending.defers = [
+            d for d in by_uuid.get(ending.uuid, [])
+            if d.timestamp <= ending.timestamp]
+        join.endings.append(ending)
+        ended.add(ending.uuid)
+
     for uuid, defers in by_uuid.items():
-        if uuid not in claimed:
-            join.uuids_without_execution += 1
-            join.defers_without_execution += len(defers)
+        if uuid in claimed:
+            continue
+        if uuid in ended:
+            join.uuids_ended_without_execution += 1
+            join.defers_ended_without_execution += len(defers)
+            continue
+        join.uuids_without_execution += 1
+        join.defers_without_execution += len(defers)
 
     return join
 
@@ -1062,6 +1169,16 @@ def print_join_integrity(join, complete, incomplete, clipped, defer_window_start
               'in shipping, or an operation type which defers without '
               'emitting the event')
 
+    if join.endings:
+        counts = collections.Counter(e.outcome for e in join.endings)
+        detail = ', '.join(
+            f'{counts[outcome]} {outcome}'
+            for outcome in list(ENDED_OUTCOMES) + sorted(
+                o for o in counts if o not in ENDED_OUTCOMES)
+            if counts.get(outcome))
+        print(f'  {len(join.endings)} operations ended without executing '
+              f'({detail}); {join.uuids_ended_without_execution} of them had '
+              f'deferred ({join.defers_ended_without_execution} defer events)')
     if join.uuids_without_execution:
         print(f'  {join.uuids_without_execution} deferred operations '
               f'({join.defers_without_execution} defer events) have no '
@@ -1128,6 +1245,44 @@ def print_join_integrity(join, complete, incomplete, clipped, defer_window_start
         print(f'  {len(no_execution_time)} operations carry no execution '
               'time, so their creation time is derived from the event '
               'timestamp alone')
+
+
+ENDED_HEADINGS = ['outcome', 'n', 'defers p50', 'defers max', 'wait p50',
+                  'wait p95', 'wait max']
+
+
+def ended_rows(endings):
+    """One row per outcome, known outcomes first and in a fixed order."""
+    by_outcome = grouped(endings, lambda e: e.outcome)
+    order = {outcome: i for i, outcome in enumerate(ENDED_OUTCOMES)}
+    by_outcome.sort(key=lambda item: (order.get(item[0], len(order)), item[0]))
+
+    rows = []
+    for outcome, group in by_outcome:
+        defers = [e.defer_count for e in group]
+        waits = [e.wait for e in group if e.wait is not None]
+        rows.append([
+            ENDED_OUTCOMES.get(outcome, outcome),
+            str(len(group)),
+            str(percentile(defers, 0.5)),
+            str(max(defers)),
+            format_seconds(percentile(waits, 0.5)) if waits else 'n/a',
+            format_seconds(percentile(waits, 0.95)) if waits else 'n/a',
+            format_seconds(max(waits)) if waits else 'n/a',
+        ])
+    return rows
+
+
+def print_endings(join):
+    print_table(
+        f'Operations which ended without executing (n={len(join.endings)})',
+        ENDED_HEADINGS, ended_rows(join.endings),
+        footnote=[
+            'a dependency ended each of these before it ran, so none has an '
+            'execution event; their wait is the whole of',
+            'their life, from enqueue to the ending. An operation abandoned '
+            'after the defer budget is the six-minute tail.'],
+        empty='(no operation in this window ended without executing)')
 
 
 def write_csv(path, operations):
@@ -1305,12 +1460,16 @@ def main(argv=None, client=None):
             DEFER_SELECTOR, defer_start, end, chunk_seconds)
         execution_lines, execution_report = client.fetch(
             EXECUTION_SELECTOR, start, end, chunk_seconds)
+        ended_lines, ended_report = client.fetch(
+            ENDED_SELECTOR, start, end, chunk_seconds)
     except LokiError as e:
         print(f'error: {e}', file=sys.stderr)
         return 1
 
-    join = join_streams(defer_lines, execution_lines, program=args.program)
-    print_fetch_integrity([defer_report, execution_report], join, args)
+    join = join_streams(defer_lines, execution_lines, ended_lines,
+                        program=args.program)
+    print_fetch_integrity([defer_report, execution_report, ended_report],
+                          join, args)
 
     if not join.operations:
         print()
@@ -1320,6 +1479,10 @@ def main(argv=None, client=None):
               'and whose "extra" carries "wait_seconds".')
         print('An empty result means the window is quiet, the tenant is '
               'wrong, or LOG_EVENTS_TO_LOKI is off on the cluster.')
+        if join.endings:
+            # Nothing ran, but something was ended: that is a finding,
+            # not an empty window.
+            print_endings(join)
         return 0
 
     complete = [o for o in join.operations if o.joined]
@@ -1358,6 +1521,8 @@ def main(argv=None, client=None):
         footnote=('the whole of this wait is one queue sit, so there is '
                   'nothing to decompose'),
         empty='(every operation in this window deferred)')
+
+    print_endings(join)
 
     # Sorted numerically rather than by label: the unexplained wait this
     # tool exists for was in first deferrals specifically, so the reader

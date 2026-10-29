@@ -5,7 +5,7 @@ import warnings
 
 from shakenfist.protos import database_pb2 as database__pb2
 
-GRPC_GENERATED_VERSION = '1.84.0'
+GRPC_GENERATED_VERSION = '1.84.1'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -78,16 +78,6 @@ class DatabaseServiceStub:
                 '/shakenfist.protos.DatabaseService/ListOrphanedClusterOperations',
                 request_serializer=database__pb2.ListOrphanedClusterOperationsRequest.SerializeToString,
                 response_deserializer=database__pb2.ListOrphanedClusterOperationsReply.FromString,
-                _registered_method=True)
-        self.ClaimCoalescibleSiblings = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/ClaimCoalescibleSiblings',
-                request_serializer=database__pb2.ClaimCoalescibleSiblingsRequest.SerializeToString,
-                response_deserializer=database__pb2.ClaimCoalescibleSiblingsReply.FromString,
-                _registered_method=True)
-        self.FindExistingCoalescibleOp = channel.unary_unary(
-                '/shakenfist.protos.DatabaseService/FindExistingCoalescibleOp',
-                request_serializer=database__pb2.FindExistingCoalescibleOpRequest.SerializeToString,
-                response_deserializer=database__pb2.FindExistingCoalescibleOpReply.FromString,
                 _registered_method=True)
         self.ClaimCoalescibleSiblingsV2 = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/ClaimCoalescibleSiblingsV2',
@@ -1284,25 +1274,18 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def ClaimCoalescibleSiblings(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def FindExistingCoalescibleOp(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def ClaimCoalescibleSiblingsV2(self, request, context):
-        """V2 of the two coalescing RPCs, taking a multi-column key. The V1
-        pair above is retained unmodified for one release so a rolling
-        upgrade can still serve old clients. A new client never falls back
-        to V1: an old server would ignore the extra key columns and fold on
-        the first column alone, which is exactly the cross-node corruption
-        the new names exist to prevent.
+        """The two coalescing RPCs take a multi-column key. They carry a V2
+        suffix because they replaced a single-column pair
+        (ClaimCoalescibleSiblings, FindExistingCoalescibleOp) under new
+        names: a repeated field on the old messages would have been
+        wire-compatible, and an old server would then have ignored the
+        extra key columns and folded on the first column alone, which is
+        exactly the cross-node corruption the wider key exists to prevent.
+        The old pair was removed in #4639. No release ever carried it, so
+        no client can still send it, and its server side could not tell
+        one node's work from another's. An old server answers these with
+        UNIMPLEMENTED, which a client treats as "coalescing unavailable".
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2856,16 +2839,6 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.ListOrphanedClusterOperationsRequest.FromString,
                     response_serializer=database__pb2.ListOrphanedClusterOperationsReply.SerializeToString,
             ),
-            'ClaimCoalescibleSiblings': grpc.unary_unary_rpc_method_handler(
-                    servicer.ClaimCoalescibleSiblings,
-                    request_deserializer=database__pb2.ClaimCoalescibleSiblingsRequest.FromString,
-                    response_serializer=database__pb2.ClaimCoalescibleSiblingsReply.SerializeToString,
-            ),
-            'FindExistingCoalescibleOp': grpc.unary_unary_rpc_method_handler(
-                    servicer.FindExistingCoalescibleOp,
-                    request_deserializer=database__pb2.FindExistingCoalescibleOpRequest.FromString,
-                    response_serializer=database__pb2.FindExistingCoalescibleOpReply.SerializeToString,
-            ),
             'ClaimCoalescibleSiblingsV2': grpc.unary_unary_rpc_method_handler(
                     servicer.ClaimCoalescibleSiblingsV2,
                     request_deserializer=database__pb2.ClaimCoalescibleSiblingsV2Request.FromString,
@@ -4245,60 +4218,6 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/ListOrphanedClusterOperations',
             database__pb2.ListOrphanedClusterOperationsRequest.SerializeToString,
             database__pb2.ListOrphanedClusterOperationsReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def ClaimCoalescibleSiblings(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/shakenfist.protos.DatabaseService/ClaimCoalescibleSiblings',
-            database__pb2.ClaimCoalescibleSiblingsRequest.SerializeToString,
-            database__pb2.ClaimCoalescibleSiblingsReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def FindExistingCoalescibleOp(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/shakenfist.protos.DatabaseService/FindExistingCoalescibleOp',
-            database__pb2.FindExistingCoalescibleOpRequest.SerializeToString,
-            database__pb2.FindExistingCoalescibleOpReply.FromString,
             options,
             channel_credentials,
             insecure,
