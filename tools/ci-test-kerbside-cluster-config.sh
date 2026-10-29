@@ -122,8 +122,10 @@ EOF
 chmod +x "${STUB}"
 
 # Play 6a's shape: the preflight first, a marker where the play's set-config
-# and deploy key tasks would be, then the credentials. cluster_db_host and
-# extra_config are play vars, as there, and node_mesh_ip an include var.
+# and deploy key tasks would be, then the credentials. cluster_db_host is a
+# play var, as there, node_mesh_ip an include var, and extra_config comes from
+# the inventory (here, extra vars) or is unset, as it is for an operator who
+# has none.
 cat > "${WORK}/play.yml" << 'EOF'
 ---
 - name: Exercise the Kerbside entry points as play 6a does
@@ -131,7 +133,6 @@ cat > "${WORK}/play.yml" << 'EOF'
   connection: local
   gather_facts: false
   vars:
-    extra_config: "[]"
     cluster_db_host: localhost
   tasks:
     - name: Check the Kerbside configuration against cluster_config

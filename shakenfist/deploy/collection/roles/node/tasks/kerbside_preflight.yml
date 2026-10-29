@@ -59,7 +59,7 @@
       loop: "{{ kerbside_preflight_settings }}"
       loop_control:
         label: "{{ item.name }}"
-      when: item.name in (extra_config | from_json | map(attribute='name') | map('upper') | list)
+      when: item.name in (extra_config | default('[]') | from_json | map(attribute='name') | map('upper') | list)
 
     # Never --show-secrets: that would put every cluster secret into a
     # registered variable to read two values which are not secret. Numbers

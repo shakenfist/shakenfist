@@ -362,16 +362,19 @@
 # getsf wheel-copy mechanism, and is what the step-5 CI path uses to deploy
 # the current commit.
 # ---------------------------------------------------------------------------
+# No play declares a literal default for a variable the operator may set in
+# the inventory: play vars outrank group_vars, so a default here would silently
+# shadow it (which is how sfcbr ran without its extra_config for months, and
+# why sf_build_local_wheels could only be turned on with -e). Defaults are
+# applied where the variable is read, with the default filter.
 - name: Build Shaken Fist wheels from local checkouts
   hosts: localhost
   connection: local
   gather_facts: false
   become: false
-  vars:
-    sf_build_local_wheels: false
   tasks:
     - name: Build and locate the local wheels
-      when: sf_build_local_wheels | bool
+      when: sf_build_local_wheels | default(false) | bool
       block:
         - name: Fail if repo_path / client_repo_path are not set
           ansible.builtin.assert:
@@ -415,11 +418,9 @@
   hosts: allsf:&reachable
   gather_facts: false
   become: true
-  vars:
-    sf_build_local_wheels: false
   tasks:
     - name: Distribute the local wheels and repoint the package variables
-      when: sf_build_local_wheels | bool
+      when: sf_build_local_wheels | default(false) | bool
       block:
         - name: Copy the server wheel to this host's /tmp
           ansible.builtin.copy:
@@ -757,16 +758,15 @@
   gather_facts: false
   run_once: true
   vars:
-    http_proxy: ""
-    extra_config: "[]"
     cluster_db_host: "{{ database_tier_hosts[0] }}"
   tasks:
     # First, before any set-config: refuse to deploy a kerbside_url or
     # kerbside_token_duration which a cluster_config row (existing, or about to
     # be written from extra_config below) would silently override. Does nothing
-    # unless kerbside_url is set. cluster_db_host and extra_config reach the
-    # role as this play's vars; passing them again as include vars would be a
-    # recursive template.
+    # unless kerbside_url is set. cluster_db_host reaches the role as this
+    # play's var, and extra_config as the operator's inventory variable (or the
+    # role's own default when it is unset); passing either as an include var
+    # would be a recursive template.
     - name: Check the Kerbside configuration against cluster_config
       ansible.builtin.include_role:
         name: shakenfist.shakenfist.node
@@ -801,7 +801,7 @@
         /srv/shakenfist/venv/bin/sf-ctl set-config HTTP_PROXY {{ http_proxy }}
       delegate_to: "{{ cluster_db_host }}"
       changed_when: true
-      when: http_proxy | length != 0
+      when: http_proxy | default('') | length != 0
 
     - name: Apply any extra cluster config
       ansible.builtin.command: >-
@@ -809,7 +809,7 @@
         {{ item['name'] }} {{ item['value'] }}
       delegate_to: "{{ cluster_db_host }}"
       changed_when: true
-      loop: "{{ extra_config | from_json }}"
+      loop: "{{ extra_config | default('[]') | from_json }}"
 
     # Retire the pre-rename, now-inert RAM_SYSTEM_RESERVATION cluster_config
     # row. Reservations are now per-node NODE_* keys set via /etc/sf/config, so
