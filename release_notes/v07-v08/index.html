@@ -17767,6 +17767,11 @@ own is refreshed exactly as it always was.</p>
   <code>sf-database</code> without the batch RPC still works, one object at a time.
   New metrics are the <code>skipped</code> outcome of <code>cluster_deleted_object_seconds</code>
   and <code>cluster_deleted_object_batch_seconds</code>.</li>
+<li>The operator guide now describes how to
+  <a href="../../operator_guide/database/#draining-a-backlog">drain a backlog of deleted objects</a>
+  by sizing <code>DELETED_OBJECT_SWEEP_MAX_OBJECTS</code>, and how to check whether the
+  sweep is keeping up with a "days behind" query under
+  <a href="../../operator_guide/database/#watching-for-sweeps-that-silently-do-nothing">Watching for sweeps that silently do nothing</a>.</li>
 <li>The floating network now uses a well-known UUID (<code>f10a7f10-a7f1-4a7f-a10a-7f10a7f10a7f</code>)
   instead of the invalid string "floating". Existing deployments must run
   <code>sf-ctl migrate-floating-network-uuid</code> after stopping services to migrate.
