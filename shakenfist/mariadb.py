@@ -24609,11 +24609,18 @@ def _direct_get_all_cluster_config() -> dict[str, Any]:
         return {}
 
 
-def _direct_get_cluster_config_value(key_name: str) -> Any:
+def _direct_get_cluster_config_value(
+        key_name: str, raise_on_error: bool = False) -> Any:
     """Return one config key's JSON-decoded value, or None if absent.
 
     An indexed single-row read, so callers wanting one key don't pay
     for -- or transit -- the whole table (issue 4096).
+
+    A failed read returns None, unless raise_on_error, when it raises
+    DatabaseUnavailable. A caller which acts on the absence of the row,
+    as the VDI signing key bootstrap does when it mints a fresh key set,
+    must ask for the exception: a None it cannot tell from "no row yet"
+    is a fail-open (issue 4704).
     """
     engine = _get_engine()
     table = _get_cluster_config_table()
@@ -24625,6 +24632,10 @@ def _direct_get_cluster_config_value(key_name: str) -> Any:
             row = conn.execute(stmt).first()
             return row[0] if row is not None else None
     except OperationalError as e:
+        if raise_on_error:
+            raise exceptions.DatabaseUnavailable(
+                f'MariaDB get_cluster_config_value failed for '
+                f'{key_name}: {e}') from e
         LOG.warning(
             f'MariaDB get_cluster_config_value failed for '
             f'{key_name}: {e}')
@@ -24939,20 +24950,34 @@ def _grpc_get_all_cluster_config() -> dict[str, Any]:
     }
 
 
-def _grpc_get_cluster_config_value(key_name: str) -> Any:
+def _grpc_get_cluster_config_value(
+        key_name: str, raise_on_error: bool = False) -> Any:
     """Fetch one config key's value via the database microservice.
 
     Scans the reply for the requested key rather than assuming a
     single entry, because during a rolling upgrade an older
     sf-database ignores key_name and returns the whole table.
+
+    A failed RPC already raises (DatabaseUnavailable from _grpc_call's
+    exhausted retries, or the RpcError itself); raise_on_error closes
+    the two remaining silent paths -- no stub, or no reply -- so a
+    caller which acts on the absence of the row cannot read a failure
+    as "no row yet" (issue 4704, as the direct path above).
     """
     stub = _get_database_stub()
     if not stub:
+        if raise_on_error:
+            raise exceptions.DatabaseUnavailable(
+                f'no database service stub for get_cluster_config_value '
+                f'of {key_name}')
         return None
 
     request = database_pb2.ClusterConfigRequest(key_name=key_name)
     response = _grpc_call(stub.GetClusterConfig, request)
     if response is None:
+        if raise_on_error:
+            raise exceptions.DatabaseUnavailable(
+                f'no reply from GetClusterConfig for {key_name}')
         return None
 
     for entry in response.entries:
@@ -25009,7 +25034,8 @@ def get_cluster_config() -> dict[str, Any]:
     return _direct_get_all_cluster_config()
 
 
-def get_cluster_config_value(key_name: str) -> Any:
+def get_cluster_config_value(
+        key_name: str, raise_on_error: bool = False) -> Any:
     """Return one cluster config value, or None if the key is absent.
 
     Prefer this to get_cluster_config() whenever only one key is
@@ -25017,14 +25043,19 @@ def get_cluster_config_value(key_name: str) -> Any:
     (AUTH_SECRET_SEED, the VDI signing key's private PEM) in memory
     and, on the gRPC path, on the wire (issue 4096).
 
+    A failed read returns None, unless raise_on_error, when it raises
+    DatabaseUnavailable. A caller which acts on the absence of the row
+    must ask for the exception, or a transient database failure reads
+    as "no row yet" (issue 4704).
+
     Routes to the database microservice or direct MariaDB depending
     on _use_database_service(). Callers running on the database node
     (MARIADB_HOST set) use direct access so that bootstrap-time
     commands work before the database daemon is started.
     """
     if _use_database_service():
-        return _grpc_get_cluster_config_value(key_name)
-    return _direct_get_cluster_config_value(key_name)
+        return _grpc_get_cluster_config_value(key_name, raise_on_error)
+    return _direct_get_cluster_config_value(key_name, raise_on_error)
 
 
 def set_cluster_config(key_name: str, value: Any) -> None:

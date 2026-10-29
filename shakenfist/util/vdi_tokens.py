@@ -111,6 +111,12 @@ def generate_keypair() -> dict[str, Any]:
 def get_signing_material() -> Optional[dict[str, Any]]:
     """Return the stored signing material, or None if the row is absent.
 
+    None means the row genuinely does not exist. A failed read raises
+    exceptions.DatabaseUnavailable instead of returning None, because
+    ensure_signing_key() acts destructively on absence -- it mints a
+    fresh one-key set over whatever is stored, replacing the active key
+    and dropping the two-key rotation window (issue 4704).
+
     Reads only the ``KERBSIDE_JWT_SIGNING_KEY`` row via
     ``mariadb.get_cluster_config_value()`` -- a full-table read here
     would materialise every cluster secret per call to a
@@ -125,7 +131,8 @@ def get_signing_material() -> Optional[dict[str, Any]]:
     # module risks a circular import (see config.load_cluster_config).
     from shakenfist import mariadb
 
-    value = mariadb.get_cluster_config_value(SIGNING_KEY_CONFIG_NAME)
+    value = mariadb.get_cluster_config_value(
+        SIGNING_KEY_CONFIG_NAME, raise_on_error=True)
     if value is None:
         return None
     if isinstance(value, str):
@@ -137,11 +144,18 @@ def get_signing_material() -> Optional[dict[str, Any]]:
     return value
 
 
-def ensure_signing_key() -> dict[str, Any]:
-    """Return existing signing material, creating it if absent.
+def ensure_signing_key() -> tuple[dict[str, Any], bool]:
+    """Return ``(material, created)``, creating the key if absent.
 
-    Idempotent: if the row already exists it is returned unchanged. If
-    it is absent, a fresh keypair is generated and written. The write
+    Idempotent: if the row already exists it is returned unchanged with
+    ``created`` False. If it is absent, a fresh keypair is generated
+    and written, and ``created`` is True -- so ``sf-ctl`` can report
+    truthfully whether anything changed. A failed read raises
+    (see get_signing_material) rather than reading as absence: minting
+    here over an unreadable stored set would silently replace the
+    active key and invalidate every in-flight token (issue 4704).
+
+    The write
     is a last-writer-wins upsert: cluster_config deliberately has no
     create-if-absent primitive, because adding one means proto and
     gRPC-tier churn this feature does not need, so two concurrent
@@ -156,7 +170,7 @@ def ensure_signing_key() -> dict[str, Any]:
     """
     material = get_signing_material()
     if material is not None:
-        return material
+        return material, False
 
     keypair = generate_keypair()
     value = {'active_kid': keypair['kid'], 'keys': [keypair]}
@@ -171,7 +185,7 @@ def ensure_signing_key() -> dict[str, Any]:
             'signing key not present immediately after write')
     LOG.with_fields({'active_kid': stored['active_kid']}).info(
         'Ensured Kerbside VDI token signing key')
-    return stored
+    return stored, True
 
 
 def rotate_signing_key() -> dict[str, Any]:
@@ -181,6 +195,9 @@ def rotate_signing_key() -> dict[str, Any]:
     and trims ``keys`` to at most two entries (newest first). The row is
     written and then re-read so the caller sees what is actually stored.
     Tokens signed by the dropped (third-oldest) key become unverifiable.
+    A failed read raises (see get_signing_material) rather than reading
+    as absence, which here would write a one-key set and drop the
+    rotation window (issue 4704).
     """
     material = get_signing_material()
     keypair = generate_keypair()

@@ -166,8 +166,12 @@ Kerbside before anyone opens a console — with the idempotent:
 sf-ctl ensure-kerbside-signing-key
 ```
 
-This prints the active key id and how many keys are published; it never
-prints private material and does nothing if a key already exists.
+This prints whether it created a key or found one already stored, the active
+key id and how many keys are published; it never prints private material and
+does nothing if a key already exists. If the stored key cannot be read -- the
+database is unreachable, say -- it exits non-zero rather than minting a
+replacement key over the stored set, which would invalidate every in-flight
+console token.
 
 !!! warning "Provision the key before upgrading a cluster Kerbside already scrapes"
 

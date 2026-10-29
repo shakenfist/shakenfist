@@ -14,8 +14,9 @@
 # (or which an older sf-ctl redacts), or an extra_config entry naming either,
 # stops the deploy before anything is written, while an equal row only warns;
 # that a Kerbside key which is equal to system_key, too short, or set without
-# a URL is refused before it is minted; and that the node role's config
-# template renders the token duration only beside the URL. No CI lane can
+# a URL is refused before it is minted; that the signing key task reports
+# changed only when sf-ctl says it created a key (issue 4704); and that the
+# node role's config template renders the token duration only beside the URL. No CI lane can
 # turn the feature on yet, so this is the only thing which runs the "on"
 # path. It also refuses a non-positive duration, and a show-config which is not
 # a JSON object, before anything is read or written, and checks structurally
@@ -103,6 +104,18 @@ cat > "${STUB}" << EOF
 } >> '${STUB_LOG}'
 if [ "\${1:-}" = 'show-config' ]; then
     cat '${ROWS}'
+fi
+# As the real command: the first line says whether a key was created, so the
+# role's changed_when can be checked. The key "exists" once ensured.
+if [ "\${1:-}" = 'ensure-kerbside-signing-key' ]; then
+    if [ ! -f '${WORK}/signing-key-exists' ]; then
+        touch '${WORK}/signing-key-exists'
+        echo 'Created a new signing key.'
+    else
+        echo 'Found an existing signing key.'
+    fi
+    echo 'Active kid: abcd1234'
+    echo 'Published keys: 1'
 fi
 EOF
 chmod +x "${STUB}"
@@ -239,6 +252,19 @@ assert_no_call() {
     done
 }
 
+# assert_task_status TASK_NAME STATUS: in the last run's output, the named
+# task reported STATUS (changed/ok/skipping). Verbose runs interleave lines
+# between the TASK banner and the result, so take the first result line in a
+# window after the banner rather than the next line.
+assert_task_status() {
+    local line
+    line="$(grep -A40 -F "$1" "${LAST_LOG}" | grep -m1 -E '^(changed|ok|skipping|fatal):')"
+    case "${line}" in
+        "$2: "*) ;;
+        *) fail "task '$1' reported '${line:-nothing}', wanted '$2'" ;;
+    esac
+}
+
 # assert_output_has / assert_output_lacks FIXED_STRING: the ansible output.
 assert_output_has() {
     grep -qF -- "$1" "${LAST_LOG}" || fail "the ansible output lacks '$1'"
@@ -272,6 +298,9 @@ case_2_url_only() {
 ARGV: ensure-kerbside-signing-key
 -- credentials done --'
     assert_output_lacks 'WARNING: the cluster_config row'
+    # The first ensure creates the key, and the task must say so
+    # (issue 4704: changed_when false was a lie on the first run).
+    assert_task_status 'Ensure the Kerbside console token signing key exists' changed
 }
 
 case_3_both_set() {
@@ -289,6 +318,10 @@ ARGV: bootstrap-system-key --key-from-stdin kerbside
 ENV: SHAKENFIST_NODE_MESH_IP=192.0.2.53
 STDIN: ${KERBSIDE_KEY}
 -- credentials done --"
+    # Case 2 created the key, so this run finds it and must report ok
+    # (issue 4704: changed on every run would be a lie on all but the
+    # first).
+    assert_task_status 'Ensure the Kerbside console token signing key exists' ok
     BOTH_SET_LOG="${LAST_LOG}"
 }
 
