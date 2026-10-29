@@ -5,11 +5,18 @@ The .vv files the CI tests attach to their logs carry a live console
 credential, and the logs are public, so the redaction has to match every
 spelling configparser accepts for the key, not only the one today's
 producers emit.
+
+vdi.py imports ``shakenfist_ci.base``, which imports ``shakenfist_client``
+and ``prettytable``, neither of which is installed in the unit test
+environment, so it is imported here behind the same stubs
+``test_ci_agentops_shared.py`` uses.
 """
 
 import configparser
+import logging
 import os
 import sys
+import types
 
 from shakenfist.tests import base
 
@@ -19,21 +26,75 @@ CI_SUITE = os.path.join(
     'deploy', 'shakenfist_ci')
 
 
-def _load_vdi():
-    """Import the functional suite's vdi.py from the tree.
+def _client_stubs():
+    """A shakenfist_client which is only its exception taxonomy.
 
-    The suite is not a package the unit environment installs. sys.path
-    and sys.modules are put back afterwards, because stestr runs the
-    whole unit suite in one process.
+    ``base.py`` builds ``AGENT_OPERATION_FAILURES`` at import time from
+    these exception classes, so the stub defines the taxonomy and nothing
+    else.
     """
-    names = ('shakenfist_ci', 'shakenfist_ci.base', 'shakenfist_ci.process',
+    client = types.ModuleType('shakenfist_client')
+    apiclient = types.ModuleType('shakenfist_client.apiclient')
+
+    class APIException(Exception):
+        def __init__(self, message='', method=None, url=None,
+                     status_code=None, text=None):
+            super().__init__(message)
+            self.status_code = status_code
+            self.text = text
+
+    apiclient.APIException = APIException
+    for name in ('InsufficientResourcesException',
+                 'ResourceStateConflictException',
+                 'ResourceNotFoundException',
+                 'RequestMalformedException',
+                 'ServiceUnavailableException',
+                 'IncapableException',
+                 'AgentCommandError',
+                 'AgentOperationFailed',
+                 'AgentAwaitTimeout'):
+        setattr(apiclient, name, type(name, (APIException,), {}))
+
+    apiclient.ASYNC_PAUSE = 'pause'
+    apiclient.ASYNC_CONTINUE = 'continue'
+    apiclient.Client = type(
+        'Client', (), {'__init__': lambda self, *a, **kw: None})
+
+    client.apiclient = apiclient
+    return client, apiclient
+
+
+def _load_vdi():
+    """Import the functional suite's vdi.py from the tree, behind stubs.
+
+    The suite is not a package the unit environment installs. sys.path,
+    sys.modules and the root logger are put back afterwards, because
+    stestr runs the whole unit suite in one process and a stubbed
+    shakenfist_client left in sys.modules would be a trap for a later
+    test.
+    """
+    names = ('prettytable', 'shakenfist_client',
+             'shakenfist_client.apiclient', 'shakenfist_ci',
+             'shakenfist_ci.base', 'shakenfist_ci.process',
              'shakenfist_ci.retries', 'shakenfist_ci.vdi')
     saved_path = list(sys.path)
     saved_modules = {name: sys.modules.get(name) for name in names}
+    root_logger = logging.getLogger()
+    saved_handlers = list(root_logger.handlers)
+    saved_level = root_logger.level
     try:
         sys.path.insert(0, os.path.dirname(CI_SUITE))
         for name in names:
             sys.modules.pop(name, None)
+
+        prettytable = types.ModuleType('prettytable')
+        prettytable.PrettyTable = type('PrettyTable', (), {})
+        sys.modules['prettytable'] = prettytable
+
+        client, _ = _client_stubs()
+        sys.modules['shakenfist_client'] = client
+        sys.modules['shakenfist_client.apiclient'] = client.apiclient
+
         import shakenfist_ci.vdi as vdi
         return vdi
     finally:
@@ -43,6 +104,8 @@ def _load_vdi():
                 sys.modules.pop(name, None)
             else:
                 sys.modules[name] = module
+        root_logger.handlers[:] = saved_handlers
+        root_logger.setLevel(saved_level)
 
 
 vdi = _load_vdi()
