@@ -261,12 +261,21 @@ first phase.
    - The son-of-SPICE helper, being a program rather than a
      patch series, will still want its own repository if phase 4
      says go.
+     - *Superseded 2026-10-29 by phase 4:* the helper is a
+       `qemu` platform in andris (shakenfist/andris#56), so it
+       needs no repository of its own.
 3. **Does Kerbside's role change if phase 4 succeeds?** Partly
    decided on 2026-09-24: Kerbside stays in front of any
    helper, because hypervisor ports are never exposed to
    clients. What remains open is how much of ticketing and
    firewalling moves into the helper, and that is an output of
    phase 4, not an input.
+   - *Answered 2026-10-29 by phase 4*
+     (`docs/performance/dbus-display-spike.md`): Kerbside
+     fronted andris exactly as it fronts spice-server, with no
+     proxy or firewall change. Ticketing stays a ticket the
+     helper reads from a private file, which whatever launches
+     the helper must share with Kerbside's source.
 4. **Transcode or relay: who decides, and when?** Phase 3's
    question. Once Kerbside re-encodes a display channel it owns
    the client's cache state (pixmap cache, GLZ dictionary,
@@ -303,8 +312,8 @@ first phase.
 |-------|------|--------|--------|
 | 1. Proxy backpressure and a WAN baseline | [PLAN-spice-performance-phase-01-proxy-backpressure.md](/components/kerbside/plans/PLAN-spice-performance-phase-01-proxy-backpressure/) | Complete | 52046167f8 (#478) |
 | 2. qemu damage path: prototype and measure; carry qemu, submit the kernel fix | | In progress | kerbside-patches b53aa39c7e (#1748) |
-| 3. Display transcoding in Kerbside: feasibility spike (verdict: no-go) | [PLAN-spice-performance-phase-03-transcoding.md](/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/) | In progress | 2e19d737aa (#489), ryll fdb5ead5b4 (#406), eab2c572cf (#494), 9d1b64d6 (#505), 13e9e2eb (#581), bba71155 (#616) |
-| 4. Son of SPICE: D-Bus display feasibility spike | | Not started | |
+| 3. Display transcoding in Kerbside: feasibility spike (verdict: no-go) | [PLAN-spice-performance-phase-03-transcoding.md](/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/) | Complete | 2e19d737aa (#489), ryll fdb5ead5b4 (#406), eab2c572cf (#494), 9d1b64d6 (#505), 13e9e2eb (#581), bba71155 (#616), 7919eadf73 (#630) |
+| 4. Son of SPICE: D-Bus display feasibility spike (verdict: no-go, as measured) | [PLAN-spice-performance-phase-04-dbus-spike.md](/components/kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike/) | In progress | andris 9a997a3 (#56) |
 | 5. Small spice-server patches (item 9, and item 4 if still wanted) | | Not started | |
 | 6. Push audit of phases 1-5 (kerbside and kerbside-patches) | | Not started | |
 | 7. QUIC client leg: experiments | | Not started | |
@@ -697,6 +706,66 @@ with a D-Bus input. Its output is a go or
 no-go recommendation, with a proposal for a separate master
 plan if the answer is go.
 
+The phase plan
+([PLAN-spice-performance-phase-04-dbus-spike.md](/components/kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike/),
+2026-10-29) grounds this sketch in the code and changes it in
+these places:
+- Step 1's trace "through every device's refresh path" is
+  answered by reading qemu. virtio-gpu 2D hands the guest's
+  flush rectangle to the listener with no timer. std-vga is
+  polled every 30 ms in full-width scanline bands. QXL exists
+  only with SPICE. The D-Bus listener neither merges nor splits
+  rectangles. What remains is runtime promptness, which needs a
+  listener, so step 1 now builds the helper's picture half and
+  measures with it, as a gate on the rest.
+- Step 2's "minimal helper" is a `qemu` platform backend in
+  andris, not a new program. andris already separates its
+  source from its SPICE output behind seven platform traits.
+- Upstream is building helpers on this interface in other
+  protocols: qemu 11.1 ships `tools/qemu-vnc`, and libvirt runs
+  qemu-rdp for `<graphics type='rdp'>`. No SPICE helper exists.
+- Nova and oVirt cannot configure a D-Bus display, so a go
+  helps the sources we control first. The verdict must name
+  which sources could attach a helper.
+- No component (andris, qemu-display's servers) handles a GPU
+  frame. The design inputs below need a second pipeline
+  whatever the spike finds.
+
+The helper landed in andris as shakenfist/andris#56 (merged as
+9a997a3), and the shaped-link rig gained a `helper` config to
+measure it (`docs/performance/dbus-helper-measurements.md`).
+
+**Verdict, 2026-10-29: no-go, as measured**
+(`docs/performance/dbus-display-spike.md`). Go needed all three
+of the phase plan's criteria (decision 8):
+- **Latency fails.** The helper was level with or better than
+  the better spice-server config in 9 of 14 cells, within 5 ms
+  of `streaming-video=all` wherever andris streamed. But it was
+  worse than streaming off in four: 3492 against 2039 ms at
+  80 ms / 10 Mbit heavy, 3263 against 371 ms and 6931 against
+  4952 ms at 80 ms / 5 Mbit, and over 15 s against 869 ms at
+  150 ms / 2 Mbit busy.
+- **Cost passes.** qemu plus andris used at most 1.27 times the
+  cheaper spice-server config, idle and with heavy activity
+  (1.8 times with busy activity, six times on std-vga).
+- **Reachability passes, narrowly.** Shaken Fist could attach a
+  helper with work only in Shaken Fist and andris. Nova and
+  oVirt need upstream changes, and Proxmox only an unsupported
+  raw `args:` plus a hookscript. Every libvirt source also needs
+  an andris attach mode that does not use QMP.
+
+The latency failure is andris's, not the D-Bus display's. qemu
+delivered every flush in 0.2 ms and its CPU and memory were flat
+on every link, while andris's ACK lag reached 3 to 11 s. The
+five cells it lost are exactly those where andris never
+streamed: its heat map (`server/updates/heat.rs`) counts frames it has
+*sent*, and on a slow link its ACK window spaced them more than
+200 ms apart, so no tile ever qualified. Counting heat from what
+qemu delivers, plus socket pacing, would plausibly turn the
+verdict; a re-measure of the failing cells decides (Future
+work). With no go, there is no proposal for a separate master
+plan yet.
+
 Design inputs for phase 4, from the low-latency streaming
 stacks: NVIDIA GameStream and its open reimplementation
 Sunshine/Moonlight, Amazon DCV, PCoIP and Parsec. The spike
@@ -742,7 +811,9 @@ server-internal, in two parts:
   moves encoding for slow links out of spice-server and reduces
   its value. Phase 3's no-go leaves spice-server's streams as
   the slow-link lever for relayed sessions, which raises item
-  4's value.
+  4's value. Phase 4's no-go (2026-10-29) means it no longer
+  waits; even a later go would leave Nova and oVirt on
+  spice-server's encoder.
 
 **Phase 6** is the push audit for the plan as first written,
 phases 1-5, run before the QUIC work starts so that the two
@@ -926,6 +997,17 @@ become the next plan:
 - token authentication inside TLS (item 8). This would also
   unpin Ryll from SHA-1-era RustCrypto crates (ryll #93).
 
+Phase 4 said no-go on 2026-10-29, so by the paragraph above
+these four become the next plan. They should, without waiting
+for the re-measure below: even a go would help only the sources
+that can run a helper (Shaken Fist first), and Nova and oVirt
+deployments keep in-qemu SPICE until their own upstreams can
+configure a D-Bus display. Items 2 and 8 are spice-server
+changes, item 7 a qemu change, and item 6's proxy hint is
+Kerbside's own and would serve andris as well. If a later go
+puts a helper in front of some sources, Kerbside defines the
+same four there itself.
+
 Other deferred items:
 
 - lossless refinement for remote `gl=on` (item 3);
@@ -960,6 +1042,11 @@ Other deferred items:
   sent H.264 that Ryll did not decode (ryll#398), so
   spice-server's stream rate control ran on reports from a client
   that drew nothing.
+  - *Partly answered 2026-10-29 by phase 4:* its `all` runs sent
+    MJPEG, not H.264, with the same Ryll and proxy, and Ryll
+    decoded 16 of each repeat's 21 streams. `all`'s latency was
+    much as before (113 against 118 ms at 80 ms / 10 Mbit heavy).
+    Why the codec changed is the next item.
 - Upstream the rig's small Ryll patch, which adds a `rect` to the
   control socket's `surface_drawn` event
   (`tools/shaped-link/ryll-surface-drawn-rect.patch`). Until
@@ -1003,6 +1090,57 @@ Other deferred items:
   where the link was the limit (andris paces on a window of 20),
   and that 64-pixel tiles which moving content only partly
   covers send their text as JPEG. Both are andris's behaviour.
+  Phase 4 adds a second reason for socket pacing: with no
+  stream, andris's message-counted window held seconds of JPEG
+  tiles on slow links (3263 ms p50 at 80 ms / 5 Mbit busy,
+  against 371 ms for spice-server with streaming off).
+- **Find out which codec spice-server chooses for
+  `streaming-video=all`, and why.** Phase 4's 28 `all` repeats
+  sent MJPEG (codec 1); the re-baseline, ACK-window,
+  transcoding measurement and transcoding spike pages report
+  H.264 with the same Ryll (0d140b3) and an unchanged proxy.
+  Those pages are left as written until this is understood. The
+  host's gstreamer x264 plugin is installed, so that is not
+  the obvious cause.
+- **Andris: count stream heat from what the platform delivers,
+  not from frames sent** (phase 4). `HeatMap::record` is called
+  from the display channel's `detect`, once per frame *sent*, so
+  on a link where the ACK window spaces sends over
+  `HOT_MAX_GAP` (200 ms) no tile reaches `HOT_FRAMES` (20) and
+  no stream starts; the activity then goes as JPEG tiles that
+  keep the sends spaced. spice-server counts the drawing
+  commands qemu hands it, independent of the link. For the qemu
+  platform, diff each update against its screen as it is copied
+  in (the rig's guest flushes its whole plane, so damage alone
+  does not say which tiles changed) and record those tiles at
+  qemu's rate. It would help the X11 platform on slow links too.
+  This is an andris issue to propose; it is the change most
+  likely to reverse phase 4's verdict.
+- **Re-measure the helper's failing cells** once the heat change
+  and socket pacing land: 80 ms / 10 Mbit heavy, 80 ms / 5 Mbit
+  busy and heavy, and 150 ms / 2 Mbit busy and heavy, with the
+  rig's `helper` config at the new `ANDRIS_REF`. If the helper
+  is no longer worse than streaming off anywhere, phase 4's
+  criteria all pass, and the go proposal for a separate master
+  plan follows: own bindings, a lag watchdog, a libvirt attach
+  mode, Shaken Fist first, and a libvirt helper-launch path for
+  Nova.
+- **Andris: a lag watchdog for the qemu platform.** qemu queues
+  display messages to a stalled listener without bound on
+  std-vga and page-flipping guests (184 to 262 MiB/s in phase 4's
+  trace). Re-registering the listener frees the queue, so the
+  helper should do that when it falls behind.
+- **Andris: an attach mode for libvirt.** andris attaches only
+  through QMP, which libvirt owns. It needs either an inherited
+  descriptor (`<graphics type='dbus' p2p='yes'/>` with
+  `virDomainOpenGraphicsFD`) or a bus-address mode (non-p2p, the
+  mode libvirt runs qemu-rdp on).
+- **Andris: D-Bus bindings of its own** for a productised helper.
+  The qemu-display crate is pinned at git 6ffedb9 because its
+  0.2.1 release links libusb unconditionally, and its zbus 5
+  brings RUSTSEC-2026-0370/0371/0372, which andris ignores in
+  `deny.toml` and `.cargo/audit.toml`. Proxies generated from
+  qemu's `ui/dbus-display1.xml` on zbus 6 would remove both.
 - **The `transcode` feature's CI steps.** The Rust proxy job runs
   clippy and the tests with `--features transcode` while the
   experiment is kept; drop them if the experiment is removed. A

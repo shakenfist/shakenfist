@@ -114,7 +114,7 @@ skipping review, required checks and the merge queue.
 and `repos/shakenfist/<r>/collaborators/shakenfist-bot/permission`
 reports `admin` in all ten of shakenfist, kerbside, ryll, instar,
 hunkydory, client-python-k3s, actions, development, sfui and
-kerbside-client. (`sfconductor` is an ordinary member.) No ruleset
+kerbside-client, and in andris (checked 2026-10-30). (`sfconductor` is an ordinary member.) No ruleset
 names `OrganizationAdmin` or the admin repository role as a bypass
 actor today, so ownership does not bypass anything by itself. But a
 repository admin can rewrite the ruleset, and can widen an
@@ -134,7 +134,7 @@ one of the two in scope:
 | Secret | Workflows | Triggers |
 |--------|-----------|----------|
 | `RENOVATE_TOKEN` | `renovate.yml` in 17 repositories, including all six above | `schedule`, `workflow_dispatch` |
-| `DEPENDENCIES_TOKEN` | `prune-reviews.yml` in actions, development, hunkydory, kerbside, kerbside-client, ryll, sfui | `push`, `schedule`, `workflow_dispatch` |
+| `DEPENDENCIES_TOKEN` | `prune-reviews.yml` in andris, hunkydory, kerbside, ryll (in actions, development, kerbside-client and sfui it resolves to nothing, so the push uses `github.token`) | `push`, `schedule`, `workflow_dispatch` |
 | `DEPENDENCIES_TOKEN` | `pin-indirect-dependencies.yml` in shakenfist, kerbside | `pull_request`, `schedule`, `workflow_dispatch` |
 | `DEPENDENCIES_TOKEN` | `code-formatting.yml` in shakenfist, client-python | `pull_request`, `schedule`, `workflow_dispatch` |
 | `DEPENDENCIES_TOKEN` | `functional-tests.yml` (claude-code delinter job) in shakenfist | `pull_request`, `merge_group` |
@@ -152,12 +152,23 @@ and against accident, but not against a writer
 (`templates/pin-indirect-dependencies/pin-indirect-dependencies.yml:58-65`).
 
 **Where the secrets live is not visible to this repository.**
-`actions` has no repository secrets at all, yet its
-`prune-reviews` pushed as `shakenfist-bot` 44 times in a quarter,
-so at least `DEPENDENCIES_TOKEN` is an organisation secret. Its
-visibility (all repositories, or selected ones) needs `admin:org`
-to read. If it is visible to every repository, a push of a new
-workflow to any branch of any of them reaches it.
+`actions` has no repository secrets at all, and its
+`prune-reviews` commits are authored by `shakenfist-bot`, but that
+is `ci-prune-reviews.sh` setting `git config user.name`, not the
+token: its ruleset rule suites show those pushes made by
+`github-actions[bot]`, as are sfui's and kerbside-client's, while
+ryll's are made by `shakenfist-bot` (checked 2026-10-29). Checked
+with `repos/<r>/actions/secrets` and
+`repos/<r>/actions/organization-secrets` the same day:
+`DEPENDENCIES_TOKEN` is a repository secret in shakenfist,
+client-python, hunkydory, kerbside and ryll, and absent from
+actions, development, kerbside-client and sfui. andris lacked it
+until 2026-10-29 18:39 UTC, so its `prune-reviews` pushes, made by
+`github-actions[bot]`, were rejected by its ruleset (six times that
+month); since it was added they land as `shakenfist-bot`. The only
+organisation secrets those ten can see are `RENOVATE_TOKEN`, and
+`GITLAB_TESTDATA_TOKEN` in shakenfist. Their visibility beyond that
+needs `admin:org` to read.
 
 **Only one job needs the bypass.** The ruleset rule-suite history
 for the last month shows what the bypass is actually used for:

@@ -317,12 +317,16 @@ nav:
                 - "Kolla-Ansible": components/kerbside/deployment/kolla-ansible.md
                 - "Containers": components/kerbside/deployment/containers.md
             - Performance:
+                - "A SPICE helper on qemu's D-Bus display, on a shaped link": components/kerbside/performance/dbus-helper-measurements.md
+                - "A SPICE helper on qemu's D-Bus display: the spike's verdict": components/kerbside/performance/dbus-display-spike.md
                 - "Proxy backpressure on a shaped client link": components/kerbside/performance/proxy-backpressure.md
                 - "spice-server's ACK window, observed from the proxy": components/kerbside/performance/ack-window.md
                 - "Streaming and the qemu damage series on a shaped link": components/kerbside/performance/streaming-rebaseline.md
                 - "Switching a display channel between relaying and transcoding": components/kerbside/performance/transcoding-switching.md
                 - "The transcoding display channel on a shaped link": components/kerbside/performance/transcoding-measurements.md
                 - "Transcoding the display channel: the spike's verdict": components/kerbside/performance/transcoding-spike.md
+                - Dbus Helper:
+                    - "Pooled summary of the D-Bus helper measurements": components/kerbside/performance/dbus-helper/summary.md
             - Plans:
                 - "Plans index": components/kerbside/plans/index.md
                 - "A working installation path: the compose demo": components/kerbside/plans/PLAN-demo-install.md
@@ -342,6 +346,7 @@ nav:
                 - "Deployment options phase 4: containers": components/kerbside/plans/PLAN-deployment-options-phase-04-containers.md
                 - "Deployment options phase 5: the Ansible role": components/kerbside/plans/PLAN-deployment-options-phase-05-ansible.md
                 - "Deployment options phase 6: installation hand-off": components/kerbside/plans/PLAN-deployment-options-phase-06-installation.md
+                - "Deployment options phase 7: push audit": components/kerbside/plans/PLAN-deployment-options-phase-07-push-audit.md
                 - "Host subject phase 1: subject pinning in shakenfist-spice-protocol": components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier.md
                 - "Host subject phase 2: kerbside adoption, CI proof, docs": components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption.md
                 - "Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange.md
@@ -363,6 +368,7 @@ nav:
                 - "Phase 4: `multi-cloud.md` and `placement.md`": components/kerbside/plans/PLAN-use-case-docs-phase-04-multi-cloud.md
                 - "Phase 4: a CI lane for the compose demo": components/kerbside/plans/PLAN-demo-install-phase-04-ci-lane.md
                 - "Phase 4: Port latency loadtest to control socket": components/kerbside/plans/PLAN-test-harness-phase-04-port-latency.md
+                - "Phase 4: Son of SPICE, a D-Bus display feasibility spike": components/kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike.md
                 - "Phase 5: Direct-qemu CI workflow": components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci.md
                 - "Phase 5: rewrite `docs/installation.md`": components/kerbside/plans/PLAN-demo-install-phase-05-docs.md
                 - "Phase 5: the index slim-down and closeout": components/kerbside/plans/PLAN-use-case-docs-phase-05-index-slimdown.md

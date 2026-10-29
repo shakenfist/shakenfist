@@ -505,6 +505,40 @@ against the relay:
   made on first use and safe to delete. `quality.sh test` runs
   `test_quality.py`.
 
+The rig can also put a SPICE server other than qemu's own in front of
+the guest, and change the guest's display device:
+
+- **A SPICE helper on qemu's D-Bus display.** A `DISPLAYS` entry
+  whose streaming field is `helper` runs qemu with
+  `-display dbus,p2p=on` and no `-spice`, and puts
+  [andris](https://github.com/shakenfist/andris) in front of it with
+  its qemu platform (`--platform qemu --qmp <socket>`). andris listens
+  on the port and ticket spice-server would have used, so the mock
+  control plane and the proxy see an ordinary SPICE server. With
+  `RYLL_BIN` and the rest set as for any run:
+
+  ```sh
+  tools/shaped-link/build-andris.sh /tmp/sl   # andris at ANDRIS_REF, in Docker
+  Q=qemu-system-x86_64 G=/tmp/sl/guest
+  ANDRIS_BIN=/tmp/sl/andris/target/release/andris \
+      DISPLAYS="off:$Q:off:$G helper:$Q:helper:$G" CONFIGS=relay:0:0 \
+      tools/shaped-link/run-matrix.sh
+  ```
+
+  `build-andris.sh` builds from a sibling `../andris` checkout when
+  there is one (`ANDRIS_SRC` overrides it), at a pinned commit
+  (`ANDRIS_REF`), with `make release FEATURES=qemu` in andris's own
+  Docker image. `ANDRIS_ARGS` passes extra andris flags. A helper case
+  adds andris's CPU time and RSS to `proc.txt` as a line of its own,
+  so `summarise.py` reports qemu and andris separately. It also writes
+  `andris.log`, and an `andris-died` marker if andris exited mid-case,
+  which counts like `qemu-died`. On the backend leg, the `ss` columns
+  that name qemu then describe andris's socket.
+- **std-vga.** `GUEST_VGA=std` gives every display in the run qemu's
+  std-vga in place of virtio-vga. The guest drives it with bochs-drm,
+  which `build-guest.sh` includes. std-vga has no `DIRTYFB`, so qemu
+  finds what changed by polling its dirty bitmap every 30 ms.
+
 ## Testing the SPICE console of an oVirt VM
 
 `tools/test-ovirt-console.py` is Kerbside's oVirt SPICE console probe.
