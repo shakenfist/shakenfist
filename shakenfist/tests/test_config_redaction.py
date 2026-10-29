@@ -24,6 +24,7 @@ from unittest import mock
 
 from shakenfist import config as sf_config
 from shakenfist.config import config
+from shakenfist.config import config_field_is_numeric
 from shakenfist.config import redacted_config_items
 from shakenfist.config import SECRET_CONFIG_KEY_RE
 from shakenfist.daemons.queues import startup_tasks
@@ -69,7 +70,7 @@ class ConfigRedactionTestCase(base.ShakenFistTestCase):
         for key, value in redacted_config_items():
             if not SECRET_CONFIG_KEY_RE.search(key):
                 continue
-            if isinstance(value, (bool, int, float)):
+            if config_field_is_numeric(key):
                 continue
             self.assertEqual('<redacted>', value, key)
 
@@ -109,16 +110,33 @@ class ConfigRedactionTestCase(base.ShakenFistTestCase):
         # A lower-case row sets the same field (pydantic-settings matches
         # environment names case-insensitively), so it is the same secret.
         self.assertTrue(config_value_is_secret('auth_secret_seed', 'x'))
-        self.assertTrue(config_value_is_secret('KERBSIDE_TOKEN_DURATION', 'x'))
-        self.assertFalse(config_value_is_secret('KERBSIDE_TOKEN_DURATION', 3600))
-        self.assertFalse(config_value_is_secret('SOME_TOKEN_FLAG', True))
-        self.assertFalse(config_value_is_secret('SOME_TOKEN_RATIO', 0.5))
         self.assertFalse(config_value_is_secret('NODE_NAME', 'x'))
         # The value-type exemptions apply to a lowercase name the same
         # way, because show-config sees whatever name the row has.
         self.assertTrue(config_value_is_secret('auth_secret_seed', 'x'))
         self.assertFalse(config_value_is_secret('kerbside_token_duration', 3600))
         self.assertFalse(config_value_is_secret('node_name', 'x'))
+
+    def test_the_exemption_is_by_declared_type_not_by_value(self):
+        from shakenfist.config import config_value_is_secret
+        # sf-ctl set-config stores an all-digit value as an int, so a
+        # credential which happens to be all digits reaches the predicate
+        # as a number. The field's declared type, not the value's, says
+        # whether it can hold one.
+        self.assertTrue(config_value_is_secret('AUTH_SECRET_SEED', 12345678))
+        self.assertTrue(config_value_is_secret('MARIADB_PASSWORD', 3.14))
+        # An undeclared row's type is whatever was stored, so a
+        # secret-looking name is masked whatever the value's type.
+        self.assertTrue(config_value_is_secret('SOME_TOKEN_FLAG', True))
+        self.assertTrue(config_value_is_secret('SOME_TOKEN_RATIO', 0.5))
+        # A field declared numeric cannot hold a credential, whatever is
+        # stored under it: a stray string there is a misconfiguration the
+        # operator needs to see, not a secret.
+        self.assertFalse(config_value_is_secret('KERBSIDE_TOKEN_DURATION', 3600))
+        self.assertFalse(config_value_is_secret('KERBSIDE_TOKEN_DURATION', 'x'))
+        self.assertTrue(config_field_is_numeric('API_TOKEN_DURATION'))
+        self.assertFalse(config_field_is_numeric('AUTH_SECRET_SEED'))
+        self.assertFalse(config_field_is_numeric('SOME_TOKEN_FLAG'))
 
 
 class ConfigDumpCallerTestCase(base.ShakenFistTestCase):

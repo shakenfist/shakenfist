@@ -426,9 +426,13 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         self.assertEqual('<redacted>', data['AUTH_SECRET_SEED'])
 
     @mock.patch('shakenfist.client.ctl.mariadb')
-    def test_show_config_string_token_redacted(self, mock_mariadb):
+    def test_show_config_string_under_numeric_field_is_shown(
+            self, mock_mariadb):
         from shakenfist.client.ctl import show_config
 
+        # The field is declared int, so it cannot hold a credential; a
+        # string stored under it is a misconfiguration verify-config will
+        # refuse, and the operator reads this output to find it.
         mock_mariadb.get_cluster_config.return_value = {
             'KERBSIDE_TOKEN_DURATION': 'notanumber'
         }
@@ -436,8 +440,33 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         result = self.runner.invoke(show_config)
 
         self.assertEqual(result.exit_code, 0)
-        self.assertNotIn('notanumber', result.output)
-        self.assertIn('<redacted>', result.output)
+        self.assertIn('notanumber', result.output)
+        self.assertNotIn('<redacted>', result.output)
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_show_config_numeric_secret_redacted(self, mock_mariadb):
+        from shakenfist.client.ctl import show_config
+
+        # set-config stores an all-digit value as an int, and the deploy
+        # logs this command's output, so a credential which happens to
+        # be all digits must still be masked: by the field's declared
+        # type for AUTH_SECRET_SEED, and by name alone for a row SFConfig
+        # does not declare.
+        mock_mariadb.get_cluster_config.return_value = {
+            'AUTH_SECRET_SEED': 12345678,
+            'SOME_PLUGIN_TOKEN': 4242,
+            'API_TOKEN_DURATION': 3600,
+        }
+
+        result = self.runner.invoke(show_config)
+
+        self.assertEqual(result.exit_code, 0)
+        data = json.loads(result.output)
+        self.assertEqual('<redacted>', data['AUTH_SECRET_SEED'])
+        self.assertEqual('<redacted>', data['SOME_PLUGIN_TOKEN'])
+        self.assertEqual(3600, data['API_TOKEN_DURATION'])
+        self.assertNotIn('12345678', result.output)
+        self.assertNotIn('4242', result.output)
 
     @mock.patch('shakenfist.client.ctl.mariadb')
     def test_show_config_show_secrets(self, mock_mariadb):

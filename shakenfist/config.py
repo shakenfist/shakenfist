@@ -40,8 +40,8 @@ from pydantic_settings import NoDecode
 # over-match today, catching the integer API_TOKEN_DURATION,
 # FEDERATION_MAX_TOKEN_BYTES and KERBSIDE_TOKEN_DURATION. Callers
 # should therefore decide through config_value_is_secret() below, which
-# also exempts numbers, rather than testing this pattern against a key
-# name alone: for a number it is no longer an over-match at all.
+# exempts the fields SFConfig declares as numbers, rather than testing
+# this pattern against a key name alone.
 #
 # This is deliberately belt-and-braces with the SecretStr types on the
 # secret-carrying fields themselves. The dumping sites iterate every
@@ -1316,21 +1316,40 @@ load_cluster_config()
 config = SFConfig()
 
 
+def config_field_is_numeric(key: str) -> bool:
+    """Whether SFConfig declares this item as a bool, int or float.
+
+    False for a name SFConfig does not declare: an undeclared row's type
+    is whatever was stored, which says nothing about what it holds.
+    """
+    field = SFConfig.model_fields.get(canonical_config_key_name(key))
+    return field is not None and field.annotation in (bool, int, float)
+
+
 def config_value_is_secret(key: str, value: Any) -> bool:
     """Whether a configuration item's value must be masked when displayed.
 
-    True when the name matches SECRET_CONFIG_KEY_RE and the value is not
-    a bool, int or float. The name pattern over-matches by design, but
-    numbers are exempted: API_TOKEN_DURATION, FEDERATION_MAX_TOKEN_BYTES
-    and KERBSIDE_TOKEN_DURATION all match the name pattern, none of them
-    can be a credential, and all three are tunables an operator reads
-    this output to confirm. A credential is always a string (or a
-    SecretStr, which is not an int either, so it is still masked).
+    True when the name matches SECRET_CONFIG_KEY_RE and SFConfig does
+    not declare the field as a bool, int or float. The name pattern
+    over-matches by design, but the numeric fields are exempted:
+    API_TOKEN_DURATION, FEDERATION_MAX_TOKEN_BYTES and
+    KERBSIDE_TOKEN_DURATION all match the name pattern, none of them can
+    be a credential, and all three are tunables an operator reads this
+    output to confirm.
+
+    The exemption is by the field's declared type, not the value's
+    runtime type. sf-ctl set-config coerces an all-digit value to int
+    before storing it, so a credential which happens to be all digits
+    (an AUTH_SECRET_SEED, say) arrives here as a number; it is still a
+    credential, and the deploy logs show-config's output. The declared
+    type is the only thing which says a field cannot hold one, and the
+    ``value`` argument is kept so that callers which have it to hand
+    need not change.
     """
-    if isinstance(value, (bool, int, float)):
+    del value
+    if not SECRET_CONFIG_KEY_RE.search(canonical_config_key_name(key)):
         return False
-    return SECRET_CONFIG_KEY_RE.search(
-        canonical_config_key_name(key)) is not None
+    return not config_field_is_numeric(key)
 
 
 def redacted_config_items() -> Iterator[tuple[str, Any]]:
