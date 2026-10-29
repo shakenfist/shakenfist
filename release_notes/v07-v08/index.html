@@ -18362,7 +18362,8 @@ object, each with an <code>observational</code> key, are advertised by the new
 <li>An instance's list no longer shows operations which only target other
   objects. The network reconcile work an instance start waits for is in the
   network's list; <code>GET /clusteroperations/{op_uuid}/chain</code> traces what an
-  operation waits on.</li>
+  operation waits on. An agent operation's preflight (<code>node_aop_op</code>) is in
+  the instance's list, and its view carries <code>instance_uuid</code>.</li>
 <li>By default only queued, preflight and executing operations are listed.
   <code>all=true</code> adds finished operations which have not yet been removed
   (eligible for removal thirty seconds after finishing and removed by the
@@ -18371,14 +18372,36 @@ object, each with an <code>observational</code> key, are advertised by the new
 <li>Deleting an instance cancels every outstanding operation which targets it,
   billing and health sweeps included, except snapshots. It no longer cancels
   network reconcile work which an instance operation depended on, because
-  other instances share it. The agent operation preflight targets only its
-  agent operation, so a delete does not cancel it.</li>
+  other instances share it. An agent operation's preflight targets the
+  instance as well as the agent operation, so a delete cancels it too. A
+  preflight enqueued before this release keeps only its agent operation
+  target, and an instance delete does not cancel it.</li>
 <li>The delete now waits for any snapshot it did not cancel, not only the
   newest operation, so a running snapshot is no longer overtaken and its disks
   deleted.</li>
+<li><code>DELETE /instances/{instance_ref}</code> answers 503 when the instance's
+  outstanding operations cannot be read, instead of enqueuing a delete which
+  cancels nothing and waits for no snapshot. Retry the delete. <code>DELETE
+  /instances</code> answers the same 503 part way through its namespace, leaving
+  the deletes already enqueued standing; a retry enqueues them all again,
+  which is harmless. An instance whose start fails during such an outage is
+  errored but its delete is not enqueued, and the instance holds its
+  placement until it is deleted explicitly.</li>
 <li>The sf-database service accepts a new <code>pending_only</code> field on the request
   which lists an object's operation targets. An older service ignores it and
   returns every row, which is correct but slower during a rolling upgrade.</li>
+<li><code>GET /clusteroperations/{operation_type}/{operation_uuid}</code> now checks every
+  object an operation targets, not one of them, and refuses a non-admin
+  caller with 403 for an operation targeting an object with no namespace,
+  such as a blob or an interface, as the chain endpoint already did. The
+  sf-database reply for an operation's target now carries every row; an older
+  service reports one, and a multi-target operation is judged on it during a
+  rolling upgrade.</li>
+<li><code>GET /artifacts/{artifact_ref}/clusteroperations</code> is now an owner's route.
+  A namespace the artifact is shared with, or which its owner trusts, can
+  still read the artifact but is refused the listing with a 404, because a
+  fetch operation names the namespace and instance whose boot caused it. The
+  by-target listing already refused the same callers.</li>
 </ul>
 <p>The infra report will show a new <code>HasPendingClusterOperationTarget</code> caller
 from the API, because every object view now makes one more indexed query.</p>

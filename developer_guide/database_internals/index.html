@@ -16572,11 +16572,14 @@ briefly becomes the object's latest operation.</p>
   error anywhere.</li>
 <li>Marking a task observational also changes what a failing task does. When
   a <code>node_inst_op</code> task raises, <code>NodeInstOp.dispatch_task()</code> marks the
-  operation errored, and for a mutating task it moves the instance to an
-  error state too. For an observational task it leaves the instance alone,
-  because a failure to measure a guest says nothing about the guest. So a
-  mutating task marked observational would also stop erroring its instance
-  when it fails.</li>
+  operation errored, and for a mutating operation it moves the instance to
+  an error state too. For an observational operation it leaves the instance
+  alone, because a failure to measure a guest says nothing about the guest.
+  The question is asked of the whole operation, with <code>is_observational()</code>,
+  not of the task which failed: an operation which runs a probe ahead of a
+  mutating task is mutating, and a failed probe ends it before the mutating
+  task runs, so the instance is errored. So a mutating task marked
+  observational would also stop erroring its instance when it fails.</li>
 </ul>
 <p>The classification of every task is pinned by
 <code>shakenfist/tests/schema/operations/test_observational_tasks.py</code>. It holds a
@@ -16595,7 +16598,9 @@ history:</p>
   terminal state.</li>
 <li><strong><code>has_pending_cluster_operation()</code> (method)</strong>: returns <code>True</code> if any
   non-observational target row's operation is in
-  <code>{queued, preflight, executing}</code>. Consumed by <code>Network.is_okay()</code> and
+  <code>{queued, preflight, executing}</code>, the <code>ACTIVE_OPERATION_STATES</code> set in
+  <code>schema/operations/baseclusteroperation.py</code> which every reader of the
+  in-flight and terminal sets shares. Consumed by <code>Network.is_okay()</code> and
   any future history-aware gate. The query
   joins <code>cluster_operation_targets</code> against <code>object_states</code>, so a later
   terminal operation cannot mask an earlier in-flight one.
