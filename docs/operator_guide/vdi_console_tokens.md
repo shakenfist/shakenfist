@@ -100,7 +100,9 @@ sf-ctl set-config KERBSIDE_URL https://kerbside.example.com
     `KERBSIDE_TOKEN_DURATION`) and deploy again, relying on the variable. A row
     equal to its variable does not stop the deploy; it is reported as a warning
     and can be removed the same way. An `sf-ctl` older than the collection
-    shows the row as `<redacted>`, which the deploy treats as different.
+    shows the row as `<redacted>`, which the deploy treats as different. Row
+    names are case-insensitive, so a `kerbside_url` row, or a lower-case
+    `extra_config` entry, is caught too.
 
 `KERBSIDE_URL` is both the base for the returned console URL and the token
 **audience** (`aud`) claim. Kerbside's expected audience — its own

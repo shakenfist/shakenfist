@@ -385,7 +385,8 @@ argument_specs:
         differs from its variable, naming the sf-ctl unset-config command which
         fixes it. A row equal to its variable is left alone with a warning.
         Rows are compared as strings, since set-config stores 300 as an
-        integer.
+        integer, and names case-insensitively, since a kerbside_url row
+        shadows the variable exactly as KERBSIDE_URL does.
       - >-
         Every sf-ctl call is delegated to cluster_db_host, which must have
         direct database access. Reads no inventory groups.
