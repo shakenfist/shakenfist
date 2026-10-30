@@ -144,6 +144,7 @@ nav:
                 - "Audit: Plan phase references": components/development/audits/plan-phase-references.md
                 - "Audit: Plan references in source": components/development/audits/plan-source-references.md
                 - "Audit: Plan template": components/development/audits/plan-template.md
+                - "Audit: Pre-commit Node version": components/development/audits/pre-commit-node-version.md
                 - "Audit: Pre-push audit file": components/development/audits/push-audit.md
                 - "Audit: Push audit phase in master plans": components/development/audits/plan-audit-phase.md
                 - "Audit: pyproject.toml usage": components/development/audits/pyproject-usage.md
@@ -320,6 +321,7 @@ nav:
                 - "A SPICE helper on qemu's D-Bus display, on a shaped link": components/kerbside/performance/dbus-helper-measurements.md
                 - "A SPICE helper on qemu's D-Bus display: the spike's verdict": components/kerbside/performance/dbus-display-spike.md
                 - "Proxy backpressure on a shaped client link": components/kerbside/performance/proxy-backpressure.md
+                - "spice-server patches on a shaped link": components/kerbside/performance/spice-server-patches.md
                 - "spice-server's ACK window, observed from the proxy": components/kerbside/performance/ack-window.md
                 - "Streaming and the qemu damage series on a shaped link": components/kerbside/performance/streaming-rebaseline.md
                 - "Switching a display channel between relaying and transcoding": components/kerbside/performance/transcoding-switching.md
@@ -371,6 +373,7 @@ nav:
                 - "Phase 4: Son of SPICE, a D-Bus display feasibility spike": components/kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike.md
                 - "Phase 5: Direct-qemu CI workflow": components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci.md
                 - "Phase 5: rewrite `docs/installation.md`": components/kerbside/plans/PLAN-demo-install-phase-05-docs.md
+                - "Phase 5: spice-server patches, measured": components/kerbside/plans/PLAN-spice-performance-phase-05-spice-server.md
                 - "Phase 5: the index slim-down and closeout": components/kerbside/plans/PLAN-use-case-docs-phase-05-index-slimdown.md
                 - "Phase 6: Ryll Cargo feature work + digest decoding + restore keypress-to-screen latency": components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding.md
                 - "Phase 7: First Sextant scenario tempest test": components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test.md
@@ -383,6 +386,7 @@ nav:
                 - "Proxmox source phase 4: the source driver": components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver.md
                 - "Proxmox source phase 5: the CI lane": components/kerbside/plans/PLAN-proxmox-source-phase-05-ci-lane.md
                 - "Proxmox source phase 6: the use-case page": components/kerbside/plans/PLAN-proxmox-source-phase-06-use-case-page.md
+                - "Proxmox source phase 7: push audit": components/kerbside/plans/PLAN-proxmox-source-phase-07-push-audit.md
                 - "Proxy dev releases phase 1: the publish workflow": components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow.md
                 - "Proxy dev releases phase 2: the committed dev specifier": components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier.md
                 - "Proxy dev releases phase 3: the contract handshake": components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake.md

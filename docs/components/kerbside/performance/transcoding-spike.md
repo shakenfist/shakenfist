@@ -127,14 +127,13 @@ job than the productising list below. And once the crash is gone, the
 transcoder's remaining unique win is the heavy activity on the slowest
 link.
 
-One gap in the evidence could cut either way. In every
-`streaming-video=all` measurement the streams were H.264, which Ryll
-does not decode. So spice-server's stream rate control ran on reports
-from a client that drew nothing. The key box is never streamed, so its
-latency is unaffected, but a client that decodes the stream might see
-different contention. That should be measured before
-`streaming-video=all` becomes the recommendation (see
-[follow-ups](#follow-ups)).
+In every `streaming-video=all` measurement here the streams were
+MJPEG, the codec the Ryll used asks for first, and Ryll decodes MJPEG
+(see [the spice-server patches](/components/kerbside/performance/spice-server-patches/#which-codec-the-streams-used)).
+So spice-server's stream rate control ran on reports from a client
+that drew the stream. A client that asks for H.264 might see different
+contention, and Ryll does not yet decode spice-server's H.264
+(ryll#398), so that is not measured (see [follow-ups](#follow-ups)).
 
 ## The evidence, by question
 
@@ -392,9 +391,10 @@ Any of these would reopen the question:
   Evidence that Kerbside's users run incompressible motion over links
   like 150 ms / 2 Mbit, the one case where the transcoder beat
   streaming relay (1459 against 7328 ms).
-- **A decoding client changes the streaming numbers.** If relay with
-  `streaming-video=all` is markedly slower with a client that decodes
-  its streams, the comparison above has to be redone.
+- **An H.264 client changes the streaming numbers.** The measurements
+  streamed MJPEG. If relay with `streaming-video=all` is markedly slower
+  with a client that asks for H.264 and decodes it, the comparison above
+  has to be redone.
 - **A transcoder with a stream path ties streaming relay.** Suppose
   andris's stream path came across with a codec that needs no
   licensing decision (MJPEG or VP8), and the client clock problem
@@ -445,10 +445,13 @@ Nothing here has been filed.
   The cause is not established. One candidate is the control socket's
   stream of `surface_drawn` events.
 - **Reproduce spice-server 0.15.2's connect crash against current
-  master,** then report or patch it. This is now the main obstacle to
-  recommending `streaming-video=all`.
-- **Measure `streaming-video=all` with a client that decodes the
-  stream,** so that stream rate control runs on real reports.
+  master,** then report or patch it. Done: it reproduces on 0.16.0
+  and master, only for clients that send their codec preference at
+  connect (Ryll, not remote-viewer), and a patch is ready to send
+  ([spice-server patches](/components/kerbside/performance/spice-server-patches/)).
+- **Measure `streaming-video=all` with a client that decodes H.264.**
+  The measurements here streamed MJPEG, which Ryll decodes; Ryll does
+  not yet decode spice-server's H.264 (ryll#398).
 - **Recommend a `streaming-video` setting to operators,** stating the
   crash, once the two items above are settled.
 - **Andris: socket pacing, and the JPEG fringe** at the edges of

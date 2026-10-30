@@ -222,6 +222,11 @@ Guides for working on Kerbside itself:
   latency that decided it is andris's rather than qemu's, which sources
   could attach one, and what would change the answer
 
+- [spice-server patches on a shaped link](/components/kerbside/performance/spice-server-patches/) -
+  Which codec the streaming pages really used, the connect crash in every
+  released spice-server and its fix, hardware encoding on any GPU, and
+  what upgrading 0.15.2 to master gains
+
 ### Architecture Documentation
 
 Internal design of the Kerbside proxy:
