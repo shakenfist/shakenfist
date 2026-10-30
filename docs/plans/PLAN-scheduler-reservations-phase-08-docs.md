@@ -517,6 +517,151 @@ not-reported list only in table and simple output, and JSON output
 keeps the whole response (`node_capacity()` in client-python's
 `commandline/node.py`).
 
+**Departures from the plan.**
+
+- Survey finding F10 was wrong about #3882. It grepped `mariadb.py` and
+  the cluster daemon's `main.py` for the drift logging and found none,
+  but the logging lives in `scheduled_tasks.py`, in
+  `reconcile_scheduler_capacity()`. Step 6 found it there, so 6(c) took
+  the "logged" branch and `database.md` was not edited.
+- The glossary's reconciler entry was tightened in review to "creates
+  node and cluster capacity rows". The first draft said it creates the
+  capacity rows, but step 3 found that a claim row is created by the
+  operator's request, not by the reconciler.
+- Step 4 left two facts out of its brief because no source bore them
+  out: that `node resources` was "fixed", and the pure-affinity
+  capability token. It also added one fact the brief lacked, the
+  upgrade order of `sf-database` before `sf-api`, taken from
+  `database.md`.
+- Step 3 found two of its brief's premises wrong and wrote what the code
+  does: the reconciler creates node and cluster rows, but a claim row is
+  created by the operator's request; and an absent row is handled two
+  ways, with placement admitting unguarded and recording why while claim
+  creation refuses.
+
 ## Outcome
 
-Not yet written.
+Implemented and checked, with one step outstanding: the client release
+(step 1) is not finished. The `v0.8.4` tag has not been pushed, so PyPI
+still serves 0.8.3, and Definition of done items 1 and 2 are pending
+the tag. They are neither met nor failed. **This pull request's merge
+waits on them**; a follow-up commit fills in items 1 and 2 once the
+release lands. Every other item was run from the worktree root rather
+than read.
+
+### What each step did
+
+* **Step 1** (client release, management session) is half done. The dry
+  run of `release.yml` passed (run 41018325275); the tag and the
+  `release` environment approval are Michael's and are not yet given.
+* **Step 2** (`bc909e5bd5`) replaced the three false "has no claim
+  verbs / no events verb" sentences in `scheduler.md` with the commands,
+  opened the diagnosis section with `sf-client node capacity`, added the
+  two service classes, and tied the commands to shakenfist-client 0.8.4.
+  The execution-notes record of its gate is `732b4a9b11`.
+* **Step 3** (`0fda633726`) added "Guarded counters for finite
+  resources" to `database_internals.md`, with the `ARCHITECTURE.md`
+  index entry: when the idiom applies, its three parts, the rules each
+  tied to the function that bears it out, and a map of the scheduler's
+  instance.
+* **Step 4** (`8730e49603`) added three sections to `v07-v08.md` for
+  atomic admission and claims, the readable capacity surface, and
+  affinity constraints with the deprecation of weights, each written
+  for an upgrader.
+* **Step 5** (`da7876c3d2`) added five glossary entries (capacity claim,
+  capacity ledger, coverage state, guarded UPDATE, scheduler capacity
+  reconciler) and the mutual "not to be confused with" pair between
+  capacity claim and mapping rule.
+* **Step 6** (`3f5728b976`) rewrote three master-plan success criteria
+  to the design phase 0 chose, and closed two issues with evidence.
+* **Step 7** (this section) ran the Definition of done.
+
+### Release status
+
+Dry run passed, run 41018325275 (2026-10-30). `v0.8.4` is not tagged;
+PyPI serves 0.8.3. Items 1 and 2 stay pending until the tag is pushed,
+the `release` environment is approved, and PyPI serves 0.8.4. Until
+then `scheduler.md` and the release notes name a version that cannot yet
+be installed.
+
+### Issue comments
+
+* [#4391 closing comment](https://github.com/shakenfist/shakenfist/issues/4391#issuecomment-6517954014)
+* [#3882 closing comment](https://github.com/shakenfist/shakenfist/issues/3882#issuecomment-6517955250)
+
+Step 6(c) took the "logged" branch: `reconcile_scheduler_capacity()` in
+`shakenfist/daemons/cluster/scheduled_tasks.py` logs "Scheduler capacity
+counters drifted, corrected" per drifted node with the `used_*` deltas,
+and a pass summary with `drifted_nodes`. Only `used_*` drift is logged,
+not `limit_*` changes. `database.md` was therefore not edited.
+
+### Definition of done, item by item
+
+| Item | Result | Note |
+|---|---|---|
+| 1 | **Pending the tag** | PyPI serves 0.8.3 until `v0.8.4` is pushed; the install check cannot run. |
+| 2 | **Pending the tag** | `grep -o` prints one hit, `` shakenfist-client` 0.8.4 ``: it names 0.8.4 and nothing older, but PyPI does not yet serve it. |
+| 3 | **Met** | `grep -c 'has no claim verbs\|has no events verb'` prints `0`. |
+| 4 | **Met** | `sf-client node capacity` `5`; `namespace claim list --all` `1`; `namespace claim events` `1`. |
+| 5 | **Met** | `grep -c 'best-effort'` prints `1`. |
+| 6 | **Met** | `^## Guarded counters for finite resources` `1`; `guarded-counters-for-finite-resources` in `ARCHITECTURE.md` `1`. |
+| 7 | **Met** | `prefer_with_tag` 2, `namespace claim` 5, `node capacity` 6, `cluster_capacity` 2, `advisory` 1, `ensure-mariadb-schema` 13. The last appears inside the new section (`## Atomic admission and namespace capacity claims`, `:1345` to `:1437`) at `:1362` and `:1372`. |
+| 8 | **Met** | The five anchors count `5`; the `mapping rule` entry links `[capacity claim](#capacity-claim)`. |
+| 9 | **Met** | `node_reservations. table is the single source` `0`; `deferred out of this plan by D8` `1`. |
+| 10 | **Met** | `gh issue view 4391 --json state --jq .state` prints `CLOSED`; `gh issue view 3882 --json comments --jq '.comments | length'` prints `1`. |
+| 11 | **Met** | `pre-commit run --all-files` exited 0 after all edits to this file: 16 hooks passed, 0 failed, including `check-doc-anchors`, `check-plan-phase-references` and `check-plan-status`. |
+| 12 | **Met for the scheduler lines; item wrong as written** | See below. |
+| 13 | **Met, with a gap in the item** | See below. |
+| 14 | **Met** | The master plan's Execution row for this phase reads `In progress` with `—` in `Merged` (`:365`); `grep -c '13 of 16' docs/plans/index.md` prints `1`. |
+
+### Item 12: what phase 5 inherits
+
+The command as written returns 232 lines. Of those, 222 are under
+`docs/components/`, which is documentation synced in from other
+repositories (ryll, kerbside, instar, development and others) and uses
+"advisory" of CI lanes and audits; none concerns scheduler claims. The
+item's `grep -v '^docs/plans/'` does not exclude them, so it should have
+excluded `docs/components/` as well. The 10 lines outside it:
+
+```
+docs/glossary.md:63:active claim per namespace. The ceiling is advisory this release: a placement
+docs/developer_guide/ci.md:15:| `agent-context.yml` | ... Advisory: see Branch Protection ...
+docs/developer_guide/ci.md:16:| `mermaid-lint.yml` | ... Advisory: see Branch Protection ...
+docs/developer_guide/subsystem_internals.md:312:- **Claim ceilings are advisory** for one release.
+docs/operator_guide/scheduler.md:451:### Advisory this release: exceedances are recorded, not refused
+docs/operator_guide/scheduler.md:455:*advisory*: a placement that would push a namespace past the limits it
+docs/operator_guide/scheduler.md:517:difference between advisory mode working and advisory mode being absent.
+docs/operator_guide/database.md:932:- **Claim ceilings are advisory in this release.** The instance admission
+docs/release_notes/v07-v08.md:1411:**Claim ceilings are advisory this release.** A placement that takes a
+ARCHITECTURE.md:209:claims exist but their ceilings are advisory this release. Enforcing
+```
+
+Every scheduler line says the
+ceiling is advisory this release or equivalent
+("for one release", "in this release"); none says it is enforced. The
+two `ci.md` lines are about CI lanes and are unrelated.
+
+### Item 13: the client commands, side by side
+
+* `claim list --all`: `scheduler.md:633` and `v07-v08.md:1472` and
+  `:1490` agree on the command, the `--coverage active|expired` filter
+  and the capability-missing behaviour (refusal and exit 1). **The
+  glossary does not mention it at all**, so the item's "three of
+  `claim list --all`" is really two files; there is nothing to
+  disagree with.
+* `node capacity`: `scheduler.md:687`, `:937`, `:980`, `:1037`,
+  `v07-v08.md:1444` to `:1500` and `glossary.md:73` agree that it
+  renders `/admin/resources`, that `<node>` cuts it to one node, that the
+  cluster claims ledger prints last, and that missing hypervisors appear
+  as not reported. The glossary mentions only the ledger rendering,
+  which agrees with the others.
+
+No contradiction was found.
+
+### What phase 5 and the follow-up commit inherit
+
+* Items 1 and 2 are pending the `v0.8.4` tag; the follow-up commit
+  records the release run id, the PyPI timestamp and the fresh-venv
+  `sf-client node capacity --help` result.
+* Item 12 should exclude `docs/components/`, and item 13 should say two
+  files for `claim list --all`.
