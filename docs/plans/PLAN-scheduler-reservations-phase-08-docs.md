@@ -488,7 +488,34 @@ a 1152-line file.
 
 ## Execution notes
 
-Not yet started.
+Implementation began on 2026-10-30 (Australia/Sydney).
+
+**Back brief answers (2026-10-30).**
+- Steps 2 to 6 run one at a time in this worktree, through sub-agents,
+  because every step runs `pre-commit` in the same tree; step 7 last.
+  Step 1 runs alongside them.
+- The release is `v0.8.4`, and the dry run could start at once.
+- Step 6 may post to GitHub: close #4391 and comment on or close #3882.
+- This session may push the branch and open the pull request once the
+  definition of done passes, noting in the body that the merge waits on
+  PyPI serving the release.
+
+**Step 1 so far.** client-python `develop`'s head is
+`44696ddaf059ff1c8ed6e5ab0235a6366f1d0fc7` (#443). Its merge-queue
+`functional-tests.yml` run, 40744116587 on 2026-10-28, succeeded. The
+`workflow_dispatch` dry run of `release.yml`, run 41018325275 on
+2026-10-30, succeeded: the build job passed and every publishing job
+was skipped, as designed. The tag command was handed to Michael; the
+tag and the environment approval are his.
+
+**Step 2.** The gate text was agreed with one correction to the brief:
+a claimed namespace is not "honoured absolutely" while ceilings are
+advisory, so the service-class sentence describes what the ledger keeps
+from others instead. The management session added one qualifier the
+agent's draft lacked: naming a node drops the ledger and the
+not-reported list only in table and simple output, and JSON output
+keeps the whole response (`node_capacity()` in client-python's
+`commandline/node.py`).
 
 ## Outcome
 
