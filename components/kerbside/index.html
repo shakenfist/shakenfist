@@ -9976,6 +9976,34 @@
   
   
     <li class="md-nav__item">
+      <a href="plans/PLAN-proxmox-source-phase-06-use-case-page/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -11438,6 +11466,34 @@
     
   
     oVirt
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="use-cases/proxmox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox VE
   
 
     
@@ -17183,9 +17239,9 @@ column names the CI lane that exercises the scenario end to end; see
 <td><code>ovirt_matrix</code>, nightly tier</td>
 </tr>
 <tr>
-<td>Proxmox</td>
-<td>Deferred until a Proxmox source driver exists</td>
-<td>No source yet</td>
+<td><a href="/components/kerbside/use-cases/proxmox/">Proxmox VE</a></td>
+<td>Puts a protocol-aware front door before Proxmox's <code>spiceproxy</code>: discovery and per-session tickets from the PVE API with a two-privilege token, and every backend connection reached only through <code>spiceproxy</code>, with the SPICE session inside the tunnel over TLS and pinned to the node's certificate subject</td>
+<td><code>proxmox-functional</code>, nightly tier, advisory on Proxmox-path pull requests</td>
 </tr>
 <tr>
 <td><a href="/components/kerbside/use-cases/multi-cloud/">Multi-cloud aggregation</a></td>
@@ -17199,8 +17255,6 @@ column names the CI lane that exercises the scenario end to end; see
 </tr>
 </tbody>
 </table>
-<p>Scenarios without a link are planned rather than written; see
-<a href="/components/kerbside/plans/PLAN-use-case-docs/">plans/PLAN-use-case-docs.md</a>.</p>
 <p>The <code>direct-qemu</code> lane runs the full daemon + API + MariaDB stack
 against a local qemu SPICE server via the static source, so it is the
 end-to-end exercise of the standalone scenario. See

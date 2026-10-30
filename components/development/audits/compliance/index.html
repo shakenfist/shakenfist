@@ -3574,6 +3574,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#release-merge-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        release-merge-queue
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#release-process" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10323,6 +10334,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-proxmox-source-phase-06-use-case-page/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -11785,6 +11824,34 @@
     
   
     oVirt
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/use-cases/proxmox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox VE
   
 
     
@@ -17523,6 +17590,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#release-merge-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        release-merge-queue
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#release-process" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -17765,7 +17843,7 @@ many manual runs came before it. See
 <a href="/components/development/consistency-audits/">../consistency-audits.md</a> for what a run
 does.</p>
 <!-- consistency-audit:begin -->
-<p><em>Generated 2026-10-25T20:21:47.014253+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
+<p><em>Generated 2026-10-29T20:03:01.364575+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <h2 id="ci-review-automation">ci-review-automation<a class="headerlink" href="#ci-review-automation" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/ci-review-automation/">ci-review-automation.md</a></p>
 <table>
@@ -17854,8 +17932,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside-patches</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-patches/issues/1977" title="GitHub Issue: shakenfist/kerbside-patches #1977">kerbside-patches#1977</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>library-utilities</td>
@@ -17905,7 +17983,6 @@ does.</p>
 <li><strong>clingwrap</strong> (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch</li>
 <li><strong>divergulent</strong> (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request</li>
 <li><strong>kerbside-client</strong> (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No automated reviewer: no workflow other than pr-re-review.yml or pr-retest.yml calls shakenfist/actions/.github/workflows/pr-auto-review.yml@main or uses shared action review-pr-with-claude@main</li>
-<li><strong>kerbside-patches</strong> (Status): No automated reviewer: no workflow other than pr-re-review.yml or pr-retest.yml calls shakenfist/actions/.github/workflows/pr-auto-review.yml@main or uses shared action review-pr-with-claude@main</li>
 <li><strong>uncalibrated-sextant</strong> (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No automated reviewer: no workflow other than pr-re-review.yml or pr-retest.yml calls shakenfist/actions/.github/workflows/pr-auto-review.yml@main or uses shared action review-pr-with-claude@main</li>
 </ul>
 <h2 id="console-logging">console-logging<a class="headerlink" href="#console-logging" title="Permanent link">&para;</a></h2>
@@ -18655,8 +18732,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/826" title="GitHub Issue: shakenfist/instar #826">instar#826</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -18690,8 +18767,8 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/616" title="GitHub Issue: shakenfist/ryll #616">ryll#616</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -18717,8 +18794,6 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>instar</strong> (Status): 2 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute <a href="https://github.com/">https://github.com/</a>... URLs, which survive the docs site import): docs/plans/PLAN-differencing-phase-17-compose-docs.md -&gt; docs/plans/PLAN-differencing.md, docs/plans/PLAN-differencing-phase-17-compose-docs.md -&gt; plans/PLAN-differencing.md</li>
-<li><strong>ryll</strong> (Status): 1 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute <a href="https://github.com/">https://github.com/</a>... URLs, which survive the docs site import): docs/plans/completed/PLAN-stream-caps-and-flap-phase-05-auto-snapshot.md -&gt; PLAN-stream-caps-and-flap.md</li>
 <li><strong>uncalibrated-sextant</strong> (Status): 67 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute <a href="https://github.com/">https://github.com/</a>... URLs, which survive the docs site import): docs/plans/PLAN-audit-cleanup-phase-02-structural.md -&gt; ../../src/bootloader.rs, docs/plans/PLAN-audit-cleanup-phase-02-structural.md -&gt; ../../src/renderer/mod.rs, docs/plans/PLAN-audit-cleanup-phase-02-structural.md -&gt; ../../src/scene.rs, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -&gt; ../../Makefile, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -&gt; ../../scripts/screenshot.sh, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -&gt; ../../scripts/verify-release.sh, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -&gt; ../../src/scene.rs, docs/plans/PLAN-audit-cleanup.md -&gt; ../../AGENTS.md, docs/plans/PLAN-audit-cleanup.md -&gt; ../../ARCHITECTURE.md, docs/plans/PLAN-audit-cleanup.md -&gt; ../../PUSH-AUDIT.md (+57 more)</li>
 </ul>
 <h2 id="docs-line-references">docs-line-references<a class="headerlink" href="#docs-line-references" title="Permanent link">&para;</a></h2>
@@ -18794,8 +18869,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/827" title="GitHub Issue: shakenfist/instar #827">instar#827</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -18829,8 +18904,8 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/659" title="GitHub Issue: shakenfist/ryll #659">ryll#659</a></td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -18856,7 +18931,7 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>instar</strong> (Status): 6 line(s) in the documentation cite code by line number, which goes stale on the next edit to that code (name the function or class instead, or use a GitHub permalink pinned to a commit sha): docs/create.md:405, docs/create.md:406, docs/create.md:411, docs/measure.md:105, docs/quirks.md:1118, docs/quirks.md:1123</li>
+<li><strong>ryll</strong> (Status): 27 line(s) in the documentation cite code by line number, which goes stale on the next edit to that code (name the function or class instead, or use a GitHub permalink pinned to a commit sha): docs/multi-mode-parity.md:110, docs/multi-mode-parity.md:121, docs/multi-mode-parity.md:130, docs/multi-mode-parity.md:137, docs/multi-mode-parity.md:141, docs/multi-mode-parity.md:142, docs/multi-mode-parity.md:143, docs/multi-mode-parity.md:144, docs/multi-mode-parity.md:145, docs/multi-mode-parity.md:146 (+17 more)</li>
 </ul>
 <h2 id="eol-distro">eol-distro<a class="headerlink" href="#eol-distro" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/eol-distro/">eol-distro.md</a></p>
@@ -18946,8 +19021,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside-patches</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-patches/issues/1987" title="GitHub Issue: shakenfist/kerbside-patches #1987">kerbside-patches#1987</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>library-utilities</td>
@@ -18991,10 +19066,6 @@ does.</p>
 </tr>
 </tbody>
 </table>
-<p>Details for non-compliant projects:</p>
-<ul>
-<li><strong>kerbside-patches</strong> (Status): 1 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above</li>
-</ul>
 <h2 id="eol-producers">eol-producers<a class="headerlink" href="#eol-producers" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/eol-producers/">eol-producers.md</a></p>
 <table>
@@ -20160,8 +20231,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/648" title="GitHub Issue: shakenfist/kerbside #648">kerbside#648</a></td>
 </tr>
 <tr>
 <td>kerbside-client</td>
@@ -20215,6 +20286,10 @@ does.</p>
 </tr>
 </tbody>
 </table>
+<p>Details for non-compliant projects:</p>
+<ul>
+<li><strong>kerbside</strong> (Status): ARCHITECTURE.md is 508 lines / 3487 words (limits: 500 lines, 4000 words); move detail into docs/ and leave a summary and a link</li>
+</ul>
 <h2 id="llm-tooling">llm-tooling<a class="headerlink" href="#llm-tooling" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/llm-tooling/">llm-tooling.md</a></p>
 <table>
@@ -21539,7 +21614,7 @@ does.</p>
 <tr>
 <td>shakenfist</td>
 <td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4630" title="GitHub Issue: shakenfist/shakenfist #4630">shakenfist#4630</a></td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4728" title="GitHub Issue: shakenfist/shakenfist #4728">shakenfist#4728</a></td>
 </tr>
 <tr>
 <td>uncalibrated-sextant</td>
@@ -21558,7 +21633,7 @@ does.</p>
 <li><strong>client-python</strong> (Status): 19 plan history reference(s) in source, in 3 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
 <li><strong>client-python-k3s</strong> (Status): 63 plan history reference(s) in source, in 14 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
 <li><strong>divergulent</strong> (Status): 251 plan history reference(s) in source, in 47 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
-<li><strong>shakenfist</strong> (Status): 45 plan history reference(s) in source, in 22 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+<li><strong>shakenfist</strong> (Status): 1 plan history reference(s) in source, in 1 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
 <li><strong>uncalibrated-sextant</strong> (Status): 22 plan history reference(s) in source, in 5 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
 </ul>
 <h2 id="plan-index">plan-index<a class="headerlink" href="#plan-index" title="Permanent link">&para;</a></h2>
@@ -21634,8 +21709,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/828" title="GitHub Issue: shakenfist/instar #828">instar#828</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -21696,7 +21771,6 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>instar</strong> (Status): 1 status cell(s) outside the shared vocabulary (Proposed, Not started, In progress, Blocked, Complete, Abandoned, Superseded): Populated BAT output: fixed VHDX and non-qcow2 preallocation ("full on vmdk / vpc / vhdx as the no-o...")</li>
 <li><strong>uncalibrated-sextant</strong> (Status): 7 status cell(s) outside the shared vocabulary (Proposed, Not started, In progress, Blocked, Complete, Abandoned, Superseded): Locked bootloader ("Complete (commits a7b261d through thi..."), Display-mode keystrokes ("Complete (commits 455d2b5 through thi..."), Audit cleanup ("Complete (commits 1482eb0 through thi..."), Visual on-screen digest ("Complete (commits 55844a5 through thi..."), Continuous multi-channel visual digest ("Complete (commits 8814fab through thi...") (+2 more)</li>
 </ul>
 <h2 id="plan-phase-references">plan-phase-references<a class="headerlink" href="#plan-phase-references" title="Permanent link">&para;</a></h2>
@@ -21787,8 +21861,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside-patches</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-patches/issues/1975" title="GitHub Issue: shakenfist/kerbside-patches #1975">kerbside-patches#1975</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>library-utilities</td>
@@ -21834,9 +21908,8 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>client-python</strong> (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121</li>
-<li><strong>kerbside-patches</strong> (Status): 34 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/containerised-deployer.md:117, docs/containerised-deployer.md:118, docs/containerised-deployer.md:127, docs/containerised-deployer.md:220, docs/containerised-deployer.md:270, docs/containerised-deployer.md:276, docs/containerised-deployer.md:291, docs/containerised-deployer.md:297, docs/containerised-deployer.md:299, docs/containerised-deployer.md:317 (+24 more)</li>
-<li><strong>private-ci</strong> (Status): 9 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/capacity-claims.md:249, docs/capacity-claims.md:943, docs/capacity-claims.md:949, docs/capacity-claims.md:982, docs/capacity-claims.md:1007, docs/capacity-claims.md:1026, docs/capacity-claims.md:1428, docs/capacity-claims.md:1434, docs/capacity-claims.md:1495</li>
+<li><strong>client-python</strong> (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:142</li>
+<li><strong>private-ci</strong> (Status): 18 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/capacity-claims.md:251, docs/capacity-claims.md:448, docs/capacity-claims.md:506, docs/capacity-claims.md:561, docs/capacity-claims.md:564, docs/capacity-claims.md:603, docs/capacity-claims.md:738, docs/capacity-claims.md:741, docs/capacity-claims.md:767, docs/capacity-claims.md:1033 (+8 more)</li>
 <li><strong>uncalibrated-sextant</strong> (Status): 25 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, AGENTS.md:166, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137 (+15 more)</li>
 </ul>
 <h2 id="plan-source-references">plan-source-references<a class="headerlink" href="#plan-source-references" title="Permanent link">&para;</a></h2>
@@ -21957,8 +22030,8 @@ does.</p>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4727" title="GitHub Issue: shakenfist/shakenfist #4727">shakenfist#4727</a></td>
 </tr>
 <tr>
 <td>uncalibrated-sextant</td>
@@ -21975,6 +22048,7 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>client-python</strong> (Status): 2 of 4 plan reference(s) in source or configuration do not resolve, in 2 file(s) (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository)</li>
+<li><strong>shakenfist</strong> (Status): 1 of 307 plan reference(s) in source or configuration do not resolve, in 1 file(s) (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository)</li>
 </ul>
 <h2 id="plan-template">plan-template<a class="headerlink" href="#plan-template" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/plan-template/">plan-template.md</a></p>
@@ -22049,8 +22123,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/829" title="GitHub Issue: shakenfist/instar #829">instar#829</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -22084,8 +22158,8 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/617" title="GitHub Issue: shakenfist/ryll #617">ryll#617</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -22113,8 +22187,6 @@ does.</p>
 <ul>
 <li><strong>client-python-k3s</strong> (Status): shared block plan-push-audit-phase is stale (v3 embedded, v4 current; copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)</li>
 <li><strong>divergulent</strong> (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/plan-file-conventions.md in the development repository); shared block plan-push-audit-phase is stale (v3 embedded, v4 current; copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)</li>
-<li><strong>instar</strong> (Status): shared block plan-push-audit-phase is stale (v3 embedded, v4 current; copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)</li>
-<li><strong>ryll</strong> (Status): shared block plan-push-audit-phase is stale (v3 embedded, v4 current; copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)</li>
 <li><strong>uncalibrated-sextant</strong> (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/plan-file-conventions.md in the development repository); missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository); missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)</li>
 </ul>
 <h2 id="push-audit">push-audit<a class="headerlink" href="#push-audit" title="Permanent link">&para;</a></h2>
@@ -23065,8 +23137,8 @@ does.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="release-process">release-process<a class="headerlink" href="#release-process" title="Permanent link">&para;</a></h2>
-<p>Criterion: <a href="/components/development/audits/release-process/">release-process.md</a></p>
+<h2 id="release-merge-queue">release-merge-queue<a class="headerlink" href="#release-merge-queue" title="Permanent link">&para;</a></h2>
+<p>Criterion: <a href="/components/development/audits/release-merge-queue/">release-merge-queue.md</a></p>
 <table>
 <thead>
 <tr>
@@ -23088,7 +23160,7 @@ does.</p>
 </tr>
 <tr>
 <td>andris</td>
-<td>N/A</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -23128,7 +23200,7 @@ does.</p>
 </tr>
 <tr>
 <td>hunkydory</td>
-<td>N/A</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -23138,7 +23210,144 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>kerbside-client</td>
 <td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>kerbside-patches</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>library-utilities</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>occystrap</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/182" title="GitHub Issue: shakenfist/occystrap #182">occystrap#182</a></td>
+</tr>
+<tr>
+<td>private-ci</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>ryll</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>sfui</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>uncalibrated-sextant</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>visual-digest-rust</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<p>Details for non-compliant projects:</p>
+<ul>
+<li><strong>occystrap</strong> (Status): No merge queue on default branch "develop", but release.yml releases from it: add a merge_queue rule to the branch's ruleset</li>
+</ul>
+<h2 id="release-process">release-process<a class="headerlink" href="#release-process" title="Permanent link">&para;</a></h2>
+<p>Criterion: <a href="/components/development/audits/release-process/">release-process.md</a></p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Status</th>
+<th>Issue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>actions</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>client-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>client-python-k3s</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>client-python-ova</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>clingwrap</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>cloudgood</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>development</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>divergulent</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>hunkydory</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>images</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>instar</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -23173,7 +23382,7 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>N/A</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -23404,8 +23613,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/830" title="GitHub Issue: shakenfist/instar #830">instar#830</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -23419,8 +23628,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside-patches</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-patches/issues/1976" title="GitHub Issue: shakenfist/kerbside-patches #1976">kerbside-patches#1976</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>library-utilities</td>
@@ -23439,8 +23648,8 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/618" title="GitHub Issue: shakenfist/ryll #618">ryll#618</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -23471,10 +23680,7 @@ does.</p>
 <li><strong>client-python-k3s</strong> (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped</li>
 <li><strong>clingwrap</strong> (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped; renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently</li>
 <li><strong>divergulent</strong> (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped</li>
-<li><strong>instar</strong> (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped</li>
 <li><strong>kerbside-client</strong> (Status): Missing: .github/workflows/renovate.yml, renovate.json</li>
-<li><strong>kerbside-patches</strong> (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped</li>
-<li><strong>ryll</strong> (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json does not extend customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped</li>
 <li><strong>uncalibrated-sextant</strong> (Status): Missing: .github/workflows/renovate.yml, renovate.json</li>
 </ul>
 <h2 id="reusable-workflow-secrets">reusable-workflow-secrets<a class="headerlink" href="#reusable-workflow-secrets" title="Permanent link">&para;</a></h2>
@@ -23623,8 +23829,8 @@ does.</p>
 <tbody>
 <tr>
 <td>actions</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/200" title="GitHub Issue: shakenfist/actions #200">actions#200</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>agent-python</td>
@@ -23633,8 +23839,8 @@ does.</p>
 </tr>
 <tr>
 <td>andris</td>
-<td>N/A</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/58" title="GitHub Issue: shakenfist/andris #58">andris#58</a></td>
 </tr>
 <tr>
 <td>client-python</td>
@@ -23673,8 +23879,8 @@ does.</p>
 </tr>
 <tr>
 <td>hunkydory</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/121" title="GitHub Issue: shakenfist/hunkydory #121">hunkydory#121</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>images</td>
@@ -23745,12 +23951,11 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>actions</strong> (Status): 152 of 163 in-scope files reviewed at HEAD; 11 need review (threshold 5)</li>
-<li><strong>development</strong> (Status): 181 of 225 in-scope files reviewed at HEAD; 44 need review (threshold 5)</li>
-<li><strong>hunkydory</strong> (Status): 54 of 62 in-scope files reviewed at HEAD (1 imported from shakenfist/development); 8 need review (threshold 5)</li>
-<li><strong>kerbside</strong> (Status): 100 of 292 in-scope files reviewed at HEAD (4 imported from shakenfist/development); 192 need review (threshold 5)</li>
-<li><strong>kerbside-client</strong> (Status): 2 of 15 in-scope files reviewed at HEAD (2 imported from shakenfist/development); 13 need review (threshold 5)</li>
-<li><strong>ryll</strong> (Status): 162 of 272 in-scope files reviewed at HEAD (1 imported from shakenfist/development); 110 need review (threshold 5)</li>
+<li><strong>andris</strong> (Status): 8 of 134 in-scope files reviewed at HEAD (8 imported from shakenfist/development); 126 need review (threshold 5)</li>
+<li><strong>development</strong> (Status): 218 of 232 in-scope files reviewed at HEAD; 14 need review (threshold 5)</li>
+<li><strong>kerbside</strong> (Status): 92 of 354 in-scope files reviewed at HEAD (6 imported from shakenfist/development); 262 need review (threshold 5)</li>
+<li><strong>kerbside-client</strong> (Status): 3 of 15 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 12 need review (threshold 5)</li>
+<li><strong>ryll</strong> (Status): 147 of 284 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 137 need review (threshold 5)</li>
 <li><strong>sfui</strong> (Status): 5 of 49 in-scope files reviewed at HEAD (5 imported from shakenfist/development); 44 need review (threshold 5)</li>
 </ul>
 <h2 id="review-scope-completeness">review-scope-completeness<a class="headerlink" href="#review-scope-completeness" title="Permanent link">&para;</a></h2>
@@ -23776,7 +23981,7 @@ does.</p>
 </tr>
 <tr>
 <td>andris</td>
-<td>N/A</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -23831,8 +24036,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/650" title="GitHub Issue: shakenfist/kerbside #650">kerbside#650</a></td>
 </tr>
 <tr>
 <td>kerbside-client</td>
@@ -23862,7 +24067,7 @@ does.</p>
 <tr>
 <td>ryll</td>
 <td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/619" title="GitHub Issue: shakenfist/ryll #619">ryll#619</a></td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/660" title="GitHub Issue: shakenfist/ryll #660">ryll#660</a></td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -23888,6 +24093,7 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
+<li><strong>kerbside</strong> (Status): 4 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them</li>
 <li><strong>ryll</strong> (Status): 1 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them</li>
 </ul>
 <h2 id="review-tracking-templates">review-tracking-templates<a class="headerlink" href="#review-tracking-templates" title="Permanent link">&para;</a></h2>
@@ -23903,8 +24109,8 @@ does.</p>
 <tbody>
 <tr>
 <td>actions</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/215" title="GitHub Issue: shakenfist/actions #215">actions#215</a></td>
 </tr>
 <tr>
 <td>agent-python</td>
@@ -23913,8 +24119,8 @@ does.</p>
 </tr>
 <tr>
 <td>andris</td>
-<td>N/A</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/59" title="GitHub Issue: shakenfist/andris #59">andris#59</a></td>
 </tr>
 <tr>
 <td>client-python</td>
@@ -23953,8 +24159,8 @@ does.</p>
 </tr>
 <tr>
 <td>hunkydory</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/132" title="GitHub Issue: shakenfist/hunkydory #132">hunkydory#132</a></td>
 </tr>
 <tr>
 <td>images</td>
@@ -23968,13 +24174,13 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/651" title="GitHub Issue: shakenfist/kerbside #651">kerbside#651</a></td>
 </tr>
 <tr>
 <td>kerbside-client</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-client/issues/14" title="GitHub Issue: shakenfist/kerbside-client #14">kerbside-client#14</a></td>
 </tr>
 <tr>
 <td>kerbside-patches</td>
@@ -24003,8 +24209,8 @@ does.</p>
 </tr>
 <tr>
 <td>sfui</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/sfui/issues/61" title="GitHub Issue: shakenfist/sfui #61">sfui#61</a></td>
 </tr>
 <tr>
 <td>shakenfist</td>
@@ -24025,7 +24231,13 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>ryll</strong> (Status): tools/review-tracking.sh differs from templates/review-tracking/review-tracking.sh. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
+<li><strong>actions</strong> (Status): tools/ci-prune-reviews.sh differs from templates/review-tracking/ci-prune-reviews.sh. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
+<li><strong>andris</strong> (Status): tools/ci-prune-reviews.sh differs from templates/review-tracking/ci-prune-reviews.sh. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
+<li><strong>hunkydory</strong> (Status): tools/ci-prune-reviews.sh differs from templates/review-tracking/ci-prune-reviews.sh. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
+<li><strong>kerbside</strong> (Status): tools/ci-prune-reviews.sh differs from templates/review-tracking/ci-prune-reviews.sh. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
+<li><strong>kerbside-client</strong> (Status): tools/ci-prune-reviews.sh differs from templates/review-tracking/ci-prune-reviews.sh. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
+<li><strong>ryll</strong> (Status): tools/ci-prune-reviews.sh differs from templates/review-tracking/ci-prune-reviews.sh. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
+<li><strong>sfui</strong> (Status): tools/ci-prune-reviews.sh differs from templates/review-tracking/ci-prune-reviews.sh. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
 </ul>
 <h2 id="rust-unwrap-lint">rust-unwrap-lint<a class="headerlink" href="#rust-unwrap-lint" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/rust-unwrap-lint/">rust-unwrap-lint.md</a></p>
@@ -24212,8 +24424,8 @@ does.</p>
 </tr>
 <tr>
 <td>cloudgood</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/cloudgood/issues/12" title="GitHub Issue: shakenfist/cloudgood #12">cloudgood#12</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>development</td>
@@ -24237,8 +24449,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/831" title="GitHub Issue: shakenfist/instar #831">instar#831</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -24297,11 +24509,6 @@ does.</p>
 </tr>
 </tbody>
 </table>
-<p>Details for non-compliant projects:</p>
-<ul>
-<li><strong>cloudgood</strong> (Status): 1 workflow(s) that fire unattended have failed on main at least 3 times and never once succeeded, so whatever they are meant to do has never happened. The usual cause is an installation that was not finished -- a missing secret, or an organisation secret not granted to this repository -- and the reason is in the log of the linked run</li>
-<li><strong>instar</strong> (Status): 1 workflow(s) that fire unattended have failed on develop at least 3 times and never once succeeded, so whatever they are meant to do has never happened. The usual cause is an installation that was not finished -- a missing secret, or an organisation secret not granted to this repository -- and the reason is in the log of the linked run</li>
-</ul>
 <h2 id="scope-coverage">scope-coverage<a class="headerlink" href="#scope-coverage" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/scope-coverage/">scope-coverage.md</a></p>
 <table>
@@ -24816,7 +25023,7 @@ does.</p>
 <tr>
 <td>ryll</td>
 <td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/620" title="GitHub Issue: shakenfist/ryll #620">ryll#620</a></td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/661" title="GitHub Issue: shakenfist/ryll #661">ryll#661</a></td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -24842,9 +25049,9 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>kerbside</strong> (Status): kerbside/api/static/sfui: 4 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
-<li><strong>private-ci</strong> (Status): conductor/static/sfui: 9 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
-<li><strong>ryll</strong> (Status): ryll/src/web/assets/sfui: 22 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
+<li><strong>kerbside</strong> (Status): kerbside/api/static/sfui: 19 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
+<li><strong>private-ci</strong> (Status): conductor/static/sfui: 24 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
+<li><strong>ryll</strong> (Status): ryll/src/web/assets/sfui: 19 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
 </ul>
 <h2 id="undeclared-direct-dependency">undeclared-direct-dependency<a class="headerlink" href="#undeclared-direct-dependency" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/undeclared-direct-dependency/">undeclared-direct-dependency.md</a></p>
@@ -24924,8 +25131,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/649" title="GitHub Issue: shakenfist/kerbside #649">kerbside#649</a></td>
 </tr>
 <tr>
 <td>kerbside-client</td>
@@ -24979,6 +25186,10 @@ does.</p>
 </tr>
 </tbody>
 </table>
+<p>Details for non-compliant projects:</p>
+<ul>
+<li><strong>kerbside</strong> (Status): Imported but declared only as a transitive pin: Jinja2 (pyproject.toml:122). Declare each above the # START_OF_INDIRECT_DEPS marker; the reconciler drops the generated copy on its next run</li>
+</ul>
 <h2 id="unused-declared-dependency">unused-declared-dependency<a class="headerlink" href="#unused-declared-dependency" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/unused-declared-dependency/">unused-declared-dependency.md</a></p>
 <table>
@@ -25311,8 +25522,8 @@ does.</p>
 <td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
-<td>N/A</td>
-<td>N/A</td>
+<td>compliant</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -25549,9 +25760,9 @@ does.</p>
 <td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
-<td>non-compliant</td>
+<td>compliant</td>
 <td>N/A</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/635" title="GitHub Issue: shakenfist/ryll #635">ryll#635</a></td>
+<td>-</td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -25613,11 +25824,10 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>client-python</strong> (VM size): 3 "vm" runner job(s) naming no size: code-formatting.yml:19 (self-hosted, vm), functional-tests.yml:95 (self-hosted, vm), supply-chain.yml:81 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl; m-bigdisk/xl-bigdisk when the job needs the disk; s-cloud/s-cluster when it builds a nested cloud or cluster); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
-<li><strong>clingwrap</strong> (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:29 (self-hosted, vm, debian-13). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl; m-bigdisk/xl-bigdisk when the job needs the disk; s-cloud/s-cluster when it builds a nested cloud or cluster); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
+<li><strong>client-python</strong> (VM size): 3 "vm" runner job(s) naming no size: code-formatting.yml:19 (self-hosted, vm), functional-tests.yml:102 (self-hosted, vm), supply-chain.yml:81 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl; m-bigdisk/xl-bigdisk when the job needs the disk; s-cloud/s-cluster when it builds a nested cloud or cluster); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
+<li><strong>clingwrap</strong> (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:31 (self-hosted, vm, debian-13). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl; m-bigdisk/xl-bigdisk when the job needs the disk; s-cloud/s-cluster when it builds a nested cloud or cluster); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
 <li><strong>kerbside-client</strong> (flake8wrap): Missing shellcheck disable=SC2086 directive</li>
 <li><strong>kerbside-client</strong> (Linting): Missing .pre-commit-config.yaml</li>
-<li><strong>ryll</strong> (Review scope): A pull request changing only .vscode/review-scope.toml skips the automated reviewer: ci.yml (its paths-filter excludes it). The scope config decides what is reviewed at all, so it is not review state; filter only REVIEWS.md, .vscode/<em>.weaudit and .vscode/</em>.weaudit-shas.json</li>
 <li><strong>uncalibrated-sextant</strong> (Runners): 1 unmarked GitHub-hosted runner reference(s): pre-commit.yml:10 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment</li>
 <li><strong>uncalibrated-sextant</strong> (Permissions): 1 workflow(s) missing top-level permissions: pre-commit.yml</li>
 </ul>

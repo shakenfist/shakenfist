@@ -16,7 +16,7 @@
         <link rel="prev" href="../openstack/">
       
       
-        <link rel="next" href="../multi-cloud/">
+        <link rel="next" href="../proxmox/">
       
       
         
@@ -9647,6 +9647,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-proxmox-source-phase-06-use-case-page/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -11282,6 +11310,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../proxmox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox VE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -17005,7 +17061,8 @@ integrated broker today, so the options are:</p>
 </ul>
 <h2 id="status-and-limitations">Status and limitations<a class="headerlink" href="#status-and-limitations" title="Permanent link">&para;</a></h2>
 <p>Kerbside is experimental overall; the oVirt source specifically
-is exercised end to end on every merge-queue entry, which covers
+is exercised end to end by the nightly-tier <code>ovirt_matrix</code> lane,
+and on demand through <code>workflow_dispatch</code>, which covers
 discovery against a live engine, the CA equality check, ticket
 acquisition, the TLS escalation with subject pinning, a real
 relayed SPICE session, and API-driven termination.</p>
@@ -17058,7 +17115,8 @@ relayed SPICE session, and API-driven termination.</p>
   firewall, the connection state machine, and the relay</li>
 <li><a href="/components/kerbside/testing/">Testing</a> — the CI lanes, including the oVirt
   end-to-end lane described above</li>
-<li><a href="/components/kerbside/use-cases/shakenfist/">Kerbside for Shaken Fist</a>,
+<li><a href="/components/kerbside/use-cases/proxmox/">Kerbside for Proxmox VE</a>,
+  <a href="/components/kerbside/use-cases/shakenfist/">Kerbside for Shaken Fist</a>,
   <a href="/components/kerbside/use-cases/openstack/">Kerbside for OpenStack</a> and
   <a href="/components/kerbside/use-cases/standalone/">Kerbside standalone</a> — the sibling
   deployment guides</li>

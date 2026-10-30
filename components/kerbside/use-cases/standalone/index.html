@@ -9647,6 +9647,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-proxmox-source-phase-06-use-case-page/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -11274,6 +11302,34 @@
     
   
     oVirt
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../proxmox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox VE
   
 
     
@@ -16728,13 +16784,14 @@ driver reads a fixed list of targets from <code>sources.yaml</code> and
 fronts them with the same audited, firewalled proxy the cloud
 deployments get.</p>
 <h2 id="value-proposition">Value proposition<a class="headerlink" href="#value-proposition" title="Permanent link">&para;</a></h2>
-<p>The <a href="/components/kerbside/use-cases/shakenfist/">Shaken Fist</a>, <a href="/components/kerbside/use-cases/openstack/">OpenStack</a> and
-<a href="/components/kerbside/use-cases/ovirt/">oVirt</a> console sources put Kerbside in front of a platform that
-already knows where its consoles are. Here there is none — a lab
-bench, a CI job, a rack of appliance VMs no API will ever
-enumerate — and the <code>static</code> driver is how you get the proxy's
-session model, its audit trail and its SPICE firewall without
-standing anything else up first.</p>
+<p>The <a href="/components/kerbside/use-cases/shakenfist/">Shaken Fist</a>, <a href="/components/kerbside/use-cases/openstack/">OpenStack</a>,
+<a href="/components/kerbside/use-cases/ovirt/">oVirt</a> and <a href="/components/kerbside/use-cases/proxmox/">Proxmox VE</a> console sources
+put Kerbside in front of a platform that already knows where its
+consoles are. Here there is none — a lab bench, a CI job, a
+rack of appliance VMs no API will ever enumerate — and the
+<code>static</code> driver is how you get the proxy's session model, its
+audit trail and its SPICE firewall without standing anything
+else up first.</p>
 <ul>
 <li><strong>There is nothing to stand up and nothing to authenticate
   to.</strong> The driver makes no external call at all. There is no
@@ -16766,11 +16823,11 @@ standing anything else up first.</p>
   a bench qemu as in front of a cloud, because qemu itself
   offers none of it.</li>
 <li><strong>It composes with the clouds.</strong> A static entry sits in the
-  same file as oVirt, Shaken Fist and OpenStack entries, which
-  is how a target no platform knows about — an appliance, a bare
-  qemu, something mid-migration — joins the same console list as
-  everything else. One thing comes with that; see
-  <a href="#user-interaction-model">User interaction model</a>.</li>
+  same file as oVirt, Proxmox VE, Shaken Fist and OpenStack
+  entries, which is how a target no platform knows about — an
+  appliance, a bare qemu, something mid-migration — joins the
+  same console list as everything else. One thing comes with
+  that; see <a href="#user-interaction-model">User interaction model</a>.</li>
 </ul>
 <p>In return, users get the SPICE features a serial console or an HTML5
 wrapper cannot offer: high-resolution and multi-monitor
@@ -17028,6 +17085,7 @@ termination.</p>
 <li><a href="/components/kerbside/direct-qemu-harness/">The direct-qemu harness</a> — the
   daemon-less local harness for driving the proxy against qemu</li>
 <li><a href="/components/kerbside/use-cases/ovirt/">Kerbside for oVirt</a>,
+  <a href="/components/kerbside/use-cases/proxmox/">Kerbside for Proxmox VE</a>,
   <a href="/components/kerbside/use-cases/shakenfist/">Kerbside for Shaken Fist</a> and
   <a href="/components/kerbside/use-cases/openstack/">Kerbside for OpenStack</a> — the sibling
   deployment guides</li>

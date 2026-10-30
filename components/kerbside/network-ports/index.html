@@ -9766,6 +9766,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source-phase-06-use-case-page/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -11228,6 +11256,34 @@
     
   
     oVirt
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../use-cases/proxmox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox VE
   
 
     
@@ -16741,7 +16797,7 @@ Kerbside's <code>VDI_*_PORT</code> values out of the range in that case.</p>
 <tr>
 <td>Hypervisor SPICE, <strong>plaintext and TLS</strong> ports, per console</td>
 <td>Rust proxy</td>
-<td>The backend leg. The proxy dials the plaintext port first and escalates to TLS only when the hypervisor answers <code>NEED_SECURED</code> and the console has a TLS port (<code>rust/kerbside-proxy/src/backend.rs</code>). So both ports must be reachable, and a hypervisor that accepts plaintext is relayed in plaintext. A console that carries a tunnel is the exception: the proxy dials only the HTTP CONNECT proxy it names, over TLS.</td>
+<td>The backend leg. The proxy dials the plaintext port first and escalates to TLS only when the hypervisor answers <code>NEED_SECURED</code> and the console has a TLS port (<code>rust/kerbside-proxy/src/backend.rs</code>). So both ports must be reachable, and a hypervisor that accepts plaintext is relayed in plaintext. A console that carries a tunnel is the exception: the proxy dials only the HTTP CONNECT proxy it names, sends a plaintext CONNECT to it, and runs a TLS-only SPICE session inside the tunnel.</td>
 </tr>
 <tr>
 <td>MariaDB/MySQL (<code>SQL_URL</code>, usually 3306)</td>

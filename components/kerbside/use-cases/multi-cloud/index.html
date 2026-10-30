@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/kerbside/use-cases/multi-cloud/">
       
       
-        <link rel="prev" href="../ovirt/">
+        <link rel="prev" href="../proxmox/">
       
       
         <link rel="next" href="../placement/">
@@ -9647,6 +9647,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-proxmox-source-phase-06-use-case-page/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -11111,6 +11139,34 @@
     
   
     oVirt
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../proxmox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox VE
   
 
     
@@ -16670,9 +16726,9 @@ Kerbside treats the second entry differently from the first. The
 maintenance pass walks the entries in file order and the entry's
 type decides how its consoles arrive:</p>
 <ul>
-<li><strong>Scraped sources</strong> — <code>shakenfist</code>, <code>ovirt</code> and <code>static</code> —
-  are enumerated by the pass, which constructs the driver for
-  each entry's type and records what it yields.</li>
+<li><strong>Scraped sources</strong> — <code>shakenfist</code>, <code>ovirt</code>, <code>proxmox</code> and
+  <code>static</code> — are enumerated by the pass, which constructs the
+  driver for each entry's type and records what it yields.</li>
 <li><strong>OpenStack is not scraped at all.</strong> The pass skips an entry
   of that type outright. Those consoles are recorded when a user
   presents a Nova token, not in advance.</li>
@@ -16743,11 +16799,11 @@ survive a migration.</p>
 first place. Each sibling page describes its own path: Shaken
 Fist's own broker mints a token and returns the file in one
 call, Nova hands the user a URL at Kerbside carrying a token to
-exchange, and oVirt and standalone deployments have no
-integrated broker at all. A Kerbside fronting all three fronts
-all three paths; it does not merge them. Kerbside's own web UI
-and REST API are the one place that does show the whole estate,
-and interactive login to them is Keystone-only today
+exchange, and oVirt, Proxmox VE and standalone deployments
+have no integrated broker at all. A Kerbside fronting all three
+fronts all three paths; it does not merge them. Kerbside's own
+web UI and REST API are the one place that does show the whole
+estate, and interactive login to them is Keystone-only today
 (<a href="https://github.com/shakenfist/kerbside/issues/300">#300</a>),
 which an estate with no OpenStack in it has nothing to point
 at. See the limitations table.</p>
@@ -16768,7 +16824,7 @@ lanes the sibling pages describe.</p>
 <tbody>
 <tr>
 <td>Nothing in CI runs two sources at once</td>
-<td>Each lane writes a single-source <code>sources.yaml</code> and says so itself: <code>tools/ovirt-e2e/gen-sources.py</code> emits "exactly one <code>type: ovirt</code> source", <code>tools/sf-e2e/deploy-kerbside.sh</code> writes "sources.yaml with one type: shakenfist source", and the heredoc in <code>tools/direct-qemu/lane-up.sh</code> declares one static entry. Aggregation itself is therefore untested end to end: every property on this page is read out of code which is only ever exercised one source at a time.</td>
+<td>Each lane writes a single-source <code>sources.yaml</code> and says so itself: <code>tools/ovirt-e2e/gen-sources.py</code> emits "exactly one <code>type: ovirt</code> source", <code>tools/proxmox-e2e/gen-sources.py</code> emits "exactly one <code>type: proxmox</code> source", <code>tools/sf-e2e/deploy-kerbside.sh</code> writes "sources.yaml with one type: shakenfist source", and the heredoc in <code>tools/direct-qemu/lane-up.sh</code> declares one static entry. Aggregation itself is therefore untested end to end: every property on this page is read out of code which is only ever exercised one source at a time.</td>
 </tr>
 <tr>
 <td>Configured OpenStack clouds share a trust domain</td>
@@ -16801,9 +16857,10 @@ lanes the sibling pages describe.</p>
 <li><a href="/components/kerbside/testing/">Testing</a> — the CI lanes, each of which runs
   exactly one source</li>
 <li><a href="/components/kerbside/use-cases/ovirt/">Kerbside for oVirt</a>,
+  <a href="/components/kerbside/use-cases/proxmox/">Kerbside for Proxmox VE</a>,
   <a href="/components/kerbside/use-cases/shakenfist/">Kerbside for Shaken Fist</a>,
   <a href="/components/kerbside/use-cases/openstack/">Kerbside for OpenStack</a> and
-  <a href="/components/kerbside/use-cases/standalone/">Kerbside standalone</a> — the four source pages
+  <a href="/components/kerbside/use-cases/standalone/">Kerbside standalone</a> — the five source pages
   this one puts behind a single proxy</li>
 </ul>
 
