@@ -360,8 +360,8 @@ table entirely (decision D8).
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started | — |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
-| 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654) |
-| 7b. Capacity and claim views in sf-client | `PLAN-scheduler-reservations-phase-07b-client-views.md` (in shakenfist/client-python, branch `scheduler-reservations-phase-07b-client-views`; a relative link cannot cross repositories, so it is named rather than linked) | Not started | — |
+| 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
+| 7b. Capacity and claim views in sf-client | `PLAN-scheduler-reservations-phase-07b-client-views.md` (in shakenfist/client-python on its `develop`; a relative link cannot cross repositories, so it is named rather than linked) | Complete | client-python `d484fdc` (#442) |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started | — |
 | 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started | — |
 
@@ -625,6 +625,25 @@ is here.
     stub). The Execution notes in the phase plan record the two
     gate decisions: an absolute `metrics_timestamp`, and the reason
     strings as a closed set.
+
+- **Phase 7b** merged as client-python#442 on 2026-10-28. Its plan,
+  its push audit and its outcome live in that repository, at
+  `docs/plans/PLAN-scheduler-reservations-phase-07b-client-views.md`.
+  - **What it adds:** `sf-client node capacity [NODE]` with the three
+    ledgers side by side, the binding marker, the not-reported list
+    (and, against a 7a server, each node's exclusion reason and the
+    cluster claims ledger), `namespace events`, `namespace claim
+    events`, `namespace claim list --all` with `--coverage`,
+    `peak_used_*` on `claim show`, daemon states on `node show`, a
+    working `node resources`, and `docs/cluster-capacity.md` and
+    `docs/namespace-claims.md` in client-python.
+  - **Carried 7a's deferred step 8** as its step 6, so the capacity
+    surface 7a published has a reader. Nothing from either phase is
+    left unread.
+  - **Deferred, and recorded in its Future work:**
+    `IncapableException` in `GroupCatchExceptions`, a per-node
+    `/admin/resources` form, and an sfui capacity view. No release was
+    cut (4b's D7); phase 8 cuts one.
 
 ### Phase scope stubs
 
