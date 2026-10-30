@@ -52,6 +52,12 @@
 
 set -uo pipefail
 
+# stestr runs below use the tox venv's python directly, so tox.ini's
+# setenv does not apply and shakenfist_utilities.logs.setup() would
+# default to SysLogHandler -- spraying every mutated run's logging into
+# the developer's syslog (issue #4725 was the CI flavour of this).
+export SHAKENFIST_LOG_TO_STDOUT=1
+
 PYTHON=".tox/py3/bin/python"
 BASE="shakenfist/external_api/base.py"
 VALIDATION="shakenfist/external_api/validation.py"
