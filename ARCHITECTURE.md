@@ -204,7 +204,7 @@ bottom of it, and how to diagnose a placement decision from audit events.
 Atomic reservation-table scheduling is being built per
 [`docs/plans/PLAN-scheduler-reservations.md`](docs/plans/PLAN-scheduler-reservations.md);
 the capacity tables and their reconciler are described under
-[Cluster Operation Storage and Work Queues](docs/developer_guide/database_internals.md#cluster-operation-storage-and-work-queues).
+[Guarded counters for finite resources](docs/developer_guide/database_internals.md#guarded-counters-for-finite-resources).
 Placement admission consumes those tables, and per-namespace capacity
 claims exist but their ceilings are advisory this release. Enforcing
 those ceilings and moving more pre-filter logic into SQL is still to

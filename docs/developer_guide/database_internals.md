@@ -182,6 +182,137 @@ the `filters=` argument and execute after the indexed scan.
 See [`database.md`](../operator_guide/database.md) — "SQL Filter Pushdown" — for
 per-API guidance and a code example.
 
+## Guarded counters for finite resources
+
+This is the pattern for a shared pool of a finite resource which many
+concurrent writers draw down against an aggregate limit, written for a
+developer about to add a second such claim (per-session floating IPs
+are the obvious next one). The scheduler is the worked instance: its
+[capacity notes](subsystem_internals.md#scheduler-and-node-capacity-metrics)
+and [the claim admission transaction](subsystem_internals.md#the-claim-admission-transaction)
+say how the pattern was built there. This section says what to copy.
+
+### When it applies
+
+Use it when the limit is on a *sum*: the units are interchangeable,
+and the question is how many are left. If each unit is a distinct,
+nameable thing which at most one owner may hold, a simpler tool fits.
+VXLAN ids are a `UNIQUE` constraint (`uq_networks_vxid` on
+`networks.vxid`), so a failed insert is the refusal. IPAM keeps one
+`ipam_reservations` row per address, keyed by the IPAM and the address,
+with its own reserve and release path. Neither needs a counter, and
+neither should grow one.
+
+### The three parts
+
+- **A materialised counter row per pool**, carrying `used_*` beside
+  `limit_*` for every dimension. The row is the ledger; nothing
+  re-derives usage at decision time.
+- **Admission as one guarded `UPDATE`**:
+  `UPDATE pool SET used = used + :x WHERE key = :k AND used + :x <= limit`.
+  A second writer blocks on the row lock and then re-evaluates the
+  `WHERE` against the first writer's result, so the row count *is* the
+  answer: one row matched is a grant, none is a refusal, and there is
+  no window between checking and taking. The mysqldb dialect sets
+  `CLIENT_FOUND_ROWS`, so the count is rows matched rather than changed,
+  which is what lets a zero-sized request read as a grant. Release is
+  the mirror, a decrement floored with `GREATEST(0, used - :x)`; a
+  release that had to clamp has found drift and should say so, as
+  `_floored_node_decrement()` does.
+- **A reconciler** which recomputes every counter from ground truth on
+  a cadence, and is the only writer which *creates* a pool's row. An
+  absent row therefore means "not reconciled yet", and the guard must
+  choose, explicitly and per pool, whether that refuses or admits
+  unguarded. It must never be read as a row of zeroes. The scheduler
+  makes both choices: a placement onto a node with no row admits
+  unguarded and records why (`node_not_sized` or `never_reconciled`),
+  because a refusal would cite limits the node never contributed to
+  the totals and the next pass sizes it; creating a namespace
+  claim with no `cluster_capacity` row refuses, because it would be a
+  promise against totals nothing has computed. (A claim row is not a
+  pool row: the operator's request creates it, and that request is
+  itself a guarded admission against the pool.)
+
+### The rules
+
+- **The guarded `UPDATE` is the transaction's first statement.** Any
+  probe the decision needs runs on its own connection before the
+  transaction opens. Why is in
+  [standards.md](standards.md#a-guarded-update-must-be-the-transactions-first-statement).
+- **No per-decision reservation rows.** The placed object is the record
+  of the drawdown -- for the scheduler, the instance's `instance_location`
+  reference rows, which are what release credits back and what the
+  reconciler recomputes usage from. A row per decision is a second
+  record that can disagree with the first, a release which dies leaks
+  it, and something then has to reap it.
+- **Several rows: one canonical order, one RPC, retried whole.** An
+  admission touching more than one pool updates them in one
+  transaction, in an order every writer of those tables shares, so
+  concurrent writers queue rather than deadlock; two rows of one table
+  go in key order. The transaction runs inside a single `sf-database`
+  RPC rather than being composed from single-table calls, and is
+  retried as a whole by `_retry_transaction()` on MariaDB 1213
+  (deadlock), 1205 (lock wait timeout) and 1020 (ER_CHECKREAD), the
+  set `_TRANSIENT_TRANSACTION_ERRNOS` names; anything else is a real
+  error. Do not widen `_retry_on_deadlock()` instead: its cluster-lock
+  callers treat a 1205 as a lease genuinely not taken.
+- **Never guard with an aggregate.** A conditional `INSERT ... SELECT`,
+  or a `SUM()` over rows locked `FOR UPDATE`, is the obvious first
+  design and is wrong. The design benchmark
+  ([`PLAN-scheduler-reservations-phase-00-findings.md`](../plans/PLAN-scheduler-reservations-phase-00-findings.md#step-2-benchmark-results-run-2026-07-30))
+  found both silently overshoot under READ COMMITTED (`INSERT ...
+  SELECT` committed twice the limit) and livelock under REPEATABLE
+  READ (thousands of deadlocks for a handful of grants), while the
+  guarded single-row `UPDATE` was correct, deadlock-free and fastest
+  in every cell. A scalar subquery reading one row from inside the
+  guarded `UPDATE` is not an aggregate guard.
+- **Counters are allocation ledgers, not measurements.** `used_*`
+  counts what was granted, so a powered-off instance keeps its
+  reservation though no measurement sees it. An admission which must
+  also compare against a measurement reads it inside the same
+  transaction, as a subquery in the guarded `UPDATE`'s `WHERE` (which
+  is how `_demand_guard_clause()` reads `node_metrics`), and never
+  substitutes one for the other.
+- **Admission and release do the drawdown; the reconciler heals drift.**
+  The hot path keeps the counters current; the reconciler recomputes
+  them wholesale and overwrites what it finds. A difference between
+  the two is drift, corrected on the next pass. Do not make the
+  reconciler the only writer: a counter as stale as its cadence guards
+  nothing. An admission committed during a pass may be overwritten by
+  it and is reinstated by the next, which sees its placement.
+
+### Reading the counters
+
+A read returns the counters with two flags kept apart: whether the row
+exists, and whether the read itself failed. "Not reconciled yet" and
+"could not read" are different statements, and neither is a pool of
+zeroes, which would report the pool as full. `SchedulerNodeCapacityRead`
+and `ClusterCapacityRead` in `shakenfist/mariadb.py` are tuples carrying
+`degraded` so a caller has to unpack it, the gRPC replies forward the
+database daemon's own failure in their `degraded` field, and
+`/admin/resources` publishes the singleton as `row_present` and
+`degraded` with every figure `null` when either says so (see
+[the cluster-wide ledger](../operator_guide/scheduler.md#the-cluster-wide-ledger-in-the-resources-response)).
+
+### The scheduler's instance
+
+Three tables: `scheduler_node_capacity` (a row per schedulable
+hypervisor), `namespace_claims` (a row per claim) and `cluster_capacity`
+(a singleton of totals, claimed and unclaimed-used counters). Their
+canonical order is `cluster_capacity`, then `namespace_claims`, then
+`scheduler_node_capacity`. Admission and release are the
+`AdmitInstancePlacement` and `ReleaseInstancePlacement` RPCs
+(`_direct_admit_instance_placement()`,
+`_direct_release_instance_placement()`), the claim CRUD RPCs are a
+third writer guarded by `_claim_capacity_guard()`, and the reconciler is
+the `ReconcileSchedulerCapacity` RPC behind
+`reconcile_scheduler_capacity()`, which the elected cluster node runs
+every five minutes and which is described under
+[Cluster Operation Storage and Work Queues](#cluster-operation-storage-and-work-queues).
+Copy its tests too: the `test_mariadb_capacity_*_live` modules run the
+transactions against a real MariaDB, the only place concurrency and
+snapshot-isolation defects show.
+
 ## gRPC Reliability
 
 All gRPC calls use `timeout=30` seconds. The `_grpc_call()` helper in
