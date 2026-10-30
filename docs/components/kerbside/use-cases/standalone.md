@@ -10,13 +10,14 @@ deployments get.
 
 ## Value proposition
 
-The [Shaken Fist](/components/kerbside/use-cases/shakenfist/), [OpenStack](/components/kerbside/use-cases/openstack/) and
-[oVirt](/components/kerbside/use-cases/ovirt/) console sources put Kerbside in front of a platform that
-already knows where its consoles are. Here there is none — a lab
-bench, a CI job, a rack of appliance VMs no API will ever
-enumerate — and the `static` driver is how you get the proxy's
-session model, its audit trail and its SPICE firewall without
-standing anything else up first.
+The [Shaken Fist](/components/kerbside/use-cases/shakenfist/), [OpenStack](/components/kerbside/use-cases/openstack/),
+[oVirt](/components/kerbside/use-cases/ovirt/) and [Proxmox VE](/components/kerbside/use-cases/proxmox/) console sources
+put Kerbside in front of a platform that already knows where its
+consoles are. Here there is none — a lab bench, a CI job, a
+rack of appliance VMs no API will ever enumerate — and the
+`static` driver is how you get the proxy's session model, its
+audit trail and its SPICE firewall without standing anything
+else up first.
 
 - **There is nothing to stand up and nothing to authenticate
   to.** The driver makes no external call at all. There is no
@@ -48,11 +49,11 @@ standing anything else up first.
   a bench qemu as in front of a cloud, because qemu itself
   offers none of it.
 - **It composes with the clouds.** A static entry sits in the
-  same file as oVirt, Shaken Fist and OpenStack entries, which
-  is how a target no platform knows about — an appliance, a bare
-  qemu, something mid-migration — joins the same console list as
-  everything else. One thing comes with that; see
-  [User interaction model](#user-interaction-model).
+  same file as oVirt, Proxmox VE, Shaken Fist and OpenStack
+  entries, which is how a target no platform knows about — an
+  appliance, a bare qemu, something mid-migration — joins the
+  same console list as everything else. One thing comes with
+  that; see [User interaction model](#user-interaction-model).
 
 In return, users get the SPICE features a serial console or an HTML5
 wrapper cannot offer: high-resolution and multi-monitor
@@ -313,6 +314,7 @@ Not covered, and worth knowing before you deploy:
 - [The direct-qemu harness](/components/kerbside/direct-qemu-harness/) — the
   daemon-less local harness for driving the proxy against qemu
 - [Kerbside for oVirt](/components/kerbside/use-cases/ovirt/),
+  [Kerbside for Proxmox VE](/components/kerbside/use-cases/proxmox/),
   [Kerbside for Shaken Fist](/components/kerbside/use-cases/shakenfist/) and
   [Kerbside for OpenStack](/components/kerbside/use-cases/openstack/) — the sibling
   deployment guides

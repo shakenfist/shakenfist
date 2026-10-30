@@ -382,6 +382,7 @@ nav:
                 - "Proxmox source phase 3b: tunnel transport": components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport.md
                 - "Proxmox source phase 4: the source driver": components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver.md
                 - "Proxmox source phase 5: the CI lane": components/kerbside/plans/PLAN-proxmox-source-phase-05-ci-lane.md
+                - "Proxmox source phase 6: the use-case page": components/kerbside/plans/PLAN-proxmox-source-phase-06-use-case-page.md
                 - "Proxy dev releases phase 1: the publish workflow": components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow.md
                 - "Proxy dev releases phase 2: the committed dev specifier": components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier.md
                 - "Proxy dev releases phase 3: the contract handshake": components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake.md
@@ -433,6 +434,7 @@ nav:
                 - "Shaken Fist": components/kerbside/use-cases/shakenfist.md
                 - "OpenStack": components/kerbside/use-cases/openstack.md
                 - "oVirt": components/kerbside/use-cases/ovirt.md
+                - "Proxmox VE": components/kerbside/use-cases/proxmox.md
                 - "Across several clouds": components/kerbside/use-cases/multi-cloud.md
                 - "Placement topologies": components/kerbside/use-cases/placement.md
         - Occystrap:

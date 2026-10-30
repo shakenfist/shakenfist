@@ -118,12 +118,9 @@ column names the CI lane that exercises the scenario end to end; see
 | [Shaken Fist](/components/kerbside/use-cases/shakenfist/) | Broker embedded in Shaken Fist itself; Ed25519 VDI console tokens exchanged offline at `/sf-console.vv` | `sf-e2e`, smoke tier and nightly |
 | [OpenStack](/components/kerbside/use-cases/openstack/) | Nova 2025.1 spice-direct consoles, with Kerbside as the endpoint Nova's console URL names | `openstack_matrix`, nightly tier |
 | [oVirt](/components/kerbside/use-cases/ovirt/) | Replaces oVirt's SPICE proxy (squid) with a protocol-aware front door: discovery via the engine API, TLS to the hypervisor with the engine-supplied subject pinned where the engine supplies one, and the engine, network, and account prerequisites | `ovirt_matrix`, nightly tier |
-| Proxmox | Deferred until a Proxmox source driver exists | No source yet |
+| [Proxmox VE](/components/kerbside/use-cases/proxmox/) | Puts a protocol-aware front door before Proxmox's `spiceproxy`: discovery and per-session tickets from the PVE API with a two-privilege token, and every backend connection reached only through `spiceproxy`, with the SPICE session inside the tunnel over TLS and pinned to the node's certificate subject | `proxmox-functional`, nightly tier, advisory on Proxmox-path pull requests |
 | [Multi-cloud aggregation](/components/kerbside/use-cases/multi-cloud/) | One Kerbside brokering several sources at once, so users keep a single console entry point as workloads move between providers | Not covered |
 | [Placement topologies](/components/kerbside/use-cases/placement/) | Kerbside instances placed by user population rather than by cloud — one per regional office, close to its users, with the WAN hop as the inspected backend leg | Not covered |
-
-Scenarios without a link are planned rather than written; see
-[plans/PLAN-use-case-docs.md](/components/kerbside/plans/PLAN-use-case-docs/).
 
 The `direct-qemu` lane runs the full daemon + API + MariaDB stack
 against a local qemu SPICE server via the static source, so it is the

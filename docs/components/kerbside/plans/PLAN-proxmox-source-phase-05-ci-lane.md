@@ -416,7 +416,7 @@ session runs it and sends each fix back to a sub-agent.
       nightly issue.
 - [x] `tox -epy3`, `tox -eflake8`, `pre-commit run --all-files`
       and `tools/check-backend-tls-claims.py` pass.
-- [ ] The master plan's Execution table records this phase's
+- [x] The master plan's Execution table records this phase's
       merge commit, set by the next phase's close-out.
 
 ## Bugs fixed during this work

@@ -45,10 +45,9 @@ source wants on its own terms — so that phase changes
 Out of scope: PVE's VNC consoles, PVE clustering (a
 single-node source is enough to prove the model), direct
 (unbrokered) `.vv` files for Proxmox consoles, for the reason
-given under *What the measurements settled*, and the
-Proxmox use-case documentation page, which belongs to
-PLAN-use-case-docs.md's table and stays deferred until this
-plan produces something to document.
+given under *What the measurements settled*. The Proxmox
+use-case page was first left to PLAN-use-case-docs.md's
+table; that plan closed leaving it here, as phase 6.
 
 ## Why this is not another `ovirt.py`
 
@@ -428,7 +427,7 @@ phase plan links are tracked under *Execution*.
 | 3b. Tunnel transport | `Target`/proto change (open question 3), the session token row and the minting hook carrying the tunnel, and `backend.rs` dialling it. The proxy URL, the CONNECT host and the TLS port all arrive with each mint, so they live on the session's token row beside its ticket, not on the `Console` row, whose `hypervisor` column already names the node. `build_config` (`backend.rs:202`) builds `ConnectionConfig` with `tls_port: None` and escalates to TLS only on `NEED_SECURED`, but phase 2 refuses a tunnel without a TLS port, so a tunnelled target must set `tls_port` from the start. The ryll pin already contains phase 2 |
 | 4. The source driver | `kerbside/sources/proxmox.py`: discovery over `/cluster/resources`, which names each VM's node in one call, minting over `spiceproxy`, CA and subject handling, and the direct `.vv` handler refusing Proxmox sources. Also the source's configuration reference in `console-sources.md`, since a source type is unusable without one |
 | 5. CI lane | A lane on the phase 1b action that proves an end-to-end proxied session through `spiceproxy`, with the source's token made by the documented `pveum` commands, so that it settles open question 4. Nightly, on dispatch, and advisory on pull requests that touch the Proxmox path, rather than in the smoke tier |
-| 6. Docs | The use-case page PLAN-use-case-docs.md has been holding a row for. `console-sources.md` gains its Proxmox section in phase 4 |
+| 6. Docs | `docs/use-cases/proxmox.md`, the use-case page `docs/index.md` has held a row for, linking `console-sources.md`'s Proxmox section (written in phase 4) rather than restating it, plus the sibling pages that count the source pages. The backend-TLS claims checker's description of the backend leg predates the tunnel and is corrected |
 | 7. Push audit | Work through `PUSH-AUDIT.md` over the accumulated kerbside diff of phases 3a to 6, deriving the range from the `Merged` cells with `tools/audit/plan-range.sh`. Phases that land in ryll or shakenfist/actions are audited there, not here |
 
 Phases 2 and 3a are independent and can run in parallel.
@@ -478,8 +477,8 @@ and cited from phase 2's *Outcome*.
 | 3a. Minting at connect time | [PLAN-proxmox-source-phase-03a-connect-time-minting.md](/components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting/) | Complete | 696f5aa |
 | 3b. Tunnel transport | [PLAN-proxmox-source-phase-03b-tunnel-transport.md](/components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport/) | Complete | c435ea3 |
 | 4. The source driver | [PLAN-proxmox-source-phase-04-source-driver.md](/components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/) | Complete | 6519c3b |
-| 5. CI lane | [PLAN-proxmox-source-phase-05-ci-lane.md](/components/kerbside/plans/PLAN-proxmox-source-phase-05-ci-lane/) | In progress | |
-| 6. Docs | | Not started | |
+| 5. CI lane | [PLAN-proxmox-source-phase-05-ci-lane.md](/components/kerbside/plans/PLAN-proxmox-source-phase-05-ci-lane/) | Complete | c4b4011 |
+| 6. Docs | [PLAN-proxmox-source-phase-06-use-case-page.md](/components/kerbside/plans/PLAN-proxmox-source-phase-06-use-case-page/) | In progress | |
 | 7. Push audit | | Not started | |
 
 ## Relationship to other plans
@@ -499,7 +498,7 @@ and cited from phase 2's *Outcome*.
 
 ## Status
 
-In progress. Phases 1, 1b, 2, 3a, 3b and 4 are complete.
+In progress. Phases 1, 1b, 2, 3a, 3b, 4 and 5 are complete.
 - CI can build a Proxmox VE node on demand.
 - ryll tunnels through `spiceproxy`, proven against a real node
   on every ryll pull request that touches the tunnel.
@@ -512,4 +511,4 @@ In progress. Phases 1, 1b, 2, 3a, 3b and 4 are complete.
   path, drives a proxied session through a real node's
   `spiceproxy` with the documented least-privilege token.
 
-Phase 5, the CI lane, is in progress.
+Phase 6, the use-case page, is in progress.

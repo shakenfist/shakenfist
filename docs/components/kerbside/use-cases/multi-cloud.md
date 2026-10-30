@@ -53,9 +53,9 @@ Kerbside treats the second entry differently from the first. The
 maintenance pass walks the entries in file order and the entry's
 type decides how its consoles arrive:
 
-- **Scraped sources** — `shakenfist`, `ovirt` and `static` —
-  are enumerated by the pass, which constructs the driver for
-  each entry's type and records what it yields.
+- **Scraped sources** — `shakenfist`, `ovirt`, `proxmox` and
+  `static` — are enumerated by the pass, which constructs the
+  driver for each entry's type and records what it yields.
 - **OpenStack is not scraped at all.** The pass skips an entry
   of that type outright. Those consoles are recorded when a user
   presents a Nova token, not in advance.
@@ -137,11 +137,11 @@ What does not aggregate is how a user reaches a broker in the
 first place. Each sibling page describes its own path: Shaken
 Fist's own broker mints a token and returns the file in one
 call, Nova hands the user a URL at Kerbside carrying a token to
-exchange, and oVirt and standalone deployments have no
-integrated broker at all. A Kerbside fronting all three fronts
-all three paths; it does not merge them. Kerbside's own web UI
-and REST API are the one place that does show the whole estate,
-and interactive login to them is Keystone-only today
+exchange, and oVirt, Proxmox VE and standalone deployments
+have no integrated broker at all. A Kerbside fronting all three
+fronts all three paths; it does not merge them. Kerbside's own
+web UI and REST API are the one place that does show the whole
+estate, and interactive login to them is Keystone-only today
 ([#300](https://github.com/shakenfist/kerbside/issues/300)),
 which an estate with no OpenStack in it has nothing to point
 at. See the limitations table.
@@ -158,7 +158,7 @@ Not covered, and worth knowing before you deploy:
 
 | Limitation | Detail |
 |------------|--------|
-| Nothing in CI runs two sources at once | Each lane writes a single-source `sources.yaml` and says so itself: `tools/ovirt-e2e/gen-sources.py` emits "exactly one ``type: ovirt`` source", `tools/sf-e2e/deploy-kerbside.sh` writes "sources.yaml with one type: shakenfist source", and the heredoc in `tools/direct-qemu/lane-up.sh` declares one static entry. Aggregation itself is therefore untested end to end: every property on this page is read out of code which is only ever exercised one source at a time. |
+| Nothing in CI runs two sources at once | Each lane writes a single-source `sources.yaml` and says so itself: `tools/ovirt-e2e/gen-sources.py` emits "exactly one ``type: ovirt`` source", `tools/proxmox-e2e/gen-sources.py` emits "exactly one ``type: proxmox`` source", `tools/sf-e2e/deploy-kerbside.sh` writes "sources.yaml with one type: shakenfist source", and the heredoc in `tools/direct-qemu/lane-up.sh` declares one static entry. Aggregation itself is therefore untested end to end: every property on this page is read out of code which is only ever exercised one source at a time. |
 | Configured OpenStack clouds share a trust domain | A presented token is offered to each OpenStack entry in turn until one accepts it, so every configured cloud is asked to validate tokens minted by the others, and any of them can claim a token it recognises. Nothing scopes the exchange to one cloud. This suits several clouds under one operator; it is not a boundary between clouds in separate trust domains. |
 | One broken cloud degrades the others | Only a clean "not mine" moves the exchange on to the next cloud: a `NotFoundException` or an empty validation result. Every other failure ends the whole request rather than stepping over that cloud — an SSL failure talking to its Keystone returns a 500 immediately, and anything else, such as bad credentials or an unreachable Keystone, is caught by the enclosing handler and returns a 500 too. Either way the clouds after it in the file are never asked, and their users cannot get a console either. |
 | Discovery is serial across the sources | The maintenance pass walks the configured sources in file order and does each one's discovery inline, with nothing running two sources concurrently. A platform which is slow to answer therefore delays every source after it in the file, and stretches the cycle for all of them. No lane has ever had two sources to run, so the behaviour at a fleet's worth of them is uncharacterised. |
@@ -177,7 +177,8 @@ Not covered, and worth knowing before you deploy:
 - [Testing](/components/kerbside/testing/) — the CI lanes, each of which runs
   exactly one source
 - [Kerbside for oVirt](/components/kerbside/use-cases/ovirt/),
+  [Kerbside for Proxmox VE](/components/kerbside/use-cases/proxmox/),
   [Kerbside for Shaken Fist](/components/kerbside/use-cases/shakenfist/),
   [Kerbside for OpenStack](/components/kerbside/use-cases/openstack/) and
-  [Kerbside standalone](/components/kerbside/use-cases/standalone/) — the four source pages
+  [Kerbside standalone](/components/kerbside/use-cases/standalone/) — the five source pages
   this one puts behind a single proxy
