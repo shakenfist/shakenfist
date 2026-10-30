@@ -17275,7 +17275,12 @@
   the range in that file. Its own variables are documented in
   <a href="https://github.com/shakenfist/kerbside/tree/develop/ansible">Kerbside's collection README</a>.
   <code>kerbside_url</code> and <code>kerbside_system_key</code> must be visible to both the Shaken
-  Fist and the Kerbside hosts, for example in <code>group_vars/all</code>. Kerbside needs
+  Fist and the Kerbside hosts, for example in <code>group_vars/all</code>. The deploy
+  now refuses, before it changes any host, a <code>kerbside_url</code> which ends in <code>/</code>
+  or which Shaken Fist's nodes see differently: either makes Kerbside refuse
+  every console token. Removing a trailing slash from an existing inventory
+  changes nothing at runtime, since <code>sf-api</code> already stripped it before
+  minting a token's audience. Kerbside needs
   a MySQL or MariaDB database you create beforehand (a <code>kerbside</code> database and
   a user with all privileges on it); the deploy runs its migrations. The
   optional <code>kerbside_extra_sources</code> adds console sources for other clusters or
