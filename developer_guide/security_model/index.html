@@ -16806,7 +16806,12 @@ declared-field test comes first deliberately: <code>AUTH_SECRET_SEED</code> matc
 secret pattern via <code>_SEED$</code> but is a declared field and must keep being
 exported, so a plain "never export a secret" rule would break authentication
 cluster-wide. <code>KERBSIDE_JWT_SIGNING_KEY</code> is withheld because it matches via
-<code>_KEY$</code> and is not declared.</p>
+<code>_KEY$</code> and is not declared. Both tests are case-insensitive, matching the
+case-insensitivity with which pydantic-settings reads the environment: a
+lowercase <code>auth_secret_seed</code> row is live configuration and keeps being
+exported, and a lowercase <code>kerbside_jwt_signing_key</code> row is withheld just as
+its uppercase twin is (<a href="https://github.com/shakenfist/shakenfist/issues/4702">issue
+4702</a>).</p>
 <p>That keeps the private key out of every process's environment, and out of
 the privexec children which inherit it. Single-key readers use the keyed
 <code>mariadb.get_cluster_config_value()</code> / <code>GetClusterConfig(key_name=...)</code>
