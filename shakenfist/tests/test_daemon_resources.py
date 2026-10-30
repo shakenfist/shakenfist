@@ -693,6 +693,27 @@ class RunInnerCadenceTestCase(base.ShakenFistTestCase):
         mock_upsert, _ = self._drive([{17, 18}] * 4, iterations=4)
         self.assertEqual(2, mock_upsert.call_count)
 
+    def test_a_tick_which_does_not_poll_keeps_the_last_domain_set(self):
+        # In production idle() advances one second against a five second
+        # poll interval, so four ticks in five poll nothing. Those ticks
+        # must leave last_domains alone: if a tick without a poll reset
+        # it, the next poll would compare a real set against nothing,
+        # read that as a change, and publish -- fifteen database round
+        # trips every five seconds on every node for the life of the
+        # cluster, which is the load the publish-on-change design exists
+        # to avoid. The other tests here drive the loop at clock_step=5,
+        # so every iteration polls and that branch is never taken; this
+        # one paces at one second so that it is (issue 4475).
+        mock_upsert, _ = self._drive([{17}, {17}, {17}], iterations=11,
+                                     clock_step=1)
+
+        # Eleven one-second ticks hold three polls, at 1000, 1005 and
+        # 1010, and only two publishes: the startup publish and the one
+        # which measures it settled.
+        self.assertEqual(3, self.connection.call_count)
+        published_at = [c[0][2] for c in mock_upsert.call_args_list]
+        self.assertEqual([1000.0, 1005.0], published_at)
+
     def test_failed_poll_keeps_the_previous_domain_set(self):
         # The third poll raises, after the startup publish has settled. It
         # must not publish, and it must not be recorded as an observation --
