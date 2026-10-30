@@ -65,42 +65,70 @@ class TestPerObjectClusterOperations(base.BaseNamespacedTestCase):
         self.addDetail(name, content.text_content(
             json.dumps(value, indent=4, sort_keys=True)))
 
-    def test_instance_listing_and_pending_flag(self):
-        # The suite's client pauses until the instance leaves its
-        # transitional states, by which time the create may well have
-        # finished. The view is read through a client which does not
-        # wait, so that the instance is seen while its create is still
-        # outstanding.
-        non_blocking = apiclient.Client(
+    def _non_blocking_client(self):
+        """A client which returns as soon as a request is accepted.
+
+        The suite's client pauses until an instance leaves its
+        transitional states, by which time the create may well have
+        finished. Reading an object while its create is still
+        outstanding needs a client which does not wait.
+        """
+        return apiclient.Client(
             base_url=self.system_client.base_url,
             namespace=self.namespace, key=self.namespace_key,
             async_strategy=apiclient.ASYNC_CONTINUE)
-        inst = self.create_instance(
-            *self._instance_spec('objops-inst'), client=non_blocking)
-        self._record('inst', inst)
 
-        # The listing is read before the view: a create which finishes
-        # between the two reads then shows as active in the listing and
-        # the flag is not asserted on a stale view, rather than failing
-        # on one. A create takes seconds, so the listing is expected to
-        # show it; a run on which it did not is recorded as such.
-        outstanding = self.test_client.get_instance_clusteroperations(
-            inst['uuid'])
+    def _assert_pending_while_outstanding(self, kind, view, outstanding):
+        """has_pending_operations is true while a mutating op is outstanding.
+
+        The view is read before the listing, and the order matters. An
+        operation which is still non-terminal in the later listing, and
+        which was enqueued before the view was read, was non-terminal
+        when the view was read too, so a false flag on that view is a
+        defect. Read the other way round, an operation finishing between
+        the two reads shows as active in the listing and false on the
+        view, and the test fails on a race it did not mean to assert.
+
+        When the listing shows nothing outstanding the flag cannot be
+        asserted from this view. That is recorded as a tracing event as
+        well as a detail, so a fleet where the create always beats the
+        read is visible from the traces rather than only from a subunit
+        stream nobody opens.
+        """
         self._record('outstanding', outstanding)
         active = [op for op in outstanding
                   if op['state'] not in TERMINAL_STATES
                   and not op.get('observational')]
         if active:
-            view = self.test_client.get_instance(inst['uuid'])
             self.assertTrue(
                 view.get('has_pending_operations'),
-                'The instance has a mutating operation outstanding but its '
-                'view does not say so: %s' % view)
-        else:
-            self.addDetail('pending-flag-while-outstanding',
-                           content.text_content(
-                               'not asserted: the create had already '
-                               'finished when the listing was read'))
+                'The %s has a mutating operation outstanding but its view '
+                'does not say so: %s' % (kind, view))
+            return
+
+        self._emit_tracing_event({
+            'msg': 'Pending flag not asserted while outstanding',
+            'object_type': kind,
+            'object_uuid': view.get('uuid'),
+            'reason': 'no mutating operation was outstanding when the '
+                      'listing was read',
+        })
+        self.addDetail('pending-flag-while-outstanding',
+                       content.text_content(
+                           'not asserted: no mutating operation was '
+                           'outstanding when the listing was read'))
+
+    def test_instance_listing_and_pending_flag(self):
+        inst = self.create_instance(
+            *self._instance_spec('objops-inst'),
+            client=self._non_blocking_client())
+        self._record('inst', inst)
+
+        # The view first, then the listing; see the helper for why.
+        view = self.test_client.get_instance(inst['uuid'])
+        outstanding = self.test_client.get_instance_clusteroperations(
+            inst['uuid'])
+        self._assert_pending_while_outstanding('instance', view, outstanding)
 
         self._await_instance_ready(inst['uuid'])
         self._await_instance_operations_complete(inst['uuid'])
@@ -155,26 +183,17 @@ class TestPerObjectClusterOperations(base.BaseNamespacedTestCase):
         url = 'https://sfcbr.shakenfist.com/gw-basic/gwbasic.qcow2'
         art = self.test_client.cache_artifact(url)
         self._record('art', art)
+        # Artifacts are cached per namespace, so this is a fresh artifact
+        # in this test's own namespace however many times the fleet has
+        # fetched the URL. The stranger refusal below rests on that, so
+        # it is asserted rather than assumed.
+        self.assertEqual(self.namespace, art.get('namespace'))
 
-        # As for the instance: the listing first, and the flag only on a
-        # view read while the fetch is known to be outstanding.
+        # The view first, then the listing; see the helper for why.
+        view = self.test_client.get_artifact(art['uuid'])
         outstanding = self.test_client.get_artifact_clusteroperations(
             art['uuid'])
-        self._record('outstanding', outstanding)
-        active = [op for op in outstanding
-                  if op['state'] not in TERMINAL_STATES
-                  and not op.get('observational')]
-        if active:
-            view = self.test_client.get_artifact(art['uuid'])
-            self.assertTrue(
-                view.get('has_pending_operations'),
-                'The artifact has a mutating operation outstanding but its '
-                'view does not say so: %s' % view)
-        else:
-            self.addDetail('pending-flag-while-outstanding',
-                           content.text_content(
-                               'not asserted: the fetch had already '
-                               'finished when the listing was read'))
+        self._assert_pending_while_outstanding('artifact', view, outstanding)
 
         results = self._await_artifacts_ready([art['uuid']])
         self._record('results', results)
@@ -225,10 +244,7 @@ class TestPerObjectClusterOperations(base.BaseNamespacedTestCase):
         left non-terminal. Whether the create was still outstanding when
         the delete arrived is recorded, not required.
         """
-        non_blocking = apiclient.Client(
-            base_url=self.system_client.base_url,
-            namespace=self.namespace, key=self.namespace_key,
-            async_strategy=apiclient.ASYNC_CONTINUE)
+        non_blocking = self._non_blocking_client()
         inst = self.create_instance(
             *self._instance_spec('objops-delete-during-create'),
             client=non_blocking)
@@ -246,7 +262,14 @@ class TestPerObjectClusterOperations(base.BaseNamespacedTestCase):
             'instance', inst['uuid'])
         self._record('every', every)
         self.assertNotEqual([], every)
-        lingering = [op for op in every if op['state'] not in TERMINAL_STATES]
+        # Observational sweeps are left out, as the listings above leave
+        # them out. enqueue_delete() aborts the ones it finds, and the
+        # unit suite pins that, but the cleaner enqueues a sweep on its
+        # own cadence and one which arrives after the walk is not this
+        # test's finding.
+        lingering = [op for op in every
+                     if op['state'] not in TERMINAL_STATES
+                     and not op.get('observational')]
         self.assertEqual(
             [], lingering,
             'Operations were left outstanding on a deleted instance: %s'

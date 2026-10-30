@@ -41,8 +41,9 @@ check_wheel_data = _load_script()
 class CheckWheelDataTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
-        self.root = tempfile.mkdtemp()
-        self.addCleanup(self._rmtree, self.root)
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = tmp.name
         self.dist = os.path.join(self.root, 'dist')
         os.makedirs(self.dist)
         os.makedirs(os.path.join(self.root, 'shakenfist', 'data'))
@@ -53,11 +54,6 @@ class CheckWheelDataTestCase(base.ShakenFistTestCase):
         self.cwd = os.getcwd()
         os.chdir(self.root)
         self.addCleanup(os.chdir, self.cwd)
-
-    @staticmethod
-    def _rmtree(path):
-        import shutil
-        shutil.rmtree(path, ignore_errors=True)
 
     def _data_file(self, name):
         with open(os.path.join('shakenfist', 'data', name), 'w') as f:
