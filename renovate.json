@@ -55,6 +55,34 @@
         "zope.event",
         "zope.interface"
       ]
+    },
+    {
+      "description": "A Renovate major can raise engines.node past the node-version that .github/workflows/renovate.yml sets up, leaving every hourly run on a Node that Renovate does not support. This note reaches the reviewer of the bump.",
+      "matchDepNames": [
+        "renovate"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "prBodyNotes": [
+        ":warning: Before merging, check this version's `engines.node` (`npm view renovate@<version> engines`) against `node-version` in `.github/workflows/renovate.yml`. If it no longer accepts that Node major, raise `node-version` in the same pull request, and in shakenfist/development's `templates/renovate/renovate.yml`, which every repository copies verbatim."
+      ]
+    },
+    {
+      "description": "Renovate's github-actions manager proposes Node majors for setup-node, and .github/workflows/renovate.yml must stay on a Node that the pinned Renovate's engines.node accepts, or every hourly run fails with \"Unsupported node environment detected\". That Node is raised by hand, in the pull request for the Renovate major that needs it (see the rule above), never on its own. Node in other workflows is unaffected.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchFileNames": [
+        ".github/workflows/renovate.yml"
+      ],
+      "matchDepNames": [
+        "node"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
     }
   ],
   "minimumReleaseAge": "3 days",
