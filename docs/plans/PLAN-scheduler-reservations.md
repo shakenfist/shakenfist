@@ -1327,15 +1327,18 @@ because the following statements will be true:
 * The "schedule N, fail on N-1" pattern is no longer
   reachable for batch creates. Either the whole batch is
   reserved up front or it fails up front.
-* The `node_reservations` table is the single source of
-  truth for pending capacity claims, and stranded reservations
-  are reaped without operator intervention.
-* The existing in-process `Scheduler()` callers are gone, or
-  explicitly justified for staying on the old shape with a
-  documented reason.
-* The new batch-create API exists, is documented, and is used
-  end-to-end in at least one functional test under
-  `deploy/shakenfist_ci/cluster_ci_tests`.
+* The three materialised capacity tables are the single source
+  of truth for admission, and drift between them and ground
+  truth is corrected by the reconciler without operator
+  intervention. (Phase 0 replaced the per-decision reservations
+  table with counters; see the Execution preamble.)
+* The existing in-process `Scheduler()` callers are gone (phase
+  5), or explicitly justified for staying on the old shape with
+  a documented reason.
+* A batch-create API was deferred out of this plan by D8. The
+  "schedule N, fail on N-1" pattern is addressed instead by
+  atomic per-create admission plus a namespace claim covering
+  the batch, which is what the conductor does (phase 4c).
 * The affinity model is either preserved as today, simplified
   to the binary-soft form, or removed — with a clear documented
   rationale and a migration note for the user-facing API.
