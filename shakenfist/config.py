@@ -47,8 +47,20 @@ from pydantic_settings import NoDecode
 # cover every other way a field might be stringified. Removing either
 # one re-opens a hole the other does not close. See
 # docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
+#
+# The match is case-insensitive because the names tested against it are
+# not all ours to choose. pydantic-settings reads the environment
+# case-insensitively, so a lowercase cluster_config row -- say
+# auth_secret_seed -- is live configuration, and while this pattern
+# matched uppercase names only such a row was printed by show-config
+# and exported into every daemon environment (#4702). This is paired
+# with the declared-field test in _exportable_cluster_config_key()
+# normalising to uppercase: matching more names here without that would
+# withhold a declared field's lowercase row from the environment, and
+# AUTH_SECRET_SEED is exactly such a field.
 SECRET_CONFIG_KEY_RE = re.compile(
-    r'(SECRET|PASSWORD|PASSPHRASE|TOKEN|AUTH_HEADER|_SEED$|_KEY$)')
+    r'(SECRET|PASSWORD|PASSPHRASE|TOKEN|AUTH_HEADER|_SEED$|_KEY$)',
+    re.IGNORECASE)
 
 
 # The sentinel AUTH_SECRET_SEED carries until an operator sets one, which
@@ -111,8 +123,19 @@ def _exportable_cluster_config_key(key_name: str) -> bool:
     this function -- breaks authentication cluster-wide. Do not make
     it. KERBSIDE_JWT_SIGNING_KEY is caught because it matches via
     ``_KEY$`` *and* is not a declared field.
+
+    Both tests are case-insensitive, because pydantic-settings reads
+    the environment case-insensitively and so a lowercase row is live
+    configuration (#4702). A lowercase row naming a declared field
+    must keep being exported -- an operator who set auth_secret_seed
+    has a working cluster today, and a case-sensitive declared-field
+    test paired with a case-insensitive secret pattern would silently
+    withhold it on upgrade -- while a lowercase row naming an
+    undeclared secret is just as much a credential as its uppercase
+    twin. The uppercase normalisation is total because every SFConfig
+    field name is uppercase, which a unit test pins.
     """
-    if key_name in SFConfig.model_fields:
+    if key_name.upper() in SFConfig.model_fields:
         return True
     return SECRET_CONFIG_KEY_RE.search(key_name) is None
 

@@ -242,7 +242,12 @@ declared-field test comes first deliberately: `AUTH_SECRET_SEED` matches the
 secret pattern via `_SEED$` but is a declared field and must keep being
 exported, so a plain "never export a secret" rule would break authentication
 cluster-wide. `KERBSIDE_JWT_SIGNING_KEY` is withheld because it matches via
-`_KEY$` and is not declared.
+`_KEY$` and is not declared. Both tests are case-insensitive, matching the
+case-insensitivity with which pydantic-settings reads the environment: a
+lowercase `auth_secret_seed` row is live configuration and keeps being
+exported, and a lowercase `kerbside_jwt_signing_key` row is withheld just as
+its uppercase twin is ([issue
+4702](https://github.com/shakenfist/shakenfist/issues/4702)).
 
 That keeps the private key out of every process's environment, and out of
 the privexec children which inherit it. Single-key readers use the keyed
