@@ -231,7 +231,10 @@ its criteria, so the criteria should be true before it does.
   membership and timing only"; whether the pass logs corrections now
   is a question for the code, and no `drift` string appears in
   `mariadb.py`'s reconcile path. Step 6 answers it rather than this
-  survey guessing.
+  survey guessing. *(Answered: the pass does log its corrections, in
+  `reconcile_scheduler_capacity()` in the cluster daemon's
+  `scheduled_tasks.py`, which this survey did not grep; see the
+  Execution notes.)*
 
 **Corrected at source in this planning commit:** the phase 8 stub
 in the master plan now carries a *Corrected by the phase 8 survey*
@@ -447,14 +450,16 @@ records the result.
     `check-doc-anchors`, `check-plan-phase-references` and
     `check-plan-status`.
 12. The Outcome carries the output of
-    `grep -rn -i 'advisory' docs ARCHITECTURE.md --include='*.md' | grep -v '^docs/plans/'`
-    as the list phase 5 inherits, and every line in it says the
+    `grep -rn -i 'advisory' docs ARCHITECTURE.md --include='*.md' | grep -v '^docs/plans/\|^docs/components/'`
+    as the list phase 5 inherits (the synced `docs/components/` tree
+    uses the word of CI lanes and is excluded), and every line in it says the
     ceiling is advisory *this release* or equivalent; none says it is
     enforced.
 13. No fact about the client's commands is stated differently in
     `scheduler.md`, the release notes and the glossary: the management
-    session reads the three mentions of `claim list --all` and the
-    three of `node capacity` side by side and records that they agree.
+    session reads the mentions of `claim list --all` (in `scheduler.md`
+    and the release notes) and of `node capacity` (in all three files)
+    side by side and records that they agree.
 14. The master plan's Execution row for this phase still reads `In
     progress` with `—` in `Merged` on the branch, and the index row
     reads `13 of 16`.

@@ -1188,7 +1188,12 @@ So the diff under audit is the plan's cumulative diff, not
 0 merged (`87a58a81e^1`, 2026-07-30) -- restricted to the
 paths this plan touches, so the range does not drag in
 unrelated work merged over the same months. The phase plan
-pins the path list.
+pins the path list. The audit also re-checks every code identifier
+the developer guide's guarded-counter pattern section cites
+(`docs/developer_guide/database_internals.md`, *Guarded counters for
+finite resources*) against `shakenfist/mariadb.py`, because phase 5
+changes the admission path those names describe and nothing else
+keeps the prose in step with them.
 Client-python has no `PUSH-AUDIT.md`. 4b's client range
 predates the `plan-push-audit-phase` rule and is audited from
 here, the way `PLAN-transient-capacity-refusals` phase 7 audited

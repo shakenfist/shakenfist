@@ -1036,7 +1036,8 @@ A hypervisor that is not in `per_node` is in the top-level `excluded`
 mapping, keyed by node uuid, if the scheduler considered it.
 `sf-client node capacity` lists these as hypervisors not reported by the
 scheduler, with their reasons; table and simple output leave the list
-out when a node is named. Each entry carries a `reason`, and there are exactly four:
+out when a node is named. Each entry carries a `reason`, and there are
+exactly four:
 
 | `reason` | Meaning | Extra fields |
 |----------|---------|--------------|
