@@ -242,5 +242,6 @@ which of those accounts for the second shortfall.
   is inferred, not observed. spice-server logs its result only at debug
   level, and this rig does not capture it. The window and the JPEG
   draws are what was observed.
-- `streaming-video=all` streams were H.264, which Ryll does not decode
-  (ryll#398), as in the re-baseline.
+- `streaming-video=all` streams were MJPEG, which Ryll decodes, not the
+  re-baseline's H.264: the Ryll used here asks for MJPEG first (see
+  [the spice-server patches](/components/kerbside/performance/spice-server-patches/#which-codec-the-streams-used)).

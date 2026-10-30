@@ -282,7 +282,7 @@ page as written.
       *Execution notes*.
 - [x] `tox -epy3`, `tox -eflake8`, `pre-commit run --all-files` and
       `tools/mermaid-lint.sh` pass.
-- [ ] The master plan's Execution table records this phase's merge
+- [x] The master plan's Execution table records this phase's merge
       commit, set by the close-out commit of the push-audit phase's
       planning.
 

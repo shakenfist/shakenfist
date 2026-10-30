@@ -287,10 +287,9 @@ the animating activity, as Ryll does.
   Relaying with `streaming-video=all` is as fast or two to five times faster
   on every link except 150 ms / 2 Mbit heavy. It costs the proxy almost
   nothing, and its loss of text is confined to a 16-pixel strip during
-  animation. It also has two costs transcoding avoids: spice-server 0.15.2
+  animation. It also has a cost transcoding avoids: spice-server 0.15.2
   crashes qemu when a client connects while a stream exists, which
-  happened here twice, and its streams were H.264 that Ryll did not
-  decode.
+  happened here twice.
 - It loses to relaying with streaming off on smooth, compressible activity
   at 80 ms / 10 Mbit, and only roughly matches it at lower rates. Both fill
   the link there.
@@ -337,10 +336,11 @@ the animating activity, as Ryll does.
 - **Repeat counts are small.** Two repeats of 40 presses at
   80 ms / 10 Mbit and 80 ms / 5 Mbit, and one valid repeat for
   80 ms / 5 Mbit heavy with streaming on.
-- The relay with streaming on sent H.264, which Ryll does not decode, as in
-  the re-baseline. The key box is never streamed, so its latency is
-  unaffected, but the stream's rate control ran on reports from a client
-  that drew nothing.
+- The relay with streaming on sent MJPEG, not the re-baseline's H.264:
+  the Ryll used here asks for MJPEG first (see
+  [the spice-server patches](/components/kerbside/performance/spice-server-patches/#which-codec-the-streams-used)).
+  Ryll decodes MJPEG, so the stream's rate control ran on reports from a
+  client that drew the stream.
 
 ## Procedure
 

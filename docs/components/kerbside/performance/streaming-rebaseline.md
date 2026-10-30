@@ -69,10 +69,13 @@ Measured on 2026-09-24.
 - **spice-server 0.15.2 segfaults when a client connects while
   streams already exist.** Every streaming case in the first
   attempt crashed qemu on connect. The rig now delays the guest's
-  activity until the client has connected (`ACTIVITY_DELAY`). This
-  would hit real deployments with streaming on: a user reconnecting
-  to a VM that is playing video crashes the VM's qemu. It is not
-  yet reproduced against spice-server's current master.
+  activity until the client has connected (`ACTIVITY_DELAY`). It
+  has since been reproduced on 0.16.0 and spice-server master and
+  patched ([spice-server patches](/components/kerbside/performance/spice-server-patches/)). It
+  needs a client that sends its codec preference as the display
+  channel comes up, as Ryll does. remote-viewer does not, so
+  remote-viewer users reconnecting to a streaming VM are not
+  affected.
 - The rig runs Ryll with `-v` for the stream counts below, which
   costs a little client CPU. The backpressure runs did not.
 - One host, CUBIC, two passes of 40 presses per cell. The v2 and

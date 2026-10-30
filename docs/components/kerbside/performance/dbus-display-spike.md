@@ -370,18 +370,15 @@ to change, and nothing would for a go.
   them into andris's screen, because reading memory the guest writes
   through a Rust slice is undefined behaviour. That second copy was not
   measured; [Cost](#cost) bounds it.
-- **spice-server's codec differed from earlier runs.** With
+- **spice-server's codec differed from the re-baseline.** With
   `streaming-video=all`, spice-server sent MJPEG in all 28 of its repeats
-  here, and andris sent H.264 in all 14 of the helper's. The earlier pages
-  on this rig ([the re-baseline](/components/kerbside/performance/streaming-rebaseline/),
-  [the transcoding measurements](/components/kerbside/performance/transcoding-measurements/),
-  [the ACK window](/components/kerbside/performance/ack-window/) and
-  [the transcoding spike](/components/kerbside/performance/transcoding-spike/)) report `all`'s streams as
-  H.264 that Ryll did not decode (ryll#398), with the same Ryll (0d140b3)
-  and an unchanged proxy. Why spice-server chose differently was not
-  established, and those pages are left as they were. It does mean that
-  here Ryll decoded `all`'s streams, 16 of the 21 it was offered, and
-  `all`'s latency was much as on those pages (113 against 118 ms at
+  here, and andris sent H.264 in all 14 of the helper's.
+  [The re-baseline](/components/kerbside/performance/streaming-rebaseline/) saw H.264 because its older
+  Ryll asked for H.264 first; the Ryll used here (0d140b3), like the one
+  behind the other pages on this rig, asks for MJPEG first (see
+  [the spice-server patches](/components/kerbside/performance/spice-server-patches/#which-codec-the-streams-used)).
+  So here Ryll decoded `all`'s streams, 16 of the 21 it was offered, and
+  `all`'s latency was much as on the transcoding pages (113 against 118 ms at
   80 ms / 10 Mbit heavy, 7315 against 7328 ms at 150 ms / 2 Mbit heavy).
 - **The guest flushes its whole plane.** Every configuration saw
   full-plane damage. qemu's spice-display diffs it in 32-pixel columns
@@ -415,10 +412,10 @@ Nothing here has been filed.
   separate plan that a go calls for: bindings of our own, the watchdog,
   the attach mode, a Shaken Fist integration first, and a libvirt
   helper-launch mechanism for Nova.
-- **Find out which codec spice-server chooses for `streaming-video=all`,
-  and why,** given that the same Ryll and proxy saw H.264 on earlier runs
-  and MJPEG on this one. Whether Ryll can decode `all`'s streams decides
-  what those pages' figures mean for a real client.
+- **Which codec spice-server chooses for `streaming-video=all`** is
+  answered in [the spice-server patches](/components/kerbside/performance/spice-server-patches/#which-codec-the-streams-used):
+  the client's preference decides it, and this Ryll asks for MJPEG
+  first.
 - **Ticketing, link hints, observability and token authentication**
   stay spice-server and qemu work. A helper would let Kerbside define
   them itself, but only for sources that can run one, and Nova and oVirt
