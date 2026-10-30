@@ -389,6 +389,7 @@ Not covered, and worth knowing before you deploy:
   — the CI lanes, including the Shaken Fist end-to-end lane
   described above
 - [Kerbside for oVirt](/components/kerbside/use-cases/ovirt/),
+  [Kerbside for Proxmox VE](/components/kerbside/use-cases/proxmox/),
   [Kerbside for OpenStack](/components/kerbside/use-cases/openstack/) and
   [Kerbside standalone](/components/kerbside/use-cases/standalone/) — the sibling
   deployment guides
