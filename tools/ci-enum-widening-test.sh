@@ -76,6 +76,13 @@ if ! echo "${regime}" | grep -qE $'\t1$'; then
 fi
 
 echo "Running live MariaDB tests..."
+# stestr runs outside tox here, so tox.ini's setenv does not apply and
+# shakenfist_utilities.logs.setup() would default to SysLogHandler --
+# putting every test's logging in the CI runner's journal, which sfcbr
+# ships to Loki (issue #4725). Export what tox.ini exports so stestr
+# captures the logs and shows them only for failing tests.
+export SHAKENFIST_LOG_TO_STDOUT=1
+
 # --serial because these share one database and drop their tables on
 # cleanup. The regex is anchored on the module name so a live test
 # module added later is picked up without touching this script.

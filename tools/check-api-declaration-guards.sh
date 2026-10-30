@@ -57,6 +57,11 @@ fi
 # NO-OP comparison report a difference that is not a mutation.
 export PYTHONDONTWRITEBYTECODE=1
 
+# tox sets this too; without it shakenfist_utilities.logs.setup()
+# installs a SysLogHandler and every mutated run's test logging lands
+# in the developer's syslog (issue #4725 was the CI flavour of this).
+export SHAKENFIST_LOG_TO_STDOUT=1
+
 # tox also sets LC_ALL for its environments, and this script does not
 # get that either. The API sources contain non-ASCII, so under an
 # ASCII locale every file read in the audit used to die with
