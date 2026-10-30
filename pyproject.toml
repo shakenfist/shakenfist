@@ -249,7 +249,6 @@ test = [
     "tox==4.67.1",              # mit
     "mkdocs==1.6.1",            # bsd
     "mkdocs-material==9.8.0",   # mit
-    "testscenarios==0.7.0",     # bsd
     "mypy==2.4.0",             # mit
     "mypy-protobuf==5.1.0",     # apache2
     "grpc-stubs==1.53.0.6",     # mit
