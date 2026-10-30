@@ -1256,4 +1256,8 @@ and sets phase 7 and the plan to Complete.
   shape play has proven the Shaken Fist nodes agree. The wiring test's
   own valid URL carried a trailing slash, which the new check refuses;
   it no longer does. SF-14's `redact_vv` moved to the shared `vdi`
-  module so the direct `.vv` fetch can use it too.
+  module so the direct `.vv` fetch can use it too. The follow-up merged
+  as `0b5d147477` (#4715); its automated review raised no fix items,
+  and its one document item and three cheap considers landed in a last
+  pull request after the merge, at the operator's choice, rather than
+  by ejecting #4715 from the merge queue.

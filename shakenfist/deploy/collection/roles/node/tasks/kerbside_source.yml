@@ -135,9 +135,9 @@
 # roles/node/templates/sf-api.socket; the others are the defaults of
 # RESOURCES_METRICS_PORT, CLUSTER_METRICS_PORT, MARIADB_GATEWAY_PORT and
 # MARIADB_GATEWAY_METRICS_PORT in shakenfist/config.py. sf-database runs only
-# on the database tier,
-# but which nodes those are is the inventory's, so its ports are reserved on
-# every co-located host. A change to any of those defaults belongs here too.
+# on the database tier, but which nodes those are is the inventory's, so its
+# ports are reserved on every co-located host. A change to any of those
+# defaults belongs here too.
 - name: Reserve the ports Shaken Fist uses on this host
   ansible.builtin.set_fact:
     kerbside_reserved_ports: >-
