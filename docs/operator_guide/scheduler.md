@@ -437,13 +437,16 @@ as the claim is active. It is a cluster-wide quantity, not a per-node
 one -- a claim says nothing about *where* the namespace's instances land,
 only how much of the cluster is set aside for them in total.
 
-Claims are administered through the REST API at
-`/auth/namespaces/<namespace>/claims`, admin-only, alongside the
-namespace's keys and mapping rules. The request and response bodies are
-published in the [OpenAPI specification](https://openapi.shakenfist.com);
-`sf-client` has no claim verbs yet, so for now a claim is created with an
-HTTP request rather than a command. A namespace holds at most one active
-claim.
+Claims are administered with `sf-client namespace claim` and its
+`create`, `show`, `list`, `update` and `delete` verbs, which need
+`shakenfist-client` 0.8.4 or later; the client's
+[namespace claims page](https://github.com/shakenfist/client-python/blob/develop/docs/namespace-claims.md)
+documents their options. Like the namespace's keys and mapping rules,
+claims are admin-only. Scripts can use the REST API at
+`/auth/namespaces/<namespace>/claims` instead, whose request and
+response bodies are published in the
+[OpenAPI specification](https://openapi.shakenfist.com). A namespace
+holds at most one active claim.
 
 ### Advisory this release: exceedances are recorded, not refused
 
@@ -464,7 +467,12 @@ people:
   `cluster_capacity.claimed_*`, and the guard that admits instances in
   namespaces *without* a claim only lets them use what active claims have
   not spoken for. So an oversized claim starves unclaimed namespaces
-  today, even though it does not bind its own.
+  today, even though it does not bind its own. These are the cluster's
+  two service classes: a namespace with an active claim is *claimed*,
+  and what its claim holds is kept from every namespace without one and
+  from every claim granted after it, while a namespace without one is
+  *best-effort*, and competes for what the active claims have not
+  spoken for.
 
 The record of an exceedance is an audit event on the *instance* whose
 placement crossed the line:
@@ -491,11 +499,13 @@ different event about a different thing: that one says a ground-truth
 writer was forced past a *node's* guard, this one says a placement was
 charged to its *namespace's* claim and the claim is now over.
 
-Both trails are readable over REST, admin-gated like the claim verbs
-themselves since `sf-client` has no events verb for either yet:
-`GET /auth/namespaces/<namespace>/claims/<claim_ref>/events` for the
+Both trails are admin-gated like the claim verbs themselves.
+`sf-client namespace claim events <namespace> <claim-uuid>` reads the
 claim's own events while it still exists, and
-`GET /auth/namespaces/<namespace>/events` for the namespace's. **An
+`sf-client namespace events <namespace>` reads the namespace's; over
+REST they are
+`GET /auth/namespaces/<namespace>/claims/<claim_ref>/events` and
+`GET /auth/namespaces/<namespace>/events`. **An
 operator calibrating a claim should read the namespace's events, not
 the claim's** -- a claim's own events are removed by `hard_delete()`,
 so the exceedance history that made the case for growing a claim
@@ -620,12 +630,18 @@ which is why the listings below show it.
 
 ### Listing every namespace's claims
 
-`GET /admin/claims` lists the claims of every namespace in one request,
-admin-only, where `/auth/namespaces/<namespace>/claims` lists one
-namespace's. Each entry has the same shape as there. An optional
-`coverage_state` of `active` or `expired` restricts the listing to claims
-in that [coverage state](#the-two-states-a-claim-carries), and the
-filter is applied by the database. Any other value is a 400.
+`sf-client namespace claim list --all` lists the claims of every
+namespace, with a namespace column ahead of the usual ones, and
+`--coverage active` or `--coverage expired` narrows it to the claims in
+that coverage state. `--coverage` without `--all` is a usage error,
+because a single namespace's listing cannot be filtered.
+
+Behind it, `GET /admin/claims` lists the claims of every namespace in
+one request, admin-only, where `/auth/namespaces/<namespace>/claims`
+lists one namespace's. Each entry has the same shape as there. An
+optional `coverage_state` of `active` or `expired` restricts the listing
+to claims in that [coverage state](#the-two-states-a-claim-carries), and
+the filter is applied by the database. Any other value is a 400.
 
 The listing deliberately includes a claim whose object state is
 `deleted`. A claim has no soft delete: such a row still holds
@@ -665,10 +681,15 @@ the capacity is still held and the request can simply be repeated.
 
 ### Verifying claims on a cluster
 
-`sf-client` has no claim verbs, so there is no quick interactive way to
-confirm that the claim pathway works on a particular cluster.
-`tools/exercise-namespace-claims.py` in the Shaken Fist source tree
-does it instead: it walks the whole surface end to end -- request
+The quick interactive check that the claim pathway works on a
+particular cluster is to create a claim with
+`sf-client namespace claim create` and then run
+`sf-client node capacity`, whose cluster claims ledger should show the
+claim's limits as claimed (the client's
+[cluster capacity page](https://github.com/shakenfist/client-python/blob/develop/docs/cluster-capacity.md)
+explains what the command prints). The thorough check is
+`tools/exercise-namespace-claims.py` in the Shaken Fist source tree:
+it walks the whole surface end to end -- request
 validation, create, the duplicate and capacity refusals, reads and
 cross-namespace non-disclosure, field-masked updates, drawdown against
 a real instance, the below-usage shrink refusal, expiry and delete --
@@ -913,8 +934,13 @@ tells the whole story:
   -- the stage name plus the previous event's `dropped` map identify
   exactly which constraint eliminated the last node.
 
-The admin resources API (`/admin/resources`, surfaced by
-`get_cluster_resources()` in the client) reports per-node
+`sf-client node capacity` renders the admin resources API's response,
+with each hypervisor's committed and measured ledgers side by side;
+`sf-client node capacity <node>` cuts it to one node and, in table and
+simple output, leaves out the cluster-wide parts described below (JSON
+output keeps the whole response). The API itself
+(`/admin/resources`, surfaced by `get_cluster_resources()` in the
+client) reports per-node
 `cpu_schedulable`, `memory_reserved_mb`, `cpu_available` and RAM
 headroom using the same pre-filter arithmetic as the pipeline above.
 It also breaks the CPU decision out into `cpu_hard_max`,
@@ -951,7 +977,9 @@ the one ledger that both cluster-wide guards test against (see
 of claims, and it is deliberately kept out of `total`: `total` adds up
 per-node headroom bounded by measurement, whereas this ledger's totals
 are sums of node *limits*, and the two should not be compared as if they
-were the same quantity.
+were the same quantity. It is the last table `sf-client node capacity`
+prints, as its cluster claims ledger; table and simple output leave it
+out when a node is named.
 
 | Field | Meaning |
 |-------|---------|
@@ -1005,8 +1033,10 @@ per-node ledger.
 ### Why a node is missing from the resources response
 
 A hypervisor that is not in `per_node` is in the top-level `excluded`
-mapping, keyed by node uuid, if the scheduler considered it. Each entry
-carries a `reason`, and there are exactly four:
+mapping, keyed by node uuid, if the scheduler considered it.
+`sf-client node capacity` lists these as hypervisors not reported by the
+scheduler, with their reasons; table and simple output leave the list
+out when a node is named. Each entry carries a `reason`, and there are exactly four:
 
 | `reason` | Meaning | Extra fields |
 |----------|---------|--------------|
