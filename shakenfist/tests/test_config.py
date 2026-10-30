@@ -270,6 +270,31 @@ class ClusterConfigExportFilterTestCase(base.ShakenFistTestCase):
         self.assertNotIn('SOME_FUTURE_OPTION', SFConfig.model_fields)
         self.assertTrue(_exportable_cluster_config_key('SOME_FUTURE_OPTION'))
 
+    def test_lowercase_rows_get_the_same_answers(self):
+        # pydantic-settings reads the environment case-insensitively,
+        # so a lowercase cluster_config row is live configuration. For
+        # as long as the filter matched uppercase names only, a
+        # lowercase secret-named row was exported into every daemon
+        # environment (#4702) -- and fixing the pattern alone would
+        # have withheld a lowercase declared field instead, breaking
+        # authentication for a cluster whose seed row happened to be
+        # lowercase. All three cases above must hold for lowercase
+        # names too.
+        self.assertTrue(_exportable_cluster_config_key('auth_secret_seed'))
+        self.assertFalse(
+            _exportable_cluster_config_key('kerbside_jwt_signing_key'))
+        self.assertTrue(_exportable_cluster_config_key('some_future_option'))
+
+    def test_every_declared_field_name_is_uppercase(self):
+        # The filter's declared-field test normalises the row name to
+        # uppercase before looking it up in SFConfig.model_fields. That
+        # normalisation is only total while every field name is
+        # uppercase: a mixed-case field would be unreachable by the
+        # lookup, and its rows silently withheld whenever the name also
+        # looked secret.
+        for name in SFConfig.model_fields:
+            self.assertEqual(name.upper(), name)
+
     @mock.patch.dict(
         'os.environ', {'SHAKENFIST_MARIADB_HOST': 'db.example.com'},
         clear=True)

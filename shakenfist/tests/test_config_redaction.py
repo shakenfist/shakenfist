@@ -90,6 +90,19 @@ class ConfigRedactionTestCase(base.ShakenFistTestCase):
         for key in ['NODE_NAME', 'ZONE', 'API_PORT', 'LOKI_BASE_URL']:
             self.assertFalse(SECRET_CONFIG_KEY_RE.search(key), key)
 
+    def test_predicate_is_case_insensitive(self):
+        # pydantic-settings reads the environment case-insensitively,
+        # so a lowercase cluster_config row is live configuration, and
+        # while the pattern matched uppercase only such a row was
+        # printed by show-config and the two dumps here (#4702). Mixed
+        # case too, so the fix is insensitivity rather than a second
+        # lowercase alternation.
+        for key in ['auth_secret_seed', 'mariadb_password',
+                    'Loki_Auth_Header', 'kerbside_jwt_signing_key']:
+            self.assertTrue(SECRET_CONFIG_KEY_RE.search(key), key)
+        for key in ['node_name', 'zone', 'api_port', 'loki_base_url']:
+            self.assertFalse(SECRET_CONFIG_KEY_RE.search(key), key)
+
     def test_config_value_is_secret(self):
         from shakenfist.config import config_value_is_secret
         self.assertTrue(config_value_is_secret('AUTH_SECRET_SEED', 'x'))
@@ -98,6 +111,11 @@ class ConfigRedactionTestCase(base.ShakenFistTestCase):
         self.assertFalse(config_value_is_secret('SOME_TOKEN_FLAG', True))
         self.assertFalse(config_value_is_secret('SOME_TOKEN_RATIO', 0.5))
         self.assertFalse(config_value_is_secret('NODE_NAME', 'x'))
+        # The value-type exemptions apply to a lowercase name the same
+        # way, because show-config sees whatever name the row has.
+        self.assertTrue(config_value_is_secret('auth_secret_seed', 'x'))
+        self.assertFalse(config_value_is_secret('kerbside_token_duration', 3600))
+        self.assertFalse(config_value_is_secret('node_name', 'x'))
 
 
 class ConfigDumpCallerTestCase(base.ShakenFistTestCase):
