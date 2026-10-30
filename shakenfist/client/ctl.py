@@ -227,6 +227,12 @@ def set_config(flag: str, value: Optional[str],
         value = _read_stdin_value()
     assert value is not None
 
+    # Row names are case-insensitive identifiers (pydantic-settings and
+    # the table's collation both say so), stored in their canonical
+    # upper-case spelling so that every name check sees the same row the
+    # loader does.
+    flag = sf_config.canonical_config_key_name(flag)
+
     # Convert values if possible
     converted_value: Any = value
     if value in ['t', 'true', 'True']:
@@ -254,6 +260,7 @@ def set_config(flag: str, value: Optional[str],
 @click.argument('flag')
 def unset_config(flag: str) -> None:
     """Delete a cluster-wide configuration value."""
+    flag = sf_config.canonical_config_key_name(flag)
     click.echo(f'Unsetting {flag}')
     mariadb.delete_cluster_config(flag)
 

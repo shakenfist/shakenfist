@@ -32,6 +32,9 @@ from pydantic_settings import NoDecode
 # leaves the cluster. The same reasoning puts handles_credentials() in
 # external_api/base.py rather than in app.py.
 #
+# Matched against the canonical (upper-case) spelling of the name, see
+# canonical_config_key_name() below; a lower-case row is the same row.
+#
 # Match generously -- under-matching leaks a credential, while
 # over-matching merely hides a value. The name pattern does in fact
 # over-match today, catching the integer API_TOKEN_DURATION,
@@ -61,6 +64,32 @@ from pydantic_settings import NoDecode
 SECRET_CONFIG_KEY_RE = re.compile(
     r'(SECRET|PASSWORD|PASSPHRASE|TOKEN|AUTH_HEADER|_SEED$|_KEY$)',
     re.IGNORECASE)
+
+
+def canonical_config_key_name(key_name: str) -> str:
+    """The spelling of a cluster_config row name every comparison uses.
+
+    Row names are case-insensitive identifiers whose canonical spelling
+    is upper case. Nothing else is consistent with how the rows are
+    consumed: pydantic-settings matches environment variable names
+    case-insensitively, so a row named ``kerbside_url`` exported as
+    ``SHAKENFIST_kerbside_url`` sets the ``KERBSIDE_URL`` field exactly
+    as the upper-case row would, and the table's primary key is a
+    utf8mb4 string column, which under MariaDB's default collations
+    compares case-insensitively too. A name check which compares the
+    spelling as written therefore disagrees with the loader about which
+    field a row sets: the pattern above did not match
+    ``auth_secret_seed``, so such a row was printed by show-config and
+    exported into every daemon's environment unredacted, and the deploy
+    preflight did not see a lower-case row shadowing a Kerbside
+    variable.
+
+    sf-ctl stores the canonical spelling, and every name comparison in
+    this module -- the export filter, the secret predicate -- is made
+    on it, so a row written before that, by hand or by an older sf-ctl,
+    behaves exactly like its upper-case spelling.
+    """
+    return key_name.upper()
 
 
 # The sentinel AUTH_SECRET_SEED carries until an operator sets one, which
@@ -135,7 +164,8 @@ def _exportable_cluster_config_key(key_name: str) -> bool:
     twin. The uppercase normalisation is total because every SFConfig
     field name is uppercase, which a unit test pins.
     """
-    if key_name.upper() in SFConfig.model_fields:
+    key_name = canonical_config_key_name(key_name)
+    if key_name in SFConfig.model_fields:
         return True
     return SECRET_CONFIG_KEY_RE.search(key_name) is None
 
@@ -216,7 +246,8 @@ def load_cluster_config() -> None:
                     value = value_raw
                 if isinstance(value, (dict, list)):
                     value = json.dumps(value)
-                os.environ['SHAKENFIST_%s' % key_name] = str(value)
+                os.environ['SHAKENFIST_%s' % canonical_config_key_name(
+                    key_name)] = str(value)
             return
 
         except Exception:
@@ -250,7 +281,8 @@ def load_cluster_config() -> None:
                 # See the direct branch above for why this is silent.
                 continue
             value = json.loads(entry.value_json)
-            os.environ['SHAKENFIST_%s' % entry.key_name] = str(value)
+            os.environ['SHAKENFIST_%s' % canonical_config_key_name(
+                entry.key_name)] = str(value)
 
         channel.close()
 
@@ -1297,7 +1329,8 @@ def config_value_is_secret(key: str, value: Any) -> bool:
     """
     if isinstance(value, (bool, int, float)):
         return False
-    return SECRET_CONFIG_KEY_RE.search(key) is not None
+    return SECRET_CONFIG_KEY_RE.search(
+        canonical_config_key_name(key)) is not None
 
 
 def redacted_config_items() -> Iterator[tuple[str, Any]]:

@@ -106,6 +106,9 @@ class ConfigRedactionTestCase(base.ShakenFistTestCase):
     def test_config_value_is_secret(self):
         from shakenfist.config import config_value_is_secret
         self.assertTrue(config_value_is_secret('AUTH_SECRET_SEED', 'x'))
+        # A lower-case row sets the same field (pydantic-settings matches
+        # environment names case-insensitively), so it is the same secret.
+        self.assertTrue(config_value_is_secret('auth_secret_seed', 'x'))
         self.assertTrue(config_value_is_secret('KERBSIDE_TOKEN_DURATION', 'x'))
         self.assertFalse(config_value_is_secret('KERBSIDE_TOKEN_DURATION', 3600))
         self.assertFalse(config_value_is_secret('SOME_TOKEN_FLAG', True))
