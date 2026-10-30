@@ -362,7 +362,7 @@ table entirely (decision D8).
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
 | 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
 | 7b. Capacity and claim views in sf-client | `PLAN-scheduler-reservations-phase-07b-client-views.md` (in shakenfist/client-python on its `develop`; a relative link cannot cross repositories, so it is named rather than linked) | Complete | client-python `d484fdc` (#442) |
-| 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started | — |
+| 8. Documentation and operator guide, and the client release | [PLAN-scheduler-reservations-phase-08-docs.md](PLAN-scheduler-reservations-phase-08-docs.md) | In progress | — |
 | 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started | — |
 
 The `Merged` column records what put each phase on `develop`.
@@ -1144,6 +1144,23 @@ cuts one release covering everything phases 4b to 7b accumulate,
 and the guide must not merge claiming a command an operator
 cannot install. That ordering is this phase's obligation and
 nobody else's.
+
+*Corrected by the phase 8 survey (2026-10-30).* The operator guide
+this stub asks for already exists: `docs/operator_guide/scheduler.md`
+carries the pipeline, the guarded admission, the claims with their
+advisory status and two states, the cross-namespace listing, the
+diagnosis path and the cluster ledger, and
+`docs/operator_guide/database.md` carries the reconciler; phases 3 to
+7a each wrote their part as they landed. The affinity migration notes
+exist too, in `docs/user_guide/affinity.md`, written by phase 6. What
+remains is narrower: the guide says in three places that `sf-client`
+has no claim or events verbs, which has been false since 4b and 7b;
+its diagnosis section is written against `/admin/resources` rather
+than `node capacity`; the guarded-UPDATE idiom is documented only as
+the scheduler's instance, never as a pattern (D10); the release notes
+mention none of phases 3 to 7b; the glossary defines none of the
+vocabulary; and the client release is overdue. The phase plan records
+the survey and scopes the phase to those gaps.
 
 **Phase 9 — push audit.** Run
 the repository's pre-push audit over everything this plan
