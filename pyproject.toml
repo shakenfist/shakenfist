@@ -246,7 +246,7 @@ test = [
     "python-subunit==1.4.6",    # apache2 -- pinned <1.4.5, 1.4.5+
                                 #            requires testtools>=2.7
     "flake8==7.4.1",            # mit
-    "tox==4.67.1",              # mit
+    "tox==4.67.4",              # mit
     "mkdocs==1.6.1",            # bsd
     "mkdocs-material==9.8.0",   # mit
     "mypy==2.4.0",             # mit
