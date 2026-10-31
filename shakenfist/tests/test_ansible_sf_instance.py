@@ -1189,7 +1189,8 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
 
     def _run(self, creates, lookups=None, capacity_wait=1800,
              await_instance=False, awaits=None, instances=None, jitter=0,
-             create_seconds=0, expect_failure=False, await_placement=False):
+             create_seconds=0, expect_failure=False, await_placement=False,
+             client_takes_timeout=True):
         """Run the module against a scripted client and a fake clock.
 
         creates and awaits are the outcomes of successive
@@ -1198,6 +1199,8 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
         to the outcomes of successive get_instance() calls for it; the
         last repeats. Every client call is recorded, in order, in
         self.calls, with the fake clock's time for creates.
+        client_takes_timeout False builds a create_instance() which
+        predates the timeout argument.
         """
         params = dict(self.PARAMS)
         params['await'] = await_instance
@@ -1227,11 +1230,18 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
             return value
 
         # A real function, so that _create_accepts_timeout() sees the
-        # timeout argument and an awaited create is passed timeout=0.
-        def create_instance(*args, timeout=None, **kwargs):
-            calls.append(('create', clock.now, timeout))
-            clock.now += create_seconds
-            return outcome(creates.pop(0))
+        # timeout argument (or, for an old client, does not) and an
+        # awaited create is passed timeout=0 only when it can take it.
+        if client_takes_timeout:
+            def create_instance(*args, timeout=None, **kwargs):
+                calls.append(('create', clock.now, timeout))
+                clock.now += create_seconds
+                return outcome(creates.pop(0))
+        else:
+            def create_instance(*args, **kwargs):
+                calls.append(('create', clock.now, kwargs.get('timeout')))
+                clock.now += create_seconds
+                return outcome(creates.pop(0))
 
         def get_instance(ref, namespace=None):
             calls.append(('get', ref, namespace))
@@ -1275,6 +1285,7 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
                 sf_instance.run_module)
 
         self.module = module
+        self.client = client
         self.clock = clock
         self.calls = calls
         return module
@@ -1933,3 +1944,124 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
         ], self.calls)
         self.assertEqual([], self._calls('create'))
         self.assertEqual([], self._calls('delete'))
+
+    def test_a_placement_wait_whose_read_fails_fails_as_an_api_error(self):
+        # A failed read says nothing about where the instance went, so it
+        # fails the task through _fail_api_error(), keeping the log, rather
+        # than escaping run_module() or being taken for placed.
+        error = sf_instance.apiclient.APIException('connection reset')
+        module = self._run(
+            [{'uuid': 'created', 'state': 'initial'}],
+            lookups={'created': [error]},
+            await_placement=True, expect_failure=True)
+
+        kwargs = module.fail_json.call_args[1]
+        self.assertEqual(
+            'Waiting for instance placement failed: connection reset',
+            kwargs['msg'])
+        self.assertIn(kwargs['msg'], kwargs['log'])
+        self.assertNotIn('capacity_waited', kwargs)
+        self.assertEqual(1, len(self._calls('create')))
+        self.assertEqual([], self._calls('delete'))
+
+    def test_a_placement_wait_whose_read_fails_after_a_replay_returns_it(self):
+        # The same failure after a replay must still return what the
+        # capacity wait did, as every other failure after a refusal does.
+        aborted = {'uuid': 'aborted', 'name': 'test', 'state': 'error',
+                   'error_message': 'Unable to find suitable node'}
+        error = sf_instance.apiclient.APIException('connection reset')
+        module = self._run(
+            [{'uuid': 'aborted', 'state': 'initial'},
+             {'uuid': 'created', 'state': 'initial'}],
+            lookups={'aborted': [aborted, aborted,
+                                 dict(aborted, state='deleted')],
+                     'created': [error]},
+            await_placement=True, expect_failure=True)
+
+        kwargs = module.fail_json.call_args[1]
+        self.assertEqual(
+            'Waiting for instance placement failed: connection reset',
+            kwargs['msg'])
+        self.assertEqual('failed', kwargs['capacity_waited']['outcome'])
+        self.assertEqual(2, kwargs['capacity_waited']['attempts'])
+        self.assertEqual(2, len(self._calls('create')))
+
+    def test_a_placement_wait_after_a_replay_is_not_charged_the_capacity_wait(
+            self):
+        # Each create takes five seconds. The refused attempt and the
+        # minute before its replay come out of the capacity budget, so the
+        # replay's placement wait is handed await_timeout less only its own
+        # create's five seconds, exactly as the first attempt's was.
+        aborted = {'uuid': 'aborted', 'name': 'test', 'state': 'error',
+                   'error_message': 'Unable to find suitable node'}
+        module = self._run(
+            [{'uuid': 'aborted', 'state': 'initial'},
+             {'uuid': 'created', 'state': 'initial'}],
+            lookups={'aborted': [aborted, aborted,
+                                 dict(aborted, state='deleted')]},
+            await_placement=True, create_seconds=5)
+
+        log = module.exit_json.call_args[1]['log']
+        self.assertIn('Awaiting placement of instance aborted for 595 '
+                      'seconds (5 already spent)', log)
+        self.assertIn('Awaiting placement of instance created for 595 '
+                      'seconds (5 already spent)', log)
+        self.assertEqual(60, self._waited()['seconds'])
+
+    def test_a_placement_await_on_an_old_client_lets_the_create_wait(self):
+        # A client which predates the timeout argument must not be handed
+        # it (a TypeError would stop every create), and the log says so,
+        # as it does for await.
+        module = self._run(
+            [{'uuid': 'created', 'state': 'initial'}],
+            await_placement=True, client_takes_timeout=False)
+
+        self.assertIn('Client predates the create timeout argument, so the '
+                      'create will wait and what it spends is deducted from '
+                      'the await budget instead',
+                      module.exit_json.call_args[1]['log'])
+        _args, kwargs = self.client.create_instance.call_args
+        self.assertNotIn('timeout', kwargs)
+        self.assertEqual([], self._calls('await'))
+
+    def test_a_placement_await_fails_an_instance_in_an_unexpected_state(self):
+        # Only creating and created are placed. A deleted instance, a
+        # record with no state, or a state which is not even a string must
+        # fail the task rather than be reported as placed.
+        for state in ('deleted', None, 5):
+            with self.subTest(state=state):
+                read = {'uuid': 'created'}
+                if state is not None:
+                    read['state'] = state
+                module = self._run(
+                    [{'uuid': 'created', 'state': 'initial'}],
+                    lookups={'created': [read]},
+                    await_placement=True, expect_failure=True)
+
+                kwargs = module.fail_json.call_args[1]
+                self.assertEqual(
+                    'Waiting for instance placement failed: instance '
+                    'created is in unexpected state %s' % state,
+                    kwargs['msg'])
+                self.assertNotIn('capacity_waited', kwargs)
+                self.assertEqual(1, len(self._calls('create')))
+                self.assertEqual([], self._calls('delete'))
+
+    def test_a_placement_await_fails_a_read_back_which_is_not_a_dict(self):
+        # Nothing to read a state from, so nothing to wait for either:
+        # one read, then a failure through fail_json() rather than an
+        # AttributeError escaping run_module().
+        module = self._run(
+            [{'uuid': 'created', 'state': 'initial'}],
+            lookups={'created': [None]},
+            await_placement=True, expect_failure=True)
+
+        self.assertEqual(
+            'Waiting for instance placement failed: instance created could '
+            'not be read back (got None)',
+            module.fail_json.call_args[1]['msg'])
+        self.assertEqual([
+            ('get', 'test', 'ns'),
+            ('create', 0, 0),
+            ('get', 'created', None),
+        ], self.calls)
