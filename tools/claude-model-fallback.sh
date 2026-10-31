@@ -37,7 +37,7 @@
 #
 # Options:
 #   --models LIST  Comma-separated models to try in order
-#                  (default: claude-fable-5,claude-opus-5)
+#                  (default: claude-opus-5)
 #   --prompt-file FILE
 #                  Read the prompt from FILE, on stdin, rather than passing it
 #                  as a claude argument. Required for a prompt of any size.
@@ -62,7 +62,7 @@
 
 set -uo pipefail
 
-models='claude-fable-5,claude-opus-5'
+models='claude-opus-5'
 quiet=0
 check_model=''
 prompt_file=''
@@ -77,7 +77,7 @@ Usage:
 
 Options:
   --models LIST  Comma-separated models to try in order
-                 (default: claude-fable-5,claude-opus-5)
+                 (default: claude-opus-5)
   --prompt-file FILE
                  Read the prompt from FILE, on stdin, rather than passing it
                  as a claude argument. Required for a prompt of any size: a

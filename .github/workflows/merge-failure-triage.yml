@@ -98,7 +98,7 @@ on:
       models:
         description: 'Comma-separated models to try, in preference order'
         required: false
-        default: 'claude-fable-5,claude-opus-5'
+        default: 'claude-opus-5'
         type: string
       dry_run:
         description: 'Dry run (classify only, no issue or PR comments)'
@@ -163,7 +163,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       REPO: ${{ github.repository }}
-      MODELS: ${{ inputs.models || 'claude-fable-5,claude-opus-5' }}
+      MODELS: ${{ inputs.models || 'claude-opus-5' }}
       DRY_RUN: ${{ inputs.dry_run || 'false' }}
       FAILED_RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
       # Through env: and never into a run: line, because a job name is free
