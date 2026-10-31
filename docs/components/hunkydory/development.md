@@ -50,6 +50,13 @@ one ahead of it, so revisit those groups first.
 A new job in `ci.yml` goes in the `needs:` of both "Can enqueue" and
 "Can merge", or the queue will merge without it.
 
+Every required check in the `develop` ruleset is pinned to the GitHub
+Actions app (`integration_id: 15368` in
+`.github/exported-config/ruleset-develop-branch.json`), so a check run
+with the same name from any other GitHub App installed on the repository
+cannot satisfy it. A check made required later must be pinned the same
+way.
+
 `mermaid-lint.yml` is the deliberate exception, and is neither in those
 `needs:` lists nor a required check. It runs only when markdown changes,
 and a path-filtered workflow made required never reports on the pull

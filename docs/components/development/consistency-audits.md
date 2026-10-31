@@ -183,8 +183,9 @@ repository's default branch before it creates, and on a private
 repository that read needs Contents. Issues alone was enough while
 the bot was an organisation owner; once it became a member on
 2026-10-30 the token could no longer file in private-ci (#349), and
-Contents read was added to it on 2026-10-31. `update-docs` uses it only to look up the open
-issues the page links to; the page itself is pushed by
+Contents read was added to it on 2026-10-31; audit run 41140043392
+then filed there again. `update-docs` uses it only to look up the
+open issues the page links to; the page itself is pushed by
 `scripts/commit-audit-docs.sh` with the job's own `GITHUB_TOKEN`,
 which `actions/checkout` leaves in the clone and the job's
 `contents: write` permission lets push to this repository alone. The
