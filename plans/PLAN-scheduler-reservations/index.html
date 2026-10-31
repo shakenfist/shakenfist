@@ -17265,18 +17265,18 @@ table entirely (decision D8).</p>
 <td>7a. An operator-readable capacity surface</td>
 <td><a href="../PLAN-scheduler-reservations-phase-07a-capacity-surface/">PLAN-scheduler-reservations-phase-07a-capacity-surface.md</a></td>
 <td>Complete</td>
-<td><code>e8585a874</code> (#4654)</td>
+<td><code>e8585a874</code> (#4654), <code>3695f168a</code> (#4687)</td>
 </tr>
 <tr>
 <td>7b. Capacity and claim views in sf-client</td>
-<td><code>PLAN-scheduler-reservations-phase-07b-client-views.md</code> (in shakenfist/client-python, branch <code>scheduler-reservations-phase-07b-client-views</code>; a relative link cannot cross repositories, so it is named rather than linked)</td>
-<td>Not started</td>
-<td>—</td>
+<td><code>PLAN-scheduler-reservations-phase-07b-client-views.md</code> (in shakenfist/client-python on its <code>develop</code>; a relative link cannot cross repositories, so it is named rather than linked)</td>
+<td>Complete</td>
+<td>client-python <code>d484fdc</code> (#442)</td>
 </tr>
 <tr>
-<td>8. Documentation and operator guide</td>
-<td>PLAN-scheduler-reservations-phase-08-docs.md</td>
-<td>Not started</td>
+<td>8. Documentation and operator guide, and the client release</td>
+<td><a href="../PLAN-scheduler-reservations-phase-08-docs/">PLAN-scheduler-reservations-phase-08-docs.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -17536,11 +17536,33 @@ is here.</p>
     <code>node capacity</code> command, so it became 7b's last step rather
     than holding 7a open (decided 2026-10-27). 7a's tokens and
     response shapes are what that step reads.</li>
-<li><strong>Phase 5 has two keys to carry:</strong> its rewrite of the admin view
+<li>
+<p><strong>Phase 5 has two keys to carry:</strong> its rewrite of the admin view
     must keep <code>cluster_capacity</code> and <code>excluded</code> (see the phase 5
     stub). The Execution notes in the phase plan record the two
     gate decisions: an absolute <code>metrics_timestamp</code>, and the reason
-    strings as a closed set.</li>
+    strings as a closed set.</p>
+</li>
+<li>
+<p><strong>Phase 7b</strong> merged as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/442" title="GitHub Issue: shakenfist/client-python #442">client-python#442</a> on 2026-10-28. Its plan,
+  its push audit and its outcome live in that repository, at
+  <code>docs/plans/PLAN-scheduler-reservations-phase-07b-client-views.md</code>.</p>
+</li>
+<li><strong>What it adds:</strong> <code>sf-client node capacity [NODE]</code> with the three
+    ledgers side by side, the binding marker, the not-reported list
+    (and, against a 7a server, each node's exclusion reason and the
+    cluster claims ledger), <code>namespace events</code>, <code>namespace claim
+    events</code>, <code>namespace claim list --all</code> with <code>--coverage</code>,
+    <code>peak_used_*</code> on <code>claim show</code>, daemon states on <code>node show</code>, a
+    working <code>node resources</code>, and <code>docs/cluster-capacity.md</code> and
+    <code>docs/namespace-claims.md</code> in client-python.</li>
+<li><strong>Carried 7a's deferred step 8</strong> as its step 6, so the capacity
+    surface 7a published has a reader. Nothing from either phase is
+    left unread.</li>
+<li><strong>Deferred, and recorded in its Future work:</strong>
+    <code>IncapableException</code> in <code>GroupCatchExceptions</code>, a per-node
+    <code>/admin/resources</code> form, and an sfui capacity view. No release was
+    cut (4b's D7); phase 8 cuts one.</li>
 </ul>
 <h3 id="phase-scope-stubs">Phase scope stubs<a class="headerlink" href="#phase-scope-stubs" title="Permanent link">&para;</a></h3>
 <p>Each stub is the seed for that phase's plan file; decisions
@@ -18024,6 +18046,22 @@ cuts one release covering everything phases 4b to 7b accumulate,
 and the guide must not merge claiming a command an operator
 cannot install. That ordering is this phase's obligation and
 nobody else's.</p>
+<p><em>Corrected by the phase 8 survey (2026-10-30).</em> The operator guide
+this stub asks for already exists: <code>docs/operator_guide/scheduler.md</code>
+carries the pipeline, the guarded admission, the claims with their
+advisory status and two states, the cross-namespace listing, the
+diagnosis path and the cluster ledger, and
+<code>docs/operator_guide/database.md</code> carries the reconciler; phases 3 to
+7a each wrote their part as they landed. The affinity migration notes
+exist too, in <code>docs/user_guide/affinity.md</code>, written by phase 6. What
+remains is narrower: the guide says in three places that <code>sf-client</code>
+has no claim or events verbs, which has been false since 4b and 7b;
+its diagnosis section is written against <code>/admin/resources</code> rather
+than <code>node capacity</code>; the guarded-UPDATE idiom is documented only as
+the scheduler's instance, never as a pattern (D10); the release notes
+mention none of phases 3 to 7b; the glossary defines none of the
+vocabulary; and the client release is overdue. The phase plan records
+the survey and scopes the phase to those gaps.</p>
 <p><strong>Phase 9 — push audit.</strong> Run
 the repository's pre-push audit over everything this plan
 built, as a single body of work rather than one branch at a
@@ -18048,7 +18086,12 @@ it. That defect is the reason this phase exists.</p>
 0 merged (<code>87a58a81e^1</code>, 2026-07-30) -- restricted to the
 paths this plan touches, so the range does not drag in
 unrelated work merged over the same months. The phase plan
-pins the path list.
+pins the path list. The audit also re-checks every code identifier
+the developer guide's guarded-counter pattern section cites
+(<code>docs/developer_guide/database_internals.md</code>, <em>Guarded counters for
+finite resources</em>) against <code>shakenfist/mariadb.py</code>, because phase 5
+changes the admission path those names describe and nothing else
+keeps the prose in step with them.
 Client-python has no <code>PUSH-AUDIT.md</code>. 4b's client range
 predates the <code>plan-push-audit-phase</code> rule and is audited from
 here, the way <code>PLAN-transient-capacity-refusals</code> phase 7 audited
@@ -18173,15 +18216,18 @@ because the following statements will be true:</p>
 <li>The "schedule N, fail on N-1" pattern is no longer
   reachable for batch creates. Either the whole batch is
   reserved up front or it fails up front.</li>
-<li>The <code>node_reservations</code> table is the single source of
-  truth for pending capacity claims, and stranded reservations
-  are reaped without operator intervention.</li>
-<li>The existing in-process <code>Scheduler()</code> callers are gone, or
-  explicitly justified for staying on the old shape with a
-  documented reason.</li>
-<li>The new batch-create API exists, is documented, and is used
-  end-to-end in at least one functional test under
-  <code>deploy/shakenfist_ci/cluster_ci_tests</code>.</li>
+<li>The three materialised capacity tables are the single source
+  of truth for admission, and drift between them and ground
+  truth is corrected by the reconciler without operator
+  intervention. (Phase 0 replaced the per-decision reservations
+  table with counters; see the Execution preamble.)</li>
+<li>The existing in-process <code>Scheduler()</code> callers are gone (phase
+  5), or explicitly justified for staying on the old shape with
+  a documented reason.</li>
+<li>A batch-create API was deferred out of this plan by D8. The
+  "schedule N, fail on N-1" pattern is addressed instead by
+  atomic per-create admission plus a namespace claim covering
+  the batch, which is what the conductor does (phase 4c).</li>
 <li>The affinity model is either preserved as today, simplified
   to the binary-soft form, or removed — with a clear documented
   rationale and a migration note for the user-facing API.</li>

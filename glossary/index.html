@@ -16683,11 +16683,30 @@ it, for example <code>sf_client.check_capability('blob-search-by-hash')</code>. 
 capabilities") and <code>docs/developer_guide/api_reference/blobs.md</code>. Not to be
 confused with an authorization term: capabilities do not grant or restrict
 access in Shaken Fist. The authorization noun is <a href="#scope">scope</a>.</p>
+<p><strong id="capacity-claim">capacity claim</strong> -- A namespace's reservation of aggregate
+cluster vCPU, memory and disk, created by an administrator, with at most one
+active claim per namespace. The ceiling is advisory this release: a placement
+that exceeds it is admitted and the exceedance recorded, while the claim's
+limits are still reserved against namespaces without a claim. Defined in
+<code>docs/operator_guide/scheduler.md#namespace-capacity-claims</code>. Not to be
+confused with the bound claims of a <a href="#mapping-rule">mapping rule</a>, which are
+fields of an OIDC <a href="#identity-token">identity token</a>.</p>
+<p><strong id="capacity-ledger">capacity ledger</strong> -- The <code>cluster_capacity</code> singleton row of
+cluster totals, claimed counters and unclaimed-used counters that both
+cluster-wide admission guards test against. It is published as
+<code>cluster_capacity</code> in <code>/admin/resources</code> and rendered by <code>sf-client node
+capacity</code>. Defined in
+<code>docs/operator_guide/scheduler.md#the-cluster-wide-ledger-in-the-resources-response</code>.</p>
 <p><strong id="cluster-operation">cluster operation</strong> -- The internal work-queue object that
 tracks a unit of cluster-wide work through its own state machine. Defined in
 <code>docs/developer_guide/database_internals.md</code> ("Cluster Operation Tracking" and
 "Cluster Operation Storage and Work Queues"). Not to be confused with an <em>agent operation</em>, which is
 executed by the in-guest <a href="#agent">agent</a> rather than by cluster daemons.</p>
+<p><strong id="coverage-state">coverage state</strong> -- Whether a <a href="#capacity-claim">capacity claim</a>
+currently covers placements: <code>active</code> or <code>expired</code>. It is carried beside, and
+never merged with, the object <code>state</code> (<code>created</code> or <code>deleted</code>), so an expired
+claim reads <code>state: created, coverage_state: expired</code>. Defined in
+<code>docs/operator_guide/scheduler.md#the-two-states-a-claim-carries</code>.</p>
 <p><strong id="credential">credential</strong> -- In the documentation this word appears mainly for
 MariaDB database credentials -- the username and password an operator configures
 for the database tier. Defined in <code>docs/operator_guide/database.md</code>. The
@@ -16705,6 +16724,14 @@ own retention period. Defined in <code>docs/user_guide/events.md</code>. Note: "
 event" strictly means an event of type <code>audit</code>; documentation sometimes uses the
 phrase loosely to mean "the event that serves as the audit record", which may be
 of another type.</p>
+<p><strong id="guarded-update">guarded UPDATE</strong> -- A single <code>UPDATE</code> whose <code>WHERE</code> clause
+carries the admission test, so that the affected row count is the decision and
+two concurrent writers serialise on the row. It is how a finite shared resource
+is drawn down without a read-then-write race, and under snapshot isolation it
+must be the transaction's first statement. Defined in
+<code>docs/developer_guide/database_internals.md#guarded-counters-for-finite-resources</code>
+and
+<code>docs/developer_guide/standards.md#a-guarded-update-must-be-the-transactions-first-statement</code>.</p>
 <p><strong id="identity-token">identity token</strong> -- An externally-issued JWT proving
 workload or user identity, for example a GitHub Actions OIDC token or an
 Authentik-issued token. It is presented to <code>POST /auth/federated</code>, along with a
@@ -16754,7 +16781,9 @@ vouches for nor inherit the wildcard an unscoped <a href="#namespace-key">namesp
 would. Rules are consumed by <code>POST /auth/federated</code>, which is where an
 <a href="#identity-token">identity token</a> becomes a key. Defined in
 <code>shakenfist/mapping_rule.py</code> and
-<code>docs/developer_guide/api_reference/authentication.md</code>.</p>
+<code>docs/developer_guide/api_reference/authentication.md</code>. Not to be confused with a
+namespace <a href="#capacity-claim">capacity claim</a>, which reserves cluster capacity
+and has nothing to do with identity tokens.</p>
 <p><strong id="namespace">namespace</strong> -- The tenancy and authorization unit: objects belong
 to a namespace, and a caller acts within one. Visibility extends to a caller's
 own namespace and to namespaces that <a href="#trust">trust</a> it. Defined in
@@ -16837,6 +16866,14 @@ This vocabulary -- "trusted publisher", "OIDC token", "keyless signing", release
 (namespace <a href="#trust">trust</a>, <a href="#trusted-issuer">trusted issuers</a>,
 <a href="#identity-token">identity tokens</a>). Defined in
 <code>docs/developer_guide/release_process.md</code>.</p>
+<p><strong id="scheduler-capacity-reconciler">scheduler capacity reconciler</strong> -- The
+five-minute pass on the elected cluster node that rebuilds the three capacity
+tables (<code>scheduler_node_capacity</code>, <code>namespace_claims</code> and <code>cluster_capacity</code>)
+from ground truth and expires stale <a href="#capacity-claim">capacity claims</a>. It
+corrects drift left by the incremental admission and release paths, and is the
+only writer that creates node and cluster capacity rows (a claim row is
+created by the operator's request). Defined in
+<code>docs/operator_guide/database.md#high-churn-dedicated-tables</code>.</p>
 <p><strong id="scope">scope</strong> -- A <code>resource-family.verb</code> string naming a class of
 operation that a <a href="#namespace-key">namespace key</a> (and the tokens derived from
 it) may perform, for example <code>blob.read</code> or <code>instance.delete</code>. Scope is the

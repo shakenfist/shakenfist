@@ -15011,6 +15011,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#atomic-admission-and-namespace-capacity-claims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Atomic admission and namespace capacity claims
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-operator-readable-capacity-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An operator-readable capacity surface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#affinity-constraints-and-the-deprecation-of-weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Affinity constraints, and the deprecation of weights
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#agent-operations-are-bounded-by-a-deadline-not-a-fixed-backstop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -17240,6 +17273,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#atomic-admission-and-namespace-capacity-claims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Atomic admission and namespace capacity claims
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-operator-readable-capacity-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An operator-readable capacity surface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#affinity-constraints-and-the-deprecation-of-weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Affinity constraints, and the deprecation of weights
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#agent-operations-are-bounded-by-a-deadline-not-a-fixed-backstop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -18670,6 +18736,193 @@ refused until they drain. Operators who prefer the historic
 behaviour can set <code>CPU_OVERCOMMIT_RATIO=16</code> and
 <code>NODE_CPU_RESERVATION_THREADS</code> / <code>NODE_RAM_RESERVATION_GB</code> to zero
 per node in inventory.</p>
+<h2 id="atomic-admission-and-namespace-capacity-claims">Atomic admission and namespace capacity claims<a class="headerlink" href="#atomic-admission-and-namespace-capacity-claims" title="Permanent link">&para;</a></h2>
+<p>Choosing a hypervisor and admitting an instance onto it are now two
+steps. Once the scheduler has chosen a candidate, the placement is
+admitted by a guarded capacity claim against an allocation ledger, in
+the same database transaction that writes the instance's <code>placement</code>
+attribute and the node's <code>instance_location</code> reference row. Two creates
+racing the last slot on a node therefore admit exactly once, and RAM and
+disk are protected the same way CPU is. A refused candidate is not a
+failed create: the scheduler walks to the next one, and the request
+fails with a 507 only once every candidate has refused. Which node
+refused, and on which dimension, is recorded in the instance's
+<code>schedule failed, every candidate refused by capacity guard</code> event
+rather than in the response body.</p>
+<p>What an operator must do:</p>
+<ul>
+<li><strong>Run <code>sf-ctl ensure-mariadb-schema</code> before rolling the daemons.</strong> The
+  ledger lives in three new tables, <code>scheduler_node_capacity</code>,
+  <code>namespace_claims</code> and <code>cluster_capacity</code>, and the command creates
+  them.</li>
+<li><strong>Upgrade the <code>sf-database</code> tier before <code>sf-api</code> and the queue
+  daemons.</strong> Admission is the <code>AdmitInstancePlacement</code> RPC, which has no
+  client-side fallback. A new <code>sf-api</code> calling an old <code>sf-database</code>
+  answers every instance create with a 500, whose error names
+  <code>database service predates AdmitInstancePlacement</code>, until the tier
+  catches up. See
+  <a href="/operator_guide/database/#ensure-mariadb-schema">ensure-mariadb-schema</a>.</li>
+</ul>
+<p>The tables are recomputed from ground truth every five minutes by a
+reconciler on the elected cluster node. Admission and release draw them
+down and give capacity back between passes, so the reconciler corrects
+drift rather than being the only writer. A node, or the cluster, whose
+row the reconciler has not yet written fails open: the placement
+proceeds unguarded and records an <code>instance placed without capacity
+guard</code> event, which is normal for the first minutes after the upgrade.
+The reconciler publishes the <code>scheduler_capacity_*</code> metrics from the
+elected node; alert on it falling behind rather than on its gauges
+disappearing, as the <a href="/operator_guide/database/">database guide</a>
+explains.</p>
+<p>The same guard carries an expected-demand term, which spreads a burst of
+creates across nodes rather than bounding capacity. Each admission
+charges <code>vcpus × SCHEDULER_DEMAND_PER_VCPU</code> (default 0.6) of
+anticipated load to its node, decaying over
+<code>SCHEDULER_DEMAND_DECAY_SECONDS</code> (default 600), and a node whose
+measured load plus the demand already charged to it is over its target
+is refused on the <code>demand</code> dimension. Demand alone never produces a
+507: if it was the only reason a walk admitted nowhere, the walk is
+repeated with the demand clause waived. Both settings are cluster-wide,
+set with
+<code>sf-ctl set-config</code>; see
+<a href="/operator_guide/scheduler/#expected-demand">Expected demand</a>.</p>
+<p><strong>Namespace capacity claims</strong> are new. A claim reserves aggregate
+cluster vCPUs, memory and disk for one namespace. It is a cluster-wide
+quantity, not a per-node one, and a namespace holds at most one active
+claim. Claims are admin-only, and are administered with
+<code>sf-client namespace claim</code> (<code>create</code>, <code>show</code>, <code>list</code>, <code>update</code> and
+<code>delete</code>) from <code>shakenfist-client</code> 0.8.4, or over REST at
+<code>/auth/namespaces/&lt;namespace&gt;/claims</code>. The server advertises them with
+the <code>namespace-claims</code> capability. Creating a claim moves the
+namespace's existing usage onto it. Expiry is a duration in seconds,
+applied against the cluster's clock; an expired claim stops covering
+placements but keeps its row until it is deleted, and must be replaced
+rather than grown back.</p>
+<p><strong>Claim ceilings are advisory this release.</strong> A placement that takes a
+namespace past its claim is admitted, not refused, and is recorded as a
+warning-level <code>placement admitted over namespace capacity claim</code> event
+on the instance and on the namespace. A claim does not cap its own
+namespace, but it does reserve capacity from everybody else at once:
+namespaces without a claim are admitted only into what active claims
+have not spoken for, so an oversized claim starves them today. Refusal
+arrives in a later release. Until then the events are what to calibrate
+a claim against, and the namespace's are the ones to read, because a
+claim's own events are removed with the claim.</p>
+<p>Creating or growing a claim is an admission decision of its own, and
+the status code says which kind of refusal it was:</p>
+<ul>
+<li><strong>507</strong>: the cluster cannot promise the capacity. The message names
+  each dimension that did not fit.</li>
+<li><strong>503</strong>: retry. The reconciler has not yet built the cluster ledger,
+  or the claim was being changed concurrently.</li>
+<li><strong>409</strong>: change the request. The namespace already holds an active
+  claim, a shrink went below what the claim is using, or the claim has
+  expired and must be replaced.</li>
+</ul>
+<p>See <a href="/operator_guide/scheduler/#namespace-capacity-claims">Namespace capacity claims</a>
+in the scheduler guide, and the client's
+<a href="https://github.com/shakenfist/client-python/blob/develop/docs/namespace-claims.md">namespace claims page</a>
+for the commands' options.</p>
+<h2 id="an-operator-readable-capacity-surface">An operator-readable capacity surface<a class="headerlink" href="#an-operator-readable-capacity-surface" title="Permanent link">&para;</a></h2>
+<p>The ledgers the scheduler admits against can now be read directly,
+from the API and from the client, rather than inferred from
+measurements. The client commands below need <code>shakenfist-client</code> 0.8.4.</p>
+<ul>
+<li><strong><code>sf-client node capacity</code></strong> renders <code>/admin/resources</code> with each
+  hypervisor's committed and measured ledgers side by side, which is
+  what answers "this node looks idle but is refusing work".
+  <code>sf-client node capacity &lt;node&gt;</code> cuts it to one node. In the
+  response itself, each node now carries its capacity row's
+  <code>cpu_committed</code>, <code>cpu_limit</code>, <code>disk_limit_gb</code> and
+  <code>disk_committed_gb</code> beside the measured figures, and <code>total</code> carries
+  <code>capacity_degraded</code>, which says the counters could not be read and is
+  worth reading before anything else. <code>sf-client node resources</code> still
+  prints the node's own last measurement, which is not what admission
+  uses.</li>
+<li><strong><code>/admin/resources</code> carries a <code>cluster_capacity</code> key</strong>: the cluster
+  ledger that admission and claims are tested against, with its totals,
+  what active claims hold, what namespaces without a claim use, and
+  <code>unallocated_*</code>, the figure to read. <code>row_present</code> and <code>degraded</code> say
+  why figures are missing, and a missing figure is <code>null</code>, never zero.
+  <code>node capacity</code> prints it last, as the cluster claims ledger.</li>
+<li><strong><code>/admin/resources</code> carries an <code>excluded</code> mapping</strong>, giving the
+  reason each hypervisor missing from <code>per_node</code> was left out:
+  <code>queue too long</code>, <code>stale metrics</code>, <code>no metrics</code> or
+  <code>metrics unreadable</code>. Previously a hypervisor whose daemon had stopped
+  publishing looked the same, in this response, as a network node.
+  <code>node capacity</code> lists these as hypervisors not reported by the
+  scheduler.</li>
+<li><strong><code>GET /admin/claims</code></strong> lists every namespace's claims in one
+  request, filtered on <code>coverage_state</code> (<code>active</code> or <code>expired</code>) if
+  asked. It includes claims whose object state is <code>deleted</code>, because
+  such a row still holds capacity. The client command is
+  <code>sf-client namespace claim list --all</code>, narrowed with
+  <code>--coverage active</code> or <code>--coverage expired</code>.</li>
+<li><strong>Claims publish <code>peak_used_*</code></strong>, the largest each usage counter has
+  reached while the claim has existed, which is never lowered and so
+  answers what a namespace held after its instances have gone.
+  <code>sf-client namespace claim show</code> prints it. The upgrade adds the
+  columns at zero, so a claim already holding instances reports a peak
+  below its use until the next reconcile pass.</li>
+<li><strong><code>sf-client namespace events &lt;namespace&gt;</code></strong> and
+  <strong><code>sf-client namespace claim events &lt;namespace&gt; &lt;claim&gt;</code></strong> read the
+  two event trails, which over REST are
+  <code>GET /auth/namespaces/&lt;namespace&gt;/events</code> and
+  <code>GET /auth/namespaces/&lt;namespace&gt;/claims/&lt;claim_ref&gt;/events</code>.</li>
+</ul>
+<p>Each read is advertised separately: <code>cluster-capacity</code>,
+<code>cluster-resources-excluded</code> and <code>cluster-claims</code> in the <code>admin</code> family,
+and <code>namespace-events</code> and <code>namespace-claim-events</code> in the <code>auth</code>
+family. Against a server without the matching capability, <code>node
+capacity</code>, <code>claim list --all</code> and the two events commands print the
+client's refusal and exit 1, while <code>node capacity</code> simply leaves out the
+exclusion reasons or the ledger when only those are missing.</p>
+<p>See the scheduler guide's sections on
+<a href="/operator_guide/scheduler/#the-cluster-wide-ledger-in-the-resources-response">the cluster-wide ledger</a>,
+<a href="/operator_guide/scheduler/#why-a-node-is-missing-from-the-resources-response">why a node is missing</a>
+and <a href="/operator_guide/scheduler/#listing-every-namespaces-claims">listing every namespace's claims</a>,
+and the client's
+<a href="https://github.com/shakenfist/client-python/blob/develop/docs/cluster-capacity.md">cluster capacity page</a>
+for what <code>node capacity</code> prints.</p>
+<h2 id="affinity-constraints-and-the-deprecation-of-weights">Affinity constraints, and the deprecation of weights<a class="headerlink" href="#affinity-constraints-and-the-deprecation-of-weights" title="Permanent link">&para;</a></h2>
+<p>The <code>affinity</code> metadata entry accepts a second value shape, using four
+reserved names that each take a JSON list of tags:</p>
+<ul>
+<li><code>require_with_tag</code> and <code>require_without_tag</code> are hard. A hypervisor
+  hosting no matching instance, or a matching one, respectively cannot
+  host the instance at all.</li>
+<li><code>prefer_with_tag</code> and <code>prefer_without_tag</code> are soft. Each matching
+  instance adds one to, or takes one from, a hypervisor's score, summed
+  across neighbours and tags.</li>
+</ul>
+<p>All four match only instances already placed, and only in the
+instance's own namespace, so <code>require_without_tag</code> is not an isolation
+primitive. The hard pair is a filter applied alongside the CPU, memory
+and disk filters, and it can leave no candidate: the create then fails
+with a 409 naming the constraint, where a weight would have placed the
+instance anywhere. The filter runs every time the instance is
+scheduled, restarts included, so a constraint that can no longer be
+satisfied refuses a restart too. A specification mixing tag weights and
+the reserved names is refused with a 400. The scheduler records the hard
+filter as the <code>schedule at stage affinity_constraints</code> event.</p>
+<p><strong>Tag weights are deprecated.</strong> They still work, and will for at least
+one more release, by being mapped onto the preference form: a positive
+weight becomes <code>prefer_with_tag</code>, a negative one <code>prefer_without_tag</code>,
+and zero nothing. The magnitude is discarded, so <code>{"webserver": -10}</code>
+and <code>{"webserver": -100}</code> now behave identically. Ordering is unchanged
+when every weight in a specification shares a magnitude, which includes
+every single-tag specification, and can change where magnitudes
+differed.</p>
+<p>Accepting a weighted specification records a <code>deprecated weighted
+affinity specification accepted</code> event on the instance. Instances which
+already carried one before the upgrade never emit it, so the scheduler
+guide carries a script to
+<a href="/operator_guide/scheduler/#finding-instances-that-still-use-weighted-affinity">find instances that still use weighted affinity</a>;
+convert what it finds before the release that removes weights. See
+<a href="/user_guide/affinity/#constraints-not-just-preferences">Affinity</a> in
+the user guide for the constraint form, and
+<a href="/user_guide/affinity/#the-weighted-form-is-deprecated">the weighted form is deprecated</a>
+for the mapping.</p>
 <h2 id="agent-operations-are-bounded-by-a-deadline-not-a-fixed-backstop">Agent operations are bounded by a deadline, not a fixed backstop<a class="headerlink" href="#agent-operations-are-bounded-by-a-deadline-not-a-fixed-backstop" title="Permanent link">&para;</a></h2>
 <p>Agent operations used to be bounded by a single hardcoded 900 second
 execution timeout, measured from the moment the sidechannel executor
