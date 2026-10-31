@@ -306,9 +306,9 @@ class GrpcGetClusterConfigValueTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._get_database_stub')
     def test_sends_keyed_request_and_decodes_value(
             self, mock_stub, mock_call):
-        mock_call.return_value = mock.Mock(entries=[
-            mock.Mock(key_name='DNS_SERVER',
-                      value_json=json.dumps('8.8.8.8'))])
+        mock_call.return_value = database_pb2.ClusterConfigReply(entries=[
+            database_pb2.ClusterConfigEntry(
+                key_name='DNS_SERVER', value_json=json.dumps('8.8.8.8'))])
 
         result = mariadb._grpc_get_cluster_config_value('DNS_SERVER')
 
@@ -322,11 +322,12 @@ class GrpcGetClusterConfigValueTestCase(base.ShakenFistTestCase):
             self, mock_stub, mock_call):
         # During a rolling upgrade an older sf-database ignores
         # key_name and replies with every row; take only ours.
-        mock_call.return_value = mock.Mock(entries=[
-            mock.Mock(key_name='AUTH_SECRET_SEED',
-                      value_json=json.dumps('secret123')),
-            mock.Mock(key_name='DNS_SERVER',
-                      value_json=json.dumps('8.8.8.8'))])
+        mock_call.return_value = database_pb2.ClusterConfigReply(entries=[
+            database_pb2.ClusterConfigEntry(
+                key_name='AUTH_SECRET_SEED',
+                value_json=json.dumps('secret123')),
+            database_pb2.ClusterConfigEntry(
+                key_name='DNS_SERVER', value_json=json.dumps('8.8.8.8'))])
 
         result = mariadb._grpc_get_cluster_config_value('DNS_SERVER')
         self.assertEqual('8.8.8.8', result)
@@ -334,10 +335,26 @@ class GrpcGetClusterConfigValueTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._grpc_call')
     @mock.patch('shakenfist.mariadb._get_database_stub')
     def test_returns_none_when_absent(self, mock_stub, mock_call):
-        mock_call.return_value = mock.Mock(entries=[])
+        mock_call.return_value = database_pb2.ClusterConfigReply(entries=[])
 
         result = mariadb._grpc_get_cluster_config_value('MISSING')
         self.assertIsNone(result)
+
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_marked_failed_read_raises_when_asked(
+            self, mock_stub, mock_call):
+        # Issue 4735: an sf-database whose own MariaDB read failed marks
+        # the reply, and with raise_on_error that marker is a failure,
+        # not an absent row.
+        mock_call.return_value = database_pb2.ClusterConfigReply(
+            entries=[], read_failed=True)
+
+        self.assertIsNone(mariadb._grpc_get_cluster_config_value('key'))
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb._grpc_get_cluster_config_value,
+            'key', raise_on_error=True)
 
     @mock.patch('shakenfist.mariadb._get_database_stub')
     def test_no_stub_raises_when_asked(self, mock_stub):
@@ -418,7 +435,9 @@ class ServicerGetClusterConfigKeyedTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, len(reply.entries))
         self.assertEqual('DNS_SERVER', reply.entries[0].key_name)
         self.assertEqual('8.8.8.8', json.loads(reply.entries[0].value_json))
-        mock_value.assert_called_once_with('DNS_SERVER')
+        # The read must opt into raising, or a failed read returns None
+        # and is replied as an absent row (issue 4735).
+        mock_value.assert_called_once_with('DNS_SERVER', raise_on_error=True)
         # The whole point: no full-table read for a keyed request.
         mock_all.assert_not_called()
 
@@ -431,6 +450,21 @@ class ServicerGetClusterConfigKeyedTestCase(base.ShakenFistTestCase):
         reply = self.servicer.GetClusterConfig(request, mock.MagicMock())
 
         self.assertEqual(0, len(reply.entries))
+        # Absence is not failure: the reply must stay unmarked.
+        self.assertFalse(reply.read_failed)
+
+    @mock.patch('shakenfist.mariadb._direct_get_cluster_config_value',
+                side_effect=exceptions.DatabaseUnavailable('nope'))
+    def test_keyed_request_marks_a_failed_read(self, mock_value):
+        # Issue 4735: a failed MariaDB read must not answer with the
+        # same empty reply as "no such row".
+        request = database_pb2.ClusterConfigRequest(
+            key_name='DNS_SERVER')
+
+        reply = self.servicer.GetClusterConfig(request, mock.MagicMock())
+
+        self.assertEqual(0, len(reply.entries))
+        self.assertTrue(reply.read_failed)
 
     @mock.patch('shakenfist.mariadb._direct_get_all_cluster_config')
     def test_unkeyed_request_still_returns_everything(self, mock_all):

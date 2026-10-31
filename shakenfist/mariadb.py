@@ -24960,9 +24960,13 @@ def _grpc_get_cluster_config_value(
 
     A failed RPC already raises (DatabaseUnavailable from _grpc_call's
     exhausted retries, or the RpcError itself); raise_on_error closes
-    the two remaining silent paths -- no stub, or no reply -- so a
-    caller which acts on the absence of the row cannot read a failure
-    as "no row yet" (issue 4704, as the direct path above).
+    the three remaining silent paths -- no stub, no reply, or a reply
+    marked read_failed because sf-database's own MariaDB read failed
+    (issue 4735) -- so a caller which acts on the absence of the row
+    cannot read a failure as "no row yet" (issue 4704, as the direct
+    path above). An older sf-database never sets read_failed, so during
+    a rolling upgrade its failed reads still arrive as unmarked empty
+    replies; the marker narrows the gap, it does not prove success.
     """
     stub = _get_database_stub()
     if not stub:
@@ -24978,6 +24982,15 @@ def _grpc_get_cluster_config_value(
         if raise_on_error:
             raise exceptions.DatabaseUnavailable(
                 f'no reply from GetClusterConfig for {key_name}')
+        return None
+
+    if response.read_failed:
+        if raise_on_error:
+            raise exceptions.DatabaseUnavailable(
+                f'sf-database could not read cluster config for '
+                f'{key_name}')
+        LOG.warning(
+            f'gRPC get_cluster_config_value read failed for {key_name}')
         return None
 
     for entry in response.entries:

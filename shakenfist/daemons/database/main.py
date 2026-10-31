@@ -565,12 +565,21 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         indexed single-row read; an empty key_name returns every row.
         Single-key callers must name their key so the full table -- which
         includes cluster secrets -- stays out of the reply (issue 4096).
+
+        A failed read answers with read_failed set rather than an empty
+        reply, which is indistinguishable from "no such row" -- a client
+        acting on absence (the VDI signing key bootstrap mints a fresh
+        key set over it) must be able to tell the two apart, as it can
+        on the direct path (issue 4735). The reply marker, rather than
+        an UNAVAILABLE status, keeps raising opt-in on the client: a
+        status would be retried into DatabaseUnavailable by _grpc_call
+        for every reader, including those which fall back on absence.
         """
         try:
             if request.key_name:
                 self.monitor.counters['get_cluster_config_value'].inc()
                 value = mariadb._direct_get_cluster_config_value(
-                    request.key_name)
+                    request.key_name, raise_on_error=True)
                 if value is None:
                     return database_pb2.ClusterConfigReply(entries=[])
                 return database_pb2.ClusterConfigReply(entries=[
@@ -593,7 +602,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database GetClusterConfig failed', e)
-            return database_pb2.ClusterConfigReply(entries=[])
+            return database_pb2.ClusterConfigReply(
+                entries=[], read_failed=True)
 
     def SetClusterConfig(
         self,

@@ -881,16 +881,26 @@ class ClusterConfigReply(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     ENTRIES_FIELD_NUMBER: _builtins.int
+    READ_FAILED_FIELD_NUMBER: _builtins.int
+    read_failed: _builtins.bool
+    """Set when the handler's own MariaDB read failed, so a caller which
+    acts on the absence of a row (the VDI signing key bootstrap mints
+    a fresh key set over it) can tell a failed read from "no such row"
+    (issue 4735). An older sf-database never sets this, so during a
+    rolling upgrade a failed read still arrives unmarked; absence of
+    the marker is not proof the read succeeded.
+    """
     @_builtins.property
     def entries(self) -> _containers.RepeatedCompositeFieldContainer[Global___ClusterConfigEntry]: ...
     def __init__(
         self,
         *,
         entries: _abc.Iterable[Global___ClusterConfigEntry] | None = ...,
+        read_failed: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["entries", b"entries"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["entries", b"entries", "read_failed", b"read_failed"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
