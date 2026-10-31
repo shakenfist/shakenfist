@@ -10,7 +10,9 @@ Atomic reservation-table scheduling is being built per
 The capacity tables, their reconciler, the guarded-UPDATE admission
 path that draws them down and the namespace claims API have all landed;
 hard claim ceilings, caller migration and further SQL pushdown are still
-to come.
+to come. The general form of the idiom, for a new finite-resource claim
+to copy, is
+[Guarded counters for finite resources](database_internals.md#guarded-counters-for-finite-resources).
 
 The scheduler ranks hypervisors by load per schedulable thread and
 admits against reservation-adjusted capacity. The reservation

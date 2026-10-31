@@ -58,11 +58,33 @@ capabilities") and `docs/developer_guide/api_reference/blobs.md`. Not to be
 confused with an authorization term: capabilities do not grant or restrict
 access in Shaken Fist. The authorization noun is [scope](#scope).
 
+**capacity claim**{#capacity-claim} -- A namespace's reservation of aggregate
+cluster vCPU, memory and disk, created by an administrator, with at most one
+active claim per namespace. The ceiling is advisory this release: a placement
+that exceeds it is admitted and the exceedance recorded, while the claim's
+limits are still reserved against namespaces without a claim. Defined in
+`docs/operator_guide/scheduler.md#namespace-capacity-claims`. Not to be
+confused with the bound claims of a [mapping rule](#mapping-rule), which are
+fields of an OIDC [identity token](#identity-token).
+
+**capacity ledger**{#capacity-ledger} -- The `cluster_capacity` singleton row of
+cluster totals, claimed counters and unclaimed-used counters that both
+cluster-wide admission guards test against. It is published as
+`cluster_capacity` in `/admin/resources` and rendered by `sf-client node
+capacity`. Defined in
+`docs/operator_guide/scheduler.md#the-cluster-wide-ledger-in-the-resources-response`.
+
 **cluster operation**{#cluster-operation} -- The internal work-queue object that
 tracks a unit of cluster-wide work through its own state machine. Defined in
 `docs/developer_guide/database_internals.md` ("Cluster Operation Tracking" and
 "Cluster Operation Storage and Work Queues"). Not to be confused with an *agent operation*, which is
 executed by the in-guest [agent](#agent) rather than by cluster daemons.
+
+**coverage state**{#coverage-state} -- Whether a [capacity claim](#capacity-claim)
+currently covers placements: `active` or `expired`. It is carried beside, and
+never merged with, the object `state` (`created` or `deleted`), so an expired
+claim reads `state: created, coverage_state: expired`. Defined in
+`docs/operator_guide/scheduler.md#the-two-states-a-claim-carries`.
 
 **credential**{#credential} -- In the documentation this word appears mainly for
 MariaDB database credentials -- the username and password an operator configures
@@ -83,6 +105,15 @@ own retention period. Defined in `docs/user_guide/events.md`. Note: "audit
 event" strictly means an event of type `audit`; documentation sometimes uses the
 phrase loosely to mean "the event that serves as the audit record", which may be
 of another type.
+
+**guarded UPDATE**{#guarded-update} -- A single `UPDATE` whose `WHERE` clause
+carries the admission test, so that the affected row count is the decision and
+two concurrent writers serialise on the row. It is how a finite shared resource
+is drawn down without a read-then-write race, and under snapshot isolation it
+must be the transaction's first statement. Defined in
+`docs/developer_guide/database_internals.md#guarded-counters-for-finite-resources`
+and
+`docs/developer_guide/standards.md#a-guarded-update-must-be-the-transactions-first-statement`.
 
 **identity token**{#identity-token} -- An externally-issued JWT proving
 workload or user identity, for example a GitHub Actions OIDC token or an
@@ -137,7 +168,9 @@ vouches for nor inherit the wildcard an unscoped [namespace key](#namespace-key)
 would. Rules are consumed by `POST /auth/federated`, which is where an
 [identity token](#identity-token) becomes a key. Defined in
 `shakenfist/mapping_rule.py` and
-`docs/developer_guide/api_reference/authentication.md`.
+`docs/developer_guide/api_reference/authentication.md`. Not to be confused with a
+namespace [capacity claim](#capacity-claim), which reserves cluster capacity
+and has nothing to do with identity tokens.
 
 **namespace**{#namespace} -- The tenancy and authorization unit: objects belong
 to a namespace, and a caller acts within one. Visibility extends to a caller's
@@ -227,6 +260,15 @@ This vocabulary -- "trusted publisher", "OIDC token", "keyless signing", release
 (namespace [trust](#trust), [trusted issuers](#trusted-issuer),
 [identity tokens](#identity-token)). Defined in
 `docs/developer_guide/release_process.md`.
+
+**scheduler capacity reconciler**{#scheduler-capacity-reconciler} -- The
+five-minute pass on the elected cluster node that rebuilds the three capacity
+tables (`scheduler_node_capacity`, `namespace_claims` and `cluster_capacity`)
+from ground truth and expires stale [capacity claims](#capacity-claim). It
+corrects drift left by the incremental admission and release paths, and is the
+only writer that creates node and cluster capacity rows (a claim row is
+created by the operator's request). Defined in
+`docs/operator_guide/database.md#high-churn-dedicated-tables`.
 
 **scope**{#scope} -- A `resource-family.verb` string naming a class of
 operation that a [namespace key](#namespace-key) (and the tokens derived from

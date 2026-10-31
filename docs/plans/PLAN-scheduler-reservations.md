@@ -360,9 +360,9 @@ table entirely (decision D8).
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started | — |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
-| 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654) |
-| 7b. Capacity and claim views in sf-client | `PLAN-scheduler-reservations-phase-07b-client-views.md` (in shakenfist/client-python, branch `scheduler-reservations-phase-07b-client-views`; a relative link cannot cross repositories, so it is named rather than linked) | Not started | — |
-| 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started | — |
+| 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
+| 7b. Capacity and claim views in sf-client | `PLAN-scheduler-reservations-phase-07b-client-views.md` (in shakenfist/client-python on its `develop`; a relative link cannot cross repositories, so it is named rather than linked) | Complete | client-python `d484fdc` (#442) |
+| 8. Documentation and operator guide, and the client release | [PLAN-scheduler-reservations-phase-08-docs.md](PLAN-scheduler-reservations-phase-08-docs.md) | In progress | — |
 | 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started | — |
 
 The `Merged` column records what put each phase on `develop`.
@@ -625,6 +625,25 @@ is here.
     stub). The Execution notes in the phase plan record the two
     gate decisions: an absolute `metrics_timestamp`, and the reason
     strings as a closed set.
+
+- **Phase 7b** merged as client-python#442 on 2026-10-28. Its plan,
+  its push audit and its outcome live in that repository, at
+  `docs/plans/PLAN-scheduler-reservations-phase-07b-client-views.md`.
+  - **What it adds:** `sf-client node capacity [NODE]` with the three
+    ledgers side by side, the binding marker, the not-reported list
+    (and, against a 7a server, each node's exclusion reason and the
+    cluster claims ledger), `namespace events`, `namespace claim
+    events`, `namespace claim list --all` with `--coverage`,
+    `peak_used_*` on `claim show`, daemon states on `node show`, a
+    working `node resources`, and `docs/cluster-capacity.md` and
+    `docs/namespace-claims.md` in client-python.
+  - **Carried 7a's deferred step 8** as its step 6, so the capacity
+    surface 7a published has a reader. Nothing from either phase is
+    left unread.
+  - **Deferred, and recorded in its Future work:**
+    `IncapableException` in `GroupCatchExceptions`, a per-node
+    `/admin/resources` form, and an sfui capacity view. No release was
+    cut (4b's D7); phase 8 cuts one.
 
 ### Phase scope stubs
 
@@ -1126,6 +1145,23 @@ and the guide must not merge claiming a command an operator
 cannot install. That ordering is this phase's obligation and
 nobody else's.
 
+*Corrected by the phase 8 survey (2026-10-30).* The operator guide
+this stub asks for already exists: `docs/operator_guide/scheduler.md`
+carries the pipeline, the guarded admission, the claims with their
+advisory status and two states, the cross-namespace listing, the
+diagnosis path and the cluster ledger, and
+`docs/operator_guide/database.md` carries the reconciler; phases 3 to
+7a each wrote their part as they landed. The affinity migration notes
+exist too, in `docs/user_guide/affinity.md`, written by phase 6. What
+remains is narrower: the guide says in three places that `sf-client`
+has no claim or events verbs, which has been false since 4b and 7b;
+its diagnosis section is written against `/admin/resources` rather
+than `node capacity`; the guarded-UPDATE idiom is documented only as
+the scheduler's instance, never as a pattern (D10); the release notes
+mention none of phases 3 to 7b; the glossary defines none of the
+vocabulary; and the client release is overdue. The phase plan records
+the survey and scopes the phase to those gaps.
+
 **Phase 9 — push audit.** Run
 the repository's pre-push audit over everything this plan
 built, as a single body of work rather than one branch at a
@@ -1152,7 +1188,12 @@ So the diff under audit is the plan's cumulative diff, not
 0 merged (`87a58a81e^1`, 2026-07-30) -- restricted to the
 paths this plan touches, so the range does not drag in
 unrelated work merged over the same months. The phase plan
-pins the path list.
+pins the path list. The audit also re-checks every code identifier
+the developer guide's guarded-counter pattern section cites
+(`docs/developer_guide/database_internals.md`, *Guarded counters for
+finite resources*) against `shakenfist/mariadb.py`, because phase 5
+changes the admission path those names describe and nothing else
+keeps the prose in step with them.
 Client-python has no `PUSH-AUDIT.md`. 4b's client range
 predates the `plan-push-audit-phase` rule and is audited from
 here, the way `PLAN-transient-capacity-refusals` phase 7 audited
@@ -1291,15 +1332,18 @@ because the following statements will be true:
 * The "schedule N, fail on N-1" pattern is no longer
   reachable for batch creates. Either the whole batch is
   reserved up front or it fails up front.
-* The `node_reservations` table is the single source of
-  truth for pending capacity claims, and stranded reservations
-  are reaped without operator intervention.
-* The existing in-process `Scheduler()` callers are gone, or
-  explicitly justified for staying on the old shape with a
-  documented reason.
-* The new batch-create API exists, is documented, and is used
-  end-to-end in at least one functional test under
-  `deploy/shakenfist_ci/cluster_ci_tests`.
+* The three materialised capacity tables are the single source
+  of truth for admission, and drift between them and ground
+  truth is corrected by the reconciler without operator
+  intervention. (Phase 0 replaced the per-decision reservations
+  table with counters; see the Execution preamble.)
+* The existing in-process `Scheduler()` callers are gone (phase
+  5), or explicitly justified for staying on the old shape with
+  a documented reason.
+* A batch-create API was deferred out of this plan by D8. The
+  "schedule N, fail on N-1" pattern is addressed instead by
+  atomic per-create admission plus a namespace claim covering
+  the batch, which is what the conductor does (phase 4c).
 * The affinity model is either preserved as today, simplified
   to the binary-soft form, or removed — with a clear documented
   rationale and a migration note for the user-facing API.
