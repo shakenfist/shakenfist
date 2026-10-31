@@ -191,7 +191,12 @@
     creates: /srv/shakenfist/venv/bin/activate
 
 - name: Upgrade pip and install uv in the virtualenv
-  ansible.builtin.command: /srv/shakenfist/venv/bin/pip install -U pip uv
+  # noqa: command-instead-of-shell -- shell word-splitting is required because
+  # pip_extra may be empty or expand to several whitespace-separated arguments.
+  # pip_extra is passed here as well as below: on a node which can only reach
+  # a private index, this install is the first to need those flags.
+  ansible.builtin.shell: >-
+    /srv/shakenfist/venv/bin/pip install -U {{ pip_extra }} pip uv
   changed_when: true
 
 - name: Install the Shaken Fist server and client packages
