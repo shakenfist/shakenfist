@@ -337,10 +337,11 @@ argument_specs:
         default: ""
         description:
           - >-
-            Extra arguments passed to uv pip install when installing the
-            server and client packages, for example --index-url or proxy
-            flags for local/CI installs. May be empty or expand to several
-            arguments.
+            Extra arguments passed to every pip install the bootstrap entry
+            point runs -- both the pip install which upgrades pip and installs
+            uv, and the uv pip install of the server and client packages --
+            for example --index-url or proxy flags for local/CI installs. May
+            be empty or expand to several arguments.
   bootstrap:
     short_description: Install OS packages and base services for a node.
     description:

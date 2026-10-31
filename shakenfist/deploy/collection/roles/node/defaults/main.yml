@@ -106,9 +106,10 @@ federation_jwks_ca_bundle: ""
 # Shaken Fist server/client package references installed into /srv/shakenfist's
 # virtualenv. The defaults install the released packages from PyPI. For
 # local/CI installs these may be overridden to local wheel paths (for example
-# /tmp/shakenfist-0.8.x.whl), and pip_extra may carry extra uv pip flags such
-# as --index-url or proxy options. pip_extra may be empty or expand to several
-# arguments.
+# /tmp/shakenfist-0.8.x.whl), and pip_extra may carry extra pip flags such
+# as --index-url or proxy options. Both the pip install which upgrades pip
+# and installs uv, and the uv pip install of the packages, read pip_extra.
+# It may be empty or expand to several arguments.
 server_package: "shakenfist"
 client_package: "shakenfist-client"
 pip_extra: ""
