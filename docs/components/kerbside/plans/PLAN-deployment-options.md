@@ -260,7 +260,7 @@ would creep back in. **Recommendation: yes.** Extend
 | 4. Containers: compose beyond the demo, and Kubernetes | [PLAN-deployment-options-phase-04-containers.md](/components/kerbside/plans/PLAN-deployment-options-phase-04-containers/) | Complete | 46a03a6 |
 | 5. Ansible: the `kerbside` role | [PLAN-deployment-options-phase-05-ansible.md](/components/kerbside/plans/PLAN-deployment-options-phase-05-ansible/) | Complete | c1f5938 |
 | 6. Installation hand-off | [PLAN-deployment-options-phase-06-installation.md](/components/kerbside/plans/PLAN-deployment-options-phase-06-installation/) | Complete | eebb1b2 |
-| 7. Push audit | [PLAN-deployment-options-phase-07-push-audit.md](/components/kerbside/plans/PLAN-deployment-options-phase-07-push-audit/) | In progress | |
+| 7. Push audit | [PLAN-deployment-options-phase-07-push-audit.md](/components/kerbside/plans/PLAN-deployment-options-phase-07-push-audit/) | Complete | c9056b0 |
 
 **Phase 1: survey, matrix and scaffolding.** Re-check the
 inventory above against the tree and against the Shaken Fist
@@ -421,19 +421,20 @@ copy lives in shakenfist/development at
 ## Dependencies on other plans
 
 - **shakenfist/shakenfist `PLAN-kerbside-deployer.md`** owns the
-  `kerbside` role. Phases 1 to 3 have merged, and phase 4 is
-  shakenfist#4479 (open on 2026-10-10). Its phase 5 already makes
-  Kerbside's sf-e2e lane deploy through the collection, and its
-  open question 2 already names Kerbside as the long-term home
-  of the systemd units.
+  `kerbside` role. That plan is complete: its phase 4,
+  shakenfist#4479, merged on 2026-10-18, and its phase 5 made
+  Kerbside's sf-e2e lane deploy through the collection. Its open
+  question 2 named Kerbside as the long-term home of the systemd
+  units.
 
   **Amendment accepted 2026-10-10** by the session running that
   plan, as a rewritten phase 5,
   `PLAN-kerbside-deployer-phase-05-role-to-kerbside.md`, committed
   as shakenfist 431d6a269 on shakenfist#4479's branch. The move
   needs that plan's phase 4 to merge, and a Kerbside release
-  containing #536 (the fix for #533). The newest release, v0.6.0,
-  predates it, **so a Kerbside release is on the critical path.**
+  containing #536 (the fix for #533). The newest release then,
+  v0.6.0, predated it, so a Kerbside release was on the critical
+  path; v0.8.0, below, was that release.
   It rewrites its phase 5 so that the role moves into this
   repository, as an ansible collection, rather than Kerbside's
   lane reaching into Shaken Fist's collection. The changes are:
@@ -446,10 +447,12 @@ copy lives in shakenfist/development at
 
   Kerbside's CI runs faster than Shaken Fist's, so iterating on
   the role here should be quicker. Shaken Fist's phase 4 merge
-  lane keeps proving the integration from the other side. The
-  cost is a collection dependency across repositories and a
-  release step for it, which that phase has to design. This
-  plan's phase 5 waits on the move.
+  lane was to keep proving the integration from the other side;
+  since shakenfist#4653 (merged 2026-10-25) that lane is a weekly
+  run rather than part of Shaken Fist's merge queue. The cost is a
+  collection dependency across repositories and a release step for
+  it, which that phase designed. This plan's phase 5 waited on the
+  move.
 
   **The move landed on 2026-10-22.**
   - Release: v0.8.0 published the role on Galaxy as the

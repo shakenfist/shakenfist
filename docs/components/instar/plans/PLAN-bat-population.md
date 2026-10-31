@@ -714,8 +714,8 @@ rather than merge requests.
 | 3. Host-only create: non-qcow2 preallocation parity and monolithicFlat | [PLAN-bat-population-phase-03-host-create.md](/components/instar/plans/PLAN-bat-population-phase-03-host-create/) | Complete | `a8d2f4ca` (#824) |
 | 4. Read side: BAT entry count (#626), partial last block, `LeaveBlocksAllocated` and `resize` | [PLAN-bat-population-phase-04-read-side.md](/components/instar/plans/PLAN-bat-population-phase-04-read-side/) | Complete | `d140aa04` (#835) |
 | 5. VHDX geometry: default block size (#645), 64 TiB ceiling, one shared layout | [PLAN-bat-population-phase-05-geometry.md](/components/instar/plans/PLAN-bat-population-phase-05-geometry/) | Complete | `52518787` (#848) |
-| 6. Streaming BAT emitter and the fixed `plan_vhdx` | [PLAN-bat-population-phase-06-emitter.md](/components/instar/plans/PLAN-bat-population-phase-06-emitter/) | In progress | |
-| 7. `create -f vhdx -o subformat=fixed`: guest streaming and host CLI | PLAN-bat-population-phase-07-create.md | Not started | |
+| 6. Streaming BAT emitter and the fixed `plan_vhdx` | [PLAN-bat-population-phase-06-emitter.md](/components/instar/plans/PLAN-bat-population-phase-06-emitter/) | Complete | `aef757d2` (#853) |
+| 7. `create -f vhdx -o subformat=fixed`: guest streaming and host CLI | [PLAN-bat-population-phase-07-create.md](/components/instar/plans/PLAN-bat-population-phase-07-create/) | In progress | |
 | 8. `convert -O vhdx --subformat fixed` | PLAN-bat-population-phase-08-convert.md | Not started | |
 | 9. `measure -O vhdx -o subformat=fixed` | PLAN-bat-population-phase-09-measure.md | Not started | |
 | 10. Cross-version matrix and derived-profile validation | PLAN-bat-population-phase-10-matrix.md | Not started | |
@@ -885,13 +885,19 @@ the layout, because convert does not link the create crate (see the
 phase 6 plan).
 
 **Phase 7** wires create end to end: the guest streams the BAT
-through one slot and extends the file to `data_start +
-virtual_size`, exactly as `emit_qcow2_l2_and_extend` does for qcow2
-L2 tables; the host lifts both refusals, parses `block_state_zero`,
+through one slot, as `emit_qcow2_l2_and_extend` does for qcow2 L2
+tables; the host lifts both refusals, parses `block_state_zero`,
 carries the subformat in `CreateConfig.vhd_subformat` and the state
 in a new `flags` bit (no struct layout change), sizes the output
 device from the layout, and refuses a backing file with
-`subformat=fixed`. Integration tests compare instar's fixed images
+`subformat=fixed`. Its survey moved the file extension to the host:
+the host opens the output at `fixed_data_start + virtual_size`, so a
+filesystem that cannot hold the file (ext4 refuses 16 TiB, because the
+data start pushes it past the ceiling) is refused by name before the
+guest runs, rather than reported as a write failure after the BAT is
+streamed. The survey also predicted the streaming cost from a qcow2
+proxy, about 21 µs per 512-byte sector: about 0.7 s at 2 TiB and 5 s at
+15 TiB with 1 MiB blocks (see the phase 7 plan). Integration tests compare instar's fixed images
 with qemu's through the structural comparator, not only through
 `qemu-img info`. This phase also measures the streaming cost
 (open question 4) and records it. One trap from phase 4's survey:
@@ -1636,6 +1642,10 @@ Found while planning, and assigned to phases above:
   does not copy it. Reporting it upstream is the operator's call.
 * `docs/quirks.md`'s measure entry for VHDX sources states the
   divergence backwards. Phase 9.
+* Found by phase 7, outside this plan's scope and not yet filed:
+  instar's size arguments refuse a fractional size such as `1.5M`
+  ("invalid memory size"), which qemu-img accepts (`do_strtosz` in
+  `util/cutils.c`); `parse_memory_size` takes integers only.
 * Found by phase 3 and filed, outside this plan's scope: `convert`
   rounds a raw source's virtual size up to 64 KiB (#821); `check`
   refuses every monolithicFlat VMDK (#822); sparse VMDK descriptors

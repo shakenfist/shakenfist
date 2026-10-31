@@ -12,10 +12,12 @@ that Kerbside has no first-party container image
 production compose file, and nothing for Kubernetes: no chart, no
 manifests and no operator.
 
-Two mechanisms do exist and are documented.
+Three mechanisms do exist and are documented.
 [By hand](/components/kerbside/deployment/manual/) installs Kerbside on a host with pip and
 systemd, and every step on it says what to create and why, which is
 what a container image of your own has to reproduce.
+[Ansible](/components/kerbside/deployment/ansible/) does the same on hosts you choose, with
+Kerbside's own role.
 [Kolla-Ansible](/components/kerbside/deployment/kolla-ansible/) deploys Kerbside in containers as
 part of an OpenStack cloud, with Kolla's images.
 
@@ -121,9 +123,11 @@ answer for you:
   sources are in the file `sources_path` names. The token signing
   seed, the database password, each source's credentials and the
   proxy's private key are all secrets, and both processes read both
-  files. [By hand](/components/kerbside/deployment/manual/#what-it-deploys) gives the ownership
-  and modes it uses, and the reasons, which carry over to mounted
-  secrets.
+  files. Mount the secrets as files rather than passing them as
+  `KERBSIDE_*` variables: a variable shows in `docker inspect`, and
+  in the compose file that sets it.
+  [By hand](/components/kerbside/deployment/manual/#what-it-deploys) gives the ownership and modes
+  it uses, and the reasons, which carry over to mounted secrets.
 - **The certificate lifecycle.** The demo issues its own
   certificates for 30 days, inside the container, and regenerates
   them when they near expiry. A production deployment takes the

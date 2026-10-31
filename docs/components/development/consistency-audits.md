@@ -134,6 +134,24 @@ Administration permission does not reach them, and the probe below
 fails with "cannot see repository settings". The organisation also
 refuses a fine-grained token whose lifetime is over 366 days.
 
+The minting account's own role matters as much. GitHub returns
+`security_and_analysis` only to a caller with admin access to the
+repository, and a fine-grained token never exceeds its account's
+access. The token is `shakenfist-bot`'s, and the bot stopped being
+an organisation owner on 2026-10-30; it reads the setting now
+because the bot is an organisation **security manager**, through
+the `sf-security-managers` team. That role reads every repository,
+writes every security alert (code scanning, Dependabot and secret
+scanning, including reading leaked values and dismissing alerts)
+and can change code security settings such as secret scanning and
+push protection at organisation and repository level; it grants no
+ruleset, environment or branch right. It is wider than the audit
+needs, and it belongs to the account, so every bot token whose
+scopes allow it carries that reach too. A token re-minted under an
+account without the role, or the team dropped from the security
+managers, fails every leg at "Check the read token". The way out
+is a read-only App identity for the legs, #352.
+
 These are enough for `release-environment-protection` too: the token
 was confirmed on 2026-10-19 to read both
 `environments/<name>` and its `deployment-branch-policies` without a
@@ -156,11 +174,16 @@ replace the secret, then dispatch a run of `main` to confirm it.
 
 `AUDIT_TOKEN` is also a fine-grained personal access token, with the
 `shakenfist` organisation as its resource owner, access to all
-repositories and no organisation permissions. It needs one repository
-permission beyond the Metadata every token gets: **Issues**, read and
-write, which covers listing, filing, editing, commenting on and
-closing issues, and creating the `consistency` label. It needs no
-Contents permission. `update-docs` uses it only to look up the open
+repositories and no organisation permissions. It needs two repository
+permissions beyond the Metadata every token gets: **Issues**, read
+and write, which covers listing, filing, editing, commenting on and
+closing issues, and creating the `consistency` label; and
+**Contents**, read only, because `gh issue create` reads the
+repository's default branch before it creates, and on a private
+repository that read needs Contents. Issues alone was enough while
+the bot was an organisation owner; once it became a member on
+2026-10-30 the token could no longer file in private-ci (#349), and
+Contents read was added to it on 2026-10-31. `update-docs` uses it only to look up the open
 issues the page links to; the page itself is pushed by
 `scripts/commit-audit-docs.sh` with the job's own `GITHUB_TOKEN`,
 which `actions/checkout` leaves in the clone and the job's

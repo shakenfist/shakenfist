@@ -41,7 +41,7 @@ Per-target option flags (alternatives to `-o`):
          --lazy-refcounts, --compat
   vmdk:  --subformat, --grain-size
   vpc:   --subformat, --block-size
-  vhdx:  --block-size
+  vhdx:  --subformat, --block-size
 ```
 
 `SIZE` accepts a suffix from `{b,K,M,G,T}` (e.g. `1G`, `512M`). It is
@@ -59,7 +59,7 @@ The full flag surface is reported by `instar create --help`.
 | qcow2  | n/a                    | Yes      | info-equivalent (modulo refcount_bits, compat, zstd) |
 | vmdk   | monolithicSparse, streamOptimized, monolithicFlat | Yes (not monolithicFlat) | info-equivalent |
 | vpc    | dynamic, fixed         | Yes (dynamic only) | info-equivalent (modulo CHS virtual_size rounding) |
-| vhdx   | dynamic                | Yes      | info-equivalent |
+| vhdx   | dynamic, fixed         | Yes (dynamic only) | info-equivalent |
 
 A "No" in the *Backing?* column means the format cannot be created
 *as a child* at all: `-b` / `-o backing_file` is rejected. Raw is the
@@ -238,6 +238,38 @@ Honoured:
   up to 32 TiB, then 64 MiB. The `Created:` line's `unit_size` reports
   the block size the image records.
 - `preallocation` (off|falloc|full; `falloc` and `full` are no-ops, `metadata` is refused)
+- `subformat` (dynamic|fixed). A fixed image sets the
+  `LeaveBlocksAllocated` file parameter and has a BAT entry for every
+  payload block. By default each entry is `PAYLOAD_BLOCK_ZERO`; with
+  `block_state_zero=off` each is `PAYLOAD_BLOCK_FULLY_PRESENT`, at
+  sequential offsets from the data start qemu-img uses. The file is
+  sparse and as long as that data start plus the virtual size, so
+  creating a large one is quick and allocates only the metadata. The
+  data region is not written. A fixed image is refused in three cases:
+
+  ```
+  $ instar create -f vhdx -o subformat=fixed -b base.vhdx new.vhdx
+  Error: "create: vhdx subformat=fixed cannot have a backing file"
+  $ instar create -f vhdx -o subformat=fixed --preallocation metadata f.vhdx 1G
+  Error: "create: preallocation=metadata is not supported for vhdx"
+  $ instar create -f vhdx -o subformat=fixed big.vhdx 16T
+  Error: "create: a fixed VHDX of 17592186044416 bytes needs a 17592198627328-byte file, which the filesystem holding 'big.vhdx' cannot store: File too large (os error 27)"
+  ```
+
+  The last is what a filesystem whose files top out at 16 TiB (ext4,
+  for one) says, because the file is the virtual size plus the data
+  start. No file is left behind; qemu-img leaves a small one (131152
+  bytes, measured) and says "The image size is too large for file
+  format 'vhdx'". At some sizes qemu-img writes a fixed image it
+  cannot open again, and instar writes the same one; see the
+  [VHDX partial last block](/components/instar/quirks/#vhdx-partial-last-block-past-the-first-chunk) entry
+  in quirks.md.
+- `block_state_zero` (on|off, default on), which picks the state of a
+  fixed image's BAT entries as above. Any other value is refused:
+  `create: bad value 'bogus' for -o key 'block_state_zero' (expected on/off)`.
+  It is parsed but changes nothing on a dynamic image, whose BAT stays
+  `PAYLOAD_BLOCK_NOT_PRESENT`; that is also what qemu-img writes with
+  `block_state_zero=off`.
 - `backing_file`, `backing_fmt` — a VHDX child with a parent sets the
   `HasParent` file-parameter bit and writes a populated parent
   locator metadata item carrying the parent's active-header
@@ -476,12 +508,6 @@ through `instar check` and match `qemu-img` (instar #365).
 - qemu's DDB lines (`ddb.virtualHWVersion`, `ddb.geometry.*`,
   `ddb.adapterType`, `ddb.toolsVersion`) in VMDK descriptors, honouring
   `adapter_type`, `hwversion` and `toolsversion`.
-- VHDX `subformat=fixed`. instar refuses it today, but qemu-img does emit it:
-  `qemu-img create -f vhdx -o subformat=fixed` sets the `LeaveBlocksAllocated`
-  file parameter, writes a BAT entry for every payload block
-  (`PAYLOAD_BLOCK_ZERO` by default, `PAYLOAD_BLOCK_FULLY_PRESENT` at
-  sequential offsets with `-o block_state_zero=off`) and extends the file
-  sparsely to the end of its data region.
 - `--object OBJDEF` and `encrypt.*` for LUKS-encrypted create —
   pair with the existing convert-side passphrase plumbing.
 - Atomic-rename safety: write to `FILENAME.tmp` and `rename()` on
