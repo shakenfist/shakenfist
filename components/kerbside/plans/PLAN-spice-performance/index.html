@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/kerbside/plans/PLAN-spice-performance/">
       
       
-        <link rel="prev" href="../PLAN-kerbside-vdi-tokens/">
+        <link rel="prev" href="../PLAN-spice-performance-phase-06-push-audit/">
       
       
         <link rel="next" href="../PLAN-two-tier-ci-phase-01-ovirt-kerbside/">
@@ -10570,6 +10570,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-spice-performance-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE performance phase 6: push audit of phases 1-5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -17292,7 +17320,7 @@ first phase.</p>
 <td>3. Display transcoding in Kerbside: feasibility spike (verdict: no-go)</td>
 <td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/">PLAN-spice-performance-phase-03-transcoding.md</a></td>
 <td>Complete</td>
-<td>2e19d737aa (#489), ryll fdb5ead5b4 (#406), eab2c572cf (#494), 9d1b64d6 (#505), 13e9e2eb (#581), bba71155 (#616), 7919eadf73 (#630)</td>
+<td>2e19d737aa (#489), ryll fdb5ead5b4 (#406), eab2c572cf (#494), 9d1b64deae (#505), 13e9e2eb (#581), bba71155 (#616), 7919eadf73 (#630)</td>
 </tr>
 <tr>
 <td>4. Son of SPICE: D-Bus display feasibility spike (verdict: no-go, as measured)</td>
@@ -17303,13 +17331,13 @@ first phase.</p>
 <tr>
 <td>5. spice-server patches, measured: codec choice, the connect crash, trace ring, 60 fps, hardware probing</td>
 <td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-05-spice-server/">PLAN-spice-performance-phase-05-spice-server.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>46c3e9857c (#654), kerbside-patches 2d7b626422 (#2024)</td>
 </tr>
 <tr>
-<td>6. Push audit of phases 1-5 (kerbside and kerbside-patches)</td>
-<td></td>
-<td>Not started</td>
+<td>6. Push audit of phases 1-5 (kerbside, kerbside-patches and ryll #406)</td>
+<td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/">PLAN-spice-performance-phase-06-push-audit.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -17354,9 +17382,14 @@ What remains is the dri-devel submission of the kernel fix;
 qemu is carried downstream, not submitted (below).</p>
 <p>Its <code>Merged</code> cell records <code>kerbside-patches &lt;sha&gt; (#pr)</code> for the
 import, and <code>linux &lt;sha&gt;</code> once the kernel fix lands. The push
-audit cites kerbside-patches' own audit for the import and the
-dri-devel review for the kernel fix. The carried qemu series
-has no upstream review, so its audit is kerbside-patches' own.</p>
+audit cites the dri-devel review for the kernel fix. The carried
+qemu series has no upstream review, so its audit is
+kerbside-patches' own.
+  - <em>Corrected 2026-10-31 by phase 6's survey:</em> kerbside-patches
+    has no <code>PUSH-AUDIT.md</code>, and its upstream-series push audit
+    has not run, so there is no audit of the import to cite.
+    Phase 6 applies the shared block's floor checklist to it
+    instead, and reviews the carried qemu series itself.</p>
 <p>Both have now reported, and each upstream has its own
 contribution rule.</p>
 <ul>
@@ -17878,8 +17911,16 @@ kerbside-patches' <code>upstream/spice/</code>:
 phases 1-5, run before the QUIC work starts so that the two
 bodies of work are audited separately. It follows the shared
 block below over the ranges recorded in phases 1-5's <code>Merged</code>
-cells, and cites kerbside-patches' own audits for the work
-that landed there.</p>
+cells.
+- <em>Corrected 2026-10-31 by its survey:</em> there are no
+  kerbside-patches audits to cite. That repository has no
+  <code>PUSH-AUDIT.md</code>, so phase 6 applies the block's floor
+  checklist to #1748 and #2024 itself. ryll #406 was never
+  audited either, so phase 6 runs ryll's runbook over it.
+  andris #56 carries its own audit, which phase 6 cites. The
+  phase plan
+  (<a href="/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/">PLAN-spice-performance-phase-06-push-audit.md</a>)
+  has the full survey.</p>
 <p><strong>Phases 7 and 8</strong> (added 2026-09-27) put the ryll-to-Kerbside
 client leg on QUIC, so that one UDP connection carries every
 SPICE channel of a session. They are deliberately loosely
@@ -17955,7 +17996,7 @@ their accumulated diff and cites phase 6 for phases 1-5,
 rather than re-auditing work that has already been audited.
 Work that lands in ryll is audited under ryll's own push
 audit, and phase 9 cites it.</p>
-<!-- shared-block: plan-push-audit-phase v3 -->
+<!-- shared-block: plan-push-audit-phase v4 -->
 <p>Push audit phase (shared block; do not edit -- the canonical
 copy lives in shakenfist/development at
 <code>templates/shared-blocks/plan-push-audit-phase.md</code>):</p>
@@ -18020,7 +18061,32 @@ copy lives in shakenfist/development at
 <li>A repository with no <code>PUSH-AUDIT.md</code> still carries the phase, and
   the phase says that the runbook does not exist yet and what was
   done instead. Silently omitting it is what let the audit go
-  untriggered for as long as it did.</li>
+  untriggered for as long as it did. What is done instead is at
+  least the checklist below, applied to the recorded ranges: it is
+  a floor, not a substitute for a runbook, and a plan adds the
+  questions its own repository's blast radius raises. Each item
+  gets a verdict, or a sentence saying why it does not apply.
+  Do not borrow another repository's runbook instead: a runbook is
+  written for one repository's blast radius.</li>
+<li>Every recorded landing takes one of the forms above: a merge
+     commit with two parents, whose diff is read against its first
+     parent; every commit of a direct landing, or its <code>first..last</code>
+     range; a landing in another repository, whose own audit is
+     cited; or a statement that no range is recoverable, naming the
+     paths the audit read.</li>
+<li>Anything the diff added that runs unattended -- cron, a timer,
+     a scheduled workflow, a self-update -- reports its own failure
+     somewhere a human sees, or is named as not doing so.</li>
+<li>No secret or token entered any repository, and no private
+     hostname or IP address entered a repository more public than
+     the one it came from.</li>
+<li>Anything the diff removed or renamed has no consumer left,
+     checked by grep across every repository that could consume it
+     rather than by assumption, with the greps stated.</li>
+<li>Where the repository publishes something -- an image, a
+     release, a package -- a broken change fails closed: one that
+     publishes nothing is recoverable, one that publishes something
+     wrong is not.</li>
 </ul>
 <!-- shared-block-end -->
 
@@ -18110,7 +18176,7 @@ same four there itself.</p>
 <li>Upstream the rig's small Ryll patch, which adds a <code>rect</code> to the
   control socket's <code>surface_drawn</code> event
   (<code>tools/shaped-link/ryll-surface-drawn-rect.patch</code>). Until
-  then the rig carries it as a patch.</li>
+  then the rig carries it as a patch. Filed in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/673" title="GitHub Issue: shakenfist/ryll #673">ryll#673</a>.</li>
 <li><em>Answered by phase 5 (2026-10-30).</em> Report spice-server 0.15.2's
   crash when a client connects while streams already exist, once it has been reproduced
   against spice-server's current master. Since phase 3's no-go
@@ -18146,10 +18212,11 @@ same four there itself.</p>
   <code>self.last_ack = self.message_count.saturating_sub(1);</code> in the
   <code>SET_ACK</code> handler, was confirmed on ryll 0d140b3; display and
   cursor channels both need it. It belongs in a ryll pull
-  request.</li>
+  request. Filed in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/673" title="GitHub Issue: shakenfist/ryll #673">ryll#673</a>.</li>
 <li><strong>Ryll: the display-socket stall.</strong> In 18 of 184 phase 3
   repeats Ryll stopped reading its display socket, relay and
-  transcode alike. The cause is not established.</li>
+  transcode alike. The cause is not established. Filed in
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/673" title="GitHub Issue: shakenfist/ryll #673">ryll#673</a>.</li>
 <li><strong>Andris: socket pacing and the JPEG fringe.</strong> Phase 3 found
   socket pacing beating an ACK window of 40 by up to two times
   where the link was the limit (andris paces on a window of 20),
@@ -18158,7 +18225,8 @@ same four there itself.</p>
   Phase 4 adds a second reason for socket pacing: with no
   stream, andris's message-counted window held seconds of JPEG
   tiles on slow links (3263 ms p50 at 80 ms / 5 Mbit busy,
-  against 371 ms for spice-server with streaming off).</li>
+  against 371 ms for spice-server with streaming off). Filed,
+  with the other andris items below, as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/62" title="GitHub Issue: shakenfist/andris #62">andris#62</a>.</li>
 <li><em>Answered by phase 5 (2026-10-30).</em> <strong>Find out which codec
   spice-server chooses for <code>streaming-video=all</code>, and why.</strong> Phase 4's 28 <code>all</code> repeats
   sent MJPEG (codec 1); the re-baseline, ACK-window,
@@ -18221,15 +18289,15 @@ same four there itself.</p>
   arrive before the init message is handled, which Ryll's link-up
   send does. Waiting until after it would keep Ryll users safe on
   every released spice-server while the fix goes upstream. It
-  belongs in a ryll pull request.</li>
+  belongs in a ryll pull request. Filed in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/673" title="GitHub Issue: shakenfist/ryll #673">ryll#673</a>.</li>
 <li><strong>kerbside-patches: <code>upstream/qemu/rig/sysroot/build.sh</code> cannot
   extract what it downloads</strong> (found in phase 5). <code>apt-get download</code>
   writes to the current directory and ignores
   <code>Dir::Cache::archives</code>, so the <code>.deb</code> files never reach <code>$WORK</code>.
-  An issue is to be filed in kerbside-patches.</li>
+  Filed as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-patches/issues/2033" title="GitHub Issue: shakenfist/kerbside-patches #2033">kerbside-patches#2033</a> (2026-10-31).</li>
 <li><strong>A faster bitrate ramp in spice-server</strong> (item 4, deferred by
   phase 5). The lead: spice-server rate control holds delivered
-  stream frames to 4 to 12 per second on these links whatever the
+  display messages to 4 to 12 per second on these links whatever the
   frame-rate ceiling (phase 5's 60 fps measurement). Whether a
   faster ramp would raise that, and at what cost on the slow
   links, needs a client that decodes the codec measured.</li>

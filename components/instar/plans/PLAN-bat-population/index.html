@@ -10786,6 +10786,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-spice-performance-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE performance phase 6: push audit of phases 1-5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-spice-performance/" class="md-nav__link">
         
   
@@ -17836,13 +17864,13 @@ rather than merge requests.</p>
 <tr>
 <td>6. Streaming BAT emitter and the fixed <code>plan_vhdx</code></td>
 <td><a href="/components/instar/plans/PLAN-bat-population-phase-06-emitter/">PLAN-bat-population-phase-06-emitter.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>aef757d2</code> (#853)</td>
 </tr>
 <tr>
 <td>7. <code>create -f vhdx -o subformat=fixed</code>: guest streaming and host CLI</td>
-<td>PLAN-bat-population-phase-07-create.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-bat-population-phase-07-create/">PLAN-bat-population-phase-07-create.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -18036,13 +18064,19 @@ cannot see instar-testdata. The filler lives in the vhdx crate, beside
 the layout, because convert does not link the create crate (see the
 phase 6 plan).</p>
 <p><strong>Phase 7</strong> wires create end to end: the guest streams the BAT
-through one slot and extends the file to <code>data_start +
-virtual_size</code>, exactly as <code>emit_qcow2_l2_and_extend</code> does for qcow2
-L2 tables; the host lifts both refusals, parses <code>block_state_zero</code>,
+through one slot, as <code>emit_qcow2_l2_and_extend</code> does for qcow2 L2
+tables; the host lifts both refusals, parses <code>block_state_zero</code>,
 carries the subformat in <code>CreateConfig.vhd_subformat</code> and the state
 in a new <code>flags</code> bit (no struct layout change), sizes the output
 device from the layout, and refuses a backing file with
-<code>subformat=fixed</code>. Integration tests compare instar's fixed images
+<code>subformat=fixed</code>. Its survey moved the file extension to the host:
+the host opens the output at <code>fixed_data_start + virtual_size</code>, so a
+filesystem that cannot hold the file (ext4 refuses 16 TiB, because the
+data start pushes it past the ceiling) is refused by name before the
+guest runs, rather than reported as a write failure after the BAT is
+streamed. The survey also predicted the streaming cost from a qcow2
+proxy, about 21 µs per 512-byte sector: about 0.7 s at 2 TiB and 5 s at
+15 TiB with 1 MiB blocks (see the phase 7 plan). Integration tests compare instar's fixed images
 with qemu's through the structural comparator, not only through
 <code>qemu-img info</code>. This phase also measures the streaming cost
 (open question 4) and records it. One trap from phase 4's survey:
@@ -18778,6 +18812,10 @@ Found while planning, and assigned to phases above:</p>
   does not copy it. Reporting it upstream is the operator's call.</li>
 <li><code>docs/quirks.md</code>'s measure entry for VHDX sources states the
   divergence backwards. Phase 9.</li>
+<li>Found by phase 7, outside this plan's scope and not yet filed:
+  instar's size arguments refuse a fractional size such as <code>1.5M</code>
+  ("invalid memory size"), which qemu-img accepts (<code>do_strtosz</code> in
+  <code>util/cutils.c</code>); <code>parse_memory_size</code> takes integers only.</li>
 <li>Found by phase 3 and filed, outside this plan's scope: <code>convert</code>
   rounds a raw source's virtual size up to 64 KiB (#821); <code>check</code>
   refuses every monolithicFlat VMDK (#822); sparse VMDK descriptors

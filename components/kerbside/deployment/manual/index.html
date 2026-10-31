@@ -10692,6 +10692,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-spice-performance-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE performance phase 6: push audit of phases 1-5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-spice-performance/" class="md-nav__link">
         
   
@@ -16905,8 +16933,8 @@ one.</p>
 <tr>
 <td><code>/run/kerbside</code></td>
 <td><code>kerbside</code></td>
-<td>systemd's default</td>
-<td>The daemon's API socket, created by <code>RuntimeDirectory=kerbside</code> each time the daemon starts</td>
+<td>0700</td>
+<td>The daemon's API socket, mode 0600. systemd creates the directory (<code>RuntimeDirectory=kerbside</code>) each time the daemon starts, and the daemon sets both modes when it binds</td>
 </tr>
 </tbody>
 </table>
@@ -16919,12 +16947,13 @@ read its secrets but cannot rewrite its own configuration, and cannot
 replace the code it runs.</p>
 <p>There is no state directory and no log directory, because Kerbside
 writes almost nothing locally. Its state is in the database. Apart
-from a temporary file the oVirt driver writes its CA to, the only file
-it creates at runtime is its API socket. That goes in <code>/run/kerbside</code>,
-a directory only root may create, so systemd creates it for the
-service user. Kerbside logs to syslog, which on a systemd host lands in the
-journal, so <code>journalctl</code> is where its logs are. <code>LOG_OUTPUT_PATH</code>
-changes that (see
+from the temporary files Proxmox sources, and oVirt sources without a
+<code>ca_file</code>, write their CA to, the only file it creates at runtime is
+its API socket. That goes in <code>/run/kerbside</code>, a directory only root
+may create, so systemd creates it for the service user. Kerbside logs
+to syslog, which on a systemd host lands in the journal, so
+<code>journalctl</code> is where its logs are. <code>LOG_OUTPUT_PATH</code> changes that
+(see
 <a href="/components/kerbside/configuration/#logging-and-monitoring-settings">configuration.md</a>),
 and a file it names has to be writable by the <code>kerbside</code> user.</p>
 <p>The role also keeps its helper scripts in <code>/srv/kerbside/bin</code> and a

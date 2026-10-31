@@ -10729,6 +10729,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-spice-performance-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE performance phase 6: push audit of phases 1-5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-spice-performance/" class="md-nav__link">
         
   
@@ -17009,6 +17037,23 @@ reads the organisation's public ones, as any token can, but its
 Administration permission does not reach them, and the probe below
 fails with "cannot see repository settings". The organisation also
 refuses a fine-grained token whose lifetime is over 366 days.</p>
+<p>The minting account's own role matters as much. GitHub returns
+<code>security_and_analysis</code> only to a caller with admin access to the
+repository, and a fine-grained token never exceeds its account's
+access. The token is <code>shakenfist-bot</code>'s, and the bot stopped being
+an organisation owner on 2026-10-30; it reads the setting now
+because the bot is an organisation <strong>security manager</strong>, through
+the <code>sf-security-managers</code> team. That role reads every repository,
+writes every security alert (code scanning, Dependabot and secret
+scanning, including reading leaked values and dismissing alerts)
+and can change code security settings such as secret scanning and
+push protection at organisation and repository level; it grants no
+ruleset, environment or branch right. It is wider than the audit
+needs, and it belongs to the account, so every bot token whose
+scopes allow it carries that reach too. A token re-minted under an
+account without the role, or the team dropped from the security
+managers, fails every leg at "Check the read token". The way out
+is a read-only App identity for the legs, #352.</p>
 <p>These are enough for <code>release-environment-protection</code> too: the token
 was confirmed on 2026-10-19 to read both
 <code>environments/&lt;name&gt;</code> and its <code>deployment-branch-policies</code> without a
@@ -17028,11 +17073,16 @@ pointing at the run. Mint a replacement with the permissions above and
 replace the secret, then dispatch a run of <code>main</code> to confirm it.</p>
 <p><code>AUDIT_TOKEN</code> is also a fine-grained personal access token, with the
 <code>shakenfist</code> organisation as its resource owner, access to all
-repositories and no organisation permissions. It needs one repository
-permission beyond the Metadata every token gets: <strong>Issues</strong>, read and
-write, which covers listing, filing, editing, commenting on and
-closing issues, and creating the <code>consistency</code> label. It needs no
-Contents permission. <code>update-docs</code> uses it only to look up the open
+repositories and no organisation permissions. It needs two repository
+permissions beyond the Metadata every token gets: <strong>Issues</strong>, read
+and write, which covers listing, filing, editing, commenting on and
+closing issues, and creating the <code>consistency</code> label; and
+<strong>Contents</strong>, read only, because <code>gh issue create</code> reads the
+repository's default branch before it creates, and on a private
+repository that read needs Contents. Issues alone was enough while
+the bot was an organisation owner; once it became a member on
+2026-10-30 the token could no longer file in private-ci (#349), and
+Contents read was added to it on 2026-10-31. <code>update-docs</code> uses it only to look up the open
 issues the page links to; the page itself is pushed by
 <code>scripts/commit-audit-docs.sh</code> with the job's own <code>GITHUB_TOKEN</code>,
 which <code>actions/checkout</code> leaves in the clone and the job's

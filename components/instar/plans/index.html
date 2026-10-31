@@ -10631,6 +10631,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-spice-performance-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE performance phase 6: push audit of phases 1-5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-spice-performance/" class="md-nav__link">
         
   
@@ -16912,7 +16940,7 @@ at the repo root).</p>
 <td><a href="/components/instar/plans/PLAN-bat-population/">Populated BAT output: fixed VHDX and non-qcow2 preallocation</a></td>
 <td>Emit fixed VHDX from <code>create</code> and <code>convert</code> (and answer it in <code>measure</code>) the way qemu-img does -- <code>LeaveBlocksAllocated</code> set and every payload BAT entry written, <code>PAYLOAD_BLOCK_ZERO</code> by default or <code>FULLY_PRESENT</code> at sequential offsets with <code>block_state_zero=off</code> -- through a streaming BAT emitter that never holds the table in guest memory; accept <code>-o preallocation=falloc</code> and <code>full</code> on vmdk / vpc / vhdx as the no-op qemu-img makes it (and refuse <code>metadata</code>); add host-only <code>create -f vmdk -o subformat=monolithicFlat</code>. Fixes the VHDX read and geometry defects fixed output would expose first: the BAT entry count (#626, which makes instar refuse some well-formed qemu images), qemu's size-scaled default block size (#645), <code>check</code> rejecting a partial last block, <code>resize</code> turning a fixed VHDX into a hybrid, and the 64 TiB ceiling. Multi-extent VMDK output is out of scope</td>
 <td>In progress</td>
-<td><a href="/components/instar/plans/PLAN-bat-population-phase-01-pin/">1: pin</a> ✓, <a href="/components/instar/plans/PLAN-bat-population-phase-02-fixtures/">2: fixtures</a> ✓ (five small fixtures rather than the 128 GiB one the master plan assumed -- git-LFS stores sparse files fully allocated, and an 8 MiB dynamic image reproduces #626; the generator joins <code>scripts/create-vhd-testdata.sh</code> in instar, and the create baselines move to phase 10), <a href="/components/instar/plans/PLAN-bat-population-phase-03-host-create/">3: host create</a> ✓ (no-op preallocation for vmdk / vpc / vhdx and host-only monolithicFlat create, tested against the phase 1 pin; fixes #820, convert's flat extent name), <a href="/components/instar/plans/PLAN-bat-population-phase-04-read-side/">4: read side</a> ✓ (one BAT entry count, qemu's, closing #626; <code>check</code> accepts a partial last block by payload index, deliberately not copying qemu's BAT-index rule, which refuses qemu's own fixed images past the first chunk (#797); <code>resize</code> refuses a fixed VHDX with its own error code (#798); <code>measure</code> joins the fixture read matrix), <a href="/components/instar/plans/PLAN-bat-population-phase-05-geometry/">5: geometry</a> ✓ (one VHDX layout function for every writer, readers keep no ceiling; qemu's size-scaled default block size in create, convert, dd and measure, closing #645; the 64 TiB ceiling, closing #799; sizes rounded to 512 as qemu does, closing #843), <a href="/components/instar/plans/PLAN-bat-population-phase-06-emitter/">6: emitter</a> (the streaming BAT filler and qemu's fixed data start in the vhdx crate, and a fixed subformat in <code>plan_vhdx</code>, reachable only from the crate until phase 7; the survey found instar's shared builders differ from qemu's in the Required bit, the metadata items' flags and placement, and the physical sector size, and fixes all of them for every VHDX writer), 7: create, 8: convert, 9: measure, 10: matrix, 11: fuzz, 12: docs, 13: push audit</td>
+<td><a href="/components/instar/plans/PLAN-bat-population-phase-01-pin/">1: pin</a> ✓, <a href="/components/instar/plans/PLAN-bat-population-phase-02-fixtures/">2: fixtures</a> ✓ (five small fixtures rather than the 128 GiB one the master plan assumed -- git-LFS stores sparse files fully allocated, and an 8 MiB dynamic image reproduces #626; the generator joins <code>scripts/create-vhd-testdata.sh</code> in instar, and the create baselines move to phase 10), <a href="/components/instar/plans/PLAN-bat-population-phase-03-host-create/">3: host create</a> ✓ (no-op preallocation for vmdk / vpc / vhdx and host-only monolithicFlat create, tested against the phase 1 pin; fixes #820, convert's flat extent name), <a href="/components/instar/plans/PLAN-bat-population-phase-04-read-side/">4: read side</a> ✓ (one BAT entry count, qemu's, closing #626; <code>check</code> accepts a partial last block by payload index, deliberately not copying qemu's BAT-index rule, which refuses qemu's own fixed images past the first chunk (#797); <code>resize</code> refuses a fixed VHDX with its own error code (#798); <code>measure</code> joins the fixture read matrix), <a href="/components/instar/plans/PLAN-bat-population-phase-05-geometry/">5: geometry</a> ✓ (one VHDX layout function for every writer, readers keep no ceiling; qemu's size-scaled default block size in create, convert, dd and measure, closing #645; the 64 TiB ceiling, closing #799; sizes rounded to 512 as qemu does, closing #843), <a href="/components/instar/plans/PLAN-bat-population-phase-06-emitter/">6: emitter</a> ✓ (the streaming BAT filler and qemu's fixed data start in the vhdx crate, and a fixed subformat in <code>plan_vhdx</code>, reachable only from the crate until phase 7; the survey found instar's shared builders differ from qemu's in the Required bit, the metadata items' flags and placement, and the physical sector size, and fixes all of them for every VHDX writer), <a href="/components/instar/plans/PLAN-bat-population-phase-07-create/">7: create</a> (<code>create -f vhdx -o subformat=fixed</code> and <code>--subformat fixed</code>, honouring <code>block_state_zero</code>; the guest streams the BAT through one 64 KiB slot and the host opens the output at its fixed length, so a filesystem too small for the file is refused by name; tested against every fixed pin case with nothing masked), 8: convert, 9: measure, 10: matrix, 11: fuzz, 12: docs, 13: push audit</td>
 </tr>
 </tbody>
 </table>

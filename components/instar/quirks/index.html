@@ -14606,6 +14606,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-spice-performance-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE performance phase 6: push audit of phases 1-5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-spice-performance/" class="md-nav__link">
         
   
@@ -25501,6 +25529,12 @@ defect rather than damage to the image.</p>
 host <code>qemu-img</code>, requires <code>instar info</code>, <code>check</code>, <code>map</code> and <code>measure</code> to
 pass on it, and requires the host <code>qemu-img check</code> to exit 2 on it, so
 a qemu that fixes the defect shows up there.</p>
+<p><code>instar create -f vhdx -o subformat=fixed,block_state_zero=off</code> writes
+qemu-img's layout at those sizes too, so the image it makes is one
+<code>qemu-img</code> cannot open either, while <code>instar check</code> reads it.
+<code>TestCreateVhdxFixedLarge</code> in <code>tests/test_create.py</code> creates the
+4608.5M image with both tools, requires the two structures to be
+identical, and requires <code>instar check</code> to pass on instar's.</p>
 <h2 id="measure-subcommand-quirks">measure subcommand quirks<a class="headerlink" href="#measure-subcommand-quirks" title="Permanent link">&para;</a></h2>
 <h3 id="-image-opts-is-rejected"><code>--image-opts</code> is rejected<a class="headerlink" href="#-image-opts-is-rejected" title="Permanent link">&para;</a></h3>
 <p><code>qemu-img measure --image-opts driver=qcow2,file.filename=...</code>

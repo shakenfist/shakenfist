@@ -10836,6 +10836,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-spice-performance-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE performance phase 6: push audit of phases 1-5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-spice-performance/" class="md-nav__link">
         
   
@@ -17389,8 +17417,8 @@ would creep back in. <strong>Recommendation: yes.</strong> Extend
 <tr>
 <td>7. Push audit</td>
 <td><a href="/components/kerbside/plans/PLAN-deployment-options-phase-07-push-audit/">PLAN-deployment-options-phase-07-push-audit.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>c9056b0</td>
 </tr>
 </tbody>
 </table>
@@ -17545,19 +17573,20 @@ copy lives in shakenfist/development at
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>shakenfist/shakenfist <code>PLAN-kerbside-deployer.md</code></strong> owns the
-  <code>kerbside</code> role. Phases 1 to 3 have merged, and phase 4 is
-  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4479" title="GitHub Issue: shakenfist/shakenfist #4479">shakenfist#4479</a> (open on 2026-10-10). Its phase 5 already makes
-  Kerbside's sf-e2e lane deploy through the collection, and its
-  open question 2 already names Kerbside as the long-term home
-  of the systemd units.</li>
+  <code>kerbside</code> role. That plan is complete: its phase 4,
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4479" title="GitHub Issue: shakenfist/shakenfist #4479">shakenfist#4479</a>, merged on 2026-10-18, and its phase 5 made
+  Kerbside's sf-e2e lane deploy through the collection. Its open
+  question 2 named Kerbside as the long-term home of the systemd
+  units.</li>
 </ul>
 <p><strong>Amendment accepted 2026-10-10</strong> by the session running that
   plan, as a rewritten phase 5,
   <code>PLAN-kerbside-deployer-phase-05-role-to-kerbside.md</code>, committed
   as shakenfist 431d6a269 on <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4479" title="GitHub Issue: shakenfist/shakenfist #4479">shakenfist#4479</a>'s branch. The move
   needs that plan's phase 4 to merge, and a Kerbside release
-  containing #536 (the fix for #533). The newest release, v0.6.0,
-  predates it, <strong>so a Kerbside release is on the critical path.</strong>
+  containing #536 (the fix for #533). The newest release then,
+  v0.6.0, predated it, so a Kerbside release was on the critical
+  path; v0.8.0, below, was that release.
   It rewrites its phase 5 so that the role moves into this
   repository, as an ansible collection, rather than Kerbside's
   lane reaching into Shaken Fist's collection. The changes are:</p>
@@ -17570,10 +17599,12 @@ copy lives in shakenfist/development at
 </ul>
 <p>Kerbside's CI runs faster than Shaken Fist's, so iterating on
   the role here should be quicker. Shaken Fist's phase 4 merge
-  lane keeps proving the integration from the other side. The
-  cost is a collection dependency across repositories and a
-  release step for it, which that phase has to design. This
-  plan's phase 5 waits on the move.</p>
+  lane was to keep proving the integration from the other side;
+  since <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4653" title="GitHub Issue: shakenfist/shakenfist #4653">shakenfist#4653</a> (merged 2026-10-25) that lane is a weekly
+  run rather than part of Shaken Fist's merge queue. The cost is a
+  collection dependency across repositories and a release step for
+  it, which that phase designed. This plan's phase 5 waited on the
+  move.</p>
 <p><strong>The move landed on 2026-10-22.</strong>
   - Release: v0.8.0 published the role on Galaxy as the
     <code>shakenfist.kerbside</code> collection.

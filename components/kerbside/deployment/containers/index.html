@@ -10681,6 +10681,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-spice-performance-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE performance phase 6: push audit of phases 1-5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-spice-performance/" class="md-nav__link">
         
   
@@ -16787,10 +16815,12 @@ that Kerbside has no first-party container image
 (<a href="https://github.com/shakenfist/kerbside/issues/553">#553</a>), no
 production compose file, and nothing for Kubernetes: no chart, no
 manifests and no operator.</p>
-<p>Two mechanisms do exist and are documented.
+<p>Three mechanisms do exist and are documented.
 <a href="/components/kerbside/deployment/manual/">By hand</a> installs Kerbside on a host with pip and
 systemd, and every step on it says what to create and why, which is
 what a container image of your own has to reproduce.
+<a href="/components/kerbside/deployment/ansible/">Ansible</a> does the same on hosts you choose, with
+Kerbside's own role.
 <a href="/components/kerbside/deployment/kolla-ansible/">Kolla-Ansible</a> deploys Kerbside in containers as
 part of an OpenStack cloud, with Kolla's images.</p>
 <p>This page is about how Kerbside is run, not about why. The pieces
@@ -16902,9 +16932,11 @@ answer for you:</p>
   sources are in the file <code>sources_path</code> names. The token signing
   seed, the database password, each source's credentials and the
   proxy's private key are all secrets, and both processes read both
-  files. <a href="/components/kerbside/deployment/manual/#what-it-deploys">By hand</a> gives the ownership
-  and modes it uses, and the reasons, which carry over to mounted
-  secrets.</li>
+  files. Mount the secrets as files rather than passing them as
+  <code>KERBSIDE_*</code> variables: a variable shows in <code>docker inspect</code>, and
+  in the compose file that sets it.
+  <a href="/components/kerbside/deployment/manual/#what-it-deploys">By hand</a> gives the ownership and modes
+  it uses, and the reasons, which carry over to mounted secrets.</li>
 <li><strong>The certificate lifecycle.</strong> The demo issues its own
   certificates for 30 days, inside the container, and regenerates
   them when they near expiry. A production deployment takes the

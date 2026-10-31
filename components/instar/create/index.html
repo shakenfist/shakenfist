@@ -10812,6 +10812,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-spice-performance-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE performance phase 6: push audit of phases 1-5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-spice-performance/" class="md-nav__link">
         
   
@@ -17073,7 +17101,7 @@ metadata via virtio-block.</p>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>         --lazy-refcounts, --compat
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  vmdk:  --subformat, --grain-size
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  vpc:   --subformat, --block-size
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  vhdx:  --block-size
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  vhdx:  --subformat, --block-size
 </code></pre></div>
 <p><code>SIZE</code> accepts a suffix from <code>{b,K,M,G,T}</code> (e.g. <code>1G</code>, <code>512M</code>). It is
 required unless <code>-b BACKING</code> is given, in which case it defaults to the
@@ -17117,8 +17145,8 @@ file, so it always needs <code>SIZE</code>.</p>
 </tr>
 <tr>
 <td>vhdx</td>
-<td>dynamic</td>
-<td>Yes</td>
+<td>dynamic, fixed</td>
+<td>Yes (dynamic only)</td>
 <td>info-equivalent</td>
 </tr>
 </tbody>
@@ -17293,6 +17321,35 @@ length as both <code>metadata_bytes_written</code> and <code>file_size_after</co
   up to 32 TiB, then 64 MiB. The <code>Created:</code> line's <code>unit_size</code> reports
   the block size the image records.
 - <code>preallocation</code> (off|falloc|full; <code>falloc</code> and <code>full</code> are no-ops, <code>metadata</code> is refused)
+- <code>subformat</code> (dynamic|fixed). A fixed image sets the
+  <code>LeaveBlocksAllocated</code> file parameter and has a BAT entry for every
+  payload block. By default each entry is <code>PAYLOAD_BLOCK_ZERO</code>; with
+  <code>block_state_zero=off</code> each is <code>PAYLOAD_BLOCK_FULLY_PRESENT</code>, at
+  sequential offsets from the data start qemu-img uses. The file is
+  sparse and as long as that data start plus the virtual size, so
+  creating a large one is quick and allocates only the metadata. The
+  data region is not written. A fixed image is refused in three cases:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>$ instar create -f vhdx -o subformat=fixed -b base.vhdx new.vhdx
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Error: "create: vhdx subformat=fixed cannot have a backing file"
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>$ instar create -f vhdx -o subformat=fixed --preallocation metadata f.vhdx 1G
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>Error: "create: preallocation=metadata is not supported for vhdx"
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>$ instar create -f vhdx -o subformat=fixed big.vhdx 16T
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>Error: "create: a fixed VHDX of 17592186044416 bytes needs a 17592198627328-byte file, which the filesystem holding 'big.vhdx' cannot store: File too large (os error 27)"
+</code></pre></div>
+<p>The last is what a filesystem whose files top out at 16 TiB (ext4,
+  for one) says, because the file is the virtual size plus the data
+  start. No file is left behind; qemu-img leaves a small one (131152
+  bytes, measured) and says "The image size is too large for file
+  format 'vhdx'". At some sizes qemu-img writes a fixed image it
+  cannot open again, and instar writes the same one; see the
+  <a href="/components/instar/quirks/#vhdx-partial-last-block-past-the-first-chunk">VHDX partial last block</a> entry
+  in quirks.md.
+- <code>block_state_zero</code> (on|off, default on), which picks the state of a
+  fixed image's BAT entries as above. Any other value is refused:
+  <code>create: bad value 'bogus' for -o key 'block_state_zero' (expected on/off)</code>.
+  It is parsed but changes nothing on a dynamic image, whose BAT stays
+  <code>PAYLOAD_BLOCK_NOT_PRESENT</code>; that is also what qemu-img writes with
+  <code>block_state_zero=off</code>.
 - <code>backing_file</code>, <code>backing_fmt</code> — a VHDX child with a parent sets the
   <code>HasParent</code> file-parameter bit and writes a populated parent
   locator metadata item carrying the parent's active-header
@@ -17422,8 +17479,8 @@ both covered in full in the "VHD/VHDX differencing" section of
   <code>ERROR_PARENT_NAME_TOO_LONG</code>.</li>
 </ul>
 <p>A <strong>differencing VHD or VHDX is refused as a backing file</strong>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>create failed: backing file is a differencing VHD or VHDX; create does
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>not support stacking a backing file on one
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>create failed: backing file is a differencing VHD or VHDX; create does
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>not support stacking a backing file on one
 </code></pre></div>
 <p>This has its own error code (<code>ERROR_BACKING_DIFFERENCING</code>) rather than
 the generic <code>ERROR_BACKING_PARSE_FAILED</code>, because the backing header
@@ -17535,12 +17592,6 @@ through <code>instar check</code> and match <code>qemu-img</code> (instar #365).
 <li>qemu's DDB lines (<code>ddb.virtualHWVersion</code>, <code>ddb.geometry.*</code>,
   <code>ddb.adapterType</code>, <code>ddb.toolsVersion</code>) in VMDK descriptors, honouring
   <code>adapter_type</code>, <code>hwversion</code> and <code>toolsversion</code>.</li>
-<li>VHDX <code>subformat=fixed</code>. instar refuses it today, but qemu-img does emit it:
-  <code>qemu-img create -f vhdx -o subformat=fixed</code> sets the <code>LeaveBlocksAllocated</code>
-  file parameter, writes a BAT entry for every payload block
-  (<code>PAYLOAD_BLOCK_ZERO</code> by default, <code>PAYLOAD_BLOCK_FULLY_PRESENT</code> at
-  sequential offsets with <code>-o block_state_zero=off</code>) and extends the file
-  sparsely to the end of its data region.</li>
 <li><code>--object OBJDEF</code> and <code>encrypt.*</code> for LUKS-encrypted create —
   pair with the existing convert-side passphrase plumbing.</li>
 <li>Atomic-rename safety: write to <code>FILENAME.tmp</code> and <code>rename()</code> on
@@ -17555,40 +17606,40 @@ through <code>instar check</code> and match <code>qemu-img</code> (instar #365).
 applied during JSON comparison, see <code>tests/helpers/info_json.py</code>.</p>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Create a 1 GiB qcow2 with default options:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar create -f qcow2 disk.qcow2 1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar create -f qcow2 disk.qcow2 1G
 </code></pre></div>
 <p>Same but with a 4 KiB cluster size and extended L2:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar create -f qcow2 -o cluster_size=4k,extended_l2=on disk.qcow2 1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar create -f qcow2 -o cluster_size=4k,extended_l2=on disk.qcow2 1G
 </code></pre></div>
 <p>Create a vmdk with the stream-optimised subformat:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar create -f vmdk -o subformat=streamOptimized disk.vmdk 1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar create -f vmdk -o subformat=streamOptimized disk.vmdk 1G
 </code></pre></div>
 <p>Create a 16 MiB fixed VHD (footer-only metadata at end of file):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar create -f vpc -o subformat=fixed disk.vhd 16M
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar create -f vpc -o subformat=fixed disk.vhd 16M
 </code></pre></div>
 <p>Create a 1 GiB vhdx. With no <code>block_size</code> it gets qemu-img's default
 for the size, 8 MiB here; the default rises to 16 MiB above 1 GiB,
 32 MiB above 100 GiB and 64 MiB above 32 TiB (see
 <a href="/components/instar/quirks/#vhdx-default-block_size-scales-with-the-size-as-qemu-imgs-does">quirks.md</a>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar create -f vhdx disk.vhdx 1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>instar create -f vhdx disk.vhdx 1G
 </code></pre></div>
 <p>Create a vhdx with an explicit 32 MiB block size:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>instar create -f vhdx -o block_size=32M disk.vhdx 1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>instar create -f vhdx -o block_size=32M disk.vhdx 1G
 </code></pre></div>
 <p>Create a qcow2 child image with a backing reference (virtual_size
 defaults from the parent):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>instar create -f qcow2 -b parent.qcow2 -F qcow2 child.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>instar create -f qcow2 -b parent.qcow2 -F qcow2 child.qcow2
 </code></pre></div>
 <p>Create a differencing VHD child (the parent's identity is read off the
 parent and the virtual size defaults from it):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>instar create -f vpc -b parent.vhd -F vpc child.vhd
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>instar create -f vpc -b parent.vhd -F vpc child.vhd
 </code></pre></div>
 <p>Create a raw image with <code>falloc</code> preallocation (reserves blocks
 without writing them):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>instar create -f raw --preallocation falloc disk.raw 1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>instar create -f raw --preallocation falloc disk.raw 1G
 </code></pre></div>
 <p>JSON output for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>instar create -f qcow2 --output json disk.qcow2 1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>instar create -f qcow2 --output json disk.qcow2 1G
 </code></pre></div>
 
 
