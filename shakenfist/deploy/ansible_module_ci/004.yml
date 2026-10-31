@@ -260,6 +260,55 @@
         that: not ci_instance['failed']
         fail_msg: "failed should be false in {{ ci_instance }}"
 
+    # NOTE(mikal): regression coverage for shakenfist/actions#207. Only the
+    # real shakenfist_client shows that an unawaited create returns before
+    # the scheduler has placed the instance, so this is the one place the
+    # placement wait is exercised against it.
+    - name: Create an instance and wait only for its placement
+      sf_instance:
+        name: "ansibleci-004-placed"
+        namespace: "{{ namespace_name }}"
+        cpu: 1
+        ram: 1024
+        disks:
+          - 10@debian:11
+        state: present
+        await_placement: true
+      register: ci_instance_placed
+
+    - name: Assert the instance is new
+      assert:
+        that: ci_instance_placed['changed']
+        fail_msg: "changed should be true in {{ ci_instance_placed }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_instance_placed['failed']
+        fail_msg: "failed should be false in {{ ci_instance_placed }}"
+
+    - name: Assert the instance was placed
+      assert:
+        that:
+          - ci_instance_placed['meta']['state'] in ['creating', 'created']
+          - ci_instance_placed['log'] | select('search', 'was placed') | list | length > 0
+        fail_msg: "instance not reported as placed in {{ ci_instance_placed }}"
+
+    - name: Delete the placed instance
+      sf_instance:
+        uuid: "{{ ci_instance_placed['meta']['uuid'] }}"
+        state: "absent"
+      register: ci_instance_placed
+
+    - name: Assert the instance was changed
+      assert:
+        that: ci_instance_placed['changed']
+        fail_msg: "changed should be true in {{ ci_instance_placed }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_instance_placed['failed']
+        fail_msg: "failed should be false in {{ ci_instance_placed }}"
+
     - name: Delete the first network
       sf_network:
         uuid: "{{ ci_network_a['meta']['uuid'] }}"
