@@ -12,7 +12,8 @@
 # reaches the ansible output, even at -vvvv; that a KERBSIDE_URL or
 # KERBSIDE_TOKEN_DURATION cluster_config row which differs from its variable
 # (or which an older sf-ctl redacts), or an extra_config entry naming either,
-# stops the deploy before anything is written, while an equal row only warns;
+# in whatever letter case, stops the deploy before anything is written, while
+# an equal row only warns;
 # that a Kerbside key which is equal to system_key, too short, or set without
 # a URL is refused before it is minted; that the signing key task reports
 # changed only when sf-ctl says it created a key (issue 4704); and that the
@@ -121,8 +122,10 @@ EOF
 chmod +x "${STUB}"
 
 # Play 6a's shape: the preflight first, a marker where the play's set-config
-# and deploy key tasks would be, then the credentials. cluster_db_host and
-# extra_config are play vars, as there, and node_mesh_ip an include var.
+# and deploy key tasks would be, then the credentials. cluster_db_host is a
+# play var, as there, node_mesh_ip an include var, and extra_config comes from
+# the inventory (here, extra vars) or is unset, as it is for an operator who
+# has none.
 cat > "${WORK}/play.yml" << 'EOF'
 ---
 - name: Exercise the Kerbside entry points as play 6a does
@@ -130,7 +133,6 @@ cat > "${WORK}/play.yml" << 'EOF'
   connection: local
   gather_facts: false
   vars:
-    extra_config: "[]"
     cluster_db_host: localhost
   tasks:
     - name: Check the Kerbside configuration against cluster_config
@@ -349,6 +351,12 @@ case_5_equal_rows() {
 -- preflight passed --
 ARGV: ensure-kerbside-signing-key
 -- credentials done --'
+
+    # A lower-case row is the same row: the daemons read it as KERBSIDE_URL.
+    CURRENT_CASE='case 5b: a lower-case row equal to its variable'
+    write_rows "{\"kerbside_url\": \"${URL}\"}"
+    run_play "$(write_vars equal-lower "{\"kerbside_url\": \"${URL}\"}")"
+    assert_output_has 'WARNING: the cluster_config row KERBSIDE_URL repeats kerbside_url'
 }
 
 # assert_stopped_in_preflight: show-config ran, and nothing after it.
@@ -368,6 +376,16 @@ case_6_differing_url() {
     # The equal duration row only warns.
     assert_output_has 'WARNING: the cluster_config row KERBSIDE_TOKEN_DURATION repeats'
     assert_output_lacks 'The cluster_config row KERBSIDE_TOKEN_DURATION is '
+    assert_stopped_in_preflight
+
+    # A differing row in lower case shadows the variable just the same.
+    CURRENT_CASE='case 6b: a differing lower-case kerbside_url row'
+    write_rows '{"kerbside_url": "https://old.example.com"}'
+    run_play_fails 'sf-ctl unset-config KERBSIDE_URL' "$(write_vars both "{
+      \"kerbside_url\": \"${URL}\",
+      \"kerbside_system_key\": \"${KERBSIDE_KEY}\"
+    }")"
+    assert_output_has "The cluster_config row KERBSIDE_URL is 'https://old.example.com', but kerbside_url is '${URL}'"
     assert_stopped_in_preflight
 }
 
@@ -420,6 +438,18 @@ case_9_extra_config() {
         fi
         assert_no_call ensure-kerbside-signing-key bootstrap-system-key set-config
     done
+
+    # sf-ctl stores a lower-case name in upper case, so the row the play
+    # would write is KERBSIDE_URL whatever the entry says.
+    CURRENT_CASE='case 9b: extra_config names a Kerbside setting in lower case'
+    run_play_fails 'extra_config sets KERBSIDE_URL' "$(write_vars extra-lower "{
+      \"kerbside_url\": \"${URL}\",
+      \"extra_config\": \"[{\\\"name\\\": \\\"kerbside_url\\\", \\\"value\\\": \\\"${URL}\\\"}]\"
+    }")"
+    if stub_log | grep -q -- '-- preflight passed --'; then
+        fail 'the run got past the preflight'
+    fi
+    assert_no_call ensure-kerbside-signing-key bootstrap-system-key set-config
 }
 
 case_10_refused_credentials() {

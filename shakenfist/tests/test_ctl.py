@@ -426,9 +426,13 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         self.assertEqual('<redacted>', data['AUTH_SECRET_SEED'])
 
     @mock.patch('shakenfist.client.ctl.mariadb')
-    def test_show_config_string_token_redacted(self, mock_mariadb):
+    def test_show_config_string_under_numeric_field_is_shown(
+            self, mock_mariadb):
         from shakenfist.client.ctl import show_config
 
+        # The field is declared int, so it cannot hold a credential; a
+        # string stored under it is a misconfiguration verify-config will
+        # refuse, and the operator reads this output to find it.
         mock_mariadb.get_cluster_config.return_value = {
             'KERBSIDE_TOKEN_DURATION': 'notanumber'
         }
@@ -436,8 +440,33 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         result = self.runner.invoke(show_config)
 
         self.assertEqual(result.exit_code, 0)
-        self.assertNotIn('notanumber', result.output)
-        self.assertIn('<redacted>', result.output)
+        self.assertIn('notanumber', result.output)
+        self.assertNotIn('<redacted>', result.output)
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_show_config_numeric_secret_redacted(self, mock_mariadb):
+        from shakenfist.client.ctl import show_config
+
+        # set-config stores an all-digit value as an int, and the deploy
+        # logs this command's output, so a credential which happens to
+        # be all digits must still be masked: by the field's declared
+        # type for AUTH_SECRET_SEED, and by name alone for a row SFConfig
+        # does not declare.
+        mock_mariadb.get_cluster_config.return_value = {
+            'AUTH_SECRET_SEED': 12345678,
+            'SOME_PLUGIN_TOKEN': 4242,
+            'API_TOKEN_DURATION': 3600,
+        }
+
+        result = self.runner.invoke(show_config)
+
+        self.assertEqual(result.exit_code, 0)
+        data = json.loads(result.output)
+        self.assertEqual('<redacted>', data['AUTH_SECRET_SEED'])
+        self.assertEqual('<redacted>', data['SOME_PLUGIN_TOKEN'])
+        self.assertEqual(3600, data['API_TOKEN_DURATION'])
+        self.assertNotIn('12345678', result.output)
+        self.assertNotIn('4242', result.output)
 
     @mock.patch('shakenfist.client.ctl.mariadb')
     def test_show_config_show_secrets(self, mock_mariadb):
@@ -460,8 +489,8 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result.exit_code, 0)
         mock_mariadb.set_cluster_config.assert_called_once_with(
-            'myflag', 'myvalue')
-        self.assertIn('Setting myflag', result.output)
+            'MYFLAG', 'myvalue')
+        self.assertIn('Setting MYFLAG', result.output)
 
     @mock.patch('shakenfist.client.ctl.mariadb')
     def test_set_config_bool_true(self, mock_mariadb):
@@ -471,7 +500,7 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result.exit_code, 0)
         mock_mariadb.set_cluster_config.assert_called_once_with(
-            'myflag', True)
+            'MYFLAG', True)
         # Verify bool conversion happened
         self.assertIn("<class 'bool'>", result.output)
 
@@ -483,7 +512,7 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result.exit_code, 0)
         mock_mariadb.set_cluster_config.assert_called_once_with(
-            'myflag', 42)
+            'MYFLAG', 42)
         self.assertIn("<class 'int'>", result.output)
 
     @mock.patch('shakenfist.client.ctl.mariadb')
@@ -494,8 +523,48 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result.exit_code, 0)
         mock_mariadb.set_cluster_config.assert_called_once_with(
-            'myflag', 3.14)
+            'MYFLAG', 3.14)
         self.assertIn("<class 'float'>", result.output)
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_set_config_stores_the_canonical_name(self, mock_mariadb):
+        from shakenfist.client.ctl import set_config
+
+        result = self.runner.invoke(
+            set_config, ['kerbside_url', 'https://kerbside.example.com'])
+
+        # pydantic-settings would have matched the lower-case row to
+        # KERBSIDE_URL anyway; storing it that way means every name check
+        # (the export filter, redaction, the deploy preflight) sees the
+        # row the loader sees.
+        self.assertEqual(result.exit_code, 0)
+        mock_mariadb.set_cluster_config.assert_called_once_with(
+            'KERBSIDE_URL', 'https://kerbside.example.com')
+        self.assertIn('Setting KERBSIDE_URL', result.output)
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_set_config_redacts_by_the_canonical_name(self, mock_mariadb):
+        from shakenfist.client.ctl import set_config
+
+        result = self.runner.invoke(
+            set_config, ['auth_secret_seed', 'sekrit'])
+
+        self.assertEqual(result.exit_code, 0)
+        mock_mariadb.set_cluster_config.assert_called_once_with(
+            'AUTH_SECRET_SEED', 'sekrit')
+        self.assertNotIn('sekrit', result.output)
+        self.assertIn('<redacted>', result.output)
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_unset_config_uses_the_canonical_name(self, mock_mariadb):
+        from shakenfist.client.ctl import unset_config
+
+        result = self.runner.invoke(unset_config, ['kerbside_url'])
+
+        self.assertEqual(result.exit_code, 0)
+        mock_mariadb.delete_cluster_config.assert_called_once_with(
+            'KERBSIDE_URL')
+        self.assertIn('Unsetting KERBSIDE_URL', result.output)
 
     @mock.patch('shakenfist.client.ctl.mariadb')
     def test_set_config_value_from_stdin(self, mock_mariadb):
@@ -506,7 +575,7 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result.exit_code, 0)
         mock_mariadb.set_cluster_config.assert_called_once_with(
-            'myflag', 'myvalue')
+            'MYFLAG', 'myvalue')
         self.assertNotIn('myvalue', result.output)
         self.assertIn('<redacted>', result.output)
 
@@ -549,8 +618,8 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         result = self.runner.invoke(unset_config, ['myflag'])
 
         self.assertEqual(result.exit_code, 0)
-        mock_mariadb.delete_cluster_config.assert_called_once_with('myflag')
-        self.assertIn('Unsetting myflag', result.output)
+        mock_mariadb.delete_cluster_config.assert_called_once_with('MYFLAG')
+        self.assertIn('Unsetting MYFLAG', result.output)
 
     @mock.patch('shakenfist.client.ctl.mariadb')
     def test_unset_config_no_flag(self, mock_mariadb):

@@ -198,9 +198,11 @@ def bootstrap_system_key(keyname: str, key: Optional[str],
 def show_config(show_secrets: bool) -> None:
     """Show cluster-wide configuration, redacting secrets by default.
 
-    Numeric values are never redacted even when the name looks secret
-    (for example KERBSIDE_TOKEN_DURATION), as a number cannot be a
-    credential.
+    A field SFConfig declares as a number (for example
+    KERBSIDE_TOKEN_DURATION) is never redacted, as it cannot hold a
+    credential. The exemption is by declared type, not by the stored
+    value's type: set-config stores an all-digit value as an int, and a
+    credential which happens to be all digits is still a credential.
     """
     config_data = mariadb.get_cluster_config()
     if not show_secrets:
@@ -226,6 +228,12 @@ def set_config(flag: str, value: Optional[str],
     if value_from_stdin:
         value = _read_stdin_value()
     assert value is not None
+
+    # Row names are case-insensitive identifiers (pydantic-settings and
+    # the table's collation both say so), stored in their canonical
+    # upper-case spelling so that every name check sees the same row the
+    # loader does.
+    flag = sf_config.canonical_config_key_name(flag)
 
     # Convert values if possible
     converted_value: Any = value
@@ -254,6 +262,7 @@ def set_config(flag: str, value: Optional[str],
 @click.argument('flag')
 def unset_config(flag: str) -> None:
     """Delete a cluster-wide configuration value."""
+    flag = sf_config.canonical_config_key_name(flag)
     click.echo(f'Unsetting {flag}')
     mariadb.delete_cluster_config(flag)
 

@@ -9,6 +9,13 @@
 # play itself writes on every deploy. So this runs once per cluster, before
 # that play's first set-config, and checks both sources for both names.
 #
+# Names are compared in upper case. A row name is a case-insensitive
+# identifier (the daemons' settings loader matches environment variable names
+# case-insensitively, and the table's collation compares them that way too),
+# so a kerbside_url row, written by hand or by an older sf-ctl, shadows the
+# variable exactly as KERBSIDE_URL does. sf-ctl now stores the upper-case
+# spelling, and the messages below name it.
+#
 # With kerbside_url empty it does nothing at all -- not even the show-config
 # -- so a cluster which never turned the feature on, or which configures it
 # purely through sf-ctl set-config, is not touched.
@@ -46,13 +53,13 @@
       ansible.builtin.fail:
         msg: >-
           extra_config sets {{ item.name }}, which the deploy would write as a
-          cluster_config row overriding {{ item.variable }} on every node.
-          Remove the {{ item.name }} entry from extra_config and set
-          {{ item.variable }} instead.
+          cluster_config row overriding {{ item.variable }} on every node (row
+          names are case-insensitive). Remove the {{ item.name }} entry from
+          extra_config and set {{ item.variable }} instead.
       loop: "{{ kerbside_preflight_settings }}"
       loop_control:
         label: "{{ item.name }}"
-      when: item.name in (extra_config | from_json | map(attribute='name') | list)
+      when: item.name in (extra_config | default('[]') | from_json | map(attribute='name') | map('upper') | list)
 
     # Never --show-secrets: that would put every cluster secret into a
     # registered variable to read two values which are not secret. Numbers
@@ -69,15 +76,23 @@
     # Parsed once, here. from_json raises a template error on anything which
     # is not JSON (an sf-ctl which printed a warning first, say), before any
     # assert could run, so the parse sits in a block whose rescue leaves the
-    # rows as none and the assert below reports it in words.
+    # rows as none and the assert below reports it in words. The rows are
+    # keyed by the upper-case name, so a lower-case row is checked like any
+    # other; two rows differing only in case cannot both exist under the
+    # table's collation, so nothing is lost by the re-keying.
     - name: Parse the cluster configuration rows
       block:
         - name: Parse the show-config output
-          ansible.builtin.set_fact:
-            kerbside_preflight_rows: >-
+          vars:
+            kerbside_preflight_parsed: >-
               {{ (kerbside_preflight_show_config.stdout | from_json)
               if (kerbside_preflight_show_config.stdout | trim | regex_search('^[{]'))
               else none }}
+          ansible.builtin.set_fact:
+            kerbside_preflight_rows: >-
+              {{ dict(kerbside_preflight_parsed.keys() | map('upper')
+                      | zip(kerbside_preflight_parsed.values()))
+              if kerbside_preflight_parsed is mapping else none }}
       rescue:
         - name: Treat unparseable show-config output as no rows
           ansible.builtin.set_fact:

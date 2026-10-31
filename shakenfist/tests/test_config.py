@@ -299,6 +299,61 @@ class ClusterConfigExportFilterTestCase(base.ShakenFistTestCase):
         'os.environ', {'SHAKENFIST_MARIADB_HOST': 'db.example.com'},
         clear=True)
     @mock.patch('sqlalchemy.create_engine')
+    def test_direct_branch_exports_the_canonical_name(
+            self, mock_create_engine):
+        conn = mock.MagicMock()
+        conn.__enter__.return_value = conn
+        conn.execute.return_value.fetchall.return_value = [
+            ('kerbside_url', json.dumps('https://kerbside.example.com')),
+            ('kerbside_jwt_signing_key', json.dumps(
+                {'active_kid': 'deadbeef',
+                 'keys': [{'kid': 'deadbeef',
+                           'private_pem': 'THE-PRIVATE-PEM'}]})),
+        ]
+        mock_create_engine.return_value.connect.return_value = conn
+
+        load_cluster_config()
+
+        # Exported under the spelling SFConfig declares, not as written.
+        self.assertEqual(
+            'https://kerbside.example.com',
+            os.environ.get('SHAKENFIST_KERBSIDE_URL'))
+        self.assertNotIn('SHAKENFIST_kerbside_url', os.environ)
+        self.assertNotIn(
+            'THE-PRIVATE-PEM', ''.join(os.environ.values()))
+
+    @mock.patch.dict(
+        'os.environ',
+        {'SHAKENFIST_MARIADB_GATEWAY_HOSTS': '10.0.0.1'}, clear=True)
+    @mock.patch('shakenfist.util.grpc_channel.make_database_channel')
+    @mock.patch('shakenfist.protos.database_pb2_grpc.DatabaseServiceStub')
+    def test_grpc_branch_exports_the_canonical_name(
+            self, mock_stub, mock_channel):
+        entries = [
+            mock.Mock(key_name='kerbside_url',
+                      value_json=json.dumps('https://kerbside.example.com')),
+            mock.Mock(key_name='kerbside_jwt_signing_key',
+                      value_json=json.dumps(
+                          {'active_kid': 'deadbeef',
+                           'keys': [{'kid': 'deadbeef',
+                                     'private_pem': 'THE-PRIVATE-PEM'}]})),
+        ]
+        mock_stub.return_value.GetClusterConfig.return_value = mock.Mock(
+            entries=entries)
+
+        load_cluster_config()
+
+        self.assertEqual(
+            'https://kerbside.example.com',
+            os.environ.get('SHAKENFIST_KERBSIDE_URL'))
+        self.assertNotIn('SHAKENFIST_kerbside_url', os.environ)
+        self.assertNotIn(
+            'THE-PRIVATE-PEM', ''.join(os.environ.values()))
+
+    @mock.patch.dict(
+        'os.environ', {'SHAKENFIST_MARIADB_HOST': 'db.example.com'},
+        clear=True)
+    @mock.patch('sqlalchemy.create_engine')
     def test_direct_branch_applies_the_filter(self, mock_create_engine):
         conn = mock.MagicMock()
         conn.__enter__.return_value = conn
