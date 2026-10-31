@@ -542,8 +542,7 @@ class NetworkMetadatasEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)],
         [(200, 'Artifact metadata, if any.', None),
-         (404, 'Artifact not found.', None)],
-        requires_admin=True))
+         (404, 'Artifact not found.', None)]))
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -563,8 +562,7 @@ class NetworkMetadatasEndpoint(api_base.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Network not found.', None)],
-        requires_admin=True))
+         (404, 'Network not found.', None)]))
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -593,8 +591,7 @@ class NetworkMetadataEndpoint(api_base.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Network not found.', None)],
-        requires_admin=True))
+         (404, 'Network not found.', None)]))
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -618,8 +615,7 @@ class NetworkMetadataEndpoint(api_base.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Network not found.', None)],
-        requires_admin=True))
+         (404, 'Network not found.', None)]))
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     @api_base.log_token_use
@@ -670,8 +666,7 @@ class NetworkPingEndpoint(api_base.Resource):
         [(200, 'The stdout and stderr of the ping request.', None),
          (400, 'The IPv4 address is not in the network\'s netblock or is invalid.',
           None),
-         (404, 'Network not found.', None)],
-        requires_admin=True))
+         (404, 'Network not found.', None)]))
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
     # NOTE: this is the sole remaining `redirect_to_network_node`

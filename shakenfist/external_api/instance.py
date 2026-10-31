@@ -1738,8 +1738,7 @@ class InstanceMetadatasEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(200, 'Instance metadata, if any.', None),
-         (404, 'Instance not found.', None)],
-        requires_admin=True))
+         (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -1759,8 +1758,7 @@ class InstanceMetadatasEndpoint(api_base.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Instance not found.', None)],
-        requires_admin=True))
+         (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -1913,8 +1911,7 @@ class InstanceMetadataEndpoint(api_base.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Instance not found.', None)],
-        requires_admin=True))
+         (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -1938,8 +1935,7 @@ class InstanceMetadataEndpoint(api_base.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Instance not found.', None)],
-        requires_admin=True))
+         (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use
@@ -1970,8 +1966,7 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
              'to fetch the entire console log.', False)
         ],
         [(200, 'The console data as an application/octet-stream.', None),
-         (404, 'Instance not found.', None)],
-        requires_admin=True))
+         (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -2009,8 +2004,7 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
              api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'Nothing.', None),
-         (404, 'Instance not found.', None)],
-        requires_admin=True))
+         (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request

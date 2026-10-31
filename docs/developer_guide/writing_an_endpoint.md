@@ -316,6 +316,16 @@ federated token endpoint). Treat `503` as a global response when
 writing a client; declare it on your endpoint only if you have
 something endpoint-specific to say about it.
 
+Two responses are declared for you. Every authenticated endpoint gets a
+generic `401`, and `requires_admin=True` adds the `403` that
+`caller_is_admin` answers when a system-namespace token lacks the admin
+scope. `requires_admin` means exactly "guarded by
+`@api_base.caller_is_admin`" — it documents rather than enforces, so a
+unit test holds the flag and the decorator together in both directions.
+If your endpoint has something specific to say about `401` or `403`,
+declare it: your words lead and the generic cause is appended, rather
+than overwriting yours as it once did.
+
 ## Checking your work
 
 The audit derives the correct location for every declaration and

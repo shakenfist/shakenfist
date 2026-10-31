@@ -1148,6 +1148,15 @@ def _validated_constraints(section: str, name: str,
 # https://swagger.io/specification/v2/ defines the schema for this dictionary
 def swagger_helper(section, description, parameters, responses,
                    requires_admin=False, requires_auth=True):
+    # requires_admin means exactly "guarded by caller_is_admin" -- a
+    # test enforces the pairing -- and caller_is_admin reads the
+    # verified token, so an admin endpoint that does not demand
+    # authentication is a contradiction in the declaration.
+    if requires_admin and not requires_auth:
+        raise exceptions.InvalidAPIDeclaration(
+            '%s declares requires_admin without requires_auth, but '
+            'caller_is_admin reads the verified token' % section)
+
     out = {
         'tags': [section],
         'parameters': [],
@@ -1343,12 +1352,6 @@ def swagger_helper(section, description, parameters, responses,
             'schema': schema
         })
 
-    if requires_auth:
-        responses.append((
-            401,
-            'You must authenticate. See '
-            'https://shakenfist.com/developer_guide/authentication/ for details.',
-            None))
     for (httpcode, respdescription, sample) in responses:
         out['responses'][httpcode] = {
             'description': respdescription
@@ -1358,10 +1361,34 @@ def swagger_helper(section, description, parameters, responses,
                 'application/json': sample
             }
 
+    # The responses the decorators answer before any handler runs.
+    # These used to be appended to the endpoint's own list, so an
+    # endpoint with something specific to say about a code had it
+    # silently overwritten; now the endpoint's words lead and the
+    # generic cause follows.
+    generic_responses = []
+    if requires_auth:
+        generic_responses.append((
+            401,
+            'You must authenticate. See '
+            'https://shakenfist.com/developer_guide/authentication/ for '
+            'details.'))
+    if requires_admin:
+        generic_responses.append((
+            403,
+            'The token is not scoped for administrative operations.'))
+    for (httpcode, respdescription) in generic_responses:
+        if httpcode in out['responses']:
+            out['responses'][httpcode]['description'] += \
+                ' ' + respdescription
+        else:
+            out['responses'][httpcode] = {'description': respdescription}
+
     access_notes = []
     if requires_admin:
         access_notes.append(
-            'Requires authentication as a member of the system namespace.')
+            'Requires authentication as a member of the system namespace, '
+            'with a token carrying the administrative scope.')
 
     if access_notes:
         out['description'] += \

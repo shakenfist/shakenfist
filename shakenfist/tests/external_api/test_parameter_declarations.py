@@ -177,6 +177,31 @@ def _declared_response_codes(fn):
     return None
 
 
+def _declares_requires_admin(fn):
+    """Whether a handler's swagger_helper passes requires_admin=True.
+
+    None where there is no swagger_helper call, or where the call --
+    or the requires_admin value -- cannot be read statically, for the
+    same reason as _declared_response_codes above: "cannot read this"
+    must not wear the same face as "declares nothing".
+    """
+    for dec in fn.decorator_list:
+        if not (isinstance(dec, ast.Call)
+                and 'swagger_helper' in ast.unparse(dec)):
+            continue
+        call = dec.args[0] if dec.args else None
+        if not isinstance(call, ast.Call):
+            return None
+        for kw in call.keywords:
+            if kw.arg == 'requires_admin':
+                value = declarations.literal(kw.value)
+                if not isinstance(value, bool):
+                    return None
+                return value
+        return False
+    return None
+
+
 def _endpoints():
     """Yield (class name, method name, method node) per handler."""
     for _, _, cls, fn in declarations.handlers():
@@ -809,6 +834,54 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             'expected 13 handlers behind requires_instance_active, found '
             '%d. If the count changed on purpose, update it here.'
             % checked)
+
+    def test_requires_admin_means_guarded_by_caller_is_admin(self):
+        """requires_admin=True means exactly "behind caller_is_admin".
+
+        swagger_helper() appends the decorator's 403 -- a system
+        namespace token without the admin scope -- to every declaration
+        passing requires_admin=True, so the flag has to track the guard
+        in both directions. Before this was asserted, 54 declarations
+        claimed admin while 28 handlers were guarded: the metadata,
+        interface, label and trust endpoints published "system
+        namespace only" for routes any owner can call, and five node
+        endpoints hid the 401 and 403 the guard really answers.
+
+        The count is pinned, like the decorator pairings above, because
+        a walk which silently stopped finding the guard would otherwise
+        pass by examining nothing.
+        """
+        guarded_count = 0
+        for cls, method, fn in _endpoints():
+            guarded = 'caller_is_admin' in [
+                _bare_decorator_name(dec) for dec in fn.decorator_list]
+            declared = _declares_requires_admin(fn)
+            if declared is None:
+                # The undocumented health probes have no swagger_helper
+                # call to read; anything else unreadable is a failure.
+                self.assertIn(
+                    (cls, method), UNDOCUMENTED_BY_DESIGN,
+                    '%s.%s has no readable swagger_helper call, so whether '
+                    'it declares requires_admin cannot be checked'
+                    % (cls, method))
+                declared = False
+            if guarded:
+                guarded_count += 1
+            self.assertEqual(
+                guarded, declared,
+                '%s.%s is %s caller_is_admin but passes requires_admin=%s. '
+                'The flag means exactly "guarded by caller_is_admin": it '
+                'publishes the guard\'s 403 and its access note, so '
+                'declaring it without the guard publishes a restriction '
+                'that does not exist, and guarding without declaring it '
+                'hides a status every scoped credential can receive'
+                % (cls, method,
+                   'behind' if guarded else 'not behind', declared))
+
+        self.assertEqual(
+            28, guarded_count,
+            'expected 28 handlers behind caller_is_admin, found %d. If the '
+            'count changed on purpose, update it here.' % guarded_count)
 
 
 class DerivationTestCase(base.ShakenFistTestCase):

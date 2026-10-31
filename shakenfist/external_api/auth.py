@@ -793,8 +793,7 @@ class AuthNamespaceTrustsEndpoint(api_base.Resource):
         ],
         [(200, 'The current state of the namespace.', namespace_get_example),
          (400, 'No external namespace specified.', None),
-         (404, 'Namespace not found.', None)],
-        requires_admin=True))
+         (404, 'Namespace not found.', None)]))
     @arg_is_namespace
     @api_base.log_token_use
     def post(self, namespace=None, external_namespace=None, namespace_from_db=None):
@@ -823,8 +822,7 @@ class AuthNamespaceTrustEndpoint(api_base.Resource):
         ],
         [(200, 'The current state of the namespace.', namespace_get_example),
          (400, 'No external namespace specified.', None),
-         (404, 'Namespace not found.', None)],
-        requires_admin=True))
+         (404, 'Namespace not found.', None)]))
     @arg_is_namespace
     @api_base.log_token_use
     def delete(self, namespace=None, external_namespace=None, namespace_from_db=None):
