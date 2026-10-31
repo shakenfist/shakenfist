@@ -897,6 +897,13 @@ host `qemu-img`, requires `instar info`, `check`, `map` and `measure` to
 pass on it, and requires the host `qemu-img check` to exit 2 on it, so
 a qemu that fixes the defect shows up there.
 
+`instar create -f vhdx -o subformat=fixed,block_state_zero=off` writes
+qemu-img's layout at those sizes too, so the image it makes is one
+`qemu-img` cannot open either, while `instar check` reads it.
+`TestCreateVhdxFixedLarge` in `tests/test_create.py` creates the
+4608.5M image with both tools, requires the two structures to be
+identical, and requires `instar check` to pass on instar's.
+
 ## measure subcommand quirks
 
 ### `--image-opts` is rejected

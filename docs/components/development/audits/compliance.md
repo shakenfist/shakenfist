@@ -26,7 +26,7 @@ many manual runs came before it. See
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-10-29T20:03:01.364575+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-10-31T00:18:55.650054+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -1023,7 +1023,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
-| private-ci | non-compliant | - |
+| private-ci | non-compliant | shakenfist/private-ci#259 |
 | ryll | compliant | - |
 | sfui | compliant | - |
 | shakenfist | compliant | - |
@@ -1033,7 +1033,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 Details for non-compliant projects:
 
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:142
-- **private-ci** (Status): 18 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/capacity-claims.md:251, docs/capacity-claims.md:448, docs/capacity-claims.md:506, docs/capacity-claims.md:561, docs/capacity-claims.md:564, docs/capacity-claims.md:603, docs/capacity-claims.md:738, docs/capacity-claims.md:741, docs/capacity-claims.md:767, docs/capacity-claims.md:1033 (+8 more)
+- **private-ci** (Status): 18 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/capacity-claims.md:251, docs/capacity-claims.md:448, docs/capacity-claims.md:506, docs/capacity-claims.md:561, docs/capacity-claims.md:564, docs/capacity-claims.md:603, docs/capacity-claims.md:738, docs/capacity-claims.md:741, docs/capacity-claims.md:767, docs/capacity-claims.md:1032 (+8 more)
 - **uncalibrated-sextant** (Status): 25 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, AGENTS.md:166, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137 (+15 more)
 
 ## plan-source-references
@@ -1070,7 +1070,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 Details for non-compliant projects:
 
 - **client-python** (Status): 2 of 4 plan reference(s) in source or configuration do not resolve, in 2 file(s) (update the path, or use an absolute https://github.com/... URL for a plan in another repository)
-- **shakenfist** (Status): 1 of 307 plan reference(s) in source or configuration do not resolve, in 1 file(s) (update the path, or use an absolute https://github.com/... URL for a plan in another repository)
+- **shakenfist** (Status): 1 of 310 plan reference(s) in source or configuration do not resolve, in 1 file(s) (update the path, or use an absolute https://github.com/... URL for a plan in another repository)
 
 ## plan-template
 
@@ -1108,6 +1108,37 @@ Details for non-compliant projects:
 - **client-python-k3s** (Status): shared block plan-push-audit-phase is stale (v3 embedded, v4 current; copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **divergulent** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/plan-file-conventions.md in the development repository); shared block plan-push-audit-phase is stale (v3 embedded, v4 current; copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **uncalibrated-sextant** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/plan-file-conventions.md in the development repository); missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository); missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
+
+## pre-commit-node-version
+
+Criterion: [pre-commit-node-version.md](/components/development/audits/pre-commit-node-version/)
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | N/A | - |
+| agent-python | N/A | - |
+| andris | N/A | - |
+| client-python | N/A | - |
+| client-python-k3s | N/A | - |
+| client-python-ova | N/A | - |
+| clingwrap | N/A | - |
+| cloudgood | compliant | - |
+| development | N/A | - |
+| divergulent | N/A | - |
+| hunkydory | N/A | - |
+| images | N/A | - |
+| instar | N/A | - |
+| kerbside | N/A | - |
+| kerbside-client | N/A | - |
+| kerbside-patches | N/A | - |
+| library-utilities | N/A | - |
+| occystrap | N/A | - |
+| private-ci | N/A | - |
+| ryll | N/A | - |
+| sfui | N/A | - |
+| shakenfist | N/A | - |
+| uncalibrated-sextant | N/A | - |
+| visual-digest-rust | N/A | - |
 
 ## push-audit
 
@@ -1545,11 +1576,11 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **andris** (Status): 8 of 134 in-scope files reviewed at HEAD (8 imported from shakenfist/development); 126 need review (threshold 5)
-- **development** (Status): 218 of 232 in-scope files reviewed at HEAD; 14 need review (threshold 5)
-- **kerbside** (Status): 92 of 354 in-scope files reviewed at HEAD (6 imported from shakenfist/development); 262 need review (threshold 5)
+- **andris** (Status): 9 of 134 in-scope files reviewed at HEAD (9 imported from shakenfist/development); 125 need review (threshold 5)
+- **development** (Status): 219 of 235 in-scope files reviewed at HEAD; 16 need review (threshold 5)
+- **kerbside** (Status): 90 of 356 in-scope files reviewed at HEAD (6 imported from shakenfist/development); 266 need review (threshold 5)
 - **kerbside-client** (Status): 3 of 15 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 12 need review (threshold 5)
-- **ryll** (Status): 147 of 284 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 137 need review (threshold 5)
+- **ryll** (Status): 148 of 284 in-scope files reviewed at HEAD (4 imported from shakenfist/development); 136 need review (threshold 5)
 - **sfui** (Status): 5 of 49 in-scope files reviewed at HEAD (5 imported from shakenfist/development); 44 need review (threshold 5)
 
 ## review-scope-completeness
@@ -1818,7 +1849,7 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
-| private-ci | non-compliant | - |
+| private-ci | non-compliant | shakenfist/private-ci#260 |
 | ryll | non-compliant | shakenfist/ryll#661 |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
@@ -1827,9 +1858,9 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): kerbside/api/static/sfui: 19 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
-- **private-ci** (Status): conductor/static/sfui: 24 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
-- **ryll** (Status): ryll/src/web/assets/sfui: 19 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **kerbside** (Status): kerbside/api/static/sfui: 21 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **private-ci** (Status): conductor/static/sfui: 26 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **ryll** (Status): ryll/src/web/assets/sfui: 21 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## undeclared-direct-dependency
 

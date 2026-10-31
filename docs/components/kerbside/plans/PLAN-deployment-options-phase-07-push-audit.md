@@ -308,6 +308,12 @@ plan are filed as issues.
 - Phase 7 stays `In progress`. The follow-up pull request fixes the
   *Outcome*'s ten items, records this phase's merge commit, and marks
   phase 7 and the plan `Complete`.
+- The audit merged on 2026-10-30 as c9056b0 (#645). The follow-up
+  pull request fixed the *Outcome*'s ten items and marked phase 7 and
+  the plan `Complete`. #647, which landed between the two, had
+  already corrected the guard's `backend.rs` line references, so item
+  8's share of that was one range end. Item 10 was checked again with
+  `gh pr view` before it was written.
 
 ## Back brief
 

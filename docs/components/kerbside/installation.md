@@ -366,7 +366,9 @@ consoles from several sources and sit wherever its users are.
 There is a page for each way of deploying it:
 [by hand, with pip, a venv and systemd](/components/kerbside/deployment/manual/), with
 [the Ansible role](/components/kerbside/deployment/ansible/), with
-[Kolla-Ansible from kerbside-patches](/components/kerbside/deployment/kolla-ansible/), or
+[Kolla-Ansible from kerbside-patches](/components/kerbside/deployment/kolla-ansible/),
+which deploys it inside one OpenStack cloud rather than in front of
+it, or
 [in containers](/components/kerbside/deployment/containers/).
 [Deployment Options](/components/kerbside/index/#deployment-options) compares them: which
 sources each configures, and what Kerbside's CI tests.

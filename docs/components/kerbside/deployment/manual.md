@@ -63,7 +63,7 @@ On disk, the result is:
 | `/etc/kerbside/pki` | `root:root` | 0755 | The proxy's certificate and CA |
 | `/etc/kerbside/pki/server-key.pem` | `root:kerbside` | 0640 | The proxy's private key |
 | `/etc/systemd/system/kerbside-*.service` | `root:root` | 0644 | The two units |
-| `/run/kerbside` | `kerbside` | systemd's default | The daemon's API socket, created by `RuntimeDirectory=kerbside` each time the daemon starts |
+| `/run/kerbside` | `kerbside` | 0700 | The daemon's API socket, mode 0600. systemd creates the directory (`RuntimeDirectory=kerbside`) each time the daemon starts, and the daemon sets both modes when it binds |
 
 The `kerbside` user is a system user with no login shell. Its home is
 `/srv/kerbside`, but root owns that directory, and root owns
@@ -75,12 +75,13 @@ replace the code it runs.
 
 There is no state directory and no log directory, because Kerbside
 writes almost nothing locally. Its state is in the database. Apart
-from a temporary file the oVirt driver writes its CA to, the only file
-it creates at runtime is its API socket. That goes in `/run/kerbside`,
-a directory only root may create, so systemd creates it for the
-service user. Kerbside logs to syslog, which on a systemd host lands in the
-journal, so `journalctl` is where its logs are. `LOG_OUTPUT_PATH`
-changes that (see
+from the temporary files Proxmox sources, and oVirt sources without a
+`ca_file`, write their CA to, the only file it creates at runtime is
+its API socket. That goes in `/run/kerbside`, a directory only root
+may create, so systemd creates it for the service user. Kerbside logs
+to syslog, which on a systemd host lands in the journal, so
+`journalctl` is where its logs are. `LOG_OUTPUT_PATH` changes that
+(see
 [configuration.md](/components/kerbside/configuration/#logging-and-monitoring-settings)),
 and a file it names has to be writable by the `kerbside` user.
 

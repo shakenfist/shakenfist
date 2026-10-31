@@ -68,8 +68,11 @@ What it leaves to you:
   issues certificates for you.
 - **TLS in front of the API.** The role binds the API to every
   address in plain HTTP. The API carries bearer tokens and console
-  files, so put a TLS-terminating reverse proxy in front of it.
-  Kerbside ships no configuration for one.
+  files, so put a TLS-terminating reverse proxy in front of it, and
+  set `kerbside_api_address` to `127.0.0.1` so that the proxy is the
+  only way in. If the proxy is on another host, firewall the API port
+  (`kerbside_api_port`, 13002 by default) to it instead. Kerbside
+  ships no proxy configuration.
 - **Client libraries for other sources.** The role installs
   `shakenfist-client` and no other client library
   ([#602](https://github.com/shakenfist/kerbside/issues/602)).
@@ -225,9 +228,9 @@ Fist node, and checks that a second deploy restarts nothing.
 | oVirt and OpenStack sources do not work | The role validates and renders all five source types, but installs no client library but `shakenfist-client` ([#602](https://github.com/shakenfist/kerbside/issues/602)). An `ovirt` source is marked errored and ignored, and an `openstack` source's token exchange answers 500. Today the role deploys a Kerbside for Shaken Fist, Proxmox and static sources, which need no other client library. |
 | Proxmox through the role is untested | The role validates a `proxmox` source, and a unit test checks its required fields, but the rootless test renders none and no lane starts one. No CI lane yet proves a proxied session against a real Proxmox VE cluster, by any deployment mechanism. |
 | No setting beyond the fifteen | `kerbside.ini` is rendered from a fixed set, with no way to add to it, so there is no Keystone login, firewall mode or verbose logging through the role ([#629](https://github.com/shakenfist/kerbside/issues/629)). The drop-in in [Settings the role does not write](#settings-the-role-does-not-write) works around it, and is untested. |
-| Kerbside is started only with a Shaken Fist source, co-located | `sf-e2e` is the only lane that runs `register` against a real database and systemd, and it deploys one `shakenfist` source on a Shaken Fist node. The rootless test renders every source type, but skips the migration and the units. No lane starts a role-deployed Kerbside with a `static` source, or on a host of its own. |
+| Kerbside is started only with a Shaken Fist source, co-located | `sf-e2e` is the only lane that runs `register` against a real database and systemd, and it deploys one `shakenfist` source on a Shaken Fist node. The rootless test renders every source type but `proxmox`, and skips the migration and the units. No lane starts a role-deployed Kerbside with a `static` source, or on a host of its own. |
 | Only through Shaken Fist's `site.yml` | `sf-e2e` calls the role from Shaken Fist's playbook. No lane calls it from a playbook of its own, as the second route above does. |
 | One Kerbside host | No lane runs two Kerbside hosts sharing a database. Shaken Fist's [Load balancing](https://shakenfist.com/operator_guide/kerbside/#load-balancing) describes the shape, and says it is untested. |
-| The API is plain HTTP | The role binds gunicorn to every address with no TLS, and no lane puts a reverse proxy in front of it. |
+| The API is plain HTTP | The role binds gunicorn to every address with no TLS, and no lane puts a reverse proxy in front of it. Until something binds it to loopback or firewalls it, port 13002 serves tokens and credentials in the clear. |
 | A redeploy ends live sessions | A redeploy that changes Kerbside restarts it on every host in the same task, dropping every session at once, unless the play runs with `serial`. |
 | Nobody can log in without Keystone | Interactive login is Keystone-only ([#300](https://github.com/shakenfist/kerbside/issues/300)), and the role configures no Keystone. Without one, people cannot log into the web UI, and something else has to hold credentials and call the API. |
