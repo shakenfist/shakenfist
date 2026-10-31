@@ -16940,7 +16940,9 @@ the fix: remove the row with <code>sf-ctl unset-config KERBSIDE_URL</code> (or
 <code>KERBSIDE_TOKEN_DURATION</code>) and deploy again, relying on the variable. A row
 equal to its variable does not stop the deploy; it is reported as a warning
 and can be removed the same way. An <code>sf-ctl</code> older than the collection
-shows the row as <code>&lt;redacted&gt;</code>, which the deploy treats as different.</p>
+shows the row as <code>&lt;redacted&gt;</code>, which the deploy treats as different. Row
+names are case-insensitive, so a <code>kerbside_url</code> row, or a lower-case
+<code>extra_config</code> entry, is caught too.</p>
 </div>
 <p><code>KERBSIDE_URL</code> is both the base for the returned console URL and the token
 <strong>audience</strong> (<code>aud</code>) claim. Kerbside's expected audience — its own

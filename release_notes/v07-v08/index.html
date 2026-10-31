@@ -17465,10 +17465,12 @@
   override the rendered configuration. Fix it by running
   <code>sf-ctl unset-config &lt;NAME&gt;</code> and deploying again, or by moving the value into
   the variable; a row equal to its variable only warns. Separately,
-  <code>sf-ctl show-config</code> now shows numeric values even when the name looks
-  secret (<code>KERBSIDE_TOKEN_DURATION</code>, <code>API_TOKEN_DURATION</code>,
-  <code>FEDERATION_MAX_TOKEN_BYTES</code>); string values under such names are still
-  redacted. See the
+  <code>sf-ctl show-config</code> now shows the fields declared as numbers even when the
+  name looks secret (<code>KERBSIDE_TOKEN_DURATION</code>, <code>API_TOKEN_DURATION</code>,
+  <code>FEDERATION_MAX_TOKEN_BYTES</code>). The exemption is by the field's declared
+  type, not the stored value's: <code>set-config</code> stores an all-digit value as a
+  number, and an all-digit <code>AUTH_SECRET_SEED</code>, or any secret-named row
+  <code>SFConfig</code> does not declare, stays redacted whatever its type. See the
   <a href="/operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a>.</li>
 <li>The collection can now deploy Kerbside itself. Add hosts to an optional
   <code>kerbside</code> inventory group (Shaken Fist nodes or dedicated hosts) and set
@@ -18444,6 +18446,23 @@ details.</p>
 </ul>
 <h2 id="minor-changes">Minor changes<a class="headerlink" href="#minor-changes" title="Permanent link">&para;</a></h2>
 <ul>
+<li><code>cluster_config</code> row names are case-insensitive identifiers, stored in upper
+  case. <code>sf-ctl set-config kerbside_url ...</code> now writes a <code>KERBSIDE_URL</code> row,
+  and <code>unset-config</code> deletes by the same spelling. The daemons always read
+  rows this way (a lower-case <code>auth_secret_seed</code> row set <code>AUTH_SECRET_SEED</code>),
+  but the checks on the name did not: <code>sf-ctl show-config</code> printed such a row
+  and the daemons' environment export did not withhold a lower-case
+  undeclared secret. Both now compare the upper-case spelling, so a row
+  written in lower case before this release behaves exactly like its
+  upper-case form.</li>
+<li><code>extra_config</code> and <code>http_proxy</code> set in the inventory (<code>group_vars/all.yml</code>,
+  where the installation guide says to put them) now reach the cluster
+  configuration play. The play declared empty defaults for both as play
+  variables, which outrank inventory variables, so only <code>-e</code> on the command
+  line could set them; an inventory <code>extra_config</code> was silently never applied.
+  <code>sf_build_local_wheels</code> had the same defect. No play in
+  <code>examples/_shared/site.yml</code> declares a literal default any more, and a unit
+  test keeps it that way.</li>
 <li>The sf-database service no longer serves the single-column coalescing RPCs
   <code>ClaimCoalescibleSiblings</code> and <code>FindExistingCoalescibleOp</code>. No release
   carried them, and their handlers could fold one node's network work into
