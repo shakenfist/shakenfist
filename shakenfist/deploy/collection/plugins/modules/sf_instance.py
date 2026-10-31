@@ -153,9 +153,31 @@ options:
     required: false
     default: false
     type: bool
+  await_placement:
+    description:
+      - Whether to block until the scheduler has placed the instance, that
+        is until it reaches state C(creating) or C(created), or until
+        preflight has aborted it. It does not wait for the instance to
+        boot, so a play can create several instances without awaiting
+        each one and still learn, within seconds, which of them the
+        cluster refused.
+      - Without it an unawaited create returns as soon as the instance
+        reaches C(preflight), before the scheduler has decided where it
+        goes, and a preflight abort goes unnoticed by the task. With it
+        that abort fails the task with the server's message, or is
+        replayed by O(capacity_wait). An instance found in any other
+        state, such as C(deleted), also fails the task.
+      - The wait spends O(await_timeout), which is budgeted exactly as it
+        is for O(await). O(await) supersedes this option. When both are
+        true the module waits for the whole create, which covers
+        placement, and this option changes nothing.
+    required: false
+    default: false
+    type: bool
   await_timeout:
     description:
-      - How long to wait, in seconds, when O(await) is true.
+      - How long to wait, in seconds, when O(await) or O(await_placement)
+        is true.
       - This is the budget for the whole operation rather than for the
         wait at the end of it. Where an instance is being replaced, the
         time spent deleting the old one and creating the new one is
@@ -181,12 +203,13 @@ options:
       - Two refusals are replayed, and nothing else. The first is a 507
         from the create whose JSON body has C(transient) set to true,
         which the server sends only for a scheduler stage that waiting
-        can clear. The second, only when O(await) is true, is an instance
-        which preflight aborted with the error message C(Unable to find
-        suitable node) or C(Too many start attempts). A 507 without the
-        marker (for example an exhausted address pool), a C(transient)
-        false 507, a body which is not JSON, a 409, an affinity failure
-        and every other error fail at once.
+        can clear. The second, only when the create is awaited -- to boot
+        with O(await) or to placement with O(await_placement) -- is an
+        instance which preflight aborted with the error message C(Unable
+        to find suitable node) or C(Too many start attempts). A 507
+        without the marker (for example an exhausted address pool), a
+        C(transient) false 507, a body which is not JSON, a 409, an
+        affinity failure and every other error fail at once.
       - A refused create still leaves an instance record behind, which
         the server parks in state C(error) and which keeps its name until
         someone deletes it. Before each replay the module waits for that
@@ -377,6 +400,17 @@ PREFLIGHT_CAPACITY_MESSAGES = (
 # the error and this module reads the instance again, error is the likelier
 # of the two. The message, not the state, is what identifies the abort.
 PREFLIGHT_ABORT_STATES = ('preflight-error', 'error')
+
+# The states an instance is in before the scheduler has given its verdict.
+# await_placement has to wait these out itself: create_instance()'s wait
+# loop in client-python's apiclient.py returns once the state is not initial
+# or creating, a list which predates preflight, so the create returns before
+# preflight has placed the instance or aborted it.
+UNPLACED_STATES = ('initial', 'preflight')
+
+# The states which mean the scheduler placed the instance. Anything else is
+# a failure, rather than something await_placement may report as placed.
+PLACED_STATES = ('creating', 'created')
 
 # The capacity wait's sleep, jitter source and wall clock. They are module
 # level names so that the tests can replace them and run a half hour wait
@@ -571,6 +605,51 @@ def _await_record_gone(client, log, ref, namespace, deadline):
         _sleep(min(CAPACITY_RECORD_POLL, remaining))
 
 
+def _await_placement(client, uuid, deadline):
+    """Wait for the scheduler's verdict on an instance.
+
+    Reads the instance by uuid until its state is no longer one of
+    UNPLACED_STATES, and returns that read: creating or created once it
+    has been placed, an error state once preflight has aborted it. If
+    deadline (a time.monotonic() value) passes first, returns the last
+    read, still unplaced, and the caller decides what that means. The
+    instance is always read at least once, so a deadline already passed
+    still reports an instance which was placed in the meantime.
+
+    This waits only for placement, not for the instance to boot, so that
+    a play which creates several instances without awaiting them still
+    overlaps their boots. An APIException is raised to the caller: a
+    failed read says nothing about where the instance went.
+    """
+    while True:
+        instance = client.get_instance(uuid)
+        if not isinstance(instance, dict):
+            # Not something there is a state to read from, and so not
+            # something waiting longer will help with: the caller fails it.
+            return instance
+        if instance.get('state') not in UNPLACED_STATES:
+            return instance
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return instance
+        _sleep(min(CAPACITY_RECORD_POLL, remaining))
+
+
+def _remaining_await_budget(await_timeout, operation_started,
+                            capacity_seconds):
+    """What is left of await_timeout for a wait starting now.
+
+    Whatever the delete and the create already spent comes out of the
+    budget, so await_timeout bounds the sequence rather than each leg of
+    it. Time spent waiting for capacity does not: it has a budget of its
+    own (see _CapacityWait), and is always 0 when capacity_wait is.
+    Returns (elapsed, budget), the budget never below zero.
+    """
+    elapsed = time.monotonic() - operation_started - capacity_seconds
+    return elapsed, max(0, await_timeout - elapsed)
+
+
 class _CapacityWait:
     """The bounded wait for capacity which capacity_wait asks for.
 
@@ -582,13 +661,13 @@ class _CapacityWait:
     share seconds. It starts with the first refused attempt and stops at
     the start of the attempt which is accepted. Between those it counts the
     pauses between replays, the waits for each refused record to be
-    deleted, the creates which were refused, and every await which ended in
-    a preflight capacity abort. run_module() deducts what it counted from
-    the time it charges to await_timeout, so the accepted instance's await
-    is budgeted exactly as if it had been the first attempt. A task's worst
-    case is therefore capacity_wait plus await_timeout: a replay is never
-    sent after the capacity budget has run out, and the last one sent can
-    still spend a whole await.
+    deleted, the creates which were refused, and every await or placement
+    wait which ended in a preflight capacity abort. run_module() deducts
+    what it counted from the time it charges to await_timeout, so the
+    accepted instance's await is budgeted exactly as if it had been the
+    first attempt. A task's worst case is therefore capacity_wait plus
+    await_timeout: a replay is never sent after the capacity budget has run
+    out, and the last one sent can still spend a whole await.
     """
 
     def __init__(self, module, client, log, budget, name, namespace):
@@ -626,6 +705,8 @@ class _CapacityWait:
     def preflight_abort(self, instance_uuid):
         """Read an instance whose await failed, if this wait might replay it.
 
+        The await here is either the client's await of the whole create or
+        _await_placement() having returned the instance in an error state.
         Returns the instance when preflight aborted it for capacity, and
         None otherwise. The client's await raises the same exception for
         every error state, and preflight carries no machine readable reason
@@ -1111,6 +1192,8 @@ def run_module():
         'secure_boot': {'required': False, 'type': 'bool'},
         'metadata': {'required': False, 'type': 'dict'},
         'await': {'required': False, 'type': 'bool', 'default': False},
+        'await_placement': {
+            'required': False, 'type': 'bool', 'default': False},
         'await_timeout': {'required': False, 'type': 'int', 'default': 600},
         'capacity_wait': {'required': False, 'type': 'int', 'default': 0},
         'state': {
@@ -1202,6 +1285,11 @@ def run_module():
             # 4200 seconds -- and reported the 600
             # (shakenfist/kerbside#355).
             #
+            # A wait only for placement spends await_timeout too, so the
+            # same applies to it: the bounded loop in _await_placement()
+            # should do the waiting, not the client's strategy deadline.
+            # The two log lines below are worded to be true of either.
+            #
             # timeout=0 is not a falsy "unset" to the client: it tests
             # "if timeout is None" and then bounds the POST's dependency
             # retries and the wait afterwards at now + 0, so the call
@@ -1225,14 +1313,21 @@ def run_module():
             # per-call arguments (this one, and async_request on the
             # delete in _delete_and_wait()) keep each call site's waiting
             # behaviour explicit at the call itself.
-            if module.params.get('await') and _create_accepts_timeout(client):
+            awaiting = (module.params.get('await') or
+                        module.params.get('await_placement'))
+            if awaiting and _create_accepts_timeout(client):
                 instance_kwargs['timeout'] = 0
                 log.append('Client accepts a create timeout, so the create '
                            'will not wait')
-            elif module.params.get('await'):
+            elif awaiting:
                 log.append('Client predates the create timeout argument, so '
                            'the create will wait and what it spends is '
                            'deducted from the await budget instead')
+
+        if module.params.get('await') and \
+                module.params.get('await_placement'):
+            log.append('await_placement is covered by the full await, so '
+                       'there is no separate wait for placement')
 
         # Each pass is one create and its await. A pass ends in a replay
         # only when capacity_wait is set and the cluster refused the
@@ -1261,18 +1356,85 @@ def run_module():
                         'Instance creation failed', e)
                     continue
 
+            if (module.params.get('await_placement') and
+                    not module.params.get('await')):
+                await_timeout = module.params.get('await_timeout')
+                elapsed, placement_budget = _remaining_await_budget(
+                    await_timeout, operation_started, capacity.seconds)
+                log.append('Awaiting placement of instance %s for %d '
+                           'seconds (%d already spent)'
+                           % (i['uuid'], placement_budget, elapsed))
+                try:
+                    placed = _await_placement(
+                        client, i['uuid'],
+                        time.monotonic() + placement_budget)
+                except apiclient.APIException as e:
+                    _fail_api_error(
+                        module, log, 'Waiting for instance placement failed',
+                        e, **capacity.failure())
+
+                if not isinstance(placed, dict):
+                    msg = ('Waiting for instance placement failed: instance '
+                           '%s could not be read back (got %r)'
+                           % (i['uuid'], placed))
+                    log.append(msg)
+                    module.fail_json(msg=msg, meta=None, log=log,
+                                     **capacity.failure())
+
+                placed_state = placed.get('state')
+                if (isinstance(placed_state, str) and
+                        _is_error_state(placed_state)):
+                    # As for the await below, only an instance this task
+                    # created can be replayed.
+                    aborted = None
+                    if needs_replacement:
+                        aborted = capacity.preflight_abort(i['uuid'])
+                    if aborted:
+                        capacity.refused(
+                            'preflight', None, aborted['error_message'],
+                            i['uuid'], None,
+                            'Waiting for instance placement failed',
+                            aborted['error_message'])
+                        continue
+
+                    msg = ('Waiting for instance placement failed: instance '
+                           '%s is in state %s: %s'
+                           % (i['uuid'], placed_state,
+                              placed.get('error_message') or
+                              'no error message'))
+                    log.append(msg)
+                    module.fail_json(msg=msg, meta=None, log=log,
+                                     **capacity.failure())
+
+                if placed_state in UNPLACED_STATES:
+                    msg = ('Instance %s was not placed within the %d second '
+                           'await_timeout (last state: %s)'
+                           % (i['uuid'], await_timeout, placed_state))
+                    log.append(msg)
+                    module.fail_json(msg=msg, meta=None, log=log,
+                                     **capacity.failure())
+
+                if placed_state not in PLACED_STATES:
+                    msg = ('Waiting for instance placement failed: instance '
+                           '%s is in unexpected state %s'
+                           % (i['uuid'], placed_state))
+                    log.append(msg)
+                    module.fail_json(msg=msg, meta=None, log=log,
+                                     **capacity.failure())
+
+                log.append('Instance %s was placed (state %s)'
+                           % (i['uuid'], placed_state))
+                break
+
             if not module.params.get('await'):
                 log.append('Not awaiting instance')
                 break
 
-            # Whatever the delete and the create already spent comes out
-            # of the budget, so await_timeout bounds the sequence rather
-            # than each leg of it. Time spent waiting for capacity does
-            # not: it has a budget of its own (see _CapacityWait), and is
-            # always 0 when capacity_wait is.
+            # See _remaining_await_budget() for what is charged to
+            # await_timeout and what is not.
             await_timeout = module.params.get('await_timeout')
-            elapsed = time.monotonic() - operation_started - capacity.seconds
-            await_budget = max(0, await_timeout - elapsed)
+            elapsed, await_budget = _remaining_await_budget(
+                await_timeout, operation_started, capacity.seconds)
             log.append('Awaiting instance %s for %d seconds (%d already '
                        'spent)' % (i['uuid'], await_budget, elapsed))
             try:

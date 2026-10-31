@@ -73,7 +73,7 @@ import the `shakenfist_client` SDK and call the Shaken Fist REST API directly
 |--------|---------|
 | `shakenfist.shakenfist.sf_namespace` | Idempotently create or delete a namespace (`name`, `state`). |
 | `shakenfist.shakenfist.sf_network` | Idempotently create or delete a network (`name`/`uuid`, `netblock`, `nat`, `dhcp`, `dns`, `state`). A changed specification deletes and recreates the network. |
-| `shakenfist.shakenfist.sf_instance` | Idempotently create, replace or delete an instance (`name`/`uuid`, `cpu`, `ram`, `disks`/`diskspecs`, `networks`/`networkspecs`, `metadata`, `await`, `await_timeout`, `capacity_wait`, `state`). A changed specification deletes and recreates the instance. |
+| `shakenfist.shakenfist.sf_instance` | Idempotently create, replace or delete an instance (`name`/`uuid`, `cpu`, `ram`, `disks`/`diskspecs`, `networks`/`networkspecs`, `metadata`, `await`, `await_placement`, `await_timeout`, `capacity_wait`, `state`). A changed specification deletes and recreates the instance. |
 | `shakenfist.shakenfist.sf_snapshot` | Snapshot an instance's disks (optionally updating a label) or delete a snapshot artifact (`instance_uuid`/`uuid`, `all`, `label`, `state`). |
 | `shakenfist.shakenfist.sf_claim` | Idempotently create, resize, re-date or delete a namespace's capacity claim (`namespace`, `limit_cpus`, `limit_memory_mb`, `limit_disk_gb`, `expires_in_seconds`, `renew_within_seconds`, `state`). Administrator only. |
 
