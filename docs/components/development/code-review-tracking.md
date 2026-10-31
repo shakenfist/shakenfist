@@ -306,16 +306,102 @@ did not write.
    [templates/review-tracking/README.md](https://github.com/shakenfist/development/blob/main/templates/review-tracking/README.md)
    for what else the workflow needs (the `.gitignore` exception,
    `.vscode/review-scope.toml`, and the `paths-ignore` block from
-   step 8) and for gitsign and the development clone it makes. A
-   repository whose default-branch ruleset requires a pull request
-   needs a `DEPENDENCIES_TOKEN` secret, since GitHub will not accept
-   the built-in Actions app as a bypass actor and shakenfist-bot has
-   to push with a token instead; a repository without that
-   requirement pushes with `GITHUB_TOKEN`. Changes to the workflow
-   or script go to the template, not to a repository's copy of them.
-   The consistency audit's `review-coverage` check needs no per-repo
-   setup -- it notices the scope config and starts checking the repo
-   automatically.
+   step 8) and for gitsign and the development clone it makes.
+   Changes to the workflow or script go to the template, not to a
+   repository's copy of them. The consistency audit's
+   `review-coverage` check needs no per-repo setup -- it notices the
+   scope config and starts checking the repo automatically.
+
+   Before the workflow's first run, an operator with admin on the
+   repository sets up where it pushes from. Every adopting
+   repository gets a `review-marks` environment with the
+   default-branch policy, key or no key: the job names the
+   environment, and one GitHub creates on first reference has no
+   branch policy, so a key added to it later would be readable from
+   any branch. A repository whose default-branch ruleset requires a
+   pull request also gets the `shakenfist-review-marks` GitHub App,
+   which pushes there, since GitHub will not accept the built-in
+   Actions app as a bypass actor; the rest push with `GITHUB_TOKEN`
+   and need nothing more. The key is only ever an environment
+   secret, never a repository or organisation one:
+   `secrets.REVIEW_MARKS_APP_KEY` resolves at all three levels, and
+   the workflow would mint from a repository or organisation secret,
+   which any branch can read, just as quietly. The App's client id
+   is already the organisation variable `REVIEW_MARKS_APP_CLIENT_ID`.
+   With `<r>` the repository and `<default>` its default branch, in
+   this order:
+
+   1. Create the environment with a custom branch policy, then give
+      it exactly one policy, of type `branch`, naming the default
+      branch:
+
+      ```
+      echo '{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}' |
+          gh api -X PUT repos/shakenfist/<r>/environments/review-marks --input -
+      gh api -X POST repos/shakenfist/<r>/environments/review-marks/deployment-branch-policies \
+          -f name=<default> -f type=branch
+      ```
+
+      Read both back (`gh api
+      repos/shakenfist/<r>/environments/review-marks` and the same
+      path with `/deployment-branch-policies`): the policy must be
+      the default branch alone, with no glob characters and no tag
+      entry, since "admits the default branch" is not the test. A
+      repository without a pull-request ruleset stops here.
+
+   2. Install the App on the repository: in the organisation's
+      settings, under GitHub Apps, configure
+      `shakenfist-review-marks` and add the repository to its
+      selected repositories.
+
+   3. Put the App's private key in the environment, and nowhere
+      else. No copy of the key is kept outside the environments, and
+      the App holds exactly one key, the one every repository's
+      environment carries, so adding a repository is a rotation, not
+      a new key for that repository alone. Generate a new private
+      key on the App's settings page; set it in the new repository's
+      environment and again in every repository whose environment
+      already holds the key; read back each environment's secret
+      list; then delete the old key on the App's page, so that one
+      remains, and shred the downloaded file. Until the old key is
+      deleted both work, so no run fails partway through:
+
+      ```
+      for r in <r> <every repository already holding the key>; do
+          gh secret set REVIEW_MARKS_APP_KEY --repo shakenfist/$r --env review-marks < <key>.pem
+          gh api repos/shakenfist/$r/environments/review-marks/secrets --jq '.secrets[].name'
+          gh secret list --repo shakenfist/$r    # must not list REVIEW_MARKS_APP_KEY
+      done
+      ```
+
+      The repositories already holding the key are the App's
+      selected repositories, as its installation settings list them.
+
+   4. Add the App to the ruleset's bypass actors, by the same fetch
+      and PUT that [merge queue
+      configuration](/components/development/audits/merge-queue-config/) uses, carrying
+      everything else over unchanged and adding the App (its app id
+      is 5538020). The filter drops any entry for the App before
+      adding it, so running the step twice leaves one entry, not two:
+
+      ```
+      gh api repos/shakenfist/<r>/rulesets --jq \
+          '.[] | select(.target == "branch") | {id, name}'
+      gh api repos/shakenfist/<r>/rulesets/<id> | jq \
+          '{name, target, enforcement, conditions, rules,
+            bypass_actors: ([(.bypass_actors // [])[]
+                | select(.actor_type != "Integration" or .actor_id != 5538020)]
+              + [{"actor_id": 5538020, "actor_type": "Integration",
+                  "bypass_mode": "always"}])}' > ruleset.json
+      gh api -X PUT repos/shakenfist/<r>/rulesets/<id> --input ruleset.json
+      gh api repos/shakenfist/<r>/rulesets/<id> --jq '.bypass_actors'
+      ```
+
+      Read the bypass actors back: the App must appear once, beside
+      every actor that was there before.
+
+   The job's `environment:` sets `deployment: false`, so its runs do
+   not appear in the repository's Deployments view.
 
 8. Teach the repository's build and analysis workflows to ignore
    review-only changes, so a review session (or a bot prune) does
@@ -765,17 +851,24 @@ file reading as reviewed, so an import bug must not hold it up, but it
 must not pass unnoticed either. A concurrency group serialises the
 workflow's own runs, and the loop terminates either way: a repository
 that can push with the default `GITHUB_TOKEN` never retriggers the
-workflow at all, while one whose ruleset forces a PAT instead -- as
-ryll's does, since develop requires a pull request before merging and
-GitHub will not accept the built-in Actions app as a bypass actor, so
-shakenfist-bot pushes with `DEPENDENCIES_TOKEN` -- retriggers exactly
-once, into a run that finds nothing left to do (observed 2026-09-11
-04:57:20 UTC, before ryll carried the merged workflow, `Prune stale
-review marks.`, which committed nothing).
+workflow at all, while one whose ruleset requires a pull request --
+as ryll's does, since GitHub will not accept the built-in Actions app
+as a bypass actor -- pushes as the `shakenfist-review-marks` GitHub
+App, the ruleset's bypass actor, with a token minted per run from the
+key in the repository's `review-marks` environment (step 7 above).
+An App push retriggers the workflow exactly once, into a run that
+finds nothing left to do, as the personal access token that pushed
+before it did (observed 2026-09-11 04:57:20 UTC, before ryll carried
+the merged workflow, `Prune stale review marks.`, which committed
+nothing). The commit's author is still shakenfist-bot, set by the
+script, whichever identity pushes it.
 
-The job runs on shared, long-lived static runners that also run pull
-request code, so it trusts as little as it can of what an earlier job
-could have left there. It never reads the reused workspace: the script
+The job runs on an ephemeral vm runner, a fresh machine per job. Its
+design assumes a shared, long-lived runner that also runs pull
+request code, as the static runners are, and keeps that isolation on
+the vm runner as defence in depth, since the runner is one line of
+the workflow: it trusts as little as it can of what an earlier job
+could have left on the runner. It never reads the workspace: the script
 comes from a fresh clone in `RUNNER_TEMP`, and lands from another; it
 ignores global and system git configuration, gives gitsign a fresh TUF
 cache on every run, keeps no credentials in either clone, and hands
