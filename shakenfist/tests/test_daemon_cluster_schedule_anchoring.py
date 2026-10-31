@@ -14,6 +14,7 @@ import time
 import uuid
 from unittest import mock
 
+from prometheus_client import REGISTRY
 import schedule
 
 from shakenfist.daemons.cluster import main as cluster_main
@@ -399,23 +400,27 @@ class ForcedCapacityReconcileTestCase(base.ShakenFistTestCase):
 
     def test_a_fresh_hypervisor_with_no_row_forces_the_pass(self):
         # Realistic dashed uuids rather than the short opaque names the
-        # rest of this class uses, and one source handing back a UUID
+        # rest of this class uses, and every source handing back a UUID
         # object rather than a string, because the set arithmetic joins
         # three independently sourced spellings of a node uuid and
         # a mismatch between uuid spellings fails silently (see "A
         # column-to-column comparison has no bind processor" in
-        # docs/developer_guide/coding_rules.md). If the str()
-        # normalisation were dropped, the guarded node would never
-        # subtract from the capacity rows, and the unguarded one would
-        # never intersect with the active set: the first spelling
+        # docs/developer_guide/coding_rules.md). Each side has its own
+        # str() and each can be dropped on its own, so each side has to
+        # be handed a UUID object: with the metrics side left as a
+        # string, dropping its str() survived the suite (issue 4475).
+        # If the capacity-row normalisation were dropped, the guarded
+        # node would never subtract from the capacity rows; if the
+        # metrics or active-node one were, the unguarded node would
+        # never intersect with the active set. The first spelling
         # mismatch forces the five minute pass every sixty seconds
         # forever, the second silently forces nothing.
         guarded = '2f9a1c74-0b3d-4a1e-9c8f-7d6e5b4a3c21'
         unguarded = 'a1b2c3d4-e5f6-4708-9a0b-1c2d3e4f5061'
         self._patch(
             rows=[{'node_uuid': uuid.UUID(guarded)}],
-            metrics=[self._metrics(guarded, {'is_hypervisor': True}),
-                     self._metrics(unguarded, {'is_hypervisor': True})],
+            metrics=[self._metrics(uuid.UUID(guarded), {'is_hypervisor': True}),
+                     self._metrics(uuid.UUID(unguarded), {'is_hypervisor': True})],
             active=[uuid.UUID(guarded), uuid.UUID(unguarded)])
         m = self._monitor_with_capacity_job()
 
@@ -424,6 +429,26 @@ class ForcedCapacityReconcileTestCase(base.ShakenFistTestCase):
         self.assertTrue(self._became_due(m))
         self.assertEqual(
             frozenset([unguarded]), m._forced_capacity_reconcile_for)
+
+    def test_a_forced_pass_is_counted(self):
+        # scheduler_capacity_reconcile_forced_total is documented in the
+        # operator and developer guides and read by dashboards, so both
+        # its name and the fact that a force increments it are a
+        # contract (issue 4475). Read through the registry by the
+        # published name, so a rename fails here rather than on a
+        # dashboard.
+        name = 'scheduler_capacity_reconcile_forced_total'
+        before = REGISTRY.get_sample_value(name) or 0
+        self._patch(
+            rows=[self._row('guarded')],
+            metrics=[self._metrics('unguarded', {'is_hypervisor': True})],
+            active=['guarded', 'unguarded'])
+        m = self._monitor_with_capacity_job()
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertTrue(self._became_due(m))
+        self.assertEqual(before + 1, REGISTRY.get_sample_value(name))
 
     def test_the_same_unguarded_set_does_not_force_twice(self):
         self._patch(

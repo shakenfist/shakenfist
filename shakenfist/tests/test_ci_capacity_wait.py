@@ -380,6 +380,11 @@ class WaitForCapacityTestCase(test_base.ShakenFistTestCase):
             'An absent node must read as no headroom, not as the '
             'headroom of whichever node happened to be listed.')
         self.assertEqual(8, record['headroom_at_end']['cpus'])
+        # No headroom is not the same as a dimension which binds: the
+        # roster said nothing about the node, so nothing can be named
+        # as the shortfall (best_node() draws this distinction and the
+        # wait-trace analysis relies on it; issue 4475).
+        self.assertIsNone(record['binding_dimension'])
 
     def test_a_binding_limit_beats_generous_published_headroom(self):
         """The decision this whole phase rests on.
@@ -456,6 +461,14 @@ class WaitForCapacityTestCase(test_base.ShakenFistTestCase):
         self.assertEqual(2, record['polls'])
         self.assertEqual(['ValueError: connection reset'],
                          record['poll_errors'])
+        # The figures come from the poll which read the roster, not the
+        # one which raised. An empty roster standing in for the failed
+        # poll would record zero headroom and a cpus shortfall for a
+        # wait which was in fact satisfied by its first real read, and
+        # the wait-trace analysis would count that as a refusal with a
+        # cause (issue 4475).
+        self.assertEqual(8, record['headroom_at_start']['cpus'])
+        self.assertIsNone(record['binding_dimension'])
 
     def test_a_create_waits_on_memory_the_same_way_it_waits_on_cpus(self):
         """The dimension most likely to bind in CI, and the one D8 missed.

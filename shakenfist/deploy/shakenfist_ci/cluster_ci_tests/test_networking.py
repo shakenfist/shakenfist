@@ -328,3 +328,82 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.assertEqual(0, results['return-code'])
         self.assertEqual('', results['stderr'])
         self.assertTrue(' 0% packet' in results['stdout'], results['stdout'])
+
+    def test_extraneous_network_duplicates(self):
+        """A ping across the mesh gets one reply per request.
+
+        Two instances on one hypervisor and a third on another, all on
+        the same virtual network, so that the ping between the first two
+        crosses nothing while the third's presence puts a second
+        hypervisor in the network's VXLAN mesh. A mesh which forwards a
+        frame back to the segment it came from makes ping report DUP!
+        replies, which is what this asserts against.
+
+        This test lived in the smoke and guest suites, pinned to nodes
+        named sf-2 and sf-3. The smoke suite runs only on single-node
+        clusters, so the first create answered 404 and the test skipped
+        at every call site in the fleet, under a message which named the
+        wrong cause for a cluster where the artifact rather than the node
+        was missing (issue 4458). It needs two hypervisors, which is this
+        suite's shape, and it reads them from the cluster rather than
+        assuming their names.
+        """
+        hypervisors = self._hypervisor_nodes()
+        if len(hypervisors) < 2:
+            self.skipTest(
+                'This test needs two hypervisors to put a second node in '
+                'the mesh, and this cluster has %d' % len(hypervisors))
+        first, second = hypervisors[0]['name'], hypervisors[1]['name']
+        self.addDetail('hypervisors', content.text_content(json.dumps(
+            [first, second], indent=4, sort_keys=True)))
+
+        dupnet = self.test_client.allocate_network(
+            '10.0.0.0/24', True, True, '%s-dups' % self.namespace)
+        self.addDetail(
+            'dupnet',
+            content.text_content(json.dumps(dupnet, indent=4, sort_keys=True)))
+        self._await_networks_ready([dupnet['uuid']])
+
+        instances = []
+        for name, node in (('dup1', first), ('dup2', first),
+                           ('dup3', second)):
+            inst = self.create_instance(
+                name, 1, 1024,
+                [
+                    {
+                        'network_uuid': dupnet['uuid']
+                    }
+                ],
+                [
+                    {
+                        'size': 8,
+                        'base': base.CLUSTER_CI_IMAGE,
+                        'type': 'disk'
+                    }
+                ], None, None, force_placement=node)
+            self.addDetail(
+                name, content.text_content(json.dumps(inst, indent=4,
+                                                      sort_keys=True)))
+            instances.append(inst)
+
+        for inst in instances:
+            self._await_instance_ready(inst['uuid'])
+
+        # The scheduler honoured the pins, or the ping below crosses a
+        # different path from the one described above.
+        for inst, node in zip(instances, (first, first, second)):
+            placed = self._node_by_identifier(
+                hypervisors, self.test_client.get_instance(inst['uuid'])['node'])
+            self.assertIsNotNone(placed, 'Instance %s has no placement' % inst['uuid'])
+            self.assertEqual(node, placed['name'])
+
+        nics = self.test_client.get_instance_interfaces(instances[1]['uuid'])
+        results = self._await_command(
+            instances[0]['uuid'], 'ping -c 3 %s' % nics[0]['ipv4'])
+        self.addDetail(
+            'ping results',
+            content.text_content(json.dumps(results, indent=4, sort_keys=True)))
+        self.assertEqual(0, results['return-code'])
+        self.assertEqual('', results['stderr'])
+        self.assertTrue(' 0% packet' in results['stdout'], results['stdout'])
+        self.assertNotIn('DUP', results['stdout'])

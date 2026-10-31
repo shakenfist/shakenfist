@@ -259,3 +259,39 @@ class InstanceEnqueueDeleteSqlTestCase(
             [(ObjectType.NODE_INST_SNAP_OP, snap),
              (ObjectType.NODE_INST_NET_IFACE_OP, hot_plug)],
             [(d['op_type'], d['op_uuid']) for d in delete.runs_after])
+
+    def test_delete_walk_aborts_an_executing_operation(self):
+        # The walk reads every outstanding target, and an operation which
+        # a worker has already picked up is outstanding too: it is aborted
+        # like a queued one, so that it does not run on against an
+        # instance being deleted. The test above only ever aborts queued
+        # operations, so a walk which quietly skipped the executing ones
+        # passed it (issue 4669).
+        _, hot_plug = node_inst_net_iface_op.create_and_enqueue(
+            NODE_UUID, INSTANCE_UUID, NETWORK_UUID, INTERFACE_UUID,
+            HOT_PLUG_TASKS, PRIORITY.user_facing)
+        _, sweep = node_inst_op.create_and_enqueue(
+            NODE_UUID, INSTANCE_UUID, SWEEP_TASKS, PRIORITY.background)
+        self._set_op_state(hot_plug, 'executing')
+        self._set_op_state(sweep, 'executing')
+
+        inst = _instance()
+        with mock.patch.object(
+                instance.Instance, 'placement',
+                new_callable=mock.PropertyMock,
+                return_value={'node': NODE_UUID}), \
+                mock.patch('shakenfist.instance.add_event_multi'), \
+                mock.patch('shakenfist.eventlog.add_event'):
+            inst.enqueue_delete()
+            delete = inst.get_cluster_operations()[0].op
+
+        self.assertEqual('abort', self._op_state(hot_plug))
+        self.assertEqual('abort', self._op_state(sweep))
+        self.assertEqual(
+            [node_inst_op.model_tasks.instance_delete], delete.tasks)
+        # The newest mutating operation is still waited for, aborted or
+        # not: a terminal dependency is satisfied, so this costs nothing,
+        # and the pointer is re-read rather than trusted.
+        self.assertEqual(
+            [(ObjectType.NODE_INST_NET_IFACE_OP, hot_plug)],
+            [(d['op_type'], d['op_uuid']) for d in delete.runs_after])
