@@ -2549,6 +2549,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/pre-commit-node-version/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Pre-commit Node version
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/push-audit/" class="md-nav__link">
         
   
@@ -7859,6 +7887,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../spice-server-patches/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spice-server patches on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ack-window/" class="md-nav__link">
         
   
@@ -8253,10 +8309,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_9" id="__nav_3_8_12_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
             
   
   
@@ -8274,8 +8330,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_9">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9587,6 +9643,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-spice-performance-phase-05-spice-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: spice-server patches, measured
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-use-case-docs-phase-05-index-slimdown/" class="md-nav__link">
         
   
@@ -9903,6 +9987,34 @@
     
   
     Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-proxmox-source-phase-07-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 7: push audit
   
 
     
@@ -17085,14 +17197,13 @@ kerbside-patches like the qemu damage series. That is a much smaller
 job than the productising list below. And once the crash is gone, the
 transcoder's remaining unique win is the heavy activity on the slowest
 link.</p>
-<p>One gap in the evidence could cut either way. In every
-<code>streaming-video=all</code> measurement the streams were H.264, which Ryll
-does not decode. So spice-server's stream rate control ran on reports
-from a client that drew nothing. The key box is never streamed, so its
-latency is unaffected, but a client that decodes the stream might see
-different contention. That should be measured before
-<code>streaming-video=all</code> becomes the recommendation (see
-<a href="#follow-ups">follow-ups</a>).</p>
+<p>In every <code>streaming-video=all</code> measurement here the streams were
+MJPEG, the codec the Ryll used asks for first, and Ryll decodes MJPEG
+(see <a href="/components/kerbside/performance/spice-server-patches/#which-codec-the-streams-used">the spice-server patches</a>).
+So spice-server's stream rate control ran on reports from a client
+that drew the stream. A client that asks for H.264 might see different
+contention, and Ryll does not yet decode spice-server's H.264
+(<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/398" title="GitHub Issue: shakenfist/ryll #398">ryll#398</a>), so that is not measured (see <a href="#follow-ups">follow-ups</a>).</p>
 <h2 id="the-evidence-by-question">The evidence, by question<a class="headerlink" href="#the-evidence-by-question" title="Permanent link">&para;</a></h2>
 <h3 id="does-spice-servers-ack-window-explain-the-slow-link-backlog">Does spice-server's ACK window explain the slow-link backlog?<a class="headerlink" href="#does-spice-servers-ack-window-explain-the-slow-link-backlog" title="Permanent link">&para;</a></h3>
 <p>Yes, for the backlog, and no, for throughput. Observed from inside the
@@ -17358,9 +17469,10 @@ on a cache miss, which the job's cargo cache otherwise keeps.</p>
   Evidence that Kerbside's users run incompressible motion over links
   like 150 ms / 2 Mbit, the one case where the transcoder beat
   streaming relay (1459 against 7328 ms).</li>
-<li><strong>A decoding client changes the streaming numbers.</strong> If relay with
-  <code>streaming-video=all</code> is markedly slower with a client that decodes
-  its streams, the comparison above has to be redone.</li>
+<li><strong>An H.264 client changes the streaming numbers.</strong> The measurements
+  streamed MJPEG. If relay with <code>streaming-video=all</code> is markedly slower
+  with a client that asks for H.264 and decodes it, the comparison above
+  has to be redone.</li>
 <li><strong>A transcoder with a stream path ties streaming relay.</strong> Suppose
   andris's stream path came across with a codec that needs no
   licensing decision (MJPEG or VP8), and the client clock problem
@@ -17410,10 +17522,13 @@ on a cache miss, which the job's cargo cache otherwise keeps.</p>
   The cause is not established. One candidate is the control socket's
   stream of <code>surface_drawn</code> events.</li>
 <li><strong>Reproduce spice-server 0.15.2's connect crash against current
-  master,</strong> then report or patch it. This is now the main obstacle to
-  recommending <code>streaming-video=all</code>.</li>
-<li><strong>Measure <code>streaming-video=all</code> with a client that decodes the
-  stream,</strong> so that stream rate control runs on real reports.</li>
+  master,</strong> then report or patch it. Done: it reproduces on 0.16.0
+  and master, only for clients that send their codec preference at
+  connect (Ryll, not remote-viewer), and a patch is ready to send
+  (<a href="/components/kerbside/performance/spice-server-patches/">spice-server patches</a>).</li>
+<li><strong>Measure <code>streaming-video=all</code> with a client that decodes H.264.</strong>
+  The measurements here streamed MJPEG, which Ryll decodes; Ryll does
+  not yet decode spice-server's H.264 (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/398" title="GitHub Issue: shakenfist/ryll #398">ryll#398</a>).</li>
 <li><strong>Recommend a <code>streaming-video</code> setting to operators,</strong> stating the
   crash, once the two items above are settled.</li>
 <li><strong>Andris: socket pacing, and the JPEG fringe</strong> at the edges of

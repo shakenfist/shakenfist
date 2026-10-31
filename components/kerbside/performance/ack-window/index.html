@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/kerbside/performance/ack-window/">
       
       
-        <link rel="prev" href="../proxy-backpressure/">
+        <link rel="prev" href="../spice-server-patches/">
       
       
         <link rel="next" href="../streaming-rebaseline/">
@@ -2529,6 +2529,34 @@
     
   
     Audit: Plan template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/audits/pre-commit-node-version/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Pre-commit Node version
   
 
     
@@ -7856,6 +7884,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../spice-server-patches/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spice-server patches on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -8120,10 +8176,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_9" id="__nav_3_8_12_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
             
   
   
@@ -8141,8 +8197,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_9">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9454,6 +9510,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-spice-performance-phase-05-spice-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: spice-server patches, measured
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-use-case-docs-phase-05-index-slimdown/" class="md-nav__link">
         
   
@@ -9770,6 +9854,34 @@
     
   
     Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-proxmox-source-phase-07-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 7: push audit
   
 
     
@@ -17115,8 +17227,9 @@ which of those accounts for the second shortfall.</p>
   is inferred, not observed. spice-server logs its result only at debug
   level, and this rig does not capture it. The window and the JPEG
   draws are what was observed.</li>
-<li><code>streaming-video=all</code> streams were H.264, which Ryll does not decode
-  (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/398" title="GitHub Issue: shakenfist/ryll #398">ryll#398</a>), as in the re-baseline.</li>
+<li><code>streaming-video=all</code> streams were MJPEG, which Ryll decodes, not the
+  re-baseline's H.264: the Ryll used here asks for MJPEG first (see
+  <a href="/components/kerbside/performance/spice-server-patches/#which-codec-the-streams-used">the spice-server patches</a>).</li>
 </ul>
 
 

@@ -2549,6 +2549,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/pre-commit-node-version/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Pre-commit Node version
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/push-audit/" class="md-nav__link">
         
   
@@ -7859,6 +7887,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../spice-server-patches/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spice-server patches on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ack-window/" class="md-nav__link">
         
   
@@ -8109,10 +8165,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_9" id="__nav_3_8_12_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
             
   
   
@@ -8130,8 +8186,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_9">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9443,6 +9499,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-spice-performance-phase-05-spice-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: spice-server patches, measured
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-use-case-docs-phase-05-index-slimdown/" class="md-nav__link">
         
   
@@ -9759,6 +9843,34 @@
     
   
     Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-proxmox-source-phase-07-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 7: push audit
   
 
     
@@ -16722,10 +16834,13 @@ Measured on 2026-09-24.</p>
 <li><strong>spice-server 0.15.2 segfaults when a client connects while
   streams already exist.</strong> Every streaming case in the first
   attempt crashed qemu on connect. The rig now delays the guest's
-  activity until the client has connected (<code>ACTIVITY_DELAY</code>). This
-  would hit real deployments with streaming on: a user reconnecting
-  to a VM that is playing video crashes the VM's qemu. It is not
-  yet reproduced against spice-server's current master.</li>
+  activity until the client has connected (<code>ACTIVITY_DELAY</code>). It
+  has since been reproduced on 0.16.0 and spice-server master and
+  patched (<a href="/components/kerbside/performance/spice-server-patches/">spice-server patches</a>). It
+  needs a client that sends its codec preference as the display
+  channel comes up, as Ryll does. remote-viewer does not, so
+  remote-viewer users reconnecting to a streaming VM are not
+  affected.</li>
 <li>The rig runs Ryll with <code>-v</code> for the stream counts below, which
   costs a little client CPU. The backpressure runs did not.</li>
 <li>One host, CUBIC, two passes of 40 presses per cell. The v2 and

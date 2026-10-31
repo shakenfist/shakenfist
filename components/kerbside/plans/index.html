@@ -2549,6 +2549,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/pre-commit-node-version/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Pre-commit Node version
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/push-audit/" class="md-nav__link">
         
   
@@ -7857,6 +7885,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../performance/spice-server-patches/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spice-server patches on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../performance/ack-window/" class="md-nav__link">
         
   
@@ -8005,10 +8061,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_9" id="__nav_3_8_12_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
             
   
   
@@ -8026,8 +8082,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_9">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9410,6 +9466,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-spice-performance-phase-05-spice-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: spice-server patches, measured
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-use-case-docs-phase-05-index-slimdown/" class="md-nav__link">
         
   
@@ -9726,6 +9810,34 @@
     
   
     Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-proxmox-source-phase-07-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 7: push audit
   
 
     
@@ -16682,14 +16794,14 @@ repo root. For pre-push audits of our own work see
 <td><a href="/components/kerbside/plans/PLAN-proxmox-source/">Proxmox console source</a></td>
 <td>A Proxmox VE source driver and the transport work it needs: PVE reaches qemu's SPICE listener only through an HTTP CONNECT to its <code>spiceproxy</code>, which the backend dialer cannot do, and mints both credentials per request, which the authorize path has no way to ask for. Carries the feasibility research promoted out of PLAN-two-tier-ci.md's future-work section on 2026-09-20, now measured against an ephemeral PVE 9.2.20 deployment built by private prototype Ansible. Promoted to a master plan on 2026-09-24 when phase 2 was planned, which brings the mandatory push-audit phase (phase 7) with it</td>
 <td>In progress</td>
-<td>phase 1 (complete -- ticket semantics, measured against an ephemeral deployment on 2026-09-20 before the plan was scheduled; no code and no plan file, and its results are the master plan's <em>What the measurements settled</em>), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/">phase 1b</a> (complete, merged actions 5399c4f (#96), its ryll half inside phase 2's merge -- a Proxmox deployment action in shakenfist/actions and a ryll lane on it, replacing phase 2's operator-assisted step 2f. The survey found there was never a standing node, that the measurements never minted with the API token or resolved the node's FQDN off-node, and that ryll's VM lanes carry no fork guard. The decision most likely to be argued with is landing the lane's ryll commits inside phase 2's pull request. The node deploys in about seven minutes; the lane went red at the expired check alone on a deliberate-failure run, after review found it could not fail at all without <code>pipefail</code>), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/">phase 2</a> (complete, merged ryll ea4bf67 (#402) -- HTTP CONNECT in ryll's <code>shakenfist-spice-protocol</code>, plus <code>.vv</code> <code>proxy=</code> support in the ryll binary, so ryll opens a Proxmox <code>.vv</code> without kerbside. The survey found open question 2 is a correctness requirement rather than hardening: <code>ServerName::try_from</code> rejects a pseudo-hostname outright, so every tunnelled handshake would fail. It also found the pseudo-hostname, which carries a signed ticket, written into ryll's logs, capture metadata and bug reports; an IPv6-literal dial bug the rewrite fixes in passing; and that kerbside's <code>build_config</code> escalates to TLS only on <code>NEED_SECURED</code>, which phase 3b must change for tunnels. Both settled open questions are recorded at source. The decision most likely to be argued with is redacting the whole tunnel target from ryll's output rather than parsing Proxmox's format to show the vmid and node. Its push audit ran after merge and raised only low and advisory findings, fixed in ryll #411), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting/">phase 3a</a> (complete, merged 696f5aa -- minting moved into the authorize path through a source-driver hook, with <code>ovirt.py</code> requesting an explicit expiry and no longer storing its ticket on the <code>Console</code> row. The survey overturned the master plan's in-memory ticket store: a load balancer may send one session's channels to different proxy nodes, so the ticket lives on the session's token row in the shared database, under a row lock so one channel mints. It also found that no channel can arrive after the session's one-minute token expires, so an oVirt ticket covering the token never needs replacing, and settled supersession from the oVirt, libvirt, qemu and Proxmox sources: a new SPICE password keeps connected clients. The decision most likely to be argued with is that database store, which puts a live password in the database the master plan meant to keep it out of -- for about a minute and a half, where the oVirt path left one on the console row for two hours. The direct-qemu lane proved both that a connected client survives <code>set_password</code> and <code>expire_password</code> and that eight concurrent channels mint once under the row lock on MariaDB. Two review rounds ran 1 fix then 0 fix; round one added a per-console guard so an abandoned mint cannot replace a newer ticket within one daemon, and serialising mints across daemons is recorded as future work), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport/">phase 3b</a> (complete, merged c435ea3 -- a <code>Tunnel</code> sub-message on <code>Target</code>, the proxy's backend leg dialling it TLS-only through an HTTP CONNECT proxy with no plaintext attempt, and the session token row carrying the tunnel beside its ticket. The survey found the ryll pin already contains phase 2, and that the master plan's migration was aimed at the wrong table: the <code>Console</code> row already names the node in <code>hypervisor</code>, while the proxy URL, the signed CONNECT host and the TLS port all arrive with each mint, so they belong with the session's ticket. The CONNECT host is itself a credential. The decision most likely to be argued with is three named columns rather than a transport blob. Kerbside's first Proxmox lane moves to phase 5; the direct-qemu lane proved the tunnel against a CONNECT proxy in three modes, with no connect host in any artifact or the step log. CI found a test that passed only after another had installed the rustls crypto provider. One review round, with 0 fix items, made a minted tunnel missing a field a clean denial rather than a gRPC INTERNAL error), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/">phase 4</a> (complete, merged 6519c3b -- <code>kerbside/sources/proxmox.py</code>, discovering running SPICE VMs over <code>/cluster/resources</code> and minting over <code>spiceproxy</code>, plus the direct <code>.vv</code> handler refusing a proxied-only source before it mints, the role's source checker and the configuration reference. The survey read PVE's source rather than its docs. It found that <code>spiceproxy</code> takes a <code>proxy</code> parameter, so the broker can CONNECT to the API host and the node's FQDN need not resolve for it. It found that the host subject can be read from <code>certificates/info</code> without minting, which matters because every mint replaces the VM's SPICE password. And it found that <code>VM.Audit</code> and <code>VM.Console</code> on <code>/vms</code> cover every call, answering open question 4 pending phase 5's proof. The decision most likely to be argued with is a console uuid of <code>&lt;vmid&gt;-&lt;smbios uuid&gt;</code>, because PVE reuses freed vmids. Review round 1 found that uuid could not fit: the initial schema made every console <code>uuid</code> column <code>String(36)</code>, which SQLite-backed unit tests never noticed, so migration <code>dabe2f66e369</code> widens them, proven on MariaDB in the direct-qemu lane. Round 2, with 0 fix items, made any failed read error the source for that scrape rather than finish without the consoles it could not read, which would have deleted them and the tokens of their running sessions), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-05-ci-lane/">phase 5</a> (complete, merged c4b4011 -- kerbside's first lane against a real PVE node, on <code>shakenfist/actions</code>' <code>deploy-proxmox-on-shakenfist</code>. It deploys kerbside on the runner and relays a proxied session through <code>spiceproxy</code>. The survey found that the action's token is not the documented one: it is <code>privsep=0</code> with <code>PVEVMUser</code> and <code>PVEAuditor</code>, and its own comments call the least privilege unproven. So the lane creates the source's token by running <code>console-sources.md</code>'s <code>pveum</code> block, and proves each of the two privileges necessary with single-privilege tokens. It counts mints in PVE's own access log rather than trusting kerbside's account. The decision most likely to be argued with is the tier: nightly and advisory on Proxmox-path pull requests, as ryll's lane is, rather than a node booked on every push. Its first contact with a real node found no defect in the phase 4 driver, and one wrong expectation in the plan: a second session to a VM displaces the first, because qemu's SPICE server serves one client at a time. The lane now asserts that, and mints once itself to keep a real-PVE proof that a password change keeps a connected client. It settled open question 4. Four review rounds ran 2, 1, 1 and 0 fix items in code, and round 3's was a leak path: failure diagnostics printed raw log tails to the public job log before the secret scan ran), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-06-use-case-page/">phase 6</a> (in progress -- <code>docs/use-cases/proxmox.md</code>, in <code>ovirt.md</code>'s shape. The survey found <code>console-sources.md</code> already carries about 120 lines of Proxmox reference, which the lane executes, so the page links it rather than restating it; that is the decision most likely to be argued with. It also found the backend-TLS claims checker still describing every backend leg as plaintext first and escalating on NEED_SECURED, which the tunnel made untrue: a Proxmox leg's SPICE session is always TLS inside a plaintext CONNECT and always pinned, so the page says so with its reason, and the checker's docstring is corrected without changing its rules. It found PVE's own console button bypassing Kerbside for any user holding VM.Console, and a stale merge-queue claim in <code>ovirt.md</code>, fixed in passing), phase 7 (not started -- push audit)</td>
+<td>phase 1 (complete -- ticket semantics, measured against an ephemeral deployment on 2026-09-20 before the plan was scheduled; no code and no plan file, and its results are the master plan's <em>What the measurements settled</em>), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/">phase 1b</a> (complete, merged actions 5399c4f (#96), its ryll half inside phase 2's merge -- a Proxmox deployment action in shakenfist/actions and a ryll lane on it, replacing phase 2's operator-assisted step 2f. The survey found there was never a standing node, that the measurements never minted with the API token or resolved the node's FQDN off-node, and that ryll's VM lanes carry no fork guard. The decision most likely to be argued with is landing the lane's ryll commits inside phase 2's pull request. The node deploys in about seven minutes; the lane went red at the expired check alone on a deliberate-failure run, after review found it could not fail at all without <code>pipefail</code>), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/">phase 2</a> (complete, merged ryll ea4bf67 (#402) -- HTTP CONNECT in ryll's <code>shakenfist-spice-protocol</code>, plus <code>.vv</code> <code>proxy=</code> support in the ryll binary, so ryll opens a Proxmox <code>.vv</code> without kerbside. The survey found open question 2 is a correctness requirement rather than hardening: <code>ServerName::try_from</code> rejects a pseudo-hostname outright, so every tunnelled handshake would fail. It also found the pseudo-hostname, which carries a signed ticket, written into ryll's logs, capture metadata and bug reports; an IPv6-literal dial bug the rewrite fixes in passing; and that kerbside's <code>build_config</code> escalates to TLS only on <code>NEED_SECURED</code>, which phase 3b must change for tunnels. Both settled open questions are recorded at source. The decision most likely to be argued with is redacting the whole tunnel target from ryll's output rather than parsing Proxmox's format to show the vmid and node. Its push audit ran after merge and raised only low and advisory findings, fixed in ryll #411), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting/">phase 3a</a> (complete, merged 696f5aa -- minting moved into the authorize path through a source-driver hook, with <code>ovirt.py</code> requesting an explicit expiry and no longer storing its ticket on the <code>Console</code> row. The survey overturned the master plan's in-memory ticket store: a load balancer may send one session's channels to different proxy nodes, so the ticket lives on the session's token row in the shared database, under a row lock so one channel mints. It also found that no channel can arrive after the session's one-minute token expires, so an oVirt ticket covering the token never needs replacing, and settled supersession from the oVirt, libvirt, qemu and Proxmox sources: a new SPICE password keeps connected clients. The decision most likely to be argued with is that database store, which puts a live password in the database the master plan meant to keep it out of -- for about a minute and a half, where the oVirt path left one on the console row for two hours. The direct-qemu lane proved both that a connected client survives <code>set_password</code> and <code>expire_password</code> and that eight concurrent channels mint once under the row lock on MariaDB. Two review rounds ran 1 fix then 0 fix; round one added a per-console guard so an abandoned mint cannot replace a newer ticket within one daemon, and serialising mints across daemons is recorded as future work), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-03b-tunnel-transport/">phase 3b</a> (complete, merged c435ea3 -- a <code>Tunnel</code> sub-message on <code>Target</code>, the proxy's backend leg dialling it TLS-only through an HTTP CONNECT proxy with no plaintext attempt, and the session token row carrying the tunnel beside its ticket. The survey found the ryll pin already contains phase 2, and that the master plan's migration was aimed at the wrong table: the <code>Console</code> row already names the node in <code>hypervisor</code>, while the proxy URL, the signed CONNECT host and the TLS port all arrive with each mint, so they belong with the session's ticket. The CONNECT host is itself a credential. The decision most likely to be argued with is three named columns rather than a transport blob. Kerbside's first Proxmox lane moves to phase 5; the direct-qemu lane proved the tunnel against a CONNECT proxy in three modes, with no connect host in any artifact or the step log. CI found a test that passed only after another had installed the rustls crypto provider. One review round, with 0 fix items, made a minted tunnel missing a field a clean denial rather than a gRPC INTERNAL error), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/">phase 4</a> (complete, merged 6519c3b -- <code>kerbside/sources/proxmox.py</code>, discovering running SPICE VMs over <code>/cluster/resources</code> and minting over <code>spiceproxy</code>, plus the direct <code>.vv</code> handler refusing a proxied-only source before it mints, the role's source checker and the configuration reference. The survey read PVE's source rather than its docs. It found that <code>spiceproxy</code> takes a <code>proxy</code> parameter, so the broker can CONNECT to the API host and the node's FQDN need not resolve for it. It found that the host subject can be read from <code>certificates/info</code> without minting, which matters because every mint replaces the VM's SPICE password. And it found that <code>VM.Audit</code> and <code>VM.Console</code> on <code>/vms</code> cover every call, answering open question 4 pending phase 5's proof. The decision most likely to be argued with is a console uuid of <code>&lt;vmid&gt;-&lt;smbios uuid&gt;</code>, because PVE reuses freed vmids. Review round 1 found that uuid could not fit: the initial schema made every console <code>uuid</code> column <code>String(36)</code>, which SQLite-backed unit tests never noticed, so migration <code>dabe2f66e369</code> widens them, proven on MariaDB in the direct-qemu lane. Round 2, with 0 fix items, made any failed read error the source for that scrape rather than finish without the consoles it could not read, which would have deleted them and the tokens of their running sessions), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-05-ci-lane/">phase 5</a> (complete, merged c4b4011 -- kerbside's first lane against a real PVE node, on <code>shakenfist/actions</code>' <code>deploy-proxmox-on-shakenfist</code>. It deploys kerbside on the runner and relays a proxied session through <code>spiceproxy</code>. The survey found that the action's token is not the documented one: it is <code>privsep=0</code> with <code>PVEVMUser</code> and <code>PVEAuditor</code>, and its own comments call the least privilege unproven. So the lane creates the source's token by running <code>console-sources.md</code>'s <code>pveum</code> block, and proves each of the two privileges necessary with single-privilege tokens. It counts mints in PVE's own access log rather than trusting kerbside's account. The decision most likely to be argued with is the tier: nightly and advisory on Proxmox-path pull requests, as ryll's lane is, rather than a node booked on every push. Its first contact with a real node found no defect in the phase 4 driver, and one wrong expectation in the plan: a second session to a VM displaces the first, because qemu's SPICE server serves one client at a time. The lane now asserts that, and mints once itself to keep a real-PVE proof that a password change keeps a connected client. It settled open question 4. Four review rounds ran 2, 1, 1 and 0 fix items in code, and round 3's was a leak path: failure diagnostics printed raw log tails to the public job log before the secret scan ran), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-06-use-case-page/">phase 6</a> (complete, merged 746c7ef -- <code>docs/use-cases/proxmox.md</code>, in <code>ovirt.md</code>'s shape. The survey found <code>console-sources.md</code> already carries about 120 lines of Proxmox reference, which the lane executes, so the page links it rather than restating it; that is the decision most likely to be argued with. It also found the backend-TLS claims checker still describing every backend leg as plaintext first and escalating on NEED_SECURED, which the tunnel made untrue: a Proxmox leg's SPICE session is always TLS inside a plaintext CONNECT and always pinned, so the page says so with its reason, and the checker's docstring is corrected without changing its rules. It found PVE's own console button bypassing Kerbside for any user holding VM.Console, and a stale merge-queue claim in <code>ovirt.md</code>, fixed in passing. A read-only fact check of the finished page made ten corrections, the main one that the hop to <code>spiceproxy</code> is a plaintext CONNECT carrying the signed connect host in the clear, which the page, <code>network-ports.md</code> and this row had all stated as TLS. The one automated review raised no fix items; its six consider items were all taken, and carried the same correction into the plan's own finding and decision. The checker's rules stayed unchanged, which leaves a known blind spot: a sentence naming only the SPICE session or qemu, not the backend, is not read as a claim), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-07-push-audit/">phase 7</a> (in progress -- the mandatory push audit over the five merges that carry code, phases 3a to 6, each against its own first parent, because #491 and #638 make <code>plan-range.sh</code> sweep in other plans' work. Phases 1b and 2 were audited in actions and ryll, and are cited. The survey found the plan changed Rust, which <code>PUSH-AUDIT.md</code> does not gate, so <code>rust.yml</code>'s runs on the two merges that touched it are cited instead. It also found the security surface much larger than a docs plan's: live SPICE passwords and a credential-bearing CONNECT host in the shared database, a driver that mints, and a scheduled lane that handles real token secrets. The decision most likely to be argued with is splitting the security review into two opus agents, ticket and tunnel path against driver and lane, with a handoff list of sensitive fields between them. Findings are fixed in a follow-up pull request. Audited 2026-10-30: no critical, high or medium finding. Twelve go to the follow-up, four of them low: the driver accepts an <code>http://</code> url, trusts the proxy URI a mint returns, a failed thread start leaves a minting worker registered for five minutes, and the checker misses the page's own heading. Wave 1's only failure was seven deliberate <code>print()</code>s without the marker. Filed #656 to #661, a comment on #138, ryll #665 and #666 and actions #216, for untracked future work and problems that predate the plan)</td>
 </tr>
 <tr>
 <td>2026-09-23</td>
 <td><a href="/components/kerbside/plans/PLAN-spice-performance/">SPICE session performance</a></td>
 <td>Make SPICE sessions through Kerbside measurably faster in three horizons: proxy socket backpressure now (the relay hides congestion from spice-server), a qemu <code>ui/spice-display.c</code> damage-path patch series soon (unioned damage cut into 32px columns defeats stream detection on virtio-gpu), and a feasibility spike for a Rust SPICE server on qemu's D-Bus display. Carries the ranked upstream wishlist from the 2026-09-23 research. Same-day measurement overturned the proxy finding (spice-server's ACK window, not proxy buffering, bounds the backlog) and found a sticky <code>ignore_damage_clips</code> bug making virtio-gpu guests report full-plane damage</td>
 <td>In progress</td>
-<td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-01-proxy-backpressure/">phase 1</a> (complete), phase 2 (in progress -- import merged, kernel fix to submit), <a href="/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/">phase 3</a> (complete -- transcoding spike. Steps 1a and 1b landed #477's caps fix. Re-surveyed 2026-10-28 once ryll's RDP phase 1 unblocked step 3b: step 3a turned out already delivered by andris's wire-type and encoder phases and ryll's slim renderer, and andris's paced display output becomes 3b's client half, copied for the spike and extracted into a shared crate only if the answer is go. Steps 2 and 3b landed in #616: the ACK window bounds the backlog at 2W+1 but does not cap throughput, and the transcoder exists behind a non-default feature. Steps 4 to 6 measured the transcoder, tested switching mid-session and wrote up the verdict: no-go. Transcoding wins clearly only on incompressible activity with streaming off on links of 10 Mbit or less; relay with <code>streaming-video=all</code> is level or faster elsewhere at a fraction of the CPU, and switching works only against a relay without GLZ or streams. The transcoder stays an experiment behind its feature, and the effort moves to making <code>streaming-video=all</code> safe to recommend), <a href="/components/kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike/">phase 4</a> (in progress -- Son of SPICE spike, planned 2026-10-29. The survey found that the helper is a <code>qemu</code> platform backend for andris rather than a new program, that qemu hands virtio-gpu 2D flush rectangles to a D-Bus listener with no timer or column splitting, and that Nova and oVirt cannot configure a D-Bus display. Step 1 built the picture half and passed its gate: qemu delivers virtio-gpu flushes to the listener in 0.2 ms. The platform landed in andris as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/56" title="GitHub Issue: shakenfist/andris #56">andris#56</a> (9a997a3), and the rig measured it against in-qemu SPICE. Step 5's verdict: no-go, as measured. Cost passes (at most 1.27 times spice-server's CPU) and Shaken Fist could attach a helper, but on slow links the helper was worse than streaming off in four cells, because andris's stream heuristic counts frames sent and never fires once its ACK window spaces them. That is andris's, not the D-Bus display's, so a re-measure after an andris fix could turn the verdict), phase 5 (not started -- spice-server patches), phase 6 (not started -- push audit of phases 1-5), phase 7 (not started -- QUIC client leg experiments), phase 8 (not started -- QUIC implementation, if go), phase 9 (not started -- push audit of phases 7-8)</td>
+<td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-01-proxy-backpressure/">phase 1</a> (complete), phase 2 (in progress -- import merged, kernel fix to submit), <a href="/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/">phase 3</a> (complete -- transcoding spike. Steps 1a and 1b landed #477's caps fix. Re-surveyed 2026-10-28 once ryll's RDP phase 1 unblocked step 3b: step 3a turned out already delivered by andris's wire-type and encoder phases and ryll's slim renderer, and andris's paced display output becomes 3b's client half, copied for the spike and extracted into a shared crate only if the answer is go. Steps 2 and 3b landed in #616: the ACK window bounds the backlog at 2W+1 but does not cap throughput, and the transcoder exists behind a non-default feature. Steps 4 to 6 measured the transcoder, tested switching mid-session and wrote up the verdict: no-go. Transcoding wins clearly only on incompressible activity with streaming off on links of 10 Mbit or less; relay with <code>streaming-video=all</code> is level or faster elsewhere at a fraction of the CPU, and switching works only against a relay without GLZ or streams. The transcoder stays an experiment behind its feature, and the effort moves to making <code>streaming-video=all</code> safe to recommend), <a href="/components/kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike/">phase 4</a> (complete, merged a90f17ff90 (#637) and andris 9a997a3 (#56) -- Son of SPICE spike, planned 2026-10-29. The survey found that the helper is a <code>qemu</code> platform backend for andris rather than a new program, that qemu hands virtio-gpu 2D flush rectangles to a D-Bus listener with no timer or column splitting, and that Nova and oVirt cannot configure a D-Bus display. Step 1 built the picture half and passed its gate: qemu delivers virtio-gpu flushes to the listener in 0.2 ms. The platform landed in andris as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/56" title="GitHub Issue: shakenfist/andris #56">andris#56</a> (9a997a3), and the rig measured it against in-qemu SPICE. Step 5's verdict: no-go, as measured. Cost passes (at most 1.27 times spice-server's CPU) and Shaken Fist could attach a helper, but on slow links the helper was worse than streaming off in four cells, because andris's stream heuristic counts frames sent and never fires once its ACK window spaces them. That is andris's, not the D-Bus display's, so a re-measure after an andris fix could turn the verdict), <a href="/components/kerbside/plans/PLAN-spice-performance-phase-05-spice-server/">phase 5</a> (in progress -- spice-server patches, measured, planned 2026-10-30. The survey found that spice-server, unlike qemu, takes AI-assisted patches (56 Claude-trailered commits since February, 54 of them the maintainer's), so the series is to be submitted rather than carried. Item 9's GLZ half is not a server defect and is withdrawn. Item 4's hardware encoding is gated on Intel GPUs, though GStreamer's <code>va</code> plugin is vendor-neutral, and this host's AMD GPU can measure a vendor-neutral probe. The phase also takes in the connect crash and the question of why phase 4's <code>streaming-video=all</code> runs sent MJPEG. qemu 10.0.13 cannot choose a codec, so the client's preference decides it. Each patch is kept only if the rig shows it helps and regresses nowhere. Outcome: the codec was Ryll's own choice, not a proxy fault. Every released spice-server and master crash on connect to a streaming guest when the client sends its codec preference early, as Ryll does and remote-viewer does not; a 16-line patch fixes it. Hardware encoding on any GPU is kept: on an AMD GPU it cut qemu CPU and slow-link latency, for memory paid only when an encoder is built. The trace ring and the 60 fps ceiling measured nothing and are dropped. The series of three patches sits in kerbside-patches <code>upstream/spice/</code> for Mikal to send), phase 6 (not started -- push audit of phases 1-5), phase 7 (not started -- QUIC client leg experiments), phase 8 (not started -- QUIC implementation, if go), phase 9 (not started -- push audit of phases 7-8)</td>
 </tr>
 <tr>
 <td>2026-09-27</td>

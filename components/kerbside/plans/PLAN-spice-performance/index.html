@@ -2549,6 +2549,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/pre-commit-node-version/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Pre-commit Node version
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/push-audit/" class="md-nav__link">
         
   
@@ -7857,6 +7885,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../performance/spice-server-patches/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spice-server patches on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../performance/ack-window/" class="md-nav__link">
         
   
@@ -8005,10 +8061,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_9" id="__nav_3_8_12_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
             
   
   
@@ -8026,8 +8082,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_9">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9341,6 +9397,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-spice-performance-phase-05-spice-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: spice-server patches, measured
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-use-case-docs-phase-05-index-slimdown/" class="md-nav__link">
         
   
@@ -9657,6 +9741,34 @@
     
   
     Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-proxmox-source-phase-07-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 7: push audit
   
 
     
@@ -17043,7 +17155,7 @@ Future work for what is scheduled.</p>
 </tr>
 <tr>
 <td>9</td>
-<td><code>NUM_TRACE_ITEMS</code> 8 to 64; GLZ invalidations in the zlib fallback</td>
+<td><code>NUM_TRACE_ITEMS</code> 8 to 64; GLZ invalidations in the zlib fallback (GLZ half withdrawn 2026-10-30: not a server defect, see phase 5)</td>
 <td>spice-server</td>
 <td>High</td>
 </tr>
@@ -17185,13 +17297,13 @@ first phase.</p>
 <tr>
 <td>4. Son of SPICE: D-Bus display feasibility spike (verdict: no-go, as measured)</td>
 <td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike/">PLAN-spice-performance-phase-04-dbus-spike.md</a></td>
-<td>In progress</td>
-<td>andris 9a997a3 (#56)</td>
+<td>Complete</td>
+<td>andris 9a997a3 (#56), a90f17ff90 (#637)</td>
 </tr>
 <tr>
-<td>5. Small spice-server patches (item 9, and item 4 if still wanted)</td>
-<td></td>
-<td>Not started</td>
+<td>5. spice-server patches, measured: codec choice, the connect crash, trace ring, 60 fps, hardware probing</td>
+<td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-05-spice-server/">PLAN-spice-performance-phase-05-spice-server.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -17318,6 +17430,10 @@ applies to the series carried in kerbside-patches.</p>
   production it means a user reconnecting to a VM that is
   playing video crashes that VM's qemu, which matters more now
   that streaming is the main lever (Future work).
+  - <em>Narrowed 2026-10-30 by phase 5:</em> only a client that sends
+    its codec preference before spice-server has handled
+    <code>SPICE_MSGC_DISPLAY_INIT</code> triggers it, as Ryll does.
+    remote-viewer does not.
 - Ryll has three issues: H.264 streams from spice-server never
   decode (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/398" title="GitHub Issue: shakenfist/ryll #398">ryll#398</a>, openh264 <code>dsNoParamSets</code>); <code>--capture</code>
   panics outside a runtime (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/399" title="GitHub Issue: shakenfist/ryll #399">ryll#399</a>); and <code>display.pcap</code> loses
@@ -17697,6 +17813,67 @@ server-internal, in two parts:
   4's value. Phase 4's no-go (2026-10-29) means it no longer
   waits; even a later go would leave Nova and oVirt on
   spice-server's encoder.</p>
+<p>The phase plan
+(<a href="/components/kerbside/plans/PLAN-spice-performance-phase-05-spice-server/">PLAN-spice-performance-phase-05-spice-server.md</a>,
+2026-10-30) grounds this sketch in spice-server master
+(adeb620a04) and changes it in these places:
+- spice-server takes AI-assisted patches. 55 commits since
+  2026-02-09 carry a <code>Co-Authored-By: Claude</code> trailer, 54 of them
+  the maintainer's. So unlike the qemu series, this one is
+  <code>submit</code>, and Mikal sends it.
+- Item 9's GLZ half is withdrawn. Every GLZ image carries its
+  window-head distance, which is how the server tells the client
+  what to drop, and Ryll has honoured it since April. The ~30 MiB/s
+  growth behind the item was Ryll's own image cache.
+- Item 4 splits. Hardware encoding is gated on an Intel GPU,
+  though GStreamer's <code>va</code> plugin is vendor-neutral, and this host
+  has an AMD GPU that can measure a vendor-neutral probe. The
+  60 fps ceiling is <code>MAX_FPS</code>. H.265 and a faster bitrate ramp
+  cannot be measured on the rig, so they go to Future work.
+- The phase takes in the connect crash and the codec question
+  from Future work. The crash is a spice-server patch, or a named
+  upstream fix. The codec question decides what the other
+  measurements measure: qemu 10.0.13 has no codec option, so the
+  codec spice-server uses depends on the client's preference
+  reaching it.
+- Every patch is kept only if the rig shows it helps and
+  regresses nowhere, measured against master with a 0.15.2 row
+  for what deployments run today.</p>
+<p>Phase 5's outcome (2026-10-30), written up in
+<code>docs/performance/spice-server-patches.md</code>, with the series in
+kerbside-patches' <code>upstream/spice/</code>:
+- <strong>The codec was Ryll's choice.</strong> The proxy relays the client's
+  preference correctly. Ryll 50a9cc0, which the re-baseline used,
+  asked for H.264 first; 15cd776, in the 0d140b3 every later page
+  used, asks for MJPEG first. The ACK-window, transcoding
+  measurement and transcoding spike pages sent MJPEG, and are
+  corrected at source.
+- <strong>Every released spice-server crashes.</strong> 0.15.2, 0.16.0 and
+  master adeb620a04 each crashed in 20 of 20 connects to a
+  streaming guest; a 16-line patch takes master to 0 of 20. Only
+  a client that sends its codec preference before spice-server
+  has handled <code>SPICE_MSGC_DISPLAY_INIT</code> triggers it. Ryll does.
+  spice-gtk sends one only when the application asks, and
+  remote-viewer never does.
+- <strong>Hardware probing on any GPU is kept,</strong> split into a software
+  fallback and the broader probe. vah264enc engaged on every
+  H.264 stream, qemu's CPU fell from 0.15 to 0.13 cores, and at
+  80 ms / 10 Mbit heavy p50 fell from 186 to 107 ms and p95 from
+  1262 to 275 ms. qemu's RSS grows 56 to 64 MiB, but only once a
+  GStreamer encoder is built, which makes it conditional enough
+  to keep.
+- <strong>The trace ring and the 60 fps ceiling are dropped,</strong> each with
+  no measurable effect. Under the 60 fps ceiling streams start at
+  60 fps, but the client still received 4 to 12 display messages
+  a second.
+- <strong>Upgrading 0.15.2 to master helps</strong> in 9 of 15 cells (qemu CPU
+  and, with <code>all</code>, latency and bandwidth), and regresses in 2 by
+  just over the spread. It does not fix the crash.
+- Series v1 is the crash fix plus the two hardware patches,
+  <code>disposition: submit</code>, for Mikal to send. A recount of
+  spice-server's history finds 56 commits with a Claude
+  <code>Co-Authored-By</code> trailer since 2026-02-09, not 55: one spells
+  it <code>Co-authored-by</code>.</p>
 <p><strong>Phase 6</strong> is the push audit for the plan as first written,
 phases 1-5, run before the QUIC work starts so that the two
 bodies of work are audited separately. It follows the shared
@@ -17852,7 +18029,8 @@ copy lives in shakenfist/development at
 implementation by sub-agents, review and commits in the
 management session. Phases 2, 3 and 4 involve protocol and
 upstream-codebase judgement and are planned at high effort;
-phases 1 and 5 at medium. Rust builds run in Docker, per
+phase 1 at medium. Phase 5 was planned at high, once its survey
+widened it. Rust builds run in Docker, per
 the proxy's Makefile, never with a native toolchain on the
 host.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
@@ -17918,16 +18096,32 @@ same four there itself.</p>
     decoded 16 of each repeat's 21 streams. <code>all</code>'s latency was
     much as before (113 against 118 ms at 80 ms / 10 Mbit heavy).
     Why the codec changed is the next item.</li>
+<li><em>Phase 5's facts (2026-10-30):</em> the runs after the re-baseline
+    all sent MJPEG, which Ryll decodes, so their rate control ran
+    on real reports; H.264 still waits on <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/398" title="GitHub Issue: shakenfist/ryll #398">ryll#398</a>. Every released
+    spice-server (0.15.2 and 0.16.0) and master crash on connect
+    to a streaming guest when the client sends its codec
+    preference early, as Ryll does; remote-viewer does not. The
+    fix is in kerbside-patches' spice-server series, not upstream
+    yet. Upgrading 0.15.2 to master helps latency and qemu CPU
+    with <code>all</code>, but does not fix the crash. The recommendation
+    should say which clients are safe on which versions, and
+    wait for the fix to land for the rest.</li>
 <li>Upstream the rig's small Ryll patch, which adds a <code>rect</code> to the
   control socket's <code>surface_drawn</code> event
   (<code>tools/shaped-link/ryll-surface-drawn-rect.patch</code>). Until
   then the rig carries it as a patch.</li>
-<li>Report spice-server 0.15.2's crash when a client connects
-  while streams already exist, once it has been reproduced
+<li><em>Answered by phase 5 (2026-10-30).</em> Report spice-server 0.15.2's
+  crash when a client connects while streams already exist, once it has been reproduced
   against spice-server's current master. Since phase 3's no-go
   this is the main obstacle to recommending
   <code>streaming-video=all</code>; it crashed qemu twice in phase 3's
   measurements.</li>
+<li><em>Outcome:</em> it reproduces on 0.15.2, 0.16.0 and master, 20 of
+    20 each, for a client that sends its codec preference before
+    <code>SPICE_MSGC_DISPLAY_INIT</code> is handled. Patch 1 of
+    kerbside-patches' <code>upstream/spice/series/v1/</code> takes master to
+    0 of 20; it is ready to send, not sent.</li>
 <li><strong>RDP out.</strong> <code>PLAN-rdp-gateway.md</code> (proposed 2026-09-27) is
   superseded by ryll's <code>PLAN-rdp-frontend.md</code> (2026-10-19),
   which builds RDP out as <code>ryll --rdp</code> first and moves it here
@@ -17965,14 +18159,19 @@ same four there itself.</p>
   stream, andris's message-counted window held seconds of JPEG
   tiles on slow links (3263 ms p50 at 80 ms / 5 Mbit busy,
   against 371 ms for spice-server with streaming off).</li>
-<li><strong>Find out which codec spice-server chooses for
-  <code>streaming-video=all</code>, and why.</strong> Phase 4's 28 <code>all</code> repeats
+<li><em>Answered by phase 5 (2026-10-30).</em> <strong>Find out which codec
+  spice-server chooses for <code>streaming-video=all</code>, and why.</strong> Phase 4's 28 <code>all</code> repeats
   sent MJPEG (codec 1); the re-baseline, ACK-window,
   transcoding measurement and transcoding spike pages report
   H.264 with the same Ryll (0d140b3) and an unchanged proxy.
   Those pages are left as written until this is understood. The
   host's gstreamer x264 plugin is installed, so that is not
   the obvious cause.</li>
+<li><em>Answered by phase 5:</em> the client's preference decides it, and
+    Ryll changed its order (50a9cc0 asked for H.264 first, 15cd776
+    in 0d140b3 asks for MJPEG first). The proxy relayed it
+    correctly. Only the re-baseline saw H.264; the other pages are
+    corrected at source.</li>
 <li><strong>Andris: count stream heat from what the platform delivers,
   not from frames sent</strong> (phase 4). <code>HeatMap::record</code> is called
   from the display channel's <code>detect</code>, once per frame <em>sent</em>, so
@@ -18012,6 +18211,28 @@ same four there itself.</p>
   brings RUSTSEC-2026-0370/0371/0372, which andris ignores in
   <code>deny.toml</code> and <code>.cargo/audit.toml</code>. Proxies generated from
   qemu's <code>ui/dbus-display1.xml</code> on zbus 6 would remove both.</li>
+<li><strong>H.265 in spice-server</strong> (item 4, deferred by phase 5).
+  spice-server's codec table names it, but <code>gstreamer_encoder_new</code>
+  rejects it and <code>get_gst_codec_name</code> has no case for it. The rig
+  cannot measure it: Ryll has no H.265 decoder, and remote-viewer
+  reports no timings.</li>
+<li><strong>Ryll: send the codec preference after <code>SPICE_MSGC_DISPLAY_INIT</code></strong>
+  (phase 5). spice-server's connect crash needs the preference to
+  arrive before the init message is handled, which Ryll's link-up
+  send does. Waiting until after it would keep Ryll users safe on
+  every released spice-server while the fix goes upstream. It
+  belongs in a ryll pull request.</li>
+<li><strong>kerbside-patches: <code>upstream/qemu/rig/sysroot/build.sh</code> cannot
+  extract what it downloads</strong> (found in phase 5). <code>apt-get download</code>
+  writes to the current directory and ignores
+  <code>Dir::Cache::archives</code>, so the <code>.deb</code> files never reach <code>$WORK</code>.
+  An issue is to be filed in kerbside-patches.</li>
+<li><strong>A faster bitrate ramp in spice-server</strong> (item 4, deferred by
+  phase 5). The lead: spice-server rate control holds delivered
+  stream frames to 4 to 12 per second on these links whatever the
+  frame-rate ceiling (phase 5's 60 fps measurement). Whether a
+  faster ramp would raise that, and at what cost on the slow
+  links, needs a client that decodes the codec measured.</li>
 <li><strong>The <code>transcode</code> feature's CI steps.</strong> The Rust proxy job runs
   clippy and the tests with <code>--features transcode</code> while the
   experiment is kept; drop them if the experiment is removed. A

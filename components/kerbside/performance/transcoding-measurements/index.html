@@ -2549,6 +2549,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/pre-commit-node-version/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Pre-commit Node version
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/push-audit/" class="md-nav__link">
         
   
@@ -7859,6 +7887,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../spice-server-patches/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spice-server patches on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ack-window/" class="md-nav__link">
         
   
@@ -8198,10 +8254,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_9" id="__nav_3_8_12_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
             
   
   
@@ -8219,8 +8275,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_9">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9532,6 +9588,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-spice-performance-phase-05-spice-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: spice-server patches, measured
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-use-case-docs-phase-05-index-slimdown/" class="md-nav__link">
         
   
@@ -9848,6 +9932,34 @@
     
   
     Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-proxmox-source-phase-07-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 7: push audit
   
 
     
@@ -18005,10 +18117,9 @@ the animating activity, as Ryll does.</p>
   Relaying with <code>streaming-video=all</code> is as fast or two to five times faster
   on every link except 150 ms / 2 Mbit heavy. It costs the proxy almost
   nothing, and its loss of text is confined to a 16-pixel strip during
-  animation. It also has two costs transcoding avoids: spice-server 0.15.2
+  animation. It also has a cost transcoding avoids: spice-server 0.15.2
   crashes qemu when a client connects while a stream exists, which
-  happened here twice, and its streams were H.264 that Ryll did not
-  decode.</li>
+  happened here twice.</li>
 <li>It loses to relaying with streaming off on smooth, compressible activity
   at 80 ms / 10 Mbit, and only roughly matches it at lower rates. Both fill
   the link there.</li>
@@ -18055,10 +18166,11 @@ the animating activity, as Ryll does.</p>
 <li><strong>Repeat counts are small.</strong> Two repeats of 40 presses at
   80 ms / 10 Mbit and 80 ms / 5 Mbit, and one valid repeat for
   80 ms / 5 Mbit heavy with streaming on.</li>
-<li>The relay with streaming on sent H.264, which Ryll does not decode, as in
-  the re-baseline. The key box is never streamed, so its latency is
-  unaffected, but the stream's rate control ran on reports from a client
-  that drew nothing.</li>
+<li>The relay with streaming on sent MJPEG, not the re-baseline's H.264:
+  the Ryll used here asks for MJPEG first (see
+  <a href="/components/kerbside/performance/spice-server-patches/#which-codec-the-streams-used">the spice-server patches</a>).
+  Ryll decodes MJPEG, so the stream's rate control ran on reports from a
+  client that drew the stream.</li>
 </ul>
 <h2 id="procedure">Procedure<a class="headerlink" href="#procedure" title="Permanent link">&para;</a></h2>
 <p>The rig is <code>tools/shaped-link/</code>, described in <a href="/components/kerbside/testing/">Testing</a>;

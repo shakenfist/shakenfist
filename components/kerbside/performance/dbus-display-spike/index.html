@@ -2549,6 +2549,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/pre-commit-node-version/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Pre-commit Node version
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/push-audit/" class="md-nav__link">
         
   
@@ -8072,6 +8100,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../spice-server-patches/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spice-server patches on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ack-window/" class="md-nav__link">
         
   
@@ -8220,10 +8276,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_9" id="__nav_3_8_12_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
             
   
   
@@ -8241,8 +8297,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_9">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9554,6 +9610,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-spice-performance-phase-05-spice-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: spice-server patches, measured
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-use-case-docs-phase-05-index-slimdown/" class="md-nav__link">
         
   
@@ -9870,6 +9954,34 @@
     
   
     Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-proxmox-source-phase-07-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 7: push audit
   
 
     
@@ -17440,18 +17552,15 @@ to change, and nothing would for a go.</p>
   them into andris's screen, because reading memory the guest writes
   through a Rust slice is undefined behaviour. That second copy was not
   measured; <a href="#cost">Cost</a> bounds it.</li>
-<li><strong>spice-server's codec differed from earlier runs.</strong> With
+<li><strong>spice-server's codec differed from the re-baseline.</strong> With
   <code>streaming-video=all</code>, spice-server sent MJPEG in all 28 of its repeats
-  here, and andris sent H.264 in all 14 of the helper's. The earlier pages
-  on this rig (<a href="/components/kerbside/performance/streaming-rebaseline/">the re-baseline</a>,
-  <a href="/components/kerbside/performance/transcoding-measurements/">the transcoding measurements</a>,
-  <a href="/components/kerbside/performance/ack-window/">the ACK window</a> and
-  <a href="/components/kerbside/performance/transcoding-spike/">the transcoding spike</a>) report <code>all</code>'s streams as
-  H.264 that Ryll did not decode (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/398" title="GitHub Issue: shakenfist/ryll #398">ryll#398</a>), with the same Ryll (0d140b3)
-  and an unchanged proxy. Why spice-server chose differently was not
-  established, and those pages are left as they were. It does mean that
-  here Ryll decoded <code>all</code>'s streams, 16 of the 21 it was offered, and
-  <code>all</code>'s latency was much as on those pages (113 against 118 ms at
+  here, and andris sent H.264 in all 14 of the helper's.
+  <a href="/components/kerbside/performance/streaming-rebaseline/">The re-baseline</a> saw H.264 because its older
+  Ryll asked for H.264 first; the Ryll used here (0d140b3), like the one
+  behind the other pages on this rig, asks for MJPEG first (see
+  <a href="/components/kerbside/performance/spice-server-patches/#which-codec-the-streams-used">the spice-server patches</a>).
+  So here Ryll decoded <code>all</code>'s streams, 16 of the 21 it was offered, and
+  <code>all</code>'s latency was much as on the transcoding pages (113 against 118 ms at
   80 ms / 10 Mbit heavy, 7315 against 7328 ms at 150 ms / 2 Mbit heavy).</li>
 <li><strong>The guest flushes its whole plane.</strong> Every configuration saw
   full-plane damage. qemu's spice-display diffs it in 32-pixel columns
@@ -17484,10 +17593,10 @@ to change, and nothing would for a go.</p>
   separate plan that a go calls for: bindings of our own, the watchdog,
   the attach mode, a Shaken Fist integration first, and a libvirt
   helper-launch mechanism for Nova.</li>
-<li><strong>Find out which codec spice-server chooses for <code>streaming-video=all</code>,
-  and why,</strong> given that the same Ryll and proxy saw H.264 on earlier runs
-  and MJPEG on this one. Whether Ryll can decode <code>all</code>'s streams decides
-  what those pages' figures mean for a real client.</li>
+<li><strong>Which codec spice-server chooses for <code>streaming-video=all</code></strong> is
+  answered in <a href="/components/kerbside/performance/spice-server-patches/#which-codec-the-streams-used">the spice-server patches</a>:
+  the client's preference decides it, and this Ryll asks for MJPEG
+  first.</li>
 <li><strong>Ticketing, link hints, observability and token authentication</strong>
   stay spice-server and qemu work. A helper would let Kerbside define
   them itself, but only for sources that can run one, and Nova and oVirt

@@ -2549,6 +2549,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/pre-commit-node-version/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Pre-commit Node version
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/push-audit/" class="md-nav__link">
         
   
@@ -7857,6 +7885,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../performance/spice-server-patches/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spice-server patches on a shaped link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../performance/ack-window/" class="md-nav__link">
         
   
@@ -8005,10 +8061,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_9" id="__nav_3_8_12_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
             
   
   
@@ -8026,8 +8082,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_9">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9341,6 +9397,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-spice-performance-phase-05-spice-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: spice-server patches, measured
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-use-case-docs-phase-05-index-slimdown/" class="md-nav__link">
         
   
@@ -9842,6 +9926,34 @@
     
   
     Proxmox source phase 6: the use-case page
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-proxmox-source-phase-07-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 7: push audit
   
 
     
@@ -17275,7 +17387,7 @@ phase plan links are tracked under <em>Execution</em>.</p>
 </tr>
 <tr>
 <td>7. Push audit</td>
-<td>Work through <code>PUSH-AUDIT.md</code> over the accumulated kerbside diff of phases 3a to 6, deriving the range from the <code>Merged</code> cells with <code>tools/audit/plan-range.sh</code>. Phases that land in ryll or shakenfist/actions are audited there, not here</td>
+<td>Work through <code>PUSH-AUDIT.md</code> over the accumulated kerbside diff of phases 3a to 6, auditing each <code>Merged</code> cell's merge against its own first parent rather than deriving one range with <code>tools/audit/plan-range.sh</code>, which #491 and #638 make sweep in other plans' work. Phases that land in ryll or shakenfist/actions are audited there, not here</td>
 </tr>
 </tbody>
 </table>
@@ -17366,13 +17478,13 @@ and cited from phase 2's <em>Outcome</em>.</p>
 <tr>
 <td>6. Docs</td>
 <td><a href="/components/kerbside/plans/PLAN-proxmox-source-phase-06-use-case-page/">PLAN-proxmox-source-phase-06-use-case-page.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>746c7ef</td>
 </tr>
 <tr>
 <td>7. Push audit</td>
-<td></td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-proxmox-source-phase-07-push-audit/">PLAN-proxmox-source-phase-07-push-audit.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 </tbody>
@@ -17393,19 +17505,22 @@ and cited from phase 2's <em>Outcome</em>.</p>
   is why a <code>Target</code> change couples the daemon and the binary.</li>
 </ul>
 <h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>In progress. Phases 1, 1b, 2, 3a, 3b, 4 and 5 are complete.
+<p>In progress. Phases 1, 1b, 2, 3a, 3b, 4, 5 and 6 are complete.
 - CI can build a Proxmox VE node on demand.
 - ryll tunnels through <code>spiceproxy</code>, proven against a real node
   on every ryll pull request that touches the tunnel.
 - kerbside mints console tickets when a channel connects, one
   per session, which the oVirt source now uses.
-- kerbside's proxy dials a minted tunnel over TLS only, proven
-  against a CONNECT proxy in the direct-qemu lane.
+- kerbside's proxy dials a minted tunnel, a plaintext HTTP
+  CONNECT and then a SPICE session that is TLS only inside it,
+  proven against a CONNECT proxy in the direct-qemu lane.
 - kerbside has a <code>proxmox</code> source driver.
 - A nightly lane, also run on pull requests that touch the Proxmox
   path, drives a proxied session through a real node's
-  <code>spiceproxy</code> with the documented least-privilege token.</p>
-<p>Phase 6, the use-case page, is in progress.</p>
+  <code>spiceproxy</code> with the documented least-privilege token.
+- <code>docs/use-cases/proxmox.md</code> documents the source in the shape of
+  the other use-case pages, linking <code>console-sources.md</code> for setup.</p>
+<p>Phase 7, the push audit, is in progress.</p>
 
 
 
