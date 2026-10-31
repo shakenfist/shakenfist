@@ -35,7 +35,8 @@ from shakenfist.node import Node
 from shakenfist.node import Nodes
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.operations.baseoperation import BaseClusterOperation
-from shakenfist.operations.baseoperation import get_all_node_queues
+from shakenfist.operations.baseoperation import get_node_background_node_queues
+from shakenfist.operations.baseoperation import get_node_user_facing_node_queues
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.upload import remove_abandoned_uploads
 from shakenfist.util import concurrency as util_concurrency
@@ -610,14 +611,20 @@ class Monitor(daemon.Daemon):
                 self._drop_blob_locations(
                     n, 'deleting blob location as hosting node has been deleted')
 
-                # Clean up any lingering queue tasks. Drain in batches of
+                # Clean up any lingering queue tasks. Per-node queues are
+                # named by node uuid, not fqdn, and the shared any-* queues
+                # carry live work belonging to other nodes, so drain only
+                # the dead node's own queues (issue 4655, the sf-cluster
+                # sibling of #4543 and #4652). Drain in batches of
                 # 100 -- this only runs once per deleted node, so a
                 # larger batch amortises the dequeue cost without
                 # growing the orphan window noticeably (this code path
                 # is the only consumer of the dead node's queues, so a
                 # crash mid-batch just leaves the rows for the next
                 # cluster pass).
-                node_queues = list(get_all_node_queues(n.fqdn))
+                node_queues = (
+                    get_node_user_facing_node_queues(str(n.uuid)) +
+                    get_node_background_node_queues(str(n.uuid)))
                 while items := mariadb.dequeue_work_items(
                         node_queues, limit=100):
                     self.pet_watchdog()
