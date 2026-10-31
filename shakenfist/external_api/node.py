@@ -69,7 +69,8 @@ class NodeEndpoint(api_base.Resource):
         'nodes', 'Get information for a node.',
         [('node', 'path', 'node', 'The name of a node.', True)],
         [(200, 'Information about a single node.', node_get_example),
-         (404, 'Node not found.', None)]))
+         (404, 'Node not found.', None)],
+        requires_admin=True))
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None):
@@ -82,7 +83,8 @@ class NodeEndpoint(api_base.Resource):
         'nodes', 'Delete a node.',
         [('node', 'path', 'node', 'The name of a node.', True)],
         [(200, 'Information about a single node.', node_delete_example),
-         (404, 'Node not found.', None)]))
+         (404, 'Node not found.', None)],
+        requires_admin=True))
     @api_base.caller_is_admin
     @api_base.log_token_use
     def delete(self, node=None):
@@ -119,7 +121,8 @@ class NodesEndpoint(api_base.Resource):
         'nodes', 'List all nodes.',
         [],
         [(200, 'Information about all nodes.', node_list_example),
-         (404, 'Node not found.', None)]))
+         (404, 'Node not found.', None)],
+        requires_admin=True))
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self):
@@ -167,7 +170,8 @@ class NodeEventsEndpoint(api_base.Resource):
              'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
         ],
         [(200, 'Event information about a single node.', node_events_example),
-         (404, 'Node not found.', None)]))
+         (404, 'Node not found.', None)],
+        requires_admin=True))
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None, event_type=None, limit=100):
@@ -191,7 +195,8 @@ class NodeProcessMetricsEndpoint(api_base.Resource):
             ('node', 'path', 'node', 'The name of a node.', True)
         ],
         [(200, 'Process metrics for a single node.', node_process_metrics_example),
-         (404, 'Node not found.', None)]))
+         (404, 'Node not found.', None)],
+        requires_admin=True))
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, node=None):

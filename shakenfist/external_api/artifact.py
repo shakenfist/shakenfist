@@ -941,8 +941,7 @@ class ArtifactMetadatasEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.ARTIFACT_REF_NAMESPACE_DESCRIPTION, False)],
         [(200, 'Artifact metadata, if any.', None),
-         (404, 'Artifact not found.', None)],
-        requires_admin=True))
+         (404, 'Artifact not found.', None)]))
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -962,8 +961,7 @@ class ArtifactMetadatasEndpoint(api_base.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Artifact not found.', None)],
-        requires_admin=True))
+         (404, 'Artifact not found.', None)]))
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -992,8 +990,7 @@ class ArtifactMetadataEndpoint(api_base.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Artifact not found.', None)],
-        requires_admin=True))
+         (404, 'Artifact not found.', None)]))
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
@@ -1017,8 +1014,7 @@ class ArtifactMetadataEndpoint(api_base.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Artifact not found.', None)],
-        requires_admin=True))
+         (404, 'Artifact not found.', None)]))
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use

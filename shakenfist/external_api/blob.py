@@ -388,8 +388,7 @@ class BlobMetadatasEndpoint(api_base.Resource):
             ('blob_uuid', 'path', 'uuid', 'The blob to fetch metadata for.', True)
         ],
         [(200, 'Blob metadata, if any.', None),
-         (404, 'Blob not found.', None)],
-        requires_admin=True))
+         (404, 'Blob not found.', None)]))
     @arg_is_blob_uuid
     @api_base.log_token_use
     def get(self, blob_uuid=None, blob_from_db=None):
@@ -406,8 +405,7 @@ class BlobMetadatasEndpoint(api_base.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Blob not found.', None)],
-        requires_admin=True))
+         (404, 'Blob not found.', None)]))
     @arg_is_blob_uuid
     @api_base.log_token_use
     def post(self, blob_uuid=None, key=None, value=None, blob_from_db=None):
@@ -433,8 +431,7 @@ class BlobMetadataEndpoint(api_base.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Blob not found.', None)],
-        requires_admin=True))
+         (404, 'Blob not found.', None)]))
     @arg_is_blob_uuid
     @api_base.log_token_use
     def put(self, blob_uuid=None, key=None, value=None, blob_from_db=None):
@@ -455,8 +452,7 @@ class BlobMetadataEndpoint(api_base.Resource):
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
-         (404, 'Blob not found.', None)],
-        requires_admin=True))
+         (404, 'Blob not found.', None)]))
     @arg_is_blob_uuid
     @api_base.log_token_use
     def delete(self, blob_uuid=None, key=None, blob_from_db=None):

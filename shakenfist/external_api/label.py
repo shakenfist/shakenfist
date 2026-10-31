@@ -111,8 +111,7 @@ class LabelEndpoint(api_base.Resource):
         ],
         [(200, 'The updated artifact.', label_example),
          (400, 'The label name is malformed, or the max_versions is not a '
-          'non-negative integer.', None)],
-        requires_admin=True))
+          'non-negative integer.', None)]))
     @api_base.log_token_use
     def post(self, label_name=None, blob_uuid=None, max_versions=0):
         namespace, label_url, err = _label_url_or_error(label_name)
@@ -166,8 +165,7 @@ class LabelEndpoint(api_base.Resource):
         ],
         [(200, 'The label artifact, if found.', label_example),
          (400, 'The label name is malformed.', None),
-         (404, 'Label not found.', None)],
-        requires_admin=True))
+         (404, 'Label not found.', None)]))
     @api_base.log_token_use
     def get(self, label_name=None):
         # _label_url returns a pair, and this route used to hand the
@@ -196,8 +194,7 @@ class LabelEndpoint(api_base.Resource):
         ],
         [(200, 'The label artifact, if found.', label_example),
          (400, 'The label name is malformed.', None),
-         (404, 'Label not found.', None)],
-        requires_admin=True))
+         (404, 'Label not found.', None)]))
     @api_base.log_token_use
     def delete(self, label_name=None):
         # Carried the same pair-into-url_filter bug as get(), and so has
