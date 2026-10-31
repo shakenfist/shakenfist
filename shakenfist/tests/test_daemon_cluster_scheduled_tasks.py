@@ -826,7 +826,7 @@ class HardDeleteExpiredNamespaceKeyTestCase(base.ShakenFistTestCase):
                              after - config.CLEANER_DELAY)
         mock_event.assert_called_once_with(
             EVENT_TYPE_AUDIT, 'namespace_key', KEY_UUID_1,
-            'hard deleted object')
+            'hard deleted object', suppress_event_logging=True)
 
     @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch('shakenfist.mariadb.hard_delete_objects', return_value=[])
@@ -1841,6 +1841,11 @@ class DeletedObjectSweepBatchTestCase(base.ShakenFistTestCase):
                 for c in self.mock_batch.call_args_list]
 
     def _audited(self):
+        # Every sweep audit event is muted from the log stream: one INFO
+        # line per hard delete is what issue 4723 measured as a 241% log
+        # volume increase while a backlog drained.
+        for c in self.mock_event.call_args_list:
+            self.assertTrue(c.kwargs.get('suppress_event_logging'), c)
         return [c.args for c in self.mock_event.call_args_list]
 
     def _entry_count(self, objtype, outcome):
