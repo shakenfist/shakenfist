@@ -116,7 +116,7 @@ if ! [[ "${REPO}" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
 fi
 
 OUTPUT_DIR="${OUTPUT_DIR:-$(mktemp -d)}"
-MODELS="${MODELS:-claude-fable-5,claude-opus-5}"
+MODELS="${MODELS:-claude-opus-5}"
 MAX_TURNS="${MAX_TURNS:-60}"
 DRY_RUN="${DRY_RUN:-false}"
 TRIAGE_RUN_URL="${TRIAGE_RUN_URL:-}"

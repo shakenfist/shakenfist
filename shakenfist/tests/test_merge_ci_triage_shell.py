@@ -184,7 +184,7 @@ cat "${CLAUDE_RESPONSE}"
 # subscription credit is its documented exit 1, and an exec that never
 # happened looks the same from here.
 BROKEN_CLAUDE_STUB = '''#!/bin/bash
-echo "claude-model-fallback: every model in 'claude-fable-5' is out of credit" >&2
+echo "claude-model-fallback: every model in 'claude-opus-5' is out of credit" >&2
 exit 1
 '''
 

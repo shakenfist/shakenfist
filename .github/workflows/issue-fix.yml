@@ -110,7 +110,7 @@ on:
       models:
         description: 'Comma-separated models to try for the fix, in preference order'
         required: false
-        default: 'claude-fable-5,claude-opus-5'
+        default: 'claude-opus-5'
         type: string
       dry_run:
         description: 'Dry run (no label, no comments, no commits, no PR)'
@@ -834,7 +834,7 @@ jobs:
             echo ""
             echo "Signed-off-by: Michael Still <mikal@stillhq.com>"
             echo "Assisted-By: Claude Code"
-            echo "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
+            echo "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
           } >> ${{ runner.temp }}/commit-message.txt
 
           git commit -F ${{ runner.temp }}/commit-message.txt
