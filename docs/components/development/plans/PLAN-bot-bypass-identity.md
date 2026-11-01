@@ -1592,7 +1592,7 @@ the queue time is the pool's load, not the boot, and it sits outside
 `timeout-minutes`, which counts from the job's start. The job then
 took 16 seconds. `Mint the push token` was skipped, `Prune and import
 review marks` succeeded and pushed `0bd8d7c` ("Prune and import
-review marks.", the marks this pull request staled), rule suite
+review marks.", the marks #354's merge staled), rule suite
 4829478319 records the push by `github-actions[bot]` (actor id
 41898282), and `repos/shakenfist/development/deployments?environment=review-marks`
 lists nothing, so GitHub accepted `deployment: false`. The no-key
@@ -1602,8 +1602,8 @@ path works as designed.
 
 | Repository | Pull request | Merged | First run | Token step | Push actor (`actor_name`, `actor_id`) | Deployments |
 |------------|--------------|--------|-----------|------------|----------------------------------------|-------------|
-| development | #354 | `9f080cd`, 2026-10-31 | 41171895436 | skipped | `github-actions[bot]`, 41898282 | none |
-| andris | andris#65 (eb5278f) | | | ran | | |
+| development | #354 | `9f080cd`, 2026-10-31 | 41171895436 | skipped | `github-actions[bot]`, 41898282 (rule suite 4829478319) | none |
+| andris | andris#65 (eb5278f, then 003665c) | `dcdee41`, 2026-10-31 | 41183486988 | failed (proxy; see notes) | none: nothing pushed | none |
 | hunkydory | *pending* | | | ran | | |
 | ryll | *pending* | | | ran | | |
 | kerbside | *pending* | | | ran | | |
@@ -1650,6 +1650,31 @@ with what the log showed.
   here; andris#65 carries the earlier wording, so andris needs a
   comment-only re-sync once this lands, and 2c's pull requests carry
   the fixed text.
+- 2026-10-31 19:30 AEDT: andris#65 merged as `dcdee41` (with
+  003665c, andris's own AGENTS.md and phase 11 note, from its
+  review). Its first `prune-reviews` run on `develop`, 41183486988,
+  queued at 19:10 and started at 19:19 on a vm runner, failed in
+  `Mint the push token` before minting: "A proxy environment
+  variable is set, but Node.js native proxy support is not enabled.
+  Set NODE_USE_ENV_PROXY=1 for this action step." The vm runners set
+  a proxy, and `create-github-app-token` v3 refuses to start behind
+  one unless Node.js is told to honour it (its `lib/request.js`, and
+  its README's "Proxy support"). Nothing was pushed and the prune
+  step was skipped, so the failure was closed, as decision 6 meant;
+  the step ran rather than being skipped, so the presence guard
+  reads the environment secret, and there is no deployment, so
+  `deployment: false` holds. The rollout stopped there, as 2b says.
+  The 2b brief reads a failed token step as a wrong key or client id
+  (risk 2), and it was neither: the survey checked the image for what
+  the script needs, not for what a Node action needs (now risk 9).
+  Mikal chose to fix
+  it in the template, not to revert andris: the mint step now sets
+  `NODE_USE_ENV_PROXY: '1'`, pinned by the shape test and a twelfth
+  mutant. Until the fix is re-synced into andris, every push to its
+  `develop` fails its prune run and its stale marks stay. 2b is
+  re-run for andris with the fixed template, and its three readings
+  taken again, before 2c starts; the re-run gets a row of its own in
+  the rollout table, so the table still shows this one failed.
 
 #### Risks and mitigations
 
@@ -1694,6 +1719,12 @@ with what the log showed.
    still in the bypass team until phase 3, so a repository on the
    old copy keeps landing marks with `DEPENDENCIES_TOKEN`. A stall
    costs nothing but time.
+9. **The vm runner's environment breaks the token action.** A proxy
+   the action does not honour, or a Node.js too old for it, fails
+   the token step before anything is pushed, as andris's first run
+   did (execution notes, 19:30). The fix belongs in the template,
+   never in one repository's copy, and 2b or 2c stops until it has
+   been re-synced.
 
 #### Definition of done
 

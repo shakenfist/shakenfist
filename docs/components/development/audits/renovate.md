@@ -8,6 +8,9 @@
   copied verbatim rather than edited per repository.
 * `renovate.yml` does not run `renovatebot/github-action`, which needs
   a Docker daemon on the runner.
+* `renovate.yml` matches the template's apart from the versions
+  Renovate bumps: the value of `PINNED_RENOVATE_VERSION` and the ref of
+  each action it uses.
 * `renovate.json` exists, with package grouping rules and scheduling.
   It is a per-repository adaptation, not expected to be
   byte-identical to the template's copy.
@@ -39,6 +42,32 @@ matters is lock files, which Renovate now refreshes with the runner's
 own tools. The template provides npm always and a Rust toolchain when
 the repository has a `Cargo.lock`, so every repository can copy it
 unmodified.
+
+### The workflow is the template's
+
+`renovate.yml` is copied verbatim, so any difference from
+`templates/renovate/renovate.yml` is drift, except the versions
+Renovate bumps in each copy on its own schedule: the value of
+`PINNED_RENOVATE_VERSION`, and the ref after `@` on each `uses:` line
+(with the version comment digest pinning leaves after it). A copy
+whose Renovate or whose actions are ahead of or behind the template's
+still matches; the action's name still has to. `node-version` is not
+among them: the template's `renovate.json` stops Renovate bumping it,
+and it is the line the check exists to hold.
+
+The drift that prompted this was Node. Renovate proposed Node 26 for
+the workflow's `setup-node` step, the pull request merged in eleven
+repositories, and each one's Renovate, which needs Node `^24.11.0`,
+then failed on every hourly run. The template's `renovate.json` now
+stops Renovate proposing that bump, but a copy can still drift by
+hand, and the workflow is where Node has to match the Renovate it
+runs.
+
+The finding names each place the copy differs, up to three, with the
+copy's line and the template's, and counts the rest. A copy still on
+the container action gets only that finding, which already says to
+copy the template. If the audit cannot read its own template, it
+reports an error rather than a verdict.
 
 ### The pre-commit manager
 
