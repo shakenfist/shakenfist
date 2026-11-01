@@ -769,25 +769,35 @@ checks, and blocks deletion and non-fast-forward pushes.
 
 The one thing that still pushes directly to `develop` is the
 `prune-reviews` workflow, which drops review marks invalidated
-by whatever just merged. It authenticates as `shakenfist-bot`
-using the `DEPENDENCIES_TOKEN` secret; the bot is a member of
-the "SF Can Skip Merge Queue" team, which is the ruleset's
-bypass actor. GitHub does not accept the built-in Actions app as
-a bypass actor at all, so the token is load-bearing rather than
-a preference. That team also contains a human, which is the
-escape hatch if the ruleset ever wedges.
+by whatever just merged. It pushes with an installation token
+for the `shakenfist-review-marks` GitHub App, which is the
+ruleset's bypass actor; GitHub does not accept the built-in
+Actions app as a bypass actor at all, so the App is
+load-bearing rather than a preference. The commit itself is
+authored as `shakenfist-bot`. The App's private key is the
+`REVIEW_MARKS_APP_KEY` secret of the `review-marks`
+environment, whose deployment branch policy admits `develop`
+alone, so no other ref's run can mint a token. Each run mints
+one token, limited to this repository and `contents: write`,
+and revoked when the job ends. The ruleset's other bypass
+actor, the "SF Can Skip Merge Queue" team, contains a human,
+which is the escape hatch if the ruleset ever wedges.
 
-A push made with a personal access token retriggers workflows,
-where a `GITHUB_TOKEN` push does not, so `prune-reviews`
-triggers itself once. That is safe rather than a loop: the
-second run finds nothing to prune and exits before committing.
+An App push retriggers workflows, where a `GITHUB_TOKEN` push
+does not, so `prune-reviews` triggers itself once. That is safe
+rather than a loop: the second run finds nothing to prune and
+exits before committing.
 
 The workflow is guarded to the default branch, because every
 push starts a run and only `develop`'s should land anything. It
-never reads the static runner's reused workspace: there is no
-checkout, the script comes from a fresh depth 1 clone of
-`develop` in `RUNNER_TEMP`, and it lands from a second fresh
-clone, with the token given to the final `git push` alone.
+runs on an ephemeral vm runner, a fresh machine per job, and
+still treats the workspace as hostile: there is no checkout,
+the script comes from a fresh depth 1 clone of `develop` in
+`RUNNER_TEMP`, and it lands from a second fresh clone, with the
+token given to the final `git push` alone. The workflow and its
+script are byte-for-byte copies of shakenfist/development's
+`templates/review-tracking/`, which documents them; change the
+template, not the copy.
 
 Ruleset changes are captured under `.github/exported-config/`
 by `export-repo-config.yml`, which runs daily and on demand.
