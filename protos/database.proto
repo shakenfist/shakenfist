@@ -685,6 +685,13 @@ message ClusterConfigEntry {
 
 message ClusterConfigReply {
   repeated ClusterConfigEntry entries = 1;
+  // Set when the handler's own MariaDB read failed, so a caller which
+  // acts on the absence of a row (the VDI signing key bootstrap mints
+  // a fresh key set over it) can tell a failed read from "no such row"
+  // (issue 4735). An older sf-database never sets this, so during a
+  // rolling upgrade a failed read still arrives unmarked; absence of
+  // the marker is not proof the read succeeded.
+  bool read_failed = 2;
 }
 
 message SetClusterConfigRequest {

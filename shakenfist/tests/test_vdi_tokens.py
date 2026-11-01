@@ -8,8 +8,11 @@ import time
 from unittest import mock
 
 import jwt
+from sqlalchemy.exc import OperationalError
 
 from shakenfist import exceptions
+from shakenfist.daemons.database import main as daemons_database_main
+from shakenfist.protos import database_pb2
 from shakenfist.tests import base
 from shakenfist.util import vdi_tokens
 
@@ -105,6 +108,56 @@ class GetSigningMaterialTestCase(base.ShakenFistTestCase):
             json.dumps(material))
 
         self.assertEqual(material, vdi_tokens.get_signing_material())
+
+
+class GrpcPathFailedReadTestCase(base.ShakenFistTestCase):
+    """Issue 4735: the gRPC path must not read a failed read as absence.
+
+    Issue 4724 closed the direct path, but DatabaseService's own
+    MariaDB read failing used to answer the same empty reply as "no
+    such row", so a caller routed through sf-database still took the
+    failure for an absent signing key and minted over the stored set.
+    Run the real servicer against a MariaDB read that raises
+    OperationalError, feed its actual wire reply through the real gRPC
+    client path, and assert the failure surfaces.
+    """
+
+    def _reply_for_failed_read(self):
+        engine = mock.MagicMock()
+        conn = engine.connect.return_value.__enter__.return_value
+        conn.execute.side_effect = OperationalError('stmt', {}, Exception())
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=engine):
+            servicer = daemons_database_main.DatabaseService(
+                mock.MagicMock())
+            return servicer.GetClusterConfig(
+                database_pb2.ClusterConfigRequest(
+                    key_name=vdi_tokens.SIGNING_KEY_CONFIG_NAME),
+                mock.MagicMock())
+
+    def test_failed_read_on_sf_database_raises_rather_than_minting(self):
+        reply = self._reply_for_failed_read()
+        self.assertTrue(reply.read_failed)
+
+        set_config = mock.Mock()
+        with mock.patch('shakenfist.mariadb._use_database_service',
+                        return_value=True), \
+                mock.patch('shakenfist.mariadb._get_database_stub'), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply), \
+                mock.patch('shakenfist.mariadb.set_cluster_config',
+                           set_config):
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                vdi_tokens.get_signing_material)
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                vdi_tokens.ensure_signing_key)
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                vdi_tokens.rotate_signing_key)
+        # Nothing may be minted over the unreadable stored set.
+        set_config.assert_not_called()
 
 
 class EnsureSigningKeyTestCase(base.ShakenFistTestCase):
