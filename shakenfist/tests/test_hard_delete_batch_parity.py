@@ -388,6 +388,10 @@ class HardDeleteParityTestCase(base.ShakenFistTestCase):
              (EVENT_TYPE_AUDIT, object_type, object_uuid,
               'hard deleted object')),
             call[:2], object_type)
+        # The audit event is durable but its log echo is muted: the
+        # deleted-object sweep makes this the highest-volume event in the
+        # system while a backlog drains (issue 4723).
+        self.assertTrue(call[2].get('suppress_event_logging'), object_type)
 
     def test_class_makes_one_batch_call(self):
         # The complete record: one unconditional batch for this object,
@@ -471,6 +475,9 @@ class HardDeleteParityTestCase(base.ShakenFistTestCase):
             ('delete_cluster_operation_targets_for_object',
              (ObjectType.INSTANCE, object_uuid), {}),
             recorder.calls[2])
+        # The per-object path mutes the audit event's log echo too
+        # (issue 4723).
+        self._assert_audit_event('instance', object_uuid, recorder.calls[-1])
 
     def test_in_memory_ipam_deletes_nothing(self):
         with ExitStack() as stack:

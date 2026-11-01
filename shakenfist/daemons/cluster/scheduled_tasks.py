@@ -1202,8 +1202,12 @@ def _hard_delete_deleted_object_batch(
             outcome = 'failed'
         elif obj_uuid in deleted_uuids:
             outcome = 'hard_deleted'
+            # Muted from the log stream like the hard_delete() audit event:
+            # the sweep is exactly the high-volume caller the mute exists
+            # for (issue 4723). The MariaDB event write is unaffected.
             eventlog.add_event(
-                EVENT_TYPE_AUDIT, objtype, obj_uuid, 'hard deleted object')
+                EVENT_TYPE_AUDIT, objtype, obj_uuid, 'hard deleted object',
+                suppress_event_logging=True)
         else:
             # No longer final, or not yet old enough. An entry the database
             # deleted on an earlier attempt whose reply was lost, such as one

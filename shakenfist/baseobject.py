@@ -768,7 +768,12 @@ class DatabaseBackedObject:
             mariadb.delete_state(self.object_type, object_uuid)
             mariadb.delete_object_metadata(self.object_type, object_uuid)
             mariadb.delete_object_events(self.object_type, object_uuid)
-            self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
+            # The deleted-object sweep hard deletes tens of thousands of
+            # objects a day working through a backlog, so the audit event's
+            # log echo is muted here and below (issue 4723). The MariaDB
+            # event write is unaffected.
+            self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object',
+                           suppress_event_logging=True)
             return
 
         # A type whose hard delete is nothing but row deletes keyed on the
@@ -791,7 +796,8 @@ class DatabaseBackedObject:
                 self.log.with_fields({'deleted': deleted}).error(
                     'Hard delete failed, not recording it')
                 return
-        self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
+        self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object',
+                       suppress_event_logging=True)
 
 
 class TargetedOperation(NamedTuple):
