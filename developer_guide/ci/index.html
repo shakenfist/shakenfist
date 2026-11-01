@@ -18118,13 +18118,14 @@ outside any fence the model may have left open, which is what satisfies
 <a href="#the-issue-link-check">the issue link check</a>.</p>
 <p><code>issue-fix.yml</code> runs its fix attempt through
 <code>tools/claude-model-fallback.sh</code>, which takes a comma-separated
-preference list (<code>--models</code>, default <code>claude-fable-5,claude-opus-5</code>) and
-moves to the next model when one reports its subscription credit is
-exhausted. That case arrives as an HTTP 429 in the <code>--output-format json</code>
-payload (<code>api_error_status</code>), which the claude CLI's own
-<code>--fallback-model</code> flag does not handle -- it only covers overloaded or
-unavailable models. A refused request is free, so the wrapper attempts
-the real job rather than paying for a pre-flight probe.</p>
+preference list (<code>--models</code>, default <code>claude-opus-5</code>) and moves to the
+next model when one reports its subscription credit is exhausted, so a
+caller that passes a longer list gets a fallback. That case arrives as
+an HTTP 429 in the <code>--output-format json</code> payload (<code>api_error_status</code>),
+which the claude CLI's own <code>--fallback-model</code> flag does not handle -- it
+only covers overloaded or unavailable models. A refused request is free,
+so the wrapper attempts the real job rather than paying for a pre-flight
+probe.</p>
 <p>Give it the prompt with <code>--prompt-file</code>, never as a claude argument.
 Linux caps a single argv element at 128KiB whatever <code>ulimit</code> says, and an
 argument over the cap does not truncate -- the exec fails with <code>Argument
