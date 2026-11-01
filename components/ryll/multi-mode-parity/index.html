@@ -17010,7 +17010,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>partial (<code>--monitors</code> reaches the session as in the GUI, and the renderer's <code>run_headless()</code> applies every display channel's draws to the <code>SurfaceMirror</code>, which creates a surface for each <code>SurfaceCreated</code>; <code>status</code> lists them all with their channel, but <code>screenshot</code> takes only a <code>surface_id</code> and so reaches only the primary's display channel. Multi-monitor headless is unverified end to end: <a href="https://github.com/shakenfist/ryll/issues/549">ryll#549</a>)</td>
 <td>missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope)</td>
-<td>partial (<code>--monitors</code> reaches the SPICE session and the mirror keeps every surface, but the display handler serves only the primary, and a client's multi-monitor layout is reduced to its primary monitor: <code>shakenfist-spice-rdp/src/display.rs:381</code>)</td>
+<td>partial (<code>--monitors</code> reaches the SPICE session and the mirror keeps every surface, but the display handler serves only the primary, and a client's multi-monitor layout is reduced to its primary monitor by <code>layout_size()</code> in <code>shakenfist-spice-rdp/src/display.rs</code>)</td>
 </tr>
 <tr>
 <td>Full draw-op coverage (FILL, COPY, BLEND, etc.)</td>
@@ -17087,7 +17087,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>missing (same as above)</td>
 <td>available (MVP)</td>
-<td>missing (the cursor relay keeps only the shape and visibility, <code>shakenfist-spice-rdp/src/cursor.rs:114</code>, so the client draws the pointer where its own mouse is; in server mouse mode the two drift apart)</td>
+<td>missing (the cursor relay, <code>apply_event()</code> in <code>shakenfist-spice-rdp/src/cursor.rs</code>, keeps only the shape and visibility, so the client draws the pointer where its own mouse is; in server mouse mode the two drift apart)</td>
 </tr>
 <tr>
 <td>Cursor hide/show</td>
@@ -17150,7 +17150,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>missing (the control socket declares mouse verbs a non-goal until a test needs them; no other pointer path exists in headless)</td>
 <td>available (MVP)</td>
-<td>partial (position, left and right buttons work in both mouse modes; a client that sends the middle button on the standard mouse message loses it, <code>shakenfist-spice-rdp/src/input.rs:441</code>, <a href="https://github.com/shakenfist/ryll/issues/604">ryll#604</a>. FreeRDP sends it on its own channel and is unaffected)</td>
+<td>partial (position, left and right buttons work in both mouse modes; a client that sends the middle button on the standard mouse message loses it (the <code>mouse()</code> handler in <code>shakenfist-spice-rdp/src/input.rs</code>), <a href="https://github.com/shakenfist/ryll/issues/604">ryll#604</a>. FreeRDP sends it on its own channel and is unaffected)</td>
 </tr>
 <tr>
 <td>Mouse wheel</td>
@@ -17199,7 +17199,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>available</td>
 <td>missing (out of MVP scope; no test-automation use case in browser)</td>
-<td>missing (<code>run_rdp</code>, <code>ryll/src/rdp.rs:460</code>, never reads <code>--cadence</code>; only the GUI and the renderer's <code>run_headless()</code> run it)</td>
+<td>missing (<code>run_rdp</code> in <code>ryll/src/rdp.rs</code> never reads <code>--cadence</code>; only the GUI and the renderer's <code>run_headless()</code> run it)</td>
 </tr>
 <tr>
 <td><strong>Clipboard</strong></td>
@@ -17227,42 +17227,42 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>available (<code>--enable-paste-as-keystrokes</code>)</td>
 <td>missing (out of MVP scope; clipboard sync is in Future work list in PLAN-web-frontend.md)</td>
-<td>missing (<code>run_rdp</code> passes <code>enable_paste</code> as false, <code>ryll/src/rdp.rs:341</code>)</td>
+<td>missing (every SPICE attempt is started with <code>enable_paste</code> false, in <code>SpiceAttempts::run()</code> in <code>ryll/src/rdp.rs</code>)</td>
 </tr>
 <tr>
 <td>Paste-as-keystrokes (runtime trigger via Ctrl+Alt+V)</td>
 <td>available</td>
 <td>available (via the control socket <code>paste</code> verb; Ctrl+Alt+V itself is GUI-only)</td>
 <td>missing (out of MVP scope)</td>
-<td>missing (paste is off, so the inputs channel ignores the control socket <code>paste</code> verb, <code>shakenfist-spice-renderer/src/channels/inputs.rs:859</code>)</td>
+<td>missing (paste is off, so the inputs channel's <code>handle_input_event()</code> ignores the control socket <code>paste</code> verb)</td>
 </tr>
 <tr>
 <td>Paste-as-keystrokes (headless <code>--paste-text</code>)</td>
 <td>n/a — intrinsic (GUI reads clipboard; <code>--paste-text</code> is headless-only per README)</td>
 <td>available</td>
 <td>missing (out of MVP scope)</td>
-<td>missing (<code>run_rdp</code> never reads <code>--paste-text</code>; paste is off, <code>ryll/src/rdp.rs:341</code>)</td>
+<td>missing (<code>run_rdp</code> never reads <code>--paste-text</code>; paste is off)</td>
 </tr>
 <tr>
 <td>Paste-as-keystrokes (inter-character delay <code>--paste-char-delay-ms</code>)</td>
 <td>available</td>
 <td>available (also settable per-request via the control socket <code>paste</code> verb's <code>char_delay_ms</code>)</td>
 <td>missing (out of MVP scope)</td>
-<td>missing (paste is off, <code>ryll/src/rdp.rs:341</code>)</td>
+<td>missing (paste is off)</td>
 </tr>
 <tr>
 <td>Paste-as-keystrokes (vdagent auto-disable)</td>
 <td>available (<code>RyllApp::trigger_paste()</code> in <code>ryll/src/app/</code>)</td>
 <td>available (vdagent state logged from the session's <code>SessionState</code> watch; <code>enable_paste</code> flag passed through)</td>
 <td>missing (out of MVP scope)</td>
-<td>missing (paste is off, <code>ryll/src/rdp.rs:341</code>)</td>
+<td>missing (paste is off)</td>
 </tr>
 <tr>
 <td>Paste character validation / error dialog</td>
 <td>available</td>
 <td>partial (the renderer's <code>run_headless()</code> — <code>PasteFailed</code> logged and causes non-zero exit; control-socket clients get a <code>paste_failed</code> event; no interactive dialog)</td>
 <td>missing (out of MVP scope)</td>
-<td>missing (paste is off, <code>ryll/src/rdp.rs:341</code>)</td>
+<td>missing (paste is off)</td>
 </tr>
 <tr>
 <td><strong>USB Redirection</strong></td>
@@ -17290,7 +17290,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>missing (the renderer's <code>run_headless()</code> — <code>_usb_tx</code> is created but <code>usb_rx</code> is never sent a ConnectPhysical command in headless; no CLI flag for physical devices)</td>
 <td>missing (out of MVP scope)</td>
-<td>missing (the USB command channel is created closed, <code>ryll/src/rdp.rs:303</code>, and there is no flag for a physical device)</td>
+<td>missing (the USB command channel is created closed in <code>SpiceAttempts::run()</code>, and there is no flag for a physical device)</td>
 </tr>
 <tr>
 <td>Connect virtual USB disk (<code>--usb-disk</code>)</td>
@@ -17318,7 +17318,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>partial (the renderer's <code>run_headless()</code> — errors logged; no zip written unless <code>--pedantic</code>)</td>
 <td>missing (out of MVP scope)</td>
-<td>partial (errors are logged; <code>run_rdp</code> writes bug reports only from the <code>--pedantic</code> observer, <code>ryll/src/rdp.rs:536</code>)</td>
+<td>partial (errors are logged; <code>run_rdp</code> writes bug reports only from the <code>--pedantic</code> observer)</td>
 </tr>
 <tr>
 <td><strong>Folder Sharing (WebDAV)</strong></td>
@@ -17374,35 +17374,35 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>partial (no FPS is computed; the control socket's <code>stats</code> verb returns <code>marks_received</code>, whose rate between polls is the GUI's measure)</td>
 <td>partial (no stats panel in the browser MVP; the control socket's <code>stats</code> verb works as in headless)</td>
-<td>partial (no FPS is computed; the control socket's <code>stats</code> verb returns <code>marks_received</code>, <code>ryll/src/rdp.rs:727</code>)</td>
+<td>partial (no FPS is computed; the control socket's <code>stats</code> verb returns <code>marks_received</code>)</td>
 </tr>
 <tr>
 <td>Bandwidth sparkline (rolling bytes/sec graph)</td>
 <td>available</td>
 <td>partial (no graph; the control socket's <code>stats</code> verb returns the display channel's <code>bytes_in</code>, whose rate between polls is its bandwidth)</td>
 <td>partial (no graph; the control socket's <code>stats</code> verb works as in headless)</td>
-<td>partial (no graph; the control socket's <code>stats</code> verb returns the display channel's <code>bytes_in</code>, <code>ryll/src/rdp.rs:727</code>)</td>
+<td>partial (no graph; the control socket's <code>stats</code> verb returns the display channel's <code>bytes_in</code>)</td>
 </tr>
 <tr>
 <td>PING interval sparkline (inter-PING interval graph)</td>
 <td>available</td>
 <td>partial (no graph; raw samples are reachable as control-socket <code>latency</code> events)</td>
 <td>missing (out of MVP scope)</td>
-<td>partial (no graph; raw samples are reachable as control-socket <code>latency</code> events, <code>ryll/src/rdp.rs:735</code>)</td>
+<td>partial (no graph; raw samples are reachable as control-socket <code>latency</code> events)</td>
 </tr>
 <tr>
 <td>Inputs round trip (<code>RTT</code> in the status bar)</td>
 <td>available</td>
 <td>missing (headless sends no pointer input, and a round trip is only measured from pointer messages)</td>
 <td>partial (no stats panel; the browser's pointer drives control-socket <code>input_rtt</code> events)</td>
-<td>partial (no stats panel; the RDP client's pointer drives control-socket <code>input_rtt</code> events, <code>ryll/src/rdp.rs:735</code>)</td>
+<td>partial (no stats panel; the RDP client's pointer drives control-socket <code>input_rtt</code> events)</td>
 </tr>
 <tr>
 <td>Periodic stats to stdout (headless only)</td>
 <td>n/a — intrinsic (GUI shows live stats in status bar)</td>
 <td>available (every 10 s: DISPLAY_MARKs, image draws, and bytes in and out across every channel)</td>
 <td>n/a — intrinsic (browser context)</td>
-<td>missing (<code>run_rdp</code>, <code>ryll/src/rdp.rs:460</code>, logs no periodic stats line)</td>
+<td>missing (<code>run_rdp</code> logs no periodic stats line)</td>
 </tr>
 <tr>
 <td><code>--latency-file</code> latency measurements export</td>
@@ -17437,7 +17437,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>missing (ryll's <code>run_headless()</code> — gap observer registered; warn_once fires; but the renderer's event loop has no handler to surface the count)</td>
 <td>missing (out of MVP scope)</td>
-<td>missing (<code>run_rdp</code> registers the gap observer, <code>ryll/src/rdp.rs:553</code>, but nothing surfaces the count)</td>
+<td>missing (<code>run_rdp</code> registers the gap observer but nothing surfaces the count)</td>
 </tr>
 <tr>
 <td>Protocol gap floating window (click Gaps button)</td>
@@ -17451,7 +17451,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>available (partial: ryll's <code>run_headless()</code> — <code>app_snapshot</code> is an empty default, so pedantic zips omit surface/bandwidth/latency data)</td>
 <td>missing (out of MVP scope)</td>
-<td>partial (<code>run_rdp</code> registers the observer with an empty <code>app_snapshot</code>, <code>ryll/src/rdp.rs:537</code>, so pedantic zips omit surface, bandwidth and latency data)</td>
+<td>partial (<code>run_rdp</code> registers the observer with an empty <code>app_snapshot</code>, so pedantic zips omit surface, bandwidth and latency data)</td>
 </tr>
 <tr>
 <td><code>--pedantic-dir</code> directory selection</td>
@@ -17479,7 +17479,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>partial (ryll's <code>run_headless()</code> — <code>--pedantic</code> zips have an empty <code>app_snapshot</code>; no interactive zip generation in headless)</td>
 <td>missing (out of MVP scope)</td>
-<td>partial (only <code>--pedantic</code> writes zips, with an empty <code>app_snapshot</code>, <code>ryll/src/rdp.rs:537</code>; there is no other trigger)</td>
+<td>partial (only <code>--pedantic</code> writes zips, with an empty <code>app_snapshot</code>; there is no other trigger)</td>
 </tr>
 <tr>
 <td>Bug report display region selection</td>
@@ -17493,7 +17493,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>n/a — intrinsic (no continuously-painted display)</td>
 <td>missing (out of MVP scope)</td>
-<td>missing (the only reports <code>--rdp</code> writes are pedantic ones, which take no screenshot, <code>ryll/src/bugreport.rs:2404</code>)</td>
+<td>missing (the only reports <code>--rdp</code> writes are pedantic ones, which take no screenshot: see <code>register_pedantic_observer()</code> in <code>ryll/src/bugreport.rs</code>)</td>
 </tr>
 <tr>
 <td>Runtime metrics in bug reports (Linux <code>/proc</code>)</td>
@@ -17563,21 +17563,21 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>missing (ryll's <code>run_headless()</code> — store exists and is populated, but no bell or side panel in headless; no stdout drain)</td>
 <td>missing (out of MVP scope)</td>
-<td>missing (<code>run_rdp</code> builds a notification store, <code>ryll/src/rdp.rs:523</code>, but nothing shows it to the client or prints it)</td>
+<td>missing (<code>run_rdp</code> builds a notification store but nothing shows it to the client or prints it)</td>
 </tr>
 <tr>
 <td>SPICE_MSG_NOTIFY surfacing</td>
 <td>available</td>
 <td>partial (stored in notification store; printed nowhere in headless event loop unless captured by <code>--pedantic</code>)</td>
 <td>missing (out of MVP scope)</td>
-<td>partial (logged by the main channel, <code>shakenfist-spice-renderer/src/channels/main_channel.rs:1063</code>; nothing on <code>run_rdp</code>'s event bus stores or shows it)</td>
+<td>partial (logged by the main channel's <code>handle_message()</code>; nothing on <code>run_rdp</code>'s event bus stores or shows it)</td>
 </tr>
 <tr>
 <td>Gap observer notification feed</td>
 <td>available</td>
 <td>partial (registered by <code>register_gap_notification_observer()</code> in ryll's <code>run_headless()</code>; notifications accumulate in store but are never printed to stdout)</td>
 <td>missing (out of MVP scope)</td>
-<td>partial (registered at <code>ryll/src/rdp.rs:553</code>; notifications accumulate in the store but are never shown or printed)</td>
+<td>partial (registered by <code>run_rdp</code>; notifications accumulate in the store but are never shown or printed)</td>
 </tr>
 <tr>
 <td><strong>Reconnect / Lifecycle</strong></td>
@@ -17605,14 +17605,14 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>n/a — intrinsic</td>
 <td>n/a — intrinsic (browser tab holds its own page state)</td>
-<td>partial (one store lasts the whole run, <code>ryll/src/rdp.rs:523</code>, so a SPICE reconnect keeps it, but nothing shows it)</td>
+<td>partial (one store, built by <code>run_rdp</code>, lasts the whole run, so a SPICE reconnect keeps it, but nothing shows it)</td>
 </tr>
 <tr>
 <td>Disconnect dialog</td>
 <td>available</td>
 <td>n/a — intrinsic (no GUI)</td>
 <td>missing (not in MVP scope; browser tab closure is the UX)</td>
-<td>partial (during an outage the client is shown the last frame at half brightness with no text saying why, <code>shakenfist-spice-rdp/src/display.rs:602</code>; when ryll gives up it disconnects the client, which shows its own message)</td>
+<td>partial (during an outage the client is shown the last frame at half brightness with no text saying why (<code>poll_outage()</code> in <code>shakenfist-spice-rdp/src/display.rs</code>); when ryll gives up it disconnects the client, which shows its own message)</td>
 </tr>
 <tr>
 <td>Graceful Ctrl+C shutdown</td>
@@ -17904,8 +17904,8 @@ socket), supervises SPICE reconnects, and hands the session to the
 <tr>
 <td>SPICE auto-reconnect</td>
 <td>available (the GUI retries with the same rules before showing its disconnect dialog, <code>ryll/src/app/reconnect.rs</code>)</td>
-<td>missing (ryll's <code>run_headless()</code> runs the session once and exits when it ends, <code>ryll/src/main.rs:476</code>)</td>
-<td>missing (<code>run_web</code> runs the session once, <code>ryll/src/main.rs:782</code>; a lost SPICE session is not retried)</td>
+<td>missing (ryll's <code>run_headless()</code> runs the session once and exits when it ends)</td>
+<td>missing (<code>run_web</code> in <code>ryll/src/main.rs</code> runs the session once; a lost SPICE session is not retried)</td>
 <td>available (retries after 1, 4 and 16 s, honouring a single-use or expired <code>.vv</code> ticket; the client and the listener stay up throughout)</td>
 </tr>
 </tbody>

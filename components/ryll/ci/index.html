@@ -17966,23 +17966,33 @@ request, enables the merge queue, requires the three gate
 checks, and blocks deletion and non-fast-forward pushes.</p>
 <p>The one thing that still pushes directly to <code>develop</code> is the
 <code>prune-reviews</code> workflow, which drops review marks invalidated
-by whatever just merged. It authenticates as <code>shakenfist-bot</code>
-using the <code>DEPENDENCIES_TOKEN</code> secret; the bot is a member of
-the "SF Can Skip Merge Queue" team, which is the ruleset's
-bypass actor. GitHub does not accept the built-in Actions app as
-a bypass actor at all, so the token is load-bearing rather than
-a preference. That team also contains a human, which is the
-escape hatch if the ruleset ever wedges.</p>
-<p>A push made with a personal access token retriggers workflows,
-where a <code>GITHUB_TOKEN</code> push does not, so <code>prune-reviews</code>
-triggers itself once. That is safe rather than a loop: the
-second run finds nothing to prune and exits before committing.</p>
+by whatever just merged. It pushes with an installation token
+for the <code>shakenfist-review-marks</code> GitHub App, which is the
+ruleset's bypass actor; GitHub does not accept the built-in
+Actions app as a bypass actor at all, so the App is
+load-bearing rather than a preference. The commit itself is
+authored as <code>shakenfist-bot</code>. The App's private key is the
+<code>REVIEW_MARKS_APP_KEY</code> secret of the <code>review-marks</code>
+environment, whose deployment branch policy admits <code>develop</code>
+alone, so no other ref's run can mint a token. Each run mints
+one token, limited to this repository and <code>contents: write</code>,
+and revoked when the job ends. The ruleset's other bypass
+actor, the "SF Can Skip Merge Queue" team, contains a human,
+which is the escape hatch if the ruleset ever wedges.</p>
+<p>An App push retriggers workflows, where a <code>GITHUB_TOKEN</code> push
+does not, so <code>prune-reviews</code> triggers itself once. That is safe
+rather than a loop: the second run finds nothing to prune and
+exits before committing.</p>
 <p>The workflow is guarded to the default branch, because every
 push starts a run and only <code>develop</code>'s should land anything. It
-never reads the static runner's reused workspace: there is no
-checkout, the script comes from a fresh depth 1 clone of
-<code>develop</code> in <code>RUNNER_TEMP</code>, and it lands from a second fresh
-clone, with the token given to the final <code>git push</code> alone.</p>
+runs on an ephemeral vm runner, a fresh machine per job, and
+still treats the workspace as hostile: there is no checkout,
+the script comes from a fresh depth 1 clone of <code>develop</code> in
+<code>RUNNER_TEMP</code>, and it lands from a second fresh clone, with the
+token given to the final <code>git push</code> alone. The workflow and its
+script are byte-for-byte copies of shakenfist/development's
+<code>templates/review-tracking/</code>, which documents them; change the
+template, not the copy.</p>
 <p>Ruleset changes are captured under <code>.github/exported-config/</code>
 by <code>export-repo-config.yml</code>, which runs daily and on demand.</p>
 <h2 id="reproducing-ci-locally">Reproducing CI locally<a class="headerlink" href="#reproducing-ci-locally" title="Permanent link">&para;</a></h2>
