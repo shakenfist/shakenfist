@@ -684,21 +684,36 @@ audit
 `nightly-matrix.yml` runs unattended, so everything it produces is
 produced by a script: nobody opens the Actions tab on a morning when
 nothing seems wrong. It fires at **22:00 UTC** — four hours ahead of the
-other daily schedules, because the shared `xl` pool has a measured
-ceiling of about three concurrent legs and this is the largest nightly
-the repository runs — and holds two shapes of job:
+other daily schedules, because this is the largest nightly the
+repository runs and the shared `xl` pool once had a measured ceiling of
+about three concurrent legs (by late October 2026 it ran all eight at
+once, which is why `measure` now waits for the legs rather than relying
+on the pool to separate them) — and holds two shapes of job:
 
 | Job | Runs | Produces |
 |-----|------|----------|
 | `nightly-legs` (seven, one per distro) | the six moved VHD conversion tests (`MATRIX_SET=nightly`) | a GitHub issue per failing distro, and the leg's log as an artifact |
-| `measure` (one, Debian 13) | the **whole** suite (`MATRIX_SET=all`), deliberately unseeded | the measured timings as a 30-day artifact, and an issue if the suite fails |
-| `publish-timing` (one, no tests) | nothing — it downloads that artifact and compares it | a pull request refreshing `tests/stestr-timing.txt`, an issue if the refresh itself fails, and an issue if there was no measurement to refresh from |
+| `measure` (one, Debian 13, **after** the seven legs) | the **whole** suite (`MATRIX_SET=all`), deliberately unseeded, on a pool the legs have finished with | the measured timings as a 30-day artifact, and an issue if the suite fails |
+| `publish-timing` (one, no tests) | nothing — it downloads that artifact, and the previous night's, and compares them | a pull request refreshing `tests/stestr-timing.txt`, an issue if the refresh itself fails, and an issue if there was no measurement to refresh from |
 
 `measure` is redundant as coverage — every test in it either still gates
 a merge or runs on the seven legs above — and that is not why it is
 there. It is the only job left in CI that executes the whole suite in a
 single stestr repository, which makes it the only place the timing data
 can be measured rather than guessed.
+
+It runs after the legs, not beside them, and a distro leg failing does
+not stop it (only a failed package build or a cancelled run does). The
+ordering is what makes the measurement one of the suite rather than of
+the pool's load: on the nights of 2026-10-29 and 2026-10-30 it ran its
+whole hour alongside the seven legs on the same pool, and the heavy
+conversion tests swung by 40% between nights while the sub-second ones
+did not move — the Hyper-V VHD roundtrip measured 647s, 357s and 600s on
+three consecutive nights. That is not the uniform slowdown the
+share-based comparison below cancels, and it opened two refresh pull
+requests (#857 and #862) for a file that, two nights apart, was
+immaterial against itself. The ~35 minutes of nightly wall time the
+ordering costs is time nothing waits on.
 
 **Measuring and publishing are two jobs because of the token.** The
 workflow level is `contents: read`, because every leg that runs the
@@ -779,15 +794,19 @@ actually moved.
   measurement is worth a human's attention, and exits 0 for material, 10
   for immaterial, 1 for an error. Both of its rules are expressed in each
   test's *share of the suite's weight*, because bin packing is scale-free
-  — a contended or slower runner changes every number in the file without
-  changing a single scheduling decision, and that is by far the commonest
-  night-to-night difference. It publishes when one test's share moves by
-  at least 2 percentage points, or when at least 10 points of the suite's
-  weight relocate between tests. It is also where the measured test ids
-  are validated, because this is the path that publishes them: an id
-  must be a dotted `module.Class.method` with an optional parenthesised
-  scenario suffix, drawn from a conservative charset, and anything else
-  stops the refresh rather than being dropped. The ids come from the job
+  — a *uniformly* contended or slower runner changes every number in the
+  file without changing a single scheduling decision. It calls a change
+  material when one test's share moves by at least 2 percentage points,
+  or when at least 10 points of the suite's weight relocate between
+  tests. What it cannot cancel is non-uniform contention, which slows a
+  ten-minute conversion far more than a sub-second case and so moves
+  shares; the persistence check in the publisher below is the answer to
+  that, and this stays a pure two-file comparison. It is also where the
+  measured test ids are validated, because this is the path that
+  publishes them: an id must be a dotted `module.Class.method` with an
+  optional parenthesised scenario suffix, drawn from a conservative
+  charset, and anything else stops the refresh rather than being
+  dropped. The ids come from the job
   that ran the suite over the malicious images, and they travel from
   here into a Markdown report, into the body of a pull request opened
   unattended, and into the committed file — so a backtick, a pipe, a
@@ -795,20 +814,77 @@ actually moved.
   pull request nobody wrote. Failing closed is the opposite of the
   seeding path's behaviour above, and deliberately: this one writes the
   file, that one only reads it.
-- **`tools/ci/publish-stestr-timing.sh MEASURED [--dry-run] [--force]`**
-  acts on that verdict. On a material change it copies the measurement
-  over the committed file, force-pushes the single long-lived
-  `stestr-timing/refresh` branch, and opens a pull request — or, if one
-  is already open for that branch, says so and leaves it to be updated
-  in place rather than opening a second. It never pushes to `develop`: a
-  scheduling hint is nowhere near a good enough reason to be the first
-  thing in this repository that writes to a merge-queue-protected
-  branch. On an immaterial change it prints the comparison and exits 0
-  having done nothing, which is the normal case. It assigns the pull
-  request to nobody unless `TIMING_PR_ASSIGNEE` names a login, and a
-  failed assignment is a warning rather than a failed nightly: a
-  hardcoded account that is renamed or loses access would turn a
-  scheduling hint into a failure issue.
+- **`tools/ci/fetch-previous-stestr-timing.sh OUTPUT`** finds the most
+  recent *earlier* night's measurement: it walks the nightly workflow's
+  recent runs on the same branch newest first, skips the run it is part
+  of and any run newer than it (so a re-run of an old night's publish
+  job does not compare against a later night), and takes the `stestr-timing` artifact of the first run whose
+  `measure` job concluded `success`. That is the same standard tonight's
+  measurement had to meet to reach the publisher at all, and it matters
+  because the artifact is uploaded even when the suite fails: a night
+  where a heavy test failed in seconds rather than ran for minutes still
+  leaves a timing file, and it is not a measurement of the suite. A
+  night that did not measure is passed over rather than resetting the
+  comparison. It leaves the file at `OUTPUT` with a one-line
+  `OUTPUT.source` naming the run, or leaves nothing. It exits 0 either
+  way, and a GitHub API failure — listing the runs, reading a run's
+  jobs, or downloading the artifact of a run that did measure — is a
+  warning quoting `gh`'s error: without a previous measurement the
+  publisher falls back to publishing on one night's evidence, which is
+  the visible failure (a pull request that may be noise) rather than
+  the silent one (a file ageing with nothing to say why). The workflow
+  holds it to that with `continue-on-error`, so even a fault in the
+  fetcher itself leaves the publisher running without `--previous`. It
+  needs `actions: read`, which only `publish-timing` holds.
+- **`tools/ci/publish-stestr-timing.sh MEASURED [--previous FILE]
+  [--dry-run] [--force]`** acts on those verdicts. A material change
+  against the committed file is published only if it has **persisted**:
+  compared against the previous measurement, with the same two rules,
+  it must come back *immaterial*, and the previous measurement compared
+  against the committed file must come back *material* — two
+  consecutive measurements that agree with each other and both disagree
+  with the committed file. The third comparison is not redundant: a
+  threshold is not transitive, so a previous night just short of it and
+  a tonight just over it agree with each other while only one of them
+  has moved. Anything short of both is one night nobody can tell apart
+  from contention, and the publisher logs every comparison, says it is
+  waiting, and exits 0. That rule would have held back both
+  #857 and #862; a genuine recomposition such as #840's 459 new tests
+  publishes one night later than it otherwise would. With no previous
+  measurement a material change publishes on one night's evidence, and
+  the pull request body says so, pointing at the fetch step's log as
+  the one place that tells "no earlier night measured" from "the fetch
+  failed". A `--force` refresh of an immaterial change consults no
+  previous measurement and says nothing about persistence, because
+  there is no move to persist. When it does publish it copies the
+  measurement over the committed file, force-pushes the single
+  long-lived `stestr-timing/refresh` branch, and opens a pull request —
+  or, if one is already open for that branch, says so and leaves it to
+  be updated in place rather than opening a second. It never pushes to
+  `develop`: a scheduling hint is nowhere near a good enough reason to
+  be the first thing in this repository that writes to a
+  merge-queue-protected branch. On an immaterial change it prints the
+  comparison and exits 0 having done nothing, which is the normal case.
+  It assigns the pull request to nobody unless `TIMING_PR_ASSIGNEE`
+  names a login, and a failed assignment is a warning rather than a
+  failed nightly: a hardcoded account that is renamed or loses access
+  would turn a scheduling hint into a failure issue.
+
+**Known gap: a run of waiting nights is silent.** A night that waits
+exits 0, opens no pull request and files no issue, which is right for
+one contended night. A run of nights that each fail to confirm the one
+before leaves the committed file ageing with nothing saying so — the
+silent failure the rest of this mechanism avoids. It means either the
+thresholds sit below the measuring leg's night-to-night noise and want
+raising, or something still contends with the measuring leg. It can
+also be a busy stretch of changes to the suite itself: the previous
+night's measurement is of whatever commit that night ran, so a night
+that added or removed heavy tests differs from the one before, and
+nights that each change the test set keep postponing the refresh. The
+only record is the `publish-timing` job's uploaded log, where each waiting
+night says `Waiting for a measurement that agrees with the one before
+it`. Escalating after N consecutive waits is tracked in
+[#864](https://github.com/shakenfist/instar/issues/864).
 
 **Failure reporting.**
 `tools/ci/report-nightly-matrix-failure.sh DISTRO IMAGE LOG_FILE` files
