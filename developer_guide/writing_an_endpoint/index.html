@@ -16993,6 +16993,15 @@ was an observable change of behaviour rather than a new failure mode
 federated token endpoint). Treat <code>503</code> as a global response when
 writing a client; declare it on your endpoint only if you have
 something endpoint-specific to say about it.</p>
+<p>Two responses are declared for you. Every authenticated endpoint gets a
+generic <code>401</code>, and <code>requires_admin=True</code> adds the <code>403</code> that
+<code>caller_is_admin</code> answers when a system-namespace token lacks the admin
+scope. <code>requires_admin</code> means exactly "guarded by
+<code>@api_base.caller_is_admin</code>" — it documents rather than enforces, so a
+unit test holds the flag and the decorator together in both directions.
+If your endpoint has something specific to say about <code>401</code> or <code>403</code>,
+declare it: your words lead and the generic cause is appended, rather
+than overwriting yours as it once did.</p>
 <h2 id="checking-your-work">Checking your work<a class="headerlink" href="#checking-your-work" title="Permanent link">&para;</a></h2>
 <p>The audit derives the correct location for every declaration and
 compares it against what is declared:</p>
