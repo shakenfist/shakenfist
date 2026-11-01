@@ -2944,6 +2944,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-workflow-is-the-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The workflow is the template's
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-pre-commit-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16780,6 +16791,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-workflow-is-the-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The workflow is the template's
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-pre-commit-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16880,6 +16902,9 @@
   copied verbatim rather than edited per repository.</li>
 <li><code>renovate.yml</code> does not run <code>renovatebot/github-action</code>, which needs
   a Docker daemon on the runner.</li>
+<li><code>renovate.yml</code> matches the template's apart from the versions
+  Renovate bumps: the value of <code>PINNED_RENOVATE_VERSION</code> and the ref of
+  each action it uses.</li>
 <li><code>renovate.json</code> exists, with package grouping rules and scheduling.
   It is a per-repository adaptation, not expected to be
   byte-identical to the template's copy.</li>
@@ -16908,6 +16933,28 @@ matters is lock files, which Renovate now refreshes with the runner's
 own tools. The template provides npm always and a Rust toolchain when
 the repository has a <code>Cargo.lock</code>, so every repository can copy it
 unmodified.</p>
+<h3 id="the-workflow-is-the-templates">The workflow is the template's<a class="headerlink" href="#the-workflow-is-the-templates" title="Permanent link">&para;</a></h3>
+<p><code>renovate.yml</code> is copied verbatim, so any difference from
+<code>templates/renovate/renovate.yml</code> is drift, except the versions
+Renovate bumps in each copy on its own schedule: the value of
+<code>PINNED_RENOVATE_VERSION</code>, and the ref after <code>@</code> on each <code>uses:</code> line
+(with the version comment digest pinning leaves after it). A copy
+whose Renovate or whose actions are ahead of or behind the template's
+still matches; the action's name still has to. <code>node-version</code> is not
+among them: the template's <code>renovate.json</code> stops Renovate bumping it,
+and it is the line the check exists to hold.</p>
+<p>The drift that prompted this was Node. Renovate proposed Node 26 for
+the workflow's <code>setup-node</code> step, the pull request merged in eleven
+repositories, and each one's Renovate, which needs Node <code>^24.11.0</code>,
+then failed on every hourly run. The template's <code>renovate.json</code> now
+stops Renovate proposing that bump, but a copy can still drift by
+hand, and the workflow is where Node has to match the Renovate it
+runs.</p>
+<p>The finding names each place the copy differs, up to three, with the
+copy's line and the template's, and counts the rest. A copy still on
+the container action gets only that finding, which already says to
+copy the template. If the audit cannot read its own template, it
+reports an error rather than a verdict.</p>
 <h3 id="the-pre-commit-manager">The pre-commit manager<a class="headerlink" href="#the-pre-commit-manager" title="Permanent link">&para;</a></h3>
 <p>Renovate's <code>pre-commit</code> manager is opt-in: cargo, dockerfile,
 github-actions and the Python managers are on by default, but

@@ -18817,7 +18817,7 @@ the queue time is the pool's load, not the boot, and it sits outside
 <code>timeout-minutes</code>, which counts from the job's start. The job then
 took 16 seconds. <code>Mint the push token</code> was skipped, <code>Prune and import
 review marks</code> succeeded and pushed <code>0bd8d7c</code> ("Prune and import
-review marks.", the marks this pull request staled), rule suite
+review marks.", the marks #354's merge staled), rule suite
 4829478319 records the push by <code>github-actions[bot]</code> (actor id
 41898282), and <code>repos/shakenfist/development/deployments?environment=review-marks</code>
 lists nothing, so GitHub accepted <code>deployment: false</code>. The no-key
@@ -18842,17 +18842,17 @@ path works as designed.</p>
 <td><code>9f080cd</code>, 2026-10-31</td>
 <td>41171895436</td>
 <td>skipped</td>
-<td><code>github-actions[bot]</code>, 41898282</td>
+<td><code>github-actions[bot]</code>, 41898282 (rule suite 4829478319)</td>
 <td>none</td>
 </tr>
 <tr>
 <td>andris</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/65" title="GitHub Issue: shakenfist/andris #65">andris#65</a> (eb5278f)</td>
-<td></td>
-<td></td>
-<td>ran</td>
-<td></td>
-<td></td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/65" title="GitHub Issue: shakenfist/andris #65">andris#65</a> (eb5278f, then 003665c)</td>
+<td><code>dcdee41</code>, 2026-10-31</td>
+<td>41183486988</td>
+<td>failed (proxy; see notes)</td>
+<td>none: nothing pushed</td>
+<td>none</td>
 </tr>
 <tr>
 <td>hunkydory</td>
@@ -18948,6 +18948,31 @@ with what the log showed.</p>
   here; <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/65" title="GitHub Issue: shakenfist/andris #65">andris#65</a> carries the earlier wording, so andris needs a
   comment-only re-sync once this lands, and 2c's pull requests carry
   the fixed text.</li>
+<li>2026-10-31 19:30 AEDT: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/65" title="GitHub Issue: shakenfist/andris #65">andris#65</a> merged as <code>dcdee41</code> (with
+  003665c, andris's own AGENTS.md and phase 11 note, from its
+  review). Its first <code>prune-reviews</code> run on <code>develop</code>, 41183486988,
+  queued at 19:10 and started at 19:19 on a vm runner, failed in
+  <code>Mint the push token</code> before minting: "A proxy environment
+  variable is set, but Node.js native proxy support is not enabled.
+  Set NODE_USE_ENV_PROXY=1 for this action step." The vm runners set
+  a proxy, and <code>create-github-app-token</code> v3 refuses to start behind
+  one unless Node.js is told to honour it (its <code>lib/request.js</code>, and
+  its README's "Proxy support"). Nothing was pushed and the prune
+  step was skipped, so the failure was closed, as decision 6 meant;
+  the step ran rather than being skipped, so the presence guard
+  reads the environment secret, and there is no deployment, so
+  <code>deployment: false</code> holds. The rollout stopped there, as 2b says.
+  The 2b brief reads a failed token step as a wrong key or client id
+  (risk 2), and it was neither: the survey checked the image for what
+  the script needs, not for what a Node action needs (now risk 9).
+  Mikal chose to fix
+  it in the template, not to revert andris: the mint step now sets
+  <code>NODE_USE_ENV_PROXY: '1'</code>, pinned by the shape test and a twelfth
+  mutant. Until the fix is re-synced into andris, every push to its
+  <code>develop</code> fails its prune run and its stale marks stay. 2b is
+  re-run for andris with the fixed template, and its three readings
+  taken again, before 2c starts; the re-run gets a row of its own in
+  the rollout table, so the table still shows this one failed.</li>
 </ul>
 <h4 id="risks-and-mitigations_1">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations_1" title="Permanent link">&para;</a></h4>
 <ol>
@@ -18992,6 +19017,12 @@ with what the log showed.</p>
    still in the bypass team until phase 3, so a repository on the
    old copy keeps landing marks with <code>DEPENDENCIES_TOKEN</code>. A stall
    costs nothing but time.</li>
+<li><strong>The vm runner's environment breaks the token action.</strong> A proxy
+   the action does not honour, or a Node.js too old for it, fails
+   the token step before anything is pushed, as andris's first run
+   did (execution notes, 19:30). The fix belongs in the template,
+   never in one repository's copy, and 2b or 2c stops until it has
+   been re-synced.</li>
 </ol>
 <h4 id="definition-of-done_1">Definition of done<a class="headerlink" href="#definition-of-done_1" title="Permanent link">&para;</a></h4>
 <p>Every item is checked by the management session from the tree, the
