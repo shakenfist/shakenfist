@@ -17159,26 +17159,107 @@ did not write.</p>
    <a href="https://github.com/shakenfist/development/blob/main/templates/review-tracking/README.md">templates/review-tracking/README.md</a>
    for what else the workflow needs (the <code>.gitignore</code> exception,
    <code>.vscode/review-scope.toml</code>, and the <code>paths-ignore</code> block from
-   step 8) and for gitsign and the development clone it makes. A
-   repository whose default-branch ruleset requires a pull request
-   needs a <code>DEPENDENCIES_TOKEN</code> secret, since GitHub will not accept
-   the built-in Actions app as a bypass actor and shakenfist-bot has
-   to push with a token instead; a repository without that
-   requirement pushes with <code>GITHUB_TOKEN</code>. Changes to the workflow
-   or script go to the template, not to a repository's copy of them.
-   The consistency audit's <code>review-coverage</code> check needs no per-repo
-   setup -- it notices the scope config and starts checking the repo
-   automatically.</p>
+   step 8) and for gitsign and the development clone it makes.
+   Changes to the workflow or script go to the template, not to a
+   repository's copy of them. The consistency audit's
+   <code>review-coverage</code> check needs no per-repo setup -- it notices the
+   scope config and starts checking the repo automatically.</p>
+</li>
+</ol>
+<p>Before the workflow's first run, an operator with admin on the
+   repository sets up where it pushes from. Every adopting
+   repository gets a <code>review-marks</code> environment with the
+   default-branch policy, key or no key: the job names the
+   environment, and one GitHub creates on first reference has no
+   branch policy, so a key added to it later would be readable from
+   any branch. A repository whose default-branch ruleset requires a
+   pull request also gets the <code>shakenfist-review-marks</code> GitHub App,
+   which pushes there, since GitHub will not accept the built-in
+   Actions app as a bypass actor; the rest push with <code>GITHUB_TOKEN</code>
+   and need nothing more. The key is only ever an environment
+   secret, never a repository or organisation one:
+   <code>secrets.REVIEW_MARKS_APP_KEY</code> resolves at all three levels, and
+   the workflow would mint from a repository or organisation secret,
+   which any branch can read, just as quietly. The App's client id
+   is already the organisation variable <code>REVIEW_MARKS_APP_CLIENT_ID</code>.
+   With <code>&lt;r&gt;</code> the repository and <code>&lt;default&gt;</code> its default branch, in
+   this order:</p>
+<ol>
+<li>
+<p>Create the environment with a custom branch policy, then give
+      it exactly one policy, of type <code>branch</code>, naming the default
+      branch:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>echo '{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}' |
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    gh api -X PUT repos/shakenfist/&lt;r&gt;/environments/review-marks --input -
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>gh api -X POST repos/shakenfist/&lt;r&gt;/environments/review-marks/deployment-branch-policies \
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    -f name=&lt;default&gt; -f type=branch
+</code></pre></div>
+<p>Read both back (<code>gh api
+  repos/shakenfist/&lt;r&gt;/environments/review-marks</code> and the same
+  path with <code>/deployment-branch-policies</code>): the policy must be
+  the default branch alone, with no glob characters and no tag
+  entry, since "admits the default branch" is not the test. A
+  repository without a pull-request ruleset stops here.</p>
 </li>
 <li>
-<p>Teach the repository's build and analysis workflows to ignore
+<p>Install the App on the repository: in the organisation's
+      settings, under GitHub Apps, configure
+      <code>shakenfist-review-marks</code> and add the repository to its
+      selected repositories.</p>
+</li>
+<li>
+<p>Put the App's private key in the environment, and nowhere
+      else. No copy of the key is kept outside the environments, and
+      the App holds exactly one key, the one every repository's
+      environment carries, so adding a repository is a rotation, not
+      a new key for that repository alone. Generate a new private
+      key on the App's settings page; set it in the new repository's
+      environment and again in every repository whose environment
+      already holds the key; read back each environment's secret
+      list; then delete the old key on the App's page, so that one
+      remains, and shred the downloaded file. Until the old key is
+      deleted both work, so no run fails partway through:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>for r in &lt;r&gt; &lt;every repository already holding the key&gt;; do
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    gh secret set REVIEW_MARKS_APP_KEY --repo shakenfist/$r --env review-marks &lt; &lt;key&gt;.pem
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    gh api repos/shakenfist/$r/environments/review-marks/secrets --jq '.secrets[].name'
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    gh secret list --repo shakenfist/$r    # must not list REVIEW_MARKS_APP_KEY
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>done
+</code></pre></div>
+<p>The repositories already holding the key are the App's
+  selected repositories, as its installation settings list them.</p>
+</li>
+<li>
+<p>Add the App to the ruleset's bypass actors, by the same fetch
+      and PUT that <a href="/components/development/audits/merge-queue-config/">merge queue
+      configuration</a> uses, carrying
+      everything else over unchanged and adding the App (its app id
+      is 5538020). The filter drops any entry for the App before
+      adding it, so running the step twice leaves one entry, not two:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>gh api repos/shakenfist/&lt;r&gt;/rulesets --jq \
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    '.[] | select(.target == "branch") | {id, name}'
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>gh api repos/shakenfist/&lt;r&gt;/rulesets/&lt;id&gt; | jq \
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    '{name, target, enforcement, conditions, rules,
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>      bypass_actors: ([(.bypass_actors // [])[]
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>          | select(.actor_type != "Integration" or .actor_id != 5538020)]
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>        + [{"actor_id": 5538020, "actor_type": "Integration",
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>            "bypass_mode": "always"}])}' &gt; ruleset.json
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>gh api -X PUT repos/shakenfist/&lt;r&gt;/rulesets/&lt;id&gt; --input ruleset.json
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>gh api repos/shakenfist/&lt;r&gt;/rulesets/&lt;id&gt; --jq '.bypass_actors'
+</code></pre></div>
+<p>Read the bypass actors back: the App must appear once, beside
+  every actor that was there before.</p>
+</li>
+</ol>
+<p>The job's <code>environment:</code> sets <code>deployment: false</code>, so its runs do
+   not appear in the repository's Deployments view.</p>
+<ol>
+<li>Teach the repository's build and analysis workflows to ignore
    review-only changes, so a review session (or a bot prune) does
    not burn a CI run on files no build reads. Apply it to the
    code-shaped workflows (unit tests, lint, CodeQL, functional
    lanes) but <em>not</em> to content scanners like gitleaks or the
    bidi/zero-width check: review notes are prose, and prose is a
-   place secrets or Unicode smuggling could land.</p>
-</li>
+   place secrets or Unicode smuggling could land.</li>
 </ol>
 <p>Skip the review state only: <code>REVIEWS.md</code> and the two weAudit
    files. Leave <code>.vscode/review-scope.toml</code> out of every pull
@@ -17193,13 +17274,13 @@ did not write.</p>
    skip it: by then the change has been linted and reviewed.</p>
 <p>For a workflow whose checks are <strong>not</strong> required, a trigger-level
    <code>paths-ignore</code> is the simple answer:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">on</span><span class="p">:</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">pull_request</span><span class="p">:</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">develop</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">paths-ignore</span><span class="p">:</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'REVIEWS.md'</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/*.weaudit'</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/*.weaudit-shas.json'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">on</span><span class="p">:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">pull_request</span><span class="p">:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">develop</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">paths-ignore</span><span class="p">:</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'REVIEWS.md'</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/*.weaudit'</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/*.weaudit-shas.json'</span>
 </code></pre></div>
 <p>That form is unsafe once a workflow backs a <strong>required</strong> status
    check, and the two failure modes look similar but are not the
@@ -17226,53 +17307,53 @@ did not write.</p>
    the scope config and <code>docs/**</code>, since CodeQL analyses neither, and
    it does not analyse fork pull requests at all (trimmed; the
    template's comments say why each condition is there):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">on</span><span class="p">:</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">push</span><span class="p">:</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">develop</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">paths-ignore</span><span class="p">:</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'REVIEWS.md'</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/*.weaudit'</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/*.weaudit-shas.json'</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/review-scope.toml'</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'docs/**'</span>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">  </span><span class="nt">pull_request</span><span class="p">:</span>
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">develop</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">  </span><span class="c1"># ... and a weekly schedule</span>
-<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>
-<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="nt">jobs</span><span class="p">:</span>
-<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">  </span><span class="nt">check_paths</span><span class="p">:</span>
-<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="w">    </span><span class="c1"># ... name, runner and timeout</span>
-<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
-<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="w">      </span><span class="nt">pull-requests</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
-<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="w">    </span><span class="nt">outputs</span><span class="p">:</span>
-<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a><span class="w">      </span><span class="nt">code_changed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ steps.filter.outputs.code || 'true' }}</span>
-<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dorny/paths-filter@v4</span>
-<a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a><span class="w">        </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">filter</span>
-<a id="__codelineno-8-24" name="__codelineno-8-24" href="#__codelineno-8-24"></a><span class="w">        </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">github.event_name == 'pull_request'</span>
-<a id="__codelineno-8-25" name="__codelineno-8-25" href="#__codelineno-8-25"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-<a id="__codelineno-8-26" name="__codelineno-8-26" href="#__codelineno-8-26"></a><span class="w">          </span><span class="nt">predicate-quantifier</span><span class="p">:</span><span class="w"> </span><span class="s">'every'</span>
-<a id="__codelineno-8-27" name="__codelineno-8-27" href="#__codelineno-8-27"></a><span class="w">          </span><span class="nt">filters</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-8-28" name="__codelineno-8-28" href="#__codelineno-8-28"></a><span class="w">            </span><span class="no">code:</span>
-<a id="__codelineno-8-29" name="__codelineno-8-29" href="#__codelineno-8-29"></a><span class="w">              </span><span class="no">- '**'</span>
-<a id="__codelineno-8-30" name="__codelineno-8-30" href="#__codelineno-8-30"></a><span class="w">              </span><span class="no">- '!REVIEWS.md'</span>
-<a id="__codelineno-8-31" name="__codelineno-8-31" href="#__codelineno-8-31"></a><span class="w">              </span><span class="no">- '!.vscode/*.weaudit'</span>
-<a id="__codelineno-8-32" name="__codelineno-8-32" href="#__codelineno-8-32"></a><span class="w">              </span><span class="no">- '!.vscode/*.weaudit-shas.json'</span>
-<a id="__codelineno-8-33" name="__codelineno-8-33" href="#__codelineno-8-33"></a><span class="w">              </span><span class="no">- '!.vscode/review-scope.toml'</span>
-<a id="__codelineno-8-34" name="__codelineno-8-34" href="#__codelineno-8-34"></a><span class="w">              </span><span class="no">- '!docs/**'</span>
-<a id="__codelineno-8-35" name="__codelineno-8-35" href="#__codelineno-8-35"></a>
-<a id="__codelineno-8-36" name="__codelineno-8-36" href="#__codelineno-8-36"></a><span class="w">  </span><span class="nt">analyze</span><span class="p">:</span>
-<a id="__codelineno-8-37" name="__codelineno-8-37" href="#__codelineno-8-37"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Analyze</span>
-<a id="__codelineno-8-38" name="__codelineno-8-38" href="#__codelineno-8-38"></a><span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">check_paths</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-8-39" name="__codelineno-8-39" href="#__codelineno-8-39"></a><span class="w">    </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-8-40" name="__codelineno-8-40" href="#__codelineno-8-40"></a><span class="w">      </span><span class="no">!cancelled()</span>
-<a id="__codelineno-8-41" name="__codelineno-8-41" href="#__codelineno-8-41"></a><span class="w">      </span><span class="no">&amp;&amp; needs.check_paths.outputs.code_changed != 'false'</span>
-<a id="__codelineno-8-42" name="__codelineno-8-42" href="#__codelineno-8-42"></a><span class="w">      </span><span class="no">&amp;&amp; (github.event_name != 'pull_request'</span>
-<a id="__codelineno-8-43" name="__codelineno-8-43" href="#__codelineno-8-43"></a><span class="w">          </span><span class="no">|| github.event.pull_request.head.repo.full_name == github.repository)</span>
-<a id="__codelineno-8-44" name="__codelineno-8-44" href="#__codelineno-8-44"></a><span class="w">    </span><span class="c1"># ... runner, concurrency and permissions</span>
-<a id="__codelineno-8-45" name="__codelineno-8-45" href="#__codelineno-8-45"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-<a id="__codelineno-8-46" name="__codelineno-8-46" href="#__codelineno-8-46"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v7</span>
-<a id="__codelineno-8-47" name="__codelineno-8-47" href="#__codelineno-8-47"></a><span class="w">      </span><span class="c1"># ... the rest of the analysis</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">on</span><span class="p">:</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">push</span><span class="p">:</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">develop</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">paths-ignore</span><span class="p">:</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'REVIEWS.md'</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/*.weaudit'</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/*.weaudit-shas.json'</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/review-scope.toml'</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'docs/**'</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">  </span><span class="nt">pull_request</span><span class="p">:</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">develop</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">  </span><span class="c1"># ... and a weekly schedule</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="nt">jobs</span><span class="p">:</span>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">  </span><span class="nt">check_paths</span><span class="p">:</span>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">    </span><span class="c1"># ... name, runner and timeout</span>
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">      </span><span class="nt">pull-requests</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="w">    </span><span class="nt">outputs</span><span class="p">:</span>
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="w">      </span><span class="nt">code_changed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ steps.filter.outputs.code || 'true' }}</span>
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dorny/paths-filter@v4</span>
+<a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="w">        </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">filter</span>
+<a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="w">        </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">github.event_name == 'pull_request'</span>
+<a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+<a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="w">          </span><span class="nt">predicate-quantifier</span><span class="p">:</span><span class="w"> </span><span class="s">'every'</span>
+<a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a><span class="w">          </span><span class="nt">filters</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a><span class="w">            </span><span class="no">code:</span>
+<a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a><span class="w">              </span><span class="no">- '**'</span>
+<a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a><span class="w">              </span><span class="no">- '!REVIEWS.md'</span>
+<a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a><span class="w">              </span><span class="no">- '!.vscode/*.weaudit'</span>
+<a id="__codelineno-11-32" name="__codelineno-11-32" href="#__codelineno-11-32"></a><span class="w">              </span><span class="no">- '!.vscode/*.weaudit-shas.json'</span>
+<a id="__codelineno-11-33" name="__codelineno-11-33" href="#__codelineno-11-33"></a><span class="w">              </span><span class="no">- '!.vscode/review-scope.toml'</span>
+<a id="__codelineno-11-34" name="__codelineno-11-34" href="#__codelineno-11-34"></a><span class="w">              </span><span class="no">- '!docs/**'</span>
+<a id="__codelineno-11-35" name="__codelineno-11-35" href="#__codelineno-11-35"></a>
+<a id="__codelineno-11-36" name="__codelineno-11-36" href="#__codelineno-11-36"></a><span class="w">  </span><span class="nt">analyze</span><span class="p">:</span>
+<a id="__codelineno-11-37" name="__codelineno-11-37" href="#__codelineno-11-37"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Analyze</span>
+<a id="__codelineno-11-38" name="__codelineno-11-38" href="#__codelineno-11-38"></a><span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">check_paths</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-11-39" name="__codelineno-11-39" href="#__codelineno-11-39"></a><span class="w">    </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-11-40" name="__codelineno-11-40" href="#__codelineno-11-40"></a><span class="w">      </span><span class="no">!cancelled()</span>
+<a id="__codelineno-11-41" name="__codelineno-11-41" href="#__codelineno-11-41"></a><span class="w">      </span><span class="no">&amp;&amp; needs.check_paths.outputs.code_changed != 'false'</span>
+<a id="__codelineno-11-42" name="__codelineno-11-42" href="#__codelineno-11-42"></a><span class="w">      </span><span class="no">&amp;&amp; (github.event_name != 'pull_request'</span>
+<a id="__codelineno-11-43" name="__codelineno-11-43" href="#__codelineno-11-43"></a><span class="w">          </span><span class="no">|| github.event.pull_request.head.repo.full_name == github.repository)</span>
+<a id="__codelineno-11-44" name="__codelineno-11-44" href="#__codelineno-11-44"></a><span class="w">    </span><span class="c1"># ... runner, concurrency and permissions</span>
+<a id="__codelineno-11-45" name="__codelineno-11-45" href="#__codelineno-11-45"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-11-46" name="__codelineno-11-46" href="#__codelineno-11-46"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v7</span>
+<a id="__codelineno-11-47" name="__codelineno-11-47" href="#__codelineno-11-47"></a><span class="w">      </span><span class="c1"># ... the rest of the analysis</span>
 </code></pre></div>
 <p>A few details in that shape are load-bearing:</p>
 <ul>
@@ -17336,16 +17417,16 @@ and every signature is recorded in the Rekor transparency log --
 which gives each review attestation an independent public
 timestamp as a side effect.</p>
 <p>Setup in the review account:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>git config --global commit.gpgsign true
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>git config --global gpg.format x509
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>git config --global gpg.x509.program gitsign
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>git config --global commit.gpgsign true
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>git config --global gpg.format x509
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>git config --global gpg.x509.program gitsign
 </code></pre></div>
 <p>Verification, from any account with gitsign installed:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>gitsign verify \
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    --certificate-identity=mikal@stillhq.com \
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    --certificate-oidc-issuer=https://github.com/login/oauth \
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    &lt;sha&gt;
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>git log --show-signature -- .vscode/   # with the config above
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>gitsign verify \
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    --certificate-identity=mikal@stillhq.com \
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    --certificate-oidc-issuer=https://github.com/login/oauth \
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    &lt;sha&gt;
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>git log --show-signature -- .vscode/   # with the config above
 </code></pre></div>
 <p><code>import</code> performs the same check, and needs to know which identity
 each reviewer signs as: <code>REVIEWER_IDENTITIES</code> in
@@ -17373,8 +17454,8 @@ covers, which imposes three rules:</p>
    pulling or rebasing, so the marking commit's tree reflects the
    reviewed state:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>git add .vscode/*.weaudit*
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>git commit    # signed, with a "reviewed N files" style message
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>git add .vscode/*.weaudit*
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>git commit    # signed, with a "reviewed N files" style message
 </code></pre></div>
 <ol>
 <li><strong>Never rewrite history</strong> on the branch carrying review state
@@ -17384,7 +17465,7 @@ covers, which imposes three rules:</p>
 <ol>
 <li><code>git pull</code> on a clean tree, then:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>./tools/review-tracking.sh prune
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>./tools/review-tracking.sh prune
 </code></pre></div>
 <p>discards marks for files changed since their review and
    regenerates <code>REVIEWS.md</code>. Anything it pruned is a good
@@ -17398,7 +17479,7 @@ covers, which imposes three rules:</p>
    commit that conflicts on push. The local prune usually finds
    nothing left to do.
 2. Pick a file:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>./tools/review-tracking.sh next
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>./tools/review-tracking.sh next
 </code></pre></div>
 <p>picks a random unreviewed in-scope file and opens it in VSCode
    (<code>--no-open</code> to just print it). A file imported from this
@@ -17428,9 +17509,9 @@ covers, which imposes three rules:</p>
 4. Mark it reviewed (<code>weAudit: Mark File as Reviewed</code>), attach
    findings or notes as needed.
 5. Repeat from 2. At the end of the session:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>./tools/review-tracking.sh stamp
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>git add .vscode/*.weaudit* REVIEWS.md
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>git commit
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>./tools/review-tracking.sh stamp
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>git add .vscode/*.weaudit* REVIEWS.md
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>git commit
 </code></pre></div>
 <p>The stamp records each newly reviewed file's blob SHA and date
    in the sidecar and regenerates <code>REVIEWS.md</code>, printing exactly
@@ -17575,16 +17656,23 @@ file reading as reviewed, so an import bug must not hold it up, but it
 must not pass unnoticed either. A concurrency group serialises the
 workflow's own runs, and the loop terminates either way: a repository
 that can push with the default <code>GITHUB_TOKEN</code> never retriggers the
-workflow at all, while one whose ruleset forces a PAT instead -- as
-ryll's does, since develop requires a pull request before merging and
-GitHub will not accept the built-in Actions app as a bypass actor, so
-shakenfist-bot pushes with <code>DEPENDENCIES_TOKEN</code> -- retriggers exactly
-once, into a run that finds nothing left to do (observed 2026-09-11
-04:57:20 UTC, before ryll carried the merged workflow, <code>Prune stale
-review marks.</code>, which committed nothing).</p>
-<p>The job runs on shared, long-lived static runners that also run pull
-request code, so it trusts as little as it can of what an earlier job
-could have left there. It never reads the reused workspace: the script
+workflow at all, while one whose ruleset requires a pull request --
+as ryll's does, since GitHub will not accept the built-in Actions app
+as a bypass actor -- pushes as the <code>shakenfist-review-marks</code> GitHub
+App, the ruleset's bypass actor, with a token minted per run from the
+key in the repository's <code>review-marks</code> environment (step 7 above).
+An App push retriggers the workflow exactly once, into a run that
+finds nothing left to do, as the personal access token that pushed
+before it did (observed 2026-09-11 04:57:20 UTC, before ryll carried
+the merged workflow, <code>Prune stale review marks.</code>, which committed
+nothing). The commit's author is still shakenfist-bot, set by the
+script, whichever identity pushes it.</p>
+<p>The job runs on an ephemeral vm runner, a fresh machine per job. Its
+design assumes a shared, long-lived runner that also runs pull
+request code, as the static runners are, and keeps that isolation on
+the vm runner as defence in depth, since the runner is one line of
+the workflow: it trusts as little as it can of what an earlier job
+could have left on the runner. It never reads the workspace: the script
 comes from a fresh clone in <code>RUNNER_TEMP</code>, and lands from another; it
 ignores global and system git configuration, gives gitsign a fresh TUF
 cache on every run, keeps no credentials in either clone, and hands
@@ -17678,22 +17766,22 @@ repository" puts in every adopted repository, so an import commit
 needs no new exception and triggers none of the expensive CI lanes.</p>
 <p>Each entry records where the attestation lives, not the attestation
 itself:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">"files"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="nt">"&lt;target path&gt;"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">      </span><span class="nt">"sha"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;blob sha&gt;"</span><span class="p">,</span>
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">      </span><span class="nt">"date"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;source stamp date&gt;"</span><span class="p">,</span>
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">      </span><span class="nt">"imported"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">        </span><span class="nt">"repo"</span><span class="p">:</span><span class="w"> </span><span class="s2">"shakenfist/development"</span><span class="p">,</span>
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">        </span><span class="nt">"reviewer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;reviewer&gt;"</span><span class="p">,</span>
-<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">        </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;source path&gt;"</span><span class="p">,</span>
-<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">        </span><span class="nt">"commit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;introducing commit&gt;"</span><span class="p">,</span>
-<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="w">        </span><span class="nt">"verified"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="w">      </span><span class="p">}</span>
-<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p">{</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span><span class="nt">"files"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">    </span><span class="nt">"&lt;target path&gt;"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">      </span><span class="nt">"sha"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;blob sha&gt;"</span><span class="p">,</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">      </span><span class="nt">"date"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;source stamp date&gt;"</span><span class="p">,</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="w">      </span><span class="nt">"imported"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="w">        </span><span class="nt">"repo"</span><span class="p">:</span><span class="w"> </span><span class="s2">"shakenfist/development"</span><span class="p">,</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="w">        </span><span class="nt">"reviewer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;reviewer&gt;"</span><span class="p">,</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="w">        </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;source path&gt;"</span><span class="p">,</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="w">        </span><span class="nt">"commit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;introducing commit&gt;"</span><span class="p">,</span>
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="w">        </span><span class="nt">"verified"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="w">      </span><span class="p">}</span>
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a><span class="p">}</span>
 </code></pre></div>
 <p><code>date</code> is the source stamp's date, not the day of the import, because
 it records when the content was actually read. <code>verified</code> records
@@ -17733,10 +17821,10 @@ each repository's <code>origin/&lt;default branch&gt;</code>.</p>
    <code>imported.path</code> (the source path here) and <code>imported.commit</code>.</li>
 <li>In a clone of this repository, verify the commit's signature:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>gitsign verify \
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    --certificate-identity=&lt;identity&gt; \
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    --certificate-oidc-issuer=https://github.com/login/oauth \
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    &lt;commit&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>gitsign verify \
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>    --certificate-identity=&lt;identity&gt; \
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>    --certificate-oidc-issuer=https://github.com/login/oauth \
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    &lt;commit&gt;
 </code></pre></div>
 <p><code>&lt;identity&gt;</code> comes from <code>REVIEWER_IDENTITIES</code> in
    <code>scripts/review-tracking.py</code>, which maps a reviewer name to a
@@ -17748,7 +17836,7 @@ each repository's <code>origin/&lt;default branch&gt;</code>.</p>
    "reference not found". See "Commit signing" for the trust path
    this checks.</p>
 <p>Then confirm the commit is on this repository's default branch:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>git merge-base --is-ancestor &lt;commit&gt; origin/main &amp;&amp; echo on main
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>git merge-base --is-ancestor &lt;commit&gt; origin/main &amp;&amp; echo on main
 </code></pre></div>
 <p>A signed commit that was never merged, or was rebased away, is
    not an attestation: nobody accepted it into the record, and the
@@ -17756,12 +17844,12 @@ each repository's <code>origin/&lt;default branch&gt;</code>.</p>
    only <code>origin/main</code> for this reason, so an entry whose commit is
    not on it did not come from <code>import</code>.
 3. Confirm the commit records a full-file review of that blob:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>git show &lt;commit&gt;:.vscode/&lt;reviewer&gt;.weaudit-shas.json \
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    | jq -c --arg p '&lt;source path&gt;' '.files[$p]'
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>git show &lt;commit&gt;:.vscode/&lt;reviewer&gt;.weaudit \
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    | jq -c --arg p '&lt;source path&gt;' \
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>        '{full: [.auditedFiles[]? | select(.path == $p)],
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>          partial: [.partiallyAuditedFiles[]? | select(.path == $p)]}'
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>git show &lt;commit&gt;:.vscode/&lt;reviewer&gt;.weaudit-shas.json \
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>    | jq -c --arg p '&lt;source path&gt;' '.files[$p]'
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>git show &lt;commit&gt;:.vscode/&lt;reviewer&gt;.weaudit \
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>    | jq -c --arg p '&lt;source path&gt;' \
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>        '{full: [.auditedFiles[]? | select(.path == $p)],
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>          partial: [.partiallyAuditedFiles[]? | select(.path == $p)]}'
 </code></pre></div>
 <p>The first must print the same <code>sha</code> and <code>date</code> as the imported
    entry. The second must show one <code>full</code> entry and an empty
@@ -17772,7 +17860,7 @@ each repository's <code>origin/&lt;default branch&gt;</code>.</p>
    whole-repository state, hundreds of entries long; <code>jq</code> keeps the
    output to the one path being checked.)
 4. In the target repository, confirm the entry is still current:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>git rev-parse origin/&lt;default branch&gt;:&lt;path&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>git rev-parse origin/&lt;default branch&gt;:&lt;path&gt;
 </code></pre></div>
 <p>must equal the entry's <code>sha</code>.</p>
 <p>A file whose native mark has gone stale is not imported until
@@ -17818,10 +17906,10 @@ the human's review is the one kept.</p>
 fnmatch patterns with the same semantics as <code>exclude</code> (<code>!</code>
 re-includes), and, like the other exclusions in that file, an entry
 should say why:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># Byte-identical to the template today, but this file is genuinely</span>
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="c1"># per-repository and a shared review would hide that it needs its</span>
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="c1"># own read.</span>
-<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="n">import-exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">'config/local-overrides.yml'</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Byte-identical to the template today, but this file is genuinely</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="c1"># per-repository and a shared review would hide that it needs its</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="c1"># own read.</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="n">import-exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">'config/local-overrides.yml'</span><span class="p">]</span>
 </code></pre></div>
 <p><code>import</code> never adds an entry matching <code>import-exclude</code>, and removes
 any existing imported entry that starts matching one.</p>

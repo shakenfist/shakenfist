@@ -17486,12 +17486,12 @@ the App as its bypass actor rather than a team of one.</p>
 <tbody>
 <tr>
 <td>1. Operator inventory and App creation</td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>2a24d00 (#348)</td>
 </tr>
 <tr>
 <td>2. <code>prune-reviews</code> mints an App token</td>
-<td>Not started</td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -17980,9 +17980,9 @@ Australian Eastern Daylight Time (UTC+11).</p>
 <td>repository only; no organisation secret of that name exists</td>
 <td>client-python, hunkydory, kerbside, ryll, shakenfist, and andris since 2026-10-29 18:39 UTC (#343)</td>
 <td><code>shakenfist-bot</code> (rule-suite <code>actor_name</code> of every push made with it)</td>
-<td><em>pending: the bot's token list</em></td>
-<td><em>pending</em></td>
-<td><em>pending</em></td>
+<td><em>deferred to the bot's token list</em></td>
+<td><em>deferred</em></td>
+<td><em>deferred</em></td>
 </tr>
 <tr>
 <td><code>RENOVATE_TOKEN</code></td>
@@ -18008,8 +18008,8 @@ Australian Eastern Daylight Time (UTC+11).</p>
 <td>development</td>
 <td><code>shakenfist-bot</code> (authored #247)</td>
 <td>fine-grained (<code>docs/consistency-audits.md</code>)</td>
-<td>Issues read and write, all repositories, organisation as resource owner (documented), plus Contents read since 2026-10-31 (#349; confirmed against the token list: <em>pending</em>)</td>
-<td><em>pending</em></td>
+<td>Issues read and write, all repositories, organisation as resource owner (documented), plus Contents read since 2026-10-31 09:45 AEDT (#349, closed on audit run 41140043392; confirmed against the token list: <em>deferred</em>)</td>
+<td><em>deferred to the token list</em></td>
 </tr>
 </tbody>
 </table>
@@ -18030,9 +18030,11 @@ takes its fallback shape on a current measurement: the audit
 measures only the environment half, and both the bypass list and
 the repository-level key check move to the spec's
 reviewer-confirmed half, as the plan provides.</p>
-<p><strong>The bot's token list (1a).</strong> <em>Pending: to be read as
-<code>shakenfist-bot</code> by the operator.</em> Secrets elsewhere in the fleet
-that may also be rows in it: kerbside-patches'
+<p><strong>The bot's token list (1a).</strong> <em>Deferred: still to be read as
+<code>shakenfist-bot</code> by the operator (plan-blocker b2). Phase 1 closed
+on 2026-10-31 with this the one cell not filled, by Mikal's
+decision; it lands in a later record commit.</em> Secrets elsewhere in
+the fleet that may also be rows in it: kerbside-patches'
 <code>DAILY_REBASE_TOKEN</code>, ryll's <code>HOMEBREW_TAP_TOKEN</code>, and the two
 <code>GITLAB_TESTDATA_*</code> tokens, which are GitLab's and not GitHub's.</p>
 <table>
@@ -18047,7 +18049,7 @@ that may also be rows in it: kerbside-patches'
 </thead>
 <tbody>
 <tr>
-<td><em>pending</em></td>
+<td><em>deferred, see above</em></td>
 <td></td>
 <td></td>
 <td></td>
@@ -18128,8 +18130,9 @@ automation and stays out of scope; nothing is filed. 5: the
 demotion proceeds. All four known bot credentials are the bot's.
 Written before the soak, this said none needs admin;
 <code>AUDIT_READ_TOKEN</code> did (survey item 3, corrected) and reads with
-the security manager role since 06:40, <code>AUDIT_TOKEN</code> has lost
-issue filing in private-ci (#349), and <code>update-docs</code> pushes with
+the security manager role since 06:40, <code>AUDIT_TOKEN</code> lost
+issue filing in private-ci until it was granted Contents read on
+2026-10-31 (#349, closed), and <code>update-docs</code> pushes with
 the job's own <code>GITHUB_TOKEN</code>, so it never depended on the bot.
 6: the ephemeral vm pool, <code>[self-hosted, vm, debian-13, s]</code>, which
 the one runner group serves to every repository.</p>
@@ -18185,12 +18188,20 @@ and found one more thing the owner role was quietly
 serving: <code>AUDIT_TOKEN</code>'s read of private repositories. The fix is
 in the token (grant it contents read, as the bot, when its token
 list is read) or in the script (create issues through the REST API,
-which needs only issues write); it is tracked as #349, and either
-way the <code>AUDIT_TOKEN</code> paragraph of <code>docs/consistency-audits.md</code>,
-which says the token needs no Contents permission, changes with
-it. The mechanism is inferred from the symptom (public repositories
-fine, the private one refused on <code>defaultBranchRef</code>) and from
-<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/219" title="GitHub Issue: shakenfist/private-ci #219">private-ci#219</a> having been filed as an owner; it is not measured.</p>
+which needs only issues write); it was tracked as #349, and the
+<code>AUDIT_TOKEN</code> paragraph of <code>docs/consistency-audits.md</code> changed
+with it. Resolved in the token: Mikal added Contents read to
+<code>AUDIT_TOKEN</code> on 2026-10-31 09:45 AEDT, and audit run 41140043392,
+dispatched on <code>main</code> at 09:44 AEDT, succeeded end to end, every
+leg and all three writing jobs, with <code>manage-issues</code> filing
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/259" title="GitHub Issue: shakenfist/private-ci #259">private-ci#259</a> and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/260" title="GitHub Issue: shakenfist/private-ci #260">private-ci#260</a> as <code>shakenfist-bot</code>. That run
+is the first audit to succeed end to end since the demotion, so
+the soak's audit item is met by a run as well as by the 07:45
+waiver, and #349 was closed on 2026-10-31 citing it. The
+mechanism, inferred on 2026-10-30 from the symptom (public
+repositories fine, the private one refused on <code>defaultBranchRef</code>)
+and from <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/219" title="GitHub Issue: shakenfist/private-ci #219">private-ci#219</a> having been filed as an owner, is now
+measured: Contents read alone restored the creation.</p>
 <p><strong>App (1b).</strong> <code>shakenfist-review-marks</code>, created by Mikal in the
 web UI on 2026-10-30 at 18:00 AEDT: app id 5538020, client id
 <code>Iv23li7GsD5p4UvnqE4Y</code>, installation id 176803138, no webhook, no
@@ -18201,10 +18212,11 @@ token minted from the key, which listed exactly those four and
 expired within the hour). <code>apps/shakenfist-review-marks</code> and
 <code>orgs/shakenfist/installations</code> agree. The client id is the
 organisation variable <code>REVIEW_MARKS_APP_CLIENT_ID</code>, visibility
-<code>all</code>, set 2026-10-30. Private keys held by the App: <em>pending the
-operator's confirmation from the App's page that the first key
-(lost at 18:19, after minting one live installation token) is
-deleted and only the second remains; no API lists an App's keys.</em></p>
+<code>all</code>, set 2026-10-30. Private keys held by the App: one, the
+second, from which the four environment secrets were set; the
+first (lost at 18:19, after minting one live installation token)
+is deleted. Confirmed by Mikal from the App's page on 2026-10-31
+14:05 AEDT; no API lists an App's keys.</p>
 <p><strong>Environments (1b).</strong> For each of andris, hunkydory, kerbside,
 ryll, actions, development, sfui, kerbside-client: the
 <code>environments/review-marks</code> response's <code>deployment_branch_policy</code>
@@ -18414,16 +18426,6 @@ after the PUT, identical on andris (24700229), hunkydory
   lets the role go, cited the kerbside and ryll push proofs by rule
   suite and commit, marked the soak item as met by waiver, dated
   the 2026-10-29 notes correctly, and put the notes in time order.</li>
-<li>2026-10-31 09:45 AEDT: Mikal added Contents read to <code>AUDIT_TOKEN</code>
-  (the existing token, same expiry) for #349, and
-  <code>docs/consistency-audits.md</code> now says so. The test is audit run
-  41140043392, dispatched on <code>main</code> at 09:44 AEDT: <strong>its result is
-  not yet recorded</strong>. Next session: read its <code>manage-issues</code> job; if
-  it filed in private-ci without the <code>defaultBranchRef</code> error,
-  close #349 citing the run and resolve the <code>AUDIT_TOKEN</code> half of
-  plan-blocker b2; if not, the docs paragraph and this note are
-  wrong and the REST-creation route in #349 is next. Then read
-  review round 4 on #348 if it has arrived.</li>
 <li>2026-10-31 09:20 AEDT: the third review round: the probe's date
   in the record cells, step 3a's probe placed in hunkydory with an
   unset secret failing it, step 3c's brief leading with the
@@ -18435,6 +18437,28 @@ after the PUT, identical on andris (24700229), hunkydory
   Situation. Two decisions recorded for Mikal with <code>plan-blockers</code>:
   the key confirmation, and whether #352 lands before phases 2 and
   3.</li>
+<li>2026-10-31 09:45 AEDT: Mikal added Contents read to <code>AUDIT_TOKEN</code>
+  (the existing token, same expiry) for #349, and
+  <code>docs/consistency-audits.md</code> now says so. The test was audit run
+  41140043392, dispatched on <code>main</code> at 09:44 AEDT, read at 11:30:
+  it succeeded end to end, and its <code>manage-issues</code> job filed
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/259" title="GitHub Issue: shakenfist/private-ci #259">private-ci#259</a> and #260 as <code>shakenfist-bot</code> without the
+  <code>defaultBranchRef</code> error. #349 closed citing the run; the
+  REST-creation route was not needed. No fourth review round
+  arrived on #348, which merged at 11:07 AEDT as 2a24d00 (branch
+  head 2fbf7c7).</li>
+<li>2026-10-31 14:05 AEDT: phase 1 closed out. Mikal confirmed from
+  the App's page that exactly one private key remains (b4
+  resolved), and chose to close the phase with the bot's token list
+  deferred (the remaining half of b2), the one record cell not
+  filled. Every other definition-of-done item was checked at 08:00,
+  and the soak item is now met by run 41140043392 as well as by
+  the waiver. Re-read at 14:00: #211 open, the bot's role <code>member</code>,
+  <code>mikalstill</code> the only owner, <code>shakenfist-review-marks</code> and
+  <code>shakenfist-k3s-ci-arc</code> the installed Apps. Phase 1's pull
+  request was #348 (2fbf7c7); this close-out is its own. Open
+  before phase 2: b5, whether #352 lands first or the security
+  manager role is accepted meanwhile.</li>
 </ul>
 <h4 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h4>
 <ul>
@@ -18524,17 +18548,228 @@ App and a key is cheap to do and tedious to redo across four
 repositories, and the demotion is the one step in the plan that
 could break a scheduled job overnight.</p>
 <h3 id="phase-2-prune-reviews-mints-an-app-token">Phase 2: <code>prune-reviews</code> mints an App token<a class="headerlink" href="#phase-2-prune-reviews-mints-an-app-token" title="Permanent link">&para;</a></h3>
-<p>Planning effort: medium. The template change has a worked example
-in its own token comment, and the rollout follows the
-<code>review-tracking-adoption</code> skill.</p>
+<p>Planning effort: medium, as the master plan set it: the template
+change has a worked example in its own token comment. Review
+effort: high, because the template lands on eight default branches
+and a presence guard that is always false falls back to
+<code>github.token</code> without saying so. Planned on 2026-10-31 against
+<code>41a4c92</code>, on the branch <code>bot-bypass-identity-phase-02-app-token</code>.
+This section replaces the two-row phase 2 the master plan carried
+(survey item 11), and is the phase's plan and record, as phase 1's
+section was.</p>
 <p><strong>Order matters.</strong> Until phase 3, the bot is still in the bypass
 team, so a copy that still uses <code>DEPENDENCIES_TOKEN</code> keeps working.
 A copy that has merged pushes as the App instead, which only works
-because step 1c made the App a bypass actor first: no copy merges
-into andris, hunkydory, kerbside or ryll until 1c is recorded. With
-both bypasses in place, nothing breaks partway through. Phase 3
-must not start until the copies in those four repositories have
-merged.</p>
+because step 1c made the App a bypass actor on andris, hunkydory,
+kerbside and ryll (record, 1c). With both bypasses in place,
+nothing breaks partway through. Phase 3 must not start until the
+copies in those four repositories have merged and pushed as the
+App.</p>
+<h4 id="scope_1">Scope<a class="headerlink" href="#scope_1" title="Permanent link">&para;</a></h4>
+<p>In: the template workflow, the comments in the template script
+that justify its design in static-runner terms, the workflow-shape
+tests, the template README, the adoption steps in
+<code>docs/code-review-tracking.md</code> and a pointer from the adoption
+skill; this repository's own deployed copies, which merge with the
+template; the rollout to the other seven adopters, one pull request
+each, carrying the workflow and the already-stale script (survey
+item 1); closing the seven <code>Consistency: Review tracking templates</code>
+issues those pull requests resolve; and the record of each
+repository's first run under the new copy.</p>
+<p>Out: removing the bot from <code>sf-can-skip-merge-queue</code> (step 3a);
+the <code>bypass-actor-identity</code> criterion (3c); the edits to
+<code>PLAN-workflow-ref-trust.md</code> (3b); the script's commit identity
+(<code>git config user.name 'shakenfist-bot'</code>), which is not the push
+identity; <code>DEPENDENCIES_TOKEN</code> in the pin-indirect-dependencies
+template, its README and <code>docs/audits/pin-indirect-dependencies.md</code>
+(Future work, first item); #352, which Mikal accepted as interim on
+2026-10-31 (decision 8).</p>
+<h4 id="what-the-survey-found_1">What the survey found<a class="headerlink" href="#what-the-survey-found_1" title="Permanent link">&para;</a></h4>
+<p>Read on 2026-10-31 (Australian Eastern Daylight Time) against the
+tree at <code>41a4c92</code> and the GitHub API. The workflow is as the master
+plan describes it, and the App, environments, key and bypass
+actors are as phase 1 recorded them. Eleven things are worth
+knowing before the step briefs are read.</p>
+<ol>
+<li><strong>The adopters' copies of the script are already stale.</strong>
+   <code>templates/review-tracking/prune-reviews.yml</code>, this repository's
+   deployed copy and all eight live copies are byte-identical, as
+   Situation says. But <code>tools/ci-prune-reviews.sh</code> in every other
+   adopter (andris, hunkydory, kerbside, ryll, actions, sfui,
+   kerbside-client) is blob <code>b4ce5b64</code>, and the template is
+   <code>d58e2363</code>: the template's comments changed on 2026-10-24
+   (<code>3d50a6b</code>) and three times on 2026-10-29 (<code>ad34d5e</code>, <code>e0ab735</code>,
+   <code>b2afdf5</code>, the review-token-stance work), and nobody re-synced.
+   The <code>review-tracking-templates</code> audit has filed <code>Consistency:
+   Review tracking templates</code> in all seven (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/636" title="GitHub Issue: shakenfist/ryll #636">ryll#636</a> on 2026-10-25;
+   <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/215" title="GitHub Issue: shakenfist/actions #215">actions#215</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/59" title="GitHub Issue: shakenfist/andris #59">andris#59</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/132" title="GitHub Issue: shakenfist/hunkydory #132">hunkydory#132</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/651" title="GitHub Issue: shakenfist/kerbside #651">kerbside#651</a>,
+   <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-client/issues/14" title="GitHub Issue: shakenfist/kerbside-client #14">kerbside-client#14</a> and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/sfui/issues/61" title="GitHub Issue: shakenfist/sfui #61">sfui#61</a> on 2026-10-29). <code>review-tracking.sh</code>
+   matches everywhere. So the master plan's 2b, written for one
+   file that "changes nothing else", carries two files per
+   repository, and its pull requests close those issues (decision
+   4).</li>
+<li><strong><code>deployment: false</code> is a real key.</strong> GitHub's "Control
+   deployments" page documents <code>jobs.&lt;job_id&gt;.environment.deployment</code>:
+   <code>true</code> by default, and <code>false</code> stops the run creating a
+   deployment object, with environment secrets and variables still
+   resolved and wait timers still applied; a job that sets it on an
+   environment with custom deployment protection rules fails at
+   once. The <code>review-marks</code> environments carry a branch policy and
+   nothing else (phase 1 record, 1b). <code>actionlint</code> at the rev
+   <code>.pre-commit-config.yaml</code> pins (v1.7.12) accepts it and names
+   <code>deployment</code>, <code>name</code> and <code>url</code> as the only keys it allows, tested
+   on a scratch workflow against <code>.github/actionlint.yaml</code>. The
+   master plan's "if actionlint and GitHub accept" is settled
+   (decision 1).</li>
+<li><strong>The presence guard's form is settled too.</strong> The <code>secrets</code>
+   context is not available in a step's <code>if:</code>, so the guard is a
+   job-level <code>env:</code> entry, <code>HAS_REVIEW_MARKS_KEY: ${{
+   secrets.REVIEW_MARKS_APP_KEY != '' }}</code>, tested by the token step
+   as <code>if: env.HAS_REVIEW_MARKS_KEY == 'true'</code>. That shape, with
+   <code>runs-on: [self-hosted, vm, debian-13, s]</code>, the pinned action,
+   <code>client-id</code>, <code>private-key</code>, <code>permission-contents: write</code> and
+   <code>PUSH_TOKEN: ${{ steps.app-token.outputs.token || github.token
+   }}</code>, passes <code>actionlint</code> with the repository's label
+   configuration, which already declares <code>vm</code>, <code>debian-13</code> and <code>s</code>.</li>
+<li><strong>The action pin is current.</strong> <code>actions/create-github-app-token</code>
+   v3.3.0 (2026-10-12) is still the latest release; its tag is a
+   plain commit, <code>64ab729a6294000f5aa4a4bc0b73d1f32bc45510</code>, so the
+   <code>@&lt;sha&gt; # v3.3.0</code> form pins what the tag names. Its <code>action.yml</code>
+   takes <code>client-id</code>, <code>private-key</code>, <code>owner</code>, <code>repositories</code> and
+   <code>permission-contents</code>, and deprecates <code>app-id</code> in favour of
+   <code>client-id</code>, as the master plan read it on 2026-10-14.</li>
+<li><strong>The vm image has what the job needs, bar one unverified
+   tool.</strong> <code>.github/workflows/consistency-audit.yml</code> says the image
+   has git and python3 but not gh; the script also needs bash,
+   curl, sha256sum and uname. curl is not confirmed from this
+   repository, and the first run on andris is the test (risk 4).
+   A vm job's queue-to-start was 98 seconds on shakenfist's
+   pin-indirect-dependencies run 41000029882 (created 03:55:31 UTC,
+   job started 03:57:09 on 2026-10-30), so <code>timeout-minutes: 30</code>
+   stands with about two minutes of boot inside it (decision 7).</li>
+<li><strong>Four documents the master plan's brief does not name say the
+   old thing.</strong> <code>docs/code-review-tracking.md</code> says at adoption
+   step 7 (line 311) that a ruleset repository "needs a
+   <code>DEPENDENCIES_TOKEN</code> secret", and in "Steady state" that ryll
+   pushes with it (line 771) and that the job runs on static
+   runners (line 776). The template script's own comments justify
+   its isolation in static-runner terms at lines 37, 80 and 133. The
+   README's "Prerequisites" (line 218) name the <code>static</code> label. The
+   adoption skill says nothing about tokens, and its "Source of
+   truth" section sends the reader to the doc's numbered list, so
+   the operator step belongs in that list and the skill gets a
+   pointer (decision 3).</li>
+<li><strong>The workflow test strips comments before it counts.</strong>
+   <code>workflow_steps</code> in <code>scripts/tests/test_ci_prune_reviews.py</code>
+   (line 578) drops every comment line before splitting on step
+   names, so a comment may name a secret without moving
+   <code>text.count('secrets.')</code>; the brief's restatement of that
+   assertion stands. <code>test_audit_workflow.py</code> pins only the audit's
+   own jobs to their runners; nothing pins <code>prune-reviews</code> to
+   <code>static</code>.</li>
+<li><strong>The rollout tool exists.</strong> <code>$HOME/bin/template-resync</code>
+   (<code>status</code>, <code>apply</code>, <code>check</code>), with the <code>template-resync</code> skill,
+   does exactly 2b's job: compares each adopter's copies with the
+   template on <code>origin/main</code>, cuts one worktree per stale
+   repository and copies byte for byte. It reads the template from
+   <code>origin/main</code>, so the rollout cannot start before 2a has merged,
+   which is the order the plan wants anyway. The master plan named
+   the adoption skill instead; that skill covers a fresh adoption
+   and the CI-skip check, not a re-sync.</li>
+<li><strong>This repository is the first live test of the no-key path.</strong>
+   development has a <code>review-marks</code> environment with the
+   default-branch policy and no key (phase 1 record), so 2a's own
+   merge to <code>main</code> runs the new template with the token step
+   skipped and the push made with <code>github.token</code>. That is the
+   <code>github.token</code> half of the design proven before any adopter
+   changes (decision 5).</li>
+<li><strong>What the rule suites will call the App is not yet known.</strong>
+    Phase 1 read every push's <code>actor_name</code> from the rule-suite
+    history, including in the four repositories whose only ruleset
+    is "Protect default branch history", so the same read serves
+    all eight. The name an App push carries there is first seen on
+    andris; 2b records it and the definition of done uses it.</li>
+<li><strong>Corrected at source.</strong> The master plan's phase 2 section was
+    the two-row table and one paragraph that this section replaces,
+    so its stale claims (one file per rollout pull request, the
+    adoption skill as the tool, the conditional on <code>deployment:
+    false</code>) are gone with it rather than annotated. The
+    <code>docs/plans/index.md</code> row's intent now says what phase 2 does.
+    Nothing in Situation or the open questions was found wrong.</li>
+</ol>
+<h4 id="decisions_1">Decisions<a class="headerlink" href="#decisions_1" title="Permanent link">&para;</a></h4>
+<ol>
+<li><strong><code>deployment: false</code> is used.</strong> Eight repositories run the job
+   on every push to their default branch and once a day; without
+   it, every run would record a deployment in each one, and the
+   Deployments view would be noise. The documented failure mode is
+   fail-closed (the job fails at once if the environment grows a
+   custom protection rule), and the documented behaviour is what
+   the plan needs (secrets still resolve). This is the decision
+   most likely to be argued with, because it leans on a key that
+   <code>actionlint</code> learned this year and that nothing in the fleet has
+   used: if GitHub refuses it on andris, the fix is to drop the key
+   and say in the README that every run appears in the Deployments
+   view, which is what the master plan offered as the alternative.
+   2b's first run on andris is the test, in both directions: the
+   token step ran, and <code>repos/shakenfist/andris/deployments</code>
+   filtered to the environment stays empty.</li>
+<li><strong>The script's design is kept; its comments change in 2a.</strong> The
+   no-checkout, fresh-clone, config-ignoring, token-scoping design
+   was built for the static pool, and the job leaves that pool. The
+   design stays, as defence in depth and because a repository can
+   move the job back to <code>static</code> by editing one line, and the three
+   comments that justify it in static-runner terms (survey item 6)
+   say so instead. The script is copied byte for byte into every
+   adopter, so this stales every copy again; they are already stale
+   (survey item 1), and 2b carries the script either way, so the
+   cost is one re-sync rather than two.</li>
+<li><strong>The operator setup is documented once, in the adoption
+   list.</strong> <code>docs/code-review-tracking.md</code>'s step 7 gains the
+   environment, its branch policy, the key and the variable, in
+   the order an operator must create them, with both warnings
+   (every adopter gets the environment with its policy before its
+   first run, key or no key; the key is only ever an environment
+   secret). The template README carries the same in its "What the
+   adopting repository needs" list, since it is what a reader of
+   the template sees first. The skill points at the step rather
+   than repeating it (<code>llm-doc-discipline</code>: a runbook belongs in
+   docs/, a skill is an index into it).</li>
+<li><strong>2b and 2c use <code>template-resync</code>, carry both files, and close
+   the audit issues.</strong> One pull request per repository, made with
+   <code>template-resync apply</code> and verified with <code>template-resync
+   check</code>, carrying <code>.github/workflows/prune-reviews.yml</code> and
+   <code>tools/ci-prune-reviews.sh</code> and nothing else. Each pull request
+   body closes that repository's <code>Consistency: Review tracking
+   templates</code> issue with a closing keyword, as the consistency-fix
+   convention does, since the copy it lands is the fix. Pushing
+   and opening the pull requests need Mikal's ask, once per batch.</li>
+<li><strong>andris proves the App path alone before anything else
+   changes.</strong> 2b is andris only. Its merge is followed by a read of
+   the run log (the <code>app-token</code> step ran, not skipped), the
+   rule-suite history (a <code>bypass</code> push with the App as actor) and
+   the deployments list (empty). 2c does not start until all three
+   are recorded. The order after andris is hunkydory, ryll,
+   kerbside, then actions, sfui and kerbside-client; development's
+   copies land in 2a (survey item 9) and are recorded as the no-key
+   proof.</li>
+<li><strong>The guard fails closed where it matters.</strong> In a repository
+   with a pull-request ruleset, a guard that is always false falls
+   back to <code>github.token</code>, whose push the ruleset refuses: the run
+   fails and the rule suite records the refusal. In a repository
+   without one, the fallback is the intended path. So a wrong guard
+   cannot land anything silently; it can only stop andris landing,
+   which 2b reads. No second fallback is added anywhere.</li>
+<li><strong>The runner is <code>[self-hosted, vm, debian-13, s]</code> and the
+   timeout stays at 30 minutes.</strong> Phase 1 decision 6 chose the pool
+   and the size; survey item 5 puts the boot at about two minutes,
+   which the Rekor arithmetic in the timeout comment absorbs. The
+   comment gains the boot time and loses nothing.</li>
+<li><strong>The security manager role is accepted for this phase.</strong> Mikal
+   ruled on 2026-10-31 (plan-blockers b5) that #352 does not hold
+   phases 2 and 3. It stays Future work, third item.</li>
+</ol>
+<h4 id="steps_1">Steps<a class="headerlink" href="#steps_1" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
 <tr>
@@ -18551,24 +18786,261 @@ merged.</p>
 <td>high</td>
 <td>opus</td>
 <td>worktree</td>
-<td>In this repository, change <code>templates/review-tracking/prune-reviews.yml</code> and its deployed twin <code>.github/workflows/prune-reviews.yml</code> (keep them byte-identical). The template is the post-#254 shape described in Situation: no checkout, a token-free <code>Fetch the prune script</code> step, then <code>Prune and import review marks</code>. Add <code>environment: review-marks</code> to the <code>prune-and-import</code> job; if <code>actionlint</code> and GitHub accept <code>environment: {name: review-marks, deployment: false}</code>, use that so each run does not record a deployment, and otherwise say in the README that every run appears in the Deployments view. Change <code>runs-on</code> as open question 6 settled, and revisit the <code>timeout-minutes</code> reasoning for a vm runner's boot time if it moved. If it did, also rewrite the comment above <code>Fetch the prune script</code> and the README's "Runner isolation" section, which both justify the no-checkout design in static-runner terms. Keep the design and the test that forbids <code>actions/checkout</code>, and say why: it is defence in depth, and a repository can still move the job back to <code>static</code>. Add a step <code>id: app-token</code> between the two, using <code>actions/create-github-app-token</code> pinned to a sha with a <code># vX.Y.Z</code> comment (a v3 release or later: its <code>action.yml</code> at v3.3.0, read on 2026-10-14, accepts <code>client-id</code> and the <code>permission-&lt;name&gt;</code> inputs and deprecates <code>app-id</code>) with <code>client-id: ${{ vars.REVIEW_MARKS_APP_CLIENT_ID }}</code>, <code>private-key: ${{ secrets.REVIEW_MARKS_APP_KEY }}</code>, and <code>permission-contents: write</code>. Leave <code>owner</code> and <code>repositories</code> unset, which limits the token to the current repository, and say why in a comment: the App is installed on several repositories, and naming the owner would widen every token to all of them. Guard it on the key being present, but note that the <code>secrets</code> context is not available in a step's <code>if:</code>: expose presence through a job-level <code>env:</code> entry (for example <code>HAS_REVIEW_MARKS_KEY: ${{ secrets.REVIEW_MARKS_APP_KEY != '' }}</code>) and test that, and confirm with <code>actionlint</code> that the form you choose is accepted. The script step's <code>PUSH_TOKEN</code> becomes <code>${{ steps.app-token.outputs.token \|\| github.token }}</code>. The fetch step still has no token, and the push token still goes only to the script. <code>scripts/tests/test_ci_prune_reviews.py</code>'s <code>workflow_steps</code> and <code>test_the_workflow_never_checks_out_the_workspace</code> hold the old shape, and will fail. Restate each of their assertions, keeping what it protects rather than loosening it. (1) The exact step-name set gains the token step's name. (2) The <code>PUSH_TOKEN</code> line assertion becomes the new expression. (3) <code>text.count('secrets.') == 1</code> becomes: <code>secrets.REVIEW_MARKS_APP_KEY</code> appears only in the job-level presence flag and the token step, and neither the fetch step nor the script step contains <code>secrets.</code>. (4) No token or secret reaches <code>Fetch the prune script</code>, as now. Add assertions that the job carries <code>environment: review-marks</code> and that the token step has no <code>owner:</code> or <code>repositories:</code> input. <code>test_the_workflow_steps_land_the_review_state</code> runs the fetch and script steps by name, and must not try to run the token step. Rewrite the token comment above the job's <code>permissions:</code> block, saying that <code>contents: write</code> is there for <code>github.token</code> in the repositories with no pull-request ruleset, not for the App, whose token carries its own permission, (it begins "Repositories whose default branch ruleset requires a pull request") to say why: the App is the ruleset's bypass actor, its key lives in an environment only the default branch can use, a repository with no pull-request ruleset has neither and pushes with <code>github.token</code>, and an App push, like the PAT push before it, retriggers the workflow once into a run that finds nothing to do. Remember the <code>&amp;&amp;</code>/<code>\|\|</code> value semantics explained at <code>templates/pin-indirect-dependencies/pin-indirect-dependencies.yml:154-159</code>. Leave the script's <code>git config user.name 'shakenfist-bot'</code> alone: the commit identity is not the push identity, and changing it is outside this plan. Update <code>templates/review-tracking/README.md</code>: replace the "Optionally, a <code>DEPENDENCIES_TOKEN</code> secret" bullet and its "That fallback is silent" paragraph with the environment, its branch policy, the secret and the variable, in the order an operator must create them (open question 4), keeping the warning about a silent fallback in its new form. Also say that every repository running the workflow gets the environment, with its policy, before its first run, whether or not it holds the key, since one GitHub creates on first reference has no policy; and that the key is only ever an environment secret, never a repository or organisation one (open question 4); change the Token column of its projects table; and fix the top of the file and the workflow's header comment where they say the commit lands "as shakenfist-bot", so that they say who pushes. Add the environment setup, as an operator step before the first <code>prune-reviews</code> run, to <code>.claude/skills/review-tracking-adoption/SKILL.md</code>, which today says nothing about tokens, with the same two warnings. Run <code>actionlint</code> and <code>pre-commit run --all-files</code>.</td>
+<td>In this repository, change <code>templates/review-tracking/prune-reviews.yml</code> and copy it over <code>.github/workflows/prune-reviews.yml</code> (keep them byte-identical; <code>cmp</code> proves it). The template is the post-#254 shape in Situation: no checkout, a token-free <code>Fetch the prune script</code> step, then <code>Prune and import review marks</code> with <code>PUSH_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN \|\| github.token }}</code>. (1) The job: <code>runs-on: [self-hosted, vm, debian-13, s]</code>; <code>environment:</code> with <code>name: review-marks</code> and <code>deployment: false</code> (survey item 2); a job-level <code>env:</code> entry <code>HAS_REVIEW_MARKS_KEY: ${{ secrets.REVIEW_MARKS_APP_KEY != '' }}</code> beside <code>DEFAULT_BRANCH</code>, with a comment saying the <code>secrets</code> context is not available in a step's <code>if:</code>, which is why presence is exposed this way; keep <code>permissions: contents: write</code> and <code>timeout-minutes: 30</code>, and add to the timeout comment that a vm runner boots in about two minutes (98 seconds measured, survey item 5). (2) A new step between the two, <code>name: Mint the push token</code>, <code>id: app-token</code>, <code>if: env.HAS_REVIEW_MARKS_KEY == 'true'</code>, <code>uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0</code>, <code>with:</code> <code>client-id: ${{ vars.REVIEW_MARKS_APP_CLIENT_ID }}</code>, <code>private-key: ${{ secrets.REVIEW_MARKS_APP_KEY }}</code>, <code>permission-contents: write</code>, and no <code>owner:</code> or <code>repositories:</code> input, with a comment saying why: the App is installed on several repositories, and naming the owner would widen every token to all of them, whereas unset they limit the token to the current repository. The sha is pinned, unlike the fleet's other action references, because this step handles the bypass identity's key; say so in the comment. (3) The script step's <code>PUSH_TOKEN</code> becomes <code>${{ steps.app-token.outputs.token \|\| github.token }}</code>; the fetch step still has no token, and the push token still reaches only the script. Note <code>&amp;&amp;</code>/<code>\|\|</code> value semantics (<code>templates/pin-indirect-dependencies/pin-indirect-dependencies.yml:154-159</code>): a skipped step's output is empty, so the <code>\|\|</code> arm fires. (4) Rewrite the comment above <code>permissions:</code> (it begins "Repositories whose default branch ruleset requires a pull request") to say: the App is the ruleset's bypass actor; its key lives in the <code>review-marks</code> environment, which only the default branch can use; a repository with no pull-request ruleset holds no key, mints nothing and pushes with <code>github.token</code>, which is what <code>contents: write</code> is for; and an App push, like the PAT push before it, retriggers this workflow once into a run that finds nothing to do. Rewrite the comment above <code>Fetch the prune script</code> so that it no longer says the static runners reuse the workspace: the job now runs on an ephemeral vm runner, the no-checkout design is kept as defence in depth and because a repository can move the job back to <code>static</code> by editing <code>runs-on</code>. Fix the header comment's "as shakenfist-bot" to say who pushes (the App where there is a ruleset, <code>github.token</code> otherwise; the commit identity is still the bot's, set by the script). (5) In <code>templates/review-tracking/ci-prune-reviews.sh</code>, and byte-identically in <code>tools/ci-prune-reviews.sh</code>, rewrite the three comments at lines 37, 80 and 133 that justify the isolation in static-runner terms the same way: the design stays, the runner moved, the threats described remain the reason the design stays. Change no code in the script, and leave <code>git config user.name 'shakenfist-bot'</code> alone. <code>scripts/tests/test_ci_prune_reviews.py</code> runs the template copy, and <code>ReviewTrackingDeploymentTest</code> pins <code>tools/</code> to it. (6) The tests. <code>workflow_steps</code> (line 571) asserts the exact step-name set; it gains <code>Mint the push token</code>. <code>test_the_workflow_never_checks_out_the_workspace</code> (line 585): the <code>PUSH_TOKEN</code> line assertion becomes the new expression; <code>text.count('secrets.') == 1</code> becomes: <code>secrets.REVIEW_MARKS_APP_KEY</code> appears exactly twice in the comment-stripped text, in the job-level <code>HAS_REVIEW_MARKS_KEY</code> line and the token step's <code>private-key</code> line, and no other <code>secrets.</code> reference exists; neither the fetch step nor the script step contains <code>secrets.</code> or <code>token</code> other than the <code>PUSH_TOKEN</code> line; and the <code>working-directory: ${{ runner.temp }}</code> assertion must skip the token step, which has none (a <code>uses:</code> step runs no shell). Add assertions that the job carries <code>environment:</code> with <code>name: review-marks</code> and <code>deployment: false</code>, that <code>runs-on</code> is the vm label list, that the token step is guarded by <code>env.HAS_REVIEW_MARKS_KEY == 'true'</code>, that it has no <code>owner:</code> or <code>repositories:</code> line, and that its <code>uses:</code> is a 40-hex sha with a <code># v</code> comment. <code>test_the_workflow_steps_land_the_review_state</code> (line 596) runs the fetch and script steps by name and must not try to run the token step; it already indexes <code>steps</code> by name, so confirm it still passes rather than changing it. (7) <code>templates/review-tracking/README.md</code>: replace the "Optionally, a <code>DEPENDENCIES_TOKEN</code> secret" bullet (line 49) and its three following paragraphs with the environment, its branch policy (open question 4's definition, exactly), the secret and the variable, in the order an operator creates them, with the two warnings: every adopter gets the environment with its policy before its first run, key or no key, since an environment GitHub creates on first reference has no policy; and the key is only ever an environment secret, never a repository or organisation one, because <code>secrets.REVIEW_MARKS_APP_KEY</code> resolves at all three levels and the guard would mint just as quietly from any of them. Keep a paragraph on the silent fallback in its new form: a repository with a ruleset and no key fails its push, which is the signal. Say that the App's token is minted per run, scoped to the repository, revoked when the job ends, and carries <code>contents: write</code> alone, so the <code>permissions:</code> block is for <code>github.token</code> only. Say <code>deployment: false</code> keeps runs out of the Deployments view. Change "Runner isolation" (line 123) to say the job runs on the ephemeral vm pool and why the design stays; change "Prerequisites" (line 218) to the vm labels, <code>x86_64</code>, <code>curl</code>, <code>git</code>, <code>python3</code> and egress to github.com; change the projects table's <code>Token</code> column (line 231) to <code>Pushes as</code>, with <code>App</code> for andris, hunkydory, kerbside and ryll and <code>GITHUB_TOKEN</code> for the rest; and fix line 7, "commits both back as shakenfist-bot", to say the commit is the bot's and the push is the App's or <code>GITHUB_TOKEN</code>'s. (8) <code>docs/code-review-tracking.md</code>: step 7 (line 299) replaces its <code>DEPENDENCIES_TOKEN</code> sentence with the operator steps, as a numbered sub-list that can be followed from a terminal (<code>gh api -X PUT repos/shakenfist/&lt;r&gt;/environments/review-marks --input -</code> with the policy body, <code>gh api -X POST .../deployment-branch-policies -f name=&lt;default&gt; -f type=branch</code>, and for a ruleset repository the App installation, <code>gh secret set REVIEW_MARKS_APP_KEY --repo shakenfist/&lt;r&gt; --env review-marks</code>, and the App added as a bypass actor by the GET-then-PUT shape in <code>docs/audits/merge-queue-config.md</code>; the client id is already an organisation variable); "Steady state" lines 768-776 say the App pushes where a ruleset requires a pull request and retriggers once, and line 776's "shared, long-lived static runners" paragraph says the job runs on an ephemeral vm runner and keeps the isolation anyway, linking the README as it does now. (9) <code>.claude/skills/review-tracking-adoption/SKILL.md</code>: one short paragraph after the byte-for-byte check saying that step 7 of the doc now has operator steps (environment, policy, key, bypass actor) that must be done before the first run, with the two warnings in one sentence, and that the skill does not repeat them. (10) Run <code>pre-commit run --all-files</code> and <code>python3 scripts/audit-check.py --repo-path . --repo-name development</code>; the verdicts must match <code>41a4c92</code>. Commit subject: "Mint the review-marks push token from the App."</td>
 </tr>
 <tr>
 <td>2b</td>
 <td>medium</td>
 <td>sonnet</td>
-<td>worktree</td>
-<td>Roll the 2a template out with the <code>review-tracking-adoption</code> skill, one pull request per repository, in this order: andris (the smallest adopter, and the one found failing before 2026-10-29), hunkydory, ryll, kerbside (the four whose pushes need the bypass), then the four without a pull-request ruleset (actions, sfui, kerbside-client, and development, whose own copy 2a already changed). Before each pull request merges, confirm its repository's <code>review-marks</code> environment exists with the default-branch policy (phase 1 step 1b created all eight), so the first run never creates an unprotected one. If shakenfist, instar or client-python-k3s has adopted review tracking by then, it joins the first group and phase 1 step 1b is repeated for it. Each pull request copies the template byte for byte and changes nothing else. After each merge, confirm the next <code>prune-reviews</code> run either pushed as the App or found nothing to do, and record the run URL here. On the first merge, andris's, also confirm from the run log that the <code>app-token</code> step ran rather than being skipped, before the hunkydory, ryll and kerbside pull requests are opened. A presence guard that always evaluates false falls back to <code>github.token</code> without saying so, and <code>actionlint</code> cannot show that. The commit's author and committer do not show this, because the script sets them; in the four repositories with a ruleset, the rule-suite history (<code>repos/shakenfist/&lt;r&gt;/rulesets/rule-suites?rule_suite_result=bypass</code>) shows the push's <code>actor_name</code>, and in the four without one the run's own log does. A run that fails to mint a token in a repository that has the environment means 1b's setup is wrong there: stop and report rather than adding a fallback.</td>
+<td>none</td>
+<td>After 2a has merged, and after its first <code>prune-reviews</code> run on <code>main</code> here is recorded under <em>Record</em> (the <code>Mint the push token</code> step skipped, the push, if any, by <code>github-actions[bot]</code> in the rule-suite history, <code>repos/shakenfist/development/deployments?environment=review-marks</code> empty). andris only. <code>$HOME/bin/template-resync status review-tracking</code> must list andris as stale on both <code>.github/workflows/prune-reviews.yml</code> and <code>tools/ci-prune-reviews.sh</code>; then <code>template-resync apply review-tracking andris --apply</code>, <code>template-resync check review-tracking &lt;worktree&gt;</code>, and one commit carrying those two files and nothing else, subject "Re-sync the review tracking templates.", body saying what changed (the App token, the vm runner) and <code>Closes #59</code>. Before the pull request is opened, re-read andris's <code>review-marks</code> environment and its branch policy with the definition-of-done script from phase 1, and its ruleset 24700229's <code>bypass_actors</code> (the App, 5538020, must still be there). Ask Mikal once to push and open the pull request; do not open it unasked. After the merge, read the next <code>prune-reviews</code> run on <code>develop</code>: from its log, that <code>Mint the push token</code> ran (not skipped) and <code>Prune and import review marks</code> pushed or found nothing to do; from <code>repos/shakenfist/andris/rulesets/rule-suites?time_period=day&amp;rule_suite_result=bypass</code>, the push's <code>actor_name</code> and <code>actor_id</code> (record the name: it is what the definition of done matches); and that <code>repos/shakenfist/andris/deployments?environment=review-marks</code> is empty. If the run found nothing to do, dispatch it again after the next merge to <code>develop</code>, or wait for one; the push is the proof. A run whose token step was skipped means the guard is wrong (decision 6); a run whose token step failed means 1b's key or the variable is wrong; a run that fails at the environment means <code>deployment: false</code> was refused (decision 1); a run that fails installing gitsign means the image lacks curl (risk 4). In every one of those, stop and report rather than adding a fallback or editing andris's copy. Record the pull request, the merge commit, the run URL, the actor name and the three readings under <em>Record</em>.</td>
+</tr>
+<tr>
+<td>2c</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>After 2b's record is complete. The same procedure as 2b, one pull request per repository, in this order: hunkydory (closes #132), ryll (closes #636), kerbside (closes #651), then actions (closes #215), sfui (closes #61), kerbside-client (closes #14). For each of the first three, the pre-merge re-read is the environment, its policy, the environment's secret list (<code>REVIEW_MARKS_APP_KEY</code> present) and the ruleset's <code>bypass_actors</code>; for the last three, the environment and its policy only, and the expectation flips: the token step must be skipped and the push made by <code>github-actions[bot]</code>, as before. Ask Mikal once for the batch of three before opening any, and once again for the batch of three without a ruleset. After each merge, record the same four things 2b recorded. A repository whose first run fails is reported, not patched. When all six are recorded, run <code>template-resync status review-tracking</code>: nothing stale. The next scheduled audit's compliance page is the fleet-wide check; cite its run.</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Definition of done.</strong> Every live <code>prune-reviews.yml</code> is
-byte-identical to the template (compare <code>gh api</code> content against
-it; a comment may still mention the PAT by name, so grep for
-<code>secrets.DEPENDENCIES_TOKEN</code>, not the bare name, if grepping at
-all); andris, hunkydory, kerbside and ryll each have a
-<code>prune-reviews</code> push to its default branch whose rule-suite
-<code>actor_name</code> is the App.</p>
+<h4 id="record_1">Record<a class="headerlink" href="#record_1" title="Permanent link">&para;</a></h4>
+<p>Filled in as the steps run. Every cell cites the run, pull request
+or command it came from and the date; a cell that could not be
+read says so. Dates are Australian Eastern Daylight Time (UTC+11).</p>
+<p><strong>2a landed.</strong> #354 merged on 2026-10-31 at 16:15 AEDT as
+<code>9f080cd</code>. The first <code>prune-reviews</code> run on <code>main</code> here, run
+41171895436, queued at 16:15:59 and started at 16:29:14 on the
+ephemeral runner <code>sfcbr-35REmDBR8R1taZnI</code>. That is a wait of about
+13 minutes for a vm runner, not the 98 seconds the survey measured:
+the queue time is the pool's load, not the boot, and it sits outside
+<code>timeout-minutes</code>, which counts from the job's start. The job then
+took 16 seconds. <code>Mint the push token</code> was skipped, <code>Prune and import
+review marks</code> succeeded and pushed <code>0bd8d7c</code> ("Prune and import
+review marks.", the marks this pull request staled), rule suite
+4829478319 records the push by <code>github-actions[bot]</code> (actor id
+41898282), and <code>repos/shakenfist/development/deployments?environment=review-marks</code>
+lists nothing, so GitHub accepted <code>deployment: false</code>. The no-key
+path works as designed.</p>
+<p><strong>Rollout.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Repository</th>
+<th>Pull request</th>
+<th>Merged</th>
+<th>First run</th>
+<th>Token step</th>
+<th>Push actor (<code>actor_name</code>, <code>actor_id</code>)</th>
+<th>Deployments</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>development</td>
+<td>#354</td>
+<td><code>9f080cd</code>, 2026-10-31</td>
+<td>41171895436</td>
+<td>skipped</td>
+<td><code>github-actions[bot]</code>, 41898282</td>
+<td>none</td>
+</tr>
+<tr>
+<td>andris</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/65" title="GitHub Issue: shakenfist/andris #65">andris#65</a> (eb5278f)</td>
+<td></td>
+<td></td>
+<td>ran</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>hunkydory</td>
+<td><em>pending</em></td>
+<td></td>
+<td></td>
+<td>ran</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>ryll</td>
+<td><em>pending</em></td>
+<td></td>
+<td></td>
+<td>ran</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td><em>pending</em></td>
+<td></td>
+<td></td>
+<td>ran</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>actions</td>
+<td><em>pending</em></td>
+<td></td>
+<td></td>
+<td>skipped</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>sfui</td>
+<td><em>pending</em></td>
+<td></td>
+<td></td>
+<td>skipped</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>kerbside-client</td>
+<td><em>pending</em></td>
+<td></td>
+<td></td>
+<td>skipped</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>The <code>Token step</code> column is the expectation; the record replaces it
+with what the log showed.</p>
+<h4 id="execution-notes_1">Execution notes<a class="headerlink" href="#execution-notes_1" title="Permanent link">&para;</a></h4>
+<ul>
+<li>2026-10-31 14:00 AEDT: phase planned. Mikal ruled that phase 1 is
+  closed out with its two operator cells pending (b2, b4), and that
+  #352 does not hold this phase (b5).</li>
+<li>2026-10-31 14:40 AEDT: back brief answered. Decisions 1, 2 and 3
+  stand; 2a runs as one sub-agent in a worktree; 2b and 2c wait for
+  2a to merge, since <code>template-resync</code> reads the template from
+  <code>origin/main</code>. Phase 1's close-out is pull request #353, on which
+  this branch sits; once it merges, this session rebases onto <code>main</code>,
+  pushes and opens the phase 2 pull request without asking again.</li>
+<li>2026-10-31 15:20 AEDT: 2a done by one opus sub-agent at high
+  effort in its own worktree, reviewed and committed here. It
+  added eleven workflow mutants (the old template, the static
+  runner, no environment, an unguarded mint, an <code>owner</code> input, a tag
+  pin, and others) and the shape tests caught every one. The review
+  changed one thing of substance: the agent's adoption step 7 told
+  an operator to generate a new App key for each new repository,
+  which would leave the App with one key per repository and break
+  phase 1's one-key property, so the step now makes adding a
+  repository a rotation (a new key into every keyed environment,
+  then the old one deleted). It also renamed the README's "silent
+  fallback" paragraph, which went on to explain why the fallback
+  fails loudly, and kept the agent's one extra, the README gitsign
+  section no longer claiming the static runners lack gitsign.</li>
+<li>2026-10-31 17:30 AEDT: the first automated review of <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/65" title="GitHub Issue: shakenfist/andris #65">andris#65</a>
+  (1 fix, 2 document, 1 consider) was answered there: the fix item
+  asked for the environment, key, variable and bypass entry that
+  phase 1 had already set up and 2b had re-read, and the two
+  document items were andris's own AGENTS.md and its phase 11 plan.
+  Its consider item found "On such a runner" in the script's
+  isolation comment reading as the vm runner just mentioned, which is
+  wording #354's review round introduced. It is fixed in the template
+  here; <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/65" title="GitHub Issue: shakenfist/andris #65">andris#65</a> carries the earlier wording, so andris needs a
+  comment-only re-sync once this lands, and 2c's pull requests carry
+  the fixed text.</li>
+</ul>
+<h4 id="risks-and-mitigations_1">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations_1" title="Permanent link">&para;</a></h4>
+<ol>
+<li><strong>The guard is always false, so every repository pushes with
+   <code>github.token</code>.</strong> In andris the ruleset refuses that push, the
+   run fails, and 2b reads the log before anything else changes
+   (decision 6). The failure is loud where it matters and harmless
+   where it does not.</li>
+<li><strong>The guard is true but the mint fails.</strong> A wrong client id or a
+   key that does not match the App fails the token step and the
+   run. 2b stops: the fault is in phase 1's setup, and the record
+   there says what to re-read.</li>
+<li><strong>GitHub refuses <code>deployment: false</code> on the day.</strong> The job fails
+   at the environment before any step runs. 2a's own merge here is
+   the first test (survey item 9), on a repository with no ruleset
+   to refuse anything else; the fix is to drop the key and change
+   the README sentence, not to change the environment.</li>
+<li><strong>The vm image lacks curl.</strong> <code>install_gitsign</code> fails before any
+   push, the run fails, and nothing lands. The fix is in the image
+   (33fl), not in the template; 2b stops and says so. The audit's
+   own vm jobs install <code>gh</code> with apt, so <code>sudo</code> works there, but
+   adding an apt step to this template is not the answer: the
+   README's prerequisites name curl, and an image that lacks it is
+   wrong for every job that lists it.</li>
+<li><strong>A pull request's push to a branch runs the workflow on the
+   branch.</strong> The job's guard skips it, as today; if the guard were
+   edited out on the branch, the environment's policy refuses the
+   branch, and the secret is never resolved (<code>docs/consistency-audits.md</code>
+   describes the same property for <code>audit-write</code>). That is the
+   point of the environment, and nothing in this phase weakens it.</li>
+<li><strong>An App push retriggers the workflow.</strong> Once, into a run that
+   finds nothing to do, exactly as the PAT push did (Situation);
+   the concurrency group serialises them. The record's "first run"
+   column notes where the run read is the retrigger rather than the
+   push.</li>
+<li><strong>The script change stales every adopter's copy of it.</strong> They
+   are stale already (survey item 1), the same pull request carries
+   both files, and the <code>review-tracking-templates</code> issues close
+   from the pull requests. Until each merges, that repository's
+   audit verdict stays non-compliant, as it is today.</li>
+<li><strong>The rollout stalls between andris and the rest.</strong> The bot is
+   still in the bypass team until phase 3, so a repository on the
+   old copy keeps landing marks with <code>DEPENDENCIES_TOKEN</code>. A stall
+   costs nothing but time.</li>
+</ol>
+<h4 id="definition-of-done_1">Definition of done<a class="headerlink" href="#definition-of-done_1" title="Permanent link">&para;</a></h4>
+<p>Every item is checked by the management session from the tree, the
+record and the API, not from a sub-agent's summary.</p>
+<ul>
+<li><code>cmp templates/review-tracking/prune-reviews.yml
+  .github/workflows/prune-reviews.yml</code> and <code>cmp
+  templates/review-tracking/ci-prune-reviews.sh
+  tools/ci-prune-reviews.sh</code> print nothing.</li>
+<li><code>grep -rn 'secrets.DEPENDENCIES_TOKEN' --include='*.yml'
+  --include='*.py' --include='*.md' .</code> matches only in
+  <code>templates/pin-indirect-dependencies/</code> and <code>docs/plans/</code>.</li>
+<li><code>grep -rln 'DEPENDENCIES_TOKEN' docs/code-review-tracking.md
+  templates/review-tracking/ .claude/skills/review-tracking-adoption/</code>
+  prints nothing.</li>
+<li><code>grep -n 'static' templates/review-tracking/prune-reviews.yml
+  templates/review-tracking/ci-prune-reviews.sh</code> matches only
+  lines that describe the shared runner the design assumes, not
+  lines that put the job on one. (Reworded after the first review
+  of #354, which asked for the threat model in the present tense
+  rather than as the story of the move.)</li>
+<li>For each of the eight repositories, the blob of
+  <code>.github/workflows/prune-reviews.yml</code> and of
+  <code>tools/ci-prune-reviews.sh</code> on the default branch (<code>gh api
+  repos/shakenfist/&lt;r&gt;/contents/&lt;path&gt; --jq .sha</code>) equals <code>git
+  hash-object</code> of the template file; and <code>$HOME/bin/template-resync
+  status review-tracking</code> reports nothing stale.</li>
+<li>The rollout table is full. andris, hunkydory, kerbside and ryll
+  each have a <code>prune-reviews</code> push to <code>develop</code> in their rule-suite
+  history with the App as actor, by the name 2b recorded; actions,
+  development, sfui and kerbside-client each have a run after their
+  merge whose log shows <code>Mint the push token</code> skipped.</li>
+<li><code>gh api 'repos/shakenfist/&lt;r&gt;/deployments?environment=review-marks'</code>
+  prints <code>[]</code> for all eight.</li>
+<li>The seven <code>Consistency: Review tracking templates</code> issues are
+  closed, and the first scheduled audit after the last merge
+  reports <code>review-tracking-templates</code> compliant for all eight.</li>
+<li><code>pre-commit run --all-files</code> passes, and <code>python3
+  scripts/audit-check.py --repo-path . --repo-name development</code>
+  reports the same verdicts as on <code>41a4c92</code>.</li>
+</ul>
+<h4 id="back-brief_1">Back brief<a class="headerlink" href="#back-brief_1" title="Permanent link">&para;</a></h4>
+<p>Before 2a, back brief Mikal on decisions 1 (<code>deployment: false</code>), 2
+(the script's comments change, its design does not) and 3 (where
+the operator steps are documented): a template that lands in eight
+repositories is cheap to write and tedious to re-sync. Before 2c,
+show him 2b's record: the three readings from andris are the
+evidence that the App path works, and the six pull requests that
+follow are opened on that evidence alone.</p>
 <h3 id="phase-3-move-the-bypass-and-enforce-it">Phase 3: move the bypass and enforce it<a class="headerlink" href="#phase-3-move-the-bypass-and-enforce-it" title="Permanent link">&para;</a></h3>
 <p>Planning effort: high. Steps 3a and 3b change who can push to seven
 default branches, and a mistake either locks out review marks or
@@ -18942,7 +19414,7 @@ where one exists, for directly related issues that we should
 either resolve as part of this master plan or at least be aware of
 while planning it.</p>
 <p>...</p>
-<h3 id="back-brief_1">Back brief<a class="headerlink" href="#back-brief_1" title="Permanent link">&para;</a></h3>
+<h3 id="back-brief_2">Back brief<a class="headerlink" href="#back-brief_2" title="Permanent link">&para;</a></h3>
 <p>Before executing any step of this plan, please back brief the
 operator as to your understanding of the plan and how the work you
 intend to do aligns with that plan.</p>

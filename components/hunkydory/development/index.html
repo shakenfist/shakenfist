@@ -16818,6 +16818,12 @@ run is cancelled. Raising the setting would make each entry cancel the
 one ahead of it, so revisit those groups first.</p>
 <p>A new job in <code>ci.yml</code> goes in the <code>needs:</code> of both "Can enqueue" and
 "Can merge", or the queue will merge without it.</p>
+<p>Every required check in the <code>develop</code> ruleset is pinned to the GitHub
+Actions app (<code>integration_id: 15368</code> in
+<code>.github/exported-config/ruleset-develop-branch.json</code>), so a check run
+with the same name from any other GitHub App installed on the repository
+cannot satisfy it. A check made required later must be pinned the same
+way.</p>
 <p><code>mermaid-lint.yml</code> is the deliberate exception, and is neither in those
 <code>needs:</code> lists nor a required check. It runs only when markdown changes,
 and a path-filtered workflow made required never reports on the pull

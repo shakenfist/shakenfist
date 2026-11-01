@@ -16766,7 +16766,7 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tr>
 <td>2026-10-07</td>
 <td><a href="/components/development/plans/PLAN-bot-bypass-identity/">Bot bypass identity</a></td>
-<td>Settle #211: make the only automation bypass on default-branch rulesets a GitHub App whose key only default-branch code can read, and take the bypass away from <code>shakenfist-bot</code>, whose PATs every Renovate run and several pull-request jobs carry. Phase 1 found andris an eighth adopter (its review marks were refused until 2026-10-29), the four adopters without a ruleset already pushing with <code>github.token</code>, and the audit's read token needing the bot's owner reach, now replaced by the security manager role</td>
+<td>Settle #211: make the only automation bypass on default-branch rulesets a GitHub App whose key only default-branch code can read, and take the bypass away from <code>shakenfist-bot</code>, whose PATs every Renovate run and several pull-request jobs carry. Phase 1 (#348, complete, with the bot's token list the one record cell deferred) created the App, the eight <code>review-marks</code> environments and the four keys, demoted the bot, and found the audit's read token needing the bot's owner reach, now replaced by the security manager role. Phase 2 moves <code>prune-reviews</code> onto the App token and the ephemeral vm pool and re-syncs the eight adopters, whose script copies were already stale</td>
 <td>In progress</td>
 </tr>
 <tr>
