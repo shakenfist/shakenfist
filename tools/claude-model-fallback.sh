@@ -7,7 +7,7 @@
 # JSON result looks like:
 #
 #   {"is_error": true, "total_cost_usd": 0, "api_error_status": 429,
-#    "result": "You've reached your Fable 5 limit. Run /usage-credits to
+#    "result": "You've reached your <model> limit. Run /usage-credits to
 #               continue or switch models with /model.", ...}
 #
 # The built-in --fallback-model flag does NOT cover this case (it only

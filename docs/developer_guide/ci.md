@@ -1062,13 +1062,14 @@ outside any fence the model may have left open, which is what satisfies
 
 `issue-fix.yml` runs its fix attempt through
 `tools/claude-model-fallback.sh`, which takes a comma-separated
-preference list (`--models`, default `claude-fable-5,claude-opus-5`) and
-moves to the next model when one reports its subscription credit is
-exhausted. That case arrives as an HTTP 429 in the `--output-format json`
-payload (`api_error_status`), which the claude CLI's own
-`--fallback-model` flag does not handle -- it only covers overloaded or
-unavailable models. A refused request is free, so the wrapper attempts
-the real job rather than paying for a pre-flight probe.
+preference list (`--models`, default `claude-opus-5`) and moves to the
+next model when one reports its subscription credit is exhausted, so a
+caller that passes a longer list gets a fallback. That case arrives as
+an HTTP 429 in the `--output-format json` payload (`api_error_status`),
+which the claude CLI's own `--fallback-model` flag does not handle -- it
+only covers overloaded or unavailable models. A refused request is free,
+so the wrapper attempts the real job rather than paying for a pre-flight
+probe.
 
 Give it the prompt with `--prompt-file`, never as a claude argument.
 Linux caps a single argv element at 128KiB whatever `ulimit` says, and an
