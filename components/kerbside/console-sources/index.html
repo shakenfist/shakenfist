@@ -17365,7 +17365,7 @@ the network prerequisites, and what is and is not proven.</p>
 </tr>
 <tr>
 <td>url</td>
-<td>The URL of the API of one node of the cluster, on port 8006 (e.g., <code>https://pve1.example.org:8006</code>). Its host is also the CONNECT proxy for every console in the source, so it must be a node, or something which forwards ports 8006 and 3128 to one</td>
+<td>The URL of the API of one node of the cluster, on port 8006 (e.g., <code>https://pve1.example.org:8006</code>). It must be <code>https</code>: any other scheme marks the source errored, since the token would otherwise cross the network in the clear. Its host is also the CONNECT proxy for every console in the source, so it must be a node, or something which forwards ports 8006 and 3128 to one</td>
 </tr>
 <tr>
 <td>username</td>
@@ -17402,8 +17402,11 @@ token do more than the token's own ACL allows. The token ID,
 <p>The Kerbside broker must reach the host in the source's <code>url</code> on both 8006
 (the API) and 3128 (the node's SPICE proxy). Kerbside asks Proxmox to name that
 same host as the proxy for each console, so the nodes' own names never need to
-resolve from the broker. Kerbside reaches a VM's SPICE server only through
-that proxy, with an HTTP CONNECT.</p>
+resolve from the broker, and refuses a ticket whose proxy is any other host.
+Kerbside reaches a VM's SPICE server only through that proxy, with an HTTP
+CONNECT. The CONNECT itself is plaintext, so the ticket's signed connect host
+crosses the network between the broker and that host in the clear; only the
+SPICE session inside the tunnel is TLS. Keep that network one you trust.</p>
 <h3 id="which-vms-are-listed">Which VMs are listed<a class="headerlink" href="#which-vms-are-listed" title="Permanent link">&para;</a></h3>
 <p>Each scrape lists the cluster's VMs in one request, and then reads the
 configuration of those that are candidates. A VM becomes a console only when

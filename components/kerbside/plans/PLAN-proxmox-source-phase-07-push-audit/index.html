@@ -17249,6 +17249,10 @@ counts only.</p>
   hours after its cron time. The 04:30 functional run started at 10:58
   on 2026-10-29. So the first nightly, due 05:30 UTC on 2026-10-30, had
   not yet fired. The follow-up pull request confirms that it ran.</li>
+<li>The first scheduled Proxmox nightly ran at 11:31 UTC on 2026-10-30,
+  run 41048695421, and passed.</li>
+<li>2026-10-31 AEDT, the follow-up. Mikal asked for it once #662 merged
+  as d2824dd. <em>Outcome</em>'s <em>Resolution</em> records the fixes.</li>
 <li>7g filed the issues Mikal approved, with the wording he was shown, on
   2026-10-30 AEDT:</li>
 <li>shakenfist/kerbside #656, #657, #658, #659, #660 and #661;</li>
@@ -17262,8 +17266,8 @@ medium finding. Four low security findings and nine advisory ones are
 in the plan's own diff, and go to the follow-up pull request. The
 management session reproduced every accepted finding against the tree.
 Eight <em>Future work</em> entries that no issue tracked, and four problems
-that predate the plan, are filed. Phase 7 stays <code>In progress</code> until the
-follow-up lands.</p>
+that predate the plan, are filed. The follow-up pull request fixed
+eleven and declined one, and the plan is complete (<em>Resolution</em>).</p>
 <h3 id="wave-results">Wave results<a class="headerlink" href="#wave-results" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -17405,7 +17409,7 @@ follow-up lands.</p>
 <td>7f2</td>
 <td>advisory</td>
 <td><code>tools/proxmox-e2e/drive-console.py</code>, <code>Lane.remember</code></td>
-<td>Also emit <code>::add-mask::</code> for each remembered value under Actions. This covers the window before the session's ticket is captured, when a daemon log tail can print</td>
+<td>Also emit <code>::add-mask::</code> for each remembered value under Actions, so that output which bypasses the redaction is masked once a value is known. (Corrected in the follow-up: this does not cover the window before the session's ticket is captured, since a mask registered later cannot hide earlier output. That window stays covered by Kerbside never logging a ticket, which 7f1 checked)</td>
 <td>c4b4011</td>
 </tr>
 <tr>
@@ -17426,6 +17430,89 @@ follow-up lands.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="resolution">Resolution<a class="headerlink" href="#resolution" title="Permanent link">&para;</a></h3>
+<p>The follow-up pull request, <code>proxmox-source-phase-07-fixes</code>, fixed
+eleven of the twelve findings, one commit each, except findings 1 and
+2, which share files and so share one commit. It declined finding 10. Each fix has a test, except the
+documentation fixes 6 to 9 and the markers in finding 5. Each new test
+fails on a copy of the tree with its fix removed.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Commit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1, 2</td>
+<td>Hold the Proxmox driver to https and its own proxy.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Unregister a minting worker that fails to start.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Read qemu as the backend in the TLS claims check.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Mark the Proxmox work's deliberate prints.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Name Proxmox's ports in the firewall summary.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Say how the minting sequence differs on Proxmox.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Trim the Proxmox source row in ARCHITECTURE.md.</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Say the backend ticket columns reach backups.</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Declined; see below.</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Check the session ticket row is locked in a unit test.</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Mint a Proxmox ticket through mint_with_deadline.</td>
+</tr>
+</tbody>
+</table>
+<p>Three things the fixes found:</p>
+<ul>
+<li><strong>Finding 2's case handling.</strong> A mutant dropping a case-folding call
+  survived, because <code>urlsplit()</code> already lowercases hostnames, so the
+  call was removed.</li>
+<li><strong>Finding 4's proof.</strong> It was shown on the real page. With every
+  word in the checker's condition vocabulary stripped from the
+  page's bullet, the checker now fails, and before the fix it
+  passed.</li>
+<li><strong>Finding 10 is declined.</strong> The fix was made and then reverted on
+  the same branch. Emitting <code>::add-mask::</code> prints the value to stdout
+  for the runner to read, and CodeQL's clear-text logging rule flagged
+  that print as a high-severity alert, following the data from the
+  <code>.vv</code> password. The flag is accurate about the data flow, whatever
+  the intent. Masking also covered less than first claimed: it cannot
+  hide output printed before a value is learned. The held values stay
+  protected by the redaction every log tail passes through, and by
+  Kerbside never logging a ticket, which 7f1 checked. A defence in
+  depth that leaves a standing high-severity alert, or needs one
+  dismissed, costs more than it adds.</li>
+</ul>
+<p>7d's surviving mutant, the row lock, is now caught by finding 11's
+unit test.</p>
 <h3 id="filed-future-work-no-issue-tracked">Filed: future work no issue tracked<a class="headerlink" href="#filed-future-work-no-issue-tracked" title="Permanent link">&para;</a></h3>
 <ul>
 <li>

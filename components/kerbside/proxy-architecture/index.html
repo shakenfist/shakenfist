@@ -17818,7 +17818,9 @@ is:</p>
 <ol>
 <li>The lifetime asked for is the token's remaining life plus 30 seconds
    (<code>TICKET_SLACK</code> in <code>kerbside/rpc/servicer.py</code>), since no channel is
-   authorized after the token expires.</li>
+   authorized after the token expires. oVirt honours it. Proxmox VE has
+   no way to ask: its tickets always last 30 seconds from the mint, and
+   the reuse window below is what keeps a session's channels on one.</li>
 <li><code>db.session_ticket()</code> selects the session's <code>consoletokens</code> row <code>FOR
    UPDATE</code>. If it holds a ticket with at least 10 seconds left
    (<code>REUSE_MARGIN</code>) that ticket is returned; otherwise the caller mints and
@@ -17834,8 +17836,15 @@ is:</p>
    abandoned one, a new mint waits for it within its own deadline and is
    refused if it does not finish. Otherwise the late worker could replace
    the hypervisor's password after a newer mint had set and stored its
-   own, and every later channel would be refused. A worker still running
-   after five minutes (<code>MINT_STUCK_AFTER</code>) stops holding mints up. Daemons
+   own, and every later channel would be refused. The Proxmox VE driver
+   narrows that further: once <code>MINT_POST_CUTOFF</code> (10 seconds,
+   <code>kerbside/sources/proxmox.py</code>) has passed since it started, it no
+   longer sends the request that sets the password, so a slow mint gives
+   up before changing it. The cutoff counts from the driver's start, not
+   from when its caller began waiting
+   (<a href="https://github.com/shakenfist/kerbside/issues/656">#656</a>). A worker
+   still running after five minutes (<code>MINT_STUCK_AFTER</code>) stops holding
+   mints up. Daemons
    on different nodes do not see each other's workers, nor does the direct
    <code>.vv</code> handler, which mints in the web workers; and any mint for a VM,
    whichever session it is for, replaces the password other sessions'

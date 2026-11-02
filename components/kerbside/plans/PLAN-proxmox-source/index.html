@@ -17512,8 +17512,8 @@ and cited from phase 2's <em>Outcome</em>.</p>
 <tr>
 <td>7. Push audit</td>
 <td><a href="/components/kerbside/plans/PLAN-proxmox-source-phase-07-push-audit/">PLAN-proxmox-source-phase-07-push-audit.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>d2824dd</td>
 </tr>
 </tbody>
 </table>
@@ -17533,7 +17533,7 @@ and cited from phase 2's <em>Outcome</em>.</p>
   is why a <code>Target</code> change couples the daemon and the binary.</li>
 </ul>
 <h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>In progress. Phases 1, 1b, 2, 3a, 3b, 4, 5 and 6 are complete.
+<p>Complete. Every phase, the push audit included, is complete.
 - CI can build a Proxmox VE node on demand.
 - ryll tunnels through <code>spiceproxy</code>, proven against a real node
   on every ryll pull request that touches the tunnel.
@@ -17548,7 +17548,11 @@ and cited from phase 2's <em>Outcome</em>.</p>
   <code>spiceproxy</code> with the documented least-privilege token.
 - <code>docs/use-cases/proxmox.md</code> documents the source in the shape of
   the other use-case pages, linking <code>console-sources.md</code> for setup.</p>
-<p>Phase 7, the push audit, is in progress.</p>
+<p>Phase 7's push audit found no critical, high or medium issue. A
+follow-up pull request fixed eleven of its twelve findings and
+declined one in writing. The issues the audit filed (#656 to #661,
+ryll #665 and #666, actions #216) carry the plan's remaining future
+work.</p>
 
 
 
