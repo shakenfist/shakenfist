@@ -16903,8 +16903,9 @@
 <li><code>renovate.yml</code> does not run <code>renovatebot/github-action</code>, which needs
   a Docker daemon on the runner.</li>
 <li><code>renovate.yml</code> matches the template's apart from the versions
-  Renovate bumps: the value of <code>PINNED_RENOVATE_VERSION</code> and the ref of
-  each action it uses.</li>
+  Renovate bumps: the value of each <code>PINNED_*_VERSION</code> variable
+  (<code>PINNED_RENOVATE_VERSION</code> and <code>PINNED_HASHIN_VERSION</code>) and the ref
+  of each action it uses.</li>
 <li><code>renovate.json</code> exists, with package grouping rules and scheduling.
   It is a per-repository adaptation, not expected to be
   byte-identical to the template's copy.</li>
@@ -16930,14 +16931,14 @@ Renovate renamed it, also passes.</p>
 copy is told to change both files at once. The template README covers
 what else changes when Renovate leaves its container. The one that
 matters is lock files, which Renovate now refreshes with the runner's
-own tools. The template provides npm always and a Rust toolchain when
-the repository has a <code>Cargo.lock</code>, so every repository can copy it
-unmodified.</p>
+own tools. The template provides npm always, a Rust toolchain when
+the repository has a <code>Cargo.lock</code>, and <code>hashin</code> when it has a
+<code>requirements*.txt</code>, so every repository can copy it unmodified.</p>
 <h3 id="the-workflow-is-the-templates">The workflow is the template's<a class="headerlink" href="#the-workflow-is-the-templates" title="Permanent link">&para;</a></h3>
 <p><code>renovate.yml</code> is copied verbatim, so any difference from
 <code>templates/renovate/renovate.yml</code> is drift, except the versions
-Renovate bumps in each copy on its own schedule: the value of
-<code>PINNED_RENOVATE_VERSION</code>, and the ref after <code>@</code> on each <code>uses:</code> line
+Renovate bumps in each copy on its own schedule: the value of each
+<code>PINNED_*_VERSION</code> variable, and the ref after <code>@</code> on each <code>uses:</code> line
 (with the version comment digest pinning leaves after it). A copy
 whose Renovate or whose actions are ahead of or behind the template's
 still matches; the action's name still has to. <code>node-version</code> is not
