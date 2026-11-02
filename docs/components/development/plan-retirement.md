@@ -120,5 +120,8 @@ ryll's `docs/plans/completed/` was an earlier approach: finished
 phase files were moved there by hand and kept in the tree.
 Retirement replaces it; the files in it retire like any others.
 
-The `retire-plans` skill in the private `llm-setup` repository is
-what does this, once it is written; it does not exist yet.
+The `retire-plans` skill in the private `llm-setup` repository does
+this, one pull request per repository. Its `retire-plans` helper does
+the parts with one right answer: listing eligible plans, finding
+pointers, computing permalinks, rewriting the index row and checking
+the result against the audit criteria above.
