@@ -142,7 +142,9 @@ Mechanics that constrain the design, verified in the code:
 * ryll has a `docs/plans/completed/` directory holding four phase
   files, archived by hand in May 2026. `plan-index` matches links
   by basename on purpose so that layout works. It is the only
-  instance; retirement supersedes it.
+  instance. The four are phases of `PLAN-stream-caps-and-flap.md`,
+  which is still `In progress`, so they retire with that plan;
+  retirement replaces the practice, not yet the directory.
 * The fleet's skills that act on audit issues (`consistency-fix`,
   `template-resync`) live in the private `llm-setup` repository
   under `dot-claude/skills/`, not in this one. A retirement skill
@@ -219,8 +221,8 @@ human merging the pull request.
 | Phase | Status | Merged |
 |-------|--------|--------|
 | 1. Retirement convention | Complete | f7b1219 (#333) |
-| 2. `retire-plans` helper and skill | In progress | |
-| 3. Pilot | Not started | |
+| 2. `retire-plans` helper and skill | Complete | 8010a22 (#342); llm-setup 3a9f268 (!20) |
+| 3. Pilot | In progress | |
 | 4. `plan-retirement` criterion | Not started | |
 | 5. Push audit | Not started | |
 
@@ -777,6 +779,12 @@ shape and a merge request. This shell has no credentials for
 local main (`cf613af`) and Mikal pushes it and opens the merge
 request; the `Merged` cell records it once merged.
 
+That hand-off was lost: #342 merged on this side while the
+llm-setup branch was still unpushed, so for two days the plan read
+as further along than the fleet was. It merged as `3a9f268` (!20)
+on 2026-10-31, after `next-phase` found the skill missing from
+`~/.claude/skills`.
+
 llm-setup branch `retire-plans`:
 
 | Commit | Step |
@@ -821,20 +829,213 @@ llm-setup branch `retire-plans`:
 
 ### Phase 3: pilot
 
-Planning effort: medium.
+Planning effort: medium. Review effort: high, by Mikal reading every
+deletion in the pull requests to divergulent and kerbside, and the
+ryll batch commit by commit.
 
-Run `retire-plans` by hand, in the management session, on
-divergulent (3 eligible) then kerbside (3 eligible), one pull
-request each, and review them with Mikal. These are small enough to
-read every deletion. For each, record here: what the skill moved
-into docs/ that a reviewer agreed was missing, what it got wrong,
-and what the skill change was. Then run it on one large repository
--- ryll, which also has the `completed/` directory to fold in --
-before the criterion lands. Expect at least one round of skill
-changes in `llm-setup` from each pilot; record their merges.
+#### Scope
 
-This repository has no eligible plan until late November 2026; it
-is retired by the issue the criterion files, like any other.
+In: running the `retire-plans` skill, in the management session, on
+three repositories in turn -- divergulent, then kerbside, then a
+chosen batch of ryll's plans -- one pull request per repository;
+the revisions to the skill and helper that each pilot shows are
+needed, as llm-setup merge requests; and a record here, per
+repository, of what the skill got right, what it got wrong, and
+what changed because of it.
+
+Out: the criterion (phase 4), retiring anything in this repository
+(none is eligible before 2026-11-20), ryll's remaining seventeen
+eligible plans, and ryll's `docs/plans/completed/` directory (survey
+item 3). No issue is filed by any audit in this phase; the only
+issues filed are the skill's own `from-retired-plan` ones.
+
+#### What the survey found
+
+Checked on 2026-10-31 against development `41a4c92`, llm-setup
+`3a9f268`, divergulent `765d291`, kerbside `26ae364` and ryll
+`f86cff1` (each the fetched `origin/develop`):
+
+1. **The skill and helper are live.** `~/.claude/skills/retire-plans/`
+   and `~/bin/retire-plans` both resolve into llm-setup's main
+   checkout at `3a9f268`.
+2. **Eligibility has moved since the master plan was written.**
+   `retire-plans eligible`:
+
+   | Repository | Eligible | Files | Lines |
+   |------------|---------:|------:|------:|
+   | divergulent | 3 | 18 | 3,125 |
+   | kerbside | 4 | 27 | 10,031 |
+   | ryll | 23 | 139 | 58,467 |
+
+   kerbside has four, not three: `PLAN-kerbside-vdi-tokens.md`
+   went terminal on 2026-07-31 and crossed 90 days on 2026-10-29.
+   divergulent and ryll match the Situation table.
+3. **ryll's `completed/` cannot be folded in.** Its four files are
+   phases 1, 4, 5 and 12 of `PLAN-stream-caps-and-flap.md`
+   (`ryll/docs/plans/index.md:56`), which is `In progress`. They
+   retire with that plan, through the ordinary path, since
+   `permalink` and `rewrite-index` already resolve files under
+   `completed/`. The phase's original text, and the Situation bullet
+   saying retirement supersedes the directory, are corrected here.
+4. **The helper miscounts cross-repository rows as retired.**
+   `eligible` reports kerbside as having one plan "already retired".
+   It has none: `kerbside/docs/plans/index.md:30` links Shaken
+   Fist's `PLAN-kerbside-deployer.md` at `blob/develop`, the
+   cross-repository form, and the helper counts every absolute-URL
+   row with a terminal status as retired
+   (`llm-setup/bin/retire-plans:245,269`). The count is informative
+   only, so nothing goes wrong yet, but phase 4's criterion and a
+   reviewer reading `eligible` both need the distinction: a
+   retirement permalink pins a forty-hex sha, a cross-repository
+   link names a branch. Fixed in step 3b.
+5. **The pilots' preconditions hold.** In the 2026-10-31 compliance
+   page all three pass `plan-index`, `plan-source-references`,
+   `plan-phase-references` and `docs-external-links`, so the skill
+   will not refuse any of them. None has an open pull request
+   matching `retire`, and none has a `from-retired-plan` label yet;
+   the skill creates it.
+6. **Review tracking is not disturbed.** kerbside and ryll exclude
+   `docs/plans/*` from `.vscode/review-scope.toml` (lines 110 and
+   100), so deleting plans moves no review marks or header counts.
+   divergulent has no review scope.
+7. **Each pilot repository has a `PUSH-AUDIT.md`.** The
+   `plan-push-audit-phase` block says a phase landing in another
+   repository is audited there, by the pull request that lands it,
+   and this plan's push-audit phase cites that audit rather than
+   re-running it. Phase 5's text assumed otherwise; see decision 5.
+8. **This shell cannot push to llm-setup.** It has no credentials for
+   `gitlab.home.stillhq.com`, which is how phase 2's merge request
+   went unopened for two days after #342 merged (phase 2 execution
+   notes). Each skill revision here is a branch Mikal pushes.
+
+Corrected at source: this section replaces the phase's paragraph;
+the Situation bullet on ryll's `completed/` (survey item 3); and
+phase 5's text (decision 5).
+
+#### Decisions
+
+1. **The management session runs the skill itself**, as an ordinary
+   invocation (`/retire-plans` in the target repository), not through
+   a sub-agent with a brief. The pilot is testing the skill's prose
+   as a session reads it; a brief would front-load exactly the
+   judgement the skill is supposed to supply, and hide its gaps.
+2. **ryll retires a batch of six, not all twenty-three.** This is
+   the decision most likely to be argued with, since the skill's
+   bare form retires every eligible plan and the fleet will use it
+   that way. But 58,467 lines in one pull request cannot be read
+   deletion by deletion, which is the only test of a retirement that
+   exists, and the pilot's job is to find the plan shapes the skill
+   handles badly, not to clear the backlog. The batch, 10,271 lines,
+   is chosen for range rather than age:
+
+   | Plan | Lines | Why it is in the batch |
+   |------|------:|------------------------|
+   | `PLAN-initial.md` | 197 | The port bring-up: almost all *Situation*, which the skill must recognise as now false |
+   | `PLAN-pip-distribution.md` | 181 | Single file, no phases, the most recent to qualify |
+   | `PLAN-hamburger-menu.md` | 571 | Small UI plan; tests whether user-facing docs already cover it |
+   | `PLAN-pr31-followup.md` | 1,558 | A follow-up plan: its future work is likely already issues |
+   | `PLAN-deferred-debt.md` | 2,776 | The hand-made harvest of other plans' future work; the hardest triage, and the evidence for the bulk-mode Future work item |
+   | `PLAN-crate-extraction.md` | 4,988 | Reasoning about the shape of the system, so the one most likely to need `ARCHITECTURE.md` |
+
+   It also exercises the skill's named-plan invocation, which the
+   two small pilots do not. The other
+   seventeen go through the issue phase 4's criterion files, as the
+   rest of the fleet's will.
+3. **The pilots run in sequence, each on the revised skill.** A
+   repository starts only when the previous pull request has had its
+   review and any skill revision it caused has merged, so each pilot
+   tests the skill the previous one produced. A pilot that finds
+   nothing to change says so in one line and needs no merge request.
+4. **Each skill revision is its own llm-setup merge request**, on a
+   branch named `retire-plans-pilot-<repo>`, cut in an llm-setup
+   worktree, pushed by Mikal (survey item 8). The management session
+   records the unpushed branch as a decision blocker
+   (`plan-blockers block --plan plan-retirement`) the moment it is
+   ready, and swaps it for the merge request (`plan-blockers add
+   private/claude!N`) once Mikal has opened it, so the SessionStart
+   hook keeps reporting it until it merges and the hand-off cannot
+   be lost as phase 2's was. Step 3b's helper fix
+   rides in the first revision.
+5. **Each pilot pull request runs its repository's `PUSH-AUDIT.md`
+   before it is pushed**, as the `plan-push-audit-phase` block
+   requires of a phase landing in another repository, and the pull
+   request body says what it found. Phase 5 then cites those audits
+   and does only its own extra check, that no retirement deleted
+   reasoning something still pointed at. This adds a sub-agent pass
+   to each pilot, which is what the block prices in.
+6. **Findings are recorded against the skill, not the plan.** For
+   each pilot the execution notes say what the reviewer agreed was
+   missing from `docs/` and was added, what the skill got wrong, and
+   the skill change it led to. A wrong retirement is corrected in its
+   own pull request before merge; what goes into the notes is why the
+   skill produced it.
+
+#### Steps
+
+| Step | Effort | Model | Isolation | Brief for sub-agent |
+|------|--------|-------|-----------|---------------------|
+| 3a | high | opus | management session (divergulent worktree, as the skill cuts it) | In `~/src/shakenfist/divergulent`, invoke `/retire-plans` bare: it should retire `PLAN-full-machine-run.md`, `PLAN-faster-full-run.md` and `PLAN-generated-marking.md`. Follow the skill exactly as written; where it is silent or wrong, do what is right, and write down the gap as you go -- that list is the pilot's output. Before asking to push, run divergulent's `PUSH-AUDIT.md` over the branch (decision 5). Push and open the pull request on Mikal's answer. Stop for his review; do not start 3b's changes until it is done. |
+| 3b | high | opus | llm-setup worktree, branch `retire-plans-pilot-divergulent` | Revise `dot-claude/skills/retire-plans/SKILL.md` and `bin/retire-plans` for what 3a and its review found. Always: `eligible` counts a row as retired only when its link is a GitHub `blob/<40-hex sha>/docs/plans/` URL to this repository; any other absolute link is a cross-repository row, reported in its own count (survey item 4), with a test using kerbside's line 30 as the fixture. Run `python3 -m unittest discover tests`. Commit; record the branch as a plan-blocker (decision 4) and ask Mikal to push it and open the merge request. |
+| 3c | high | opus | management session (kerbside worktree) | As 3a, in `~/src/shakenfist/kerbside`, on the merged revision: `PLAN-test-harness.md`, `PLAN-rust-proxy.md`, `PLAN-host-subject.md`, `PLAN-kerbside-vdi-tokens.md`. Confirm `eligible` now reports 0 already retired and 1 cross-repository row. kerbside's merge queue runs full CI for any non-docs file, so a pointer rewritten in source costs a full run; that is expected, not a reason to leave the pointer. |
+| 3d | high | opus | llm-setup worktree, branch `retire-plans-pilot-kerbside` | As 3b, for what 3c found. Skip, with one line in the notes, if nothing. |
+| 3e | high | opus | management session (ryll worktree) | As 3a, in `~/src/shakenfist/ryll`, invoking `/retire-plans` with decision 2's six file names as arguments. ryll's index has a fifth `Phases` column; `rewrite-index` handles it, and the reviewer should see every phase link there become a permalink. The pull request body says seventeen eligible plans remain and are left for the audit issue phase 4 will file; there is no issue to name yet. |
+| 3f | high | opus | llm-setup worktree, branch `retire-plans-pilot-ryll` | As 3b, for what 3e found, and decide from all three pilots whether the bulk mode in this plan's *Future work* is needed. Say so in the notes either way. |
+| 3g | medium | opus | none | Write *Phase 3 execution notes* here: a per-repository table (plans retired, plans left and why, issues filed, reviewer-agreed docs additions, skill errors, skill change), the `Merged:` lines, and any correction phase 4's brief needs -- in particular, anything the pilots showed about which rows the criterion should and should not count. |
+
+#### Risks and mitigations
+
+* **A retirement deletes reasoning nothing else held.** The one
+  failure this plan exists to prevent. Mitigated by Mikal reading
+  every deletion in divergulent and kerbside, by the ryll batch being
+  sized to be read the same way (decision 2), and by phase 5's
+  pointer check. The management session flags, in each pull request
+  body, any passage it judged not to be reasoning and is least sure
+  of, so the review starts there.
+* **Issues filed for a retirement that is then rejected.** The skill
+  closes them with a link if its pull request closes unmerged; the
+  management session checks the label's count against the body
+  (definition of done) so none is orphaned.
+* **A skill revision is lost between this shell and GitLab again.**
+  Decision 4: each is a recorded plan-blocker from the moment its
+  branch exists.
+* **The target repositories move under a long review.** ryll is busy
+  (145 commits ahead of the local clone today). The skill's own
+  rebase rule handles a conflict on a deleted plan; the management
+  session re-runs `check` after any rebase.
+* **Pilot fatigue shapes the record.** If a pilot is cut short, the
+  notes say what was not tried, rather than reporting the pilot as
+  if it ran to the end.
+
+#### Definition of done
+
+* The divergulent, kerbside and ryll pull requests have merged, each
+  retiring the plans named in its step or naming in its body each
+  plan left and why.
+* For each retired plan, on the merged default branch,
+  `git grep -n -e '<stem>' | grep -v 'blob/[0-9a-f]\{40\}/'` prints
+  nothing (only permalinks remain).
+* `retire-plans eligible` on divergulent and kerbside lists none of
+  the retired plans, and on ryll lists exactly the seventeen not in
+  the batch (plus any that have newly qualified, named in the notes).
+* For each repository, `gh issue list -R shakenfist/<repo> --label
+  from-retired-plan --state all --json number -q length` equals the
+  number of issues the pull request body says were filed.
+* The 2026-11 compliance page shows all three still passing
+  `plan-index`, `plan-source-references`, `plan-phase-references` and
+  `docs-external-links`.
+* `retire-plans eligible ~/src/shakenfist/kerbside` reports 0 already
+  retired.
+* Each skill revision is merged in llm-setup and has a `Merged:` line
+  here, or the notes say that pilot needed none.
+* *Phase 3 execution notes* exists with a row per repository.
+
+#### Back brief
+
+Before step 3a, back brief Mikal on decision 2 (a batch of six in
+ryll, and which six) and decision 5 (a push audit in each pilot
+pull request). Both are cheap to change before the pilots start and
+expensive after: the batch is the ryll review's size, and the audits
+are a sub-agent pass per repository.
 
 Merged: (one line per pilot pull request and per skill revision)
 
@@ -851,9 +1052,12 @@ Planning effort: high. It reaches `audit-manage-issues.py`.
 ### Phase 5: push audit
 
 Runs `PUSH-AUDIT.md` over every range recorded above, in this
-repository and `llm-setup`. In addition to the runbook: confirm, by
-reading the pilot pull requests, that no retirement deleted
-reasoning that `AGENTS.md` or another plan still pointed at.
+repository and `llm-setup`. The pilot pull requests in divergulent,
+kerbside and ryll each ran their own repository's `PUSH-AUDIT.md`
+before landing (phase 3, decision 5); cite those rather than
+re-running them. In addition to the runbook: confirm, by reading
+the pilot pull requests, that no retirement deleted reasoning that
+`AGENTS.md` or another plan still pointed at.
 
 ## Agent guidance
 

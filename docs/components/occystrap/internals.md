@@ -210,7 +210,11 @@ Key design considerations:
   some Docker versions don't fall back from HTTPS to HTTP, so we serve
   HTTPS with an ephemeral self-signed certificate generated via `openssl`
 - Blobs are stored as temp files during the push, then read and decompressed
-  when yielding elements
+  when yielding elements. A manifest may list the same blob at more than one
+  position (two layers with byte-identical diffs, such as a `COPY` followed
+  by a `chmod` that changes nothing), and Docker uploads such a blob only
+  once, so each temp file is deleted only after the last layer that
+  references it has been yielded
 - Thread-safe shared state (`_RegistryState`) coordinates between the HTTP
   handler threads and the main fetch() thread
 - Both `EmbeddedRegistryHandler` and `ProxyRegistryHandler` inherit from
