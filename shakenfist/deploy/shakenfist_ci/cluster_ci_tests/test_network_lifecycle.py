@@ -5,6 +5,7 @@ from testtools import content
 
 from shakenfist_client import apiclient
 from shakenfist_ci import base
+from shakenfist_ci import dhcp_state
 
 
 # The floating network's well known UUID, from
@@ -463,3 +464,17 @@ class TestReservedAddressIsNotAllocated(base.BaseNamespacedTestCase):
             apiclient.UnauthorizedException,
             self.test_client.release_network_address,
             self.net['uuid'], '192.168.245.1')
+
+
+class TestNetworkDeleteRemovesDhcpState(dhcp_state.DhcpStateTestsMixin,
+                                        base.BaseNamespacedTestCase):
+    """The multi-node run of the network node dnsmasq state assertion.
+
+    The test body comes from DhcpStateTestsMixin and also runs in the
+    smoke suite, where a break is cheap to find; this class is what runs
+    it on the topologies where the network node is a machine of its own.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'netdhcpstate'
+        super().__init__(*args, **kwargs)
