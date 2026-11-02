@@ -479,7 +479,7 @@ and cited from phase 2's *Outcome*.
 | 4. The source driver | [PLAN-proxmox-source-phase-04-source-driver.md](/components/kerbside/plans/PLAN-proxmox-source-phase-04-source-driver/) | Complete | 6519c3b |
 | 5. CI lane | [PLAN-proxmox-source-phase-05-ci-lane.md](/components/kerbside/plans/PLAN-proxmox-source-phase-05-ci-lane/) | Complete | c4b4011 |
 | 6. Docs | [PLAN-proxmox-source-phase-06-use-case-page.md](/components/kerbside/plans/PLAN-proxmox-source-phase-06-use-case-page/) | Complete | 746c7ef |
-| 7. Push audit | [PLAN-proxmox-source-phase-07-push-audit.md](/components/kerbside/plans/PLAN-proxmox-source-phase-07-push-audit/) | In progress | |
+| 7. Push audit | [PLAN-proxmox-source-phase-07-push-audit.md](/components/kerbside/plans/PLAN-proxmox-source-phase-07-push-audit/) | Complete | d2824dd |
 
 ## Relationship to other plans
 
@@ -498,7 +498,7 @@ and cited from phase 2's *Outcome*.
 
 ## Status
 
-In progress. Phases 1, 1b, 2, 3a, 3b, 4, 5 and 6 are complete.
+Complete. Every phase, the push audit included, is complete.
 - CI can build a Proxmox VE node on demand.
 - ryll tunnels through `spiceproxy`, proven against a real node
   on every ryll pull request that touches the tunnel.
@@ -514,4 +514,8 @@ In progress. Phases 1, 1b, 2, 3a, 3b, 4, 5 and 6 are complete.
 - `docs/use-cases/proxmox.md` documents the source in the shape of
   the other use-case pages, linking `console-sources.md` for setup.
 
-Phase 7, the push audit, is in progress.
+Phase 7's push audit found no critical, high or medium issue. A
+follow-up pull request fixed eleven of its twelve findings and
+declined one in writing. The issues the audit filed (#656 to #661,
+ryll #665 and #666, actions #216) carry the plan's remaining future
+work.

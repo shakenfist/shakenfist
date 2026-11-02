@@ -265,6 +265,13 @@ minted without a tunnel stores `NULL` in all three, so a session whose
 ticket is re-minted never keeps a stale tunnel, and a stored ticket
 whose `backend_connect_host` is `NULL` is dialled directly.
 
+These columns hold live credentials, for as long as a ticket lasts: 30
+seconds for Proxmox VE, and the token's remaining life plus 30 seconds
+for oVirt. Anything that copies the table therefore copies them too,
+including binary logs, replicas and backups. Each copied value expires
+on that schedule, but treat a backup or binlog taken while sessions
+were opening as holding credentials until then.
+
 ### proxychannels
 
 Active SPICE channel connections being proxied.

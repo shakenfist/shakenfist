@@ -255,7 +255,7 @@ The following options are used to configure a Proxmox VE console source
 |--------|-------------|
 | source | The name of the source (used as an identifier) |
 | type | The type of the source: `proxmox` |
-| url | The URL of the API of one node of the cluster, on port 8006 (e.g., `https://pve1.example.org:8006`). Its host is also the CONNECT proxy for every console in the source, so it must be a node, or something which forwards ports 8006 and 3128 to one |
+| url | The URL of the API of one node of the cluster, on port 8006 (e.g., `https://pve1.example.org:8006`). It must be `https`: any other scheme marks the source errored, since the token would otherwise cross the network in the clear. Its host is also the CONNECT proxy for every console in the source, so it must be a node, or something which forwards ports 8006 and 3128 to one |
 | username | The ID of an API token, in the form `user@realm!tokenid` (e.g., `kerbside@pve!console`). A password login is not supported |
 | password | The token's secret |
 | ca_cert | Required: the cluster's CA certificate, inline PEM text, not a path. It is `/etc/pve/pve-root-ca.pem` on any node. Kerbside uses it to validate the API, and as the CA for the TLS connection to each VM's SPICE server, which the same CA signed |
@@ -288,8 +288,11 @@ token do more than the token's own ACL allows. The token ID,
 The Kerbside broker must reach the host in the source's `url` on both 8006
 (the API) and 3128 (the node's SPICE proxy). Kerbside asks Proxmox to name that
 same host as the proxy for each console, so the nodes' own names never need to
-resolve from the broker. Kerbside reaches a VM's SPICE server only through
-that proxy, with an HTTP CONNECT.
+resolve from the broker, and refuses a ticket whose proxy is any other host.
+Kerbside reaches a VM's SPICE server only through that proxy, with an HTTP
+CONNECT. The CONNECT itself is plaintext, so the ticket's signed connect host
+crosses the network between the broker and that host in the clear; only the
+SPICE session inside the tunnel is TLS. Keep that network one you trust.
 
 ### Which VMs are listed
 
