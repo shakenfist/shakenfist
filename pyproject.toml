@@ -129,7 +129,7 @@ dependencies = [
     # determined by the pydantic pin and an explicit pin here can only ever
     # agree with it or break resolution.
     # never-pin: pydantic-core
-    "pydantic==2.14.1",                   # mit
+    "pydantic==2.14.2",                   # mit
     "pydantic-settings==2.16.2",          # mit
     "pydantic-extra-types==2.11.1",       # mit
 
