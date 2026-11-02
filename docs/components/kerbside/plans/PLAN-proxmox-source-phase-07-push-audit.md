@@ -324,6 +324,10 @@ None yet.
   hours after its cron time. The 04:30 functional run started at 10:58
   on 2026-10-29. So the first nightly, due 05:30 UTC on 2026-10-30, had
   not yet fired. The follow-up pull request confirms that it ran.
+- The first scheduled Proxmox nightly ran at 11:31 UTC on 2026-10-30,
+  run 41048695421, and passed.
+- 2026-10-31 AEDT, the follow-up. Mikal asked for it once #662 merged
+  as d2824dd. *Outcome*'s *Resolution* records the fixes.
 - 7g filed the issues Mikal approved, with the wording he was shown, on
   2026-10-30 AEDT:
   - shakenfist/kerbside #656, #657, #658, #659, #660 and #661;
@@ -338,8 +342,8 @@ medium finding. Four low security findings and nine advisory ones are
 in the plan's own diff, and go to the follow-up pull request. The
 management session reproduced every accepted finding against the tree.
 Eight *Future work* entries that no issue tracked, and four problems
-that predate the plan, are filed. Phase 7 stays `In progress` until the
-follow-up lands.
+that predate the plan, are filed. The follow-up pull request fixed
+eleven and declined one, and the plan is complete (*Resolution*).
 
 ### Wave results
 
@@ -387,9 +391,55 @@ follow-up lands.
 | 7 | 7e | advisory | `docs/proxy-architecture.md`, the minting sequence | Widened to "oVirt and Proxmox VE", but step 1's requested lifetime is ignored by Proxmox, and step 3's abandoned-worker risk is narrowed for Proxmox by `MINT_POST_CUTOFF`, which no doc mentions | 6519c3b |
 | 8 | 7e | advisory | `ARCHITECTURE.md`, the Proxmox VE source row | Restates the 30-second lifetime and the 409 refusal, which `console-sources.md` owns. Cut to a summary and the link (`llm-doc-discipline`) | 6519c3b |
 | 9 | 7f1 | advisory | `docs/schema.md`, the session token's backend columns | Add one sentence: these columns hold live, short-lived credentials, which therefore also reach binlogs, replicas and backups | 696f5aa, c435ea3 |
-| 10 | 7f2 | advisory | `tools/proxmox-e2e/drive-console.py`, `Lane.remember` | Also emit `::add-mask::` for each remembered value under Actions. This covers the window before the session's ticket is captured, when a daemon log tail can print | c4b4011 |
+| 10 | 7f2 | advisory | `tools/proxmox-e2e/drive-console.py`, `Lane.remember` | Also emit `::add-mask::` for each remembered value under Actions, so that output which bypasses the redaction is masked once a value is known. (Corrected in the follow-up: this does not cover the window before the session's ticket is captured, since a mask registered later cannot hide earlier output. That window stays covered by Kerbside never logging a ticket, which 7f1 checked) | c4b4011 |
 | 11 | 7d | advisory | `kerbside/tests/unit/test_db.py` | A unit-level backstop for the row lock: compile `session_ticket`'s query for MariaDB and assert it holds `FOR UPDATE`. The MariaDB test stays the real guard | 696f5aa |
 | 12 | 7d | advisory | `kerbside/tests/unit/test_sources_proxmox.py` | One test that mints through `minting.mint_with_deadline` with a Proxmox source row, so the driver's construction from the database is exercised beside the generic fakes | 6519c3b |
+
+### Resolution
+
+The follow-up pull request, `proxmox-source-phase-07-fixes`, fixed
+eleven of the twelve findings, one commit each, except findings 1 and
+2, which share files and so share one commit. It declined finding 10. Each fix has a test, except the
+documentation fixes 6 to 9 and the markers in finding 5. Each new test
+fails on a copy of the tree with its fix removed.
+
+| # | Commit |
+|---|--------|
+| 1, 2 | Hold the Proxmox driver to https and its own proxy. |
+| 3 | Unregister a minting worker that fails to start. |
+| 4 | Read qemu as the backend in the TLS claims check. |
+| 5 | Mark the Proxmox work's deliberate prints. |
+| 6 | Name Proxmox's ports in the firewall summary. |
+| 7 | Say how the minting sequence differs on Proxmox. |
+| 8 | Trim the Proxmox source row in ARCHITECTURE.md. |
+| 9 | Say the backend ticket columns reach backups. |
+| 10 | Declined; see below. |
+| 11 | Check the session ticket row is locked in a unit test. |
+| 12 | Mint a Proxmox ticket through mint_with_deadline. |
+
+Three things the fixes found:
+
+- **Finding 2's case handling.** A mutant dropping a case-folding call
+  survived, because `urlsplit()` already lowercases hostnames, so the
+  call was removed.
+- **Finding 4's proof.** It was shown on the real page. With every
+  word in the checker's condition vocabulary stripped from the
+  page's bullet, the checker now fails, and before the fix it
+  passed.
+- **Finding 10 is declined.** The fix was made and then reverted on
+  the same branch. Emitting `::add-mask::` prints the value to stdout
+  for the runner to read, and CodeQL's clear-text logging rule flagged
+  that print as a high-severity alert, following the data from the
+  `.vv` password. The flag is accurate about the data flow, whatever
+  the intent. Masking also covered less than first claimed: it cannot
+  hide output printed before a value is learned. The held values stay
+  protected by the redaction every log tail passes through, and by
+  Kerbside never logging a ticket, which 7f1 checked. A defence in
+  depth that leaves a standing high-severity alert, or needs one
+  dismissed, costs more than it adds.
+
+7d's surviving mutant, the row lock, is now caught by finding 11's
+unit test.
 
 ### Filed: future work no issue tracked
 

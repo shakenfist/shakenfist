@@ -94,5 +94,7 @@ specific to it. See for example the "Network" sections of
 - **From monitoring:** 13003, and only after you have moved
   `PROMETHEUS_METRICS_ADDRESS` off loopback onto a management address.
 - **From Kerbside:** every hypervisor's plaintext and TLS SPICE ports,
-  the database, and each configured cloud's API.
+  the database, and each configured cloud's API. For a Proxmox VE source
+  that is the host in its `url`, on 8006 for the API and 3128 for the
+  CONNECT proxy every console is reached through.
 - **Users never need a route to a hypervisor.**
