@@ -4,7 +4,7 @@ Phase 2 of [PLAN-two-tier-ci.md](/components/kerbside/plans/PLAN-two-tier-ci/). 
 `.github/workflows/sf-e2e-functional.yml` to also run on
 `pull_request`, superseding the phase 9 "dispatch/schedule only"
 caveat (decision 4 in
-[PLAN-kerbside-vdi-tokens-phase-09-e2e.md](/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/)).
+[`PLAN-kerbside-vdi-tokens-phase-09-e2e.md`](https://github.com/shakenfist/kerbside/blob/66dff1200a00e949efab9b4b16dec769fbf56c93/docs/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e.md)).
 
 ## Prompt
 
@@ -95,7 +95,7 @@ One commit, this branch (`sf-e2e-pr-promotion`):
      nightly-scheduled, NOT a PR gate — phase 9 decision 4".
    - `README.md`: the "dispatch- and nightly-scheduled"
      parenthetical in the sf-e2e paragraph.
-   - `PLAN-kerbside-vdi-tokens-phase-09-e2e.md`: annotate decision
+   - [`PLAN-kerbside-vdi-tokens-phase-09-e2e.md`](https://github.com/shakenfist/kerbside/blob/66dff1200a00e949efab9b4b16dec769fbf56c93/docs/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e.md): annotate decision
      4 as superseded (do not rewrite the historical decision).
 3. **`PLAN-two-tier-ci.md`**: mark the precondition resolved,
    record the relaxed criterion under open question 1, and set

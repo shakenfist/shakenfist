@@ -21,7 +21,7 @@ the format, the directory, and the index placement. This phase
 writes the second, for Shaken Fist.
 
 Shaken Fist is the strongest candidate to go next. Its underlying
-work is finished and proven: `PLAN-kerbside-vdi-tokens.md` is
+work is finished and proven: [`PLAN-kerbside-vdi-tokens.md`](https://github.com/shakenfist/kerbside/blob/d152faf7fbcf4ab44da09b3336989f11a4bcbdd8/docs/plans/PLAN-kerbside-vdi-tokens.md) is
 `Complete`, the `/sf-console.vv` offline exchange is implemented
 and documented, and `sf-e2e-functional.yml` exercises the whole
 path on every pull request and nightly. Nothing about the page
@@ -138,13 +138,13 @@ the pre-verification ones are not, `host_subject` pinning from
 `spice_server_cert_subject`, the `synthesize_host_subject` knob
 and its PKI caveat, and the signing-key fetch failure mode
 including `sf-ctl ensure-kerbside-signing-key` and the 404 from
-`/admin/vditokenpubkey`. That text is `PLAN-kerbside-vdi-tokens.md`
-phase 8 step B1's deliverable and was written deliberately. A
+`/admin/vditokenpubkey`. That text is [`PLAN-kerbside-vdi-tokens.md`](https://github.com/shakenfist/kerbside/blob/d152faf7fbcf4ab44da09b3336989f11a4bcbdd8/docs/plans/PLAN-kerbside-vdi-tokens.md)
+[phase 8](https://github.com/shakenfist/kerbside/blob/531218dda7b11a465fc8aa40af6a2034d1d88f94/docs/plans/PLAN-kerbside-vdi-tokens-phase-08-docs.md) step B1's deliverable and was written deliberately. A
 "How it works" section that re-narrates it creates two copies of
 a security-relevant description that will disagree within a
 release. Decision 3 is the answer.
 
-Everything else the plan assumes checks out: `PLAN-kerbside-vdi-tokens.md`
+Everything else the plan assumes checks out: [`PLAN-kerbside-vdi-tokens.md`](https://github.com/shakenfist/kerbside/blob/d152faf7fbcf4ab44da09b3336989f11a4bcbdd8/docs/plans/PLAN-kerbside-vdi-tokens.md)
 is `Complete`, `sf-e2e-functional.yml` runs on `pull_request`,
 `merge_group` and nightly as a smoke-tier gate
 (`docs/testing.md:76`, `:405-421`), `tools/sf-e2e/` holds the

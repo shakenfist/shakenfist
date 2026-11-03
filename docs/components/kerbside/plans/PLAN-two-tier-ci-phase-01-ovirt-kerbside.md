@@ -38,7 +38,7 @@ hypervisor. As a gate this lane validates that oVirt still
 installs, not that kerbside still works.
 
 Closing this also closes a recorded item from
-`PLAN-host-subject-phase-02-kerbside-adoption.md`'s future
+[`PLAN-host-subject-phase-02-kerbside-adoption.md`](https://github.com/shakenfist/kerbside/blob/cc17cc987f28855bc56700f64e46bdc92f6b1f3c/docs/plans/PLAN-host-subject-phase-02-kerbside-adoption.md)'s future
 work: *"Wiring the oVirt lane's console test through the proxy
 with `secure_port`/`host_subject` (true cross-hypervisor
 enforcement proof)"*.

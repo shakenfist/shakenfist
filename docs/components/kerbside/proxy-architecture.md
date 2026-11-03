@@ -12,6 +12,34 @@ consulting the Python side over a gRPC control socket for authorization and
 bookkeeping. It reuses the ryll `shakenfist-spice-protocol` crate for the
 SPICE wire format.
 
+## Why the proxy has this shape
+
+- **Rust, and policy left in Python.** The proxy parses bytes from the
+  internet and passes them to qemu's spice-server, which its upstream says
+  should not face the internet and whose demarshalling of client messages
+  has a history of memory-safety CVEs. The Python proxy this replaced
+  relayed opaquely once a client had authenticated, and ran a process per
+  channel. Rust brings memory safety to the component that parses
+  untrusted input, and a task rather than a process per connection; the
+  Python side keeps the database, the API and every policy decision
+  ("Python decides policy; Rust enforces it").
+- **gRPC over a unix socket for the control plane.** It brings message
+  framing, request/response correlation, deadlines and server push (the
+  `ProxyControl` stream). Shaken Fist's privexec/nodelock pattern, bare
+  protobuf over a unix socket with no message framing, was rejected because
+  a Rust peer cannot speak it reliably; Shaken Fist tracks it as technical
+  debt in
+  [shakenfist/shakenfist#3315](https://github.com/shakenfist/shakenfist/issues/3315),
+  and its own database daemon already uses gRPC.
+- **Framing kept even where policy passes everything.** The relay frames
+  the bulk server→client direction too, rather than splicing it with
+  `copy_bidirectional`: recording a session, rewriting a message and the
+  proxy originating traffic of its own (the danger-zone recording
+  indicator, a Kerbside-provided USB device) are not built, but all of them
+  need message boundaries, and an unframed fast path would rule them out.
+  The client→server direction, where strict parsing matters, carries little
+  traffic, so parsing it is cheap.
+
 ## Process Architecture
 
 `kerbside daemon run` (`kerbside/main.py`) supervises the proxy as a single
@@ -115,6 +143,47 @@ is then relayed without host-subject enforcement rather than refused
 `synthesize_host_subject` option substitutes `CN=<node fqdn>` in that case,
 which is only correct on the stock `cn=hostname` PKI and so is off by
 default. See [Console Sources](/components/kerbside/console-sources/#shaken-fist).
+
+### Backend host subject pinning
+
+The matching is done by the TLS verifier in ryll's
+`shakenfist-spice-protocol` crate, whose `host_subject.rs` module comment
+states the grammar and comparison rules. The proxy only passes the
+console's `host_subject` through (`build_config` in `backend.rs`). Its shape
+has these reasons:
+
+- **The rules are spice-common's, not the earlier Python proxy's.** They
+  replicate `subject_to_x509_name` and `verify_subject` in spice-common's
+  `common/ssl_verify.c`, which spice-gtk and virt-viewer apply to a `.vv`
+  file's `host-subject`, so one subject string is accepted or refused the
+  same way by virt-viewer, ryll and this proxy. The Python proxy rebuilt a
+  string from only the `C`, `O` and `CN` attributes and compared it
+  exactly, so a certificate carrying any other attribute could never match.
+  Two differences from OpenSSL are deliberate: values are compared with
+  ASCII case folding only, and the attributes of a multi-valued RDN are
+  compared in the order the certificate holds them rather than sorted.
+  Either can refuse a certificate OpenSSL would accept, never the reverse.
+- **It fails closed.** An unknown attribute key, a malformed string, a
+  value encoding the matcher cannot decode (TeletexString, BMPString) and
+  a mismatch all refuse the backend. A malformed pin is rejected when the
+  ryll client is constructed rather than at the handshake, so it fails even
+  where the plaintext attempt would have succeeded, and never quietly
+  becomes an unpinned connection.
+- **A pin replaces hostname verification**, as it does in spice-gtk,
+  because SPICE server certificates usually carry no subjectAltName.
+- **A refusal is audited as an ordinary failed connect.** The audit event
+  is `Hypervisor connection failed:` followed by the error chain, which for
+  a mismatch ends `invalid peer certificate: NotValidForName`; the proxy's
+  log line `TLS: rejecting certificate: pinned host_subject ...` names both
+  subjects. There is no separate audit event type, as there was none in
+  the Python proxy.
+- **oVirt's subjects need no normalisation.** The oVirt API reports
+  `host.certificate.subject` already in the spice-common form
+  (`O=local,CN=ovirt.local` from the oVirt CI engine, 2026-07-17), so the
+  oVirt source stores it as reported.
+
+The direct-qemu lane proves both outcomes against a real TLS backend; see
+[Backend host subject checks](/components/kerbside/testing/#backend-host-subject-checks).
 
 ## Connection State Machine
 
@@ -520,6 +589,37 @@ For every framed message the relay's `pump` runs:
    L2/L3 use (e.g. defanging); no rule emits it today, because silently
    dropping a mid-stream SPICE message would desynchronise the channel.
 
+### Why the rules are what they are
+
+- **A disallowed type terminates in both directions**, server→client
+  included, so a hypervisor sending malformed messages to exploit a
+  client is cut off. When a legitimate type is refused, the fix is to add
+  it to ryll's tables, never to weaken the verdict.
+- **The allowlist is only as good as ryll's name tables.** A type those
+  tables name is allowed, so a wrong entry fails open, and a missing one
+  terminates real sessions. In July 2026 the main and display tables
+  lacked several opcodes and mislabelled `INVAL_ALL_PIXMAPS`, which would
+  have ended ordinary remote-viewer sessions;
+  [ryll PR #141](https://github.com/shakenfist/ryll/pull/141) fixed them
+  before enforcement shipped.
+- **Message order within a channel is not checked.** Rules such as "init
+  before data" carry a high risk of refusing legitimate traffic, so they
+  are left to future body (L2) validation; L1 checks only the type and
+  whether the channel is permitted.
+- **The idle-read timeout (15 minutes) is a backstop** against a silent
+  client holding a connection permit forever. A client that trickles
+  bytes slowly is bounded instead by the size of the permit pool and the
+  16 MiB absolute frame guard.
+
+The rules were checked against real traffic before they shipped
+enforcing. On 2026-07-07 a remote-viewer session through the proxy in
+warn-only mode, across the main, display, inputs and cursor channels with
+about 1.17 MB relayed, recorded no verdicts at all and came nowhere near
+a size cap, which is why no cap has been tightened. The direct-qemu lane
+now holds every pull request to the same result with ryll and a WebDAV
+channel; see [Validating the SPICE
+firewall](/components/kerbside/direct-qemu-harness/#validating-the-spice-firewall).
+
 ### Warn-only mode
 
 `FirewallPolicy.mode` (`EnforcementMode::Enforce` default, or `WarnOnly`)
@@ -712,7 +812,11 @@ MariaDB — there is no API→proxy or proxy→proxy RPC across machines. The
 between a daemon and the single proxy it supervises on the same host, over
 the same UDS as every other RPC in the table above. Termination therefore
 has to be a DB-mediated intent that each node acts on independently for
-the channels it happens to hold:
+the channels it happens to hold. Two simpler designs were rejected:
+inferring termination from the token's absence would conflate it with
+natural expiry, which must never drop a live session, and an RPC from the
+API to a daemon cannot reach a proxy on another machine or behind a load
+balancer.
 
 ```mermaid
 flowchart TD
