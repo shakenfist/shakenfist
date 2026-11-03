@@ -159,6 +159,13 @@ Instances in the `error` state are not removed like those in the `deleted` state
 as we assume a caller must acknowledge an error occurred. To remove them, delete
 the instance in `error` state.
 
+The error message recorded when the instance entered its `*-error` transition
+state is carried across the move to `error`, so an errored instance still
+reports why it failed. Callers rely on this: the `sf_instance` Ansible module
+recognises a preflight capacity abort (`Unable to find suitable node`) by that
+message, and replays the create rather than failing. Leaving the error states,
+for example by a delete which ends in `deleted`, clears the message.
+
 An instance whose start can never run is errored the same way. If the
 operation carrying its preflight, start and create tasks is ended by a
 `depends_on` dependency that is missing, failed, or never reaches a terminal

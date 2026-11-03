@@ -713,7 +713,7 @@ class DatabaseBackedObject:
     @error.setter
     def error(self, msg):
         s = self.state
-        if msg and not s.value.endswith('error'):
+        if msg and not self._is_error_state_value(s.value):
             raise exceptions.InvalidStateException(
                 'Object not in error state (state=%s, object=%s)'
                 % (s, self.object_type))
