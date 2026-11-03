@@ -192,7 +192,7 @@ tick repaints it with the server's label.
 ### 7. Historical phase plans are left alone
 
 `PLAN-sfui-conversion-phase-05-consoles.md:299-300` says the
-routes are "both GET", and `PLAN-rust-proxy-phase-07-ci.md:152`
+routes are "both GET", and [`PLAN-rust-proxy-phase-07-ci.md`](https://github.com/shakenfist/kerbside/blob/76e5b4d6b7d7a28155d54810ae956562850d008a/docs/plans/PLAN-rust-proxy-phase-07-ci.md) line 152
 says POST when they are GET today. Both are records of what was
 true, or intended, when written. Only live documents get
 corrected: the master plan, `index.md`, `ARCHITECTURE.md`,

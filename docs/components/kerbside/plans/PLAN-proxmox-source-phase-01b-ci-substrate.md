@@ -38,7 +38,7 @@ order:
 
 The plan lives here in `shakenfist/kerbside/docs/plans/`,
 beside its master plan. That is the precedent phase 2 and
-PLAN-host-subject-phase-01-ryll-verifier.md set. Nothing in
+[`PLAN-host-subject-phase-01-ryll-verifier.md`](https://github.com/shakenfist/kerbside/blob/c40bdd992d9cae2d4b068672501d88dbf522600c/docs/plans/PLAN-host-subject-phase-01-ryll-verifier.md) set. Nothing in
 kerbside's code changes in this phase.
 
 The Ansible being ported is in the private repository

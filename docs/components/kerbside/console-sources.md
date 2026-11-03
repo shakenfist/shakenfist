@@ -120,6 +120,20 @@ token and virt-viewer (`.vv`) file. The audience Kerbside accepts is set by
 must equal Shaken Fist's `KERBSIDE_URL` exactly; see
 [Configuration](/components/kerbside/configuration/).
 
+The exchange is offline so that opening a console does not depend on the
+cluster's API being up. The signing keys therefore live in the database
+(`sf_token_keys`): the daemon's source writes them, and the API process,
+which holds no source objects, reads them there. The only call to Shaken
+Fist from the exchange path is the unknown-key-id refetch, debounced to one
+per minute per worker so a stream of tokens with random key ids cannot
+turn it into load on the cluster. The exchange never creates a console,
+unlike the OpenStack one: a token for a console not yet scraped is
+answered 404 *without* spending its `jti`, since a token can outlive the
+gap until the next scrape and a retry should then succeed. The issued
+`.vv` points at the proxy, from Kerbside's own configuration; the proxy
+then finds the backend from the scraped console row, never from the
+token's claims.
+
 **What the exchange audits.** A rejection that happens *after* the token
 verifies -- an unknown console, or a replayed `jti` -- names a verified source
 and console uuid, and is recorded as an audit event against that console. A
@@ -166,7 +180,10 @@ exists yet, because `sf-ctl ensure-kerbside-signing-key` has not been run --
 `/admin/vditokenpubkey` returns 404 until it has, and Shaken Fist never
 creates the key lazily. That case is logged at info level; a genuine failure
 such as an unreachable or unauthenticated cluster is logged as a warning.
-Kerbside refetches the keys on every maintenance pass, so nothing needs to be
+Kerbside refetches the keys on every maintenance pass, because the daemon
+constructs each source afresh on every pass and the fetch is part of
+construction; there is no separate refresh timer, so a change that keeps
+sources alive between passes must add one. Nothing needs to be
 restarted once the key is created.
 
 Each SPICE instance is matched to its hypervisor through the cluster's node

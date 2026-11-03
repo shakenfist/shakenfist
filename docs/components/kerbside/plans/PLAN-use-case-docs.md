@@ -41,7 +41,7 @@ Proposed pages:
 
 | Page | Notes |
 |------|-------|
-| Shaken Fist VDI | Broker embedded in SF; Ed25519 VDI console tokens (PLAN-kerbside-vdi-tokens.md); the sf-e2e lane is the worked example |
+| Shaken Fist VDI | Broker embedded in SF; Ed25519 VDI console tokens ([`PLAN-kerbside-vdi-tokens.md`](https://github.com/shakenfist/kerbside/blob/d152faf7fbcf4ab44da09b3336989f11a4bcbdd8/docs/plans/PLAN-kerbside-vdi-tokens.md)); the sf-e2e lane is the worked example |
 | OpenStack | Nova 2025.1 spice-direct; Kolla-Ansible deployment via kerbside-patches; much of docs/index.md's OpenStack section moves here |
 | oVirt | Front-door architecture per PLAN-two-tier-ci.md; written by that plan's phase 4 as the FIRST page, establishing the format |
 | Multi-cloud aggregation | One kerbside brokering several sources at once — the distinctive value proposition. Resurveyed 2026-09-22 and corrected: it is no longer one sentence. It is the `docs/index.md` Use Cases row plus a "One entry point across clouds" bullet on each of the three cloud pages — `ovirt.md:40`, `shakenfist.md:63` and `openstack.md:65` — and the last of those has grown to nine lines carrying the substantive material phase 2 found: several OpenStack clouds may be configured at once, a presented token is offered to each in `sources.yaml` order until one validates it, and the coupling that follows. The page therefore decides which of four places owns each fact rather than writing on a blank sheet. Covers the consequences: users keep one console entry point while workloads move between providers (cloud migration without retraining or re-plumbing client access), and multiple clouds in different regions present as a single VDI estate |

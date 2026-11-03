@@ -16,7 +16,7 @@ mostly in the `shakenfist-spice-protocol` crate, with a
 smaller change to the `ryll` binary's `.vv` parsing. The
 plan itself lives here in `shakenfist/kerbside/docs/plans/`,
 beside its master plan, following the precedent
-[PLAN-host-subject-phase-01-ryll-verifier.md](/components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/)
+[`PLAN-host-subject-phase-01-ryll-verifier.md`](https://github.com/shakenfist/kerbside/blob/c40bdd992d9cae2d4b068672501d88dbf522600c/docs/plans/PLAN-host-subject-phase-01-ryll-verifier.md)
 set. Sub-agents must be briefed accordingly: they work in
 the ryll checkout, and nothing in kerbside changes in this
 phase.

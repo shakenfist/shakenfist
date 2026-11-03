@@ -120,7 +120,7 @@ dial itself is ryll's, at
 `TcpStream::connect`, keepalives, an optional TLS wrap, then
 the link handshake and auth. The CONNECT has to happen
 between the TCP dial and the TLS wrap, which is inside that
-function. This is the PLAN-host-subject shape again — a ryll
+function. This is the [`PLAN-host-subject.md`](https://github.com/shakenfist/kerbside/blob/cc17cc987f28855bc56700f64e46bdc92f6b1f3c/docs/plans/PLAN-host-subject.md) shape again — a ryll
 change first, a kerbside adoption second — and it is why the
 transport work, not the driver, is what gates a Proxmox
 source.
@@ -177,7 +177,7 @@ verification, and PVE always supplies a subject, so the pin
 is the identity check — but the crate must then *refuse* a
 tunnelled connection that has no `host_subject`, rather than
 quietly ending up with no identity check on the backend leg.
-Both directions want a test, as PLAN-host-subject did.
+Both directions want a test, as [`PLAN-host-subject.md`](https://github.com/shakenfist/kerbside/blob/cc17cc987f28855bc56700f64e46bdc92f6b1f3c/docs/plans/PLAN-host-subject.md) did.
 
 **Settled**, and more pressing than it read here: the phase
 2 survey found that `ServerName::try_from` rejects a
@@ -490,7 +490,7 @@ and cited from phase 2's *Outcome*.
   queue, and phase 5 decides the lane's tier.
 - **PLAN-use-case-docs.md** — holds the deferred Proxmox
   page; phase 6 is what unblocks that row.
-- **PLAN-host-subject.md** — the precedent for a ryll change
+- **[`PLAN-host-subject.md`](https://github.com/shakenfist/kerbside/blob/cc17cc987f28855bc56700f64e46bdc92f6b1f3c/docs/plans/PLAN-host-subject.md)** — the precedent for a ryll change
   adopted by kerbside, and the origin of the pinning this
   source depends on more heavily than any other.
 - **PLAN-proxy-dev-releases.md** — its phase 3 contract hash
