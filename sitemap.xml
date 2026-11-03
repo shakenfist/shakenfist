@@ -1801,42 +1801,6 @@
          <lastmod>2026-11-03</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-host-subject/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/</loc>
          <lastmod>2026-11-03</lastmod>
     </url>
@@ -1905,42 +1869,6 @@
          <lastmod>2026-11-03</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-04-firewall/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-06-packaging/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-07-ci/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-08-cutover/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests/</loc>
          <lastmod>2026-11-03</lastmod>
     </url>
@@ -2002,42 +1930,6 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-spice-performance/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-03-control-socket/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-04-port-latency/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/</loc>
-         <lastmod>2026-11-03</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness/</loc>
          <lastmod>2026-11-03</lastmod>
     </url>
     <url>
