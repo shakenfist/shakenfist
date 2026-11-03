@@ -1,6 +1,7 @@
 import os
 import shutil
 import signal
+import time
 from typing import Any
 from typing import Optional
 from typing import Union
@@ -27,6 +28,10 @@ LOG, _ = logs.setup(__name__)
 # the old process still held its sockets, and the new one failed to bind its
 # DHCP port 13ms after the kill (#4472).
 KILL_WAIT_TIMEOUT = 5
+
+# How often _wait_for_exit()'s fallback rechecks a pid when psutil's own wait
+# could not be used.
+KILL_POLL_INTERVAL = 0.1
 
 
 class ManagedExecutable(dbo):
@@ -148,17 +153,49 @@ class ManagedExecutable(dbo):
         return False
 
     def _wait_for_exit(self, pid: int) -> None:
-        """Wait for a process we have killed, child or not, to be gone."""
+        """Wait for a process we have killed, child or not, to be gone.
+
+        This never raises. The kill is part way through a teardown -- terminate()
+        still has a configuration directory to remove, and its caller the rest of
+        a network delete to perform -- so a wait which cannot observe the exit
+        must say so and return rather than abort all of that (#4753).
+        """
+        log = LOG.with_fields({
+            'pid': pid,
+            'object_type': self.object_type,
+            'object_uuid': self.uuid
+        })
+        still_running = (f'Process still running {KILL_WAIT_TIMEOUT} seconds '
+                         'after SIGKILL')
+
         try:
             psutil.Process(pid).wait(timeout=KILL_WAIT_TIMEOUT)
+            return
         except psutil.NoSuchProcess:
-            pass
+            return
         except psutil.TimeoutExpired:
-            LOG.with_fields({
-                'pid': pid,
-                'object_type': self.object_type,
-                'object_uuid': self.uuid
-            }).warning(f'Process still running {KILL_WAIT_TIMEOUT} seconds after SIGKILL')
+            log.warning(still_running)
+            return
+        except OSError as e:
+            # psutil waits with pidfd_open() where it can, and falls back to its
+            # own waitpid() loop for only four errnos. A process which has been
+            # SIGKILLed but not yet reaped can still be found by pid while no
+            # longer having a thread group leader, and pidfd_open() answers
+            # EINVAL in that window rather than ESRCH, which psutil re-raises
+            # (#4753). Any other OSError from here is also a failure to watch
+            # the pid rather than evidence about the process, so poll instead of
+            # giving up on the wait that #4472 added.
+            log.info(f'Waiting for exit failed ({e}), polling the pid instead')
+
+        # These errors are all raised before any waiting happened, so the poll
+        # gets the whole timeout rather than what might be left of it.
+        deadline = time.time() + KILL_WAIT_TIMEOUT
+        while time.time() < deadline:
+            if not psutil.pid_exists(pid):
+                return
+            time.sleep(KILL_POLL_INTERVAL)
+
+        log.warning(still_running)
 
     def subst_dict(self) -> dict[str, Any]:
         return {

@@ -1,4 +1,5 @@
 import builtins
+import errno
 import os
 import signal
 import subprocess
@@ -721,6 +722,96 @@ class DnsMasqTestCase(testtools.TestCase):
         mock_open = mock.mock_open(read_data='424242')
         with mock.patch.object(builtins, 'open', new=mock_open):
             self.assertEqual(True, d._send_signal(signal.SIGKILL))
+
+    @mock.patch('os.path.exists', return_value=True)
+    # True for the _send_signal() guard, then False for the first poll.
+    @mock.patch('psutil.pid_exists', side_effect=[True, False])
+    @mock.patch('os.kill')
+    @mock.patch('psutil.Process')
+    def test_send_signal_polls_when_the_wait_cannot_watch_the_pid(
+            self, mock_process, mock_kill, mock_pid_exists, mock_path_exists):
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n)
+
+        # psutil's pidfd_open() fast path answers EINVAL, not ESRCH, for a
+        # process which has been SIGKILLed but not yet reaped, and re-raises
+        # it as a bare OSError. That used to escape terminate() and abandon
+        # the rest of a network delete (#4753).
+        mock_process.return_value.wait.side_effect = OSError(
+            errno.EINVAL, 'Invalid argument')
+        mock_open = mock.mock_open(read_data='424242')
+        with mock.patch.object(builtins, 'open', new=mock_open), \
+                mock.patch.object(managedexecutable, 'LOG') as mock_log:
+            self.assertEqual(True, d._send_signal(signal.SIGKILL))
+
+        # The pid was polled instead, saw the process gone, and did not
+        # complain that it was still running.
+        self.assertEqual(2, mock_pid_exists.call_count)
+        mock_log.with_fields.return_value.warning.assert_not_called()
+
+    @mock.patch('os.path.exists', return_value=True)
+    @mock.patch('psutil.pid_exists', return_value=True)
+    @mock.patch('os.kill')
+    @mock.patch('psutil.Process')
+    def test_send_signal_warns_when_the_polled_pid_will_not_die(
+            self, mock_process, mock_kill, mock_pid_exists, mock_path_exists):
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n)
+
+        mock_process.return_value.wait.side_effect = OSError(
+            errno.EINVAL, 'Invalid argument')
+        mock_open = mock.mock_open(read_data='424242')
+        with mock.patch.object(builtins, 'open', new=mock_open), \
+                mock.patch.object(managedexecutable, 'KILL_WAIT_TIMEOUT', 0.2), \
+                mock.patch.object(managedexecutable, 'KILL_POLL_INTERVAL',
+                                  0.01), \
+                mock.patch.object(managedexecutable, 'LOG') as mock_log:
+            self.assertEqual(True, d._send_signal(signal.SIGKILL))
+
+        mock_log.with_fields.return_value.warning.assert_called_once()
+        self.assertIn(
+            'still running',
+            mock_log.with_fields.return_value.warning.call_args.args[0])
+
+    @mock.patch('os.path.exists', return_value=True)
+    @mock.patch('psutil.pid_exists', side_effect=[True, False])
+    @mock.patch('os.kill')
+    @mock.patch('psutil.Process')
+    @mock.patch('shakenfist.managed_executables.dnsmasq.DnsMasq._remove_config')
+    def test_terminate_cleans_up_when_the_wait_cannot_watch_the_pid(
+            self, mock_remove_config, mock_process, mock_kill, mock_pid_exists,
+            mock_path_exists):
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+        d = dnsmasq.DnsMasq.new(n)
+
+        mock_process.return_value.wait.side_effect = OSError(
+            errno.EINVAL, 'Invalid argument')
+        mock_open = mock.mock_open(read_data='424242')
+        with mock.patch.object(builtins, 'open', new=mock_open):
+            d.terminate()
+
+        # The configuration directory must still be removed. When the wait
+        # raised, terminate() stopped here and the caller's remaining network
+        # teardown was skipped as well (#4753).
+        mock_remove_config.assert_called_once()
 
     def test_a_killed_process_which_is_not_our_child_is_gone_on_return(self):
         self.mock_mariadb = MockMariaDB(self, node_count=4)

@@ -210,6 +210,27 @@ every healthy rule in the namespace, and made a successful delete report
 failure on the one call that would have cleaned it up. Ask what the caller will
 do with the answer before choosing.
 
+## A cleanup step must not be abortable by its own instrumentation
+
+`psutil.Process.wait()` documents `NoSuchProcess` and `TimeoutExpired`, and
+`ManagedExecutable._wait_for_exit()` caught both. On Linux it waits with
+`pidfd_open()` and falls back to its own `waitpid()` loop for exactly four
+errnos, re-raising anything else as a bare `OSError`. A process which has been
+SIGKILLed but not yet reaped can still be found by pid while no longer having a
+thread group leader, and `pidfd_open()` answers EINVAL in that window rather
+than ESRCH -- so roughly once in 1,600 kills on sfcbr, waiting for a dying
+dnsmasq threw `OSError` out of `ManagedExecutable.terminate()`. The
+configuration directory `terminate()` removes next was left behind, and the
+network operation worker caught it as "Ignored error in net_op" and skipped the
+rest of that network's node teardown (#4753).
+
+Two lessons, and the second is the general one. Catch what a library's
+implementation can raise, not only what its documentation names. And a step
+added to make a teardown *safer* -- this wait exists because dnsmasq's
+replacement raced the dying process's sockets (#4472) -- must not be able to
+abort the teardown it was added to. Observing an exit is instrumentation; when
+instrumentation cannot answer, it says so and the cleanup still runs.
+
 ## Fail closed on a field, not on a formatting accident
 
 A reply that says "this went wrong" must say so in a field set only on the
