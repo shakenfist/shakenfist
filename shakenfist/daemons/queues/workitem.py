@@ -109,13 +109,31 @@ class Job(util_concurrency.Job):
             return
 
         # A work item the stuck-row reaper re-queued can name an operation
-        # which already finished. Its dependencies may since have been
+        # which has already run. Its dependencies may since have been
         # cleaned up, and judging them now would abort it after the fact
-        # (and error an instance it started). sf-network skips these too.
-        if not op.is_outstanding():
+        # (and error an instance it started).
+        #
+        # The test is "still queued", not "not terminal": an operation
+        # this dispatcher sees in executing has also already run, and
+        # this dispatcher has never executed one in any state but queued
+        # -- the check this one replaces sat below the dependency walk
+        # and required queued before calling execute(), so all the walk
+        # could do for a non-queued op was abort or defer an operation
+        # which had started. sf-net does run an op dequeued in executing,
+        # because there it is a coalescing sibling a survivor folded and
+        # did not complete; only NetOps are coalescible and they are
+        # never enqueued to an sf-queues queue (issue 4017).
+        #
+        # ``op.state`` is a property over a GetObjectState round trip, so
+        # this check reads it once into a local, and the check below the
+        # dependency walk no longer repeats that read when there was
+        # nothing to walk. Doing both reads on every dispatch cost this
+        # dispatcher two state reads per work item (issue 4760).
+        state = op.state
+        if state.value != BaseClusterOperation.STATE_QUEUED:
             op.add_event(
                 EVENT_TYPE_AUDIT,
-                f'skipping op already in terminal state {op.state.value}')
+                f'skipping op which is no longer queued, it is {state.value}')
             return
 
         op.queue_name = self.queue_name
@@ -195,9 +213,18 @@ class Job(util_concurrency.Job):
                          delay=dependency_defer_delay(op.current_defer_count))
                 return
 
-        # Ensure we haven't been aborted or something
-        if op.state.value != BaseClusterOperation.STATE_QUEUED:
-            return
+        # Ensure we haven't been aborted or something. Every path in the
+        # dependency walk above which ends this operation returned
+        # rather than falling through to here, so the only writer which
+        # can have moved the state since it was read at the top of this
+        # method is a concurrent one -- an abort from sf-api, say -- and
+        # it only had a window in which to do so if the walk went to the
+        # database at all. With no dependencies to walk, nothing has
+        # happened in between and the state read above is as fresh as a
+        # second read would be (issue 4760).
+        if op.depends_on or op.runs_after:
+            if op.state.value != BaseClusterOperation.STATE_QUEUED:
+                return
 
         # We're good to go!
         start_time = time.time()

@@ -60,9 +60,6 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
                    op_state=BaseClusterOperation.STATE_QUEUED):
         mock_op = mock.MagicMock()
         mock_op.state.value = op_state
-        # The real terminal test, so that op_state is what decides it.
-        mock_op.is_outstanding.side_effect = (
-            lambda: BaseClusterOperation.is_outstanding(mock_op))
         mock_op.depends_on = []
         mock_op.runs_after = []
 
@@ -178,12 +175,20 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
         mock_op.defer.assert_not_called()
         mock_op.execute.assert_not_called()
 
-    def test_finished_operation_is_skipped_before_its_dependencies(self):
+    def test_operation_which_has_run_is_skipped_before_its_dependencies(self):
         """A work item the stuck-row reaper re-queued after its op
-        finished must not have that op's dependencies judged again. A
+        started must not have that op's dependencies judged again. A
         dependency cleaned up since would otherwise abort a COMPLETE
-        instance_create and error the running instance it started."""
-        for op_state in [BaseClusterOperation.STATE_COMPLETE,
+        instance_create and error the running instance it started.
+
+        STATE_EXECUTING is in this list because an op in that state has
+        also already run, and this dispatcher would never have executed
+        it anyway -- the guard below the dependency walk required
+        queued, so the walk could only have aborted or deferred an
+        operation which had started (issue 4760).
+        """
+        for op_state in [BaseClusterOperation.STATE_EXECUTING,
+                         BaseClusterOperation.STATE_COMPLETE,
                          BaseClusterOperation.STATE_ABORT,
                          BaseClusterOperation.STATE_ERROR,
                          BaseClusterOperation.STATE_DELETED]:
@@ -198,7 +203,8 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
 
                     mock_op.add_event.assert_called_once_with(
                         mock.ANY,
-                        f'skipping op already in terminal state {op_state}')
+                        'skipping op which is no longer queued, it is '
+                        f'{op_state}')
                     mock_op.abort_for_unsuitable_dependency.assert_not_called()
                     mock_op.cancel_for_missing_dependency.assert_not_called()
                     mock_op.abandon_dependency_wait.assert_not_called()
@@ -245,6 +251,104 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
 
         mock_op.defer.assert_not_called()
         mock_op.execute.assert_called_once()
+
+
+class StateReadsPerDispatchTest(base.ShakenFistTestCase):
+    """How many times one dispatch reads the operation's state row.
+
+    ``op.state`` is a property over a GetObjectState round trip, and the
+    dispatcher used to make two of them for every work item it ran: one
+    above the dependency walk and one below it. On sfcbr that was a
+    visible step in the daemon's GetObjectState rate from the deploy
+    which added the first of them (issue 4760).
+    """
+
+    def _state_property(self, *values):
+        """A PropertyMock returning values in turn, then the last one.
+
+        Reads past the end repeat the final value rather than raising
+        StopIteration, so a test which asserts a read count fails on the
+        count it is asserting rather than on an exhausted side effect.
+        """
+        states = [mock.MagicMock(value=v) for v in values]
+        prop = mock.PropertyMock()
+        prop.side_effect = lambda: states[
+            min(prop.call_count - 1, len(states) - 1)]
+        return prop
+
+    def _run(self, state_prop, depends_on=(), runs_after=(),
+             dep_state=BaseClusterOperation.STATE_COMPLETE):
+        mock_op = mock.MagicMock()
+        type(mock_op).state = state_prop
+        mock_op.depends_on = list(depends_on)
+        mock_op.runs_after = list(runs_after)
+
+        mock_dep_op = mock.MagicMock()
+        mock_dep_op.state.value = dep_state
+
+        op_class = mock.MagicMock()
+        op_class.from_db.return_value = mock_op
+        dep_class = mock.MagicMock()
+        dep_class.from_db.return_value = mock_dep_op
+        classes = {'node_inst_netdesc_op': op_class, 'net_op': dep_class}
+
+        job = workitem.Job.__new__(workitem.Job)
+        job.queue_name = QUEUE_NAME
+        job.batch_size = None
+        job.log = mock.MagicMock()
+        job.workitem = {
+            'operation_type': 'node_inst_netdesc_op',
+            'operation_uuid': OP_UUID,
+            'defer_count': 0
+        }
+
+        with mock.patch(
+                'shakenfist.daemons.queues.workitem.get_object_class',
+                side_effect=lambda op_type: classes[op_type]):
+            job._cluster_operation_execute()
+
+        return mock_op
+
+    def test_dependency_free_dispatch_reads_state_once(self):
+        """Nothing happens between the two checks for an op with no
+        dependencies, so the second read cannot see anything the first
+        did not."""
+        state_prop = self._state_property(BaseClusterOperation.STATE_QUEUED)
+        mock_op = self._run(state_prop)
+
+        self.assertEqual(1, state_prop.call_count)
+        mock_op.execute.assert_called_once()
+
+    def test_skipped_op_reads_state_once(self):
+        state_prop = self._state_property(BaseClusterOperation.STATE_COMPLETE)
+        mock_op = self._run(state_prop)
+
+        self.assertEqual(1, state_prop.call_count)
+        mock_op.execute.assert_not_called()
+
+    def test_dependency_walk_rereads_state_before_executing(self):
+        """The walk does go to the database, so a concurrent writer has a
+        window -- the re-read stays for ops which have dependencies."""
+        for kind in ['depends_on', 'runs_after']:
+            with self.subTest(kind=kind):
+                state_prop = self._state_property(
+                    BaseClusterOperation.STATE_QUEUED)
+                dep = [{'op_type': 'net_op', 'op_uuid': DEP_UUID}]
+                mock_op = self._run(state_prop, **{kind: dep})
+
+                self.assertEqual(2, state_prop.call_count)
+                mock_op.execute.assert_called_once()
+
+    def test_abort_during_dependency_walk_is_still_caught(self):
+        state_prop = self._state_property(
+            BaseClusterOperation.STATE_QUEUED,
+            BaseClusterOperation.STATE_ABORT)
+        mock_op = self._run(
+            state_prop,
+            depends_on=[{'op_type': 'net_op', 'op_uuid': DEP_UUID}])
+
+        self.assertEqual(2, state_prop.call_count)
+        mock_op.execute.assert_not_called()
 
 
 class WorkItemResolutionTest(base.ShakenFistTestCase):
