@@ -682,7 +682,24 @@ class BaseClusterOperation(BaseOperation):
                                     BaseClusterOperation.STATE_ERROR,
                                     BaseClusterOperation.STATE_QUEUED]:
                 return
-        self.state = BaseClusterOperation.STATE_COMPLETE  # type: ignore[misc]
+
+        # The check above is a read and this is a write, so another process
+        # can take this operation terminal in between the two -- an instance
+        # delete aborting what targets it is the one which does (issue
+        # 4722). A terminal state is not undone, so the refusal is recorded
+        # and the operation left where it was put, rather than raising a
+        # traceback out of a job which did its work. The folded siblings are
+        # deliberately not completed: this operation was not completed
+        # either, and each of them runs itself instead.
+        try:
+            self.state = BaseClusterOperation.STATE_COMPLETE  # type: ignore[misc]
+        except exceptions.InvalidStateException:
+            self.add_event(
+                EVENT_TYPE_AUDIT,
+                'operation ended while its last task ran, not completing it',
+                extra={'state': self.state.value})
+            return
+
         self._complete_folded_siblings(folded)
 
     def _complete_folded_siblings(self, folded: list[str]) -> None:

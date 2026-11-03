@@ -2747,10 +2747,11 @@ class Instance(dbowo):
 
         Raises DatabaseUnavailable, and enqueues nothing, when the
         outstanding operations cannot be read. The walk below exists to
-        abort them and to make the delete wait for a snapshot; an empty
-        answer from a failed read would abort nothing and wait for
-        nothing, and the delete would race the snapshot's disks. There
-        is no best-effort form: a delete is never enqueued blind.
+        abort them and to make the delete wait for a snapshot or an
+        earlier delete; an empty answer from a failed read would abort
+        nothing and wait for nothing, and the delete would race the
+        snapshot's disks. There is no best-effort form: a delete is
+        never enqueued blind.
 
         Who retries is the caller's business. The API answers 503 and
         the client retries. enqueue_delete_due_error() catches the
@@ -2777,16 +2778,22 @@ class Instance(dbowo):
         # observational sweeps included, so that none of them runs against
         # an instance being deleted. Snapshots are protected, because their
         # artifact outlives the instance, and the delete waits for them
-        # instead. So does the newest mutating operation, re-read here in
-        # case one was enqueued after the walk. Operations which only target
-        # other objects, such as the network reconcile work an instance's
-        # start or hot-plug depends on, are left alone: other instances
-        # share them.
+        # instead. So is an outstanding delete, because it is already doing
+        # the work this request is asking for: aborting it stopped nothing
+        # (the abort is only read between tasks) and left its own completion
+        # write to be refused, since abort has no transition to complete
+        # (issue 4722). The delete enqueued below waits for it and finds
+        # the instance gone, or finishes the job if it did not. The newest
+        # mutating operation is waited for too, re-read here in case one was
+        # enqueued after the walk. Operations which only target other
+        # objects, such as the network reconcile work an instance's start or
+        # hot-plug depends on, are left alone: other instances share them.
         survivors = []
         for t in self.get_cluster_operations(outstanding_only=True,
                                              raise_on_error=True):
             op = t.op
-            if niso_tasks.instance_snapshot in op.tasks:
+            if (niso_tasks.instance_snapshot in op.tasks
+                    or nio_tasks.instance_delete in op.tasks):
                 survivors.append(op)
                 continue
 

@@ -1126,6 +1126,101 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.assertEqual('type_not_coalescible', op.coalesce_outcome)
 
 
+class ExecuteCompletionTestCase(base.ShakenFistTestCase):
+    """What ``execute()`` does when something ends the op underneath it.
+
+    The post-dispatch check is a read and the completion write is a
+    write, so another process can take the operation terminal between
+    the two. An instance delete aborting the operations which target it
+    is the one which does, and the refused ``abort -> complete`` then
+    logged a traceback for a job which had done its work (issue 4722).
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        # The state property stands in for MariaDB: reads answer with
+        # whatever was last written, and a write of ``complete`` is
+        # refused once ``refuse_complete`` is set, exactly as the real
+        # transition validation refuses it from ``abort``.
+        self.state_value = None
+        self.writes = []
+        self.refuse_complete = False
+
+        def state_property(*args):
+            if not args:
+                return State(value=self.state_value, update_time=0)
+
+            if (args[0] == BaseClusterOperation.STATE_COMPLETE
+                    and self.refuse_complete):
+                self.state_value = BaseClusterOperation.STATE_ABORT
+                raise exceptions.InvalidStateException(
+                    'Invalid state change from %s to %s', 'abort', 'complete')
+
+            self.writes.append(args[0])
+            self.state_value = args[0]
+
+        self.state_patcher = mock.patch.object(
+            BaseClusterOperation, 'state', new_callable=mock.PropertyMock,
+            side_effect=state_property)
+        self.state_patcher.start()
+        self.addCleanup(self.state_patcher.stop)
+
+        self.add_event_patcher = mock.patch.object(
+            BaseClusterOperation, 'add_event')
+        self.mock_add_event = self.add_event_patcher.start()
+        self.addCleanup(self.add_event_patcher.stop)
+
+        self.siblings_patcher = mock.patch.object(
+            BaseClusterOperation, '_complete_folded_siblings')
+        self.mock_siblings = self.siblings_patcher.start()
+        self.addCleanup(self.siblings_patcher.stop)
+
+    def _make_op(self):
+        op = _StubOp(_make_static_values())
+        op.dispatch_task = mock.MagicMock()
+        return op
+
+    def _end_events(self):
+        return [c for c in self.mock_add_event.call_args_list
+                if c.args[1].startswith('operation ended while')]
+
+    def test_a_job_which_ran_is_completed(self):
+        op = self._make_op()
+        op.execute()
+
+        self.assertEqual(1, op.dispatch_task.call_count)
+        self.assertEqual(
+            [BaseClusterOperation.STATE_EXECUTING,
+             BaseClusterOperation.STATE_COMPLETE], self.writes)
+        self.assertEqual([], self._end_events())
+        self.mock_siblings.assert_called_once_with([])
+
+    def test_a_refused_completion_is_recorded_not_raised(self):
+        self.refuse_complete = True
+
+        op = self._make_op()
+        op.execute()
+
+        # The work was done, and the state the other process wrote stands.
+        self.assertEqual(1, op.dispatch_task.call_count)
+        self.assertEqual(
+            [BaseClusterOperation.STATE_EXECUTING], self.writes)
+        self.assertEqual(
+            BaseClusterOperation.STATE_ABORT, self.state_value)
+
+        events = self._end_events()
+        self.assertEqual(1, len(events))
+        self.assertEqual(EVENT_TYPE_AUDIT, events[0].args[0])
+        self.assertEqual(
+            {'state': BaseClusterOperation.STATE_ABORT},
+            events[0].kwargs['extra'])
+
+        # The operation was not completed, so neither are the siblings it
+        # folded: each of them runs itself instead.
+        self.mock_siblings.assert_not_called()
+
+
 class ExecutionDurationExtraTestCase(base.ShakenFistTestCase):
     """The end-of-op event payload both dispatchers emit.
 
