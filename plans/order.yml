@@ -52,3 +52,4 @@
 - PLAN-blob-containers.md: Blobs as containers
 - PLAN-deleted-object-sweep.md: Keep the deleted-object sweep ahead of its arrivals
 - PLAN-idle-load-measurement.md: Measure database polling on an idle cluster
+- PLAN-placeable-capacity.md: Placeable capacity — placement dry runs and shape holds on claims
