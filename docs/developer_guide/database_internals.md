@@ -504,6 +504,9 @@ history:
   It does not follow `depends_on` or `runs_after`, so operations on other
   objects are not included. The per-object `/clusteroperations` endpoints
   render it, and `Instance.enqueue_delete()` walks it to decide what to abort.
+  It aborts everything it finds except a snapshot, whose artifact outlives the
+  instance, and a delete already in flight, which is doing the work the request
+  asks for -- the delete it enqueues waits for both of those instead.
 
 As a backstop for rows that outlive their operation, the table is bounded by
 a periodic prune in the cluster daemon, alongside the existing

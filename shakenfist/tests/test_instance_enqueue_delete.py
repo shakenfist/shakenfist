@@ -37,6 +37,7 @@ SWEEP_TASKS = [
     node_inst_op.model_tasks.health_check_kvm_process,
 ]
 SNAPSHOT_TASKS = [node_inst_snap_op.model_tasks.instance_snapshot]
+DELETE_TASKS = [node_inst_op.model_tasks.instance_delete]
 
 
 def _instance():
@@ -140,6 +141,32 @@ class InstanceEnqueueDeleteTestCase(base.ShakenFistTestCase):
         self.assertEqual([bco.STATE_ABORT], hot_plug.states)
         self.assertEqual([], snap.states)
         self.assertEqual([_pointer(snap), _pointer(hot_plug)], runs_after)
+
+    def test_outstanding_delete_is_spared_and_waited_for(self):
+        # A delete is already doing what this request asks for, so aborting
+        # it stopped nothing and only left its own completion write to be
+        # refused (issue 4722).
+        delete = _op(ObjectType.NODE_INST_OP, DELETE_TASKS)
+
+        runs_after = self._delete(
+            [TargetedOperation(delete, False)], pointer=_pointer(delete))
+
+        self.assertEqual([], delete.states)
+        self.assertEqual([], self._aborted_ops())
+        self.assertEqual([_pointer(delete)], runs_after)
+
+    def test_outstanding_delete_behind_a_newer_hot_plug_is_waited_for(self):
+        delete = _op(ObjectType.NODE_INST_OP, DELETE_TASKS)
+        hot_plug = _op(ObjectType.NODE_INST_NET_IFACE_OP, HOT_PLUG_TASKS)
+
+        runs_after = self._delete(
+            [TargetedOperation(hot_plug, False),
+             TargetedOperation(delete, False)],
+            pointer=_pointer(hot_plug))
+
+        self.assertEqual([bco.STATE_ABORT], hot_plug.states)
+        self.assertEqual([], delete.states)
+        self.assertEqual([_pointer(delete), _pointer(hot_plug)], runs_after)
 
     def test_op_which_cannot_be_aborted_is_not_waited_for(self):
         finished = _op(ObjectType.NODE_INST_OP, SWEEP_TASKS,
@@ -259,6 +286,35 @@ class InstanceEnqueueDeleteSqlTestCase(
             [(ObjectType.NODE_INST_SNAP_OP, snap),
              (ObjectType.NODE_INST_NET_IFACE_OP, hot_plug)],
             [(d['op_type'], d['op_uuid']) for d in delete.runs_after])
+
+    def test_delete_walk_spares_an_executing_delete(self):
+        # A second DELETE while the first instance_delete is executing used
+        # to abort it, which stopped nothing -- the abort is only read
+        # between tasks -- and then had the executor's own completion write
+        # refused, because abort has no transition to complete (issue 4722).
+        # The second delete waits for the first instead.
+        _, first = node_inst_op.create_and_enqueue(
+            NODE_UUID, INSTANCE_UUID, DELETE_TASKS, PRIORITY.user_facing)
+        _, sweep = node_inst_op.create_and_enqueue(
+            NODE_UUID, INSTANCE_UUID, SWEEP_TASKS, PRIORITY.background)
+        self._set_op_state(first, 'executing')
+
+        inst = _instance()
+        with mock.patch.object(
+                instance.Instance, 'placement',
+                new_callable=mock.PropertyMock,
+                return_value={'node': NODE_UUID}), \
+                mock.patch('shakenfist.instance.add_event_multi'), \
+                mock.patch('shakenfist.eventlog.add_event'):
+            inst.enqueue_delete()
+            second = inst.get_cluster_operations()[0].op
+
+        self.assertEqual('executing', self._op_state(first))
+        self.assertEqual('abort', self._op_state(sweep))
+        self.assertEqual(DELETE_TASKS, second.tasks)
+        self.assertEqual(
+            [(ObjectType.NODE_INST_OP, first)],
+            [(d['op_type'], d['op_uuid']) for d in second.runs_after])
 
     def test_delete_walk_aborts_an_executing_operation(self):
         # The walk reads every outstanding target, and an operation which
