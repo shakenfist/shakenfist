@@ -16570,7 +16570,10 @@ history:</p>
   <code>has_pending_cluster_operation()</code> ignores them.
   It does not follow <code>depends_on</code> or <code>runs_after</code>, so operations on other
   objects are not included. The per-object <code>/clusteroperations</code> endpoints
-  render it, and <code>Instance.enqueue_delete()</code> walks it to decide what to abort.</li>
+  render it, and <code>Instance.enqueue_delete()</code> walks it to decide what to abort.
+  It aborts everything it finds except a snapshot, whose artifact outlives the
+  instance, and a delete already in flight, which is doing the work the request
+  asks for -- the delete it enqueues waits for both of those instead.</li>
 </ul>
 <p>As a backstop for rows that outlive their operation, the table is bounded by
 a periodic prune in the cluster daemon, alongside the existing
