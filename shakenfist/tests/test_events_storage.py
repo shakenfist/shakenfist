@@ -162,34 +162,110 @@ class EnsureEventObjectsSchemaTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=0)
-    def test_fresh_engine_creates_table_and_returns_version_1(
+    def test_fresh_engine_creates_table_at_the_target_version(
             self, mock_get_version, mock_set_version):
-        """Starting from version 0: schema creates the table, returns target=1 and migrated=True."""
+        """Starting from version 0: schema creates the table at the target version.
+
+        A fresh create goes straight to the target rather than to v1 and
+        then through the migration, because create_all() has already made
+        the timestamp column and its index.
+        """
         mock_engine = mock.MagicMock()
 
         with mock.patch('sqlalchemy.MetaData.create_all'):
             result = mariadb._ensure_event_objects_schema(mock_engine)
 
         self.assertEqual(result['table'], 'event_objects')
-        self.assertEqual(result['target_version'], 1)
+        self.assertEqual(result['target_version'],
+                         mariadb.EVENT_OBJECTS_VERSION)
         self.assertEqual(result['start_version'], 0)
-        self.assertEqual(result['end_version'], 1)
+        self.assertEqual(result['end_version'],
+                         mariadb.EVENT_OBJECTS_VERSION)
         self.assertTrue(result['migrated'])
-        mock_set_version.assert_called_once_with(mock_engine, 'event_objects', 1)
+        mock_set_version.assert_called_once_with(
+            mock_engine, 'event_objects', mariadb.EVENT_OBJECTS_VERSION)
 
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)
-    def test_already_at_version_1_is_noop(
+    @mock.patch('shakenfist.mariadb._get_table_version')
+    def test_already_at_target_version_is_noop(
             self, mock_get_version, mock_set_version):
-        """Table already at v1: no DDL, no version bump, migrated=False."""
+        """Table already at the target: no DDL, no version bump, migrated=False."""
+        mock_get_version.return_value = mariadb.EVENT_OBJECTS_VERSION
         mock_engine = mock.MagicMock()
 
         result = mariadb._ensure_event_objects_schema(mock_engine)
 
         self.assertEqual(result['table'], 'event_objects')
-        self.assertEqual(result['target_version'], 1)
+        self.assertEqual(result['target_version'],
+                         mariadb.EVENT_OBJECTS_VERSION)
         self.assertFalse(result['migrated'])
         mock_set_version.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)
+    def test_v1_adds_the_column_backfills_then_indexes(
+            self, mock_get_version, mock_set_version):
+        """v1 -> v2 adds the column, backfills it from events, then indexes it.
+
+        The order matters in both directions: the backfill cannot run
+        before the column exists, and building the index after it means
+        the index is built once from finished data rather than maintained
+        row by row through the update.
+        """
+        conn = _MockConnection()
+        mock_engine = _MockEngine(conn)
+
+        result = mariadb._ensure_event_objects_schema(mock_engine)
+
+        rendered = [str(stmt) for stmt in conn.executed]
+        self.assertEqual(3, len(rendered))
+        self.assertIn('ADD COLUMN timestamp DOUBLE NOT NULL DEFAULT 0',
+                      rendered[0])
+        self.assertIn('UPDATE event_objects eo', rendered[1])
+        self.assertIn('SET eo.timestamp = e.timestamp', rendered[1])
+        # Only the rows the column default left behind, so a run which
+        # died part way through resumes rather than starting over.
+        self.assertIn('WHERE eo.timestamp = 0', rendered[1])
+        self.assertIn('CREATE INDEX IF NOT EXISTS '
+                      'idx_event_objects_object_timestamp', rendered[2])
+        self.assertIn('(object_type, object_uuid, timestamp)', rendered[2])
+
+        self.assertEqual(result['end_version'], 2)
+        self.assertTrue(result['migrated'])
+        mock_set_version.assert_called_once_with(
+            mock_engine, 'event_objects', 2)
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)
+    def test_a_failed_backfill_does_not_advance_the_version(
+            self, mock_get_version, mock_set_version):
+        """The read orders by the new column, so a half-filled one must not be
+        recorded as migrated: the next run has to finish the backfill.
+        """
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            _MockResult(),
+            OperationalError('UPDATE', {}, Exception('lock wait timeout')),
+        ])
+        mock_engine = _MockEngine(conn)
+
+        self.assertRaises(
+            OperationalError,
+            mariadb._ensure_event_objects_schema, mock_engine)
+        mock_set_version.assert_not_called()
+
+    def test_the_read_index_covers_the_object_key_and_the_sort_key(self):
+        """The declared index is what the per-object read's ORDER BY needs.
+
+        Without the sort key in the same index, and behind the object key,
+        the read joins the object's whole history and filesorts it.
+        """
+        table = mariadb._get_event_objects_table()
+        indexes = {idx.name: [c.name for c in idx.columns]
+                   for idx in table.indexes}
+        self.assertEqual(
+            ['object_type', 'object_uuid', 'timestamp'],
+            indexes['idx_event_objects_object_timestamp'])
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +300,7 @@ class DirectRecordEventBatchTestCase(base.ShakenFistTestCase):
             sa.Column('object_type', sa.String(32), nullable=False),
             sa.Column('object_uuid', sa.String(36), nullable=False),
             sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+            sa.Column('timestamp', sa.Double(), nullable=False),
         )
         mock_get_events_table.return_value = events_table
         mock_get_event_objects_table.return_value = event_objects_table
@@ -262,6 +339,7 @@ class DirectRecordEventBatchTestCase(base.ShakenFistTestCase):
             sa.Column('object_type', sa.String(32), nullable=False),
             sa.Column('object_uuid', sa.String(36), nullable=False),
             sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+            sa.Column('timestamp', sa.Double(), nullable=False),
         )
         mock_get_events_table.return_value = events_table
         mock_get_event_objects_table.return_value = event_objects_table
@@ -316,6 +394,7 @@ class DirectRecordEventBatchTestCase(base.ShakenFistTestCase):
             sa.Column('object_type', sa.String(32), nullable=False),
             sa.Column('object_uuid', sa.String(36), nullable=False),
             sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+            sa.Column('timestamp', sa.Double(), nullable=False),
         )
         mock_get_events_table.return_value = events_table
         mock_get_event_objects_table.return_value = event_objects_table
@@ -432,6 +511,52 @@ class DirectRecordEventBatchTestCase(base.ShakenFistTestCase):
         # All inserts were executed -- the loop is not short-circuited.
         self.assertEqual(len(conn.executed), 6)
 
+    @mock.patch('shakenfist.mariadb._get_event_objects_table')
+    @mock.patch('shakenfist.mariadb._get_events_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_every_object_row_carries_the_events_timestamp(
+            self, mock_get_engine, mock_get_events_table,
+            mock_get_event_objects_table):
+        """Each event_objects row is written with its event's timestamp.
+
+        The read sorts on this column, so a row written without it sorts
+        at the column default and an object's history comes back in an
+        arbitrary order rather than newest first.
+        """
+        events_table, event_objects_table = _make_events_and_objects_tables()
+        mock_get_events_table.return_value = events_table
+        mock_get_event_objects_table.return_value = event_objects_table
+
+        conn = _MockConnection()
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        record = EventRecord(
+            event_uuid=EVENT_UUID_1,
+            event_type='audit',
+            timestamp=1_234_567_890.0,
+            fqdn='test-node.example.com',
+            duration=None,
+            message='multi-object event',
+            extra=None,
+            request_id=None,
+            objects=[
+                ('instance', OBJ_UUID_1),
+                ('network', OBJ_UUID_2),
+                ('interface', OBJ_UUID_3),
+            ],
+        )
+
+        self.assertTrue(mariadb._direct_record_event_batch([record]))
+
+        # The first execute is the events row; the remaining three are
+        # the object rows, and every one of them must carry the time.
+        object_inserts = conn.executed[1:]
+        self.assertEqual(3, len(object_inserts))
+        for stmt in object_inserts:
+            self.assertEqual(
+                1_234_567_890.0,
+                stmt.compile().params['timestamp'])
+
 
 # ---------------------------------------------------------------------------
 # Public router tests (record_event_batch)
@@ -541,6 +666,7 @@ def _make_events_and_objects_tables():
         sa.Column('object_type', sa.String(32), nullable=False),
         sa.Column('object_uuid', sa.String(36), nullable=False),
         sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+        sa.Column('timestamp', sa.Double(), nullable=False),
     )
     return events_table, event_objects_table
 
@@ -1516,6 +1642,26 @@ class DirectGetObjectEventsTestCase(base.ShakenFistTestCase):
         results = mariadb._direct_get_object_events('instance', _OBJ_UUID_X)
 
         self.assertEqual([], results)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_sorts_on_the_indexed_copy_of_the_timestamp(self, mock_get_engine):
+        """The ORDER BY names eo.timestamp, not e.timestamp.
+
+        Both columns hold the same value, but only the event_objects copy
+        sits in an index behind the object key, so sorting on the events
+        side instead means MariaDB joins every event the object has ever
+        had and filesorts the lot to return one page -- measured at 19
+        seconds for a node with a quarter of a million references, and
+        unbounded as a node's history grows.
+        """
+        conn = _MockConnection(result=_MockResult(rows=[]))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        mariadb._direct_get_object_events('node', _OBJ_UUID_X)
+
+        rendered = str(conn.executed[0])
+        self.assertIn('ORDER BY eo.timestamp DESC', rendered)
+        self.assertNotIn('ORDER BY e.timestamp', rendered)
 
 
 # ---------------------------------------------------------------------------

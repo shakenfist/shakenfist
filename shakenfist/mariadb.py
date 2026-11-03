@@ -524,7 +524,9 @@ WORK_QUEUE_VERSION = 2
 CLUSTER_LOCKS_VERSION = 4
 CLUSTER_CONFIG_VERSION = 2
 EVENTS_VERSION = 1
-EVENT_OBJECTS_VERSION = 1
+# v2 denormalises events.timestamp into event_objects so that an
+# object's newest events have an index to come off.
+EVENT_OBJECTS_VERSION = 2
 # Scheduler-reservations capacity tables (see docs/plans/
 # PLAN-scheduler-reservations-phase-02-capacity-tables.md). v1: schema
 # creation.
@@ -2815,6 +2817,18 @@ def _get_event_objects_table() -> sa.Table:
     supports the per-object read path
     (WHERE object_type = ? AND object_uuid = ?) by prefix.
 
+    The timestamp column is a copy of events.timestamp, written by the
+    same transaction that writes both rows. It is here so that the
+    per-object read has an index which serves its ORDER BY as well as
+    its WHERE: the primary key ends in event_uuid, so selecting an
+    object's newest events by the events-side timestamp meant joining
+    every event the object has ever had and filesorting the lot to
+    return a page of 100. That cost grows without bound with an
+    object's history, and had reached 19 seconds for a node with a
+    quarter of a million references -- close enough to the gRPC
+    deadline that the read timed out. idx_event_objects_object_timestamp
+    turns it into a backwards index scan which stops at the limit.
+
     The secondary index on event_uuid supports the prune-side join
     against events, avoiding a full scan when deleting child rows
     ahead of orphan parent rows.
@@ -2837,9 +2851,13 @@ def _get_event_objects_table() -> sa.Table:
                 sa.Column('object_type', sa.String(32), nullable=False),
                 sa.Column('object_uuid', sa.String(36), nullable=False),
                 sa.Column('event_uuid', sa.CHAR(36), nullable=False),
+                sa.Column('timestamp', sa.Double(), nullable=False,
+                          server_default=sa.text('0')),
                 sa.PrimaryKeyConstraint(
                     'object_type', 'object_uuid', 'event_uuid'),
                 sa.Index('idx_event_objects_event', 'event_uuid'),
+                sa.Index('idx_event_objects_object_timestamp',
+                         'object_type', 'object_uuid', 'timestamp'),
             )
     return _event_objects_table
 
@@ -2852,10 +2870,51 @@ def _ensure_event_objects_schema(engine: sa.Engine) -> dict[str, Any]:
     table = _get_event_objects_table()
 
     if current_ver <= 0:
-        LOG.info(f'Creating {table_name} table (version 1)')
+        LOG.info(f'Creating {table_name} table '
+                 f'(version {EVENT_OBJECTS_VERSION})')
         table.metadata.create_all(
             engine, tables=[table], checkfirst=True)
-        current_ver = 1
+        current_ver = EVENT_OBJECTS_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 2:
+        # v2 copies events.timestamp into this table and indexes it with
+        # the object key, because nothing in v1 could serve the
+        # per-object read's ORDER BY -- see _get_event_objects_table().
+        # The backfill finds each events row by primary key, and the
+        # index is created after it so it is built once from finished
+        # data rather than maintained through the update. A failure here
+        # is deliberately not swallowed: the version must not advance
+        # over a half-filled column, because the read orders by it.
+        LOG.info(f'Upgrading {table_name} from v{current_ver} to v2: '
+                 'denormalising events.timestamp.')
+        with engine.connect() as conn:
+            try:
+                conn.execute(sa.text(
+                    f'ALTER TABLE {table_name} ADD COLUMN '
+                    'timestamp DOUBLE NOT NULL DEFAULT 0'))
+                conn.commit()
+            except (IntegrityError, OperationalError) as e:
+                LOG.debug(f'timestamp column already exists on '
+                          f'{table_name} or could not be added: {e}')
+
+            # Restartable: a run which died part way through leaves the
+            # rows it did not reach at the default, and they are exactly
+            # the rows this picks up next time.
+            conn.execute(sa.text(
+                f'UPDATE {table_name} eo '
+                'JOIN events e ON e.event_uuid = eo.event_uuid '
+                'SET eo.timestamp = e.timestamp '
+                'WHERE eo.timestamp = 0'))
+            conn.commit()
+
+            conn.execute(sa.text(
+                'CREATE INDEX IF NOT EXISTS '
+                'idx_event_objects_object_timestamp '
+                f'ON {table_name} (object_type, object_uuid, timestamp)'))
+            conn.commit()
+
+        current_ver = 2
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -6108,6 +6167,7 @@ def _direct_record_event_batch(events: list[EventRecord]) -> bool:
                         object_type=object_type,
                         object_uuid=object_uuid,
                         event_uuid=record.event_uuid,
+                        timestamp=record.timestamp,
                     )
                     conn.execute(obj_stmt)
     except OperationalError as e:
@@ -6540,9 +6600,15 @@ def _direct_get_object_events(
         event_type: Optional[str] = None) -> list[EventReadRow]:
     """Read events for one (object_type, object_uuid) directly.
 
-    Drives off the event_objects PK prefix (object_type, object_uuid)
-    and joins through events.event_uuid for the per-event scalar
-    columns. Optionally filters on event_type; when the caller passes
+    Drives off idx_event_objects_object_timestamp, which covers the
+    object key and the sort key together, and joins through
+    events.event_uuid for the per-event scalar columns. The ORDER BY
+    names the event_objects copy of the timestamp rather than the
+    events one deliberately: the two carry the same value, written by
+    one transaction, but only the copy is in an index with the object
+    key ahead of it, and ordering on the events side instead means
+    joining the object's whole history and filesorting it to return a
+    page. Optionally filters on event_type; when the caller passes
     ``event_type=None`` the bound parameter is the empty string and
     the SQL ``(:event_type_filter = '' OR ...)`` clause short-circuits
     so no rows are excluded.
@@ -6561,7 +6627,7 @@ def _direct_get_object_events(
         event_type: Optional event-type filter; ``None`` means any.
 
     Returns:
-        List of ``EventReadRow`` ordered by ``events.timestamp``
+        List of ``EventReadRow`` ordered by event timestamp
         descending. Empty list on OperationalError or if no events
         match.
     """
@@ -6580,7 +6646,7 @@ def _direct_get_object_events(
         WHERE eo.object_type = :object_type
           AND eo.object_uuid = :object_uuid
           AND (:event_type_filter = '' OR e.event_type = :event_type_filter)
-        ORDER BY e.timestamp DESC
+        ORDER BY eo.timestamp DESC
         LIMIT :limit
     ''')
 
