@@ -138,6 +138,54 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
         mock_mariadb_set_state.assert_not_called()
 
     @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_state',
+                return_value=State(value='preflight-error', update_time=4,
+                                   message='Unable to find suitable node'))
+    def test_error_to_error_transition_keeps_message(
+            self, mock_mariadb_get_state, mock_mariadb_set_state,
+            mock_add_event):
+        # The delete of an instance in an -error state ends in state
+        # error. The message is the only record of why it failed, so the
+        # transition must not clear it (issue 4776).
+        d = DatabaseBackedObject('12345678-1234-4321-8234-123456789012')
+        d._state_update(DatabaseBackedObject.STATE_ERROR,
+                        skip_transition_validation=True)
+        written = mock_mariadb_set_state.call_args.args[2]
+        self.assertEqual(DatabaseBackedObject.STATE_ERROR, written.value)
+        self.assertEqual('Unable to find suitable node', written.message)
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_state',
+                return_value=State(value='preflight-error', update_time=4,
+                                   message='Unable to find suitable node'))
+    def test_error_to_error_transition_takes_a_new_message(
+            self, mock_mariadb_get_state, mock_mariadb_set_state,
+            mock_add_event):
+        d = DatabaseBackedObject('12345678-1234-4321-8234-123456789012')
+        d._state_update(DatabaseBackedObject.STATE_ERROR,
+                        skip_transition_validation=True,
+                        message='a different reason')
+        written = mock_mariadb_set_state.call_args.args[2]
+        self.assertEqual('a different reason', written.message)
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_state',
+                return_value=State(value=DatabaseBackedObject.STATE_ERROR,
+                                   update_time=4, message='bad error'))
+    def test_transition_out_of_error_clears_message(
+            self, mock_mariadb_get_state, mock_mariadb_set_state,
+            mock_add_event):
+        d = DatabaseBackedObject('12345678-1234-4321-8234-123456789012')
+        d._state_update(DatabaseBackedObject.STATE_DELETED,
+                        skip_transition_validation=True)
+        written = mock_mariadb_set_state.call_args.args[2]
+        self.assertEqual(DatabaseBackedObject.STATE_DELETED, written.value)
+        self.assertIsNone(written.message)
+
+    @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch('shakenfist.mariadb.set_state', return_value=False)
     @mock.patch('shakenfist.mariadb.get_state',
                 return_value=State(value=DatabaseBackedObject.STATE_INITIAL,

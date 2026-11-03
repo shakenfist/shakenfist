@@ -649,6 +649,18 @@ class DatabaseBackedObject:
                         'object=%s uuid=%s',
                         orig.value, new_value, self.object_type, self.uuid)
 
+        # Moving from one error state to another keeps the message which
+        # says why the object failed. The delete of an object in an -error
+        # transition state ends in state error, and the message set when the
+        # error was raised is the only machine readable record of its cause:
+        # clearing it here left every instance which preflight aborted in
+        # state error with no error_message, so a client could no longer
+        # tell a capacity abort from any other failure (issue 4776).
+        if (message is None and state_attribute_name == 'state' and
+                self._is_error_state_value(orig.value) and
+                self._is_error_state_value(new_value)):
+            message = orig.message
+
         new_state = State(value=new_value, update_time=time.time(), message=message)
 
         # Primary state is stored in MariaDB, except for in-memory only
@@ -681,22 +693,27 @@ class DatabaseBackedObject:
     def state(self, new_value):
         self._state_update(new_value)
 
+    @staticmethod
+    def _is_error_state_value(value):
+        return bool(value) and value.endswith('error')
+
     @property
     def error(self):
         # The error message is stored as the message on the object's state
         # row, which every object type persists (issue 3899: the previous
         # 'error' attribute write was silently discarded for every type
         # except Instance). It is only meaningful while the object is in an
-        # error state; _state_update() clears it on the next transition.
+        # error state; _state_update() clears it on a transition out of the
+        # error states, and carries it across one between them.
         s = self.state
-        if s.value and s.value.endswith('error'):
+        if self._is_error_state_value(s.value):
             return s.message
         return None
 
     @error.setter
     def error(self, msg):
         s = self.state
-        if msg and not s.value.endswith('error'):
+        if msg and not self._is_error_state_value(s.value):
             raise exceptions.InvalidStateException(
                 'Object not in error state (state=%s, object=%s)'
                 % (s, self.object_type))

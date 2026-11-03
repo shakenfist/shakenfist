@@ -75,6 +75,38 @@ class EnqueueDeleteDueErrorTestCase(base.ShakenFistTestCase):
         mock_enqueue_delete.assert_called_once_with()
 
 
+class PreflightAbortMessageTestCase(base.ShakenFistTestCase):
+    """A preflight capacity abort must still carry its message once the
+    delete it queues has moved the instance to state error (issue 4776).
+
+    sf_instance's capacity wait identifies a preflight abort by the
+    instance's error_message, and usually reads the instance back after
+    the delete has finished. Clearing the message on the preflight-error
+    to error transition left it nothing to match, so it failed the task
+    instead of replaying the create.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+
+    @mock.patch('shakenfist.instance.Instance.enqueue_delete')
+    def test_message_survives_the_delete(self, mock_enqueue_delete):
+        inst = self.mock_mariadb.create_instance(
+            'preflightabort', set_state=Instance.STATE_PREFLIGHT)
+
+        inst.enqueue_delete_due_error('Unable to find suitable node')
+        self.assertEqual(Instance.STATE_PREFLIGHT_ERROR, inst.state.value)
+        mock_enqueue_delete.assert_called_once_with()
+
+        inst._delete_globally()
+
+        refetched = Instance.from_db(inst.uuid)
+        self.assertEqual(Instance.STATE_ERROR, refetched.state.value)
+        self.assertEqual('Unable to find suitable node', refetched.error)
+
+
 class UnreadableOperationsTestCase(base.ShakenFistTestCase):
     """Instance.enqueue_delete() refuses to enqueue a delete when the
     operations targeting the instance cannot be read (issue 4671). The
