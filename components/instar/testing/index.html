@@ -19306,6 +19306,20 @@ asserted by <code>tools/ci/test-push-fuzz-corpus.sh</code>, which runs against
 local repositories in the <code>CI tooling guards</code> job. The step also
 carries its own 20-minute <code>timeout-minutes</code>, so a future regression
 fails loudly instead of eating the job.</p>
+<p><strong>No GitLab token may be written into the testdata tree.</strong> The nightly
+seeds its corpus from that tree and pushes what the fuzzer keeps back
+into instar-testdata, whose disk every instar runner mounts. From April
+to September 2026 the push token travelled in the tree's remote URL,
+the seed walk read <code>.git/config</code>, and eight corpus entries carrying the
+token were pushed (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4714" title="GitHub Issue: shakenfist/shakenfist #4714">shakenfist#4714</a>). The token was rotated
+and the entries removed. Now <code>tools/ci/prepare-testdata.sh</code> and
+<code>tools/ci/verify-corpus-push-token.sh</code> keep the remote URL clean and
+hand the token to git and git-lfs through a credential store on tmpfs,
+set up by <code>tools/ci/gitlab-credential.sh</code> and removed on exit.
+<code>push-fuzz-corpus.sh</code> refuses to push any new entry that contains a
+credential URL (<code>oauth2:…@</code>), naming the files but never their
+contents. <code>test-prepare-testdata.sh</code> and <code>test-push-fuzz-corpus.sh</code>
+assert both.</p>
 <p>These rules make that reporting safe, most of them learned from a month
 of silently broken nightlies:</p>
 <ul>
