@@ -643,3 +643,33 @@ The same shape of trap exists wherever a property hides a query.
 `Blob.depends_on` and `Blob.transcoded` each ran their own filtered
 `get_references_from` while the caller had already read the same rows
 unfiltered; that was the other half of #3876.
+
+## A `no_log` default is a cluster-wide redaction
+
+An option declared `no_log: true` in a role's `meta/argument_specs.yml` is not
+a per-task setting. Ansible registers whatever value the argument spec
+validated as a secret for the rest of the run, and from ansible-core 2.22
+every later occurrence of that exact string anywhere in the output -- task
+names, assert messages, variables which have nothing to do with the option --
+comes out as `$REDACTED$`.
+
+The value validated is usually the role's own default, because an option an
+operator did not set still gets validated. The node role defaulted
+`system_key`, which the `kerbside_credentials` entry point declares `no_log`,
+to `"unknown"`, so a deploy which left it alone -- any deploy reading the key
+from Vault, for one -- masked an ordinary English word out of every message of
+the run. Upstream, the `shakenfist.kerbside` collection declared the whole
+`kerbside_sources` list `no_log`, which registered each source's
+`type: shakenfist` and turned a passing task header into
+`TASK [$REDACTED$.kerbside.kerbside : ...]`; that failed the Kerbside wiring
+test on every pull request in this repository until ansible-core was pinned
+below 2.22 (issue #4773, kerbside#687).
+
+So the default of a `no_log` option must be a string which cannot occur
+anywhere else: empty, which the masker ignores, or a `change-me-<thing>`
+placeholder matching the example inventories. `defaults/main.yml` has to agree
+with the spec, since it is the value a run actually validates.
+`test_collection_no_log_defaults.py` checks both. Narrow `no_log` to the
+fields which are secret rather than declaring a structure that contains one,
+and remember that `no_log` on a *task* is a different thing -- it suppresses
+that task's own output and registers nothing.

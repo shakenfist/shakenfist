@@ -4,6 +4,15 @@
 # the values here are only safe single-host fallbacks. Secrets
 # (mariadb_password, system_key) have deliberately non-functional defaults so a
 # misconfigured deploy fails loudly rather than shipping a known key.
+#
+# Those two placeholders are also strings which appear nowhere else, which is
+# load bearing: an option declared no_log in meta/argument_specs.yml -- as
+# system_key is for the kerbside_credentials entry point -- registers whatever
+# value it validates as a secret, and from ansible-core 2.22 that redacts
+# every later occurrence of the string from the entire run's output. A
+# placeholder like "unknown" therefore masks an ordinary English word out of
+# every task name and message of a deploy which did not override it (issue
+# 4773).
 
 # Per-node identity.
 node_name: "localhost"
@@ -34,13 +43,13 @@ all_mesh_hosts: {}
 deploy_name: "sf"
 api_url: "http://localhost:13000"
 floating_network_ipblock: "10.10.0.0/24"
-system_key: "unknown"
+system_key: "change-me-system-key"
 
 # Direct MariaDB access, rendered into /etc/sf/config only on database nodes.
 mariadb_host: "localhost"
 mariadb_port: 3306
 mariadb_user: "shakenfist"
-mariadb_password: "unknown"
+mariadb_password: "change-me-mariadb-password"
 mariadb_database: "sf"
 
 # How long a vxlan device matching no network this node should be on must
