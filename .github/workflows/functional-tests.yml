@@ -257,11 +257,16 @@ jobs:
           . /tmp/venv-test/bin/activate
           tox -emypy
 
+      # ansible-core is held below 2.22 until shakenfist.kerbside 0.8.1:
+      # 2.22's secret masking redacts every value of the kerbside role's
+      # no_log kerbside_sources, "shakenfist" included, from all output,
+      # which breaks the Kerbside wiring test below (shakenfist#4773,
+      # kerbside#687). Remove the pin once requirements.yml resolves to 0.8.1.
       - name: Lint Ansible playbooks
         timeout-minutes: 5
         run: |
           . /tmp/venv-test/bin/activate
-          uv pip install ansible-lint
+          uv pip install ansible-lint 'ansible-core<2.22'
           ansible-lint --config-file shakenfist/deploy/collection/.ansible-lint \
               shakenfist/deploy/collection/
 
