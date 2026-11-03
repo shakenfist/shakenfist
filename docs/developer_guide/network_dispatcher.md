@@ -80,6 +80,18 @@ Overrides must therefore be idempotent. Any other exception from the hook is
 recorded as an audit event and the op is ended anyway: the dispatchers resolve
 the work item for those, so an op left `queued` would have nothing to retry it.
 
+The two dispatchers draw that line in different places. `sf-queues` skips
+anything which is not `queued`, which is stricter than terminal and so includes
+every terminal state: it has never executed an op in any other state, and an op
+it sees in `executing` has already run too. `sf-net` does run an op dequeued in
+`executing`, because there that is a coalescing sibling a survivor folded and
+did not complete — and only `NetOp`s are coalescible, so that case cannot arise
+on an `sf-queues` queue. The stricter test is also what lets `sf-queues` read
+the op's state once per dispatch rather than twice, once above the walk and once
+below it (issue 4760). It still re-reads below the walk for an op which *has*
+dependencies, because the walk's own round trips give a concurrent abort a
+window in which to land.
+
 ## Exponential back-off map
 
 The back-off map (`self._defer_delays`, a plain `dict[str, float]`) records the
