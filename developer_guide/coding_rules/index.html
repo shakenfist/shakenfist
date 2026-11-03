@@ -15916,6 +15916,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-cleanup-step-must-not-be-abortable-by-its-own-instrumentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A cleanup step must not be abortable by its own instrumentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#fail-closed-on-a-field-not-on-a-formatting-accident" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16240,6 +16251,24 @@ which rule is broken -- raising there turned one bad row into a 500 that hid
 every healthy rule in the namespace, and made a successful delete report
 failure on the one call that would have cleaned it up. Ask what the caller will
 do with the answer before choosing.</p>
+<h2 id="a-cleanup-step-must-not-be-abortable-by-its-own-instrumentation">A cleanup step must not be abortable by its own instrumentation<a class="headerlink" href="#a-cleanup-step-must-not-be-abortable-by-its-own-instrumentation" title="Permanent link">&para;</a></h2>
+<p><code>psutil.Process.wait()</code> documents <code>NoSuchProcess</code> and <code>TimeoutExpired</code>, and
+<code>ManagedExecutable._wait_for_exit()</code> caught both. On Linux it waits with
+<code>pidfd_open()</code> and falls back to its own <code>waitpid()</code> loop for exactly four
+errnos, re-raising anything else as a bare <code>OSError</code>. A process which has been
+SIGKILLed but not yet reaped can still be found by pid while no longer having a
+thread group leader, and <code>pidfd_open()</code> answers EINVAL in that window rather
+than ESRCH -- so roughly once in 1,600 kills on sfcbr, waiting for a dying
+dnsmasq threw <code>OSError</code> out of <code>ManagedExecutable.terminate()</code>. The
+configuration directory <code>terminate()</code> removes next was left behind, and the
+network operation worker caught it as "Ignored error in net_op" and skipped the
+rest of that network's node teardown (#4753).</p>
+<p>Two lessons, and the second is the general one. Catch what a library's
+implementation can raise, not only what its documentation names. And a step
+added to make a teardown <em>safer</em> -- this wait exists because dnsmasq's
+replacement raced the dying process's sockets (#4472) -- must not be able to
+abort the teardown it was added to. Observing an exit is instrumentation; when
+instrumentation cannot answer, it says so and the cleanup still runs.</p>
 <h2 id="fail-closed-on-a-field-not-on-a-formatting-accident">Fail closed on a field, not on a formatting accident<a class="headerlink" href="#fail-closed-on-a-field-not-on-a-formatting-accident" title="Permanent link">&para;</a></h2>
 <p>A reply that says "this went wrong" must say so in a field set only on the
 success path. <code>CountFederatedAttemptReply</code> used to signal failure by carrying a
