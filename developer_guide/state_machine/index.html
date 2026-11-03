@@ -17086,6 +17086,12 @@ done because the <code>error</code> transition is a queue job and happens someti
 Instances in the <code>error</code> state are not removed like those in the <code>deleted</code> state,
 as we assume a caller must acknowledge an error occurred. To remove them, delete
 the instance in <code>error</code> state.</p>
+<p>The error message recorded when the instance entered its <code>*-error</code> transition
+state is carried across the move to <code>error</code>, so an errored instance still
+reports why it failed. Callers rely on this: the <code>sf_instance</code> Ansible module
+recognises a preflight capacity abort (<code>Unable to find suitable node</code>) by that
+message, and replays the create rather than failing. Leaving the error states,
+for example by a delete which ends in <code>deleted</code>, clears the message.</p>
 <p>An instance whose start can never run is errored the same way. If the
 operation carrying its preflight, start and create tasks is ended by a
 <code>depends_on</code> dependency that is missing, failed, or never reaches a terminal
