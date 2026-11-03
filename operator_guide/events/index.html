@@ -17044,8 +17044,19 @@ the namespace's events rather than the claim's own.</p>
 (default 100). The server enforces a hard cap of 1000 rows
 per request; a <code>limit</code> of 0 or any negative value is treated
 as the default 100.</p>
-<p>Events are returned newest-first. Each event in the response
-includes at minimum:</p>
+<p>Events are returned newest-first, and the read is bounded by
+the <code>limit</code> rather than by the object's history: <code>event_objects</code>
+carries a copy of each event's timestamp alongside the object
+key, indexed together, so MariaDB walks that index backwards and
+stops at the limit. Before that copy existed the sort had no
+index to come off and every read joined and sorted the object's
+whole history, which took 19 seconds for a node with a quarter
+of a million event references and grew for as long as the node
+lived. Upgrading an existing cluster backfills the column from
+<code>events</code> during <code>sf-ctl ensure-mariadb-schema</code>, so the upgrade
+step takes a little longer on a cluster with a large event
+history.</p>
+<p>Each event in the response includes at minimum:</p>
 <table>
 <thead>
 <tr>
