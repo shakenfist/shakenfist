@@ -2083,6 +2083,21 @@ local repositories in the `CI tooling guards` job. The step also
 carries its own 20-minute `timeout-minutes`, so a future regression
 fails loudly instead of eating the job.
 
+**No GitLab token may be written into the testdata tree.** The nightly
+seeds its corpus from that tree and pushes what the fuzzer keeps back
+into instar-testdata, whose disk every instar runner mounts. From April
+to September 2026 the push token travelled in the tree's remote URL,
+the seed walk read `.git/config`, and eight corpus entries carrying the
+token were pushed (shakenfist/shakenfist#4714). The token was rotated
+and the entries removed. Now `tools/ci/prepare-testdata.sh` and
+`tools/ci/verify-corpus-push-token.sh` keep the remote URL clean and
+hand the token to git and git-lfs through a credential store on tmpfs,
+set up by `tools/ci/gitlab-credential.sh` and removed on exit.
+`push-fuzz-corpus.sh` refuses to push any new entry that contains a
+credential URL (`oauth2:…@`), naming the files but never their
+contents. `test-prepare-testdata.sh` and `test-push-fuzz-corpus.sh`
+assert both.
+
 These rules make that reporting safe, most of them learned from a month
 of silently broken nightlies:
 
