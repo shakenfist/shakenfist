@@ -17806,6 +17806,17 @@ Raising <code>DatabaseUnavailable</code> or <code>StateWriteFailed</code> while 
 Overrides must therefore be idempotent. Any other exception from the hook is
 recorded as an audit event and the op is ended anyway: the dispatchers resolve
 the work item for those, so an op left <code>queued</code> would have nothing to retry it.</p>
+<p>The two dispatchers draw that line in different places. <code>sf-queues</code> skips
+anything which is not <code>queued</code>, which is stricter than terminal and so includes
+every terminal state: it has never executed an op in any other state, and an op
+it sees in <code>executing</code> has already run too. <code>sf-net</code> does run an op dequeued in
+<code>executing</code>, because there that is a coalescing sibling a survivor folded and
+did not complete — and only <code>NetOp</code>s are coalescible, so that case cannot arise
+on an <code>sf-queues</code> queue. The stricter test is also what lets <code>sf-queues</code> read
+the op's state once per dispatch rather than twice, once above the walk and once
+below it (issue 4760). It still re-reads below the walk for an op which <em>has</em>
+dependencies, because the walk's own round trips give a concurrent abort a
+window in which to land.</p>
 <h2 id="exponential-back-off-map">Exponential back-off map<a class="headerlink" href="#exponential-back-off-map" title="Permanent link">&para;</a></h2>
 <p>The back-off map (<code>self._defer_delays</code>, a plain <code>dict[str, float]</code>) records the
 next defer delay for each op UUID. Constants:</p>
