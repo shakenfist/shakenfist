@@ -89,8 +89,20 @@ All endpoints accept an optional `limit` query parameter
 per request; a `limit` of 0 or any negative value is treated
 as the default 100.
 
-Events are returned newest-first. Each event in the response
-includes at minimum:
+Events are returned newest-first, and the read is bounded by
+the `limit` rather than by the object's history: `event_objects`
+carries a copy of each event's timestamp alongside the object
+key, indexed together, so MariaDB walks that index backwards and
+stops at the limit. Before that copy existed the sort had no
+index to come off and every read joined and sorted the object's
+whole history, which took 19 seconds for a node with a quarter
+of a million event references and grew for as long as the node
+lived. Upgrading an existing cluster backfills the column from
+`events` during `sf-ctl ensure-mariadb-schema`, so the upgrade
+step takes a little longer on a cluster with a large event
+history.
+
+Each event in the response includes at minimum:
 
 | Field | Description |
 |-------|-------------|
