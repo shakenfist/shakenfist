@@ -904,6 +904,14 @@ qemu-img's layout at those sizes too, so the image it makes is one
 4608.5M image with both tools, requires the two structures to be
 identical, and requires `instar check` to pass on instar's.
 
+`instar convert -O vhdx --subformat fixed` does the same: it writes
+qemu's `block_state_zero=off` layout at those sizes too, so the image
+is one `qemu-img` cannot reopen while `instar check` reads it. That
+layout is deliberate. It is the one `qemu-img create -o
+subformat=fixed,block_state_zero=off` writes, not the one qemu's
+default `convert -O vhdx -o subformat=fixed` writes, which appends new
+data after the preallocated region and leaves untouched entries `ZERO`.
+
 ## measure subcommand quirks
 
 ### `--image-opts` is rejected
