@@ -18099,58 +18099,67 @@ path works as designed.</p>
 <td>none</td>
 </tr>
 <tr>
-<td>hunkydory</td>
-<td><em>pending</em></td>
-<td></td>
-<td></td>
+<td>andris (re-sync)</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/66" title="GitHub Issue: shakenfist/andris #66">andris#66</a></td>
+<td><code>d7f6d42d</code>, 2026-11-01</td>
+<td>41639665324</td>
 <td>ran</td>
-<td></td>
-<td></td>
+<td><code>shakenfist-review-marks[bot]</code>, 350161744</td>
+<td>none</td>
+</tr>
+<tr>
+<td>hunkydory</td>
+<td>#146</td>
+<td><code>a901d7a9</code>, 2026-11-04</td>
+<td>41706060196</td>
+<td>ran</td>
+<td><code>shakenfist-review-marks[bot]</code>, 350161744</td>
+<td>none</td>
 </tr>
 <tr>
 <td>ryll</td>
-<td><em>pending</em></td>
-<td></td>
-<td></td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/677" title="GitHub Issue: shakenfist/ryll #677">ryll#677</a></td>
+<td><code>c3253fa5</code>, 2026-11-01</td>
+<td>41341301984</td>
 <td>ran</td>
-<td></td>
-<td></td>
+<td><code>shakenfist-review-marks[bot]</code>, 350161744</td>
+<td>none</td>
 </tr>
 <tr>
 <td>kerbside</td>
-<td><em>pending</em></td>
-<td></td>
-<td></td>
+<td>#693</td>
+<td><code>d96b2a25</code>, 2026-11-04</td>
+<td>41707481322</td>
 <td>ran</td>
-<td></td>
-<td></td>
+<td><code>shakenfist-review-marks[bot]</code>, 350161744</td>
+<td>none</td>
 </tr>
 <tr>
 <td>actions</td>
-<td><em>pending</em></td>
-<td></td>
-<td></td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/233" title="GitHub Issue: shakenfist/actions #233">actions#233</a></td>
+<td><code>ff0edf18</code>, 2026-11-03</td>
+<td>41704975509</td>
 <td>skipped</td>
-<td></td>
-<td></td>
+<td><code>github-actions[bot]</code> (github.token)</td>
+<td>none</td>
 </tr>
 <tr>
 <td>sfui</td>
-<td><em>pending</em></td>
-<td></td>
-<td></td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/sfui/issues/66" title="GitHub Issue: shakenfist/sfui #66">sfui#66</a></td>
+<td><code>e902e7aa</code>, 2026-11-03</td>
+<td>41705006995</td>
 <td>skipped</td>
-<td></td>
-<td></td>
+<td><code>github-actions[bot]</code> (github.token)</td>
+<td>none</td>
 </tr>
 <tr>
 <td>kerbside-client</td>
-<td><em>pending</em></td>
-<td></td>
-<td></td>
+<td>#15</td>
+<td><code>3837549f</code>, 2026-11-04</td>
+<td>41725064670</td>
 <td>skipped</td>
-<td></td>
-<td></td>
+<td><code>github-actions[bot]</code> (github.token)</td>
+<td>none</td>
 </tr>
 </tbody>
 </table>
@@ -18217,6 +18226,37 @@ with what the log showed.</p>
   re-run for andris with the fixed template, and its three readings
   taken again, before 2c starts; the re-run gets a row of its own in
   the rollout table, so the table still shows this one failed.</li>
+<li>2026-11-01 AEDT: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/66" title="GitHub Issue: shakenfist/andris #66">andris#66</a> (the proxy re-sync) merged as
+  <code>d7f6d42d</code>. Its first <code>prune-reviews</code> run on <code>develop</code>, 41639665324,
+  minted the App token (<code>Mint the push token</code> ran) and pushed as
+  <code>shakenfist-review-marks[bot]</code> (350161744); deployments stayed
+  empty. andris is on the App path, and 2b's three readings hold.
+  ryll was migrated the same day by <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/677" title="GitHub Issue: shakenfist/ryll #677">ryll#677</a> (a bundled
+  consistency-fix pull request, <code>c3253fa5</code>), not by a dedicated
+  template-resync pull request; its run 41341301984 pushed as the App
+  too. So two of the four key-holders were done before 2c resumed.</li>
+<li>2026-11-04 AEDT: 2c completed. hunkydory (#146) and kerbside (#693)
+  were re-synced this session with <code>template-resync</code> (one pull request
+  each, closing #142 and #651), merged, and their first runs
+  (41706060196, 41707481322) minted the App token and pushed as
+  <code>shakenfist-review-marks[bot]</code> (350161744) with empty deployments.
+  The two automated reviews on them were consider/info only -- the
+  recurring "is <code>deployment: false</code> a real key" question, already
+  settled by the development and andris runs -- and were acked
+  nothing-to-do. actions (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/233" title="GitHub Issue: shakenfist/actions #233">actions#233</a>) and sfui (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/sfui/issues/66" title="GitHub Issue: shakenfist/sfui #66">sfui#66</a>) had been
+  re-synced in parallel by consistency-fix pull requests from other
+  sessions, closing #228 and #61; their latest runs (41704975509 on
+  <code>main</code>, 41705006995) skip the token step, as a no-key repository
+  should. kerbside-client (#15) was re-synced this session, closing
+  #14; its run 41725064670 skipped the token step and pushed with
+  <code>github.token</code>. All eight adopters now carry the template byte for
+  byte (<code>template-resync status review-tracking</code> reports review
+  tracking in sync everywhere); development's own
+  <code>tools/review-tracking.sh</code> differs on a separate template matter
+  unrelated to this phase. The original seven <code>review-tracking.yml</code>
+  issue numbers in the step briefs (2b/2c) are superseded by the
+  numbers the audit re-filed as the drift persisted (#142 for
+  hunkydory, #228 for actions); all are now closed.</li>
 </ul>
 <h4 id="risks-and-mitigations_1">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations_1" title="Permanent link">&para;</a></h4>
 <ol>
