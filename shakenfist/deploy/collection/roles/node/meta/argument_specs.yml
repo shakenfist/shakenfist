@@ -142,11 +142,13 @@ argument_specs:
             SHAKENFIST_MAINTAIN_STRAY_VXLAN_GRACE_SECONDS.
       system_key:
         type: str
-        default: "unknown"
+        default: "change-me-system-key"
         description:
           - The "system" namespace key, written into sfrc and the global auth
             file. Supply a real secret; the default is deliberately
-            non-functional.
+            non-functional, and is a string which occurs nowhere else because
+            the kerbside_credentials entry point declares this variable
+            no_log, which redacts its value from the whole run (issue 4773).
       vault_system_key_path:
         type: str
         required: false
@@ -173,10 +175,12 @@ argument_specs:
           - Direct MariaDB user. Rendered only when node_is_database_node.
       mariadb_password:
         type: str
-        default: "unknown"
+        default: "change-me-mariadb-password"
         description:
           - Direct MariaDB password. Rendered only when node_is_database_node;
-            supply a real secret.
+            supply a real secret. The default is deliberately non-functional,
+            and a string which occurs nowhere else, as a secret placeholder
+            which might one day be validated under no_log has to be.
       mariadb_database:
         type: str
         default: "sf"
@@ -436,12 +440,17 @@ argument_specs:
       kerbside_system_key: *kerbside_system_key_option
       system_key:
         type: str
-        default: "unknown"
+        default: "change-me-system-key"
         no_log: true
         description:
           - >-
             The system namespace's deploy key. Read only to refuse a
-            kerbside_system_key equal to it.
+            kerbside_system_key equal to it. The default matches the role
+            default and occurs nowhere else: no_log registers whatever this
+            validates as a secret, and from ansible-core 2.22 that redacts
+            every later occurrence of the string from the run's output, so a
+            placeholder which is also an ordinary word would mask that word
+            out of a deploy which did not override the variable (issue 4773).
       node_mesh_ip:
         type: str
         default: "127.0.0.1"

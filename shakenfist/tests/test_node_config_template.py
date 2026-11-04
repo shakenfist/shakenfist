@@ -87,7 +87,11 @@ class NodeConfigTemplateTestCase(base.ShakenFistTestCase):
     def test_direct_mariadb_only_on_database_nodes(self):
         self.assertNotIn('SHAKENFIST_MARIADB_PASSWORD', render())
         rendered = render(node_is_database_node=True)
-        self.assertIn('SHAKENFIST_MARIADB_PASSWORD="unknown"\n', rendered)
+        # Whatever the role's non-functional placeholder is; the point here is
+        # that the password is rendered on a database node and nowhere else.
+        password = load_defaults()['mariadb_password']
+        self.assertIn(
+            f'SHAKENFIST_MARIADB_PASSWORD="{password}"\n', rendered)
         self.assertIn('SHAKENFIST_NODE_IS_DATABASE_NODE=True\n', rendered)
 
     def test_defaults_are_documented_in_argument_specs(self):
