@@ -546,19 +546,25 @@ keeps the whole response (`node_capacity()` in client-python's
 
 ## Outcome
 
-Implemented and checked, with one step outstanding: the client release
-(step 1) is not finished. The `v0.8.4` tag has not been pushed, so PyPI
-still serves 0.8.3, and Definition of done items 1 and 2 are pending
-the tag. They are neither met nor failed. **This pull request's merge
-waits on them**; a follow-up commit fills in items 1 and 2 once the
-release lands. Every other item was run from the worktree root rather
-than read.
+Implemented and checked. At the time this section was first written the
+client release (step 1) was not finished — the `v0.8.4` tag was not
+pushed, PyPI still served 0.8.3, and Definition of done items 1 and 2
+were pending the tag — so the pull request's Outcome recorded them as
+neither met nor failed and said a follow-up commit would fill them in
+once the release landed. This is that follow-up (recorded in a sibling
+commit on the same pull request, alongside the phase close-out): the
+release landed on 2026-10-31, items 1 and 2 are now **met**, and the
+release status below records the run, the PyPI timestamp and the
+fresh-venv check. Every other item was run from the worktree root
+rather than read.
 
 ### What each step did
 
-* **Step 1** (client release, management session) is half done. The dry
-  run of `release.yml` passed (run 41018325275); the tag and the
-  `release` environment approval are Michael's and are not yet given.
+* **Step 1** (client release, management session) is done. The dry run
+  of `release.yml` passed first (run 41018325275); Michael then pushed
+  the `v0.8.4` tag (client-python `44696ddaf059`) and approved the
+  `release` environment. The release run (41140112308) succeeded and
+  PyPI served 0.8.4 at 2026-10-31T00:13:46Z. See *Release status*.
 * **Step 2** (`bc909e5bd5`) replaced the three false "has no claim
   verbs / no events verb" sentences in `scheduler.md` with the commands,
   opened the diagnosis section with `sf-client node capacity`, added the
@@ -583,11 +589,15 @@ than read.
 
 ### Release status
 
-Dry run passed, run 41018325275 (2026-10-30). `v0.8.4` is not tagged;
-PyPI serves 0.8.3. Items 1 and 2 stay pending until the tag is pushed,
-the `release` environment is approved, and PyPI serves 0.8.4. Until
-then `scheduler.md` and the release notes name a version that cannot yet
-be installed.
+The release landed. The `workflow_dispatch` dry run passed first (run
+41018325275, 2026-10-30). Michael pushed the `v0.8.4` tag
+(client-python `44696ddaf059`, the merge of client-python#443) and
+approved the `release` environment; the release run (41140112308,
+created 2026-10-30T22:44:38Z) succeeded and uploaded both artifacts to
+PyPI at 2026-10-31T00:13:46Z. The documentation pull request (#4737)
+merged at 2026-10-31T08:23:20Z, after PyPI served 0.8.4, so D2's
+ordering held: the guide never named a version an operator could not
+install. Items 1 and 2 are now met — see the table below.
 
 ### Issue comments
 
@@ -604,8 +614,8 @@ not `limit_*` changes. `database.md` was therefore not edited.
 
 | Item | Result | Note |
 |---|---|---|
-| 1 | **Pending the tag** | PyPI serves 0.8.3 until `v0.8.4` is pushed; the install check cannot run. |
-| 2 | **Pending the tag** | `grep -o` prints one hit, `` shakenfist-client` 0.8.4 ``: it names 0.8.4 and nothing older, but PyPI does not yet serve it. |
+| 1 | **Met** | `curl .../shakenfist-client/json \| jq -r .info.version` prints `0.8.4`; in a fresh venv `pip install shakenfist-client==0.8.4 && sf-client node capacity --help` exited 0. Release run 41140112308 (client-python `44696ddaf059`); PyPI upload 2026-10-31T00:13:46Z. |
+| 2 | **Met** | `grep -o` prints one hit, `` shakenfist-client` 0.8.4 ``: it names 0.8.4 and nothing older, and PyPI now serves it. |
 | 3 | **Met** | `grep -c 'has no claim verbs\|has no events verb'` prints `0`. |
 | 4 | **Met** | `sf-client node capacity` `5`; `namespace claim list --all` `1`; `namespace claim events` `1`. |
 | 5 | **Met** | `grep -c 'best-effort'` prints `1`. |
@@ -665,8 +675,8 @@ No contradiction was found.
 
 ### What phase 5 and the follow-up commit inherit
 
-* Items 1 and 2 are pending the `v0.8.4` tag; the follow-up commit
-  records the release run id, the PyPI timestamp and the fresh-venv
-  `sf-client node capacity --help` result.
+* Items 1 and 2 are met: the follow-up commit records the release run
+  id (41140112308), the PyPI upload timestamp (2026-10-31T00:13:46Z)
+  and the fresh-venv `sf-client node capacity --help` result (exit 0).
 * Item 12 should exclude `docs/components/`, and item 13 should say two
   files for `claim list --all`.
