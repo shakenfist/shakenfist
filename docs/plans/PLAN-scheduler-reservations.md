@@ -362,7 +362,7 @@ table entirely (decision D8).
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
 | 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
 | 7b. Capacity and claim views in sf-client | `PLAN-scheduler-reservations-phase-07b-client-views.md` (in shakenfist/client-python on its `develop`; a relative link cannot cross repositories, so it is named rather than linked) | Complete | client-python `d484fdc` (#442) |
-| 8. Documentation and operator guide, and the client release | [PLAN-scheduler-reservations-phase-08-docs.md](PLAN-scheduler-reservations-phase-08-docs.md) | In progress | — |
+| 8. Documentation and operator guide, and the client release | [PLAN-scheduler-reservations-phase-08-docs.md](PLAN-scheduler-reservations-phase-08-docs.md) | Complete | `a005fba498` (#4737) |
 | 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started | — |
 
 The `Merged` column records what put each phase on `develop`.
