@@ -220,6 +220,32 @@ class UtilLibvirtPowerState(base.ShakenFistTestCase):
         self.assertEqual(
             'failed', _connection().extract_shutoff_reason(domain))
 
+    def test_is_shutoff_failed(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_SHUTOFF,
+            reason=FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_FAILED)
+        self.assertTrue(_connection().is_shutoff_failed(domain))
+
+    def test_is_shutoff_failed_other_shutoff_reason(self):
+        for reason in [FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_UNKNOWN,
+                       FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_SHUTDOWN,
+                       FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_DESTROYED,
+                       FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_CRASHED,
+                       FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_DAEMON]:
+            domain = FakeStatefulDomain(
+                FakeLibvirtModule.VIR_DOMAIN_SHUTOFF, reason=reason)
+            self.assertFalse(
+                _connection().is_shutoff_failed(domain),
+                'Shutoff reason %s is not a failure to start' % reason)
+
+    def test_is_shutoff_failed_not_shutoff(self):
+        # A stale failed reason code on a domain which is running must not
+        # count: both the state and the reason matter.
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_RUNNING,
+            reason=FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_FAILED)
+        self.assertFalse(_connection().is_shutoff_failed(domain))
+
     def test_shutoff_reason_from_snapshot(self):
         domain = FakeStatefulDomain(
             FakeLibvirtModule.VIR_DOMAIN_SHUTOFF,

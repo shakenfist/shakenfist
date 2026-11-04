@@ -579,9 +579,39 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
             # recorded itself.
             return
 
+        # A domain which was asked to start and could not never ran, so
+        # it did not power off. Recording a power off would also clear
+        # the autostart flag, leaving nothing which says the instance
+        # should be running -- which is how a hypervisor reboot powered
+        # off every instance on a node (issue 4625): libvirtd starts its
+        # autostart domains before sf-queues has recreated the node's
+        # vxlan bridges. The power state and the flag are left exactly as
+        # they are, so that the sf-queues restore which runs once those
+        # networks are back still has its instruction, and so that a
+        # power on which fails there is what records the instance off.
+        #
+        # The conditions are the restore's own, deliberately: it starts
+        # an instance in state created which the database records as
+        # running, and nothing else. Any other inactive domain is
+        # recorded off below however it came to be inactive, because
+        # nothing is going to start it -- an errored instance's domain,
+        # which keeps its autostart flag, would otherwise be held at a
+        # stale power state and warned about for ever.
+        #
+        # The warning repeats each pass by design: an instance recorded
+        # as running whose domain will not start is an ongoing fault, and
+        # the only record of it used to be an INFO line saying the
+        # opposite. No event is added, because the durable record of a
+        # failure to start belongs to whatever tried to start it.
+        if (lc.is_shutoff_failed(domain) and previous == 'on' and
+                inst.state.value == dbo.STATE_CREATED):
+            log_ctx.warning('Domain failed to start, not recording a power off')
+            return
+
         # The order is load-bearing: callers wait for the event, then read
-        # the power state once. The shutoff reason is display only: a
-        # powered off domain is off, whatever the reason.
+        # the power state once. The shutoff reason is display only here:
+        # having ruled out a domain which never started, a powered off
+        # domain is off whatever the reason.
         log_ctx.with_fields({'previous_power_state': previous}).info(
             'Detected power off')
         inst.update_power_state('off')

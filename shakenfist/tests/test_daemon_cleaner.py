@@ -1100,6 +1100,86 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
         # The detected poweroff event is the record; no second event.
         self.assertEqual([], self._events(add_event, 'autostart cleared'))
 
+    def test_failed_to_start_is_not_a_power_off(self):
+        """A domain libvirt could not start never ran, so it did not power
+        off. The recorded power state, the agent state and the autostart
+        flag are all left exactly as they are, and no event is added, so
+        that the sf-queues restore which runs once this node's networks are
+        back still has its instruction to start the instance (issue 4625).
+        """
+        inst_uuid = self._inactive_instance(
+            reason=FakeLibvirt.VIR_DOMAIN_SHUTOFF_FAILED)
+        agent_state = self._agent_state(inst_uuid)
+
+        add_event = self._run()
+
+        self.assertEqual('on', self._power_state(inst_uuid))
+        self.assertEqual(agent_state, self._agent_state(inst_uuid))
+        self.assertEqual([], _test_set_autostart_calls)
+        self.assertEqual([], self._audit_events(add_event))
+        self.assertEqual(
+            instance.Instance.STATE_CREATED, self._state(inst_uuid))
+
+    def test_failed_to_start_is_decided_on_the_libvirt_enum(self):
+        """The guard reads the raw shutoff reason enum, not the display
+        string: a reason libvirt's bindings do not define must not be
+        mistaken for a failure to start."""
+        inst_uuid = self._inactive_instance(reason=999)
+
+        self._run()
+
+        self.assertEqual('off', self._power_state(inst_uuid))
+        self.assertEqual([(f'sf:{inst_uuid}', 0)], _test_set_autostart_calls)
+
+    def test_failed_to_start_of_an_errored_instance_is_a_power_off(self):
+        """The restore only starts an instance in state created which is
+        recorded as running, so nothing is going to start an errored
+        instance's domain. Holding its power state would leave it stale
+        and warn about it for ever, so it is recorded off like any other
+        inactive domain, and loses its autostart flag with it."""
+        inst_uuid = self._inactive_instance(
+            state=instance.Instance.STATE_ERROR,
+            reason=FakeLibvirt.VIR_DOMAIN_SHUTOFF_FAILED)
+
+        add_event = self._run()
+
+        self.assertEqual('off', self._power_state(inst_uuid))
+        self.assertEqual([(f'sf:{inst_uuid}', 0)], _test_set_autostart_calls)
+        self.assertEqual(
+            1, len(self._events(add_event, 'detected poweroff')))
+
+    def test_failed_to_start_of_a_paused_instance_is_a_power_off(self):
+        """Same again for a power state the restore does not act on."""
+        inst_uuid = self._inactive_instance(
+            power_state='paused',
+            reason=FakeLibvirt.VIR_DOMAIN_SHUTOFF_FAILED)
+
+        add_event = self._run()
+
+        self.assertEqual('off', self._power_state(inst_uuid))
+        self.assertEqual([(f'sf:{inst_uuid}', 0)], _test_set_autostart_calls)
+        self.assertEqual(
+            [mock.call(EVENT_TYPE_AUDIT, 'detected poweroff',
+                       extra={'reason': 'failed',
+                              'previous_power_state': 'paused'})],
+            self._events(add_event, 'detected poweroff'))
+
+    def test_failed_to_start_recorded_off_still_loses_autostart(self):
+        """Once something has tried to start the domain and recorded the
+        instance off -- which is what a failed power on does -- the flag
+        goes. The already-off branch does not consult the shutoff reason,
+        because the instance really is off and nothing is going to start
+        it."""
+        inst_uuid = self._inactive_instance(
+            power_state='off',
+            reason=FakeLibvirt.VIR_DOMAIN_SHUTOFF_FAILED)
+
+        add_event = self._run()
+
+        self.assertEqual([(f'sf:{inst_uuid}', 0)], _test_set_autostart_calls)
+        self.assertEqual(
+            1, len(self._events(add_event, 'autostart cleared')))
+
     def test_domain_stopping_inside_the_active_loop_is_left_to_the_inactive_loop(self):
         """A domain which stops between the active loop's isActive() check
         and its state read is not recorded as off by the active loop: that

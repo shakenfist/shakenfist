@@ -173,13 +173,35 @@ class LibvirtConnection():
                 return pretty
         return f'unrecognised reason {reason}'
 
+    def is_shutoff_failed(self, domain: Any) -> bool:
+        """True if libvirt shut this domain off because it failed to start.
+
+        VIR_DOMAIN_SHUTOFF_FAILED means the domain was asked to start and
+        could not, so the guest never ran. That is not a power off, and
+        recording one is what left every instance on a rebooted
+        hypervisor powered off (issue 4625): libvirtd starts its
+        autostart domains while it starts itself, which is before
+        sf-queues has recreated the node's br-vxlan-* bridges, so a
+        domain on a Shaken Fist network fails there every time.
+
+        Compared as raw libvirt enums so that this decision never depends
+        on the display strings rendered by extract_shutoff_reason().
+        """
+        state, reason = domain.state()
+        return (state == self.libvirt.VIR_DOMAIN_SHUTOFF and
+                reason == getattr(
+                    self.libvirt, 'VIR_DOMAIN_SHUTOFF_FAILED', None))
+
     def extract_shutoff_reason(self, domain: Any) -> str | None:
         """Return a human readable shutoff reason, or None if not shutoff.
 
-        Display only: nothing branches on this value. An inactive domain
-        is recorded as off whatever this says: a killed qemu is
-        recoverable by a power on, and libvirt may not keep the reason
-        across a libvirtd restart. See docs/operator_guide/power_states.md.
+        Display only: the one control flow decision taken on a shutoff
+        reason (did this domain fail to start?) uses is_shutoff_failed(),
+        which compares the raw libvirt enums rather than these rendered
+        strings. Every other inactive domain is recorded as off whatever
+        this says: a killed qemu is recoverable by a power on, and
+        libvirt may not keep the reason across a libvirtd restart. See
+        docs/operator_guide/power_states.md.
         """
         state, reason = domain.state()
         if state != self.libvirt.VIR_DOMAIN_SHUTOFF:

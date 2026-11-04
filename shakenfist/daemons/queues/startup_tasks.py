@@ -27,6 +27,7 @@ from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 from shakenfist.util import json as util_json
+from shakenfist.util import libvirt as util_libvirt
 
 
 LOG, HANDLER = logs.setup('main')
@@ -100,16 +101,12 @@ def upgrade_blob_datastore():
 
 
 def restore_instances():
-    # Instances are deliberately not restored here. libvirt keeps a running
-    # domain running across a restart of sf-queues or libvirtd -- there is
-    # nothing to do. After a hypervisor reboot, a domain's libvirt autostart
-    # flag decides whether it starts, not this function.
-    #
-    # What this function still does is collect this node's instances so
-    # their networks can be restored, and so their placements can be
-    # reconciled below.
+    # Collect this node's instances so that their networks can be restored,
+    # their placements reconciled, and the ones this node was running
+    # started again once their networks are back.
     networks = []
     instances = []
+    powered_on = []
     for inst in instance.Instances([instance.this_node_filter], prefilter='healthy'):
         instance_problems = []
 
@@ -138,6 +135,14 @@ def restore_instances():
         else:
             instances.append(inst)
 
+            # Which instances this node was running, read now rather than
+            # after the network restore below, which can take minutes. An
+            # instance still being created is not ours to start: its create
+            # holds the instance lock and powers it on itself.
+            if (inst.state.value == instance.Instance.STATE_CREATED and
+                    inst.power_state.get('power_state') == 'on'):
+                powered_on.append(inst)
+
     # Restore each network sequentially, with a generous per-op
     # deadline. Startup is not a user-facing context so the default
     # ``API_ASYNC_WAIT`` is the wrong yardstick here -- if the cluster
@@ -159,12 +164,18 @@ def restore_instances():
             util_exceptions.ignore_exception(
                 'restore network %s' % network_uuid, e)
 
+    # The networks are back, so the instances this node was running can
+    # run again. This goes before the placement reconciliation below so
+    # that a failure there -- an unreadable node, a database outage --
+    # cannot leave the node's instances powered off.
+    _restore_powered_on_instances(powered_on)
+
     # Reconcile the recorded instance placements for this node: add any
     # missing INSTANCE_LOCATION references, and remove stale ones. The
-    # network restore above can take many minutes, so the instances list
-    # gathered at its start is a stale snapshot -- before removing a
-    # reference, re-check the instance's authoritative placement so a
-    # concurrently placed instance is never unrecorded.
+    # network restore and power on above can take many minutes, so the
+    # instances list gathered at its start is a stale snapshot -- before
+    # removing a reference, re-check the instance's authoritative
+    # placement so a concurrently placed instance is never unrecorded.
     #
     # Every write here goes through the placement admission and release
     # RPCs rather than writing reference rows directly, so this
@@ -213,6 +224,58 @@ def restore_instances():
         # capacity reconciler recompute the counters from ground truth
         # on its next pass rather than guessing at amounts.
         _release_placement(instance_uuid, '', 0, 0, 0, node_uuid)
+
+
+def _restore_powered_on_instances(instances):
+    """Start the domains of the instances this node was running.
+
+    libvirt's autostart flag is what brings instances back after a
+    hypervisor reboot, but libvirtd starts its autostart domains while
+    libvirtd itself starts -- seconds before this daemon recreates the
+    node's br-vxlan-* bridges. A domain on a Shaken Fist network
+    therefore fails to start with "Cannot get interface MTU on
+    'br-vxlan-...'", and nothing retried it, so a reboot left every
+    instance on the hypervisor powered off (issue 4625). libvirt cannot
+    see a dependency Shaken Fist creates, so Shaken Fist has to own this
+    ordering: this runs after the network restore above, and autostart is
+    now only the first attempt rather than the only one.
+
+    A domain which is already running is left alone, so a restart of
+    sf-queues or of libvirtd still starts nothing, as before. Each power
+    on happens holding the instance lock, as every other power state
+    writer does, and on a power state read again inside it, so an
+    instance an operator powered off while the networks were being
+    restored stays off.
+
+    A failure is reported and not retried here: power_on() has already
+    tried several times and recorded what the domain really is. Nothing
+    in this path deletes or errors an instance, because a restore which
+    could not start an instance is not evidence that the instance is bad
+    -- the restore loop which was removed in favour of autostart would
+    have error deleted every instance on the node.
+    """
+    for inst in instances:
+        log_ctx = LOG.with_fields({'instance': inst.uuid})
+        try:
+            with inst.get_lock(op='Instance restore', global_scope=False,
+                               node_timeout=120):
+                if inst.power_state.get('power_state') != 'on':
+                    log_ctx.info(
+                        'Instance is no longer powered on, not restoring it')
+                    continue
+
+                with util_libvirt.LibvirtConnection() as lc:
+                    domain = lc.get_domain_from_sf_uuid(str(inst.uuid))
+                    if domain and domain.isActive():
+                        continue
+
+                log_ctx.info('Restoring powered on instance')
+                inst.power_on()
+                inst.add_event(EVENT_TYPE_AUDIT, 'instance restored')
+        except Exception as e:
+            log_ctx.warning(f'Failed to restore powered on instance: {e}')
+            inst.add_event(EVENT_TYPE_AUDIT, 'instance restore failed',
+                           extra={'error': str(e)})
 
 
 def _release_placement(instance_uuid, namespace, cpus, memory_mb, disk_gb,
