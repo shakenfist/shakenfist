@@ -16737,15 +16737,20 @@ provide image elements from various sources.</p>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span>      <span class="c1"># abstract property, the image tag</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="nd">@abstractmethod</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fetch_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ordered</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">        </span><span class="sd">"""Yield ImageElement instances."""</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_manifest</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="k">return</span> <span class="kc">None</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_config</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="k">return</span> <span class="kc">None</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fetch_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">skip_probe</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>              <span class="n">ordered</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">        </span><span class="sd">"""Yield ImageElement instances."""</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_manifest</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="k">return</span> <span class="kc">None</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_config</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="k">return</span> <span class="kc">None</span>
 </code></pre></div>
 <p><code>fetch()</code> is the only abstract method. <code>fetch_callback</code> takes a layer
 digest and returns False to skip that layer, in which case the element is
-still yielded but with <code>data=None</code>. <code>ordered=True</code> yields layers in
+still yielded but with <code>data=None</code>. <code>skip_probe</code> is an optional
+side-effect-free companion with the same contract, used by inputs that
+decide which layers can be skipped <em>before</em> the transfer starts (the
+<code>dockerpush://</code> input); inputs that do not pre-probe ignore it.
+<code>ordered=True</code> yields layers in
 manifest order; <code>ordered=False</code> yields them as they become available with
 <code>layer_index</code> set (see
 <a href="#out-of-order-layer-delivery">Out-of-Order Delivery</a>).</p>
@@ -16880,6 +16885,12 @@ normally and occystrap records a mapping between Docker's compressed digests
 and the uncompressed DiffIDs. On subsequent runs, the embedded registry returns
 <code>200</code> for HEAD checks on cached layers, causing Docker to skip the upload
 entirely. This means cached layers consume zero local transfer time.</p>
+<p>This pre-push probe asks the output which layers are cached via the
+side-effect-free <code>skip_probe</code>, not <code>fetch_callback</code>: the probe runs once
+per cached layer before the transfer, so routing it through
+<code>fetch_callback</code> would push spurious entries onto the output's
+original-DiffID FIFO and misalign the per-layer cache recording (see
+<a href="/components/occystrap/internals/">Internals</a>).</p>
 <p>The digest mapping is stored alongside the layer cache as
 <code>{cache_path}.digests</code>. This file maps Docker's compressed layer digests to
 the uncompressed DiffIDs used as cache keys. It is updated automatically
@@ -17018,16 +17029,22 @@ and handle the final destination of processed elements.</p>
 <a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="nd">@abstractmethod</span>
 <a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">fetch_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">digest</span><span class="p">):</span> <span class="o">...</span>
 <a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
-<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="nd">@abstractmethod</span>
-<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">process_image_element</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span> <span class="o">...</span>
-<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>
-<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    <span class="nd">@abstractmethod</span>
-<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">finalize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>
-<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>
-<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">verify</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">full</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span> <span class="k">return</span> <span class="n">CheckResults</span><span class="p">()</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">skip_probe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">digest</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>    <span class="nd">@abstractmethod</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">process_image_element</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>    <span class="nd">@abstractmethod</span>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">finalize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">verify</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">full</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span> <span class="k">return</span> <span class="n">CheckResults</span><span class="p">()</span>
 </code></pre></div>
 <p><code>fetch_callback()</code> returns False for a layer the destination already has,
 which is how a writer avoids paying for a download it would discard.
+<code>skip_probe()</code> makes the same decision without any per-layer side effects,
+for inputs that probe before the transfer starts; the base implementation
+just delegates to <code>fetch_callback()</code>, and only outputs that keep per-layer
+ordering state (<code>RegistryWriter</code>) override it.
 <code>requires_ordered_layers</code> tells the driver whether this writer can cope
 with out-of-order delivery; the driver passes it straight to <code>fetch()</code> as
 <code>ordered</code>. <code>finalize()</code> runs once after the last element and is where
@@ -17047,9 +17064,10 @@ build a fresh one rather than reusing the pooled clients.</p>
 <a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="k">with</span> <span class="n">redirect_logging</span><span class="p">():</span>
 <a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">img</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span>
 <a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>            <span class="n">fetch_callback</span><span class="o">=</span><span class="n">output</span><span class="o">.</span><span class="n">fetch_callback</span><span class="p">,</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>            <span class="n">ordered</span><span class="o">=</span><span class="n">ordered</span><span class="p">):</span>
-<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>        <span class="n">output</span><span class="o">.</span><span class="n">process_image_element</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
-<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">output</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>            <span class="n">skip_probe</span><span class="o">=</span><span class="n">output</span><span class="o">.</span><span class="n">skip_probe</span><span class="p">,</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>            <span class="n">ordered</span><span class="o">=</span><span class="n">ordered</span><span class="p">):</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>        <span class="n">output</span><span class="o">.</span><span class="n">process_image_element</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="n">output</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 </code></pre></div>
 <p>The <code>redirect_logging()</code> context manager comes from <code>progress.py</code> and
 routes log records around any active progress bar, so log lines do not
@@ -17192,6 +17210,10 @@ images, allowing multiple images to share storage.</p>
 <a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    └── If registry has blob: skip layer (no fetch/filter/compress/upload)
 <a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>    └── If not: process normally and record result to cache
 </code></pre></div>
+<p>The <code>dockerpush://</code> input makes the same check <em>before</em> the push through
+<code>skip_probe(digest)</code> — identical cache + HEAD logic, but without the
+per-layer FIFO side effect <code>fetch_callback</code> carries (see
+<a href="/components/occystrap/internals/">Internals</a>).</p>
 <p>Cache entries are keyed by <code>(input_diffid, filters_hash)</code> so that the same
 layer processed with different filter configurations gets separate entries.
 The cache is stored as a JSON file with one entry per layer, recording

@@ -16921,25 +16921,34 @@ so the entire filter chain respects the final output's ordering needs.</p>
 DiffIDs to their compressed output digests. When pushing multiple images that
 share base layers (common in CI), the cache allows subsequent invocations to
 skip layers entirely -- no fetch, no filter, no compress, no upload.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>fetch_callback(digest)
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    └── Check cache for (digest, filters_hash)
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    └── If found: HEAD request to verify registry still has blob
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    └── If registry has blob: skip layer entirely
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    └── If not: process normally
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>_compress_and_upload_layer()
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    └── After successful compress + upload: record to cache
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>finalize()
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    └── Save cache to disk (atomic write via temp file + rename)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>fetch_callback(digest)        # one call per yielded layer element
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    └── Record digest on the original-DiffID FIFO
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    └── Check cache for (digest, filters_hash)
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    └── If found: HEAD request to verify registry still has blob
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    └── If registry has blob: skip layer entirely
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    └── If not: process normally
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>skip_probe(digest)            # pre-fetch probe only; no FIFO side effect
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    └── Same cache + HEAD check as fetch_callback, without recording
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>_compress_and_upload_layer()
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    └── After successful compress + upload: record to cache
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>finalize()
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    └── Save cache to disk (atomic write via temp file + rename)
 </code></pre></div>
 <p>Key design considerations:
 - Cache keyed by <code>(input_diffid, filters_hash)</code> so different pipeline
   configurations get separate entries
-- Original DiffIDs are tracked via a FIFO queue in <code>fetch_callback</code> and
-  consumed in <code>process_image_element</code>, because content-modifying filters
-  (ExcludeFilter, TimestampNormalizer) recalculate the layer hash —
-  the cache must record under the original DiffID, not the transformed one
+- Original DiffIDs are tracked via a FIFO queue appended to in
+  <code>fetch_callback</code> and consumed in <code>process_image_element</code>, because
+  content-modifying filters (ExcludeFilter, TimestampNormalizer)
+  recalculate the layer hash — the cache must record under the original
+  DiffID, not the transformed one. This relies on exactly one
+  <code>fetch_callback</code> per yielded layer, so the dockerpush pre-fetch skip
+  probe calls <code>skip_probe</code> instead (a side-effect-free variant that makes
+  the same decision without touching the FIFO); using <code>fetch_callback</code>
+  there would misalign the queue and record layers under the wrong DiffID
 - <code>filters_hash</code> is computed from the serialized filter chain <strong>and</strong>
   compression type, so gzip vs zstd pipelines do not share entries
 - Registry blob existence is verified on each run (<code>HEAD</code> request) to handle
