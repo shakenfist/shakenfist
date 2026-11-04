@@ -238,6 +238,12 @@ The playbook refuses to deploy Kerbside, before changing any host, if the
 collection is missing or its version is outside the range in
 `requirements.yml`. A cluster without a `kerbside` group does not need it.
 
+Re-installing over a collection which is already present needs `--force`:
+without it `ansible-galaxy` leaves the installed version alone whatever its
+version, so an upgrade which raises the range needs
+`ansible-galaxy collection install --force -r examples/_shared/requirements.yml`.
+See [Upgrades](upgrades.md#upgrade-process).
+
 Set `kerbside_url`, `kerbside_system_key`, `kerbside_public_fqdn`,
 `kerbside_sql_url` and `kerbside_auth_secret_seed`. `kerbside_url` and
 `kerbside_system_key` must be visible to both the Shaken Fist and the Kerbside

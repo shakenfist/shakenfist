@@ -130,14 +130,14 @@ class RenovateConfigTestCase(base.ShakenFistTestCase):
         # never moves and no job errors -- so assert the regex, as written
         # in renovate.json, still extracts exactly the pins the workflow
         # carries (issue #4773).
-        workflow = os.path.join(
-            _root(), '.github', 'workflows', 'functional-tests.yml')
-        with open(workflow) as f:
+        relative = '.github/workflows/functional-tests.yml'
+        with open(os.path.join(_root(), *relative.split('/'))) as f:
             text = f.read()
 
         pinned = {
             (tool, version) for tool, version
-            in re.findall(r'\b(ansible-core|ansible-lint)==(\S+)', text)}
+            in re.findall(r'\b(ansible-core|ansible-lint)==([^\s"\']+)',
+                          text)}
         self.assertNotEqual(
             set(), pinned,
             'functional-tests.yml no longer pins ansible-core or '
@@ -148,8 +148,7 @@ class RenovateConfigTestCase(base.ShakenFistTestCase):
 
         managers = [
             manager for manager in self.config.get('customManagers', [])
-            if any(_file_pattern_matches(pattern,
-                                         '.github/workflows/functional-tests.yml')
+            if any(_file_pattern_matches(pattern, relative)
                    for pattern in _manager_file_patterns(manager))]
         self.assertEqual(
             1, len(managers),
@@ -168,12 +167,25 @@ class RenovateConfigTestCase(base.ShakenFistTestCase):
             'stop working in a future major. Use managerFilePatterns, with '
             'the regex wrapped in slashes.')
 
+        self.assertEqual(
+            'pypi', managers[0].get('datasourceTemplate'),
+            'the Ansible customManagers entry must look its versions up on '
+            'pypi. Any other datasource still matches the file and still '
+            'extracts the pins, then finds no versions and opens no pull '
+            'request, which looks exactly like there being nothing to do.')
+
         matched = set()
         for pattern in managers[0].get('matchStrings', []):
             # Renovate's regexes are JavaScript, which spells a named
             # group (?<name>...) where Python spells it (?P<name>...).
             for match in re.finditer(pattern.replace('(?<', '(?P<'), text):
                 groups = match.groupdict()
+                self.assertEqual(
+                    {'depName', 'currentValue'}, set(groups),
+                    'a matchStrings regex must capture exactly depName and '
+                    'currentValue; Renovate names the dependency and its '
+                    'version from those groups, and %r captures %s.' % (
+                        pattern, sorted(groups)))
                 matched.add((groups['depName'], groups['currentValue']))
 
         self.assertEqual(

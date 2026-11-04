@@ -17,7 +17,7 @@
   },
   "customManagers": [
     {
-      "description": "Pick up the Ansible tool pins, ansible-core and ansible-lint, in functional-tests.yml's sanity_checks job. Renovate has no manager for a uv command line in a workflow, so without this the pins would never move. They are pinned so that a new release arrives as its own pull request, which says what changed: unpinned, ansible-core 2.22.0's new no_log output masking broke the Kerbside wiring test on every pull request (#4773), and had to be held below 2.22 until the role fix was released (#4774). Kerbside pins the same two tools the same way, for the same collection (kerbside#690).",
+      "description": "Pick up the Ansible tool pins, ansible-core and ansible-lint, in functional-tests.yml's sanity_checks job. Renovate has no manager for a uv command line in a workflow, so without this the pins would never move. They are pinned so that a new release arrives as its own pull request, which says what changed: unpinned, ansible-core 2.22.0's new no_log output masking broke the Kerbside wiring test on every pull request (#4773), and had to be held below 2.22 (#4774) until the role fix, kerbside#689, was released in shakenfist.kerbside 0.9.0. customManagers is mergeable, so this entry adds to the one the customManagers:githubActionsVersions preset contributes rather than replacing it. Kerbside pins the same two tools the same way, for the same collection (kerbside#690).",
       "customType": "regex",
       "managerFilePatterns": [
         "/^\\.github/workflows/functional-tests\\.yml$/"
