@@ -305,3 +305,47 @@ plan-blocker b13 (the calibration re-run) has cleared before step 3 is
 dispatched, and agree the shape of the shared `place_on_candidates`
 helper (Decision D3) before step 1's edit begins — it is cheap to
 propose and expensive to redo once two callers depend on it.
+
+## Execution notes
+
+*2026-11-05 (+1100).* Back brief answered: the operator approved the
+`Instance.place_on_candidates()` shape (D3) and chose to land the
+ungated work now and hold the ceiling flip. Plan-blocker b13 (the
+calibration re-run) was still WAITING at execution time, so step 3 was
+**not** implemented; steps ran in the order 1, 2, 4, each by a
+sub-agent and reviewed and committed in the management session.
+
+- Step 1 — shared walk: `036f255758`.
+- Step 2 — admin capacity view: `6da5a5ef83`.
+- Step 4 — docs: `2464830e3a`.
+- Step 3 — hard-ceiling flip: **deferred**, gated on b13. It lands as a
+  separate commit on this branch once the calibration re-run has
+  produced the observation record D16 gates on. Until then the ceiling
+  stays advisory (`CLAIM_ENFORCEMENT_HARD = False`) and every doc keeps
+  its "advisory this release" wording.
+
+Refinements the steps forced:
+
+- **D4's "reads no instance state" was imprecise.** `summarize_resources()`
+  reads a node-metrics snapshot (`self.metrics`), though no per-instance
+  state and no `Scheduler` behaviour. Step 2 extracted the body around a
+  fresh `get_active_node_metrics()` snapshot rather than by constructing
+  a throwaway `Scheduler`; the bound method and its four helpers remain
+  as one-line delegators, so the ~25 scheduler-test callers are
+  unchanged. The new path is behaviourally identical to the old
+  `Scheduler().summarize_resources()` (a fresh scheduler has empty
+  metrics and refreshes on the first call).
+- **DoD item 5's `test_nodes.py` is a cluster-CI test**
+  (`deploy/shakenfist_ci/cluster_ci_tests/`), not locally runnable. The
+  response-body guard was exercised locally through
+  `tests/external_api/test_admin.py` and `tests/test_scheduler.py`
+  (both green); the cluster test runs in CI on push.
+- Two review corrections the management session made itself: step 1's
+  idle-node regression guard (issue 3813) was patching `Instance.add_event`,
+  which the extracted walk no longer routes through — repointed at
+  `add_event_multi` so the "no waiver fired" assertion is live again; and
+  a step 4 doc paragraph was rewrapped.
+
+Definition of done at this point: items 1–5, 8 and 9 pass locally
+(item 5 less its cluster-CI portion); items 6 and 7 belong to the
+deferred step 3 and are pending b13.
