@@ -16489,8 +16489,9 @@ lane's job is reported as <code>Functional lanes / &lt;lane&gt; / Smoke tests
 (collection)</code>.</p>
 <p>The weekly schedule is GitHub's <code>schedule:</code>, which has run hours late and
 sometimes not at all since August 2026. It is a stopgap until
-<code>shakenfist/private-ci</code>'s periodic CI plan (<code>PLAN-periodic-ci.md</code>) has the
-conductor dispatch this workflow into gaps in sfcbr's load, which is why
+<code>shakenfist/private-ci</code>'s periodic CI plan
+(<a href="https://github.com/shakenfist/private-ci/blob/master/docs/plans/PLAN-periodic-ci.md"><code>PLAN-periodic-ci.md</code></a>)
+has the conductor dispatch this workflow into gaps in sfcbr's load, which is why
 <code>scheduled-tests.yml</code>'s <code>workflow_dispatch</code> takes no inputs. To run the
 weekly lanes against a branch, dispatch it by hand:
 <code>gh workflow run scheduled-tests.yml --ref &lt;branch&gt;</code>. A failure there
