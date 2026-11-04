@@ -85,6 +85,21 @@ rewrites the lockfile without installing anything. That is how a
 lockfile is deliberately refreshed, and nothing is tested against the
 tree it produces until the resulting lockfile is reviewed and merged.
 
+Neither, again, is a named package installed into a prefix outside the
+project: `npm install --prefix "${RUNNER_TEMP}/renovate-bin"
+renovate@...`, which is how the renovate workflow installs a pinned
+Renovate into a scratch directory. `--prefix` points npm at a package
+root other than the working directory's, so it reads and writes the
+manifest and lockfile under that directory rather than the project's --
+the same reasoning as `-g`, by a different route. Both halves are
+needed. Without `--prefix` a named install (`npm install left-pad`)
+adds to the project's own lockfile, and with `--prefix` but no package
+(`npm install --prefix packages/app`) it resolves that sub-project's
+declared ranges, which is the failure this criterion looks for reached
+through a subdirectory. A command carrying a backslash line
+continuation is read whole, so the package named after the continuation
+is seen.
+
 Neither, finally, is the phrase appearing somewhere that is not a
 command. Only the body of a `run:` is read, and the command has to
 start there or follow a `|`, `&&` or `;`. A step called "never use npm
