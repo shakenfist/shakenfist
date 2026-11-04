@@ -40,8 +40,8 @@ on:
   workflow_dispatch:
   schedule:
     # 02:00 on Saturday in Canberra (01:00 outside daylight saving), which
-    # is when sfcbr has the most headroom: PLAN-periodic-ci's phase 0 survey
-    # found almost all of it overnight and at weekends.
+    # is when sfcbr has the most headroom: a survey of its load found the
+    # headroom concentrated overnight and at weekends.
     - cron: '00 15 * * 5'        # utc, fridays
 
 jobs:
