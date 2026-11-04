@@ -1448,6 +1448,75 @@ class Instance(dbowo):
                     extra={'node': location, 'previous_node': old_location,
                            'clamps': result['clamps']})
 
+    def place_on_candidates(self, candidates, log_targets, refusal_message,
+                            denials):
+        """Walk an ordered candidate list, claiming the first that admits.
+
+        ``find_candidates()`` filters against a metrics snapshot up to a
+        minute stale, so its ordered list is a preference, not a
+        decision: the guarded capacity claim inside ``place_instance()``
+        is what actually admits the instance, and a refusal there means
+        another placement took the slot in between. So walk the list,
+        calling ``place_instance()`` on each candidate until one takes
+        the instance, and return that node uuid -- or ``None`` when every
+        candidate was refused.
+
+        Each candidate refused on the way is recorded in ``denials`` (a
+        dict the caller owns and reads afterwards, so its own exhaustion
+        handling keeps the per-candidate stages and the refused count)
+        and evented against ``log_targets`` with ``refusal_message`` --
+        the one audit message that differs between the create path and
+        the start redirect. ``log_targets`` is the ordered list of
+        objects the event is recorded against: the create path events
+        the instance alone, the start redirect events both the operation
+        and the instance.
+
+        ``WriteException`` is deliberately not caught here: an
+        unreachable database is not a full cluster, and asking the next
+        node would only get the same unanswerable question, so it
+        propagates to the caller, which tells the two apart.
+
+        If the first pass admits nowhere and at least one candidate was
+        refused on the demand feedforward alone, a second pass re-walks
+        with that clause waived (``enforce_demand=False``): the demand
+        term spreads correlated bursts across nodes and is not a capacity
+        bound, so when there is no quieter node to spread to it must not
+        fail a placement the cluster has real capacity for (the smoke CI
+        single-node lockout of 2026-08-14).
+        """
+        def walk(enforce_demand):
+            for candidate in candidates:
+                try:
+                    self.place_instance(
+                        candidate, enforce_demand=enforce_demand)
+                    return candidate
+                except exceptions.CapacityAdmissionDenied as e:
+                    denials[candidate] = {
+                        'failing_stage': e.failing_stage,
+                        'dimensions': e.dimensions,
+                        'demand_only': e.demand_only,
+                    }
+                    add_event_multi(
+                        EVENT_TYPE_AUDIT, log_targets, refusal_message,
+                        extra={
+                            'node': candidate,
+                            'failing_stage': e.failing_stage,
+                            'dimensions': e.dimensions,
+                            'enforce_demand': enforce_demand,
+                        })
+            return None
+
+        chosen = walk(True)
+        if chosen is None and any(
+                d['demand_only'] for d in denials.values()):
+            add_event_multi(
+                EVENT_TYPE_AUDIT, log_targets,
+                'no candidate admitted and some refused on demand '
+                'alone, waiving demand guard',
+                extra={'candidates': candidates, 'denials': denials})
+            chosen = walk(False)
+        return chosen
+
     def enqueue_disk_fetches(self, target_node, priority, request_id=None,
                              artifact_event=None):
         """Enqueue an artifact fetch onto target_node for each disk image.

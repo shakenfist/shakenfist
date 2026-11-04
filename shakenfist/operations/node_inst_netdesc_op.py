@@ -7,7 +7,6 @@ from shakenfist.schema.operations import node_inst_netdesc_op as schema
 from shakenfist.schema.operations.baseclusteroperation import dependency
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import CandidateNodeNotFoundException
-from shakenfist.exceptions import CapacityAdmissionDenied
 from shakenfist.exceptions import ImagesCannotShrinkException
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import AffinityConstraintUnsatisfiable
@@ -246,57 +245,17 @@ class NodeInstNetdescOp(BaseClusterOperation):
             candidates = s.find_candidates(inst, candidates=candidates)
 
             # The scheduler's list is a preference; the guarded capacity
-            # claim inside place_instance() is the admission, so walk the
-            # candidates until one takes the instance. Exhausting the
-            # list is the same outcome as the scheduler finding no
-            # candidates at all, so it is raised as one.
-            #
-            # This walk (including the demand-only re-walk below) also
-            # exists in external_api/instance.py's create path; until a
-            # shared helper is extracted (see
-            # PLAN-scheduler-reservations.md), a semantic change here
-            # must be made there too.
+            # claim inside place_instance() is the admission, so
+            # place_on_candidates() walks the candidates until one takes
+            # the instance (re-walking once with the demand clause waived
+            # if nothing admitted and a candidate was refused on demand
+            # alone). Exhausting the list is the same outcome as the
+            # scheduler finding no candidates at all, so it is raised as
+            # one.
             denials = {}
-
-            def place_walk(enforce_demand):
-                for candidate in candidates:
-                    try:
-                        inst.place_instance(
-                            candidate, enforce_demand=enforce_demand)
-                        return candidate
-                    except CapacityAdmissionDenied as e:
-                        denials[candidate] = {
-                            'failing_stage': e.failing_stage,
-                            'dimensions': e.dimensions,
-                            'demand_only': e.demand_only,
-                        }
-                        add_event_multi(
-                            EVENT_TYPE_AUDIT, [self, inst],
-                            'reschedule candidate refused by capacity guard',
-                            extra={
-                                'node': candidate,
-                                'failing_stage': e.failing_stage,
-                                'dimensions': e.dimensions,
-                                'enforce_demand': enforce_demand,
-                            })
-                return None
-
-            target = place_walk(True)
-
-            # The D13 demand term spreads correlated bursts across
-            # nodes; it is not a capacity bound. The first pass already
-            # gave demand-quiet nodes their preference, so if nothing
-            # admitted and at least one candidate was refused on demand
-            # alone, walk again with the clause waived rather than
-            # aborting a start the cluster has real capacity for.
-            if target is None and any(
-                    d['demand_only'] for d in denials.values()):
-                add_event_multi(
-                    EVENT_TYPE_AUDIT, [self, inst],
-                    'no candidate admitted and some refused on demand '
-                    'alone, waiving demand guard',
-                    extra={'candidates': candidates, 'denials': denials})
-                target = place_walk(False)
+            target = inst.place_on_candidates(
+                candidates, [self, inst],
+                'reschedule candidate refused by capacity guard', denials)
 
             if target is None:
                 add_event_multi(

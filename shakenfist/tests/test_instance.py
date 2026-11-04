@@ -2845,6 +2845,70 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertEqual(2048, row['used_memory_mb'])
         self.assertEqual(8, row['used_disk_gb'])
 
+    def test_place_on_candidates_skips_demand_rewalk_for_a_real_denial(self):
+        """The demand-waived second pass runs only on a demand-only denial.
+
+        A candidate refused on a real capacity dimension (not the demand
+        feedforward) leaves no slack a waiver could free, so the walk
+        must not re-run with the demand clause waived: it would only ask
+        the same full node the same question.
+        """
+        calls = []
+
+        def refuse_on_cpus(node, enforce_demand=True):
+            calls.append(enforce_demand)
+            raise exceptions.CapacityAdmissionDenied(
+                'node',
+                [{'dimension': 'cpus', 'limit': 16.0, 'used': 16.0,
+                  'requested': 2.0, 'exceeded': True}])
+
+        denials = {}
+        with mock.patch.object(self.inst, 'place_instance',
+                               side_effect=refuse_on_cpus):
+            with mock.patch('shakenfist.instance.add_event_multi'):
+                chosen = self.inst.place_on_candidates(
+                    [self.node2], [self.inst],
+                    'schedule candidate refused by capacity guard', denials)
+
+        self.assertIsNone(chosen)
+        # One walk only -- the enforced pass. The real-dimension denial
+        # is not demand-only, so there is no waived re-walk.
+        self.assertEqual([True], calls)
+        self.assertFalse(denials[self.node2]['demand_only'])
+
+    def test_place_on_candidates_rewalks_for_a_demand_only_denial(self):
+        """A demand-only denial does trigger the waived second pass.
+
+        The contrast case: when the only refusal was the demand
+        feedforward, the walk re-runs with it waived and admits the node
+        its real capacity could always take.
+        """
+        calls = []
+
+        def refuse_on_demand_then_admit(node, enforce_demand=True):
+            calls.append(enforce_demand)
+            if enforce_demand:
+                raise exceptions.CapacityAdmissionDenied(
+                    'node',
+                    [{'dimension': 'cpus', 'limit': 16.0, 'used': 0.0,
+                      'requested': 2.0, 'exceeded': False},
+                     {'dimension': 'demand', 'limit': 6.0, 'used': 9.2,
+                      'requested': 2.5, 'exceeded': True}])
+            # The waived pass admits.
+
+        denials = {}
+        with mock.patch.object(self.inst, 'place_instance',
+                               side_effect=refuse_on_demand_then_admit):
+            with mock.patch('shakenfist.instance.add_event_multi'):
+                chosen = self.inst.place_on_candidates(
+                    [self.node2], [self.inst],
+                    'schedule candidate refused by capacity guard', denials)
+
+        self.assertEqual(self.node2, chosen)
+        # Two walks -- the enforced pass refused, the waived pass admitted.
+        self.assertEqual([True, False], calls)
+        self.assertTrue(denials[self.node2]['demand_only'])
+
     def test_unchanged_placement_is_not_rewritten(self):
         self.inst.place_instance(self.node2)
         with mock.patch('shakenfist.mariadb.admit_instance_placement') as a:

@@ -915,7 +915,7 @@ class ExternalApiCreateAdmissionWalkTestCase(ExternalApiTestCase):
             self.NODE_A, limit_cpus=16, limit_memory_mb=65536,
             limit_disk_gb=500, expected_demand=0.0, demand_limit=1.5)
 
-        with mock.patch('shakenfist.instance.Instance.add_event') as events:
+        with mock.patch('shakenfist.instance.add_event_multi') as events:
             with self._candidates(self.NODE_A):
                 resp = self._post('idle-node-large-instance', cpus=8)
 

@@ -18,6 +18,7 @@ from unittest import mock
 from uuid import uuid4
 
 from shakenfist import exceptions
+from shakenfist.instance import Instance
 from shakenfist.operations.node_inst_netdesc_op import AbortInstanceStart
 from shakenfist.operations.node_inst_netdesc_op import NodeInstNetdescOp
 from shakenfist.schema.object_state import State
@@ -86,6 +87,14 @@ class FakeInstance:
                           'requested': 2.5, 'exceeded': True}])
         self.placed_on.append(node)
 
+    def place_on_candidates(self, candidates, log_targets, refusal_message,
+                            denials):
+        # The candidate walk itself lives on the real Instance; run it
+        # against this double's controllable place_instance so the
+        # redirect behaviour this suite pins exercises the shared helper.
+        return Instance.place_on_candidates(
+            self, candidates, log_targets, refusal_message, denials)
+
     def enqueue_disk_fetches(self, target_node, priority, request_id=None,
                              artifact_event=None):
         self.disk_fetch_calls.append(
@@ -132,11 +141,15 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
                 with mock.patch(
                         'shakenfist.operations.node_inst_netdesc_op.'
                         'add_event_multi'):
-                    try:
-                        op._instance_preflight(inst)
-                        raised = None
-                    except AbortInstanceStart as e:
-                        raised = e
+                    # The candidate-walk events now come from the shared
+                    # Instance helper, so silence them at their new home
+                    # too (the FakeInstance is not a real evented object).
+                    with mock.patch('shakenfist.instance.add_event_multi'):
+                        try:
+                            op._instance_preflight(inst)
+                            raised = None
+                        except AbortInstanceStart as e:
+                            raised = e
         return op, mock_enqueue, raised
 
     def test_redirect_uses_schema_create_and_enqueue(self):
