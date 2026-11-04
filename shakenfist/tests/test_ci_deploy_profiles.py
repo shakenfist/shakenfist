@@ -305,6 +305,24 @@ class CiDeployProfilesTestCase(base.ShakenFistTestCase):
                 '%s: api_url on the Kerbside hosts is loopback (%s), so Kerbside would scrape '
                 'its own node. Point it at another node.' % (name, host))
 
+    def test_kerbside_profile_rechecks_units_and_expects_the_proxy(self):
+        # A profile deploying Kerbside redeploys the cluster and asserts no
+        # unit restarted the second time; dropping kerbside-*.service from
+        # redeploy_check would let a Kerbside unit flap unnoticed, and dropping
+        # the SF_CI_EXPECT_VDI_CONSOLE_PROXY export would stop the functional
+        # tests from asserting the proxy is there. Either leaves the lane
+        # green, so pin both (#4707).
+        for name, _, profile, _ in self._kerbside_profiles():
+            units = (profile.get('redeploy_check') or {}).get('units') or []
+            self.assertIn(
+                'kerbside-*.service', units,
+                '%s deploys Kerbside but its redeploy_check does not watch '
+                'kerbside-*.service for a restart.' % name)
+            self.assertEqual(
+                '1', (profile.get('test_env') or {}).get('SF_CI_EXPECT_VDI_CONSOLE_PROXY'),
+                '%s deploys Kerbside but does not export '
+                'SF_CI_EXPECT_VDI_CONSOLE_PROXY=1 for the functional tests.' % name)
+
     def test_kerbside_database_matches_its_sql(self):
         for name, _, profile, group in self._kerbside_profiles():
             url = urllib.parse.urlsplit(str(self._effective(profile, group, 'kerbside_sql_url', '')))
