@@ -16626,6 +16626,32 @@ to reach for and the loop body to be plainly an index lookup.</p>
 <code>Blob.depends_on</code> and <code>Blob.transcoded</code> each ran their own filtered
 <code>get_references_from</code> while the caller had already read the same rows
 unfiltered; that was the other half of #3876.</p>
+<h2 id="a-no_log-default-is-a-cluster-wide-redaction">A <code>no_log</code> default is a cluster-wide redaction<a class="headerlink" href="#a-no_log-default-is-a-cluster-wide-redaction" title="Permanent link">&para;</a></h2>
+<p>An option declared <code>no_log: true</code> in a role's <code>meta/argument_specs.yml</code> is not
+a per-task setting. Ansible registers whatever value the argument spec
+validated as a secret for the rest of the run, and from ansible-core 2.22
+every later occurrence of that exact string anywhere in the output -- task
+names, assert messages, variables which have nothing to do with the option --
+comes out as <code>$REDACTED$</code>.</p>
+<p>The value validated is usually the role's own default, because an option an
+operator did not set still gets validated. The node role defaulted
+<code>system_key</code>, which the <code>kerbside_credentials</code> entry point declares <code>no_log</code>,
+to <code>"unknown"</code>, so a deploy which left it alone -- any deploy reading the key
+from Vault, for one -- masked an ordinary English word out of every message of
+the run. Upstream, the <code>shakenfist.kerbside</code> collection declared the whole
+<code>kerbside_sources</code> list <code>no_log</code>, which registered each source's
+<code>type: shakenfist</code> and turned a passing task header into
+<code>TASK [$REDACTED$.kerbside.kerbside : ...]</code>; that failed the Kerbside wiring
+test on every pull request in this repository until ansible-core was pinned
+below 2.22 (issue #4773, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/687" title="GitHub Issue: shakenfist/kerbside #687">kerbside#687</a>).</p>
+<p>So the default of a <code>no_log</code> option must be a string which cannot occur
+anywhere else: empty, which the masker ignores, or a <code>change-me-&lt;thing&gt;</code>
+placeholder matching the example inventories. <code>defaults/main.yml</code> has to agree
+with the spec, since it is the value a run actually validates.
+<code>test_collection_no_log_defaults.py</code> checks both. Narrow <code>no_log</code> to the
+fields which are secret rather than declaring a structure that contains one,
+and remember that <code>no_log</code> on a <em>task</em> is a different thing -- it suppresses
+that task's own output and registers nothing.</p>
 
 
 
