@@ -87,13 +87,13 @@ class FakeInstance:
                           'requested': 2.5, 'exceeded': True}])
         self.placed_on.append(node)
 
-    def place_on_candidates(self, candidates, log_targets, refusal_message,
-                            denials):
+    def place_on_candidates(self, candidates, refusal_message, *,
+                            log_targets=None):
         # The candidate walk itself lives on the real Instance; run it
         # against this double's controllable place_instance so the
         # redirect behaviour this suite pins exercises the shared helper.
         return Instance.place_on_candidates(
-            self, candidates, log_targets, refusal_message, denials)
+            self, candidates, refusal_message, log_targets=log_targets)
 
     def enqueue_disk_fetches(self, target_node, priority, request_id=None,
                              artifact_event=None):
@@ -144,12 +144,16 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
                     # The candidate-walk events now come from the shared
                     # Instance helper, so silence them at their new home
                     # too (the FakeInstance is not a real evented object).
-                    with mock.patch('shakenfist.instance.add_event_multi'):
+                    # Captured so a test can assert the refusal event's
+                    # targets without the double raising on a real write.
+                    with mock.patch(
+                            'shakenfist.instance.add_event_multi') as events:
                         try:
                             op._instance_preflight(inst)
                             raised = None
                         except AbortInstanceStart as e:
                             raised = e
+        self.last_instance_events = events
         return op, mock_enqueue, raised
 
     def test_redirect_uses_schema_create_and_enqueue(self):
@@ -209,6 +213,27 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
             second, op.instance_uuid, op.net_desc, op.tasks,
             op.priority, op.request_id, depends_on=None)
         self.assertEqual(NodeInstNetdescOp.STATE_ABORT, op.state.value)
+
+    def test_redirect_events_refusal_against_operation_and_instance(self):
+        # The shared walk must event each refused candidate against both
+        # the operation and the instance ([op, inst]) for the redirect
+        # caller -- the one behaviour log_targets exists to preserve for
+        # this call site. Deny the first candidate so a refusal event is
+        # emitted, then admit the second so the preflight completes.
+        first = str(uuid4())
+        second = str(uuid4())
+        inst = FakeInstance('created', deny=[first])
+
+        op, _, raised = self._redirect(inst, [first, second])
+
+        self.assertIsNone(raised)
+        refusals = [
+            c for c in self.last_instance_events.call_args_list
+            if c.args[2] == 'reschedule candidate refused by capacity guard']
+        self.assertEqual(1, len(refusals))
+        # args: (event_type, log_targets, message, ...); log_targets is
+        # the ordered [operation, instance] list.
+        self.assertEqual([op, inst], refusals[0].args[1])
 
     def test_demand_only_refusals_are_waived_on_a_second_pass(self):
         # The D13 demand feedforward spreads bursts across nodes; when

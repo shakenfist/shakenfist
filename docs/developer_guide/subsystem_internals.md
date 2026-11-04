@@ -31,8 +31,8 @@ un-upgraded nodes don't look artificially large; the deploy itself
 *does* bump network and database nodes per host, so this is a
 statement about the fallback and not about the system -- see
 [the operator guide](../operator_guide/scheduler.md#system-reservations))
-— admission, ordering and `summarize_resources()` all go through
-these helpers, so keep them in sync if you touch capacity
+— admission, ordering and `summarize_cluster_resources()` all go
+through these helpers, so keep them in sync if you touch capacity
 arithmetic.
 A third participant mirrors the same arithmetic: the scheduler
 capacity reconciler's limit-derivation helpers in
@@ -142,29 +142,29 @@ used_cpus)` with `used_cpus` read from `scheduler_node_capacity`,
 because a node whose ledger is full measures as idle for as long as
 its instances spend fetching images. A node with no capacity row is
 charged nothing, matching the admission transaction's own fail-open on
-an unsized node. `summarize_resources()` charges the same way, from the
-same counters, so `/admin/resources` is not a second, independently
-derived ledger. The two differ on the limit they measure that charge
-against: the pre-filter uses the capacity row's `limit_cpus`, because
-that is what the guard behind it will use, while `/admin/resources`
-derives the limit live from the node's metrics. The arithmetic is the
-same (`mariadb._derive_cpu_memory_limits()`), but the row refreshes
-only once a reconcile period, so the published headroom can differ from
-what admission would grant for up to that long. The capacity row's own
-`limit_cpus` is published too, as `cpu_limit` -- with no fallback to
-the live-derived `cpu_hard_max` when the row is absent, so `cpu_limit`
-is `None` exactly when there is no row to disagree with. Both inputs to
-the charge are published (`cpu_measured`, `cpu_committed`, and
-`cpu_committed_row_present` to say whether a zero means "unsized" or
-"idle"), so which of the two binds is answerable from the response.
-The row's disk counters are published under the same conventions, as
-`disk_limit_gb` and `disk_committed_gb` (issue 4208): `disk_available`
-alone is headroom, which moves under load, so without the ledger's
-ceiling nothing in the response bounded what a node could ever accept
-on disk -- the gap that kept the CI saturation suite's disk case from
-being load-proof. The disk pre-filter still reads only live metrics,
-so publishing the counters moved nothing about admission.
-The reconciler maintains the
+an unsized node. `summarize_cluster_resources()` charges the same way,
+from the same counters, so `/admin/resources` is not a second,
+independently derived ledger. The two differ on the limit they measure
+that charge against: the pre-filter uses the capacity row's
+`limit_cpus`, because that is what the guard behind it will use, while
+`/admin/resources` derives the limit live from the node's metrics. The
+arithmetic is the same (`mariadb._derive_cpu_memory_limits()`), but the
+row refreshes only once a reconcile period, so the published headroom
+can differ from what admission would grant for up to that long. The
+capacity row's own `limit_cpus` is published too, as `cpu_limit` --
+with no fallback to the live-derived `cpu_hard_max` when the row is
+absent, so `cpu_limit` is `None` exactly when there is no row to
+disagree with. Both inputs to the charge are published (`cpu_measured`,
+`cpu_committed`, and `cpu_committed_row_present` to say whether a zero
+means "unsized" or "idle"), so which of the two binds is answerable
+from the response. The row's disk counters are published under the same
+conventions, as `disk_limit_gb` and `disk_committed_gb` (issue 4208):
+`disk_available` alone is headroom, which moves under load, so without
+the ledger's ceiling nothing in the response bounded what a node could
+ever accept on disk -- the gap that kept the CI saturation suite's disk
+case from being load-proof. The disk pre-filter still reads only live
+metrics, so publishing the counters moved nothing about admission. The
+reconciler maintains the
 `scheduler_node_capacity`, `namespace_claims` and `cluster_capacity`
 tables from the elected cluster node every five minutes. Rows exist
 per *schedulable hypervisor*, not per node, because a row that

@@ -69,11 +69,11 @@ snapshot up to a minute stale, whether a node probably can host the
 instance. The CPU, RAM and disk filters are ledger-aware -- they read
 the same counters the admission guard draws down -- but they are a
 cheap prune of the candidate list, not a second decider. They are not
-the admission decision -- that is a separate,
-atomic capacity claim made once a candidate is chosen (see [Admission
-is a guarded capacity claim](#admission-is-a-guarded-capacity-claim)
-below), so a node that survives every pre-filter here can still be
-refused there if another concurrent create took the last slot first.
+the admission decision -- that is a separate, atomic capacity claim
+made once a candidate is chosen (see [Admission is a guarded capacity
+claim](#admission-is-a-guarded-capacity-claim) below), so a node that
+survives every pre-filter here can still be refused there if another
+concurrent create took the last slot first.
 Stages 8 and 9 are **load shedding**: they answer whether a node is a
 good idea right now. Affinity sits between the two deliberately. A
 busy node is still a node the user asked for, so load shedding may
@@ -400,7 +400,7 @@ divergence -- the attribute and the row are written by one transaction
 resources, the remedy is a restart of that node's Shaken Fist
 services, and the interesting question is what deleted the row.
 
-`/admin/resources` (`summarize_resources()`) publishes `cpu_committed`
+`/admin/resources` (`summarize_cluster_resources()`) publishes `cpu_committed`
 sourced from these same counters rather than a separate walk,
 alongside `cpu_committed_row_present`: a node the reconciler has not
 yet sized reports `cpu_committed` as zero *and*

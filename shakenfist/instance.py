@@ -1448,8 +1448,8 @@ class Instance(dbowo):
                     extra={'node': location, 'previous_node': old_location,
                            'clamps': result['clamps']})
 
-    def place_on_candidates(self, candidates, log_targets, refusal_message,
-                            denials):
+    def place_on_candidates(self, candidates, refusal_message, *,
+                            log_targets=None):
         """Walk an ordered candidate list, claiming the first that admits.
 
         ``find_candidates()`` filters against a metrics snapshot up to a
@@ -1458,18 +1458,28 @@ class Instance(dbowo):
         is what actually admits the instance, and a refusal there means
         another placement took the slot in between. So walk the list,
         calling ``place_instance()`` on each candidate until one takes
-        the instance, and return that node uuid -- or ``None`` when every
-        candidate was refused.
+        the instance.
 
-        Each candidate refused on the way is recorded in ``denials`` (a
-        dict the caller owns and reads afterwards, so its own exhaustion
-        handling keeps the per-candidate stages and the refused count)
-        and evented against ``log_targets`` with ``refusal_message`` --
-        the one audit message that differs between the create path and
-        the start redirect. ``log_targets`` is the ordered list of
-        objects the event is recorded against: the create path events
-        the instance alone, the start redirect events both the operation
-        and the instance.
+        Returns ``(chosen, denials)``: the admitting node uuid (or
+        ``None`` when every candidate was refused), and a fresh dict of
+        the per-candidate refusals ``{node: {failing_stage, dimensions,
+        demand_only}}``. The caller reads ``denials`` for its own
+        exhaustion handling -- the per-candidate stages and the refused
+        count -- so it is built here and returned rather than passed in,
+        which keeps the demand re-walk below keyed on this call's own
+        denials alone.
+
+        Each refusal is evented against ``log_targets`` with
+        ``refusal_message`` -- the one audit message that differs between
+        the create path and the start redirect. ``log_targets`` is the
+        ordered list of objects the event is recorded against, and
+        defaults to ``[self]`` (the create path events the instance
+        alone); the start redirect passes ``[operation, instance]`` to
+        event both.
+
+        Only ``self.place_instance()`` is read from ``self`` here, which
+        a preflight test double relies on; reading any other attribute
+        would break that double.
 
         ``WriteException`` is deliberately not caught here: an
         unreachable database is not a full cluster, and asking the next
@@ -1484,6 +1494,10 @@ class Instance(dbowo):
         fail a placement the cluster has real capacity for (the smoke CI
         single-node lockout of 2026-08-14).
         """
+        if log_targets is None:
+            log_targets = [self]
+        denials = {}
+
         def walk(enforce_demand):
             for candidate in candidates:
                 try:
@@ -1515,7 +1529,7 @@ class Instance(dbowo):
                 'alone, waiving demand guard',
                 extra={'candidates': candidates, 'denials': denials})
             chosen = walk(False)
-        return chosen
+        return chosen, denials
 
     def enqueue_disk_fetches(self, target_node, priority, request_id=None,
                              artifact_event=None):

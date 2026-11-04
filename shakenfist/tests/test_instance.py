@@ -2862,13 +2862,12 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
                 [{'dimension': 'cpus', 'limit': 16.0, 'used': 16.0,
                   'requested': 2.0, 'exceeded': True}])
 
-        denials = {}
         with mock.patch.object(self.inst, 'place_instance',
                                side_effect=refuse_on_cpus):
             with mock.patch('shakenfist.instance.add_event_multi'):
-                chosen = self.inst.place_on_candidates(
-                    [self.node2], [self.inst],
-                    'schedule candidate refused by capacity guard', denials)
+                chosen, denials = self.inst.place_on_candidates(
+                    [self.node2],
+                    'schedule candidate refused by capacity guard')
 
         self.assertIsNone(chosen)
         # One walk only -- the enforced pass. The real-dimension denial
@@ -2896,18 +2895,60 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
                       'requested': 2.5, 'exceeded': True}])
             # The waived pass admits.
 
-        denials = {}
         with mock.patch.object(self.inst, 'place_instance',
                                side_effect=refuse_on_demand_then_admit):
             with mock.patch('shakenfist.instance.add_event_multi'):
-                chosen = self.inst.place_on_candidates(
-                    [self.node2], [self.inst],
-                    'schedule candidate refused by capacity guard', denials)
+                chosen, denials = self.inst.place_on_candidates(
+                    [self.node2],
+                    'schedule candidate refused by capacity guard')
 
         self.assertEqual(self.node2, chosen)
         # Two walks -- the enforced pass refused, the waived pass admitted.
         self.assertEqual([True, False], calls)
         self.assertTrue(denials[self.node2]['demand_only'])
+
+    def test_place_on_candidates_stops_at_the_first_admitting_node(self):
+        """The walk returns the first candidate that admits and stops.
+
+        A later candidate is never tried once one takes the instance, so
+        the preference order find_candidates() produced is honoured and
+        no needless second claim is attempted.
+        """
+        tried = []
+
+        def admit_first(node, enforce_demand=True):
+            tried.append(node)
+            # The first candidate admits; place_instance returns None.
+
+        with mock.patch.object(self.inst, 'place_instance',
+                               side_effect=admit_first):
+            with mock.patch('shakenfist.instance.add_event_multi'):
+                chosen, denials = self.inst.place_on_candidates(
+                    [self.node2, self.node3],
+                    'schedule candidate refused by capacity guard')
+
+        self.assertEqual(self.node2, chosen)
+        self.assertEqual([self.node2], tried)
+        self.assertEqual({}, denials)
+
+    def test_place_on_candidates_propagates_a_write_exception(self):
+        """A WriteException escapes rather than moving to the next node.
+
+        An unreachable database is not a full cluster, so the walk must
+        not swallow a WriteException and try the next candidate; it
+        propagates to the caller, which tells a 503 from a 507.
+        """
+        def fail_to_write(node, enforce_demand=True):
+            raise exceptions.WriteException('database unreachable')
+
+        with mock.patch.object(self.inst, 'place_instance',
+                               side_effect=fail_to_write):
+            with mock.patch('shakenfist.instance.add_event_multi'):
+                self.assertRaises(
+                    exceptions.WriteException,
+                    self.inst.place_on_candidates,
+                    [self.node2, self.node3],
+                    'schedule candidate refused by capacity guard')
 
     def test_unchanged_placement_is_not_rewritten(self):
         self.inst.place_instance(self.node2)

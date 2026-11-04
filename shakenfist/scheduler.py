@@ -620,10 +620,6 @@ class Scheduler:
         """The counters keyed by node uuid, and whether the read failed."""
         return _capacity_by_node()
 
-    def _cluster_capacity(self):
-        """The cluster_capacity singleton, as the resources summary publishes it."""
-        return _cluster_capacity()
-
     def _satisfies_hard_affinity(self, inst, node, memo,
                                  require_with, require_without):
         """Does this node satisfy the instance's hard affinity constraints?
@@ -1381,8 +1377,11 @@ class Scheduler:
     def summarize_resources(self):
         """Summarize cluster resources from this scheduler's metrics snapshot.
 
-        Refreshes the snapshot if it is stale. Callers which do not hold a
-        scheduler should use summarize_cluster_resources().
+        Refreshes the snapshot if it is stale. No production code calls
+        this: ``/admin/resources`` uses the module-level
+        ``summarize_cluster_resources()``, and this bound form is retained
+        for the scheduler test suite, which drives it from a constructed
+        Scheduler.
         """
         # Refresh metrics if its too old, or there are no nodes.
         diff = time.time() - self.metrics_updated

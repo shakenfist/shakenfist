@@ -252,10 +252,9 @@ class NodeInstNetdescOp(BaseClusterOperation):
             # alone). Exhausting the list is the same outcome as the
             # scheduler finding no candidates at all, so it is raised as
             # one.
-            denials = {}
-            target = inst.place_on_candidates(
-                candidates, [self, inst],
-                'reschedule candidate refused by capacity guard', denials)
+            target, denials = inst.place_on_candidates(
+                candidates, 'reschedule candidate refused by capacity guard',
+                log_targets=[self, inst])
 
             if target is None:
                 add_event_multi(

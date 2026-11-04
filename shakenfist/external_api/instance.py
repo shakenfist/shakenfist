@@ -1178,12 +1178,9 @@ class InstancesEndpoint(api_base.Resource):
         # it becomes a 503 with cleanup rather than unwinding into the
         # catch-all 500 with the half-built instance abandoned in
         # 'initial' (issue 4246).
-        denials = {}
-
         try:
-            placement = inst.place_on_candidates(
-                candidates, [inst],
-                'schedule candidate refused by capacity guard', denials)
+            placement, denials = inst.place_on_candidates(
+                candidates, 'schedule candidate refused by capacity guard')
 
         except exceptions.WriteException as e:
             # The placement write could not reach the database. This is
