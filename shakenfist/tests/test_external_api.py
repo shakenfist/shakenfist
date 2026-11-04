@@ -77,7 +77,8 @@ class FakeInstance(BaseFakeObject):
         self.last_cluster_operation = None
 
     def add_event(self, eventtype, message, duration=None, extra=None,
-                  suppress_event_logging=False, log_as_error=False):
+                  suppress_event_logging=False, log_as_error=False,
+                  log_as_debug=False):
         ...
 
     def get_lock_attr(self, name, op, global_scope=True, timeout=10):

@@ -14,6 +14,7 @@
 import base64
 import json
 import sys
+import time
 
 import flasgger
 import flask
@@ -143,6 +144,17 @@ got_request_exception.connect(_record_exception, app)
 # thousand copies of this warning, none of which said anything the
 # first one did not.
 _node_uuid_warning_emitted = False
+
+
+# Registered before every other before_request hook so that the
+# per-request summary line below can report a duration even for a
+# request one of the body size hooks refuses -- an after_request hook
+# still runs for a response a before_request hook returned. monotonic
+# rather than wall clock because a duration must not change sign when
+# ntp steps the node's clock.
+@app.before_request
+def record_request_start():
+    flask.g.sf_request_start = time.monotonic()
 
 
 @app.before_request
@@ -293,7 +305,7 @@ def log_request_info():
         '%s api request received' % flask.request.method, extra={
             'url': str(flask.request.url),
             'body': str(body)
-        })
+        }, log_as_debug=True)
 
 
 @app.after_request
@@ -328,8 +340,46 @@ def log_response_info(response):
         '%s api response sent' % flask.request.method, extra={
             'status': response.status_code,
             'body': body
-        })
+        }, log_as_debug=True)
+
+    _log_request_summary(response)
     return response
+
+
+# The one line an external request leaves in the shipped log stream.
+#
+# It replaces four INFO lines per request -- the request and response
+# audit event echoes above, log_token_use's token use echo, and
+# log_request's 'API request parsed' -- which together were about a
+# third of sfcbr's log stream, 1,247MB a day against an 800MB budget,
+# while saying nothing the events table did not already hold (issue
+# 4602). Those four are all still recorded: the events are written to
+# MariaDB unchanged, and their echoes plus the parsed line are emitted
+# at DEBUG, which journald keeps and the Loki shipper drops.
+#
+# Deliberately short. Headers, bodies and arguments are what made the
+# displaced lines large, and they are the part an operator wants only
+# when debugging a specific request -- which is what the DEBUG lines and
+# the events are for. The route template travels alongside the concrete
+# path so that traffic aggregates by endpoint rather than by uuid, the
+# same field contract log_validation_findings publishes.
+#
+# Not reached when a request dies in a way Flask does not turn into a
+# response, since after_request hooks are skipped then; the exception
+# record and its ERROR line are the trail in that case.
+def _log_request_summary(response):
+    start = flask.g.get('sf_request_start')
+    rule = flask.request.url_rule
+
+    LOG.with_fields({
+        'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
+        'identity': flask.g.get(api_base.REQUEST_IDENTITY),
+        'method': flask.request.method,
+        'path': flask.request.path,
+        'route': rule.rule if rule is not None else None,
+        'status': response.status_code,
+        'duration': (time.monotonic() - start) if start is not None else None
+    }).info('API request handled')
 
 
 # The machine searchable API capability list, as a mapping of family

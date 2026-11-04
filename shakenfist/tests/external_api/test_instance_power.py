@@ -94,7 +94,8 @@ class InstancePowerOnEndpointTestCase(InstancePowerEndpointTestCase):
             EVENT_TYPE_AUDIT, [('instance', UUID(self.instance_uuid))],
             'power on failed', duration=None,
             extra={'error': error},
-            suppress_event_logging=False, log_as_error=False)
+            suppress_event_logging=False, log_as_error=False,
+            log_as_debug=False)
 
     def test_paused_instance_answers_409(self):
         resp = self._power_on(side_effect=exceptions.InvalidLifecycleState(
@@ -135,7 +136,8 @@ class InstancePowerOffEndpointTestCase(InstancePowerEndpointTestCase):
             EVENT_TYPE_AUDIT, [('instance', UUID(self.instance_uuid))],
             'power off failed', duration=None,
             extra={'error': error},
-            suppress_event_logging=False, log_as_error=False)
+            suppress_event_logging=False, log_as_error=False,
+            log_as_debug=False)
 
 
 class InstanceRebootEndpointTestCase(InstancePowerEndpointTestCase):
