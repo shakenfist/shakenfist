@@ -54,11 +54,12 @@ class RequestLoggingTestCase(base.ShakenFistTestCase):
         logger.addHandler(self.capture)
         self.addCleanup(logger.removeHandler, self.capture)
 
-        # 'API request parsed' is emitted at INFO, below the default
-        # effective level, so it never reaches the handler unless the
-        # logger is opened up.
+        # 'API request parsed' is emitted at DEBUG (issue 4602), below
+        # the default effective level, so it never reaches the handler
+        # unless the logger is opened up. The level it is emitted at is
+        # asserted by test_request_lifecycle_logging.py.
         original_level = logger.level
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.DEBUG)
         self.addCleanup(logger.setLevel, original_level)
 
     def _request_parsed_records(self):

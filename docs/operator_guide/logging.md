@@ -171,6 +171,57 @@ metrics endpoint:
 | `logship_expired_lines_total` | Lines discarded at drain time for exceeding `LOKI_MAX_LINE_AGE`. |
 | `logship_rejected_lines_total` | Lines dropped because Loki permanently rejected their batch. |
 
+## What one API request logs
+
+An external API request leaves **one line** in the shipped log
+stream:
+
+```
+API request handled
+```
+
+It carries `request-id`, `identity` (the namespace and key name
+from the presented token, where there was one), `method`, `path`,
+`route` (the endpoint template, so traffic aggregates by endpoint
+rather than by concrete path), `status` and `duration` in seconds.
+That is enough to answer who asked for what, what they got and how
+long it took:
+
+```logql
+{job="shakenfist", daemon="sf-api"} | json
+  | message="API request handled" | duration > 1
+```
+
+The detail — full request headers, arguments and parsed body, the
+response body, and the echoes of the three per-request audit events
+— is logged at `DEBUG`, so it stays in the node's journal and is
+not shipped. Read it on the node:
+
+```bash
+journalctl -u sf-api --no-pager | grep '<request-id>'
+```
+
+This is deliberate. Those four lines per request — three event
+echoes and the parsed line — were about a third of one production
+cluster's entire log volume, 1,247MB a day against an 800MB
+budget, and almost all of that traffic is machine-to-machine:
+clients polling instance state, the in-guest agents, and the
+cluster daemon. They said nothing the events table did not already
+hold.
+
+The audit record is unaffected. Each request still writes
+`<METHOD> api request received` and `<METHOD> api response sent`
+events against its request-id, and `token used to authenticate
+request` against the namespace which owns the credential, all in
+MariaDB and all readable through the REST API — see
+[Events](events.md). Only the daemon-log echo moved.
+
+A request which dies in a way Flask cannot turn into a response
+produces no summary line; the exception record and its `ERROR`
+line are the trail in that case. Health probe paths (`/`,
+`/livez`, `/readyz`, `/healthz`) produce neither a summary line nor
+audit events, which they never did.
+
 ## API request validation findings
 
 After upgrading you may see `API request validation finding` lines
@@ -405,6 +456,11 @@ so events show up in your log stream too — giving a single
 time-ordered pane of events and logs together. That echo is
 controlled by `LOG_EVENTS_TO_LOKI` (default on); turning it off
 keeps events authoritative in MariaDB while reducing Loki volume.
+A few very high rate events echo at `DEBUG` instead, so they reach
+the journal and not Loki — the per-request API lifecycle events are
+the ones you are most likely to look for, and
+[What one API request logs](#what-one-api-request-logs) says what
+replaced them.
 Event **storage** always stays in MariaDB — it is never moved to
 Loki.
 

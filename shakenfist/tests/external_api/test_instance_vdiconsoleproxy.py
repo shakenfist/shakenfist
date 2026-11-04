@@ -137,7 +137,8 @@ class InstanceVDIProxyConsoleHelperEndpointTestCase(base.ShakenFistTestCase):
                 'namespace': 'foo',
                 'expires_at': 1789000300,
             },
-            suppress_event_logging=False, log_as_error=False)
+            suppress_event_logging=False, log_as_error=False,
+            log_as_debug=False)
 
     @mock.patch(
         'shakenfist.external_api.instance.vdi_tokens.mint_console_token')

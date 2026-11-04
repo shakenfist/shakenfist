@@ -60,11 +60,19 @@ daemon.set_log_level(LOG, 'api')
 
 
 # Unauthenticated paths hit by load balancer / orchestrator health probes.
-# These short-circuit audit logging and are downgraded from INFO to DEBUG so
-# that frequent probes do not swamp the logs or the eventlog server. Kept here
-# (rather than in app.py) because base.py is imported by app.py, avoiding a
-# circular import while letting both modules share the single tuple.
+# These short-circuit audit logging and the per-request summary line
+# entirely, so that frequent probes do not swamp the logs or write a row
+# per probe into the events table. Kept here (rather than in app.py)
+# because base.py is imported by app.py, avoiding a circular import
+# while letting both modules share the single tuple.
 HEALTH_PROBE_PATHS = ('/', '/livez', '/readyz', '/healthz')
+
+# Where log_request stashes the identity it decoded from the presented
+# JWT, so app.py's per-request summary line can name the caller without
+# decoding the token a second time. A request which never reached
+# log_request -- a 404, or a refusal from a before_request hook -- has
+# no entry, and the summary says so rather than guessing.
+REQUEST_IDENTITY = 'sf_request_identity'
 
 REDACTED_BODY = '...body not logged as this route handles credentials...'
 
@@ -1504,13 +1512,19 @@ def verify_token(func):
 
 
 def _token_use_event(ns, keyname: str, message: str,
-                     extra: Optional[dict[str, Any]] = None) -> None:
+                     extra: Optional[dict[str, Any]] = None,
+                     log_as_debug: bool = False) -> None:
     """Record a use of a token against the namespace which owns it.
 
     NOTE(mikal): the presented token must never appear in the event.
     The key name identifies which credential was used, which is what
     an audit reader actually needs; the token itself would be
     replayable by anyone who can read the namespace's events.
+
+    log_as_debug drops the event's log stream echo to DEBUG without
+    touching the event itself. The ordinary use of a token happens once
+    per authenticated request, so its echo is log volume in proportion
+    to traffic; a refusal is not, and keeps its INFO line.
     """
     fields = {
         'keyname': keyname,
@@ -1519,7 +1533,8 @@ def _token_use_event(ns, keyname: str, message: str,
         'remote-address': flask.request.remote_addr
     }
     fields.update(extra or {})
-    ns.add_event(EVENT_TYPE_AUDIT, message, extra=fields)
+    ns.add_event(EVENT_TYPE_AUDIT, message, extra=fields,
+                 log_as_debug=log_as_debug)
 
 
 def log_token_use(func):
@@ -1530,7 +1545,8 @@ def log_token_use(func):
         if not ns:
             return sf_api.error(401, 'authenticated namespace not known')
 
-        _token_use_event(ns, keyname, 'token used to authenticate request')
+        _token_use_event(ns, keyname, 'token used to authenticate request',
+                         log_as_debug=True)
         return func(*args, **kwargs)
     return wrapper
 
@@ -2122,6 +2138,11 @@ def log_request(func):
         except Exception:
             pass
 
+        try:
+            setattr(flask.g, REQUEST_IDENTITY, identity)
+        except RuntimeError:
+            pass
+
         log = LOG.with_fields({
             'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
             'identity': identity,
@@ -2132,11 +2153,16 @@ def log_request(func):
             'kwargs': kwargs_log,
             'headers': headers_log
         })
-        if flask.request.path in HEALTH_PROBE_PATHS:
-            # This is likely a load balancer or orchestrator health check
-            log.debug('API request parsed')
-        else:
-            log.info('API request parsed')
+        # Emitted at DEBUG, so it stays in the node's journal and off
+        # the shipped log stream. This line carries the full headers,
+        # arguments and body of every request, and at one per request it
+        # was a quarter of sfcbr's whole log stream (issue 4602) -- the
+        # reasoning which already demoted it for HEALTH_PROBE_PATHS
+        # applies to every high-rate caller, and most API traffic is
+        # machine-to-machine polling. What survives at INFO is the one
+        # line summary app.py's log_response_info emits per request, and
+        # the audit events, which are unchanged.
+        log.debug('API request parsed')
 
         return func(*args, **kwargs)
 

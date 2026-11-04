@@ -312,6 +312,56 @@ class TestLoki(base.BaseNamespacedTestCase):
                     found.append((match, labels, timestamp))
         return found
 
+    # The four lines an external API request used to leave in the
+    # shipped log stream, which between them were about a third of
+    # sfcbr's volume (issue 4602). They are all still emitted, at DEBUG,
+    # and all still recorded as events in MariaDB -- what is asserted
+    # here is only that the Loki shipper does not carry them.
+    PER_REQUEST_LINES = (
+        'API request parsed',
+        'api request received',
+        'api response sent',
+        'token used to authenticate request',
+    )
+
+    def test_per_request_lifecycle_lines_stay_off_loki(self):
+        start_ns = int((time.time() - 60) * 1e9)
+
+        # Authenticated traffic, so every one of the four lines has its
+        # chance: the request and response audit echoes, the token use
+        # echo, and log_request's parsed line.
+        for _ in range(5):
+            # Listed through list() because the client returns a
+            # generator for this route, and an unconsumed generator
+            # never issues the request.
+            list(self.test_client.get_networks())
+
+        # The positive control, and the replacement: one summary line
+        # per request still reaches Loki. Awaiting it also establishes
+        # that everything shippable from this window has had time to
+        # ship, which is what makes the absences below mean something.
+        self._await_loki_lines(['API request handled', '/networks'], start_ns)
+
+        end_ns = int((time.time() + 5) * 1e9)
+        shipped = {}
+        for token in self.PER_REQUEST_LINES:
+            streams = self._query_loki(token, start_ns, end_ns)
+            lines = [v for s in streams for v in s.get('values', [])]
+            if lines:
+                shipped[token] = lines
+
+        self.addDetail(
+            'per_request_lines_shipped',
+            content.text_content(json.dumps(shipped, indent=4,
+                                            sort_keys=True)))
+
+        self.assertEqual(
+            {}, shipped,
+            'Per-request API lifecycle lines reached Loki. These are '
+            'DEBUG lines by design and DEBUG is not shipped, so a match '
+            'here means one of them has been promoted back to INFO: %s'
+            % sorted(shipped))
+
     def test_no_credential_reaches_loki(self):
         """No cluster-minted key secret may appear in the log stream.
 

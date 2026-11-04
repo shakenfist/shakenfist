@@ -24,12 +24,13 @@ def add_event(
         duration: Optional[float] = None,
         extra: Optional[dict[str, Any]] = None,
         suppress_event_logging: bool = False,
-        log_as_error: bool = False
+        log_as_error: bool = False,
+        log_as_debug: bool = False
 ) -> None:
     add_event_multi(
         event_type, [(object_type, object_uuid)], message, duration=duration,
         extra=extra, suppress_event_logging=suppress_event_logging,
-        log_as_error=log_as_error)
+        log_as_error=log_as_error, log_as_debug=log_as_debug)
 
 
 def add_event_multi(
@@ -39,7 +40,8 @@ def add_event_multi(
         duration: Optional[float] = None,
         extra: Optional[dict[str, Any]] = None,
         suppress_event_logging: bool = False,
-        log_as_error: bool = False
+        log_as_error: bool = False,
+        log_as_debug: bool = False
 ) -> None:
     if not objects:
         return
@@ -89,10 +91,17 @@ def add_event_multi(
     # (Loki). It is gated by LOG_EVENTS_TO_LOKI so an operator can mute
     # the event echo, and by suppress_event_logging so high-volume
     # callers (billing statistics, object creation) can mute their own
-    # echo per-event. Neither gate affects the authoritative MariaDB
-    # write below. The 'fqdn' field is intentionally omitted here -- it
-    # would duplicate the host label on the log stream -- but is kept in
-    # the MariaDB payload below, which is the authoritative record.
+    # echo per-event. A caller which wants the echo kept for on-box
+    # debugging but off the shipped stream passes log_as_debug instead:
+    # only INFO and above reaches Loki, so DEBUG keeps the line in
+    # journald while costing the log budget nothing. That is what the
+    # per-request API lifecycle events do (issue 4602) -- four events
+    # per request, overwhelmingly machine-to-machine, which are worth
+    # auditing and not worth shipping. Neither gate, and neither
+    # severity, affects the authoritative MariaDB write below. The
+    # 'fqdn' field is intentionally omitted here -- it would duplicate
+    # the host label on the log stream -- but is kept in the MariaDB
+    # payload below, which is the authoritative record.
     if config.LOG_EVENTS_TO_LOKI and not suppress_event_logging:
         log = LOG.with_fields({
             'event_type': event_type,
@@ -105,6 +114,8 @@ def add_event_multi(
 
         if log_as_error:
             log.error('Added event')
+        elif log_as_debug:
+            log.debug('Added event')
         else:
             log.info('Added event')
 
