@@ -969,6 +969,37 @@ class InstancesEndpoint(api_base.Resource):
                     return sf_api.error(
                         400, _unfetchable_base_message(disk_base))
 
+                # A bare well-known shorthand (centos:7) is genuinely
+                # ambiguous when a label of that same name also exists: it
+                # could mean the auto-fetched upstream image or that local
+                # label, and preferring the auto-fetch silently shadows the
+                # label the caller uploaded. That shadowing surfaces much
+                # later as a boot failure rather than at create time -- an
+                # upstream UEFI build that will not boot under the default
+                # BIOS, in the case that prompted this (issue #3271). Refuse
+                # it so the caller disambiguates. The label is resolved
+                # exactly as the "label:" shorthand above resolves a bare
+                # name, so "ambiguous" means precisely that label: and the
+                # well-known fetch are both valid readings of this base; a
+                # label that is absent, unusable, or unresolvable is not a
+                # competing reading and does not trigger the refusal.
+                if images.is_image_shortcut(disk_base):
+                    label_url = (f'{LABEL_URL}{request_namespace()}'
+                                 f'/{disk_base}')
+                    shadowed = Artifact.from_url(
+                        Artifact.TYPE_LABEL, label_url, name=disk_base,
+                        namespace=namespace)
+                    if (shadowed
+                            and not _artifact_unusable_reason(shadowed)
+                            and shadowed.resolve_to_blob()):
+                        return sf_api.error(
+                            400,
+                            'disk base "%s" is ambiguous: it names both a '
+                            'well-known image and the label %s. Use %s for '
+                            'the label, or an explicit image URL for the '
+                            'upstream image.'
+                            % (disk_base, label_url, label_url))
+
                 # We ensure that the image exists in the database in an
                 # initial state here so that it will show up in image list
                 # requests. The image is fetched by the queued job later.
