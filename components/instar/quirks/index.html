@@ -24779,6 +24779,13 @@ qemu-img's layout at those sizes too, so the image it makes is one
 <code>TestCreateVhdxFixedLarge</code> in <code>tests/test_create.py</code> creates the
 4608.5M image with both tools, requires the two structures to be
 identical, and requires <code>instar check</code> to pass on instar's.</p>
+<p><code>instar convert -O vhdx --subformat fixed</code> does the same: it writes
+qemu's <code>block_state_zero=off</code> layout at those sizes too, so the image
+is one <code>qemu-img</code> cannot reopen while <code>instar check</code> reads it. That
+layout is deliberate. It is the one <code>qemu-img create -o
+subformat=fixed,block_state_zero=off</code> writes, not the one qemu's
+default <code>convert -O vhdx -o subformat=fixed</code> writes, which appends new
+data after the preallocated region and leaves untouched entries <code>ZERO</code>.</p>
 <h2 id="measure-subcommand-quirks">measure subcommand quirks<a class="headerlink" href="#measure-subcommand-quirks" title="Permanent link">&para;</a></h2>
 <h3 id="-image-opts-is-rejected"><code>--image-opts</code> is rejected<a class="headerlink" href="#-image-opts-is-rejected" title="Permanent link">&para;</a></h3>
 <p><code>qemu-img measure --image-opts driver=qcow2,file.filename=...</code>

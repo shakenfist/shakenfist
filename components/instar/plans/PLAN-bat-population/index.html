@@ -17114,13 +17114,13 @@ rather than merge requests.</p>
 <tr>
 <td>7. <code>create -f vhdx -o subformat=fixed</code>: guest streaming and host CLI</td>
 <td><a href="/components/instar/plans/PLAN-bat-population-phase-07-create/">PLAN-bat-population-phase-07-create.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>03269d7f</code> (#858)</td>
 </tr>
 <tr>
 <td>8. <code>convert -O vhdx --subformat fixed</code></td>
-<td>PLAN-bat-population-phase-08-convert.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-bat-population-phase-08-convert/">PLAN-bat-population-phase-08-convert.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -17977,12 +17977,26 @@ chosen to defer to here, so that we do not forget them.</p>
 <li>Create error messages that can name the value at fault (#580).</li>
 <li>The dynamic convert writer's in-memory BAT, which fails silently
   when the table does not fit between the staging buffer and
-  <code>ALLOC_HEAP_BASE</code> (<code>src/operations/convert/src/main.rs:4456-4460</code>).
-  Fixed convert avoids it by streaming; dynamic convert cannot stream
-  in the same way because it learns block offsets as it goes, and a
-  large dynamic BAT at a small block size is still refused with no
-  message. Worth an issue of its own if phase 8's survey confirms the
-  silent path is reachable from the CLI.</li>
+  <code>ALLOC_HEAP_BASE</code> (<code>src/operations/convert/src/main.rs</code>, the
+  <code>bat_buf_addr + bat_alloc &gt; ALLOC_HEAP_BASE</code> guard). Fixed convert
+  avoids it by streaming; dynamic convert cannot stream in the same way
+  because it learns block offsets as it goes, and a large dynamic BAT at
+  a small block size is still refused with no message (a <code>debug_print</code>
+  and a failed completion that leaves a zero-byte output). <strong>Phase 8
+  (step 8a) confirmed the silent path is reachable from the CLI, and
+  the host does not refuse first.</strong> For a single-device chain and VHDX
+  output, the dynamic <code>bat_buf</code> sits at a fixed address of 8,978,432
+  bytes, so the guard trips once the BAT exceeds 7,208,960 bytes, i.e.
+  once the no-parent BAT holds more than 901,120 entries. At the
+  smallest VHDX block size (<code>--block-size 1048576</code>, chunk ratio 4096),
+  that is a source whose virtual size exceeds 900,901 MiB (about
+  879.8 GiB): the host's <code>check_vhdx_virtual_size</code> (64 TiB) and block
+  size validation both pass, so <code>instar convert -O vhdx
+  --block-size 1048576 &lt;~880 GiB source&gt; out.vhdx</code> reaches the guard and
+  fails silently with a zero-byte output. At the default block size the
+  table is far smaller (32 MiB blocks at that size), so only a forced
+  small <code>--block-size</code> reaches it below the 64 TiB ceiling. Worth an
+  issue of its own; fixing it is out of phase 8's scope.</li>
 <li>qemu's DDB lines in instar's VMDK descriptors. Both the sparse
   writer and <code>build_flat_descriptor</code> omit <code>ddb.virtualHWVersion</code>,
   <code>ddb.geometry.*</code>, <code>ddb.adapterType</code> and (from qemu 6.2.0)

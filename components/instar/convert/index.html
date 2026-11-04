@@ -16006,25 +16006,28 @@ replacement for <code>qemu-img convert</code>.</p>
 <a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="c1"># Convert to VHDX dynamic format</span>
 <a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>instar<span class="w"> </span>convert<span class="w"> </span>-O<span class="w"> </span>vhdx<span class="w"> </span>input.qcow2<span class="w"> </span>output.vhdx
 <a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>
-<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="c1"># Decrypt native LUKS v2 container (Argon2id KDF)</span>
-<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>instar<span class="w"> </span>convert<span class="w"> </span>--luks-passphrase<span class="w"> </span><span class="s1">'secret'</span><span class="w"> </span>--max-guest-memory<span class="w"> </span>1G<span class="w"> </span>encrypted.luks<span class="w"> </span>output.raw
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="c1"># Convert to VHDX fixed format</span>
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>instar<span class="w"> </span>convert<span class="w"> </span>-O<span class="w"> </span>vhdx<span class="w"> </span>--subformat<span class="w"> </span>fixed<span class="w"> </span>input.qcow2<span class="w"> </span>output.vhdx
 <a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>
-<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="c1"># Decrypt LUKS container wrapping a QCOW2 image</span>
-<a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>instar<span class="w"> </span>convert<span class="w"> </span>--luks-passphrase<span class="w"> </span><span class="s1">'secret'</span><span class="w"> </span>luks-wrapped.img<span class="w"> </span>output.raw
+<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="c1"># Decrypt native LUKS v2 container (Argon2id KDF)</span>
+<a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>instar<span class="w"> </span>convert<span class="w"> </span>--luks-passphrase<span class="w"> </span><span class="s1">'secret'</span><span class="w"> </span>--max-guest-memory<span class="w"> </span>1G<span class="w"> </span>encrypted.luks<span class="w"> </span>output.raw
 <a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>
-<a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a><span class="c1"># Specify VMDK grain size (4096 to 65536, default: 65536)</span>
-<a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>instar<span class="w"> </span>convert<span class="w"> </span>-O<span class="w"> </span>vmdk<span class="w"> </span>--grain-size<span class="w"> </span><span class="m">4096</span><span class="w"> </span>input.raw<span class="w"> </span>output.vmdk
+<a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a><span class="c1"># Decrypt LUKS container wrapping a QCOW2 image</span>
+<a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>instar<span class="w"> </span>convert<span class="w"> </span>--luks-passphrase<span class="w"> </span><span class="s1">'secret'</span><span class="w"> </span>luks-wrapped.img<span class="w"> </span>output.raw
 <a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>
-<a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a><span class="c1"># Specify VHD block size (524288+, default: 2097152)</span>
-<a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>instar<span class="w"> </span>convert<span class="w"> </span>-O<span class="w"> </span>vpc<span class="w"> </span>--block-size<span class="w"> </span><span class="m">1048576</span><span class="w"> </span>input.raw<span class="w"> </span>output.vhd
+<a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a><span class="c1"># Specify VMDK grain size (4096 to 65536, default: 65536)</span>
+<a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>instar<span class="w"> </span>convert<span class="w"> </span>-O<span class="w"> </span>vmdk<span class="w"> </span>--grain-size<span class="w"> </span><span class="m">4096</span><span class="w"> </span>input.raw<span class="w"> </span>output.vmdk
 <a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>
-<a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a><span class="c1"># Specify VHDX block size (1048576 to 268435456, default: qemu-img's for</span>
-<a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a><span class="c1"># the size, 8388608 up to 1 GiB, 16777216 up to 100 GiB, 33554432 up to</span>
-<a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a><span class="c1"># 32 TiB, then 67108864)</span>
-<a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>instar<span class="w"> </span>convert<span class="w"> </span>-O<span class="w"> </span>vhdx<span class="w"> </span>--block-size<span class="w"> </span><span class="m">4194304</span><span class="w"> </span>input.raw<span class="w"> </span>output.vhdx
-<a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>
-<a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="c1"># Progress reporting</span>
-<a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>instar<span class="w"> </span>convert<span class="w"> </span>-p<span class="w"> </span><span class="m">5</span><span class="w"> </span>input.qcow2<span class="w"> </span>output.raw
+<a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a><span class="c1"># Specify VHD block size (524288+, default: 2097152)</span>
+<a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>instar<span class="w"> </span>convert<span class="w"> </span>-O<span class="w"> </span>vpc<span class="w"> </span>--block-size<span class="w"> </span><span class="m">1048576</span><span class="w"> </span>input.raw<span class="w"> </span>output.vhd
+<a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>
+<a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a><span class="c1"># Specify VHDX block size (1048576 to 268435456, default: qemu-img's for</span>
+<a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="c1"># the size, 8388608 up to 1 GiB, 16777216 up to 100 GiB, 33554432 up to</span>
+<a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="c1"># 32 TiB, then 67108864)</span>
+<a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>instar<span class="w"> </span>convert<span class="w"> </span>-O<span class="w"> </span>vhdx<span class="w"> </span>--block-size<span class="w"> </span><span class="m">4194304</span><span class="w"> </span>input.raw<span class="w"> </span>output.vhdx
+<a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>
+<a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="c1"># Progress reporting</span>
+<a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>instar<span class="w"> </span>convert<span class="w"> </span>-p<span class="w"> </span><span class="m">5</span><span class="w"> </span>input.qcow2<span class="w"> </span>output.raw
 </code></pre></div>
 <p>The convert operation reads the virtual content of an input image (including
 backing chain flattening) and writes it in the requested output format.
@@ -16060,7 +16063,8 @@ The default can also be set via <code>convert.sparse</code> in the config file.<
   <a href="/components/instar/quirks/#vmdk-flat-extent-names-must-fit-the-descriptor">quirks.md</a>).</li>
 <li><strong>vpc</strong> - VHD dynamic output, configurable block size (512KB+,
   default 2MB via <code>--block-size</code>)</li>
-<li><strong>vhdx</strong> - VHDX dynamic output, configurable block size (1MB-256MB
+<li><strong>vhdx</strong> - VHDX dynamic (default) or fixed (<code>--subformat fixed</code>)
+  output, configurable block size (1MB-256MB
   via <code>--block-size</code>; by default qemu-img's for the size: 8MB up to 1GB,
   16MB up to 100GB, 32MB up to 32TB, then 64MB). The virtual size is at
   most 64 TiB (70368744177664 bytes), the largest VHDX qemu-img creates:
@@ -16068,7 +16072,19 @@ The default can also be set via <code>convert.sparse</code> in the config file.<
   <code>convert: virtual size N exceeds the VHDX maximum of 64 TiB
   (70368744177664 bytes)</code>, and no output file is left behind. A size
   that is not a multiple of 512 is recorded rounded up to one, as
-  qemu-img does.</li>
+  qemu-img does.
+  A fixed VHDX is written in place: every payload BAT entry is
+  <code>FULLY_PRESENT</code> at its fixed offset, blocks that are all zero are left
+  as holes, and the file is the fixed data start plus the virtual size
+  long. If the filesystem cannot store a file that long, convert fails
+  with <code>convert: a fixed VHDX of &lt;N&gt; bytes needs a &lt;M&gt;-byte file, which
+  the filesystem holding '&lt;f&gt;' cannot store: &lt;os error&gt;</code>. <code>--subformat</code>
+  with any other output format is refused with <code>--subformat is only
+  supported with VMDK (-O vmdk) or VHDX (-O vhdx) output</code>, and a VHDX
+  subformat other than <code>dynamic</code> or <code>fixed</code> with <code>unsupported VHDX
+  subformat '&lt;v&gt;' (supported: 'dynamic', 'fixed')</code>. This is the layout
+  of <code>qemu-img create -o subformat=fixed,block_state_zero=off</code>; see the
+  "VHDX partial last block" section of <a href="/components/instar/quirks/">quirks.md</a>.</li>
 </ul>
 <h2 id="differencing-images">Differencing images<a class="headerlink" href="#differencing-images" title="Permanent link">&para;</a></h2>
 <p>A differencing VHD (footer disk type 4) or VHDX (<code>HasParent</code> set) stores

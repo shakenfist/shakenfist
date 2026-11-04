@@ -18818,8 +18818,8 @@ deliberately broken emitter is not guarding what its name says it
 guards. See the VHD and VHDX notes in
 <a href="/components/instar/chain-config/#format-specific-notes">chain-config.md</a> for the
 composing path being guarded.</p>
-<p>There are <strong>145 cases</strong>, in eleven groups.</p>
-<p>Forty-two cover the writer. Twenty-four mutate a library crate
+<p>There are <strong>150 cases</strong>, in eleven groups.</p>
+<p>Forty-seven cover the writer. Twenty-four mutate a library crate
 (<code>create</code>, <code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip
 test. Two of those twenty-four guard the region table and metadata table
 every VHDX writer shares: one sets Required on the region entries
@@ -18841,9 +18841,9 @@ fixed one, caught by reading a fixed image back against its pin. One
 more mutates the host: it removes the host's refusal of a backing file
 for a fixed VHDX, which a host unit test of the argument resolution
 catches, because the guest's own refusal of that combination does not
-say what is wrong. The remaining seventeen writer cases are caught by a
+say what is wrong. The remaining twenty-two writer cases are caught by a
 Python integration test through the real binary. Thirteen of those
-seventeen mutate the <code>create</code> guest operation, which is excluded from
+twenty-two mutate the <code>create</code> guest operation, which is excluded from
 <code>cargo test --workspace</code>, so a unit test written beside that code
 would never run. Three of the thirteen are a fixed VHDX's: the
 subformat read as dynamic whatever the host sent, the host's
@@ -18857,10 +18857,23 @@ qemu-img structure. One more mutates the host too: it reports an
 which does not say the file was too long and leaves the empty file
 behind. The test that catches it reaches <code>EFBIG</code> through a file-size
 limit, so it runs on every filesystem, not only where ext4 refuses a
-16 TiB image. The other two mutate the <code>create</code> crate but break
-something only an external parser can see. Going through the real
-binary means <code>make instar</code> before the test and again after the source
-is restored.</p>
+16 TiB image. Five more are a fixed VHDX convert's, three in the
+convert guest operation and two in the host. The first four are the
+fixed subformat flag ignored so a dynamic image is written, the BAT
+stream stopped one 64 KiB slot early, the payload packed at the data
+region start instead of each block's fixed slot, and the host sizing
+and opening the output as a dynamic convert would; all four are caught
+by comparing instar's fixed convert with a live <code>qemu-img convert</code>, or
+by the convert the guest refuses when the device is too short. The
+fifth mutates the host too, and mirrors create's: it reports an <code>EFBIG</code>
+from extending a fixed convert output as an ordinary open failure,
+which does not say the file was too long and leaves the empty file
+behind, and the test that catches it reaches <code>EFBIG</code> through a
+file-size limit, so it runs on every filesystem, not only where ext4
+refuses a 16 TiB convert. The other two mutate the <code>create</code> crate but
+break something only an external parser can see.
+Going through the real binary means <code>make instar</code> before the test and
+again after the source is restored.</p>
 <p>The other <strong>47 reader cases</strong> cover the reader — the VHD and VHDX arms of
 <code>read_chain_virtual_cluster</code>, the sector-bitmap helpers in the <code>vhd</code>
 and <code>vhdx</code> crates, and the per-chain judgement in <code>init_chain_states</code>
