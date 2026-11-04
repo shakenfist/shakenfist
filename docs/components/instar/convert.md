@@ -38,6 +38,9 @@ instar convert -O vpc input.qcow2 output.vhd
 # Convert to VHDX dynamic format
 instar convert -O vhdx input.qcow2 output.vhdx
 
+# Convert to VHDX fixed format
+instar convert -O vhdx --subformat fixed input.qcow2 output.vhdx
+
 # Decrypt native LUKS v2 container (Argon2id KDF)
 instar convert --luks-passphrase 'secret' --max-guest-memory 1G encrypted.luks output.raw
 
@@ -95,7 +98,8 @@ The default can also be set via `convert.sparse` in the config file.
   [quirks.md](/components/instar/quirks/#vmdk-flat-extent-names-must-fit-the-descriptor)).
 - **vpc** - VHD dynamic output, configurable block size (512KB+,
   default 2MB via `--block-size`)
-- **vhdx** - VHDX dynamic output, configurable block size (1MB-256MB
+- **vhdx** - VHDX dynamic (default) or fixed (`--subformat fixed`)
+  output, configurable block size (1MB-256MB
   via `--block-size`; by default qemu-img's for the size: 8MB up to 1GB,
   16MB up to 100GB, 32MB up to 32TB, then 64MB). The virtual size is at
   most 64 TiB (70368744177664 bytes), the largest VHDX qemu-img creates:
@@ -104,6 +108,18 @@ The default can also be set via `convert.sparse` in the config file.
   (70368744177664 bytes)`, and no output file is left behind. A size
   that is not a multiple of 512 is recorded rounded up to one, as
   qemu-img does.
+  A fixed VHDX is written in place: every payload BAT entry is
+  `FULLY_PRESENT` at its fixed offset, blocks that are all zero are left
+  as holes, and the file is the fixed data start plus the virtual size
+  long. If the filesystem cannot store a file that long, convert fails
+  with `convert: a fixed VHDX of <N> bytes needs a <M>-byte file, which
+  the filesystem holding '<f>' cannot store: <os error>`. `--subformat`
+  with any other output format is refused with `--subformat is only
+  supported with VMDK (-O vmdk) or VHDX (-O vhdx) output`, and a VHDX
+  subformat other than `dynamic` or `fixed` with `unsupported VHDX
+  subformat '<v>' (supported: 'dynamic', 'fixed')`. This is the layout
+  of `qemu-img create -o subformat=fixed,block_state_zero=off`; see the
+  "VHDX partial last block" section of [quirks.md](/components/instar/quirks/).
 
 ## Differencing images
 

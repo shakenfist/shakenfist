@@ -715,8 +715,8 @@ rather than merge requests.
 | 4. Read side: BAT entry count (#626), partial last block, `LeaveBlocksAllocated` and `resize` | [PLAN-bat-population-phase-04-read-side.md](/components/instar/plans/PLAN-bat-population-phase-04-read-side/) | Complete | `d140aa04` (#835) |
 | 5. VHDX geometry: default block size (#645), 64 TiB ceiling, one shared layout | [PLAN-bat-population-phase-05-geometry.md](/components/instar/plans/PLAN-bat-population-phase-05-geometry/) | Complete | `52518787` (#848) |
 | 6. Streaming BAT emitter and the fixed `plan_vhdx` | [PLAN-bat-population-phase-06-emitter.md](/components/instar/plans/PLAN-bat-population-phase-06-emitter/) | Complete | `aef757d2` (#853) |
-| 7. `create -f vhdx -o subformat=fixed`: guest streaming and host CLI | [PLAN-bat-population-phase-07-create.md](/components/instar/plans/PLAN-bat-population-phase-07-create/) | In progress | |
-| 8. `convert -O vhdx --subformat fixed` | PLAN-bat-population-phase-08-convert.md | Not started | |
+| 7. `create -f vhdx -o subformat=fixed`: guest streaming and host CLI | [PLAN-bat-population-phase-07-create.md](/components/instar/plans/PLAN-bat-population-phase-07-create/) | Complete | `03269d7f` (#858) |
+| 8. `convert -O vhdx --subformat fixed` | [PLAN-bat-population-phase-08-convert.md](/components/instar/plans/PLAN-bat-population-phase-08-convert/) | In progress | |
 | 9. `measure -O vhdx -o subformat=fixed` | PLAN-bat-population-phase-09-measure.md | Not started | |
 | 10. Cross-version matrix and derived-profile validation | PLAN-bat-population-phase-10-matrix.md | Not started | |
 | 11. Coverage and differential fuzzing | PLAN-bat-population-phase-11-fuzz.md | Not started | |
@@ -1563,12 +1563,26 @@ chosen to defer to here, so that we do not forget them.
 * Create error messages that can name the value at fault (#580).
 * The dynamic convert writer's in-memory BAT, which fails silently
   when the table does not fit between the staging buffer and
-  `ALLOC_HEAP_BASE` (`src/operations/convert/src/main.rs:4456-4460`).
-  Fixed convert avoids it by streaming; dynamic convert cannot stream
-  in the same way because it learns block offsets as it goes, and a
-  large dynamic BAT at a small block size is still refused with no
-  message. Worth an issue of its own if phase 8's survey confirms the
-  silent path is reachable from the CLI.
+  `ALLOC_HEAP_BASE` (`src/operations/convert/src/main.rs`, the
+  `bat_buf_addr + bat_alloc > ALLOC_HEAP_BASE` guard). Fixed convert
+  avoids it by streaming; dynamic convert cannot stream in the same way
+  because it learns block offsets as it goes, and a large dynamic BAT at
+  a small block size is still refused with no message (a `debug_print`
+  and a failed completion that leaves a zero-byte output). **Phase 8
+  (step 8a) confirmed the silent path is reachable from the CLI, and
+  the host does not refuse first.** For a single-device chain and VHDX
+  output, the dynamic `bat_buf` sits at a fixed address of 8,978,432
+  bytes, so the guard trips once the BAT exceeds 7,208,960 bytes, i.e.
+  once the no-parent BAT holds more than 901,120 entries. At the
+  smallest VHDX block size (`--block-size 1048576`, chunk ratio 4096),
+  that is a source whose virtual size exceeds 900,901 MiB (about
+  879.8 GiB): the host's `check_vhdx_virtual_size` (64 TiB) and block
+  size validation both pass, so `instar convert -O vhdx
+  --block-size 1048576 <~880 GiB source> out.vhdx` reaches the guard and
+  fails silently with a zero-byte output. At the default block size the
+  table is far smaller (32 MiB blocks at that size), so only a forced
+  small `--block-size` reaches it below the 64 TiB ceiling. Worth an
+  issue of its own; fixing it is out of phase 8's scope.
 * qemu's DDB lines in instar's VMDK descriptors. Both the sparse
   writer and `build_flat_descriptor` omit `ddb.virtualHWVersion`,
   `ddb.geometry.*`, `ddb.adapterType` and (from qemu 6.2.0)
