@@ -867,6 +867,211 @@ def _select_result(*rows):
     return _MockResult(rows=list(rows))
 
 
+# ---------------------------------------------------------------------------
+# _direct_backfill_event_object_timestamps tests  (Stage 0)
+# ---------------------------------------------------------------------------
+
+class _ConnectCountingEngine(_MockEngine):
+    """_MockEngine which counts how many times connect() was called."""
+
+    def __init__(self, connection):
+        super().__init__(connection)
+        self.connects = 0
+
+    def connect(self):
+        self.connects += 1
+        return super().connect()
+
+
+class BackfillEventObjectTimestampsTestCase(base.ShakenFistTestCase):
+    """Tests for _direct_backfill_event_object_timestamps() (issue 4782).
+
+    The rows this repairs are the ones a daemon still on the previous
+    release wrote after the v1 to v2 migration backfilled: the column
+    default leaves them at 0 and the per-object read orders by it, so
+    they sort as the oldest events the object has.
+    """
+
+    def _backfilled_value(self) -> float:
+        return mariadb.EVENT_OBJECT_TIMESTAMPS_BACKFILLED._value.get()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_finds_default_rows_and_updates_only_those_keys(
+            self, mock_get_engine):
+        """One batch: a candidate SELECT, then an UPDATE of those uuids."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1),
+                           _MockRow(event_uuid=EVENT_UUID_2)),
+            _MockResult(rowcount=3),
+            _select_result(),
+        ])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        total = mariadb._direct_backfill_event_object_timestamps()
+
+        self.assertEqual(3, total)
+        select_text = str(conn.execute.call_args_list[0][0][0])
+        self.assertIn('SELECT eo.event_uuid FROM event_objects eo', select_text)
+        self.assertIn('WHERE eo.timestamp = 0', select_text)
+        self.assertIn('LIMIT :batch', select_text)
+        self.assertEqual(
+            mariadb._PRUNE_BATCH_SIZE,
+            conn.execute.call_args_list[0][0][1]['batch'])
+
+        # The write is restricted to the uuids the read found, so its
+        # lock footprint is the batch rather than the table. A single
+        # table-wide UPDATE ... JOIN instead would next-key lock every
+        # row it examined, which is the shape that stalled every node's
+        # event writes in issue 3982.
+        update_text = str(conn.execute.call_args_list[1][0][0])
+        self.assertIn('UPDATE event_objects eo', update_text)
+        self.assertIn('SET eo.timestamp = e.timestamp', update_text)
+        self.assertIn('AND eo.event_uuid IN', update_text)
+        self.assertEqual(
+            {EVENT_UUID_1, EVENT_UUID_2},
+            set(conn.execute.call_args_list[1][0][1]['event_uuids']))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_the_write_does_not_inherit_the_reads_transaction(
+            self, mock_get_engine):
+        """The SELECT and the UPDATE are on separate connections.
+
+        Under innodb_snapshot_isolation an UPDATE whose read view was
+        opened by an earlier plain SELECT in the same transaction aborts
+        with ER_CHECKREAD rather than re-evaluating, so the UPDATE has
+        to establish its own (see standards.md).
+        """
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
+            _MockResult(rowcount=1),
+            _select_result(),
+        ])
+        engine = _ConnectCountingEngine(conn)
+        mock_get_engine.return_value = engine
+
+        mariadb._direct_backfill_event_object_timestamps()
+
+        # One for the batch's SELECT, one for its UPDATE, one for the
+        # SELECT which ends the loop.
+        self.assertEqual(3, engine.connects)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_an_event_at_the_default_itself_is_excluded(
+            self, mock_get_engine):
+        """Both statements exclude events whose own timestamp is 0.
+
+        Such a row cannot be repaired -- rewriting it with the same
+        value leaves it matching the candidate SELECT -- so it would
+        otherwise be found by every batch and the sweep would spend its
+        whole budget making no progress.
+        """
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
+            _MockResult(rowcount=1),
+            _select_result(),
+        ])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        mariadb._direct_backfill_event_object_timestamps()
+
+        # The guard belongs on both statements: on the SELECT so such a
+        # row is never a candidate, and on the UPDATE so a row which
+        # became one between the two is not rewritten with 0.
+        for call in conn.execute.call_args_list[:2]:
+            self.assertIn('e.timestamp != 0', str(call[0][0]))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_loops_until_the_select_is_empty(self, mock_get_engine):
+        """Two batches then an empty select: the counts sum."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
+            _MockResult(rowcount=10000),
+            _select_result(_MockRow(event_uuid=EVENT_UUID_2)),
+            _MockResult(rowcount=658),
+            _select_result(),
+        ])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        total = mariadb._direct_backfill_event_object_timestamps()
+
+        self.assertEqual(10658, total)
+        self.assertEqual(5, conn.execute.call_count)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_an_update_which_moves_nothing_stops_the_loop(
+            self, mock_get_engine):
+        """A batch whose rows were deleted under it does not spin.
+
+        The candidate SELECT has no cursor -- there is nothing to order
+        by that is not the column being filled -- so a batch which
+        updates no rows would be asked for again forever.
+        """
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
+            _MockResult(rowcount=0),
+            AssertionError('the loop asked for another batch'),
+        ])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        total = mariadb._direct_backfill_event_object_timestamps()
+
+        self.assertEqual(0, total)
+        self.assertEqual(2, conn.execute.call_count)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_expired_deadline_stops_before_any_batch(self, mock_get_engine):
+        """An already-expired deadline issues no queries (issue 4034)."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=AssertionError('no queries'))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        total = mariadb._direct_backfill_event_object_timestamps(
+            deadline=time.time() - 1.0)
+
+        self.assertEqual(0, total)
+        self.assertEqual(0, conn.execute.call_count)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_operational_error_returns_partial_count(self, mock_get_engine):
+        """A database failure keeps the progress made and does not raise.
+
+        The later stages of the sweep still have to run.
+        """
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
+            _MockResult(rowcount=17),
+            OperationalError('stmt', {}, Exception('db error')),
+        ])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        total = mariadb._direct_backfill_event_object_timestamps()
+
+        self.assertEqual(17, total)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_increments_the_backfill_counter(self, mock_get_engine):
+        """The counter is how an operator sees the repair happen at all."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
+            _MockResult(rowcount=9),
+            _select_result(),
+        ])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        before = self._backfilled_value()
+        mariadb._direct_backfill_event_object_timestamps()
+        after = self._backfilled_value()
+
+        self.assertAlmostEqual(9.0, after - before, places=9)
+
+
 class DirectPruneEventsByTypeTestCase(base.ShakenFistTestCase):
     """Tests for _direct_prune_events_by_type() using mock engine/connection.
 
@@ -1251,11 +1456,13 @@ class DirectPruneEventsOrchestratorTestCase(base.ShakenFistTestCase):
     to replicate the full config iteration in mock setup.
     """
 
+    @mock.patch('shakenfist.mariadb._direct_backfill_event_object_timestamps',
+                return_value=0)
     @mock.patch('shakenfist.mariadb._direct_prune_orphan_events', return_value=0)
     @mock.patch('shakenfist.mariadb._direct_prune_api_request_events', return_value=0)
     @mock.patch('shakenfist.mariadb._direct_prune_events_by_type', return_value=0)
     def test_skips_event_types_with_max_age_minus_one(
-            self, mock_by_type, mock_api_request, mock_orphan):
+            self, mock_by_type, mock_api_request, mock_orphan, mock_backfill):
         """Event types whose MAX_*_EVENT_AGE == -1 are skipped; others still run."""
         # Patch only audit to -1; mutate keeps its default (non-minus-one).
         with mock.patch.object(config, 'MAX_AUDIT_EVENT_AGE', -1), \
@@ -1268,15 +1475,20 @@ class DirectPruneEventsOrchestratorTestCase(base.ShakenFistTestCase):
         self.assertNotIn('audit', called_event_types)
         self.assertIn('mutate', called_event_types)
 
+    @mock.patch('shakenfist.mariadb._direct_backfill_event_object_timestamps',
+                return_value=7)
     @mock.patch('shakenfist.mariadb._direct_prune_orphan_events', return_value=30)
     @mock.patch('shakenfist.mariadb._direct_prune_api_request_events', return_value=20)
     @mock.patch('shakenfist.mariadb._direct_prune_events_by_type', return_value=10)
     def test_calls_all_three_stages_and_sums(
-            self, mock_by_type, mock_api_request, mock_orphan):
-        """Orchestrator returns sum of all stage totals.
+            self, mock_by_type, mock_api_request, mock_orphan, mock_backfill):
+        """Orchestrator returns sum of all deleting stage totals.
 
         With eight event_types each returning 10, plus api-request 20,
         plus orphan 30, the total should be (8 * 10) + 20 + 30 = 130.
+        The backfill stage's 7 is deliberately not in it: the number
+        the cluster maintainer logs daily is a count of rows deleted,
+        and rows given a timestamp were not deleted.
         """
         total = mariadb._direct_prune_events()
 
@@ -1284,13 +1496,16 @@ class DirectPruneEventsOrchestratorTestCase(base.ShakenFistTestCase):
         self.assertEqual(8, mock_by_type.call_count)
         mock_api_request.assert_called_once()
         mock_orphan.assert_called_once()
+        mock_backfill.assert_called_once()
         self.assertEqual(130, total)
 
+    @mock.patch('shakenfist.mariadb._direct_backfill_event_object_timestamps',
+                return_value=0)
     @mock.patch('shakenfist.mariadb._direct_prune_orphan_events', return_value=0)
     @mock.patch('shakenfist.mariadb._direct_prune_api_request_events', return_value=0)
     @mock.patch('shakenfist.mariadb._direct_prune_events_by_type', return_value=0)
     def test_stages_share_one_time_budget(
-            self, mock_by_type, mock_api_request, mock_orphan):
+            self, mock_by_type, mock_api_request, mock_orphan, mock_backfill):
         """All three stages receive the same wall-clock deadline.
 
         Issue 4034: the sweep bounds itself at PRUNE_EVENTS_TIME_BUDGET
@@ -1305,6 +1520,7 @@ class DirectPruneEventsOrchestratorTestCase(base.ShakenFistTestCase):
             deadlines.add(call[1]['deadline'])
         deadlines.add(mock_api_request.call_args[1]['deadline'])
         deadlines.add(mock_orphan.call_args[1]['deadline'])
+        deadlines.add(mock_backfill.call_args[1]['deadline'])
 
         self.assertEqual(1, len(deadlines))
         deadline = deadlines.pop()
@@ -1312,6 +1528,37 @@ class DirectPruneEventsOrchestratorTestCase(base.ShakenFistTestCase):
             deadline, before + mariadb.PRUNE_EVENTS_TIME_BUDGET)
         self.assertLessEqual(
             deadline, after + mariadb.PRUNE_EVENTS_TIME_BUDGET)
+
+    @mock.patch('shakenfist.mariadb._direct_backfill_event_object_timestamps')
+    @mock.patch('shakenfist.mariadb._direct_prune_orphan_events')
+    @mock.patch('shakenfist.mariadb._direct_prune_api_request_events')
+    @mock.patch('shakenfist.mariadb._direct_prune_events_by_type')
+    def test_the_backfill_runs_before_any_deleting_stage(
+            self, mock_by_type, mock_api_request, mock_orphan, mock_backfill):
+        """Stage order is load bearing (issue 4782).
+
+        The stages share one wall-clock budget, and on a cluster whose
+        prune stages routinely spend all of it a repair placed after
+        them would never run at all -- while the rows it repairs are
+        the only ones an operator can see are wrong.
+        """
+        order = []
+
+        def record(name, result):
+            def _recorded(*args, **kwargs):
+                order.append(name)
+                return result
+            return _recorded
+
+        mock_backfill.side_effect = record('backfill', 1)
+        mock_by_type.side_effect = record('by_type', 0)
+        mock_api_request.side_effect = record('api_request', 0)
+        mock_orphan.side_effect = record('orphan', 0)
+
+        mariadb._direct_prune_events()
+
+        self.assertEqual('backfill', order[0])
+        self.assertEqual({'by_type', 'api_request', 'orphan'}, set(order[1:]))
 
     def test_rpc_timeout_exceeds_server_budget(self):
         """The client deadline must outlast the server's sweep budget.
@@ -1325,22 +1572,26 @@ class DirectPruneEventsOrchestratorTestCase(base.ShakenFistTestCase):
             mariadb.PRUNE_EVENTS_RPC_TIMEOUT,
             mariadb.PRUNE_EVENTS_TIME_BUDGET + 60.0)
 
+    @mock.patch('shakenfist.mariadb._direct_backfill_event_object_timestamps',
+                return_value=0)
     @mock.patch('shakenfist.mariadb._direct_prune_orphan_events', return_value=0)
     @mock.patch('shakenfist.mariadb._direct_prune_api_request_events', return_value=0)
     @mock.patch('shakenfist.mariadb._direct_prune_events_by_type', return_value=0)
     def test_skips_api_request_when_max_age_minus_one(
-            self, mock_by_type, mock_api_request, mock_orphan):
+            self, mock_by_type, mock_api_request, mock_orphan, mock_backfill):
         """api-request stage is skipped when MAX_API_REQUEST_EVENT_AGE == -1."""
         with mock.patch.object(config, 'MAX_API_REQUEST_EVENT_AGE', -1):
             mariadb._direct_prune_events()
 
         mock_api_request.assert_not_called()
 
+    @mock.patch('shakenfist.mariadb._direct_backfill_event_object_timestamps',
+                return_value=0)
     @mock.patch('shakenfist.mariadb._direct_prune_orphan_events')
     @mock.patch('shakenfist.mariadb._direct_prune_api_request_events')
     @mock.patch('shakenfist.mariadb._direct_prune_events_by_type')
     def test_multi_object_semantic_via_orphan_sweep(
-            self, mock_by_type, mock_api_request, mock_orphan):
+            self, mock_by_type, mock_api_request, mock_orphan, mock_backfill):
         """Multi-object retention: event row survives until last object ref is gone.
 
         Scenario: An event has refs from both an instance and an api-request.

@@ -102,6 +102,19 @@ lived. Upgrading an existing cluster backfills the column from
 step takes a little longer on a cluster with a large event
 history.
 
+That backfill cannot be the whole story on a rolling upgrade: a
+daemon still on the previous release keeps writing event
+references without a timestamp until it restarts, and those rows
+take the column's default of 0, which sorts them to the far end
+of the object's history. The daily events prune sweep therefore
+begins by giving any such row the timestamp of the event it
+references, so the first sweep after the last daemon restarts
+finishes the job. Events written during the upgrade window may
+be ordered wrongly in an object's event page until that sweep
+runs; nothing else is affected. The counter
+`database_event_object_timestamps_backfilled_total` on the
+database tier records how many rows the sweep has repaired.
+
 Each event in the response includes at minimum:
 
 | Field | Description |
@@ -128,7 +141,15 @@ The daily cadence is anchored to a cluster-wide last-run stamp
 `cluster_config`), so it survives both daemon restarts and the
 maintenance lock changing hands -- a cluster whose daemons never
 run for a full day still prunes daily.
-The prune runs in three stages:
+The sweep runs in four stages. The first deletes nothing: it
+gives the event's timestamp to any `event_objects` row still
+sitting at the column default, which is what a daemon written
+before that column existed left behind during a rolling upgrade
+(see above). It is first because those rows are visibly
+mis-ordered in an object's event page, where everything the
+other stages do is reclaiming space, and a sweep which runs out
+of budget must not be one which never reaches the repair. The
+three stages which prune are then:
 
 1. **Per-event-type sweep.** Removes `event_objects` rows older
    than the configured age for each event type. The `events` row
@@ -208,6 +229,7 @@ daemon's own metrics port.
 | `database_events_inserted_total` | Counter | sf-database | Events inserted, labelled by `event_type`. Watch the per-label rate for unexpected spikes. |
 | `database_events_pruned_total` | Counter | sf-database | `event_objects` rows pruned per prune run, labelled by `event_type`. The synthetic label `event_type='api-request'` covers the object-type-override sweep. |
 | `database_orphan_events_pruned_total` | Counter | sf-database | `events` rows removed by the orphan sweep. A non-zero rate here is normal after each daily prune. |
+| `database_event_object_timestamps_backfilled_total` | Counter | sf-database | `event_objects` rows given their event's timestamp by the sweep's first stage, having been written at the column default by a daemon which predated the column. Expect it to move for one sweep after the rolling upgrade which introduced the column and then stay flat; a cluster where it keeps moving still has a daemon running old code. |
 | `eventlog_spool_depth` | Gauge | every daemon | Rows currently pending in the local spool. Should be close to zero under normal conditions. |
 | `eventlog_spool_dropped_total` | Counter | every daemon | Events dropped at the spool high-water mark. Any non-zero rate indicates that `sf-database` has been unreachable for an extended period. |
 

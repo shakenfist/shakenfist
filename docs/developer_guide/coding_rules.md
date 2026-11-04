@@ -673,3 +673,39 @@ with the spec, since it is the value a run actually validates.
 fields which are secret rather than declaring a structure that contains one,
 and remember that `no_log` on a *task* is a different thing -- it suppresses
 that task's own output and registers nothing.
+
+## A backfill cannot finish while the old writers are still running
+
+A migration which adds a column, fills it from somewhere else and then
+advances the schema version has only filled the rows that existed when
+it ran. On a rolling upgrade the schema moves first and the daemons
+restart one at a time after it, so for the length of the deploy every
+new row is written by code which does not know about the column and
+takes its `DEFAULT`. Once the version reads the new number the
+migration never runs again, and those rows keep the default forever.
+
+`event_objects.timestamp` shipped exactly that way. Its v1 to v2
+migration backfilled from `events` and its backfill was properly
+restartable, which is what made it look complete; the rows it could not
+have reached were the ones not yet written. One production deploy left
+30,658 rows at `timestamp = 0`, and because the per-object read orders
+on that column they sorted as the oldest events those objects had and
+dropped out of the recent page (issue #4782).
+
+So when a migration changes how rows are written, something which runs
+*after* the restarts has to finish it. For `event_objects` that is the
+first stage of the daily events prune sweep
+(`_direct_backfill_event_object_timestamps()`), which repairs
+default-valued rows in bounded batches and, once there are none, costs
+one candidate query which finds nothing: a sweep that finds nothing is
+the proof the deploy is over.
+Re-running `sf-ctl ensure-mariadb-schema` is not an answer on its own,
+because the version has already advanced and because an operator has to
+remember to do it.
+
+Two details worth copying. The repair must be *first* in a sweep with a
+wall-clock budget, or a cluster whose other stages exhaust the budget
+never reaches it. And it must not be a single table-wide `UPDATE ...
+JOIN`: that next-key locks every row it examines while every node in the
+cluster is trying to insert events, which is the defect
+`_direct_prune_events_by_type()` already carries the measurements for.
