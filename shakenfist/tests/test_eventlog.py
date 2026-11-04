@@ -150,6 +150,49 @@ class AddEventMultiSpoolPayloadTestCase(
         payload = self._dequeue_one()
         self.assertEqual('audit', payload['event_type'])
 
+    def test_log_as_debug_echoes_at_debug_and_still_spools(self):
+        """log_as_debug moves the echo off the shipped stream only.
+
+        Issue 4602: the per-request API lifecycle events are worth
+        auditing and not worth shipping, and only INFO and above
+        reaches Loki. The echo must therefore be emitted at DEBUG --
+        not suppressed, because journald still wants it -- and the
+        event itself must reach the spool unchanged.
+        """
+        self.mock_config.LOG_EVENTS_TO_LOKI = True
+        with mock.patch.object(eventlog, 'LOG') as mock_log:
+            eventlog.add_event_multi(
+                'audit', [('api-requests', 'req-uuid-8')],
+                'GET api response sent', log_as_debug=True)
+            emitter = mock_log.with_fields.return_value.with_fields.return_value
+            emitter.debug.assert_called_once_with('Added event')
+            emitter.info.assert_not_called()
+            emitter.error.assert_not_called()
+
+        payload = self._dequeue_one()
+        self.assertEqual('audit', payload['event_type'])
+        self.assertEqual('GET api response sent', payload['message'])
+        self.assertEqual(
+            'req-uuid-8', payload['objects'][0]['object_uuid'])
+
+    def test_log_as_error_wins_over_log_as_debug(self):
+        """An error echo is not quietened by a debug request.
+
+        Nothing passes both today, but the two flags are independent
+        booleans on a public signature, and an error which arrived as a
+        DEBUG line would be invisible to the log store.
+        """
+        self.mock_config.LOG_EVENTS_TO_LOKI = True
+        with mock.patch.object(eventlog, 'LOG') as mock_log:
+            eventlog.add_event_multi(
+                'audit', [('instance', 'inst-uuid-9')], 'both flags',
+                log_as_error=True, log_as_debug=True)
+            emitter = mock_log.with_fields.return_value.with_fields.return_value
+            emitter.error.assert_called_once_with('Added event')
+            emitter.debug.assert_not_called()
+
+        self._dequeue_one()
+
     def test_uuid_object_uuid_is_logged_as_str(self):
         """A uuid.UUID object uuid must be stringified before it is logged.
 
