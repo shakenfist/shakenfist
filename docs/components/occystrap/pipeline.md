@@ -71,7 +71,8 @@ class ImageInput(ABC):
     tag: str      # abstract property, the image tag
 
     @abstractmethod
-    def fetch(self, fetch_callback=None, ordered=True):
+    def fetch(self, fetch_callback=None, skip_probe=None,
+              ordered=True):
         """Yield ImageElement instances."""
 
     def get_manifest(self): return None
@@ -80,7 +81,11 @@ class ImageInput(ABC):
 
 `fetch()` is the only abstract method. `fetch_callback` takes a layer
 digest and returns False to skip that layer, in which case the element is
-still yielded but with `data=None`. `ordered=True` yields layers in
+still yielded but with `data=None`. `skip_probe` is an optional
+side-effect-free companion with the same contract, used by inputs that
+decide which layers can be skipped *before* the transfer starts (the
+`dockerpush://` input); inputs that do not pre-probe ignore it.
+`ordered=True` yields layers in
 manifest order; `ordered=False` yields them as they become available with
 `layer_index` set (see
 [Out-of-Order Delivery](#out-of-order-layer-delivery)).
@@ -227,6 +232,13 @@ normally and occystrap records a mapping between Docker's compressed digests
 and the uncompressed DiffIDs. On subsequent runs, the embedded registry returns
 `200` for HEAD checks on cached layers, causing Docker to skip the upload
 entirely. This means cached layers consume zero local transfer time.
+
+This pre-push probe asks the output which layers are cached via the
+side-effect-free `skip_probe`, not `fetch_callback`: the probe runs once
+per cached layer before the transfer, so routing it through
+`fetch_callback` would push spurious entries onto the output's
+original-DiffID FIFO and misalign the per-layer cache recording (see
+[Internals](/components/occystrap/internals/)).
 
 The digest mapping is stored alongside the layer cache as
 `{cache_path}.digests`. This file maps Docker's compressed layer digests to
@@ -380,6 +392,8 @@ class ImageOutput(ABC):
     @abstractmethod
     def fetch_callback(self, digest): ...
 
+    def skip_probe(self, digest): ...
+
     @abstractmethod
     def process_image_element(self, element): ...
 
@@ -391,6 +405,10 @@ class ImageOutput(ABC):
 
 `fetch_callback()` returns False for a layer the destination already has,
 which is how a writer avoids paying for a download it would discard.
+`skip_probe()` makes the same decision without any per-layer side effects,
+for inputs that probe before the transfer starts; the base implementation
+just delegates to `fetch_callback()`, and only outputs that keep per-layer
+ordering state (`RegistryWriter`) override it.
 `requires_ordered_layers` tells the driver whether this writer can cope
 with out-of-order delivery; the driver passes it straight to `fetch()` as
 `ordered`. `finalize()` runs once after the last element and is where
@@ -415,6 +433,7 @@ ordered = output.requires_ordered_layers
 with redirect_logging():
     for element in img.fetch(
             fetch_callback=output.fetch_callback,
+            skip_probe=output.skip_probe,
             ordered=ordered):
         output.process_image_element(element)
     output.finalize()
@@ -545,6 +564,11 @@ fetch_callback(digest)
     └── If registry has blob: skip layer (no fetch/filter/compress/upload)
     └── If not: process normally and record result to cache
 ```
+
+The `dockerpush://` input makes the same check *before* the push through
+`skip_probe(digest)` — identical cache + HEAD logic, but without the
+per-layer FIFO side effect `fetch_callback` carries (see
+[Internals](/components/occystrap/internals/)).
 
 Cache entries are keyed by `(input_diffid, filters_hash)` so that the same
 layer processed with different filter configurations gets separate entries.

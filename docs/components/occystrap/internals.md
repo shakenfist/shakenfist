@@ -458,11 +458,15 @@ share base layers (common in CI), the cache allows subsequent invocations to
 skip layers entirely -- no fetch, no filter, no compress, no upload.
 
 ```
-fetch_callback(digest)
+fetch_callback(digest)        # one call per yielded layer element
+    └── Record digest on the original-DiffID FIFO
     └── Check cache for (digest, filters_hash)
     └── If found: HEAD request to verify registry still has blob
     └── If registry has blob: skip layer entirely
     └── If not: process normally
+
+skip_probe(digest)            # pre-fetch probe only; no FIFO side effect
+    └── Same cache + HEAD check as fetch_callback, without recording
 
 _compress_and_upload_layer()
     └── After successful compress + upload: record to cache
@@ -474,10 +478,15 @@ finalize()
 Key design considerations:
 - Cache keyed by `(input_diffid, filters_hash)` so different pipeline
   configurations get separate entries
-- Original DiffIDs are tracked via a FIFO queue in `fetch_callback` and
-  consumed in `process_image_element`, because content-modifying filters
-  (ExcludeFilter, TimestampNormalizer) recalculate the layer hash —
-  the cache must record under the original DiffID, not the transformed one
+- Original DiffIDs are tracked via a FIFO queue appended to in
+  `fetch_callback` and consumed in `process_image_element`, because
+  content-modifying filters (ExcludeFilter, TimestampNormalizer)
+  recalculate the layer hash — the cache must record under the original
+  DiffID, not the transformed one. This relies on exactly one
+  `fetch_callback` per yielded layer, so the dockerpush pre-fetch skip
+  probe calls `skip_probe` instead (a side-effect-free variant that makes
+  the same decision without touching the FIFO); using `fetch_callback`
+  there would misalign the queue and record layers under the wrong DiffID
 - `filters_hash` is computed from the serialized filter chain **and**
   compression type, so gzip vs zstd pipelines do not share entries
 - Registry blob existence is verified on each run (`HEAD` request) to handle
