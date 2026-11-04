@@ -800,6 +800,25 @@ PYEOF
         "\"kerbside_minted_key_hash\": \"$(printf '%s' "${SYSTEM_KEY}" | sha256sum | cut -d' ' -f1)\", \
          \"kerbside_deploy_key_hash\": \"$(printf '%s' 'the-deploy-key' | sha256sum | cut -d' ' -f1)\"")" \
         "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused the minted key'
+
+    # #4709: wiring values rendered unescaped must be single lines; a co-located
+    # Kerbside PKI directory must not be the SPICE one; and the proxy FQDN must
+    # not be a Shaken Fist host name.
+    source_refuses 'a newline in kerbside_url' \
+        '"kerbside_url": "https://console.example.com\nca"' \
+        'contains a newline'
+    source_refuses 'a Kerbside PKI directory equal to the SPICE one on a co-located host' \
+        '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice"' \
+        'would overwrite'
+
+    CURRENT_CASE='case 6: kerbside_source refuses a public FQDN equal to a Shaken Fist host name'
+    printf 'localhost ansible_connection=local\n[allsf]\nlocalhost\n' > "${WORK}/inv-allsf.ini"
+    if run "${WITHOUT}" -i "${WORK}/inv-allsf.ini" \
+        -e "$(source_vars fqdn-clash '"kerbside_public_fqdn": "localhost"')" "${WORK}/kerbside-source.yml"; then
+        fail 'kerbside_source accepted a public FQDN equal to a host name'
+    fi
+    assert_output_has 'the name of a host in'
+    assert_output_has 'fatal: [localhost]: FAILED!'
 }
 
 case_7_site_validation_runs() {
