@@ -678,6 +678,16 @@ and `exclude` to maximize layer deduplication:
 This means that if two images share identical layers (after filtering),
 the second push will skip uploading those layers entirely.
 
+Normalization is idempotent: a layer that is already in the filter's
+canonical form (for example an already-normalized base layer that was
+pushed, pulled back, and re-pushed as the base of a derived image via
+`dockerpush://`) normalizes to byte-identical output, keeps its DiffID,
+and reuses its registry blob. The filter still processes every layer it
+receives, so its `Updating config diff_ids (N of M layers modified)`
+log counts only the layers whose DiffID actually changed -- an
+already-normalized re-push reports the derived layers as modified and
+leaves the untouched base layers out of the count.
+
 The `compression.py` module that implements format detection, streaming
 compression and decompression, and media type mapping is described in
 [internals.md](/components/occystrap/internals/#layer-compression).
