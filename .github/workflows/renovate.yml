@@ -56,14 +56,52 @@ jobs:
         if: hashFiles('**/Cargo.lock') != ''
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Self-hosted Renovate
+      # A requirements file pinned with --hash lines needs hashin, which
+      # Renovate runs to rewrite the hashes when it bumps a pin. Without
+      # it the pull request keeps the old version's hashes and carries
+      # an "artifact update problem". hashFiles() cannot look inside a
+      # file, so any requirements file installs it. Only hashin goes on
+      # PATH, so the venv's python and pip do not shadow the runner's.
+      - name: Set up hashin for hashed requirements
+        if: hashFiles('**/requirements*.txt') != ''
+        env:
+          # renovate: datasource=pypi depName=hashin
+          PINNED_HASHIN_VERSION: 1.0.5
+        run: |
+          python3 -m venv --clear "${RUNNER_TEMP}/hashin-venv"
+          "${RUNNER_TEMP}/hashin-venv/bin/pip" install --quiet --disable-pip-version-check \
+              "hashin==${PINNED_HASHIN_VERSION}"
+          mkdir -p "${RUNNER_TEMP}/hashin-bin"
+          ln -sf "${RUNNER_TEMP}/hashin-venv/bin/hashin" "${RUNNER_TEMP}/hashin-bin/hashin"
+          echo "${RUNNER_TEMP}/hashin-bin" >> "${GITHUB_PATH}"
+
+      # Installed in a step of its own, with no secret in its
+      # environment. The pin covers Renovate alone: npm resolves its
+      # dependency tree from the registry on every run, so an install
+      # script in that tree would otherwise run with RENOVATE_TOKEN,
+      # which writes to every repository Renovate manages. The step
+      # that holds the token runs only what this one installed.
+      #
+      # --ignore-scripts skips every install script in the tree; re2 is
+      # then rebuilt by name, because it is the one Renovate uses (its
+      # RE2 regex engine, without which it falls back to RegExp and
+      # warns on every run). It still runs without the token.
+      - name: Install Renovate
         env:
           # renovate: datasource=npm depName=renovate
-          PINNED_RENOVATE_VERSION: 44.192.0
+          PINNED_RENOVATE_VERSION: 44.198.3
+        run: |
+          rm -rf "${RUNNER_TEMP}/renovate-bin"
+          npm install --prefix "${RUNNER_TEMP}/renovate-bin" --ignore-scripts --no-audit --no-fund \
+              "renovate@${PINNED_RENOVATE_VERSION}"
+          npm rebuild --prefix "${RUNNER_TEMP}/renovate-bin" re2
+
+      - name: Self-hosted Renovate
+        env:
           RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
           RENOVATE_AUTODISCOVER: "true"
           RENOVATE_AUTODISCOVER_FILTER: ${{ github.repository }}
           # A clone and cache per job, so a long-lived runner behaves
           # like an ephemeral one.
           RENOVATE_BASE_DIR: ${{ runner.temp }}/renovate
-        run: npx --yes "renovate@${PINNED_RENOVATE_VERSION}"
+        run: "${RUNNER_TEMP}/renovate-bin/node_modules/.bin/renovate"
