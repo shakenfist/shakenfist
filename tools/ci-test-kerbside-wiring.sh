@@ -234,18 +234,22 @@ site_inventory() {
     } > "${WORK}/site/hosts.ini"
 }
 
-# A valid configuration: the Kerbside settings in group_vars/kerbside, and
-# kerbside_url and api_url for every host, with no host_vars, and the real
-# requirements.yml. Cases change them, and call this again when they are done.
+# A valid configuration: the Kerbside-host-only settings in group_vars/kerbside,
+# the cluster-wide ones (kerbside_url and kerbside_system_key, which the Shaken
+# Fist nodes read too) and api_url for every host, with no host_vars, and the
+# real requirements.yml. kerbside_system_key is cluster-wide because it is
+# minted on the database host and the Kerbside host must present the same
+# value (#4700); in group_vars/kerbside the database host would see none.
+# Cases change them, and call this again when they are done.
 reset_site_vars() {
     rm -f "${WORK}"/site/host_vars/*.yml
     cat > "${WORK}/site/group_vars/kerbside.yml" << EOF
 kerbside_public_fqdn: ${FQDN}
-kerbside_system_key: ${SYSTEM_KEY}
 kerbside_auth_secret_seed: ${SEED}
 kerbside_sql_url: '${SQL_URL}'
 EOF
-    printf "kerbside_url: '%s'\napi_url: %s\n" "${URL}" "${API_URL}" > "${WORK}/site/group_vars/all.yml"
+    printf "kerbside_url: '%s'\nkerbside_system_key: %s\napi_url: %s\n" \
+        "${URL}" "${SYSTEM_KEY}" "${API_URL}" > "${WORK}/site/group_vars/all.yml"
     cp "${REQUIREMENTS}" "${WORK}/site/requirements.yml"
 }
 
@@ -417,7 +421,7 @@ operator_args = set(node_specs['kerbside_source'].get('options') or {})
 for spec in specs.values():
     operator_args |= set(spec.get('options') or {})
 derived = {'kerbside_hosts', 'kerbside_sources', 'kerbside_colocated', 'kerbside_url_on_sf_nodes',
-           'kerbside_sf_ca_cert'}
+           'kerbside_sf_ca_cert', 'kerbside_minted_key_hash', 'kerbside_deploy_key_hash'}
 for play in (validate, deploy):
     bad = (set(play.get('vars') or {}) & operator_args) - derived
     if bad:
@@ -779,6 +783,23 @@ PYEOF
     run "${WITHOUT}" -i localhost, -e "$(source_vars insecure-optin \
         '"api_url": "http://sf-api.example.com:13000", "kerbside_allow_insecure_api_url": true')" \
         "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused the opted-out cleartext api_url'
+
+    # #4700: this host's kerbside_system_key must be the one minted on the
+    # database host, and must not be the deploy key. The hashes are what the
+    # consuming playbook passes; sha256 them the way ansible's hash('sha256')
+    # does.
+    source_refuses 'a Kerbside key which is not the one minted for the cluster' \
+        "\"kerbside_minted_key_hash\": \"$(printf '%s' 'a-different-key' | sha256sum | cut -d' ' -f1)\"" \
+        'is not the value minted as the system namespace'
+    source_refuses 'a Kerbside key equal to the deploy key' \
+        "\"kerbside_deploy_key_hash\": \"$(printf '%s' "${SYSTEM_KEY}" | sha256sum | cut -d' ' -f1)\"" \
+        "is the same as the cluster's deploy key"
+
+    CURRENT_CASE='case 6: kerbside_source accepts the minted key, not the deploy key'
+    run "${WITHOUT}" -i localhost, -e "$(source_vars key-hashes-ok \
+        "\"kerbside_minted_key_hash\": \"$(printf '%s' "${SYSTEM_KEY}" | sha256sum | cut -d' ' -f1)\", \
+         \"kerbside_deploy_key_hash\": \"$(printf '%s' 'the-deploy-key' | sha256sum | cut -d' ' -f1)\"")" \
+        "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused the minted key'
 }
 
 case_7_site_validation_runs() {
@@ -786,7 +807,11 @@ case_7_site_validation_runs() {
     reset_site_vars
     site_inventory kb-1
     echo "kerbside_url: '${URL}'" >> "${WORK}/site/group_vars/kerbside.yml"
-    echo "api_url: ${API_URL}" > "${WORK}/site/group_vars/all.yml"
+    # kerbside_url only the Kerbside hosts see, but kerbside_system_key still
+    # cluster-wide, so the kerbside_url check fires rather than the empty-key
+    # or minted-key one.
+    printf "kerbside_system_key: %s\napi_url: %s\n" "${SYSTEM_KEY}" "${API_URL}" \
+        > "${WORK}/site/group_vars/all.yml"
     run_site_head "${WITH}" && fail 'the validation play passed it'
     assert_output_has "Shaken Fist's nodes render no kerbside_url at all"
     assert_output_has 'fatal: [kb-1]: FAILED!'
@@ -827,7 +852,11 @@ case_7_site_validation_runs() {
     CURRENT_CASE="case 7: site.yml refuses the default, loopback, api_url on a dedicated Kerbside host"
     site_inventory kb-1
     reset_site_vars
-    echo "kerbside_url: '${URL}'" > "${WORK}/site/group_vars/all.yml"
+    # No api_url, so it falls back to the role default (loopback); keep
+    # kerbside_url and kerbside_system_key cluster-wide so the loopback check
+    # is what fires.
+    printf "kerbside_url: '%s'\nkerbside_system_key: %s\n" "${URL}" "${SYSTEM_KEY}" \
+        > "${WORK}/site/group_vars/all.yml"
     run_site_head "${WITH}" && fail 'the validation play passed it'
     assert_output_has 'a loopback address, but kb-1 is not a Shaken Fist node'
     assert_later_play_did_not_run

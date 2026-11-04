@@ -318,6 +318,31 @@ argument_specs:
             between the Kerbside host and the API is trusted, such as a
             private CI network. A co-located host is unaffected, since its
             loopback traffic never leaves the host.
+      kerbside_minted_key_hash: &kerbside_minted_key_hash_option
+        type: str
+        default: null
+        description:
+          - >-
+            The SHA-256 hash of the kerbside_system_key minted as the system
+            namespace's "kerbside" key on the database host, which the
+            consuming playbook passes from that host. kerbside_source refuses
+            a Kerbside host whose own kerbside_system_key does not hash to it,
+            since that host would authenticate with a credential the cluster
+            never minted. A hash so the key does not leave the database host;
+            null, the default, skips the check, as in the validation play
+            before Shaken Fist is deployed.
+      kerbside_deploy_key_hash: &kerbside_deploy_key_hash_option
+        type: str
+        default: null
+        description:
+          - >-
+            The SHA-256 hash of the database host's system_key (the deploy
+            key), which the consuming playbook passes from that host.
+            kerbside_source refuses a Kerbside host whose kerbside_system_key
+            hashes to it, since Kerbside would then authenticate as "deploy"
+            and revoking the "kerbside" key would not lock it out. A hash so
+            the key does not leave the database host; null, the default, skips
+            the check.
       federation_jwks_ca_bundle:
         type: str
         default: ""
@@ -488,8 +513,11 @@ argument_specs:
         not null and holds no PEM certificate; when api_url is a loopback URL
         and kerbside_colocated is false; when api_url is http:// and
         kerbside_colocated is false, unless kerbside_allow_insecure_api_url is
-        true; or when kerbside_url_on_sf_nodes is supplied and differs from
-        kerbside_url. No message includes the key.
+        true; when kerbside_url_on_sf_nodes is supplied and differs from
+        kerbside_url; or, when the database host's hashes are supplied, when
+        kerbside_system_key is not the minted key (kerbside_minted_key_hash) or
+        is the deploy key (kerbside_deploy_key_hash). No message includes the
+        key or the hashes.
       - >-
         Then sets the fact kerbside_sf_source, the console source through
         which Kerbside scrapes this cluster: source deploy_name, type
@@ -511,3 +539,5 @@ argument_specs:
       kerbside_url_on_sf_nodes: *kerbside_url_on_sf_nodes_option
       kerbside_colocated: *kerbside_colocated_option
       kerbside_allow_insecure_api_url: *kerbside_allow_insecure_api_url_option
+      kerbside_minted_key_hash: *kerbside_minted_key_hash_option
+      kerbside_deploy_key_hash: *kerbside_deploy_key_hash_option

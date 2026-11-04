@@ -126,6 +126,41 @@
       group_vars/all.
     quiet: true
 
+# The "kerbside" key is minted on the database host, from that host's
+# kerbside_system_key, and the kerbside_credentials entry point refuses it
+# there only against that host's system_key. A Kerbside host with its own
+# kerbside_system_key (a host_vars override, or the value kept only in
+# group_vars/kerbside so the database host saw none) therefore authenticates
+# with a key the cluster never minted -- or, if it is set to the deploy key,
+# with system_key, which /auth accepts as "deploy", so revoking "kerbside"
+# then does nothing. Neither is visible on the database host. The consuming
+# playbook passes the database host's two hashes; comparing hashes keeps both
+# secrets off this host and out of the message. null (not passed, as in the
+# validation play before Shaken Fist is deployed) skips the check, like
+# kerbside_url_on_sf_nodes.
+- name: Refuse a Kerbside system key which is not the one minted for the cluster
+  ansible.builtin.assert:
+    that: kerbside_system_key | hash('sha256') == kerbside_minted_key_hash
+    fail_msg: >-
+      kerbside_system_key on {{ inventory_hostname }} is not the value minted
+      as the system namespace's "kerbside" key on the database host, so this
+      host would authenticate with a credential the cluster never issued. Set
+      kerbside_system_key once, where both the database host and this Kerbside
+      host read it, for example in group_vars/all.
+    quiet: true
+  when: kerbside_minted_key_hash is not none
+
+- name: Refuse a Kerbside system key equal to the deploy key on a Kerbside host
+  ansible.builtin.assert:
+    that: kerbside_system_key | hash('sha256') != kerbside_deploy_key_hash
+    fail_msg: >-
+      kerbside_system_key on {{ inventory_hostname }} is the same as the
+      cluster's deploy key (system_key), so Kerbside would authenticate as
+      "deploy" and revoking the "kerbside" key would not lock it out. Kerbside
+      must have a credential of its own; generate a different value.
+    quiet: true
+  when: kerbside_deploy_key_hash is not none
+
 # Built as data, never assembled from strings, so the kerbside role writes it
 # to sources.yaml with its own quoting. The username is always system:
 # Kerbside scrapes the whole cluster, and the kerbside_credentials entry point

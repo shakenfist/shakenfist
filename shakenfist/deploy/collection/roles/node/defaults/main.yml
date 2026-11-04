@@ -112,6 +112,14 @@ kerbside_colocated: false
 # such as a private CI network.
 kerbside_allow_insecure_api_url: false
 
+# SHA-256 hashes, which the consuming playbook passes from the database host,
+# of the kerbside_system_key minted there and of system_key. kerbside_source
+# refuses a Kerbside host whose kerbside_system_key is not the minted one, or
+# is the deploy key. Hashes so neither secret leaves the database host; null
+# skips both checks, as before Shaken Fist is deployed.
+kerbside_minted_key_hash: null
+kerbside_deploy_key_hash: null
+
 # Extra certificate authorities to trust when fetching a federated identity
 # provider's JWKS. Empty means the system trust store alone. Set this to a
 # path on the nodes when the provider is behind a private CA, which a self
