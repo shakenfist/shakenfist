@@ -767,6 +767,18 @@ PYEOF
     CURRENT_CASE="case 6: kerbside_source skips the kerbside_url check without the Shaken Fist nodes' value"
     run "${WITHOUT}" -i localhost, -e "$(source_vars url-unknown '"kerbside_url_on_sf_nodes": null')" \
         "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused it'
+
+    # #4699: a cleartext api_url on a host which is not a Shaken Fist node sends
+    # the system key over the network in the clear, and is refused unless opted
+    # out of.
+    source_refuses 'a cleartext http api_url on a host which is not a Shaken Fist node' \
+        '"api_url": "http://sf-api.example.com:13000"' \
+        'uses http://, but localhost is not a Shaken Fist node'
+
+    CURRENT_CASE='case 6: kerbside_source accepts a cleartext api_url with the opt-out set'
+    run "${WITHOUT}" -i localhost, -e "$(source_vars insecure-optin \
+        '"api_url": "http://sf-api.example.com:13000", "kerbside_allow_insecure_api_url": true')" \
+        "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused the opted-out cleartext api_url'
 }
 
 case_7_site_validation_runs() {

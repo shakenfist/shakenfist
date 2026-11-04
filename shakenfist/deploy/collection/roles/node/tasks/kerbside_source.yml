@@ -80,6 +80,31 @@
   vars:
     kerbside_api_host: "{{ api_url | urlsplit('hostname') | default('', true) | lower }}"
 
+# A dedicated Kerbside host posts kerbside_system_key in the body of every
+# POST /auth over api_url, so an http:// api_url there sends the cluster
+# credential across the network in cleartext on every scrape. A co-located
+# host ordinarily reaches its own sf-api over loopback, where cleartext never
+# leaves the host; the refusal is scoped to dedicated hosts for that reason
+# and because CI deliberately runs over http. A co-located host which does
+# point at a remote http api_url (as CI does) is not caught here; that, and
+# any trusted-network case, is the purpose of the opt-out
+# kerbside_allow_insecure_api_url. The scheme, like the host, is not a secret,
+# so the message names it.
+- name: Refuse a cleartext api_url on a Kerbside host which is not a Shaken Fist node
+  ansible.builtin.assert:
+    that: >-
+      kerbside_colocated | bool
+      or kerbside_allow_insecure_api_url | bool
+      or (api_url | urlsplit('scheme') | default('', true) | lower) != 'http'
+    fail_msg: >-
+      api_url on {{ inventory_hostname }} uses http://, but
+      {{ inventory_hostname }} is not a Shaken Fist node, so Kerbside posts
+      kerbside_system_key over the network in cleartext on every scrape. Use
+      an https:// api_url, such as the cluster's load balancer or an API
+      node's address, or set kerbside_allow_insecure_api_url to true to accept
+      the risk, for example on a trusted private network or in CI.
+    quiet: true
+
 # kerbside_url is the single source of truth for the console token audience:
 # this role's config entry point renders it as Shaken Fist's KERBSIDE_URL, and
 # the kerbside role renders it as Kerbside's SF_CONSOLE_TOKEN_AUDIENCE. Set

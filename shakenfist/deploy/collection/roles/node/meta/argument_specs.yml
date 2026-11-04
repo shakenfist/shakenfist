@@ -305,6 +305,19 @@ argument_specs:
             console range; when it is not, kerbside_source refuses a loopback
             api_url, since nothing answers there. The example playbook sets it
             per host, from the allsf group.
+      kerbside_allow_insecure_api_url: &kerbside_allow_insecure_api_url_option
+        type: bool
+        default: false
+        description:
+          - >-
+            Opt out of kerbside_source's refusal of a cleartext (http://)
+            api_url on a Kerbside host which is not a Shaken Fist node
+            (kerbside_colocated false). False, the default, refuses it, since
+            Kerbside posts kerbside_system_key over the network in cleartext
+            on every POST /auth scrape. Set it true only when the network
+            between the Kerbside host and the API is trusted, such as a
+            private CI network. A co-located host is unaffected, since its
+            loopback traffic never leaves the host.
       federation_jwks_ca_bundle:
         type: str
         default: ""
@@ -473,8 +486,10 @@ argument_specs:
       - >-
         Fails when kerbside_system_key is empty; when kerbside_sf_ca_cert is
         not null and holds no PEM certificate; when api_url is a loopback URL
-        and kerbside_colocated is false; or when kerbside_url_on_sf_nodes is
-        supplied and differs from kerbside_url. No message includes the key.
+        and kerbside_colocated is false; when api_url is http:// and
+        kerbside_colocated is false, unless kerbside_allow_insecure_api_url is
+        true; or when kerbside_url_on_sf_nodes is supplied and differs from
+        kerbside_url. No message includes the key.
       - >-
         Then sets the fact kerbside_sf_source, the console source through
         which Kerbside scrapes this cluster: source deploy_name, type
@@ -495,3 +510,4 @@ argument_specs:
       kerbside_url: *kerbside_url_option
       kerbside_url_on_sf_nodes: *kerbside_url_on_sf_nodes_option
       kerbside_colocated: *kerbside_colocated_option
+      kerbside_allow_insecure_api_url: *kerbside_allow_insecure_api_url_option

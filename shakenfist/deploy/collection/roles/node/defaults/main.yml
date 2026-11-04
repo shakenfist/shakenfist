@@ -105,6 +105,13 @@ kerbside_sf_ca_cert: ""
 kerbside_url_on_sf_nodes: null
 kerbside_colocated: false
 
+# Opt out of the refusal of a cleartext (http://) api_url on a dedicated
+# Kerbside host. False, the default, refuses it, since Kerbside would post
+# kerbside_system_key across the network in cleartext on every scrape. Set it
+# true only when the network between the Kerbside host and the API is trusted,
+# such as a private CI network.
+kerbside_allow_insecure_api_url: false
+
 # Extra certificate authorities to trust when fetching a federated identity
 # provider's JWKS. Empty means the system trust store alone. Set this to a
 # path on the nodes when the provider is behind a private CA, which a self
