@@ -1604,12 +1604,13 @@ path works as designed.
 |------------|--------------|--------|-----------|------------|----------------------------------------|-------------|
 | development | #354 | `9f080cd`, 2026-10-31 | 41171895436 | skipped | `github-actions[bot]`, 41898282 (rule suite 4829478319) | none |
 | andris | andris#65 (eb5278f, then 003665c) | `dcdee41`, 2026-10-31 | 41183486988 | failed (proxy; see notes) | none: nothing pushed | none |
-| hunkydory | *pending* | | | ran | | |
-| ryll | *pending* | | | ran | | |
-| kerbside | *pending* | | | ran | | |
-| actions | *pending* | | | skipped | | |
-| sfui | *pending* | | | skipped | | |
-| kerbside-client | *pending* | | | skipped | | |
+| andris (re-sync) | andris#66 | `d7f6d42d`, 2026-11-01 | 41639665324 | ran | `shakenfist-review-marks[bot]`, 350161744 | none |
+| hunkydory | #146 | `a901d7a9`, 2026-11-04 | 41706060196 | ran | `shakenfist-review-marks[bot]`, 350161744 | none |
+| ryll | ryll#677 | `c3253fa5`, 2026-11-01 | 41341301984 | ran | `shakenfist-review-marks[bot]`, 350161744 | none |
+| kerbside | #693 | `d96b2a25`, 2026-11-04 | 41707481322 | ran | `shakenfist-review-marks[bot]`, 350161744 | none |
+| actions | actions#233 | `ff0edf18`, 2026-11-03 | 41704975509 | skipped | `github-actions[bot]` (github.token) | none |
+| sfui | sfui#66 | `e902e7aa`, 2026-11-03 | 41705006995 | skipped | `github-actions[bot]` (github.token) | none |
+| kerbside-client | #15 | `3837549f`, 2026-11-04 | 41725064670 | skipped | `github-actions[bot]` (github.token) | none |
 
 The `Token step` column is the expectation; the record replaces it
 with what the log showed.
@@ -1675,6 +1676,37 @@ with what the log showed.
   re-run for andris with the fixed template, and its three readings
   taken again, before 2c starts; the re-run gets a row of its own in
   the rollout table, so the table still shows this one failed.
+- 2026-11-01 AEDT: andris#66 (the proxy re-sync) merged as
+  `d7f6d42d`. Its first `prune-reviews` run on `develop`, 41639665324,
+  minted the App token (`Mint the push token` ran) and pushed as
+  `shakenfist-review-marks[bot]` (350161744); deployments stayed
+  empty. andris is on the App path, and 2b's three readings hold.
+  ryll was migrated the same day by ryll#677 (a bundled
+  consistency-fix pull request, `c3253fa5`), not by a dedicated
+  template-resync pull request; its run 41341301984 pushed as the App
+  too. So two of the four key-holders were done before 2c resumed.
+- 2026-11-04 AEDT: 2c completed. hunkydory (#146) and kerbside (#693)
+  were re-synced this session with `template-resync` (one pull request
+  each, closing #142 and #651), merged, and their first runs
+  (41706060196, 41707481322) minted the App token and pushed as
+  `shakenfist-review-marks[bot]` (350161744) with empty deployments.
+  The two automated reviews on them were consider/info only -- the
+  recurring "is `deployment: false` a real key" question, already
+  settled by the development and andris runs -- and were acked
+  nothing-to-do. actions (actions#233) and sfui (sfui#66) had been
+  re-synced in parallel by consistency-fix pull requests from other
+  sessions, closing #228 and #61; their latest runs (41704975509 on
+  `main`, 41705006995) skip the token step, as a no-key repository
+  should. kerbside-client (#15) was re-synced this session, closing
+  #14; its run 41725064670 skipped the token step and pushed with
+  `github.token`. All eight adopters now carry the template byte for
+  byte (`template-resync status review-tracking` reports review
+  tracking in sync everywhere); development's own
+  `tools/review-tracking.sh` differs on a separate template matter
+  unrelated to this phase. The original seven `review-tracking.yml`
+  issue numbers in the step briefs (2b/2c) are superseded by the
+  numbers the audit re-filed as the drift persisted (#142 for
+  hunkydory, #228 for actions); all are now closed.
 
 #### Risks and mitigations
 
