@@ -179,6 +179,80 @@ class IPAMTestCase(base.ShakenFistTestCase):
             ReservationType.INSTANCE,
             ipm.get_reservation('192.168.1.10').reservation_type)
 
+    def test_release_expected_type_guards_the_release(self):
+        # Issue #4261: releasing a manual reservation must be atomic with
+        # its type check, so a concurrent takeover cannot be clobbered by a
+        # racing release. reserve a manual address, then act out the race:
+        # something else takes the address over (an instance), and the
+        # second DELETE's release -- which still expects MANUAL -- must
+        # refuse rather than return the instance's address to the halo.
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
+
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.MANUAL, ''))
+
+        # The first DELETE releases the manual reservation to the halo, and a
+        # racing instance create naming that address evicts the halo and
+        # takes it -- so the address is now held by an instance.
+        self.assertTrue(ipm.release('192.168.1.10'))
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.INSTANCE, '', evict_halo=True))
+
+        # The second DELETE's release still expects MANUAL. It matches no row
+        # and refuses, leaving the instance's reservation untouched -- the
+        # collision manual reservations exist to prevent.
+        self.assertFalse(
+            ipm.release('192.168.1.10', expected_type=ReservationType.MANUAL))
+        self.assertEqual(
+            ReservationType.INSTANCE,
+            ipm.get_reservation('192.168.1.10').reservation_type)
+
+    def test_release_expected_type_allows_the_matching_type(self):
+        # The same guard releases normally when the type still holds.
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
+
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.MANUAL, ''))
+        self.assertTrue(
+            ipm.release('192.168.1.10', expected_type=ReservationType.MANUAL))
+        self.assertEqual(
+            ReservationType.DELETION_HALO,
+            ipm.get_reservation('192.168.1.10').reservation_type)
+
+    def test_release_without_expected_type_is_unguarded(self):
+        # No expected_type keeps the pre-#4261 behaviour for every other
+        # caller: the release happens whatever the current type is.
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
+
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.INSTANCE, ''))
+        self.assertTrue(ipm.release('192.168.1.10'))
+        self.assertEqual(
+            ReservationType.DELETION_HALO,
+            ipm.get_reservation('192.168.1.10').reservation_type)
+
+    def test_release_expected_type_guards_in_memory(self):
+        # The in-memory IPAM honours the guard too, so a test fixture and a
+        # real cluster agree.
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24',
+                            in_memory_only=True)
+
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.INSTANCE, ''))
+        self.assertFalse(
+            ipm.release('192.168.1.10', expected_type=ReservationType.MANUAL))
+        self.assertTrue(
+            ipm.release('192.168.1.10', expected_type=ReservationType.INSTANCE))
+
     def test_get_free_random_ip(self):
         ipam_uuid = str(uuid.uuid4())
         ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '10.0.0.0/22')

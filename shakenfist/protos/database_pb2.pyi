@@ -1703,8 +1703,16 @@ class ReleaseAddressRequest(_message.Message):
     IPAM_UUID_FIELD_NUMBER: _builtins.int
     ADDRESS_FIELD_NUMBER: _builtins.int
     HALO_RESERVATION_FIELD_NUMBER: _builtins.int
+    EXPECTED_TYPE_FIELD_NUMBER: _builtins.int
     ipam_uuid: _builtins.str
     address: _builtins.str
+    expected_type: _shakenfist_enums_pb2.ReservationType.ValueType
+    """If set to something other than RESERVATION_TYPE_UNSPECIFIED, the release
+    only proceeds when the address is currently reserved as this type,
+    checked in the UPDATE's WHERE clause so the type check and the release
+    are one atomic statement (issue #4261). An older sf-database built
+    before this field ignores it and releases unconditionally.
+    """
     @_builtins.property
     def halo_reservation(self) -> Global___IPAMReservationData:
         """The deletion-halo data to set"""
@@ -1715,10 +1723,11 @@ class ReleaseAddressRequest(_message.Message):
         ipam_uuid: _builtins.str = ...,
         address: _builtins.str = ...,
         halo_reservation: Global___IPAMReservationData | None = ...,
+        expected_type: _shakenfist_enums_pb2.ReservationType.ValueType = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["halo_reservation", b"halo_reservation"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["address", b"address", "halo_reservation", b"halo_reservation", "ipam_uuid", b"ipam_uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["address", b"address", "expected_type", b"expected_type", "halo_reservation", b"halo_reservation", "ipam_uuid", b"ipam_uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

@@ -258,13 +258,29 @@ class IPAM(dbo):
             extra=reservation.to_legacy_dict())
         return True
 
-    def release(self, address: Optional[str]) -> bool:
+    def release(self, address: Optional[str],
+                expected_type: Optional[ReservationType] = None) -> bool:
+        """Release an address, returning it to the deletion halo.
+
+        When expected_type is given, the release only proceeds if the
+        address is currently reserved as that type, and the check is atomic
+        with the release (issue #4261): the underlying UPDATE carries the
+        type in its WHERE clause, so a concurrent release cannot slip
+        between a type check and the write. A caller releasing something it
+        does not own -- a manual reservation it is the only one entitled to
+        return -- passes its expected type so a racing delete cannot defeat
+        the check.
+        """
         if not address:
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
 
         if self._in_memory_only:
-            if address not in self.__in_memory_store:
+            existing = self.__in_memory_store.get(address)
+            if existing is None:
+                return False
+            if (expected_type is not None
+                    and existing.reservation_type != expected_type):
                 return False
             del self.__in_memory_store[address]
             return True
@@ -283,7 +299,8 @@ class IPAM(dbo):
             comment=None
         )
 
-        if not mariadb.release_address(self.uuid, address, halo_reservation):
+        if not mariadb.release_address(self.uuid, address, halo_reservation,
+                                       expected_type=expected_type):
             return False
 
         self.add_event(
