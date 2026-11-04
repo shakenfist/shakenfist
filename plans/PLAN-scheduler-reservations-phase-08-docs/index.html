@@ -16474,18 +16474,24 @@ keeps the whole response (<code>node_capacity()</code> in client-python's
   creation refuses.</li>
 </ul>
 <h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>Implemented and checked, with one step outstanding: the client release
-(step 1) is not finished. The <code>v0.8.4</code> tag has not been pushed, so PyPI
-still serves 0.8.3, and Definition of done items 1 and 2 are pending
-the tag. They are neither met nor failed. <strong>This pull request's merge
-waits on them</strong>; a follow-up commit fills in items 1 and 2 once the
-release lands. Every other item was run from the worktree root rather
-than read.</p>
+<p>Implemented and checked. At the time this section was first written the
+client release (step 1) was not finished — the <code>v0.8.4</code> tag was not
+pushed, PyPI still served 0.8.3, and Definition of done items 1 and 2
+were pending the tag — so the pull request's Outcome recorded them as
+neither met nor failed and said a follow-up commit would fill them in
+once the release landed. This is that follow-up (recorded in a sibling
+commit on the same pull request, alongside the phase close-out): the
+release landed on 2026-10-31, items 1 and 2 are now <strong>met</strong>, and the
+release status below records the run, the PyPI timestamp and the
+fresh-venv check. Every other item was run from the worktree root
+rather than read.</p>
 <h3 id="what-each-step-did">What each step did<a class="headerlink" href="#what-each-step-did" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Step 1</strong> (client release, management session) is half done. The dry
-  run of <code>release.yml</code> passed (run 41018325275); the tag and the
-  <code>release</code> environment approval are Michael's and are not yet given.</li>
+<li><strong>Step 1</strong> (client release, management session) is done. The dry run
+  of <code>release.yml</code> passed first (run 41018325275); Michael then pushed
+  the <code>v0.8.4</code> tag (client-python <code>44696ddaf059</code>) and approved the
+  <code>release</code> environment. The release run (41140112308) succeeded and
+  PyPI served 0.8.4 at 2026-10-31T00:13:46Z. See <em>Release status</em>.</li>
 <li><strong>Step 2</strong> (<code>bc909e5bd5</code>) replaced the three false "has no claim
   verbs / no events verb" sentences in <code>scheduler.md</code> with the commands,
   opened the diagnosis section with <code>sf-client node capacity</code>, added the
@@ -16509,11 +16515,15 @@ than read.</p>
 <li><strong>Step 7</strong> (this section) ran the Definition of done.</li>
 </ul>
 <h3 id="release-status">Release status<a class="headerlink" href="#release-status" title="Permanent link">&para;</a></h3>
-<p>Dry run passed, run 41018325275 (2026-10-30). <code>v0.8.4</code> is not tagged;
-PyPI serves 0.8.3. Items 1 and 2 stay pending until the tag is pushed,
-the <code>release</code> environment is approved, and PyPI serves 0.8.4. Until
-then <code>scheduler.md</code> and the release notes name a version that cannot yet
-be installed.</p>
+<p>The release landed. The <code>workflow_dispatch</code> dry run passed first (run
+41018325275, 2026-10-30). Michael pushed the <code>v0.8.4</code> tag
+(client-python <code>44696ddaf059</code>, the merge of <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/443" title="GitHub Issue: shakenfist/client-python #443">client-python#443</a>) and
+approved the <code>release</code> environment; the release run (41140112308,
+created 2026-10-30T22:44:38Z) succeeded and uploaded both artifacts to
+PyPI at 2026-10-31T00:13:46Z. The documentation pull request (#4737)
+merged at 2026-10-31T08:23:20Z, after PyPI served 0.8.4, so D2's
+ordering held: the guide never named a version an operator could not
+install. Items 1 and 2 are now met — see the table below.</p>
 <h3 id="issue-comments">Issue comments<a class="headerlink" href="#issue-comments" title="Permanent link">&para;</a></h3>
 <ul>
 <li><a href="https://github.com/shakenfist/shakenfist/issues/4391#issuecomment-6517954014">#4391 closing comment</a></li>
@@ -16536,13 +16546,13 @@ not <code>limit_*</code> changes. <code>database.md</code> was therefore not edi
 <tbody>
 <tr>
 <td>1</td>
-<td><strong>Pending the tag</strong></td>
-<td>PyPI serves 0.8.3 until <code>v0.8.4</code> is pushed; the install check cannot run.</td>
+<td><strong>Met</strong></td>
+<td><code>curl .../shakenfist-client/json \| jq -r .info.version</code> prints <code>0.8.4</code>; in a fresh venv <code>pip install shakenfist-client==0.8.4 &amp;&amp; sf-client node capacity --help</code> exited 0. Release run 41140112308 (client-python <code>44696ddaf059</code>); PyPI upload 2026-10-31T00:13:46Z.</td>
 </tr>
 <tr>
 <td>2</td>
-<td><strong>Pending the tag</strong></td>
-<td><code>grep -o</code> prints one hit, <code>shakenfist-client` 0.8.4</code>: it names 0.8.4 and nothing older, but PyPI does not yet serve it.</td>
+<td><strong>Met</strong></td>
+<td><code>grep -o</code> prints one hit, <code>shakenfist-client` 0.8.4</code>: it names 0.8.4 and nothing older, and PyPI now serves it.</td>
 </tr>
 <tr>
 <td>3</td>
@@ -16646,9 +16656,9 @@ two <code>ci.md</code> lines are about CI lanes and are unrelated.</p>
 <p>No contradiction was found.</p>
 <h3 id="what-phase-5-and-the-follow-up-commit-inherit">What phase 5 and the follow-up commit inherit<a class="headerlink" href="#what-phase-5-and-the-follow-up-commit-inherit" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Items 1 and 2 are pending the <code>v0.8.4</code> tag; the follow-up commit
-  records the release run id, the PyPI timestamp and the fresh-venv
-  <code>sf-client node capacity --help</code> result.</li>
+<li>Items 1 and 2 are met: the follow-up commit records the release run
+  id (41140112308), the PyPI upload timestamp (2026-10-31T00:13:46Z)
+  and the fresh-venv <code>sf-client node capacity --help</code> result (exit 0).</li>
 <li>Item 12 should exclude <code>docs/components/</code>, and item 13 should say two
   files for <code>claim list --all</code>.</li>
 </ul>
