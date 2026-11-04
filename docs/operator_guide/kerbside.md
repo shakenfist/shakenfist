@@ -357,12 +357,15 @@ Consoles work. Kerbside's own management does not, without more work.
   and the units set no `REQUESTS_CA_BUNDLE`, so it may not consult the
   host's store at all
   ([#4699](https://github.com/shakenfist/shakenfist/issues/4699)).
-* **A full `system` credential.** Kerbside scrapes the whole cluster with a
-  key in the `system` namespace, which the deploy mints with no scopes, so
-  it is a cluster administrator credential
-  ([#4698](https://github.com/shakenfist/shakenfist/issues/4698) tracks
-  narrowing it). Anyone who can read `kerbside_system_key`, including from a
-  Kerbside host's `sources.yaml`, can act as `system`.
+* **A read-only `system` credential.** Kerbside scrapes the whole cluster
+  with a key in the `system` namespace. The deploy mints it with only the
+  scopes the production scrape needs -- `cluster-admin`, `admin.read`,
+  `node.read` and `instance.read` -- so anyone who can read
+  `kerbside_system_key`, including from a Kerbside host's `sources.yaml`, can
+  read the whole cluster but cannot change it
+  ([#4698](https://github.com/shakenfist/shakenfist/issues/4698)). Kerbside's
+  own adversarial CI driver needs a writing credential and uses the `deploy`
+  key instead.
   [The Kerbside credential](vdi_console_tokens.md#the-kerbside-credential)
   covers rotating and revoking it.
 

@@ -316,7 +316,7 @@ case_3_both_set() {
     assert_stub_log "ARGV: show-config
 -- preflight passed --
 ARGV: ensure-kerbside-signing-key
-ARGV: bootstrap-system-key --key-from-stdin kerbside
+ARGV: bootstrap-system-key --key-from-stdin --scope cluster-admin --scope admin.read --scope node.read --scope instance.read kerbside
 ENV: SHAKENFIST_NODE_MESH_IP=192.0.2.53
 STDIN: ${KERBSIDE_KEY}
 -- credentials done --"

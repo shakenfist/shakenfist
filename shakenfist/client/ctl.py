@@ -176,8 +176,14 @@ def _read_stdin_value() -> str:
 @click.option('--key-from-stdin', is_flag=True, default=False,
               help='Read the key from stdin instead of an argument, keeping '
                    'it out of the process table.')
+@click.option('--scope', 'scopes', multiple=True,
+              help='Grant only this scope (repeatable), for example '
+                   '--scope cluster-admin --scope node.read. Omitting every '
+                   '--scope records no scopes, which mints a wildcard '
+                   'cluster-administrator key, as it always has.')
 def bootstrap_system_key(keyname: str, key: Optional[str],
-                         key_from_stdin: bool) -> None:
+                         key_from_stdin: bool,
+                         scopes: tuple[str, ...]) -> None:
     if key_from_stdin == (key is not None):
         raise click.UsageError(
             'Provide the key either as an argument or via --key-from-stdin, '
@@ -188,7 +194,10 @@ def bootstrap_system_key(keyname: str, key: Optional[str],
 
     click.echo('Creating key %s' % keyname)
     ns = Namespace.new('system')
-    ns.add_key(keyname, key)
+    # add_key treats scopes=None as "record no scopes" (the historical
+    # wildcard); an empty list would be a key that can do nothing, which is
+    # never what the absence of --scope means, so collapse it back to None.
+    ns.add_key(keyname, key, scopes=list(scopes) or None)
     click.echo('Done')
 
 

@@ -363,8 +363,31 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result.exit_code, 0)
         mock_namespace.new.assert_called_once_with('system')
-        mock_ns.add_key.assert_called_once_with('mykey', 'myvalue')
+        # No --scope means scopes=None, the historical unscoped wildcard, so
+        # the deploy key task is unchanged by the --scope option.
+        mock_ns.add_key.assert_called_once_with('mykey', 'myvalue', scopes=None)
         self.assertIn('Done', result.output)
+
+    @mock.patch('shakenfist.client.ctl.Namespace')
+    def test_bootstrap_system_key_with_scopes(self, mock_namespace):
+        from shakenfist.client.ctl import bootstrap_system_key
+
+        mock_ns = mock.MagicMock()
+        mock_namespace.new.return_value = mock_ns
+
+        result = self.runner.invoke(
+            bootstrap_system_key,
+            ['kerbside', 'myvalue',
+             '--scope', 'cluster-admin', '--scope', 'admin.read',
+             '--scope', 'node.read', '--scope', 'instance.read'])
+
+        self.assertEqual(result.exit_code, 0)
+        # Repeated --scope collects into the ordered list passed to add_key,
+        # so the kerbside key is minted read-only rather than wildcard.
+        mock_ns.add_key.assert_called_once_with(
+            'kerbside', 'myvalue',
+            scopes=['cluster-admin', 'admin.read', 'node.read',
+                    'instance.read'])
 
     @mock.patch('shakenfist.client.ctl.mariadb')
     def test_show_config_empty(self, mock_mariadb):
@@ -643,7 +666,7 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result.exit_code, 0)
         mock_namespace.new.assert_called_once_with('system')
-        mock_ns.add_key.assert_called_once_with('mykey', 'myvalue')
+        mock_ns.add_key.assert_called_once_with('mykey', 'myvalue', scopes=None)
 
     @mock.patch('shakenfist.client.ctl.sf_config')
     def test_verify_config(self, mock_sf_config):
