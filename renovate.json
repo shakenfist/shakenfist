@@ -15,6 +15,19 @@
     "description": "Renovate's pre-commit manager is opt-in. Without this the hook revisions in .pre-commit-config.yaml are the one dependency file nobody is watching.",
     "enabled": true
   },
+  "customManagers": [
+    {
+      "description": "Pick up the Ansible tool pins, ansible-core and ansible-lint, in functional-tests.yml's sanity_checks job. Renovate has no manager for a uv command line in a workflow, so without this the pins would never move. They are pinned so that a new release arrives as its own pull request, which says what changed: unpinned, ansible-core 2.22.0's new no_log output masking broke the Kerbside wiring test on every pull request (#4773), and had to be held below 2.22 until the role fix was released (#4774). Kerbside pins the same two tools the same way, for the same collection (kerbside#690).",
+      "customType": "regex",
+      "fileMatch": [
+        "^\\.github/workflows/functional-tests\\.yml$"
+      ],
+      "matchStrings": [
+        "(?<depName>ansible-core|ansible-lint)==(?<currentValue>[0-9][0-9.]*)"
+      ],
+      "datasourceTemplate": "pypi"
+    }
+  ],
   "packageRules": [
     {
       "description": "Automatically merge minor and patch-level updates",

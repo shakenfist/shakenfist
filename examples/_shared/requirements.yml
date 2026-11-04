@@ -11,4 +11,4 @@
 # so a change here belongs there too.
 collections:
   - name: shakenfist.kerbside
-    version: '>=0.8.0,<0.9.0'
+    version: '>=0.9.0,<0.10.0'
