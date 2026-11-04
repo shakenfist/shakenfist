@@ -257,15 +257,16 @@ jobs:
           . /tmp/venv-test/bin/activate
           tox -emypy
 
-      # Both tools are pinned, as Kerbside pins them for the same
-      # collection (kerbside#690), so that a new release arrives as its own
-      # Renovate pull request rather than failing whichever pull request
-      # runs next. That is not hypothetical: ansible-core 2.22.0 began
-      # masking no_log argument values, which redacted every value of the
-      # kerbside role's kerbside_sources -- "shakenfist" included -- and
-      # broke the Kerbside wiring test below on every pull request (#4773,
-      # kerbside#687). The role fix ships in shakenfist.kerbside 0.9.0,
-      # which examples/_shared/requirements.yml now requires.
+      # ansible-lint and ansible-core are both pinned so that a new release
+      # of either arrives as its own Renovate pull request rather than
+      # failing whichever pull request runs next (Kerbside pins the same
+      # two, for the same collection -- kerbside#690). That is not
+      # hypothetical: ansible-core 2.22.0 began masking no_log argument
+      # values, which redacted every value of the kerbside role's
+      # kerbside_sources -- "shakenfist" included -- and broke the Kerbside
+      # wiring test below on every pull request (#4773, kerbside#687). The
+      # role fix ships in shakenfist.kerbside 0.9.0, which
+      # examples/_shared/requirements.yml now requires.
       - name: Lint Ansible playbooks
         timeout-minutes: 5
         run: |
