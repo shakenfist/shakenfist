@@ -66,7 +66,10 @@ a placement decision can be reconstructed after the fact (see
 
 Stages 1 to 5 are **pre-filters**: they answer, from a metrics
 snapshot up to a minute stale, whether a node probably can host the
-instance. They are not the admission decision -- that is a separate,
+instance. The CPU, RAM and disk filters are ledger-aware -- they read
+the same counters the admission guard draws down -- but they are a
+cheap prune of the candidate list, not a second decider. They are not
+the admission decision -- that is a separate,
 atomic capacity claim made once a candidate is chosen (see [Admission
 is a guarded capacity claim](#admission-is-a-guarded-capacity-claim)
 below), so a node that survives every pre-filter here can still be
@@ -357,11 +360,13 @@ measurements above. See
 [`docs/operator_guide/database.md`](database.md) for the RPCs and the
 tables they draw down.
 
-A refused candidate is not a failed create: the scheduler-driven
-callers (the create path and the preflight redirect) walk to the next
-candidate on a denial, so one node being momentarily full only costs
-an extra round trip. Only once every candidate has refused does the
-request fail, with a 507 reporting how many candidates refused it.
+A refused candidate is not a failed create: there is a single shared
+placement walk (`Instance.place_on_candidates()`) that both the create
+path and the start-redirect operation use. It calls `place_instance()`
+on each candidate in turn, and the guarded claim is the admission, so
+one node being momentarily full only costs an extra round trip. Only
+once every candidate has refused does the request fail, with a 507
+reporting how many candidates refused it.
 The per-candidate detail -- which node was refused, and on which
 dimension(s) (`cpus`, `memory_mb`, `disk_gb`, or the `demand`
 feedforward term described below) -- is attached to the instance's
