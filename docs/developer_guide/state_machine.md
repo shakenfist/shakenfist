@@ -161,10 +161,17 @@ the instance in `error` state.
 
 The error message recorded when the instance entered its `*-error` transition
 state is carried across the move to `error`, so an errored instance still
-reports why it failed. Callers rely on this: the `sf_instance` Ansible module
-recognises a preflight capacity abort (`Unable to find suitable node`) by that
-message, and replays the create rather than failing. Leaving the error states,
-for example by a delete which ends in `deleted`, clears the message.
+reports why it failed. Leaving the error states, for example by a delete which
+ends in `deleted`, clears the message.
+
+An error which was a placement refusal carries two more fields beside the
+message: `error_stage`, the scheduling stage which refused the instance, and
+`error_transient`, whether waiting can clear that refusal. Both are published
+in the instance's API view and survive the move to `error` the same way the
+message does. Callers rely on this: the `sf_instance` Ansible module replays a
+create which preflight aborted when `error_transient` says a wait can clear it,
+rather than matching the message text. See
+[capacity refusals](../operator_guide/capacity_refusals.md#the-refusal-on-the-instance).
 
 An instance whose start can never run is errored the same way. If the
 operation carrying its preflight, start and create tasks is ended by a

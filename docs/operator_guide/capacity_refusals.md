@@ -133,8 +133,41 @@ The `transient` field is a boolean saying whether waiting and trying again can
 plausibly succeed. It is `true` only for the stages listed as transient above.
 Read this field rather than inferring retry-worthiness from the status code or
 the `stage` name: the classification lives in one place in the server
-(`TRANSIENT_CAPACITY_STAGES` in `shakenfist/external_api/base.py`), and a
-client that reproduces the list will drift from it.
+(`TRANSIENT_CAPACITY_STAGES` in `shakenfist/constants.py`, re-exported by
+`shakenfist/external_api/base.py`), and a client that reproduces the list will
+drift from it.
+
+## The refusal on the instance
+
+Not every refusal is a `507`. A create which the scheduler accepted can still
+be refused later, when the chosen node runs preflight and finds it no longer
+has room: there is no request left to answer by then, so the server errors the
+instance and queues its delete instead. The instance carries the same two
+fields in that case, beside the message:
+
+```json
+{
+  "state": "error",
+  "error_message": "Unable to find suitable node",
+  "error_stage": "capacity_guard",
+  "error_transient": true
+}
+```
+
+`error_stage` and `error_transient` mean exactly what `stage` and `transient`
+mean in a `507` body, and are computed by the same helper, so the two cannot
+disagree about the same refusal. They describe the error the instance is
+carrying now: an error which is not a placement refusal publishes
+`error_stage: null` and `error_transient: false`, and a placement which is
+later admitted clears them. A refused `POST /instances` leaves its instance
+record behind in an error state too, and that record carries the same fields as
+the `507` which refused it.
+
+A client waiting out a refusal reads `error_transient` rather than matching
+`error_message`, for the same reason it reads `transient` rather than the
+status code. The Ansible collection's `sf_instance` `capacity_wait` does; it
+falls back to matching the two historical abort messages only against a server
+which does not publish the field.
 
 ## Retry-After header
 

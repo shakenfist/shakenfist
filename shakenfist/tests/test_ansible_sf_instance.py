@@ -1063,8 +1063,11 @@ class SfInstanceTransientRefusalTestCase(base.ShakenFistTestCase):
 class SfInstancePreflightCapacityAbortTestCase(base.ShakenFistTestCase):
     """The two exact preflight abort messages which mean "no room".
 
-    The strings are named here on purpose: a server change which rewords
-    either should fail this test, not quietly stop the wait engaging.
+    These are the fallback for a server which does not publish
+    error_transient on the instance (shakenfist/shakenfist#4568); the
+    class below covers a server which does. The strings are named here
+    on purpose: a server change which rewords either should fail this
+    test, not quietly stop the wait engaging.
     """
 
     def test_both_capacity_messages_in_both_states_match(self):
@@ -1094,6 +1097,49 @@ class SfInstancePreflightCapacityAbortTestCase(base.ShakenFistTestCase):
              'error_message': 'Unable to find suitable node'}))
         self.assertFalse(sf_instance._preflight_capacity_abort(None))
         self.assertFalse(sf_instance._preflight_capacity_abort({}))
+
+
+class SfInstanceMarkedPreflightAbortTestCase(base.ShakenFistTestCase):
+    """A server which marks the abort is believed, in preference to prose.
+
+    Issue 4568 gave the preflight abort the same transient marker a 507
+    body carries. Gating on it rather than on the message is what stops
+    this module replaying a refusal the server has already called
+    permanent -- the mistake the transient-capacity-refusals push audit
+    found in the functional suite's own wrapper.
+    """
+
+    def test_a_marked_transient_abort_matches_whatever_the_message_says(self):
+        for state in ('preflight-error', 'error'):
+            self.assertTrue(sf_instance._preflight_capacity_abort(
+                {'state': state,
+                 'error_message': 'some future wording of no room',
+                 'error_stage': 'sufficient_idle_cpu',
+                 'error_transient': True}))
+
+    def test_a_marked_permanent_abort_does_not_match(self):
+        # Even carrying one of the two legacy messages: the marker wins,
+        # because the server is the only thing which knows whether the
+        # stage it refused at can be cleared by waiting.
+        self.assertFalse(sf_instance._preflight_capacity_abort(
+            {'state': 'error',
+             'error_message': 'Too many start attempts',
+             'error_stage': 'cpu_max_per_instance',
+             'error_transient': False}))
+
+    def test_an_unmarked_error_with_the_field_present_does_not_match(self):
+        self.assertFalse(sf_instance._preflight_capacity_abort(
+            {'state': 'error',
+             'error_message': 'Missing network',
+             'error_stage': None,
+             'error_transient': False}))
+
+    def test_the_marker_is_still_read_with_the_state_check(self):
+        self.assertFalse(sf_instance._preflight_capacity_abort(
+            {'state': 'created',
+             'error_message': None,
+             'error_stage': None,
+             'error_transient': False}))
 
 
 class SfInstanceAwaitRecordGoneTestCase(base.ShakenFistTestCase):

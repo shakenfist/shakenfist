@@ -205,9 +205,12 @@ options:
         which the server sends only for a scheduler stage that waiting
         can clear. The second, only when the create is awaited -- to boot
         with O(await) or to placement with O(await_placement) -- is an
-        instance which preflight aborted with the error message C(Unable
-        to find suitable node) or C(Too many start attempts). A 507
-        without the marker (for example an exhausted address pool), a
+        instance which preflight aborted and whose record carries
+        C(error_transient) true, which the server sets by the same rule.
+        Against a server which does not publish C(error_transient) the
+        second is instead an instance aborted with the error message
+        C(Unable to find suitable node) or C(Too many start attempts). A
+        507 without the marker (for example an exhausted address pool), a
         C(transient) false 507, a body which is not JSON, a 409, an
         affinity failure and every other error fail at once.
       - A refused create still leaves an instance record behind, which
@@ -368,15 +371,19 @@ CAPACITY_REPLAY_JITTER = 15
 # to be deleted. The same cadence the client's own await uses.
 CAPACITY_RECORD_POLL = 5
 
-# The two preflight abort messages which mean "no node had room". The
-# server records a preflight abort on the instance only as a message string
-# -- preflight's LowResourceException carries a stage, but AbortInstanceStart
-# discards it -- so this is string matching, and a server change which
-# rewords either message quietly stops these aborts being replayed. That is
-# the safe direction to fail in: they then fail the task as they always
-# did. The affinity and "Requested node ..." aborts are different strings,
-# deliberately absent: waiting does not satisfy an affinity rule or free a
-# node the caller pinned to.
+# The two preflight abort messages which mean "no node had room", used
+# only against a server which does not publish C(error_transient) on the
+# instance. A server which does carries the same stage and transient
+# marker on a preflight abort that it has always carried in a 507 body
+# (shakenfist/shakenfist#4568), and _preflight_capacity_abort() gates on
+# that marker in preference to these strings: deciding for ourselves which
+# refusals are worth waiting out is how a client comes to replay a refusal
+# the server has already said is permanent. Against an older server this
+# stays string matching, and a reworded message quietly stops these aborts
+# being replayed. That is the safe direction to fail in: they then fail the
+# task as they always did. The affinity and "Requested node ..." aborts are
+# different strings, deliberately absent: waiting does not satisfy an
+# affinity rule or free a node the caller pinned to.
 #
 # The match is not exact about the cause, though. Too many start attempts
 # is preflight's limit on placement attempts, which it checks before
@@ -510,13 +517,21 @@ def _transient_refusal(e):
 def _preflight_capacity_abort(instance):
     """Did preflight abort this instance because no node had room?
 
-    See PREFLIGHT_CAPACITY_MESSAGES and PREFLIGHT_ABORT_STATES for why this
-    is a match on the exact message.
+    The server's own answer when it gives one: error_transient is true
+    only for a scheduling stage a wait can clear, computed by the same
+    helper which marks a 507 body, so this cannot disagree with the
+    create path about the same refusal. A server which predates that
+    field answers nothing at all, and only then does this fall back to
+    matching the message -- see PREFLIGHT_CAPACITY_MESSAGES and
+    PREFLIGHT_ABORT_STATES.
     """
     if not instance:
         return False
-    return (instance.get('state') in PREFLIGHT_ABORT_STATES and
-            instance.get('error_message') in PREFLIGHT_CAPACITY_MESSAGES)
+    if instance.get('state') not in PREFLIGHT_ABORT_STATES:
+        return False
+    if 'error_transient' in instance:
+        return instance['error_transient'] is True
+    return instance.get('error_message') in PREFLIGHT_CAPACITY_MESSAGES
 
 
 def _is_error_state(state):

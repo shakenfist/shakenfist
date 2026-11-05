@@ -13,6 +13,7 @@ prevents ``enqueue_delete()`` from running.
 from unittest import mock
 from uuid import uuid4
 
+from shakenfist.constants import CAPACITY_GUARD_STAGE
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist.instance import Instance
@@ -105,6 +106,107 @@ class PreflightAbortMessageTestCase(base.ShakenFistTestCase):
         refetched = Instance.from_db(inst.uuid)
         self.assertEqual(Instance.STATE_ERROR, refetched.state.value)
         self.assertEqual('Unable to find suitable node', refetched.error)
+
+
+class PreflightAbortStageTestCase(base.ShakenFistTestCase):
+    """A capacity abort reaches the instance as a stage, not just prose.
+
+    Issue 4568: preflight knew which scheduling stage refused the
+    instance and whether a wait could clear it, and then threw both away
+    -- the abort carried a message and nothing else, so a client had to
+    match two exact strings to recognise a transient capacity refusal.
+    The instance now publishes the stage and the server's own transient
+    verdict beside the message.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+
+    def _abort(self, name, message, stage):
+        inst = self.mock_mariadb.create_instance(
+            name, set_state=Instance.STATE_PREFLIGHT)
+        with mock.patch('shakenfist.instance.Instance.enqueue_delete'):
+            inst.enqueue_delete_due_error(message, stage=stage)
+        return inst
+
+    def _view(self, inst):
+        # The reference grouping in external_view() reads the caller's
+        # namespace out of a JWT, so it needs a request context these
+        # tests have no interest in standing up.
+        with mock.patch(
+                'shakenfist.instance.references_to_grouped_dict',
+                return_value={}):
+            return inst.external_view()
+
+    def test_transient_stage_is_published_as_worth_waiting_out(self):
+        inst = self._abort(
+            'transientabort', 'Unable to find suitable node',
+            CAPACITY_GUARD_STAGE)
+
+        view = self._view(inst)
+        self.assertEqual('Unable to find suitable node',
+                         view['error_message'])
+        self.assertEqual(CAPACITY_GUARD_STAGE, view['error_stage'])
+        self.assertTrue(view['error_transient'])
+
+    def test_permanent_stage_is_published_as_not_worth_waiting_out(self):
+        # The whole point of publishing the stage rather than the class:
+        # a request for more vCPUs than any node can host is refused
+        # identically after every instance on the cluster is deleted.
+        inst = self._abort(
+            'permanentabort', 'Too many start attempts',
+            'cpu_max_per_instance')
+
+        view = self._view(inst)
+        self.assertEqual('cpu_max_per_instance', view['error_stage'])
+        self.assertFalse(view['error_transient'])
+
+    def test_an_error_which_is_not_a_refusal_carries_no_stage(self):
+        inst = self._abort('plainabort', 'Missing network', None)
+
+        view = self._view(inst)
+        self.assertEqual('Missing network', view['error_message'])
+        self.assertIsNone(view['error_stage'])
+        self.assertFalse(view['error_transient'])
+
+    def test_a_later_error_replaces_the_stage_of_an_earlier_refusal(self):
+        inst = self._abort(
+            'restaged', 'Unable to find suitable node', CAPACITY_GUARD_STAGE)
+
+        with mock.patch('shakenfist.instance.Instance.enqueue_delete'):
+            inst.enqueue_delete_due_error('instance failed to power on')
+
+        view = self._view(inst)
+        self.assertIsNone(view['error_stage'])
+        self.assertFalse(view['error_transient'])
+
+    def test_a_healthy_instance_publishes_no_refusal(self):
+        inst = self.mock_mariadb.create_instance(
+            'healthy', set_state=Instance.STATE_CREATED)
+
+        view = self._view(inst)
+        self.assertIsNone(view['error_message'])
+        self.assertIsNone(view['error_stage'])
+        self.assertFalse(view['error_transient'])
+
+    def test_the_stage_survives_the_delete_the_abort_queues(self):
+        # The same reasoning as issue 4776's message test above: the
+        # client usually reads the instance back after the delete has
+        # moved it from preflight-error to error, so an annotation which
+        # does not survive that transition is not there when it looks.
+        inst = self._abort(
+            'stagesurvives', 'Unable to find suitable node',
+            CAPACITY_GUARD_STAGE)
+
+        inst._delete_globally()
+
+        refetched = Instance.from_db(inst.uuid)
+        self.assertEqual(Instance.STATE_ERROR, refetched.state.value)
+        view = self._view(refetched)
+        self.assertEqual(CAPACITY_GUARD_STAGE, view['error_stage'])
+        self.assertTrue(view['error_transient'])
 
 
 class UnreadableOperationsTestCase(base.ShakenFistTestCase):

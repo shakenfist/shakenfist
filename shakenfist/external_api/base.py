@@ -33,12 +33,12 @@ from werkzeug.exceptions import HTTPException
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import constants
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
-from shakenfist.constants import CAPACITY_GUARD_STAGE
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import scopes as api_scopes
@@ -125,50 +125,20 @@ def handles_credentials():
 TRANSIENT_RETRY_AFTER_SECONDS = 15
 
 
-# Which refusal stages a retry can actually clear, and which it cannot.
+# The capacity refusal vocabulary, re-exported from shakenfist.constants
+# where it is defined, because this module is where callers (and this
+# repository's own handlers, as api_base.<name>) already look for it.
 #
-# This line was originally drawn at the exception class: every
-# LowResourceException was transient. That was too coarse. The class
-# covers filter stages which are momentary shortages *and* filter
-# stages which are structural facts about the request or the cluster,
-# and telling a client to retry the second kind makes it replay an
-# impossible request until its deadline for nothing.
-#
-# Transient -- the resource is measured, contended and returned by an
-# ordinary instance teardown within seconds (5.3-5.6 s was measured for
-# CPU):
-TRANSIENT_CAPACITY_STAGES = frozenset([
-    'sufficient_idle_cpu',
-    'sufficient_idle_memory',
-    'sufficient_free_disk',
-    'sufficient_idle_disk',
-    'queue_state',
-
-    # The guard is an accounting refusal against the capacity counters,
-    # which a concurrent delete or a reconciler pass moves on the same
-    # horizon. This holds only while mariadb.CLAIM_ENFORCEMENT_HARD is
-    # False: today a namespace claim cannot refuse a placement at all,
-    # so every guard denial is cluster or node capacity. Once that
-    # constant is flipped (see PLAN-scheduler-reservations.md) a claim
-    # denial becomes namespace quota exhaustion, which no wait clears,
-    # and claim denials must be split out of this set at that point
-    # rather than silently inheriting it.
-    CAPACITY_GUARD_STAGE,
-])
-
-# Permanent -- the cluster would refuse the identical request again in
-# fifteen seconds, in an hour, and after every instance on it had been
-# deleted. cpu_max_per_instance means the request asks for more vCPUs
-# than any single node will ever host; is_hypervisor and pre_schedule
-# mean the candidate set was empty before any resource was measured.
-# These still publish a stage and a 507 -- the refusal is real and the
-# stage is worth reading -- but they publish transient: false and no
-# Retry-After.
-PERMANENT_CAPACITY_STAGES = frozenset([
-    'pre_schedule',
-    'is_hypervisor',
-    'cpu_max_per_instance',
-])
+# The two stage sets moved there when the preflight abort began
+# publishing the same classification on the instance it refuses (issue
+# 4568): shakenfist/instance.py cannot import the API layer, and a
+# second copy of the classification is how the API and the instance come
+# to disagree about one refusal. Anybody splitting a stage out of either
+# set -- the claim stage, once mariadb.CLAIM_ENFORCEMENT_HARD is flipped
+# by PLAN-scheduler-reservations phase 5 -- edits constants.py, not here.
+CAPACITY_GUARD_STAGE = constants.CAPACITY_GUARD_STAGE
+TRANSIENT_CAPACITY_STAGES = constants.TRANSIENT_CAPACITY_STAGES
+PERMANENT_CAPACITY_STAGES = constants.PERMANENT_CAPACITY_STAGES
 
 
 def capacity_error(message: str, stage: str) -> flask.Response:
@@ -191,13 +161,13 @@ def capacity_error(message: str, stage: str) -> flask.Response:
     pending-release horizon to compute one from).
 
     The stage is the sole discriminator. A caller hands in where the
-    refusal happened and this helper decides what that means, because
-    the alternative -- a ``transient=`` argument at each call site --
-    puts the classification somewhere it can be got wrong once per
-    caller. A stage in neither set, including the ``'unknown'`` fallback
-    for a refusal that arrived carrying no stage at all, is published as
-    non-transient: refusing to promise retry-worthiness is the safe
-    direction to be wrong in.
+    refusal happened and ``constants.capacity_refusal_is_transient()``
+    decides what that means, because the alternative -- a
+    ``transient=`` argument at each call site -- puts the
+    classification somewhere it can be got wrong once per caller. That
+    helper is also what a preflight abort publishes on the instance
+    (issue 4568), so the API and the instance record cannot disagree
+    about whether a refusal is worth waiting out.
 
     The cost of re-serialising is that the body is now assembled in two
     places -- here, and inside ``shakenfist_utilities`` -- so an upgrade
@@ -215,7 +185,7 @@ def capacity_error(message: str, stage: str) -> flask.Response:
     request field; like ``status``, they describe the refusal itself,
     not which request parameter caused it.
     """
-    transient = stage in TRANSIENT_CAPACITY_STAGES
+    transient = constants.capacity_refusal_is_transient(stage)
 
     resp = sf_api.error(507, message, suppress_traceback=True)
     if transient:

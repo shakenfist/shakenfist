@@ -1064,11 +1064,17 @@ class ExternalApiAffinityRefusalTestCase(
         with mock.patch('shakenfist.instance.Instance.'
                         'enqueue_delete_due_error') as delete:
             with self._raises(
-                    exceptions.AffinityConstraintUnsatisfiable('nope')):
+                    exceptions.AffinityConstraintUnsatisfiable(
+                        'nope', stage='affinity_constraints')):
                 resp = self._post('affinity-cleanup')
 
         self.assertEqual(409, resp.status_code, resp.get_json())
-        delete.assert_called_once_with('scheduling failed')
+        # The stage rides along so the record left behind says why it was
+        # refused (issue 4568); an affinity stage classifies as not worth
+        # waiting out, which is the point of carrying it rather than a
+        # bare flag.
+        delete.assert_called_once_with(
+            'scheduling failed', stage='affinity_constraints')
 
 
 class ExternalApiTransientRefusalContractTestCase(

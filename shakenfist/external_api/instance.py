@@ -1140,14 +1140,19 @@ class InstancesEndpoint(api_base.Resource):
             inst.add_event(
                 EVENT_TYPE_AUDIT, 'schedule failed, affinity unsatisfiable',
                 extra={'message': str(e)})
-            inst.enqueue_delete_due_error('scheduling failed')
+            inst.enqueue_delete_due_error(
+                'scheduling failed', stage=getattr(e, 'stage', '') or None)
             return sf_api.error(409, str(e), suppress_traceback=True)
 
         except exceptions.LowResourceException as e:
             inst.add_event(
                 EVENT_TYPE_AUDIT, 'schedule failed, insufficient resources',
                 extra={'message': str(e)})
-            inst.enqueue_delete_due_error('scheduling failed')
+            # The refused instance is left behind in state error until
+            # somebody deletes it, so it carries the same stage the 507
+            # below publishes rather than only the prose (issue 4568).
+            inst.enqueue_delete_due_error(
+                'scheduling failed', stage=getattr(e, 'stage', '') or None)
             # A 507 that fails to be produced is worse than one with a
             # vague stage (D30), so a missing or empty stage falls back
             # to 'unknown' rather than raising. Whether the stage is
@@ -1210,7 +1215,8 @@ class InstancesEndpoint(api_base.Resource):
                 EVENT_TYPE_AUDIT,
                 'schedule failed, every candidate refused by capacity guard',
                 extra={'candidates': candidates, 'denials': denials})
-            inst.enqueue_delete_due_error('scheduling failed')
+            inst.enqueue_delete_due_error(
+                'scheduling failed', stage=api_base.CAPACITY_GUARD_STAGE)
             # There is no single stage here -- denials may span
             # 'cluster', 'claim' and 'node' across different candidates
             # (D30) -- so the guard branch publishes the constant

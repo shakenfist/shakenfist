@@ -2835,6 +2835,31 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, self.inst.placement['placement_attempts'])
         self.assertEqual([self.node2], self._placed_on())
 
+    def test_placement_clears_an_earlier_refusal_stage(self):
+        # Issue 4568: the refusal stage is an annotation on the last
+        # placement attempt, so an attempt which is admitted must not
+        # leave the previous refusal describing it.
+        self.inst._record_refusal_stage('sufficient_idle_cpu')
+        self.assertEqual('sufficient_idle_cpu', self.inst.refusal_stage)
+
+        self.inst.place_instance(self.node2)
+
+        self.assertIsNone(self.inst.refusal_stage)
+        self.assertEqual(self.node2, self.inst.placement['node'])
+
+    def test_recording_a_refusal_stage_is_idempotent(self):
+        self.inst._record_refusal_stage('queue_state')
+        self.inst._record_refusal_stage('queue_state')
+
+        self.assertEqual('queue_state', self.inst.refusal_stage)
+
+        # Clearing a stage which was never recorded writes nothing and
+        # does not raise on the missing key.
+        self.inst._record_refusal_stage(None)
+        self.inst._record_refusal_stage(None)
+
+        self.assertIsNone(self.inst.refusal_stage)
+
     def test_placement_claims_capacity(self):
         row = self.mock_mariadb.set_node_capacity(
             self.node2, limit_cpus=16, limit_memory_mb=16384,
