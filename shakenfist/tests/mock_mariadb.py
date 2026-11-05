@@ -49,6 +49,7 @@ from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_reference import ObjectReference
+from shakenfist.schema.object_reference import validate_relationship_value
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 
@@ -1588,8 +1589,11 @@ class MockMariaDB():
         Idempotent, like the real implementation. The key deliberately
         excludes relationship_value, matching the real table's primary
         key: an upsert against an existing row refreshes last_active
-        but does not change the stored relationship_value.
+        but does not change the stored relationship_value. An over-long
+        relationship_value raises ValueError, as it does in production.
         """
+        validate_relationship_value(relationship_value)
+
         key = (source_type, str(source_uuid), relationship,
                target_type, str(target_uuid))
         if key not in self.object_references:

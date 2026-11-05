@@ -1729,6 +1729,12 @@ Python types are mapped to SQL column types:
 | `list`, `dict`, nested models | `LONGTEXT` (JSON) |
 | `Optional[X]` | Nullable column of type X |
 
+A Pydantic `Field(max_length=N)` constrains the model only; it does not
+change the generated column, which is `VARCHAR(255)` for every `str` field.
+A model declaring less than that will accept a write the column stores
+happily and then refuse to read it back, so a field whose limit matters has
+to be checked where it is written as well.
+
 ### Index Annotations
 
 Indexes can be defined directly in the Pydantic model using Python's

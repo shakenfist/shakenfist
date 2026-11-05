@@ -9,14 +9,17 @@
 # - remove_all_references_from() gRPC client function
 # - update_last_active() gRPC client function
 # - get_stale_references() gRPC client function
+# - the relationship_value length check on every write path
 
 from unittest import mock
 from uuid import uuid4
 
+from shakenfist.daemons.database import main as daemons_database_main
 from shakenfist import mariadb
 from shakenfist.config import BaseSettings
 from shakenfist.protos import database_pb2
 from shakenfist.protos import shakenfist_enums_pb2
+from shakenfist.schema.object_reference import RELATIONSHIP_VALUE_MAX_LENGTH
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.tests import base
@@ -447,3 +450,85 @@ class GetStaleReferencesTestCase(base.ShakenFistTestCase):
         result = mariadb.get_stale_references(1234567890.0)
 
         self.assertEqual(len(result), 0)
+
+
+class RelationshipValueLengthTestCase(base.ShakenFistTestCase):
+    """An over-long relationship_value is refused at the write.
+
+    The insert is raw SQL and validates nothing, while every read builds
+    an ObjectReference from the row. A value longer than the column was
+    therefore written without complaint and then raised a pydantic
+    ValidationError on every subsequent reference read for that object
+    (#4559), so the check has to happen on the way in.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+        self.too_long = 'a' * (RELATIONSHIP_VALUE_MAX_LENGTH + 1)
+        self.longest_allowed = 'a' * RELATIONSHIP_VALUE_MAX_LENGTH
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_over_long_value_is_not_sent_to_the_database(self, mock_get_stub):
+        mock_stub = mock.MagicMock()
+        mock_get_stub.return_value = mock_stub
+
+        self.assertRaises(
+            ValueError, mariadb.record_relationship,
+            ObjectType.INSTANCE, SOURCE_UUID, RelationshipType.DISK,
+            self.too_long, ObjectType.BLOB, TARGET_UUID)
+
+        mock_stub.RecordRelationship.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_value_filling_the_column_is_accepted(self, mock_get_stub):
+        # The negative control. Without it the test above passes just as
+        # well against a check which refused every value.
+        mock_stub = mock.MagicMock()
+        mock_stub.RecordRelationship.return_value = database_pb2.StatusReply(
+            success=True, error='')
+        mock_get_stub.return_value = mock_stub
+
+        result = mariadb.record_relationship(
+            ObjectType.INSTANCE, SOURCE_UUID, RelationshipType.DISK,
+            self.longest_allowed, ObjectType.BLOB, TARGET_UUID)
+
+        self.assertTrue(result)
+        call_args = mock_stub.RecordRelationship.call_args[0][0]
+        self.assertEqual(call_args.relationship_value, self.longest_allowed)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_direct_write_refuses_before_touching_the_engine(
+            self, mock_get_engine):
+        # This is the raise site for a value which arrived over gRPC
+        # from another node, where the pre-dispatch check on that node
+        # is no help at all.
+        self.assertRaises(
+            ValueError, mariadb._direct_record_relationship,
+            ObjectType.INSTANCE, SOURCE_UUID, RelationshipType.DISK,
+            self.too_long, ObjectType.BLOB, TARGET_UUID)
+
+        mock_get_engine.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_servicer_answers_an_over_long_value_with_a_failure(
+            self, mock_get_engine):
+        # End to end through the real writer: the refusal happens before
+        # the engine is reached, and the servicer's handler turns it into
+        # a failed StatusReply rather than an unhandled exception.
+        servicer = daemons_database_main.DatabaseService(mock.MagicMock())
+        request = database_pb2.RecordRelationshipRequest(
+            source_type=ObjectType.INSTANCE.proto_id,
+            source_uuid=str(SOURCE_UUID),
+            relationship=RelationshipType.DISK.proto_id,
+            relationship_value=self.too_long,
+            target_type=ObjectType.BLOB.proto_id,
+            target_uuid=str(TARGET_UUID))
+
+        reply = servicer.RecordRelationship(request, mock.MagicMock())
+
+        self.assertFalse(reply.success)
+        self.assertIn('relationship_value', reply.error)
+        mock_get_engine.assert_not_called()
