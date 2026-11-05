@@ -17120,13 +17120,13 @@ rather than merge requests.</p>
 <tr>
 <td>8. <code>convert -O vhdx --subformat fixed</code></td>
 <td><a href="/components/instar/plans/PLAN-bat-population-phase-08-convert/">PLAN-bat-population-phase-08-convert.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>e49b6275</code> (#874)</td>
 </tr>
 <tr>
 <td>9. <code>measure -O vhdx -o subformat=fixed</code></td>
-<td>PLAN-bat-population-phase-09-measure.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-bat-population-phase-09-measure/">PLAN-bat-population-phase-09-measure.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -17964,6 +17964,17 @@ chosen to defer to here, so that we do not forget them.</p>
   BAT, and so its data region, by the log's size.</li>
 <li><code>convert -O vpc</code> fixed output. instar converts to dynamic VHD only;
   qemu converts to either.</li>
+<li><code>convert -O vhdx --subformat fixed</code> fails (<code>convert operation
+  failed</code>) on a source whose virtual size is not a block multiple and
+  which holds data in the partial last block: the fixed writer does not
+  clamp the final block's write to <code>fixed_file_length</code>, so it runs past
+  the bounded output. Repro: a qcow2 of virtual size 41944576 with a
+  write at offset 41943040. qemu-img converts the same source fine, as
+  do instar's raw/dynamic/qcow2 targets, so it is an instar-specific
+  defect in the phase 8 writer (<code>convert_to_vhdx_fixed</code>); <code>measure</code> is
+  unaffected (it returns the fixed file length without reading the
+  source). Found while adding phase 9's measure tests. (GitHub issue to
+  be filed.)</li>
 <li>A failed <code>instar convert</code> leaves a zero-byte output file (seen on the
   #626 geometry). Measure what qemu-img leaves behind on the same
   failure before calling it a defect; if qemu removes or never creates

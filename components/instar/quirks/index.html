@@ -24850,8 +24850,15 @@ Categories:</p>
   case under investigation).</li>
 <li>QCOW2 sources with backing chains: instar reports the
   top layer's allocations only.</li>
-<li>VHDX sources: instar treats every BAT block as fully
-  allocated.</li>
+<li>VHDX sources: instar counts only blocks whose BAT entry is
+  fully or partially present, so it reports a smaller
+  <code>required</code> than qemu-img for a source with <code>ZERO</code>,
+  <code>NOT_PRESENT</code> or unmapped blocks, and an equal one when
+  every payload block is present (as in a fixed VHDX).
+  qemu-img counts every block of the image as allocated (its
+  <code>required</code> equals its <code>fully allocated</code>, whatever the BAT
+  says). A partially present block counts as a whole block on
+  both sides.</li>
 <li>VMDK multi-extent source layouts: instar's extent map
   propagation differs.</li>
 <li>VHD legacy CHS-only sources: instar's reported

@@ -16366,7 +16366,7 @@ values are overridden by matching <code>-o</code> keys when both are specified.<
 - <code>force_size</code>, <code>force_size_calc</code></p>
 <h3 id="vhdx">vhdx<a class="headerlink" href="#vhdx" title="Permanent link">&para;</a></h3>
 <p>Honoured:
-- <code>subformat</code> (dynamic), <code>block_size</code></p>
+- <code>subformat</code> (dynamic|fixed), <code>block_size</code></p>
 <p>The virtual size is at most 64 TiB (70368744177664 bytes), the largest
 VHDX qemu-img creates. A larger <code>--size</code> is refused before the guest
 runs (<code>measure: virtual size N exceeds the VHDX maximum of 64 TiB
@@ -16377,8 +16377,22 @@ unsupported source format. A size that is not a multiple of 512 is
 measured rounded up to one, as convert and create record it.</p>
 <p>Accepted but no size effect:
 - <code>log_size</code>, <code>block_state_zero</code></p>
-<p>Rejected (future work):
-- <code>subformat=fixed</code></p>
+<p><code>-o subformat=fixed</code> measures a fixed VHDX, which is dense: every payload
+byte is in the file whether or not the source block held data. <code>required
+size</code> and <code>fully allocated size</code> are therefore equal, and both are the
+fixed file length: the fixed data start — the end of the BAT and metadata
+regions plus the 4 MiB qemu-img leaves for future expansion, which
+<code>block_size</code> sizes through the BAT and which is 4 MiB past the data start
+a dynamic image uses (8 MiB rather than 4 MiB for a small image) — plus
+the virtual size rounded up to 512 bytes. The source's
+allocation is not read, so the answer does not vary with its content.
+<code>block_state_zero</code> does not change the answer either: <code>off</code> and <code>on</code>
+differ in the BAT entry state written (<code>FULLY_PRESENT</code> versus <code>ZERO</code>),
+not in the file length.</p>
+<p>qemu-img cannot measure VHDX (<code>Block driver 'vhdx' does not support size
+measurement</code>), so this number, like the dynamic one, has no external
+oracle. It is checked against the length of the file <code>convert -O vhdx
+--subformat fixed</code> writes for the same source and block size.</p>
 <h3 id="raw">raw<a class="headerlink" href="#raw" title="Permanent link">&para;</a></h3>
 <p>No options accepted. Any <code>-o</code> key with <code>-O raw</code> is rejected with an error.</p>
 <h2 id="known-divergences-from-qemu-img">Known divergences from qemu-img<a class="headerlink" href="#known-divergences-from-qemu-img" title="Permanent link">&para;</a></h2>
@@ -16397,8 +16411,16 @@ qemu-img's:</p>
   <a href="https://github.com/shakenfist/instar/issues/642">#642</a>; the same
   plumbing closes this for a VHD or VHDX chain, whichever format the
   chain is in.</li>
-<li><strong>VHDX sources</strong>: instar treats every BAT block as fully allocated.
-  qemu-img returns the actual block-state distribution.</li>
+<li><strong>VHDX sources</strong>: instar counts only blocks whose BAT entry is fully or
+  partially present, so it reports a smaller <code>required</code> than qemu-img for
+  any source with <code>ZERO</code>, <code>NOT_PRESENT</code> or unmapped blocks, and an equal
+  one when every payload block is present (as in a fixed VHDX). qemu-img
+  counts every block of a VHDX source as allocated: its <code>required</code> equals
+  its <code>fully allocated</code>, whatever the BAT says. A partially present block
+  counts as a whole block on both sides, so instar can over-report within
+  such a block. For a 64 MiB dynamic VHDX with 2 of 8 blocks written,
+  <code>measure -O qcow2</code> gives instar <code>required size: 17104896</code> and qemu-img
+  <code>required size: 67436544</code>; both report <code>fully allocated size: 67436544</code>.</li>
 <li><strong>VMDK multi-extent source layouts</strong>: instar's extent map propagation
   differs from qemu-img for some non-trivial layouts.</li>
 <li><strong>VHD legacy CHS-only sources</strong>: instar's reported virtual_size differs
@@ -16440,7 +16462,6 @@ predicate both the readers and this scan share.</p>
 <li><code>-l SNAPSHOT</code> snapshot-targeted measurement.</li>
 <li><code>--image-opts</code> parsing.</li>
 <li><code>-o help</code> listing.</li>
-<li><code>subformat=fixed</code> for vhdx target.</li>
 </ul>
 <p>For per-format size formulas implemented today, see
 <code>src/crates/measure/src/lib.rs</code>.</p>

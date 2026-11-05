@@ -18818,7 +18818,7 @@ deliberately broken emitter is not guarding what its name says it
 guards. See the VHD and VHDX notes in
 <a href="/components/instar/chain-config/#format-specific-notes">chain-config.md</a> for the
 composing path being guarded.</p>
-<p>There are <strong>150 cases</strong>, in eleven groups.</p>
+<p>There are <strong>153 cases</strong>, in twelve groups.</p>
 <p>Forty-seven cover the writer. Twenty-four mutate a library crate
 (<code>create</code>, <code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip
 test. Two of those twenty-four guard the region table and metadata table
@@ -18874,6 +18874,16 @@ refuses a 16 TiB convert. The other two mutate the <code>create</code> crate but
 break something only an external parser can see.
 Going through the real binary means <code>make instar</code> before the test and
 again after the source is restored.</p>
+<p>Three more are fixed VHDX <strong>measure</strong> cases, outside both the writer and
+reader groups: <code>measure -O vhdx -o subformat=fixed</code> is a predictor, not
+a writer. qemu-img cannot measure VHDX at all, so the oracle is the
+length of the file instar's own fixed <code>convert</code> writes, and the test
+(<code>TestMeasureVhdxFixed.test_matches_the_convert_output</code>) requires the
+prediction to equal it exactly. One drops the host's flag bit, so a
+fixed target is measured as a dynamic one. One returns the data region
+start where the whole file length belongs, leaving the payload out. One
+restores the old refusal of <code>subformat=fixed</code>. All three go through the
+real binary.</p>
 <p>The other <strong>47 reader cases</strong> cover the reader — the VHD and VHDX arms of
 <code>read_chain_virtual_cluster</code>, the sector-bitmap helpers in the <code>vhd</code>
 and <code>vhdx</code> crates, and the per-chain judgement in <code>init_chain_states</code>
