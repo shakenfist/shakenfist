@@ -19182,6 +19182,11 @@ in one place and avoids hand-writing SQL.</p>
 </tr>
 </tbody>
 </table>
+<p>A Pydantic <code>Field(max_length=N)</code> constrains the model only; it does not
+change the generated column, which is <code>VARCHAR(255)</code> for every <code>str</code> field.
+A model declaring less than that will accept a write the column stores
+happily and then refuse to read it back, so a field whose limit matters has
+to be checked where it is written as well.</p>
 <h3 id="index-annotations">Index Annotations<a class="headerlink" href="#index-annotations" title="Permanent link">&para;</a></h3>
 <p>Indexes can be defined directly in the Pydantic model using Python's
 <code>Annotated</code> types. This keeps index definitions co-located with the schema.</p>

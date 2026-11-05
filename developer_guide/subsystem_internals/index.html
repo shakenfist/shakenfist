@@ -16637,7 +16637,7 @@ track any object-to-object relationship.</p>
 </tr>
 <tr>
 <td>relationship_value</td>
-<td>VARCHAR(64)</td>
+<td>VARCHAR(255)</td>
 <td>Optional relationship-specific value</td>
 </tr>
 <tr>
@@ -16723,6 +16723,17 @@ track any object-to-object relationship.</p>
 </tr>
 </tbody>
 </table>
+<p><code>relationship_value</code> is capped at 255 characters, which is the generated
+column's width rather than a semantic limit — the schema generator renders
+every <code>str</code> field as <code>VARCHAR(255)</code> and ignores <code>max_length</code>. The cap is one
+constant, <code>RELATIONSHIP_VALUE_MAX_LENGTH</code> in
+<code>shakenfist/schema/object_reference.py</code>, used both as the model's validation
+limit and as the write-time check in <code>mariadb.record_relationship()</code> and
+<code>_direct_record_relationship()</code>. Both ends are needed: the insert is raw SQL
+and validates nothing, while every read builds an <code>ObjectReference</code> from the
+row, so without the write-time check an over-long value is written once and
+then breaks every later reference read for that object (#4559). Too long a
+value raises <code>ValueError</code> rather than being stored.</p>
 <p>This replaces the legacy <code>ref_count</code> and <code>locations</code> blob attributes with a
 queryable, auditable reference system. Blob reference counts are computed
 dynamically from this table via <code>mariadb.count_references_to()</code>. Blob locations
