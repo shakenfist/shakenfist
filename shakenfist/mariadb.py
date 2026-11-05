@@ -1270,6 +1270,109 @@ def _ensure_schema_versions_table(engine: sa.Engine) -> None:
                                        checkfirst=True)
 
 
+# How many rows of the migrating table one backfill batch covers. The
+# batch is the lock footprint and the transaction, so this is the knob
+# which trades commit overhead against how long a live writer can be
+# made to wait. 10,000 matches _PRUNE_BATCH_SIZE, which is what the
+# daily events sweep has been measured at.
+_MIGRATION_BACKFILL_BATCH_SIZE = 10000
+
+
+def _migration_backfill_batched(
+        engine: sa.Engine, table_name: str, cursor_column: str,
+        update_sql: str, description: str) -> int:
+    """Run a migration's backfill as bounded, individually committed batches.
+
+    ``sf-ctl ensure-mariadb-schema`` runs before the nodes restart onto
+    the new code, so every daemon in the cluster is still reading and
+    writing the table a backfill is rewriting. A single table-wide
+    ``UPDATE`` there is one unbounded transaction which, under
+    REPEATABLE READ, next-key locks every row it examines in every table
+    it touches until it commits. Backfilling ``event_objects.timestamp``
+    that way locked 71.9 million rows for 31 minutes and stalled event
+    writes on every node for the whole of it (issue 4797).
+
+    So the backfill walks ``table_name`` in ``cursor_column`` order
+    instead, and ``update_sql`` is run once per batch with
+    ``:cursor_from`` and ``:cursor_to`` bound to the inclusive range that
+    batch covers. Each batch is its own transaction, so a concurrent
+    writer waits for one batch at worst rather than for the whole table,
+    and only if its row falls inside the range currently held.
+
+    The cursor walk, rather than a repeated "find me rows which still
+    need work" query, is what keeps the total work linear: a candidate
+    query has to scan past everything already done to find the next
+    batch, which is quadratic in the size of the table.
+
+    The range is inclusive at both ends and ``update_sql`` is expected to
+    carry its own "not done yet" predicate, which makes a batch
+    idempotent and the whole backfill restartable: a run which dies part
+    way through leaves the rows it did not reach alone, and they are
+    exactly the rows the next run picks up.
+
+    The inclusive upper bound is also why ``cursor_column`` need not be
+    unique. ``event_objects.event_uuid`` is not -- one event names
+    several objects -- so a batch's last value can have rows the row
+    limit cut off. The ``UPDATE`` covers all of them because it bounds on
+    the value rather than on the rows the read returned, and the next
+    read starts strictly above that value, so nothing is done twice and
+    nothing is skipped.
+
+    The candidate read runs on its own connection so that the ``UPDATE``
+    establishes its own read view rather than inheriting one opened by a
+    plain ``SELECT`` and aborting with ER_CHECKREAD under
+    ``innodb_snapshot_isolation`` -- see standards.md.
+
+    Errors are deliberately not caught. A schema version must not advance
+    over a half-filled column, so a failed batch has to abort the
+    migration.
+
+    Args:
+        engine: The engine the migration is running on.
+        table_name: The table being rewritten.
+        cursor_column: An indexed column to walk in. Need not be unique.
+        update_sql: The backfill statement, bound by ``:cursor_from`` and
+            ``:cursor_to``.
+        description: Used in the progress log line.
+
+    Returns:
+        The number of rows the backfill changed.
+    """
+    total = 0
+    batches = 0
+    cursor = None
+
+    while True:
+        params: dict[str, Any] = {'batch': _MIGRATION_BACKFILL_BATCH_SIZE}
+        bound = ''
+        if cursor is not None:
+            bound = f'WHERE {cursor_column} > :cursor '
+            params['cursor'] = cursor
+        with engine.connect() as conn:
+            rows = conn.execute(sa.text(
+                f'SELECT {cursor_column} AS cursor_value FROM {table_name} '
+                f'{bound}ORDER BY {cursor_column} LIMIT :batch'),
+                params).fetchall()
+        if not rows:
+            break
+
+        with engine.connect() as conn:
+            result = conn.execute(sa.text(update_sql), {
+                'cursor_from': rows[0].cursor_value,
+                'cursor_to': rows[-1].cursor_value,
+            })
+            conn.commit()
+
+        total += result.rowcount or 0
+        batches += 1
+        cursor = rows[-1].cursor_value
+        if len(rows) < _MIGRATION_BACKFILL_BATCH_SIZE:
+            break
+
+    LOG.info(f'{description}: {total} rows in {batches} batches.')
+    return total
+
+
 def _parse_mariadb_version(version_string: str) -> tuple[int, int, int]:
     """Parse a MariaDB ``VERSION()`` string into a (major, minor, patch) tuple.
 
@@ -2894,6 +2997,11 @@ def _ensure_event_objects_schema(engine: sa.Engine) -> dict[str, Any]:
         # data rather than maintained through the update. A failure here
         # is deliberately not swallowed: the version must not advance
         # over a half-filled column, because the read orders by it.
+        #
+        # It is batched because the cluster is still serving while this
+        # runs -- see _migration_backfill_batched(). It walks the
+        # event_uuid secondary index, which is also the column the join
+        # to events is on.
         LOG.info(f'Upgrading {table_name} from v{current_ver} to v2: '
                  'denormalising events.timestamp.')
         with engine.connect() as conn:
@@ -2906,16 +3014,20 @@ def _ensure_event_objects_schema(engine: sa.Engine) -> dict[str, Any]:
                 LOG.debug(f'timestamp column already exists on '
                           f'{table_name} or could not be added: {e}')
 
-            # Restartable: a run which died part way through leaves the
-            # rows it did not reach at the default, and they are exactly
-            # the rows this picks up next time.
-            conn.execute(sa.text(
-                f'UPDATE {table_name} eo '
-                'JOIN events e ON e.event_uuid = eo.event_uuid '
-                'SET eo.timestamp = e.timestamp '
-                'WHERE eo.timestamp = 0'))
-            conn.commit()
+        # Restartable: a run which died part way through leaves the
+        # rows it did not reach at the default, and they are exactly
+        # the rows this picks up next time.
+        _migration_backfill_batched(
+            engine, table_name, 'event_uuid',
+            f'UPDATE {table_name} eo '
+            'JOIN events e ON e.event_uuid = eo.event_uuid '
+            'SET eo.timestamp = e.timestamp '
+            'WHERE eo.timestamp = 0 '
+            'AND eo.event_uuid >= :cursor_from '
+            'AND eo.event_uuid <= :cursor_to',
+            f'Backfill of {table_name}.timestamp')
 
+        with engine.connect() as conn:
             conn.execute(sa.text(
                 'CREATE INDEX IF NOT EXISTS '
                 'idx_event_objects_object_timestamp '
@@ -17122,8 +17234,16 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
             # ``network_interfaces.uuid`` is native UUID rendered as
             # 32-char hex, so the JOIN strips dashes — same trick as
             # ``_build_object_filter_query``.
+            #
+            # Batched because the cluster is still serving while this
+            # runs, and this statement reads ``object_states`` as well:
+            # unbounded, it next-key locks every row it examines in the
+            # table every daemon's state transitions go through. See
+            # _migration_backfill_batched().
             try:
-                conn.execute(sa.text("""
+                _migration_backfill_batched(
+                    engine, table_name, 'uuid',
+                    """
                     UPDATE network_interfaces ni
                     LEFT JOIN object_states s
                       ON REPLACE(s.object_uuid, '-', '') = LOWER(HEX(ni.uuid))
@@ -17132,8 +17252,10 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
                         WHEN s.state_value = 'deleted' THEN NULL
                         ELSE 1
                     END
-                """))
-                conn.commit()
+                    WHERE ni.uuid >= :cursor_from
+                      AND ni.uuid <= :cursor_to
+                    """,
+                    f'Backfill of {table_name}.active')
             except OperationalError as e:
                 LOG.warning(
                     f'Backfill of active column on {table_name} '

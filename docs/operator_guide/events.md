@@ -100,7 +100,10 @@ of a million event references and grew for as long as the node
 lived. Upgrading an existing cluster backfills the column from
 `events` during `sf-ctl ensure-mariadb-schema`, so the upgrade
 step takes a little longer on a cluster with a large event
-history.
+history. That backfill runs in bounded batches, each its own
+transaction, so the cluster keeps writing events while it
+proceeds — see [migrations run while the cluster is
+serving](upgrades.md#migrations-run-while-the-cluster-is-serving).
 
 That backfill cannot be the whole story on a rolling upgrade: a
 daemon still on the previous release keeps writing event

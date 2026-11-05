@@ -712,3 +712,42 @@ never reaches it. And it must not be a single table-wide `UPDATE ...
 JOIN`: that next-key locks every row it examines while every node in the
 cluster is trying to insert events, which is the defect
 `_direct_prune_events_by_type()` already carries the measurements for.
+
+## A schema backfill runs in bounded batches
+
+The previous rule's last paragraph says a *repair* must not be a single
+table-wide `UPDATE ... JOIN`. Neither may the migration. `sf-ctl
+ensure-mariadb-schema` runs from play 5 of the site playbook, before any
+node restarts onto the new code, so every daemon in the cluster is
+reading and writing the table a backfill is rewriting. Under REPEATABLE
+READ one unbounded `UPDATE` next-key locks every row it examines, in
+every table it touches, until it commits -- and a migration-time
+backfill commits once, at the end.
+
+The `event_objects.timestamp` backfill did that on a production cluster
+and held 71.9 million row locks for 31 minutes. For all 31 of them every
+node's event writes failed with MariaDB 1205 `Lock wait timeout
+exceeded` (1,454 of them), clients saw 388 `RecordEventBatch`
+`DEADLINE_EXCEEDED` errors, and object hard deletes -- which delete the
+object's events -- waited on the same locks (issue #4797). Nothing was
+wrong with the infrastructure and nothing in the migration failed; it
+simply held its locks for as long as it took.
+
+So a migration which rewrites more rows than fit comfortably in one
+transaction calls `_migration_backfill_batched()`, which walks the table
+in an indexed column's order and runs the backfill once per batch with
+`:cursor_from` and `:cursor_to` bound to that batch's inclusive range.
+Each batch is its own transaction, so a concurrent writer waits for one
+batch at worst, and only if its row falls in the range currently held.
+`test_mariadb_migration_backfills.py` reads the source of every
+`_ensure_*`/`_migrate_*` function in `mariadb.py` and fails on an
+`UPDATE` which is not bounded that way, because a new migration with
+this defect would not fail any other test.
+
+Two things to get right when you write one. The walk has to be a
+*cursor*, not a repeated "which rows still need work?" query: a
+candidate query scans past everything already done to find the next
+batch, which is quadratic in the size of the table and much slower than
+the statement it replaced. And the backfill statement keeps its own "not
+done yet" predicate alongside the range, which is what makes a batch
+idempotent and the whole migration restartable.
