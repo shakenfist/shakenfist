@@ -58,6 +58,7 @@ metrics. The headlines:
 - Cluster CI tests only run in the merge queue.
 - A signal handler only sets flags.
 - A backfill cannot finish while the old writers are still running.
+- A schema backfill runs in bounded batches.
 
 ## Things that will bite you
 

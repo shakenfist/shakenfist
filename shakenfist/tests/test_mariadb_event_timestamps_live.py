@@ -196,6 +196,103 @@ class EventObjectTimestampBackfillLiveTestCase(base.ShakenFistTestCase):
         self.assertEqual(0.0, timestamps[unrepairable])
         self.assertEqual(1_762_200_000.0, timestamps[repairable])
 
+    def _regress_to_v1(self):
+        """Put the table back the way a cluster on the old release has it."""
+        with self.engine.connect() as conn:
+            conn.execute(sa.text(
+                'DROP INDEX IF EXISTS idx_event_objects_object_timestamp '
+                'ON event_objects'))
+            conn.execute(sa.text(
+                'ALTER TABLE event_objects DROP COLUMN timestamp'))
+            conn.commit()
+        mariadb._set_table_version(self.engine, 'event_objects', 1)
+
+    def test_the_v1_to_v2_migration_walks_the_whole_table(self):
+        """The batched migration fills every row, not just the first batch.
+
+        Issue 4797: the migration used to be one table-wide UPDATE,
+        which locked every row it examined for as long as it ran. It is
+        now a cursor walk of bounded batches, and a walk which stops
+        early or revisits the same range forever would pass every
+        statement-shape assertion in the unit tests. With the batch
+        shrunk to two there are three batches to get wrong.
+        """
+        self._regress_to_v1()
+        written = [self._write(1_762_300_000.0 + i)[2] for i in range(5)]
+
+        with mock.patch.object(mariadb, '_MIGRATION_BACKFILL_BATCH_SIZE', 2):
+            result = mariadb._ensure_event_objects_schema(self.engine)
+
+        self.assertEqual(2, result['end_version'])
+        timestamps = self._reference_timestamps()
+        for i, event_uuid in enumerate(written):
+            self.assertEqual(1_762_300_000.0 + i, timestamps[event_uuid])
+
+    def test_the_v1_to_v2_migration_spans_a_shared_event_uuid(self):
+        """The walk's column is not unique, so a batch can end mid-event.
+
+        One event names several objects and each gets its own
+        event_objects row, so a batch whose row limit falls inside such
+        a group ends on a cursor value it has not finished. The next
+        read starts strictly above that value, so the write's inclusive
+        upper bound is the only thing which stops those rows being
+        skipped forever.
+        """
+        self._regress_to_v1()
+        event_uuid = str(uuid4())
+        with self.engine.connect() as conn:
+            conn.execute(sa.insert(self.events).values(
+                event_uuid=event_uuid, event_type='audit',
+                timestamp=1_762_500_000.0, fqdn='node.example.com',
+                duration=None, message='live test event',
+                extra=None, request_id=None))
+            for object_type in ['instance', 'network', 'api-request']:
+                conn.execute(sa.insert(self.event_objects).values(
+                    object_type=object_type, object_uuid=str(uuid4()),
+                    event_uuid=event_uuid))
+            conn.commit()
+
+        with mock.patch.object(mariadb, '_MIGRATION_BACKFILL_BATCH_SIZE', 2):
+            mariadb._ensure_event_objects_schema(self.engine)
+
+        with self.engine.connect() as conn:
+            timestamps = [row.timestamp for row in conn.execute(sa.text(
+                'SELECT timestamp FROM event_objects'))]
+        self.assertEqual([1_762_500_000.0] * 3, timestamps)
+
+    def test_the_v1_to_v2_migration_resumes_after_a_partial_run(self):
+        """A migration which died part way through finishes next time.
+
+        Each batch's range predicate is ANDed with ``eo.timestamp = 0``,
+        so a batch is idempotent and a rerun repairs exactly the rows
+        the failed run did not reach, leaving the ones it did alone.
+        """
+        self._regress_to_v1()
+        written = [self._write(1_762_400_000.0 + i)[2] for i in range(4)]
+
+        # What a run which died part way through leaves behind: the
+        # column exists, one row already carries its timestamp, and the
+        # version is still v1 because nothing advanced it.
+        with self.engine.connect() as conn:
+            conn.execute(sa.text(
+                'ALTER TABLE event_objects ADD COLUMN '
+                'timestamp DOUBLE NOT NULL DEFAULT 0'))
+            conn.execute(sa.text(
+                'UPDATE event_objects SET timestamp = :ts '
+                'WHERE event_uuid = :uuid'),
+                {'ts': 1_762_400_000.0, 'uuid': written[0]})
+            conn.commit()
+        self.assertEqual(
+            1, mariadb._get_table_version(self.engine, 'event_objects'))
+
+        with mock.patch.object(mariadb, '_MIGRATION_BACKFILL_BATCH_SIZE', 2):
+            result = mariadb._ensure_event_objects_schema(self.engine)
+
+        self.assertEqual(2, result['end_version'])
+        timestamps = self._reference_timestamps()
+        for i, event_uuid in enumerate(written):
+            self.assertEqual(1_762_400_000.0 + i, timestamps[event_uuid])
+
     def test_the_repaired_rows_sort_with_the_rest(self):
         """The symptom the issue was filed for.
 

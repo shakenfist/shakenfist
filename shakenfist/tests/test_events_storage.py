@@ -211,6 +211,12 @@ class EnsureEventObjectsSchemaTestCase(base.ShakenFistTestCase):
         before the column exists, and building the index after it means
         the index is built once from finished data rather than maintained
         row by row through the update.
+
+        The backfill itself is a batched cursor walk rather than one
+        table-wide UPDATE (issue 4797), so against a connection which
+        hands back no candidate rows it is the single read which finds
+        the table empty. Its statements are asserted in
+        test_mariadb_migration_backfills.py.
         """
         conn = _MockConnection()
         mock_engine = _MockEngine(conn)
@@ -221,11 +227,8 @@ class EnsureEventObjectsSchemaTestCase(base.ShakenFistTestCase):
         self.assertEqual(3, len(rendered))
         self.assertIn('ADD COLUMN timestamp DOUBLE NOT NULL DEFAULT 0',
                       rendered[0])
-        self.assertIn('UPDATE event_objects eo', rendered[1])
-        self.assertIn('SET eo.timestamp = e.timestamp', rendered[1])
-        # Only the rows the column default left behind, so a run which
-        # died part way through resumes rather than starting over.
-        self.assertIn('WHERE eo.timestamp = 0', rendered[1])
+        self.assertIn('SELECT event_uuid AS cursor_value FROM event_objects',
+                      rendered[1])
         self.assertIn('CREATE INDEX IF NOT EXISTS '
                       'idx_event_objects_object_timestamp', rendered[2])
         self.assertIn('(object_type, object_uuid, timestamp)', rendered[2])

@@ -251,6 +251,31 @@ startup.
 See [MariaDB compatibility requirements](database.md#mariadb-compatibility-requirements)
 in the database reference for the full list of server requirements.
 
+### Migrations run while the cluster is serving
+
+`sf-ctl ensure-mariadb-schema` runs before any node restarts onto the
+new code, so every daemon in the cluster is still reading and writing
+the tables it migrates. A migration which has to rewrite existing rows
+— adding a column and filling it from somewhere else, for example —
+therefore does so in batches, each of which is a separate transaction
+covering a bounded range of the table. A concurrent writer can be made
+to wait for one batch, but not for the whole migration.
+
+This matters because a single table-wide `UPDATE` holds row locks on
+everything it examines until it commits. One did: the
+`event_objects.timestamp` backfill held 71.9 million row locks for 31
+minutes on a production cluster, and for all of that time every node's
+event writes failed with `Lock wait timeout exceeded`. Batching it
+trades a slightly longer migration for a cluster which keeps working
+through it. The progress of each batched backfill is logged by the
+command, as `Backfill of <table>.<column>: N rows in M batches`.
+
+A migration which rewrites a large table is still the slowest part of an
+upgrade, so run `sf-ctl ensure-mariadb-schema` when you can afford to
+let it finish rather than interrupting it. If it does fail part way
+through, the table's schema version is not advanced and re-running the
+command resumes where it stopped.
+
 ### Manual schema verification
 
 You can manually check or apply schema migrations by running on a node
