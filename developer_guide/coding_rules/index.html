@@ -16642,8 +16642,11 @@ the run. Upstream, the <code>shakenfist.kerbside</code> collection declared the 
 <code>kerbside_sources</code> list <code>no_log</code>, which registered each source's
 <code>type: shakenfist</code> and turned a passing task header into
 <code>TASK [$REDACTED$.kerbside.kerbside : ...]</code>; that failed the Kerbside wiring
-test on every pull request in this repository until ansible-core was pinned
-below 2.22 (issue #4773, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/687" title="GitHub Issue: shakenfist/kerbside #687">kerbside#687</a>).</p>
+test on every pull request in this repository until ansible-core was held
+below 2.22 (issue #4773, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/687" title="GitHub Issue: shakenfist/kerbside #687">kerbside#687</a>). The role fix shipped in
+<code>shakenfist.kerbside</code> 0.9.0, and the sanity job now pins ansible-core and
+ansible-lint exactly, so a new release of either arrives as its own Renovate
+pull request.</p>
 <p>So the default of a <code>no_log</code> option must be a string which cannot occur
 anywhere else: empty, which the masker ignores, or a <code>change-me-&lt;thing&gt;</code>
 placeholder matching the example inventories. <code>defaults/main.yml</code> has to agree

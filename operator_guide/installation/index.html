@@ -16362,6 +16362,11 @@ is not installed with this one. Install it on the control node with:</p>
 <p>The playbook refuses to deploy Kerbside, before changing any host, if the
 collection is missing or its version is outside the range in
 <code>requirements.yml</code>. A cluster without a <code>kerbside</code> group does not need it.</p>
+<p>Re-installing over a collection which is already present needs <code>--force</code>:
+without it <code>ansible-galaxy</code> leaves the installed version alone whatever its
+version, so an upgrade which raises the range needs
+<code>ansible-galaxy collection install --force -r examples/_shared/requirements.yml</code>.
+See <a href="../upgrades/#upgrade-process">Upgrades</a>.</p>
 <p>Set <code>kerbside_url</code>, <code>kerbside_system_key</code>, <code>kerbside_public_fqdn</code>,
 <code>kerbside_sql_url</code> and <code>kerbside_auth_secret_seed</code>. <code>kerbside_url</code> and
 <code>kerbside_system_key</code> must be visible to both the Shaken Fist and the Kerbside

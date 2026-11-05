@@ -15759,6 +15759,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-one-api-request-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What one API request logs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#api-request-validation-findings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16230,6 +16241,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-one-api-request-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What one API request logs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#api-request-validation-findings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16527,6 +16549,44 @@ metrics endpoint:</p>
 </tr>
 </tbody>
 </table>
+<h2 id="what-one-api-request-logs">What one API request logs<a class="headerlink" href="#what-one-api-request-logs" title="Permanent link">&para;</a></h2>
+<p>An external API request leaves <strong>one line</strong> in the shipped log
+stream:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>API request handled
+</code></pre></div>
+<p>It carries <code>request-id</code>, <code>identity</code> (the namespace and key name
+from the presented token, where there was one), <code>method</code>, <code>path</code>,
+<code>route</code> (the endpoint template, so traffic aggregates by endpoint
+rather than by concrete path), <code>status</code> and <code>duration</code> in seconds.
+That is enough to answer who asked for what, what they got and how
+long it took:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>{job="shakenfist", daemon="sf-api"} | json
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  | message="API request handled" | duration &gt; 1
+</code></pre></div>
+<p>The detail — full request headers, arguments and parsed body, the
+response body, and the echoes of the three per-request audit events
+— is logged at <code>DEBUG</code>, so it stays in the node's journal and is
+not shipped. Read it on the node:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>journalctl<span class="w"> </span>-u<span class="w"> </span>sf-api<span class="w"> </span>--no-pager<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'&lt;request-id&gt;'</span>
+</code></pre></div>
+<p>This is deliberate. Those four lines per request — three event
+echoes and the parsed line — were about a third of one production
+cluster's entire log volume, 1,247MB a day against an 800MB
+budget, and almost all of that traffic is machine-to-machine:
+clients polling instance state, the in-guest agents, and the
+cluster daemon. They said nothing the events table did not already
+hold.</p>
+<p>The audit record is unaffected. Each request still writes
+<code>&lt;METHOD&gt; api request received</code> and <code>&lt;METHOD&gt; api response sent</code>
+events against its request-id, and <code>token used to authenticate
+request</code> against the namespace which owns the credential, all in
+MariaDB and all readable through the REST API — see
+<a href="../events/">Events</a>. Only the daemon-log echo moved.</p>
+<p>A request which dies in a way Flask cannot turn into a response
+produces no summary line; the exception record and its <code>ERROR</code>
+line are the trail in that case. Health probe paths (<code>/</code>,
+<code>/livez</code>, <code>/readyz</code>, <code>/healthz</code>) produce neither a summary line nor
+audit events, which they never did.</p>
 <h2 id="api-request-validation-findings">API request validation findings<a class="headerlink" href="#api-request-validation-findings" title="Permanent link">&para;</a></h2>
 <p>After upgrading you may see <code>API request validation finding</code> lines
 from <code>sf-api</code> in your log stream. Each records a request which did not
@@ -16689,7 +16749,7 @@ a checksum, which is what makes them greppable in a way a random
 string is not. The format is described in the
 <a href="../../user_guide/authentication/">user guide</a>.</p>
 <p>To check a cluster once, ask Loki for anything of that shape:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>{job="shakenfist"} |~ `sfk_[A-Za-z0-9]{38}`
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>{job="shakenfist"} |~ `sfk_[A-Za-z0-9]{38}`
 </code></pre></div>
 <p>The pattern is in backticks, which LogQL treats as a raw string.
 Double quotes also work for this particular pattern, but they
@@ -16709,7 +16769,7 @@ never fires, which is indistinguishable from having nothing to
 report.</p>
 <p>On a cluster which is not shipping to Loki, the same check
 against the local journal on each node is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>journalctl<span class="w"> </span>-u<span class="w"> </span><span class="s1">'sf-*'</span><span class="w"> </span>--no-pager<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s1">'sfk_[A-Za-z0-9]{38}'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>journalctl<span class="w"> </span>-u<span class="w"> </span><span class="s1">'sf-*'</span><span class="w"> </span>--no-pager<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s1">'sfk_[A-Za-z0-9]{38}'</span>
 </code></pre></div>
 <p>That is per-node and only covers the journal's retention, which
 is why it is the fallback rather than the recommendation.</p>
@@ -16759,6 +16819,11 @@ so events show up in your log stream too — giving a single
 time-ordered pane of events and logs together. That echo is
 controlled by <code>LOG_EVENTS_TO_LOKI</code> (default on); turning it off
 keeps events authoritative in MariaDB while reducing Loki volume.
+A few very high rate events echo at <code>DEBUG</code> instead, so they reach
+the journal and not Loki — the per-request API lifecycle events are
+the ones you are most likely to look for, and
+<a href="#what-one-api-request-logs">What one API request logs</a> says what
+replaced them.
 Event <strong>storage</strong> always stays in MariaDB — it is never moved to
 Loki.</p>
 <p>If you run with <code>LOG_EVENTS_TO_LOKI</code> off but still want a single
