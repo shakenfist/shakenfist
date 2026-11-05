@@ -57,6 +57,19 @@
     {%- endif %}
     {%- endfor %}
 
+    {%- if scsi_model %}
+    <!-- NOTE(mikal): a domain with a SCSI disk and no SCSI controller of its
+         own gets libvirt's default, which on x86 is LSI Logic. OVMF has no
+         driver for that, so a UEFI guest sees no disk behind it and lands in
+         the EFI shell (issue 4579). OVMF does have a virtio-scsi driver, so
+         _get_scsi_controller_model() names one for UEFI domains with a SCSI
+         disk, and nothing at all otherwise: SeaBIOS can boot LSI Logic, and
+         appliance images which ask for it ship only that driver. No PCI
+         address is given here on purpose, so libvirt places the controller
+         wherever this domain's machine type has room. -->
+    <controller type='scsi' model='{{scsi_model}}'/>
+    {%- endif %}
+
     {%- if machine_type == 'q35' -%}
     <!-- NOTE(mikal): q35 is pcie -->
     <controller type='pci' index='0' model='pcie-root'/>

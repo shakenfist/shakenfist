@@ -119,6 +119,18 @@ by copying `/usr/share/OVMF/OVMF_CODE.fd`, `OVMF_CODE.secboot.fd`,
 package. Treat those copies as unmanaged files that will not receive
 security updates.
 
+### UEFI instances with a SCSI disk
+
+A UEFI instance with a `bus=scsi` disk never booted before this release: it
+got libvirt's default LSI Logic controller, which OVMF has no driver for, so
+the firmware found no disk and dropped to the EFI shell. Such instances now
+get a virtio-scsi controller instead. As with every other domain template
+change, the persistent definition of an existing instance is not rewritten,
+so an affected instance has to be recreated (or its domain undefined, as
+described above) before it can boot. BIOS instances are deliberately left on
+the LSI Logic controller, which SeaBIOS can boot and which is the only
+controller some appliance images carry a driver for.
+
 ### Network nodes need the iptables conntrack match
 
 Since the release which made floating addresses answer from inside their own

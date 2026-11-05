@@ -19,36 +19,62 @@ class TestUEFI(base.BaseNamespacedTestCase):
         kwargs['namespace_prefix'] = 'uefi'
         super().__init__(*args, **kwargs)
 
-    def _create(self, name, secure_boot):
+    def _create(self, name, secure_boot, bus=None):
+        disk = {
+            'size': 8,
+            'base': base.CLUSTER_CI_IMAGE,
+            'type': 'disk'
+        }
+        if bus:
+            disk['bus'] = bus
+
         inst = self.create_instance(
-            name, 1, 1024, None,
-            [
-                {
-                    'size': 8,
-                    'base': base.CLUSTER_CI_IMAGE,
-                    'type': 'disk'
-                }
-            ], None, None, uefi=True, secure_boot=secure_boot)
+            name, 1, 1024, None, [disk], None, None, uefi=True,
+            secure_boot=secure_boot)
         self.addDetail(
             'inst',
             content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
         self.assertIsNotNone(inst['uuid'])
         return inst
 
-    def test_uefi_boot(self):
-        inst = self._create('test-uefi', False)
-        self.assertTrue(inst['uefi'])
-        self._await_instance_ready(inst['uuid'])
-
+    def _assert_booted_under_efi(self, instance_uuid):
         # The guest must actually have come up under EFI firmware, not
         # merely been created with a UEFI flag.
         results = self._await_command(
-            inst['uuid'], 'test -d /sys/firmware/efi && echo efi')
+            instance_uuid, 'test -d /sys/firmware/efi && echo efi')
         self.addDetail(
             'results',
             content.text_content(json.dumps(results, indent=4, sort_keys=True)))
         self.assertEqual(0, results['return-code'])
         self.assertIn('efi', results['stdout'])
+
+    def test_uefi_boot(self):
+        inst = self._create('test-uefi', False)
+        self.assertTrue(inst['uefi'])
+        self._await_instance_ready(inst['uuid'])
+        self._assert_booted_under_efi(inst['uuid'])
+
+    def test_uefi_boot_from_scsi(self):
+        # Issue 4579: a UEFI instance with a bus=scsi disk got libvirt's
+        # default LSI Logic controller, which OVMF has no driver for, so the
+        # firmware found no disk, tried the network, and dropped to the EFI
+        # shell. Nothing in the suite booted a SCSI disk at all, under either
+        # firmware. The agent coming up is the assertion: it cannot answer
+        # unless the guest booted off that disk.
+        inst = self._create('test-uefi-scsi', False, bus='scsi')
+        self._await_instance_ready(inst['uuid'])
+        self._assert_booted_under_efi(inst['uuid'])
+
+        # And the reason it booted, so a regression here says which half
+        # broke: the controller is in the domain XML, not merely implied by a
+        # guest which came up.
+        xml = self._await_domain_xml(inst['uuid'])
+        self.assertIn(
+            "<controller type='scsi' model='virtio-scsi'/>", xml,
+            'the domain XML this hypervisor generated declares no virtio-scsi '
+            'controller, so libvirt chose its LSI Logic default (issue 4579). '
+            'The most likely cause is a hypervisor running an older copy of '
+            'libvirt.tmpl.')
 
     def test_uefi_secure_boot_firmware_starts(self):
         # This exercises the secure boot code and VARS pair, which is a

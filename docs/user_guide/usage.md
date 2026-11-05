@@ -247,7 +247,10 @@ for the full contract. Here's how the keys work:
   the performance of the others are terrible. An example of a good reason is to
   install virtio drivers into legacy operating systems that lack them natively.
   ide was supported before v0.7, but the performance was so poor that support was
-  removed; a disk specification asking for it is rejected.
+  removed; a disk specification asking for it is rejected. A scsi disk on a UEFI
+  instance is attached to a virtio-scsi controller, because the LSI Logic
+  controller libvirt would otherwise choose is one UEFI firmware cannot boot
+  from; BIOS instances keep that LSI Logic controller.
 * _type_ can be one of disk or cdrom, and any other value is rejected. Note that
   cdroms are excluded from snapshots.
 
