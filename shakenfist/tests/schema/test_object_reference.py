@@ -8,10 +8,13 @@
 from unittest import mock
 from uuid import uuid4
 
+from pydantic import ValidationError
 import sqlalchemy as sa
 
 from shakenfist.schema.object_reference import ObjectReference
+from shakenfist.schema.object_reference import RELATIONSHIP_VALUE_MAX_LENGTH
 from shakenfist.schema.object_reference import references_to_grouped_dict
+from shakenfist.schema.object_reference import validate_relationship_value
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
@@ -115,20 +118,33 @@ class ObjectReferenceModelTestCase(base.ShakenFistTestCase):
         )
         self.assertIsNone(ref.relationship_value)
 
-    def test_relationship_value_max_length(self):
-        """Test that relationship_value has max length of 64."""
-        # Should work with 64 chars
+    def test_relationship_value_at_max_length(self):
+        """Test that a relationship_value filling the column validates."""
         ref = ObjectReference(
             source_object_type=ObjectType.INSTANCE,
             source_uuid=SOURCE_UUID,
             relationship=RelationshipType.DISK,
-            relationship_value='a' * 64,
+            relationship_value='a' * RELATIONSHIP_VALUE_MAX_LENGTH,
             target_object_type=ObjectType.BLOB,
             target_uuid=TARGET_UUID,
             created=1234567890.0,
             last_active=1234567890.0
         )
-        self.assertEqual(len(ref.relationship_value), 64)
+        self.assertEqual(len(ref.relationship_value),
+                         RELATIONSHIP_VALUE_MAX_LENGTH)
+
+    def test_relationship_value_over_max_length(self):
+        """Test that a relationship_value longer than the column is refused."""
+        self.assertRaises(
+            ValidationError, ObjectReference,
+            source_object_type=ObjectType.INSTANCE,
+            source_uuid=SOURCE_UUID,
+            relationship=RelationshipType.DISK,
+            relationship_value='a' * (RELATIONSHIP_VALUE_MAX_LENGTH + 1),
+            target_object_type=ObjectType.BLOB,
+            target_uuid=TARGET_UUID,
+            created=1234567890.0,
+            last_active=1234567890.0)
 
     def test_timestamps(self):
         """Test that timestamps are stored correctly."""
@@ -249,6 +265,26 @@ class ObjectReferenceTableGenerationTestCase(base.ShakenFistTestCase):
         # Check the max length is 255 (for FQDNs)
         self.assertEqual(table.c.source_uuid.type.length, 255)
         self.assertEqual(table.c.target_uuid.type.length, 255)
+
+    def test_relationship_value_column_matches_the_model(self):
+        """The column must hold every value the model will validate.
+
+        The generator maps str to VARCHAR(255) and never reads
+        max_length, so a model declaring less than the column accepts
+        takes a write the column stores and then raises on every read of
+        that row (#4559).
+        """
+        metadata = sa.MetaData()
+        table = pydantic_to_sqlalchemy_table(
+            ObjectReference, 'object_references', metadata,
+            primary_key_fields=[
+                'source_object_type', 'source_uuid', 'relationship',
+                'target_object_type', 'target_uuid'
+            ],
+            include_id_column=False)
+
+        self.assertEqual(table.c.relationship_value.type.length,
+                         RELATIONSHIP_VALUE_MAX_LENGTH)
 
     def test_indexes_exist(self):
         """Test that expected indexes are created."""
@@ -519,3 +555,34 @@ class ObjectReferenceSerializationTestCase(base.ShakenFistTestCase):
 
             self.assertIn('blob_location', result)
             self.assertEqual(len(result['blob_location']), 1)
+
+
+class ValidateRelationshipValueTestCase(base.ShakenFistTestCase):
+    """Tests for the write-time relationship_value check."""
+
+    def test_none_is_valid(self):
+        self.assertIsNone(validate_relationship_value(None))
+
+    def test_short_value_is_valid(self):
+        self.assertIsNone(validate_relationship_value('qcow2'))
+
+    def test_value_at_the_limit_is_valid(self):
+        self.assertIsNone(validate_relationship_value(
+            'a' * RELATIONSHIP_VALUE_MAX_LENGTH))
+
+    def test_value_over_the_limit_is_refused(self):
+        self.assertRaises(
+            ValueError, validate_relationship_value,
+            'a' * (RELATIONSHIP_VALUE_MAX_LENGTH + 1))
+
+    def test_refusal_names_both_lengths(self):
+        # The caller is a developer reading a traceback, so the message
+        # has to say what was passed as well as what is allowed.
+        try:
+            validate_relationship_value(
+                'a' * (RELATIONSHIP_VALUE_MAX_LENGTH + 1))
+        except ValueError as e:
+            self.assertIn(str(RELATIONSHIP_VALUE_MAX_LENGTH + 1), str(e))
+            self.assertIn(str(RELATIONSHIP_VALUE_MAX_LENGTH), str(e))
+        else:
+            self.fail('an over-long relationship_value was accepted')

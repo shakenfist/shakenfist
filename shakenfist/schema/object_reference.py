@@ -21,6 +21,37 @@ from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.util.access_tokens import request_namespace
 
 
+# The maximum length of a relationship_value. This is the width of the
+# generated object_references.relationship_value column, and is used both
+# as the model's validation limit and as the write-time check in
+# mariadb.record_relationship(), so the two cannot drift apart.
+RELATIONSHIP_VALUE_MAX_LENGTH = 255
+
+
+def validate_relationship_value(relationship_value: Optional[str]) -> None:
+    """Refuse a relationship_value which could not be read back.
+
+    A value longer than the column is a programming error, not a
+    recoverable condition. The raw-SQL insert does not validate, and every
+    read builds an ObjectReference from the row, so a value the column
+    could not hold would be written once and then raise on every
+    subsequent reference read for that object (#4559). Both
+    record_relationship() and the direct writer call this, so a value
+    arriving over gRPC is refused at the write as well as before dispatch.
+
+    Args:
+        relationship_value: The value to check. None is always valid.
+
+    Raises:
+        ValueError: If the value is longer than the column can store.
+    """
+    if relationship_value is not None and (
+            len(relationship_value) > RELATIONSHIP_VALUE_MAX_LENGTH):
+        raise ValueError(
+            f'relationship_value is {len(relationship_value)} characters, '
+            f'the maximum is {RELATIONSHIP_VALUE_MAX_LENGTH}')
+
+
 class ObjectReference(BaseModel):
     """Schema for object reference storage in MariaDB.
 
@@ -40,7 +71,8 @@ class ObjectReference(BaseModel):
             FQDN for node BLOB_LOCATION refs, or name for namespaces).
         relationship: The type of relationship (disk, artifact_index, etc.).
         relationship_value: Optional value for the relationship (e.g., disk
-            index "0", transcode style "qcow2").
+            index "0", transcode style "qcow2"), at most
+            RELATIONSHIP_VALUE_MAX_LENGTH characters.
         target_object_type: The type of the referenced object.
         target_uuid: The identifier of the referenced object (UUID string,
             FQDN for node BLOB_LOCATION refs, or name for namespaces).
@@ -72,10 +104,14 @@ class ObjectReference(BaseModel):
     source_object_type: ObjectType
     source_uuid: Annotated[str, Field(max_length=255)]
 
-    # Relationship type and optional value
+    # Relationship type and optional value. The cap is the width of the
+    # generated column, not a semantic limit: pydantic_to_sqlalchemy_table()
+    # maps every str field to VARCHAR(255) and never reads max_length, so a
+    # model which declared less than the column accepts would store a value
+    # on write and then refuse to read it back (#4559).
     relationship: RelationshipType
     relationship_value: Annotated[
-        Optional[str], Field(max_length=64)
+        Optional[str], Field(max_length=RELATIONSHIP_VALUE_MAX_LENGTH)
     ] = None
 
     # Target object (the one being referenced)

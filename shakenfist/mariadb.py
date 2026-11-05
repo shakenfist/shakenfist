@@ -99,6 +99,7 @@ from shakenfist.schema.cluster_operation_target import ClusterOperationTargetDat
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_metadata import ObjectMetadataData
 from shakenfist.schema.object_reference import ObjectReference
+from shakenfist.schema.object_reference import validate_relationship_value
 from shakenfist.schema.object_state import clip_state_message
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
@@ -8542,7 +8543,14 @@ def _direct_record_relationship(
 
     Returns:
         True if created or updated, False on error.
+
+    Raises:
+        ValueError: If relationship_value is too long for the column. This
+            is the raise site for a value which arrived over gRPC, where
+            the servicer turns it into a failed StatusReply.
     """
+    validate_relationship_value(relationship_value)
+
     engine = _get_engine()
     now = time.time()
 
@@ -9775,7 +9783,14 @@ def record_relationship(
 
     Returns:
         True if created (or already existed), False on error.
+
+    Raises:
+        ValueError: If relationship_value is too long for the column.
+            Checked before dispatch so that the gRPC path refuses it the
+            same way the direct path does.
     """
+    validate_relationship_value(relationship_value)
+
     if _use_database_service():
         return _grpc_record_relationship(
             source_type, source_uuid, relationship, relationship_value,
