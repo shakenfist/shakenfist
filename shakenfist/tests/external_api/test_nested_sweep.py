@@ -76,6 +76,15 @@ cross-namespace effect the ``warn``/``off`` rollback must not hand
 back. ``disk.size.negative`` and ``disk.size.negative_string`` are
 refused in every column now.
 
+A fifth was added by the issue 4557 fix: a disk base which no fetch
+could ever resolve -- a bare artifact uuid, a snapshot's own
+``sf://instance/`` source url, a scheme ``requests`` has no adapter
+for, a bare name which is not an image shortcut -- is refused at
+create time instead of erroring the instance on a hypervisor some
+minutes later. Four rows, refused in every column, and
+``disk.base.shortcut`` beside them is the width this guard must not
+narrow: a shortcut has no scheme and is fetchable anyway.
+
 Six more rows moved at ``warn`` after the phase, when the issue #4223
 fix taught ``from_db_by_ref`` to answer "not found" for a null or
 non-string ref: the ``net.uuid``/``hotplug.uuid`` ``int``, ``dict``
@@ -94,6 +103,7 @@ import json
 from collections import namedtuple
 from unittest import mock
 
+from shakenfist.external_api import instance as instance_api
 from shakenfist.instance import Instance
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
@@ -148,6 +158,27 @@ FAULTED = Answer(500, True, 'server error')
 def refused(message, status=400):
     """A 4xx naming what was wrong, with no exception recorded."""
     return Answer(status, False, message)
+
+
+#: An artifact uuid, as an artifact listing shows it. Pasting one into a
+#: disk base is the mistake issue 4557 is about.
+BARE_UUID = '88317f29-6d6b-4b4e-9a7f-2c1b5f0a3d41'
+
+
+def unfetchable(value, hint=''):
+    """The refusal a base the cluster could never fetch gets.
+
+    The list of supported forms is imported rather than restated,
+    because the handler builds it from the ``sf://`` prefix constants
+    and a row carrying a hand-typed copy would pin this test author's
+    reading of them rather than the API's. The sentence around it and
+    each row's hint are literal, which is where the wording is pinned;
+    ``test_the_bare_uuid_refusal_names_the_artifact_form`` pins one
+    whole message end to end.
+    """
+    return refused(
+        'disk base %s cannot be fetched. A disk base must be %s.%s'
+        % (value, instance_api.SUPPORTED_DISK_BASE_FORMS, hint))
 
 
 Case = namedtuple(
@@ -208,6 +239,53 @@ CASES = [
          ACCEPTED, ACCEPTED,
          'width, census N1: the shipped CLI and the ansible collection both '
          'send an explicit null base on an ordinary request'),
+    Case('disk.base.shortcut', CREATE, 'diskspec', 'base',
+         {'disk': [{'size': 8, 'base': 'debian:12'}]},
+         ACCEPTED, ACCEPTED,
+         'width, issue 4557: an image shortcut has no scheme at all and is '
+         'the documented way to boot from images.shakenfist.com, so the '
+         'fetchability guard has to read it as fetchable -- which it does by '
+         'asking images.is_image_shortcut, the predicate _resolve_image '
+         'itself dispatches on'),
+    Case('disk.base.bare_uuid', CREATE, 'diskspec', 'base',
+         {'disk': [{'size': 8, 'base': BARE_UUID}]},
+         unfetchable(BARE_UUID,
+                     ' Did you mean sf://artifact/%s?' % BARE_UUID),
+         unfetchable(BARE_UUID,
+                     ' Did you mean sf://artifact/%s?' % BARE_UUID),
+         'issue 4557, moves at warn: a bare artifact uuid fell through to '
+         'the plain URL branch, and requests.get() raised MissingSchema on '
+         'the hypervisor -- the instance ended in error with no error '
+         'message, hours of debugging for a paste of the one string every '
+         'artifact listing shows. A handler guard, so it holds at every '
+         'mode'),
+    Case('disk.base.unknown_scheme', CREATE, 'diskspec', 'base',
+         {'disk': [{'size': 8, 'base': 'ova:///srv/x.ova/disk.vmdk'}]},
+         unfetchable('ova:///srv/x.ova/disk.vmdk'),
+         unfetchable('ova:///srv/x.ova/disk.vmdk'),
+         'issue 4557, moves at warn: the OVA import plugin claimed this '
+         'scheme as an artifact source url, and booting from it worked only '
+         'through the issue 3603 cached-version fallback. Refused now, with '
+         'sf://artifact/<uuid> named as the form that actually resolves'),
+    Case('disk.base.instance_url', CREATE, 'diskspec', 'base',
+         {'disk': [{'size': 8,
+                    'base': 'sf://instance/%s/vda' % BARE_UUID}]},
+         unfetchable('sf://instance/%s/vda' % BARE_UUID),
+         unfetchable('sf://instance/%s/vda' % BARE_UUID),
+         'issue 4557 and issue 1167: a snapshot artifact publishes this as '
+         'its source url, so it is the obvious thing to boot from, and it is '
+         'not one of the prefixes the handler dispatches -- it used to reach '
+         'requests as a URL and fail with "No connection adapters were '
+         'found". The refusal names sf://snapshot/<uuid>, which is the form '
+         'that works'),
+    Case('disk.base.bare_name', CREATE, 'diskspec', 'base',
+         {'disk': [{'size': 8, 'base': 'wombat'}]},
+         unfetchable('wombat'), unfetchable('wombat'),
+         'issue 4557, moves at warn: a bare name which is not one of the '
+         'shortcut prefixes resolves to nothing and fetches as nothing -- '
+         'the artifact lookup in this branch matches on source url, so it '
+         'could only ever match an artifact whose own fetch had already '
+         'failed'),
 
     # ---------------------------------------------------------------
     # diskspec: size
@@ -1031,6 +1109,36 @@ class _NestedSweepMixin:
         answer, _ = self._send(case, 0)
         self.assertEqual(ACCEPTED_ON_CREATE, answer)
 
+    def test_the_bare_uuid_refusal_names_the_artifact_form(self):
+        """One whole message, pinned as a caller reads it.
+
+        The table's rows build their expected text from
+        ``SUPPORTED_DISK_BASE_FORMS``, which keeps them honest about a
+        renamed prefix but means none of them would notice if that
+        string stopped naming anything useful. This row is the
+        end-to-end reading: a caller who pasted an artifact uuid is
+        told the one thing they need, which is where to put it.
+        """
+        response = self.client.post(
+            '/instances', headers={'Authorization': self.token},
+            content_type='application/json',
+            data=json.dumps({
+                'name': 'bareuuid', 'cpus': 1, 'memory': 1024,
+                'disk': [{'size': 8, 'base': BARE_UUID}]}))
+
+        self.assertEqual(400, response.status_code, response.get_json())
+        self.assertEqual(
+            {'error':
+                'disk base 88317f29-6d6b-4b4e-9a7f-2c1b5f0a3d41 cannot be '
+                'fetched. A disk base must be an http or https URL, an image '
+                'shortcut such as "debian:12", label:<name>, '
+                'sf://artifact/<uuid>, sf://blob/<uuid>, '
+                'sf://label/<namespace>/<name>, sf://snapshot/<uuid>, or '
+                'sf://upload/<namespace>/<name>. Did you mean '
+                'sf://artifact/88317f29-6d6b-4b4e-9a7f-2c1b5f0a3d41?',
+             'status': 400},
+            response.get_json())
+
     def test_a_null_video_key_is_never_stored(self):
         """What a status code cannot see about the videospec.
 
@@ -1163,15 +1271,17 @@ class NestedSweepWarnTestCase(_NestedSweepMixin, SweepFixtureTestCase):
     what they had. ``check()`` still runs and still logs every finding,
     so the observability is unchanged; it simply does not act on one.
 
-    Twelve rows deliberately do not roll back, and this class asserts
-    that they do not. They are the four handler guards: a null
+    Sixteen rows deliberately do not roll back, and this class asserts
+    that they do not. They are the five handler guards: a null
     ``network_uuid`` on either route (F7, which used to
     be a 200 and an interface on an arbitrary network), the six shapes
     of diskspec which ask for neither a size nor a base, a
     ``videospec`` whose ``model`` or ``memory`` is an explicit null
-    (which used to be stored and to reach the hypervisor), and a
+    (which used to be stored and to reach the hypervisor), a
     negative diskspec size (issue 4248, which used to deflate the
-    capacity ledger across namespaces). A guard is
+    capacity ledger across namespaces), and a disk base no fetch could
+    resolve (issue 4557, which used to error the instance on a
+    hypervisor). A guard is
     not a schema check and does not answer to ``API_VALIDATION_MODE`` --
     which is the whole reason step 4 wrote them as guards rather than
     leaving the schema to do it, since a rollback which handed back the

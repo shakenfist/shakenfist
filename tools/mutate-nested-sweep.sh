@@ -29,23 +29,25 @@
 # This is a developer tool, not a CI job: it edits the tree in place,
 # and it takes about a minute. Run it after changing ARGTYPES'
 # structured schemas, the object branch of validation._field(), the
-# nested finding flattener, or any of the three instance handler
+# nested finding flattener, or any of the four instance handler
 # guards on nested values (a null network_uuid, a null video model or
-# memory, and a diskspec with neither a size nor a base).
+# memory, a diskspec with neither a size nor a base, and a disk base
+# no fetch could resolve).
 #
 # Usage:
 #
 #   bash tools/mutate-nested-sweep.sh
 #
 # Run it from the root of a clean-ish worktree. Your own uncommitted
-# work is safe: the eight files it touches -- the vocabulary, the
-# compiler, two handlers, the three sweeps and the shared test base --
+# work is safe: the nine files it touches -- the vocabulary, the
+# compiler, two handlers, the image fetch helper, the three sweeps and
+# the shared test base --
 # are restored from a copy
 # taken before the first mutation, never with `git checkout`, because a
 # directory-wide checkout discards uncommitted work in that directory
 # and is painful to notice afterwards.
 #
-# What is *not* safe is a concurrent edit to one of those eight files by
+# What is *not* safe is a concurrent edit to one of those nine files by
 # somebody else while this runs: restore() copies the whole file back
 # from the snapshot, so an edit made in between is silently reverted.
 # Do not run this in a worktree another agent is editing.
@@ -67,8 +69,9 @@ BOOLSWEEP="shakenfist/tests/external_api/test_boolean_sweep.py"
 DECLARATIONS="shakenfist/tests/external_api/test_parameter_declarations.py"
 ARTIFACT="shakenfist/external_api/artifact.py"
 TESTBASE="shakenfist/tests/base.py"
+IMAGES="shakenfist/images.py"
 FILES=("$BASE" "$VALIDATION" "$HANDLER" "$SWEEP" "$BOOLSWEEP" \
-       "$DECLARATIONS" "$ARTIFACT" "$TESTBASE")
+       "$DECLARATIONS" "$ARTIFACT" "$TESTBASE" "$IMAGES")
 
 if [ ! -x "$PYTHON" ]; then
     echo "No $PYTHON. Run tox once to build the test environment." >&2
@@ -338,6 +341,39 @@ mutate "${HANDLER}" \
     "            if size_is_negative:" \
     "            if False and size_is_negative:" || exit 1
 check "negative size guard" "disk.size.negative"
+
+# ---------------------------------------------------------------------
+# 10c. The fetchability guard is removed, so a base which no fetch
+#      could ever resolve is accepted again and errors the instance on
+#      a hypervisor instead (issue 4557). Caught at every mode: it is a
+#      handler guard, because `base` is prefix dispatched and the
+#      published `url` format cannot narrow to what this handler
+#      accepts.
+# ---------------------------------------------------------------------
+run "an unfetchable disk base is accepted again (issue 4557)"
+mutate "${HANDLER}" \
+    "                if not images.is_fetchable(disk_base):" \
+    "                if False and not images.is_fetchable(disk_base):" || exit 1
+check "unfetchable base guard" "disk.base.bare_uuid"
+
+# ---------------------------------------------------------------------
+# 10d. The other half of the same guard: the shortcut exemption. Without
+#      it a scheme test alone refuses `debian:12`, which is the
+#      documented way to boot from images.shakenfist.com -- a guard
+#      narrower than its handler, which is the failure mode every
+#      refusal in this file is weighed against.
+# ---------------------------------------------------------------------
+run "the fetchability guard forgets image shortcuts (issue 4557)"
+mutate "${IMAGES}" \
+    "    if is_image_shortcut(url):
+        return True
+
+    # urlparse raises" \
+    "    if False:
+        return True
+
+    # urlparse raises" || exit 1
+check "shortcut exemption" "disk.base.shortcut"
 
 # ---------------------------------------------------------------------
 # 11. The videospec guards test presence again, which is what they did

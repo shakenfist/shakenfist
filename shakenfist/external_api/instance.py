@@ -40,6 +40,7 @@ from shakenfist.schema.operations.node_inst_netdesc_op \
 from shakenfist.schema.operations.node_inst_netdesc_op \
     import model_tasks as nino_tasks
 from shakenfist import exceptions
+from shakenfist import images
 from shakenfist import instance
 from shakenfist.network import network as sfnet
 from shakenfist.schema.ipam_reservation import ReservationType
@@ -365,6 +366,33 @@ def _diskspec_value_absent(diskspec, key):
     if value and not isinstance(value, str):
         return False
     return util_general.noneish(value)
+
+
+# What a disk base may be, named by the refusal of one which can never
+# be fetched. Built from the same prefix constants the dispatch in the
+# handler uses, so a renamed prefix cannot leave the message behind
+# describing an API we no longer have.
+SUPPORTED_DISK_BASE_FORMS = (
+    'an http or https URL, an image shortcut such as "debian:12", '
+    'label:<name>, %s<uuid>, %s<uuid>, %s<namespace>/<name>, %s<uuid>, or '
+    '%s<namespace>/<name>'
+    % (ARTIFACT_URL, BLOB_URL, LABEL_URL, SNAPSHOT_URL, UPLOAD_URL))
+
+
+def _unfetchable_base_message(disk_base):
+    """Tell a caller why this base is not a base, and what one looks like.
+
+    The hint is worth the three lines because a bare artifact uuid is
+    the mistake which prompted this guard: it is what every artifact
+    listing shows, so pasting one into a disk base is the obvious thing
+    to try, and the artifact it names is sitting right there in the
+    cluster (issue 4557).
+    """
+    hint = ''
+    if util_general.valid_uuid4(disk_base):
+        hint = ' Did you mean %s%s?' % (ARTIFACT_URL, disk_base)
+    return ('disk base %s cannot be fetched. A disk base must be %s.%s'
+            % (disk_base, SUPPORTED_DISK_BASE_FORMS, hint))
 
 
 def _netdesc_safety_checks(netdesc, namespace):
@@ -920,10 +948,30 @@ class InstancesEndpoint(api_base.Resource):
                 d['blob_uuid'] = disk_base[len(BLOB_URL):]
 
             else:
-                # A plain URL, to be fetched from the internet. We ensure that
-                # the image exists in the database in an initial state here so
-                # that it will show up in image list requests. The image is
-                # fetched by the queued job later.
+                # A plain URL or image shortcut, to be fetched from the
+                # internet. Everything the cluster resolves itself has been
+                # dispatched above, so a base which arrives here and is not
+                # something requests can fetch is not a base at all: the
+                # fetch raises MissingSchema or InvalidSchema on a
+                # hypervisor, the operation is retried, and the instance
+                # ends in error long after the caller who could have fixed
+                # it went away (issue 4557). A bare artifact uuid and an
+                # sf://instance/<uuid>/<device> snapshot source url are
+                # both this, and both are strings the cluster itself hands
+                # out. Refused here, where there is still somebody to tell.
+                #
+                # A handler guard rather than a format on the declaration:
+                # `base` is prefix dispatched, so the set of strings it
+                # accepts is this handler's business and the published
+                # `url` format cannot narrow to it (see
+                # validation._format_url).
+                if not images.is_fetchable(disk_base):
+                    return sf_api.error(
+                        400, _unfetchable_base_message(disk_base))
+
+                # We ensure that the image exists in the database in an
+                # initial state here so that it will show up in image list
+                # requests. The image is fetched by the queued job later.
                 #
                 # Resolution is by ownership, because that queued job ends in
                 # add_index and add_index ends in delete_old_versions.
