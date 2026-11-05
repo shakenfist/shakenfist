@@ -716,8 +716,8 @@ rather than merge requests.
 | 5. VHDX geometry: default block size (#645), 64 TiB ceiling, one shared layout | [PLAN-bat-population-phase-05-geometry.md](/components/instar/plans/PLAN-bat-population-phase-05-geometry/) | Complete | `52518787` (#848) |
 | 6. Streaming BAT emitter and the fixed `plan_vhdx` | [PLAN-bat-population-phase-06-emitter.md](/components/instar/plans/PLAN-bat-population-phase-06-emitter/) | Complete | `aef757d2` (#853) |
 | 7. `create -f vhdx -o subformat=fixed`: guest streaming and host CLI | [PLAN-bat-population-phase-07-create.md](/components/instar/plans/PLAN-bat-population-phase-07-create/) | Complete | `03269d7f` (#858) |
-| 8. `convert -O vhdx --subformat fixed` | [PLAN-bat-population-phase-08-convert.md](/components/instar/plans/PLAN-bat-population-phase-08-convert/) | In progress | |
-| 9. `measure -O vhdx -o subformat=fixed` | PLAN-bat-population-phase-09-measure.md | Not started | |
+| 8. `convert -O vhdx --subformat fixed` | [PLAN-bat-population-phase-08-convert.md](/components/instar/plans/PLAN-bat-population-phase-08-convert/) | Complete | `e49b6275` (#874) |
+| 9. `measure -O vhdx -o subformat=fixed` | [PLAN-bat-population-phase-09-measure.md](/components/instar/plans/PLAN-bat-population-phase-09-measure/) | In progress | |
 | 10. Cross-version matrix and derived-profile validation | PLAN-bat-population-phase-10-matrix.md | Not started | |
 | 11. Coverage and differential fuzzing | PLAN-bat-population-phase-11-fuzz.md | Not started | |
 | 12. Documentation | PLAN-bat-population-phase-12-docs.md | Not started | |
@@ -1550,6 +1550,17 @@ chosen to defer to here, so that we do not forget them.
   BAT, and so its data region, by the log's size.
 * `convert -O vpc` fixed output. instar converts to dynamic VHD only;
   qemu converts to either.
+* `convert -O vhdx --subformat fixed` fails (`convert operation
+  failed`) on a source whose virtual size is not a block multiple and
+  which holds data in the partial last block: the fixed writer does not
+  clamp the final block's write to `fixed_file_length`, so it runs past
+  the bounded output. Repro: a qcow2 of virtual size 41944576 with a
+  write at offset 41943040. qemu-img converts the same source fine, as
+  do instar's raw/dynamic/qcow2 targets, so it is an instar-specific
+  defect in the phase 8 writer (`convert_to_vhdx_fixed`); `measure` is
+  unaffected (it returns the fixed file length without reading the
+  source). Found while adding phase 9's measure tests. (GitHub issue to
+  be filed.)
 * A failed `instar convert` leaves a zero-byte output file (seen on the
   #626 geometry). Measure what qemu-img leaves behind on the same
   failure before calling it a defect; if qemu removes or never creates
