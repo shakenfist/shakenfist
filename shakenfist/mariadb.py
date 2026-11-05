@@ -143,6 +143,13 @@ ORPHAN_EVENTS_PRUNED = Counter(
     'referenced them.'
 )
 
+EVENT_OBJECT_TIMESTAMPS_BACKFILLED = Counter(
+    'database_event_object_timestamps_backfilled_total',
+    'Event-object rows given the timestamp of the event they '
+    'reference by the daily sweep, having been written at the column '
+    'default by a daemon which predated the column.'
+)
+
 # Client-side attribution of database time. rpc_timing_scope() sets this for
 # the duration of a block of work; _grpc_call() reads it once per call and, if
 # it is set, observes the call's wall time. It holds a (sweep, object_type)
@@ -6525,6 +6532,97 @@ def _direct_prune_orphan_events(deadline: Optional[float] = None) -> int:
     return total
 
 
+def _direct_backfill_event_object_timestamps(
+        deadline: Optional[float] = None) -> int:
+    """Fill event_objects rows left at the timestamp column's default.
+
+    Stage 0 of the daily events prune sweep, and first in it because
+    these rows are wrong in every affected object's event page, where
+    the later stages only reclaim space.
+
+    The v1 to v2 migration adds the timestamp column, backfills it and
+    then advances the schema version, but a daemon still on the
+    previous release goes on inserting event_objects rows without a
+    timestamp for as long as it runs, and those rows take the column's
+    DEFAULT 0. The read orders by this column, so they sort as the
+    oldest events the object has and drop out of its recent page
+    (issue 4782, which found 30,658 of them after one rolling deploy).
+    A migration which changes how rows are written cannot finish while
+    the old writers are still running, so finishing it is this sweep's
+    job: it runs again every day, and the first sweep after the last
+    old daemon restarts is the one that finds nothing left.
+
+    Each batch finds up to ``_PRUNE_BATCH_SIZE`` event_uuids with a
+    non-locking SELECT and updates only those rows, which keeps the
+    lock footprint proportional to the batch rather than to the table
+    -- see _direct_prune_events_by_type() for the measurements behind
+    that shape; a single table-wide UPDATE here would next-key lock
+    every row it examined while every node was trying to write events.
+    The SELECT runs on its own connection so the UPDATE establishes
+    its own read view, rather than inheriting a stale one and aborting
+    with ER_CHECKREAD under innodb_snapshot_isolation.
+
+    A row whose own events row sits at timestamp 0 is excluded rather
+    than rewritten with the same value, because it would otherwise be
+    found again by every later batch and the sweep would spend its
+    whole budget making no progress. An event_objects row whose events
+    row is gone is not matched by the join at all; stage C is what
+    removes those.
+
+    Args:
+        deadline: Optional time.time() value after which no further
+            batches are started; rows left behind are picked up by the
+            next daily sweep.
+
+    Returns:
+        Number of event_objects rows given their event's timestamp.
+    """
+    engine = _get_engine()
+    total = 0
+
+    select_stmt = sa.text('''
+        SELECT eo.event_uuid FROM event_objects eo
+        JOIN events e ON e.event_uuid = eo.event_uuid
+        WHERE eo.timestamp = 0 AND e.timestamp != 0
+        LIMIT :batch
+    ''')
+    update_stmt = sa.text('''
+        UPDATE event_objects eo
+        JOIN events e ON e.event_uuid = eo.event_uuid
+        SET eo.timestamp = e.timestamp
+        WHERE eo.timestamp = 0 AND e.timestamp != 0
+          AND eo.event_uuid IN :event_uuids
+    ''').bindparams(sa.bindparam('event_uuids', expanding=True))
+
+    try:
+        while True:
+            if deadline is not None and time.time() >= deadline:
+                break
+            with engine.connect() as conn:
+                rows = conn.execute(select_stmt, {
+                    'batch': _PRUNE_BATCH_SIZE,
+                }).fetchall()
+            if not rows:
+                break
+            with engine.connect() as conn:
+                result = conn.execute(update_stmt, {
+                    'event_uuids': list({row.event_uuid for row in rows}),
+                })
+                conn.commit()
+            rowcount = result.rowcount or 0
+            if rowcount == 0:
+                # The rows the SELECT found are no longer there to
+                # update, so the next batch would ask the same question
+                # again. Stop rather than spin on it.
+                break
+            EVENT_OBJECT_TIMESTAMPS_BACKFILLED.inc(rowcount)
+            total += rowcount
+        return total
+    except OperationalError as e:
+        LOG.warning(f'MariaDB backfill_event_object_timestamps failed: {e}')
+        return total
+
+
 # The seven configured event_types whose retention is governed by
 # the MAX_{TYPE}_EVENT_AGE settings. Order is informational only;
 # stage A's batched DELETEs are independent across event_types.
@@ -6535,7 +6633,14 @@ _PRUNABLE_EVENT_TYPES = (
 
 
 def _direct_prune_events() -> int:
-    """Orchestrate the three-stage daily events prune sweep.
+    """Orchestrate the daily events prune sweep.
+
+    Runs the event_objects timestamp backfill first, because the rows
+    it repairs are visibly wrong in an object's event page until it
+    does and because a sweep which exhausts its budget must not be one
+    which never reaches the repair. Its count is logged but is
+    deliberately not part of the returned total, which is a count of
+    rows deleted.
 
     Iterates the seven configured event_types and prunes each whose
     ``MAX_{TYPE}_EVENT_AGE`` is not -1 (a value of -1 disables prune
@@ -6564,6 +6669,11 @@ def _direct_prune_events() -> int:
     deadline = time.time() + PRUNE_EVENTS_TIME_BUDGET
     total = 0
     per_stage: dict[str, int] = {}
+
+    backfilled = _direct_backfill_event_object_timestamps(deadline=deadline)
+    if backfilled:
+        LOG.info(f'Events prune sweep gave {backfilled} event_objects rows '
+                 'the timestamp of the event they reference.')
 
     for evtype in _PRUNABLE_EVENT_TYPES:
         max_age = getattr(config, f'MAX_{evtype.upper()}_EVENT_AGE')

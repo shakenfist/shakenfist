@@ -57,6 +57,7 @@ metrics. The headlines:
 - Credential-carrying routes are not logged, not redacted.
 - Cluster CI tests only run in the merge queue.
 - A signal handler only sets flags.
+- A backfill cannot finish while the old writers are still running.
 
 ## Things that will bite you
 
