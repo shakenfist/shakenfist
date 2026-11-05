@@ -26,6 +26,21 @@ def _renovate_path():
     return os.path.join(_root(), 'renovate.json')
 
 
+def _manager_file_patterns(manager):
+    # managerFilePatterns replaced fileMatch in Renovate 41. Renovate
+    # still migrates the old key at run time, so accept both here rather
+    # than silently finding no manager when a config has not caught up.
+    return manager.get('managerFilePatterns', manager.get('fileMatch', []))
+
+
+def _file_pattern_matches(pattern, path):
+    # A managerFilePatterns entry is a plain path, or a regex wrapped in
+    # slashes (https://docs.renovatebot.com/string-pattern-matching/).
+    if pattern.startswith('/') and pattern.endswith('/') and len(pattern) > 1:
+        return re.search(pattern[1:-1], path) is not None
+    return pattern == path
+
+
 def _package_name_matches(pattern, name):
     # matchPackageNames entries are exact names, or regexes wrapped in
     # slashes (https://docs.renovatebot.com/string-pattern-matching/).
@@ -106,3 +121,77 @@ class RenovateConfigTestCase(base.ShakenFistTestCase):
                 'pep621', managers,
                 'enabledManagers disables every unlisted manager; listing '
                 'it without pep621 stops Renovate watching pyproject.toml.')
+
+    def test_ansible_pins_are_matched_by_a_custom_manager(self):
+        # The sanity job pins ansible-core and ansible-lint exactly, and a
+        # customManagers entry is the only thing that moves them: Renovate
+        # has no manager for a uv command line in a workflow. A custom
+        # manager that stops matching fails silently -- the pin simply
+        # never moves and no job errors -- so assert the regex, as written
+        # in renovate.json, still extracts exactly the pins the workflow
+        # carries (issue #4773).
+        relative = '.github/workflows/functional-tests.yml'
+        with open(os.path.join(_root(), *relative.split('/'))) as f:
+            text = f.read()
+
+        pinned = {
+            (tool, version) for tool, version
+            in re.findall(r'\b(ansible-core|ansible-lint)==([^\s"\']+)',
+                          text)}
+        self.assertNotEqual(
+            set(), pinned,
+            'functional-tests.yml no longer pins ansible-core or '
+            'ansible-lint. Un-pinning means the next release of either '
+            'breaks whichever pull request runs next, whatever it changed; '
+            'if that is intended, remove this test and the Ansible entry '
+            'in renovate.json customManagers.')
+
+        managers = [
+            manager for manager in self.config.get('customManagers', [])
+            if any(_file_pattern_matches(pattern, relative)
+                   for pattern in _manager_file_patterns(manager))]
+        self.assertEqual(
+            1, len(managers),
+            'exactly one customManagers entry must cover '
+            '.github/workflows/functional-tests.yml, found %d. Note that '
+            'the key is managerFilePatterns: fileMatch was renamed in '
+            'Renovate 41 and only survives today because Renovate migrates '
+            'it at run time.' % len(managers))
+
+        self.assertIn(
+            'managerFilePatterns', managers[0],
+            'the Ansible customManagers entry still keys its file list as '
+            'fileMatch. That option was renamed in Renovate 41 and only '
+            'keeps working because Renovate migrates it at run time, '
+            'logging "Config migration necessary" on every run; it will '
+            'stop working in a future major. Use managerFilePatterns, with '
+            'the regex wrapped in slashes.')
+
+        self.assertEqual(
+            'pypi', managers[0].get('datasourceTemplate'),
+            'the Ansible customManagers entry must look its versions up on '
+            'pypi. Any other datasource still matches the file and still '
+            'extracts the pins, then finds no versions and opens no pull '
+            'request, which looks exactly like there being nothing to do.')
+
+        matched = set()
+        for pattern in managers[0].get('matchStrings', []):
+            # Renovate's regexes are JavaScript, which spells a named
+            # group (?<name>...) where Python spells it (?P<name>...).
+            for match in re.finditer(pattern.replace('(?<', '(?P<'), text):
+                groups = match.groupdict()
+                self.assertEqual(
+                    {'depName', 'currentValue'}, set(groups),
+                    'a matchStrings regex must capture exactly depName and '
+                    'currentValue; Renovate names the dependency and its '
+                    'version from those groups, and %r captures %s.' % (
+                        pattern, sorted(groups)))
+                matched.add((groups['depName'], groups['currentValue']))
+
+        self.assertEqual(
+            pinned, matched,
+            'renovate.json customManagers does not extract exactly the '
+            'Ansible pins in functional-tests.yml. Pinned but unmatched '
+            'versions never move; matched but unpinned ones mean the regex '
+            'has outlived the thing it watched. Pinned: %s, matched: %s' % (
+                sorted(pinned), sorted(matched)))

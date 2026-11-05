@@ -257,21 +257,26 @@ jobs:
           . /tmp/venv-test/bin/activate
           tox -emypy
 
-      # ansible-core is held below 2.22 until shakenfist.kerbside 0.8.1:
-      # 2.22's secret masking redacts every value of the kerbside role's
-      # no_log kerbside_sources, "shakenfist" included, from all output,
-      # which breaks the Kerbside wiring test below (shakenfist#4773,
-      # kerbside#687). Remove the pin once requirements.yml resolves to 0.8.1.
+      # ansible-lint and ansible-core are both pinned so that a new release
+      # of either arrives as its own Renovate pull request rather than
+      # failing whichever pull request runs next (Kerbside pins the same
+      # two, for the same collection -- kerbside#690). That is not
+      # hypothetical: ansible-core 2.22.0 began masking no_log argument
+      # values, which redacted every value of the kerbside role's
+      # kerbside_sources -- "shakenfist" included -- and broke the Kerbside
+      # wiring test below on every pull request (#4773, kerbside#687). The
+      # role fix ships in shakenfist.kerbside 0.9.0, which
+      # examples/_shared/requirements.yml now requires.
       - name: Lint Ansible playbooks
         timeout-minutes: 5
         run: |
           . /tmp/venv-test/bin/activate
-          uv pip install ansible-lint 'ansible-core<2.22'
+          uv pip install ansible-lint==26.10.1 ansible-core==2.22.0
           ansible-lint --config-file shakenfist/deploy/collection/.ansible-lint \
               shakenfist/deploy/collection/
 
       # Rootless issue and renewal test of the internal_ca role. Uses the
-      # ansible-core which ansible-lint brought in above, and needs certtool
+      # ansible-core the lint step above installs, and needs certtool
       # (gnutls-bin) on the runner image.
       - name: Test the internal_ca role
         timeout-minutes: 5
@@ -283,7 +288,7 @@ jobs:
       # kerbside_credentials entry points against a stub sf-ctl, and of the
       # Kerbside lines in its config template. The one cluster lane with the
       # feature on runs weekly, so on a merge this is what runs the "on"
-      # path. Needs only the ansible-core which ansible-lint brought in above.
+      # path. Needs only the ansible-core the lint step above installs.
       - name: Test the Kerbside cluster config
         timeout-minutes: 5
         run: |
@@ -293,7 +298,7 @@ jobs:
       # Rootless test of how examples/_shared/site.yml and the node role's
       # kerbside_source entry point wire in the kerbside role, which lives in
       # Kerbside's shakenfist.kerbside collection and is tested there. Needs
-      # the ansible-core which ansible-lint brought in above, openssl and
+      # the ansible-core the lint step above installs, openssl and
       # certtool, and Ansible Galaxy, from which it installs the release
       # examples/_shared/requirements.yml pins.
       - name: Test the Kerbside wiring

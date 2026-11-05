@@ -662,8 +662,11 @@ the run. Upstream, the `shakenfist.kerbside` collection declared the whole
 `kerbside_sources` list `no_log`, which registered each source's
 `type: shakenfist` and turned a passing task header into
 `TASK [$REDACTED$.kerbside.kerbside : ...]`; that failed the Kerbside wiring
-test on every pull request in this repository until ansible-core was pinned
-below 2.22 (issue #4773, kerbside#687).
+test on every pull request in this repository until ansible-core was held
+below 2.22 (issue #4773, kerbside#687). The role fix shipped in
+`shakenfist.kerbside` 0.9.0, and the sanity job now pins ansible-core and
+ansible-lint exactly, so a new release of either arrives as its own Renovate
+pull request.
 
 So the default of a `no_log` option must be a string which cannot occur
 anywhere else: empty, which the masker ignores, or a `change-me-<thing>`

@@ -45,6 +45,19 @@ Which will pull in all the relevant other python packages it requires.
 Then simply re-run your deployment playbook as you did when you first
 installed (see [Installation](installation.md)) and the cluster will upgrade.
 
+If your inventory has a `kerbside` group, refresh the control node's
+collections before that re-run:
+
+```bash
+ansible-galaxy collection install --force -r examples/_shared/requirements.yml
+```
+
+A Shaken Fist release can raise the `shakenfist.kerbside` range that
+`requirements.yml` pins, and the playbook refuses to deploy Kerbside when the
+installed collection falls outside it. Refreshing first turns that into a
+command you ran deliberately rather than a failed play. See
+[Installation](installation.md#set-the-deployment-variables) for the detail.
+
 If you deploy with the [`shakenfist.shakenfist` Ansible
 collection](https://github.com/shakenfist/shakenfist/tree/develop/deploy/collection),
 re-running the playbook is **restart-on-change**: the `node` role restarts a
