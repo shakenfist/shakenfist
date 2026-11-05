@@ -16476,11 +16476,14 @@ a placement decision can be reconstructed after the fact (see
 </ol>
 <p>Stages 1 to 5 are <strong>pre-filters</strong>: they answer, from a metrics
 snapshot up to a minute stale, whether a node probably can host the
-instance. They are not the admission decision -- that is a separate,
-atomic capacity claim made once a candidate is chosen (see <a href="#admission-is-a-guarded-capacity-claim">Admission
-is a guarded capacity claim</a>
-below), so a node that survives every pre-filter here can still be
-refused there if another concurrent create took the last slot first.
+instance. The CPU, RAM and disk filters are ledger-aware -- they read
+the same counters the admission guard draws down -- but they are a
+cheap prune of the candidate list, not a second decider. They are not
+the admission decision -- that is a separate, atomic capacity claim
+made once a candidate is chosen (see <a href="#admission-is-a-guarded-capacity-claim">Admission is a guarded capacity
+claim</a> below), so a node that
+survives every pre-filter here can still be refused there if another
+concurrent create took the last slot first.
 Stages 8 and 9 are <strong>load shedding</strong>: they answer whether a node is a
 good idea right now. Affinity sits between the two deliberately. A
 busy node is still a node the user asked for, so load shedding may
@@ -16737,11 +16740,13 @@ checked against the allocation ledger, not just the pre-filters'
 measurements above. See
 <a href="../database/"><code>docs/operator_guide/database.md</code></a> for the RPCs and the
 tables they draw down.</p>
-<p>A refused candidate is not a failed create: the scheduler-driven
-callers (the create path and the preflight redirect) walk to the next
-candidate on a denial, so one node being momentarily full only costs
-an extra round trip. Only once every candidate has refused does the
-request fail, with a 507 reporting how many candidates refused it.
+<p>A refused candidate is not a failed create: there is a single shared
+placement walk (<code>Instance.place_on_candidates()</code>) that both the create
+path and the start-redirect operation use. It calls <code>place_instance()</code>
+on each candidate in turn, and the guarded claim is the admission, so
+one node being momentarily full only costs an extra round trip. Only
+once every candidate has refused does the request fail, with a 507
+reporting how many candidates refused it.
 The per-candidate detail -- which node was refused, and on which
 dimension(s) (<code>cpus</code>, <code>memory_mb</code>, <code>disk_gb</code>, or the <code>demand</code>
 feedforward term described below) -- is attached to the instance's
@@ -16771,7 +16776,7 @@ divergence -- the attribute and the row are written by one transaction
 -- so if you ever see a persistent under-count of a node's committed
 resources, the remedy is a restart of that node's Shaken Fist
 services, and the interesting question is what deleted the row.</p>
-<p><code>/admin/resources</code> (<code>summarize_resources()</code>) publishes <code>cpu_committed</code>
+<p><code>/admin/resources</code> (<code>summarize_cluster_resources()</code>) publishes <code>cpu_committed</code>
 sourced from these same counters rather than a separate walk,
 alongside <code>cpu_committed_row_present</code>: a node the reconciler has not
 yet sized reports <code>cpu_committed</code> as zero <em>and</em>

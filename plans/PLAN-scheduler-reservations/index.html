@@ -16489,8 +16489,8 @@ table entirely (decision D8).</p>
 </tr>
 <tr>
 <td>5. Caller migration and hard ceiling</td>
-<td>PLAN-scheduler-reservations-phase-05-callers.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-scheduler-reservations-phase-05-callers/">PLAN-scheduler-reservations-phase-05-callers.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -16993,6 +16993,25 @@ claim-consuming path; API-side feasibility precheck;
 admin capacity view), remove the legacy in-Python capacity
 filtering, and flip the ceiling from advisory to hard one
 release after phase 4 (D16).</p>
+<p><em>Correction (2026-11-04), from the phase 5 survey
+(<a href="../PLAN-scheduler-reservations-phase-05-callers/">PLAN-scheduler-reservations-phase-05-callers.md</a>,
+What the survey found): two of this stub's three scope items are
+stale and are discharged there.</em> First, there is no "API-side
+feasibility precheck" to build and no "legacy in-Python capacity
+filtering" to remove. <code>external_api/instance.py</code> is already a
+claim-consuming admission point (it walks candidates calling
+<code>place_instance()</code>, whose guarded UPDATE is the admission), so D11's
+read-only-precheck caller never materialised; and the in-Python CPU,
+RAM and disk filters in <code>scheduler.py</code> were rebuilt on 2026-08-14 into
+ledger-aware pre-filters that read the same counters the guard draws
+down — they are a cheap candidate prune, explicitly not the admission
+decision, and removing them reintroduces the merge-CI guard-miss that
+rebuild fixed. The real caller work is <strong>de-duplicating</strong> the one
+placement walk now copied verbatim into <code>external_api/instance.py</code> and
+<code>operations/node_inst_netdesc_op.py</code>, and removing the <code>Scheduler()</code>
+construction from <code>admin.py</code> (whose capacity view phase 7a already
+moved onto the typed columns). The hard-ceiling flip (<code>D16</code>,
+<code>CLAIM_ENFORCEMENT_HARD</code>) stands, and is the phase's gated final step.</p>
 <p><em>Correction (2026-08-27):</em> "one release after phase 4" is the
 wrong gate, and phase 4c replaces it. The advisory release
 exists to collect calibration data, so what phase 5 waits on is
