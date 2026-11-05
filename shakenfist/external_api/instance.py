@@ -1169,64 +1169,18 @@ class InstancesEndpoint(api_base.Resource):
         # not a decision: the guarded capacity claim inside
         # place_instance() is what actually admits the instance, and a
         # refusal means some other create took the slot between the two.
-        # So walk the list. A WriteException is deliberately not
-        # caught by the walk -- an unreachable database is not a full
-        # cluster, and trying the next node would only ask it the same
-        # question -- but it is caught around the walk below, where it
-        # becomes a 503 with cleanup rather than unwinding into the
+        # place_on_candidates() walks the list (and re-walks it once with
+        # the demand clause waived if nothing admitted and a candidate
+        # was refused on demand alone). A WriteException is deliberately
+        # not caught by that walk -- an unreachable database is not a
+        # full cluster, and trying the next node would only ask it the
+        # same question -- but it is caught around the walk below, where
+        # it becomes a 503 with cleanup rather than unwinding into the
         # catch-all 500 with the half-built instance abandoned in
         # 'initial' (issue 4246).
-        #
-        # This walk (including the demand-only re-walk below) also exists
-        # in node_inst_netdesc_op.py's _instance_preflight(); until the
-        # remaining Scheduler() callers are migrated and a shared helper
-        # is extracted (see PLAN-scheduler-reservations.md), a semantic
-        # change here must be made there too.
-        denials = {}
-
-        def place_walk(enforce_demand):
-            for candidate in candidates:
-                try:
-                    inst.place_instance(
-                        candidate, enforce_demand=enforce_demand)
-                    return candidate
-                except exceptions.CapacityAdmissionDenied as e:
-                    denials[candidate] = {
-                        'failing_stage': e.failing_stage,
-                        'dimensions': e.dimensions,
-                        'demand_only': e.demand_only,
-                    }
-                    inst.add_event(
-                        EVENT_TYPE_AUDIT,
-                        'schedule candidate refused by capacity guard',
-                        extra={
-                            'node': candidate,
-                            'failing_stage': e.failing_stage,
-                            'dimensions': e.dimensions,
-                            'enforce_demand': enforce_demand,
-                        })
-            return None
-
         try:
-            placement = place_walk(True)
-
-            # The D13 demand term spreads correlated bursts across
-            # nodes; it is not a capacity bound. The first pass already
-            # gave demand-quiet nodes their preference, so if nothing
-            # admitted and at least one candidate was refused on demand
-            # alone, the only alternative to a second pass with the
-            # clause waived is failing a create the cluster has real
-            # capacity for -- which would turn a spreading heuristic
-            # into a user-visible rate limit (the smoke CI single-node
-            # lockout of 2026-08-14).
-            if placement is None and any(
-                    d['demand_only'] for d in denials.values()):
-                inst.add_event(
-                    EVENT_TYPE_AUDIT,
-                    'no candidate admitted and some refused on demand '
-                    'alone, waiving demand guard',
-                    extra={'candidates': candidates, 'denials': denials})
-                placement = place_walk(False)
+            placement, denials = inst.place_on_candidates(
+                candidates, 'schedule candidate refused by capacity guard')
 
         except exceptions.WriteException as e:
             # The placement write could not reach the database. This is

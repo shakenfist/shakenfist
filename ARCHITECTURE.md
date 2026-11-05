@@ -181,14 +181,17 @@ scored, while a busy node is still one the user asked for, so load
 shedding may narrow the winning affinity group but never moves
 placement out of it. These stages order and prune the candidate list
 from a metrics snapshot up to a minute stale; they are not themselves
-the admission decision.
+the admission decision. The CPU/RAM/disk filters read the same counters
+the guard draws down, but only as a cheap prune of the candidates.
 
 Admission is a separate, atomic step. Once the pipeline has picked a
 candidate, `Instance.place_instance()` makes one guarded capacity claim
 against the `scheduler_node_capacity` counters, in the same database
 transaction that writes the placement — so a placement cannot be recorded
-without the capacity it consumes. A refusal walks the caller to its next
-candidate; every candidate refusing is the ordinary 507 outcome.
+without the capacity it consumes. A single shared walk,
+`Instance.place_on_candidates()`, is used by both the create path and
+the start-redirect operation: a refusal moves it to the next candidate,
+and every candidate refusing is the ordinary 507 outcome.
 
 Capacity is reservation-aware: the resources daemon reserves hardware
 threads and RAM for the operating system on every hypervisor, and

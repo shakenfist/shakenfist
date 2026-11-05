@@ -174,8 +174,7 @@ class AdminResourcesEndpoint(api_base.Resource):
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self):
-        s = scheduler.Scheduler()
-        return s.summarize_resources()
+        return scheduler.summarize_cluster_resources()
 
 
 admin_claims_get_example = """[

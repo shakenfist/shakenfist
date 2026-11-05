@@ -357,7 +357,7 @@ table entirely (decision D8).
 | 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete | `b02ec6e5e` (#3843), `921573c47` (#3888) |
 | 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete | `c27ad9bf2` (#3930), `a5014b6ba` (#3949) |
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Complete | `c273627a2` (#3952), `948055063` (#4008), `8fc8ba961` (#4139), `2b767a9b1` (#4154) |
-| 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started | — |
+| 5. Caller migration and hard ceiling | [PLAN-scheduler-reservations-phase-05-callers.md](PLAN-scheduler-reservations-phase-05-callers.md) | In progress | — |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
 | 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
@@ -850,6 +850,26 @@ claim-consuming path; API-side feasibility precheck;
 admin capacity view), remove the legacy in-Python capacity
 filtering, and flip the ceiling from advisory to hard one
 release after phase 4 (D16).
+
+*Correction (2026-11-04), from the phase 5 survey
+([PLAN-scheduler-reservations-phase-05-callers.md](PLAN-scheduler-reservations-phase-05-callers.md),
+What the survey found): two of this stub's three scope items are
+stale and are discharged there.* First, there is no "API-side
+feasibility precheck" to build and no "legacy in-Python capacity
+filtering" to remove. `external_api/instance.py` is already a
+claim-consuming admission point (it walks candidates calling
+`place_instance()`, whose guarded UPDATE is the admission), so D11's
+read-only-precheck caller never materialised; and the in-Python CPU,
+RAM and disk filters in `scheduler.py` were rebuilt on 2026-08-14 into
+ledger-aware pre-filters that read the same counters the guard draws
+down — they are a cheap candidate prune, explicitly not the admission
+decision, and removing them reintroduces the merge-CI guard-miss that
+rebuild fixed. The real caller work is **de-duplicating** the one
+placement walk now copied verbatim into `external_api/instance.py` and
+`operations/node_inst_netdesc_op.py`, and removing the `Scheduler()`
+construction from `admin.py` (whose capacity view phase 7a already
+moved onto the typed columns). The hard-ceiling flip (`D16`,
+`CLAIM_ENFORCEMENT_HARD`) stands, and is the phase's gated final step.
 
 *Correction (2026-08-27):* "one release after phase 4" is the
 wrong gate, and phase 4c replaces it. The advisory release

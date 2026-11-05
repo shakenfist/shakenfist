@@ -2,7 +2,7 @@
 """Size a request beyond what any node in a cluster could ever serve.
 
 Every function here is a pure function of a ``per_node`` entry from
-``/admin/resources`` (``scheduler.summarize_resources()``), or of a
+``/admin/resources`` (``scheduler.summarize_cluster_resources()``), or of a
 single number read from one. The distinction the whole file turns on is
 *ceiling* versus *headroom*: a ceiling (``cpu_limit``, ``cpu_hard_max``,
 ``ram_max``) does not move when ambient load changes, while headroom
@@ -73,7 +73,7 @@ def one_unit_beyond(value, minimum=1):
 def effective_cpu_ceiling(per_node_entry):
     """The real per-node vCPU ceiling ``_has_sufficient_cpu()`` enforces.
 
-    ``summarize_resources()`` (``shakenfist/scheduler.py``) publishes
+    ``summarize_cluster_resources()`` (``shakenfist/scheduler.py``) publishes
     ``cpu_limit`` as ``None`` for a node the capacity reconciler has not
     written a ``scheduler_node_capacity`` row for yet, or ever (an
     "unguarded" node). The scheduler does not then treat that node as
@@ -98,7 +98,7 @@ def effective_ram_ceiling(per_node_entry):
     """The real per-node memory ceiling, immune to ambient headroom moving.
 
     Unlike ``cpu_available`` or ``disk_available``, ``ram_max``
-    (``summarize_resources()``, ``memory_max * config.RAM_OVERCOMMIT_RATIO``)
+    (``summarize_cluster_resources()``, ``memory_max * config.RAM_OVERCOMMIT_RATIO``)
     is a published *ceiling*: it is derived from the node's physical memory
     and the overcommit ratio, published unconditionally for every
     hypervisor, and does not move when a sibling stestr worker frees RAM by
@@ -115,7 +115,7 @@ def effective_ram_ceiling(per_node_entry):
     ``ram_max`` by its capacity row's own ``limit_memory_mb`` -- not
     published directly, but recoverable as ``ram_available +
     ram_committed`` for exactly the node where that ledger bound is the
-    one binding ``ram_available`` (``summarize_resources()``: when the
+    one binding ``ram_available`` (``summarize_cluster_resources()``: when the
     ledger bound wins the ``min()``, ``ram_available == limit_memory_mb -
     ram_committed``, so adding ``ram_committed`` back recovers
     ``limit_memory_mb`` exactly; when the measurement bound wins instead,
@@ -194,7 +194,7 @@ MINIMUM_HYPERVISOR_LEDGER = 24
 def hypervisor_ledger(per_node):
     """The cluster's total schedulable vCPU ledger, read as admission reads it.
 
-    ``summarize_resources()`` publishes a ``per_node`` entry only for a
+    ``summarize_cluster_resources()`` publishes a ``per_node`` entry only for a
     node whose metrics say ``is_hypervisor`` and whose queue is not over
     ``UNREASONABLE_QUEUE_LENGTH`` (``shakenfist/scheduler.py:1052-1057``),
     so every entry in the mapping is already a hypervisor and no

@@ -239,6 +239,326 @@ def _hard_affinity_description(require_with, require_without):
     return ', '.join(parts)
 
 
+def _schedulable_threads(metrics):
+    # Scheduling is denominated in schedulable threads -- the thread
+    # count left after the resources daemon subtracts the node's
+    # per-host thread reservation for the operating system and
+    # host-level system services. Admission, load ordering and
+    # summarize_resources() must all size a node through this helper
+    # so they cannot disagree. Returns (threads, from_fallback).
+    #
+    # Metrics rows written by an older resources daemon lack
+    # cpu_schedulable. For those we approximate the reservation the
+    # node will publish once its daemon restarts by subtracting this
+    # node's own thread reservation. We cannot know a remote node's
+    # exact per-host value, and *this fallback* applies no role-aware
+    # bump (test_old_dialect_fallback_ignores_infra_role), so we use
+    # the local config value; the fallback is transient and stops the
+    # moment that node's daemon republishes cpu_schedulable.
+    #
+    # The deployer does still bump infra roles, per host, so a real
+    # node's reservation is usually not the local config value:
+    # examples/_shared/site.yml gives a network or database node twice
+    # the plain-hypervisor thread reservation. On a small node that is
+    # load-bearing -- CI's 4-thread infra hypervisors reserve all four
+    # and are floored at one schedulable thread by
+    # _compute_reservations() -- so do not read this comment as saying
+    # the bump is gone. It is not applied *here*, which is a statement
+    # about the fallback and not about the system (issue 4201).
+    threads = metrics.get('cpu_schedulable')
+    if threads:
+        return threads, False
+
+    cpu_max = metrics.get('cpu_max', 0)
+    if not cpu_max:
+        return 0, True
+
+    return max(1, cpu_max - config.NODE_CPU_RESERVATION_THREADS), True
+
+
+def _memory_reserved_mb(metrics):
+    # The resources daemon publishes the node's per-host memory
+    # reservation (operating system plus host-level system services).
+    # Metrics rows written by an older resources daemon lack it and
+    # fall back to this node's own configured RAM reservation.
+    return metrics.get(
+        'memory_reserved_mb', int(config.NODE_RAM_RESERVATION_GB * 1024))
+
+
+def _capacity_by_node():
+    """The counters keyed by node uuid, and whether the read failed.
+
+    Read fresh on every scheduling decision rather than cached
+    beside the metrics: the counters move on every admission, and a
+    burst of concurrent creates -- precisely the case a cached
+    snapshot gets wrong -- is what reading them is for. Only
+    hypervisors the reconciler considers schedulable have a row, so
+    an absent node is not an error (P7).
+
+    An unreadable table returns empty rather than raising, which
+    degrades a caller to whatever measurement it also holds. That
+    is the right direction for a pre-filter -- the guard still
+    refuses correctly, only the cheap pruning in front of it is
+    lost -- but it is another reason this is not the admission
+    decision.
+
+    Returns ``(capacity, degraded)``: an empty mapping means either
+    an unpopulated table or a failed read, and only the second value
+    says which. Callers unpack rather than index so the degraded
+    case is visible where the read is made -- a caller which does
+    not act on it discards it explicitly.
+    """
+    read = mariadb.get_scheduler_node_capacity()
+    return ({row['node_uuid']: row for row in read.rows}, read.degraded)
+
+
+def _cluster_capacity():
+    """The cluster_capacity singleton, as the resources summary publishes it.
+
+    Only the summary calls this; placement never reads the singleton,
+    because the guarded UPDATEs at admission test against it in SQL.
+
+    Always carries ``row_present`` and ``degraded``. Every figure is
+    None unless the row was read successfully, never zero: see the
+    comment in ``_summarize_resources()`` for why. The figures are
+    copied from the read, including the ``unallocated_*`` headroom,
+    which mariadb derives once and this does not recompute.
+    """
+    read = mariadb.get_cluster_capacity()
+    row = None if read.degraded else read.row
+    published = {
+        'row_present': row is not None,
+        'degraded': read.degraded,
+    }
+    for key in CLUSTER_CAPACITY_FIGURES:
+        published[key] = row[key] if row is not None else None
+    return published
+
+
+def _summarize_resources(metrics, metrics_unavailable):
+    # The capacity counters are what admission actually draws down,
+    # so they are read once here rather than recomputed per node --
+    # publishing a second, independently derived ledger beside the
+    # real one is how the two come to disagree. This is the same
+    # read the CPU pre-filter makes, through the same helper.
+    #
+    # A degraded read is not acted on here: this summary has no
+    # instance to record an event against, and a failed read leaves
+    # every node reporting as uncounted, which is exactly what it
+    # already did. That reasoning still only covers eventing --
+    # it is not a reason to keep the flag out of the response body.
+    # A caller sampling this endpoint over time (the CI headroom
+    # probe, for one) has the same problem the pre-filter does: an
+    # empty `capacity` mapping is indistinguishable from a genuinely
+    # unpopulated table unless something says which. Publishing the
+    # flag below costs nothing here and lets that caller tell the
+    # two apart instead of discarding every sample from a failed
+    # read alongside every sample from a cluster the reconciler
+    # simply has not reached yet (P7).
+    #
+    # cluster_capacity is the cluster-wide ledger, published for the
+    # same reason: it is the singleton row itself, the one both
+    # cluster-wide guards test against -- an unclaimed placement
+    # must fit in what is neither claimed nor used by unclaimed
+    # namespaces, and so must a new claim. It is not a sum of claim
+    # rows. Admission draws the row down directly and the reconciler
+    # rebuilds it, so a total computed here from the claims would be
+    # a second ledger which agrees with the first only until the
+    # next placement. The headroom figures come from the same read,
+    # derived once beside it, so no reader has to redo that
+    # arithmetic and risk getting it subtly different. It is kept
+    # out of `total`, because total sums per-node headroom bounded
+    # by measurement, while this ledger's totals are sums of node
+    # limits. Those are different quantities, and one key holding
+    # both would invite comparing them.
+    #
+    # A singleton the reconciler has not yet written, and one which
+    # could not be read, both publish every figure as None rather
+    # than zero. A ledger of zeroes says the cluster is full, which
+    # neither state means: before the first reconcile unclaimed
+    # placements are not guarded at all. row_present and degraded
+    # say which of the two a None is.
+    capacity, capacity_degraded = _capacity_by_node()
+    cluster_capacity = _cluster_capacity()
+
+    # Only hypervisors with reasonable queue lengths are candidates.
+    #
+    # `excluded` says why an active node is missing from per_node.
+    # Without it a reader can only infer the cause from an absence,
+    # and for the metrics cases it cannot even do that: a node whose
+    # metrics row is stale or missing has an empty metrics dict
+    # here, so it carries no is_hypervisor and is skipped below
+    # exactly as a network node is. Those reasons were decided when
+    # the metrics were loaded and are reported for every active node
+    # whatever its role, because a node's role is not knowable
+    # without its metrics; a reader who wants only hypervisors
+    # filters against the node list, which publishes the role. A
+    # node which is not active is left out, as the node list already
+    # publishes its state, and a non-hypervisor with fresh metrics
+    # is not a candidate at all, so it is not "excluded" either.
+    resources = {
+        'total': {
+            'cpu_available': 0,
+            'ram_available': 0,
+            'capacity_degraded': capacity_degraded,
+        },
+        'per_node': {},
+        'excluded': {
+            n: dict(reason)
+            for n, reason in metrics_unavailable.items()},
+        'cluster_capacity': cluster_capacity,
+    }
+
+    for n in metrics.keys():
+        if not metrics[n].get('is_hypervisor', False):
+            continue
+
+        queue_reason = _queue_exclusion_reason(metrics[n])
+        if queue_reason:
+            resources['excluded'][n] = queue_reason
+            continue
+
+        resources['per_node'][n] = {}
+
+        # CPU. The charge is max(measured, committed), exactly as
+        # the pre-filter computes it (_has_sufficient_cpu()), so the
+        # headroom published here is bounded by whichever of the two
+        # binds -- which is what a create would be allowed. The two
+        # differ in one respect: the pre-filter measures that charge
+        # against the capacity row's own limit_cpus, because that is
+        # what the guard it is standing in front of will use. The
+        # counters derive that limit by the same arithmetic
+        # (mariadb._derive_cpu_memory_limits()) but refresh only
+        # once a reconcile period, where the metrics here are live,
+        # so this report publishes the live figure.
+        resources['per_node'][n]['cpu_max_per_instance'] = \
+            metrics[n].get('cpu_max_per_instance', 0)
+
+        cpu_base, _ = _schedulable_threads(metrics[n])
+        resources['per_node'][n]['cpu_schedulable'] = cpu_base
+        # A clamped reservation means cpu_schedulable (or
+        # memory_reserved_mb below) is a safety floor or cap rather
+        # than the configured reservation's arithmetic -- without the
+        # flag a node reserving all of its threads is
+        # indistinguishable from one with a genuinely spare thread
+        # (issue 4201).
+        resources['per_node'][n]['cpu_reservation_clamped'] = bool(
+            metrics[n].get('cpu_reservation_clamped', False))
+        resources['per_node'][n]['memory_reservation_clamped'] = bool(
+            metrics[n].get('memory_reservation_clamped', False))
+        hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
+        measured_cpus = metrics[n].get('cpu_total_instance_vcpus', 0)
+        # A node the reconciler has not given a capacity row -- one
+        # mid-upgrade, or one it declined to size (P7) -- is charged
+        # nothing, because it is also guarded by nothing: admission
+        # will let it through. The flag says which of those a zero
+        # is, so "why is this node's committed total zero?" is
+        # answerable from the response alone.
+        row = capacity.get(n)
+        committed_cpus = row['used_cpus'] if row else 0
+        resources['per_node'][n]['cpu_committed_row_present'] = \
+            row is not None
+        # No fallback to cpu_hard_max here: the whole point of this
+        # field is to let a reader see the two ledgers disagree, and
+        # a fallback would hide exactly that disagreement.
+        resources['per_node'][n]['cpu_limit'] = \
+            row['limit_cpus'] if row else None
+        # Both inputs to the admission decision are published, because
+        # "this node measures as idle but is refusing work" is only
+        # diagnosable if you can see which of the two is binding.
+        resources['per_node'][n]['cpu_hard_max'] = hard_max_cpus
+        resources['per_node'][n]['cpu_measured'] = measured_cpus
+        # When the node enumerated the domains cpu_measured counts, on
+        # the node's own clock (None from a node which predates the
+        # field). A figure on a shared node can move because of any
+        # instance; this says whether the measurement is recent enough
+        # to have seen a particular domain start or stop, compared with
+        # the libvirt_returned_at on that instance's power event.
+        resources['per_node'][n]['domains_enumerated_at'] = \
+            metrics[n].get('domains_enumerated_at')
+        resources['per_node'][n]['cpu_committed'] = committed_cpus
+        current_cpu = max(measured_cpus, committed_cpus)
+        resources['per_node'][n]['cpu_available'] = hard_max_cpus - current_cpu
+        # A node packed beyond the cap (for example after the cap was
+        # lowered) reports negative per-node headroom, which is honest,
+        # but must not eat into the cluster total other nodes provide.
+        resources['total']['cpu_available'] += max(
+            0, resources['per_node'][n]['cpu_available'])
+
+        resources['per_node'][n]['cpu_load_1'] = metrics[n].get(
+            'cpu_load_1', 0)
+        resources['per_node'][n]['cpu_load_5'] = metrics[n].get(
+            'cpu_load_5', 0)
+        resources['per_node'][n]['cpu_load_15'] = metrics[n].get(
+            'cpu_load_15', 0)
+
+        # Memory. As with CPU, this must match _has_sufficient_ram():
+        # published headroom is bounded by the committed ledger as
+        # well as the measurements, because that ledger is what both
+        # the pre-filter and the guard refuse on.
+        reserved = _memory_reserved_mb(metrics[n])
+        resources['per_node'][n]['memory_reserved_mb'] = reserved
+        resources['per_node'][n]['ram_max_per_instance'] = \
+            (metrics[n].get('memory_available', 0) - reserved)
+        resources['per_node'][n]['ram_max'] = \
+            metrics[n].get('memory_max', 0) * \
+            config.RAM_OVERCOMMIT_RATIO
+        committed_mb = row['used_memory_mb'] if row else 0
+        resources['per_node'][n]['ram_committed'] = committed_mb
+        ram_available = \
+            (metrics[n].get('memory_max', 0) * config.RAM_OVERCOMMIT_RATIO -
+             metrics[n].get('memory_total_instance_actual', 0))
+        if row:
+            ram_available = min(
+                ram_available, row['limit_memory_mb'] - committed_mb)
+        resources['per_node'][n]['ram_available'] = ram_available
+        resources['total']['ram_available'] += max(
+            0, resources['per_node'][n]['ram_available'])
+
+        # Disk. Each node publishes its own reservation as a metric, so we
+        # subtract the candidate node's per-host floor (falling back to our
+        # config default only for a stale metrics row mid-upgrade).
+        reservation = metrics[n].get(
+            'disk_reservation_gb', config.NODE_DISK_RESERVATION_GB)
+        disk_free = int(metrics[n].get(
+            'disk_free_instances', '0')) / GiB
+        disk_free -= reservation
+        resources['per_node'][n]['disk_available'] = disk_free
+        # The capacity row's disk counters are published for the same
+        # reason cpu_limit and cpu_committed are: disk_available is
+        # headroom, which moves whenever a sibling creates or deletes,
+        # where the ledger's ceiling is stable under load (issue 4208).
+        # One capacity row covers every dimension, so
+        # cpu_committed_row_present above already says whether these
+        # zeros mean "unsized node" -- as does a None disk_limit_gb,
+        # which deliberately has no fallback for the same reason
+        # cpu_limit does not.
+        resources['per_node'][n]['disk_limit_gb'] = \
+            row['limit_disk_gb'] if row else None
+        resources['per_node'][n]['disk_committed_gb'] = \
+            row['used_disk_gb'] if row else 0
+
+        # Instance count
+        resources['per_node'][n]['instances_total'] = metrics[n].get(
+            'instances_total', 0)
+        resources['per_node'][n]['instances_active'] = metrics[n].get(
+            'instances_active', 0)
+
+    return resources
+
+
+def summarize_cluster_resources():
+    """Summarize the cluster's resources from a fresh metrics snapshot.
+
+    This is what /admin/resources publishes. It needs only one fresh read of
+    the node metrics and of the capacity counters, not a Scheduler, so the
+    admin API does not have to construct a placement decider to call it.
+    """
+    unavailable = {}
+    metrics = get_active_node_metrics(unavailable=unavailable)
+    return _summarize_resources(metrics, unavailable)
+
+
 class Scheduler:
     def __init__(self):
         # This UUID doesn't really mean much, except as a way of tracing the
@@ -289,97 +609,16 @@ class Scheduler:
         return True, None
 
     def _schedulable_threads(self, node):
-        # Scheduling is denominated in schedulable threads -- the thread
-        # count left after the resources daemon subtracts the node's
-        # per-host thread reservation for the operating system and
-        # host-level system services. Admission, load ordering and
-        # summarize_resources() must all size a node through this helper
-        # so they cannot disagree. Returns (threads, from_fallback).
-        #
-        # Metrics rows written by an older resources daemon lack
-        # cpu_schedulable. For those we approximate the reservation the
-        # node will publish once its daemon restarts by subtracting this
-        # node's own thread reservation. We cannot know a remote node's
-        # exact per-host value, and *this fallback* applies no role-aware
-        # bump (test_old_dialect_fallback_ignores_infra_role), so we use
-        # the local config value; the fallback is transient and stops the
-        # moment that node's daemon republishes cpu_schedulable.
-        #
-        # The deployer does still bump infra roles, per host, so a real
-        # node's reservation is usually not the local config value:
-        # examples/_shared/site.yml gives a network or database node twice
-        # the plain-hypervisor thread reservation. On a small node that is
-        # load-bearing -- CI's 4-thread infra hypervisors reserve all four
-        # and are floored at one schedulable thread by
-        # _compute_reservations() -- so do not read this comment as saying
-        # the bump is gone. It is not applied *here*, which is a statement
-        # about the fallback and not about the system (issue 4201).
-        metrics = self.metrics[node]
-        threads = metrics.get('cpu_schedulable')
-        if threads:
-            return threads, False
-
-        cpu_max = metrics.get('cpu_max', 0)
-        if not cpu_max:
-            return 0, True
-
-        return max(1, cpu_max - config.NODE_CPU_RESERVATION_THREADS), True
+        """Schedulable threads for a node: see the module-level helper."""
+        return _schedulable_threads(self.metrics[node])
 
     def _memory_reserved_mb(self, node):
-        # The resources daemon publishes the node's per-host memory
-        # reservation (operating system plus host-level system services).
-        # Metrics rows written by an older resources daemon lack it and
-        # fall back to this node's own configured RAM reservation.
-        return self.metrics[node].get(
-            'memory_reserved_mb', int(config.NODE_RAM_RESERVATION_GB * 1024))
+        """The node's memory reservation: see the module-level helper."""
+        return _memory_reserved_mb(self.metrics[node])
 
     def _capacity_by_node(self):
-        """The counters keyed by node uuid, and whether the read failed.
-
-        Read fresh on every scheduling decision rather than cached
-        beside the metrics: the counters move on every admission, and a
-        burst of concurrent creates -- precisely the case a cached
-        snapshot gets wrong -- is what reading them is for. Only
-        hypervisors the reconciler considers schedulable have a row, so
-        an absent node is not an error (P7).
-
-        An unreadable table returns empty rather than raising, which
-        degrades a caller to whatever measurement it also holds. That
-        is the right direction for a pre-filter -- the guard still
-        refuses correctly, only the cheap pruning in front of it is
-        lost -- but it is another reason this is not the admission
-        decision.
-
-        Returns ``(capacity, degraded)``: an empty mapping means either
-        an unpopulated table or a failed read, and only the second value
-        says which. Callers unpack rather than index so the degraded
-        case is visible where the read is made -- a caller which does
-        not act on it discards it explicitly.
-        """
-        read = mariadb.get_scheduler_node_capacity()
-        return ({row['node_uuid']: row for row in read.rows}, read.degraded)
-
-    def _cluster_capacity(self):
-        """The cluster_capacity singleton, as the resources summary publishes it.
-
-        Only the summary calls this; placement never reads the singleton,
-        because the guarded UPDATEs at admission test against it in SQL.
-
-        Always carries ``row_present`` and ``degraded``. Every figure is
-        None unless the row was read successfully, never zero: see the
-        comment in ``summarize_resources()`` for why. The figures are
-        copied from the read, including the ``unallocated_*`` headroom,
-        which mariadb derives once and this does not recompute.
-        """
-        read = mariadb.get_cluster_capacity()
-        row = None if read.degraded else read.row
-        published = {
-            'row_present': row is not None,
-            'degraded': read.degraded,
-        }
-        for key in CLUSTER_CAPACITY_FIGURES:
-            published[key] = row[key] if row is not None else None
-        return published
+        """The counters keyed by node uuid, and whether the read failed."""
+        return _capacity_by_node()
 
     def _satisfies_hard_affinity(self, inst, node, memo,
                                  require_with, require_without):
@@ -1136,217 +1375,17 @@ class Scheduler:
             return candidates
 
     def summarize_resources(self):
+        """Summarize cluster resources from this scheduler's metrics snapshot.
+
+        Refreshes the snapshot if it is stale. No production code calls
+        this: ``/admin/resources`` uses the module-level
+        ``summarize_cluster_resources()``, and this bound form is retained
+        for the scheduler test suite, which drives it from a constructed
+        Scheduler.
+        """
         # Refresh metrics if its too old, or there are no nodes.
         diff = time.time() - self.metrics_updated
         if diff > config.SCHEDULER_CACHE_TIMEOUT or len(self.metrics) == 0:
             self.refresh_metrics()
 
-        # The capacity counters are what admission actually draws down,
-        # so they are read once here rather than recomputed per node --
-        # publishing a second, independently derived ledger beside the
-        # real one is how the two come to disagree. This is the same
-        # read the CPU pre-filter makes, through the same helper.
-        #
-        # A degraded read is not acted on here: this summary has no
-        # instance to record an event against, and a failed read leaves
-        # every node reporting as uncounted, which is exactly what it
-        # already did. That reasoning still only covers eventing --
-        # it is not a reason to keep the flag out of the response body.
-        # A caller sampling this endpoint over time (the CI headroom
-        # probe, for one) has the same problem the pre-filter does: an
-        # empty `capacity` mapping is indistinguishable from a genuinely
-        # unpopulated table unless something says which. Publishing the
-        # flag below costs nothing here and lets that caller tell the
-        # two apart instead of discarding every sample from a failed
-        # read alongside every sample from a cluster the reconciler
-        # simply has not reached yet (P7).
-        #
-        # cluster_capacity is the cluster-wide ledger, published for the
-        # same reason: it is the singleton row itself, the one both
-        # cluster-wide guards test against -- an unclaimed placement
-        # must fit in what is neither claimed nor used by unclaimed
-        # namespaces, and so must a new claim. It is not a sum of claim
-        # rows. Admission draws the row down directly and the reconciler
-        # rebuilds it, so a total computed here from the claims would be
-        # a second ledger which agrees with the first only until the
-        # next placement. The headroom figures come from the same read,
-        # derived once beside it, so no reader has to redo that
-        # arithmetic and risk getting it subtly different. It is kept
-        # out of `total`, because total sums per-node headroom bounded
-        # by measurement, while this ledger's totals are sums of node
-        # limits. Those are different quantities, and one key holding
-        # both would invite comparing them.
-        #
-        # A singleton the reconciler has not yet written, and one which
-        # could not be read, both publish every figure as None rather
-        # than zero. A ledger of zeroes says the cluster is full, which
-        # neither state means: before the first reconcile unclaimed
-        # placements are not guarded at all. row_present and degraded
-        # say which of the two a None is.
-        capacity, capacity_degraded = self._capacity_by_node()
-        cluster_capacity = self._cluster_capacity()
-
-        # Only hypervisors with reasonable queue lengths are candidates.
-        #
-        # `excluded` says why an active node is missing from per_node.
-        # Without it a reader can only infer the cause from an absence,
-        # and for the metrics cases it cannot even do that: a node whose
-        # metrics row is stale or missing has an empty metrics dict
-        # here, so it carries no is_hypervisor and is skipped below
-        # exactly as a network node is. Those reasons were decided when
-        # the metrics were loaded and are reported for every active node
-        # whatever its role, because a node's role is not knowable
-        # without its metrics; a reader who wants only hypervisors
-        # filters against the node list, which publishes the role. A
-        # node which is not active is left out, as the node list already
-        # publishes its state, and a non-hypervisor with fresh metrics
-        # is not a candidate at all, so it is not "excluded" either.
-        resources = {
-            'total': {
-                'cpu_available': 0,
-                'ram_available': 0,
-                'capacity_degraded': capacity_degraded,
-            },
-            'per_node': {},
-            'excluded': {
-                n: dict(reason)
-                for n, reason in self.metrics_unavailable.items()},
-            'cluster_capacity': cluster_capacity,
-        }
-
-        for n in self.metrics.keys():
-            if not self.metrics[n].get('is_hypervisor', False):
-                continue
-
-            queue_reason = _queue_exclusion_reason(self.metrics[n])
-            if queue_reason:
-                resources['excluded'][n] = queue_reason
-                continue
-
-            resources['per_node'][n] = {}
-
-            # CPU. The charge is max(measured, committed), exactly as
-            # the pre-filter computes it (_has_sufficient_cpu()), so the
-            # headroom published here is bounded by whichever of the two
-            # binds -- which is what a create would be allowed. The two
-            # differ in one respect: the pre-filter measures that charge
-            # against the capacity row's own limit_cpus, because that is
-            # what the guard it is standing in front of will use. The
-            # counters derive that limit by the same arithmetic
-            # (mariadb._derive_cpu_memory_limits()) but refresh only
-            # once a reconcile period, where the metrics here are live,
-            # so this report publishes the live figure.
-            resources['per_node'][n]['cpu_max_per_instance'] = \
-                self.metrics[n].get('cpu_max_per_instance', 0)
-
-            cpu_base, _ = self._schedulable_threads(n)
-            resources['per_node'][n]['cpu_schedulable'] = cpu_base
-            # A clamped reservation means cpu_schedulable (or
-            # memory_reserved_mb below) is a safety floor or cap rather
-            # than the configured reservation's arithmetic -- without the
-            # flag a node reserving all of its threads is
-            # indistinguishable from one with a genuinely spare thread
-            # (issue 4201).
-            resources['per_node'][n]['cpu_reservation_clamped'] = bool(
-                self.metrics[n].get('cpu_reservation_clamped', False))
-            resources['per_node'][n]['memory_reservation_clamped'] = bool(
-                self.metrics[n].get('memory_reservation_clamped', False))
-            hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
-            measured_cpus = self.metrics[n].get('cpu_total_instance_vcpus', 0)
-            # A node the reconciler has not given a capacity row -- one
-            # mid-upgrade, or one it declined to size (P7) -- is charged
-            # nothing, because it is also guarded by nothing: admission
-            # will let it through. The flag says which of those a zero
-            # is, so "why is this node's committed total zero?" is
-            # answerable from the response alone.
-            row = capacity.get(n)
-            committed_cpus = row['used_cpus'] if row else 0
-            resources['per_node'][n]['cpu_committed_row_present'] = \
-                row is not None
-            # No fallback to cpu_hard_max here: the whole point of this
-            # field is to let a reader see the two ledgers disagree, and
-            # a fallback would hide exactly that disagreement.
-            resources['per_node'][n]['cpu_limit'] = \
-                row['limit_cpus'] if row else None
-            # Both inputs to the admission decision are published, because
-            # "this node measures as idle but is refusing work" is only
-            # diagnosable if you can see which of the two is binding.
-            resources['per_node'][n]['cpu_hard_max'] = hard_max_cpus
-            resources['per_node'][n]['cpu_measured'] = measured_cpus
-            # When the node enumerated the domains cpu_measured counts, on
-            # the node's own clock (None from a node which predates the
-            # field). A figure on a shared node can move because of any
-            # instance; this says whether the measurement is recent enough
-            # to have seen a particular domain start or stop, compared with
-            # the libvirt_returned_at on that instance's power event.
-            resources['per_node'][n]['domains_enumerated_at'] = \
-                self.metrics[n].get('domains_enumerated_at')
-            resources['per_node'][n]['cpu_committed'] = committed_cpus
-            current_cpu = max(measured_cpus, committed_cpus)
-            resources['per_node'][n]['cpu_available'] = hard_max_cpus - current_cpu
-            # A node packed beyond the cap (for example after the cap was
-            # lowered) reports negative per-node headroom, which is honest,
-            # but must not eat into the cluster total other nodes provide.
-            resources['total']['cpu_available'] += max(
-                0, resources['per_node'][n]['cpu_available'])
-
-            resources['per_node'][n]['cpu_load_1'] = self.metrics[n].get(
-                'cpu_load_1', 0)
-            resources['per_node'][n]['cpu_load_5'] = self.metrics[n].get(
-                'cpu_load_5', 0)
-            resources['per_node'][n]['cpu_load_15'] = self.metrics[n].get(
-                'cpu_load_15', 0)
-
-            # Memory. As with CPU, this must match _has_sufficient_ram():
-            # published headroom is bounded by the committed ledger as
-            # well as the measurements, because that ledger is what both
-            # the pre-filter and the guard refuse on.
-            reserved = self._memory_reserved_mb(n)
-            resources['per_node'][n]['memory_reserved_mb'] = reserved
-            resources['per_node'][n]['ram_max_per_instance'] = \
-                (self.metrics[n].get('memory_available', 0) - reserved)
-            resources['per_node'][n]['ram_max'] = \
-                self.metrics[n].get('memory_max', 0) * \
-                config.RAM_OVERCOMMIT_RATIO
-            committed_mb = row['used_memory_mb'] if row else 0
-            resources['per_node'][n]['ram_committed'] = committed_mb
-            ram_available = \
-                (self.metrics[n].get('memory_max', 0) * config.RAM_OVERCOMMIT_RATIO -
-                 self.metrics[n].get('memory_total_instance_actual', 0))
-            if row:
-                ram_available = min(
-                    ram_available, row['limit_memory_mb'] - committed_mb)
-            resources['per_node'][n]['ram_available'] = ram_available
-            resources['total']['ram_available'] += max(
-                0, resources['per_node'][n]['ram_available'])
-
-            # Disk. Each node publishes its own reservation as a metric, so we
-            # subtract the candidate node's per-host floor (falling back to our
-            # config default only for a stale metrics row mid-upgrade).
-            reservation = self.metrics[n].get(
-                'disk_reservation_gb', config.NODE_DISK_RESERVATION_GB)
-            disk_free = int(self.metrics[n].get(
-                'disk_free_instances', '0')) / GiB
-            disk_free -= reservation
-            resources['per_node'][n]['disk_available'] = disk_free
-            # The capacity row's disk counters are published for the same
-            # reason cpu_limit and cpu_committed are: disk_available is
-            # headroom, which moves whenever a sibling creates or deletes,
-            # where the ledger's ceiling is stable under load (issue 4208).
-            # One capacity row covers every dimension, so
-            # cpu_committed_row_present above already says whether these
-            # zeros mean "unsized node" -- as does a None disk_limit_gb,
-            # which deliberately has no fallback for the same reason
-            # cpu_limit does not.
-            resources['per_node'][n]['disk_limit_gb'] = \
-                row['limit_disk_gb'] if row else None
-            resources['per_node'][n]['disk_committed_gb'] = \
-                row['used_disk_gb'] if row else 0
-
-            # Instance count
-            resources['per_node'][n]['instances_total'] = self.metrics[n].get(
-                'instances_total', 0)
-            resources['per_node'][n]['instances_active'] = self.metrics[n].get(
-                'instances_active', 0)
-
-        return resources
+        return _summarize_resources(self.metrics, self.metrics_unavailable)
