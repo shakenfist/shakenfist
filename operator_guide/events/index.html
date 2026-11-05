@@ -16300,6 +16300,18 @@ lived. Upgrading an existing cluster backfills the column from
 <code>events</code> during <code>sf-ctl ensure-mariadb-schema</code>, so the upgrade
 step takes a little longer on a cluster with a large event
 history.</p>
+<p>That backfill cannot be the whole story on a rolling upgrade: a
+daemon still on the previous release keeps writing event
+references without a timestamp until it restarts, and those rows
+take the column's default of 0, which sorts them to the far end
+of the object's history. The daily events prune sweep therefore
+begins by giving any such row the timestamp of the event it
+references, so the first sweep after the last daemon restarts
+finishes the job. Events written during the upgrade window may
+be ordered wrongly in an object's event page until that sweep
+runs; nothing else is affected. The counter
+<code>database_event_object_timestamps_backfilled_total</code> on the
+database tier records how many rows the sweep has repaired.</p>
 <p>Each event in the response includes at minimum:</p>
 <table>
 <thead>
@@ -16351,7 +16363,15 @@ The daily cadence is anchored to a cluster-wide last-run stamp
 <code>cluster_config</code>), so it survives both daemon restarts and the
 maintenance lock changing hands -- a cluster whose daemons never
 run for a full day still prunes daily.
-The prune runs in three stages:</p>
+The sweep runs in four stages. The first deletes nothing: it
+gives the event's timestamp to any <code>event_objects</code> row still
+sitting at the column default, which is what a daemon written
+before that column existed left behind during a rolling upgrade
+(see above). It is first because those rows are visibly
+mis-ordered in an object's event page, where everything the
+other stages do is reclaiming space, and a sweep which runs out
+of budget must not be one which never reaches the repair. The
+three stages which prune are then:</p>
 <ol>
 <li><strong>Per-event-type sweep.</strong> Removes <code>event_objects</code> rows older
    than the configured age for each event type. The <code>events</code> row
@@ -16489,6 +16509,12 @@ daemon's own metrics port.</p>
 <td>Counter</td>
 <td>sf-database</td>
 <td><code>events</code> rows removed by the orphan sweep. A non-zero rate here is normal after each daily prune.</td>
+</tr>
+<tr>
+<td><code>database_event_object_timestamps_backfilled_total</code></td>
+<td>Counter</td>
+<td>sf-database</td>
+<td><code>event_objects</code> rows given their event's timestamp by the sweep's first stage, having been written at the column default by a daemon which predated the column. Expect it to move for one sweep after the rolling upgrade which introduced the column and then stay flat; a cluster where it keeps moving still has a daemon running old code.</td>
 </tr>
 <tr>
 <td><code>eventlog_spool_depth</code></td>
