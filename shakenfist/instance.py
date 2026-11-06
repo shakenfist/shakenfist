@@ -325,6 +325,15 @@ class Instance(dbowo):
         dbo.STATE_DELETED: None,
     }
 
+    # The key on the placement attribute holding the scheduling stage
+    # which refused this instance's last placement attempt. It lives on
+    # that attribute because that is the record of placement attempts --
+    # it already carries placement_attempts -- and because the attribute
+    # is never cleared (P8), so the annotation outlives the delete a
+    # refusal enqueues and is still there when a client reads the
+    # errored instance.
+    REFUSAL_STAGE_KEY = 'refusal_stage'
+
     # Metadata - Reserved Keys
     METADATA_KEY_TAGS = 'tags'
     METADATA_KEY_AFFINITY = 'affinity'
@@ -700,6 +709,8 @@ class Instance(dbowo):
         # If this is an external view, then mix back in attributes that users
         # expect
         i = self._external_view()
+        error_message = self.error
+        error_stage = self.refusal_stage if error_message else None
         i.update({
             'cpus': self.cpus,
             'disk_spec': self.disk_spec,
@@ -718,7 +729,16 @@ class Instance(dbowo):
             'agent_state': self.agent_state.value,
             'agent_start_time': self.agent_start_time,
             'agent_system_boot_time': self.agent_system_boot_time,
-            'error_message': self.error,
+            'error_message': error_message,
+            # The refusal which errored the instance, machine readable:
+            # the scheduling stage which refused it and whether waiting
+            # can clear that refusal. Both are None/False for an error
+            # which was not a scheduling refusal, and the transient flag
+            # is the server's answer rather than the client's, so a
+            # client never has to classify a stage itself (issue 4568).
+            'error_stage': error_stage,
+            'error_transient': constants.capacity_refusal_is_transient(
+                error_stage or ''),
             'last_cluster_operation': self.last_cluster_operation,
             'has_pending_operations': self.has_pending_cluster_operation()
         })
@@ -863,6 +883,35 @@ class Instance(dbowo):
     @property
     def placement(self):
         return self._db_get_attribute('placement')
+
+    @property
+    def refusal_stage(self):
+        return self.placement.get(self.REFUSAL_STAGE_KEY)
+
+    def _record_refusal_stage(self, stage):
+        """Record which scheduling stage refused this instance, if any.
+
+        Called with the stage every time an error is recorded, and with
+        None when the error has nothing to do with scheduling, so the
+        stage always describes the error beside it rather than an older
+        refusal. Writes nothing when the value has not moved.
+        """
+        # Checked before the lock is taken as well as after it, because
+        # every error path calls this and almost none of them move the
+        # value: an unlocked read is enough to decide there is nothing
+        # to write, and the locked read is what makes the write safe.
+        if self.refusal_stage == stage:
+            return
+
+        with self.get_lock_attr('placement', 'Instance placement refusal'):
+            placement = copy.deepcopy(self.placement)
+            if placement.get(self.REFUSAL_STAGE_KEY) == stage:
+                return
+            if stage:
+                placement[self.REFUSAL_STAGE_KEY] = stage
+            else:
+                placement.pop(self.REFUSAL_STAGE_KEY, None)
+            self._db_set_attribute('placement', placement)
 
     @property
     def power_state(self):
@@ -1332,6 +1381,9 @@ class Instance(dbowo):
             placement['node'] = location
             placement['placement_attempts'] = placement.get(
                 'placement_attempts', 0) + 1
+            # A placement which is admitted is no longer refused, so the
+            # stage of the refusal before it does not outlive it.
+            placement.pop(self.REFUSAL_STAGE_KEY, None)
 
             result = self._admit_placement(
                 location, old_location or '', placement, enforce,
@@ -2910,9 +2962,16 @@ class Instance(dbowo):
             runs_after=runs_after,
             request_id=util_general.get_request_id())
 
-    def enqueue_delete_due_error(self, error_msg):
+    def enqueue_delete_due_error(self, error_msg, stage=None):
         # Error needs to be set immediately so that API clients get
         # correct information. The VM and network tear down can be delayed.
+        #
+        # ``stage`` is the scheduling stage which refused the instance,
+        # for the callers which have one. It is recorded beside the
+        # message so a client can tell a transient capacity refusal from
+        # a permanent one without matching on the prose (issue 4568); a
+        # caller with no stage passes none, which clears any stage an
+        # earlier refusal left behind.
         if self.state.value == self.STATE_DELETED:
             return
 
@@ -2924,9 +2983,11 @@ class Instance(dbowo):
 
         try:
             self.error = error_msg
+            self._record_refusal_stage(stage)
         except Exception as e:
-            # The error message is an annotation; failing to record it must
-            # not prevent the instance being cleaned up (issue 4112).
+            # The error message and the stage which produced it are
+            # annotations; failing to record them must not prevent the
+            # instance being cleaned up (issue 4112).
             LOG.with_fields({'instance': self.uuid}).error(
                 f'Failed to record error message before delete: {e}')
 

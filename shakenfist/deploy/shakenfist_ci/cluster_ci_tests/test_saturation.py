@@ -376,6 +376,76 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
             [{'size': requested_disk_gb, 'type': 'disk'}], None, None)
         self.assertRefusedAtStage(exc, 'sufficient_free_disk')
 
+    def test_the_refused_record_carries_the_same_stage_as_the_507(self):
+        """The record a refusal leaves behind says why it was refused.
+
+        A refused create still leaves an instance parked in an error
+        state until somebody deletes it, and before issue 4568 that
+        record carried nothing but a prose message -- so a client which
+        found it had to match the text to tell a momentary shortage from
+        a structural one. The record now carries ``error_stage`` and
+        ``error_transient``, computed by the same helper which fills in
+        the 507 body, and this asserts the two agree about one refusal
+        rather than asserting each separately.
+
+        Failure modes, and whether each is asserted or skipped:
+
+        * ``total.capacity_degraded`` is true, or ``per_node`` is empty:
+          **skipped**, by ``_cluster_resources_or_skip()``.
+        * The record cannot be resolved by name (404): **skipped**. The
+          refusal queues the instance's delete, and an instance whose
+          state ends in ``-error`` ends in state ``error`` rather than
+          ``deleted``, so it keeps answering a name lookup -- but a
+          cluster which hard deleted it between the 507 and this read
+          has nothing for this test to assert on, and that is not the
+          contract under test.
+        * The record resolves but carries no ``error_stage`` key at all:
+          **fails**. That is a server which did not publish the field.
+        """
+        resources, per_node = self._cluster_resources_or_skip()
+
+        max_ram_ceiling = max(
+            sizing.effective_ram_ceiling(entry)
+            for entry in per_node.values())
+        requested_memory_mb = sizing.one_unit_beyond(max_ram_ceiling)
+        name = 'refused-record-%s' % self._uniquifier()
+        self.addDetail('sizing', content.text_content(
+            'max_ram_ceiling=%r requested_memory_mb=%r name=%r'
+            % (max_ram_ceiling, requested_memory_mb, name)))
+
+        exc = self.assertRaises(
+            apiclient.InsufficientResourcesException,
+            # raw-create: the 507 is the assertion, exactly as in the
+            # memory test above, and the request is beyond every node's
+            # RAM ceiling by construction.
+            self.test_client.create_instance,
+            name, 1, requested_memory_mb, None,
+            [{'size': 1, 'type': 'disk'}], None, None)
+        self.assertRefusedAtStage(exc, 'sufficient_idle_memory')
+
+        try:
+            record = self.test_client.get_instance(name)
+        except apiclient.ResourceNotFoundException as e:
+            # Only "gone" skips. Any other API answer here is a defect
+            # rather than a premise this test cannot establish, so it is
+            # left to fail.
+            self.skipTest(
+                'The refused record for %s could not be read back (%s), so '
+                'there is nothing to compare the 507 against' % (name, e))
+
+        self.addDetail('refused record', content.text_content(
+            json.dumps(record, indent=4, sort_keys=True, default=str)))
+        self.assertIn(
+            'error_stage', record,
+            'The refused instance record carries no error_stage, so a '
+            'client reading it still has only the error message to go on: '
+            '%r' % record)
+        self.assertEqual('sufficient_idle_memory', record['error_stage'])
+        self.assertTrue(
+            record['error_transient'] is True,
+            'sufficient_idle_memory is a momentary shortage, so the record '
+            'must say waiting can clear it: %r' % record)
+
 
 class TestNodeFillRefusal(_CapacityReadingTestCase):
     """Fill one hypervisor to its published ledger, then be refused.

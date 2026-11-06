@@ -58,8 +58,15 @@ class InvalidNetdesc(NodeInstNetdescOpException):
 
 
 class AbortInstanceStart(NodeInstNetdescOpException):
-    def __init__(self, op, message):
+    # ``stage`` names the scheduling stage which refused the instance,
+    # for the aborts which are placement refusals. It rides on the
+    # exception rather than in the message because the instance
+    # publishes it as a machine readable field, and nothing may
+    # re-derive it by parsing the prose (issue 4568). It is the empty
+    # string for an abort which is not a placement refusal at all.
+    def __init__(self, op, message, stage=''):
         super().__init__(op, message)
+        self.stage = stage
 
 
 class NodeInstNetdescOp(BaseClusterOperation):
@@ -146,7 +153,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
         try:
             self.__getattribute__(f'_{task.name}')(inst)
         except AbortInstanceStart as e:
-            inst.enqueue_delete_due_error(e.message)
+            inst.enqueue_delete_due_error(e.message, stage=e.stage or None)
 
             try:
                 self.state = NodeInstNetdescOp.STATE_ABORT
@@ -180,6 +187,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
         s = scheduler.Scheduler()
         affinity_failure = False
         affinity_message = ''
+        refusal_stage = ''
         node_unavailable = False
         try:
             s.find_candidates(inst, candidates=[config.NODE_UUID])
@@ -197,6 +205,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
             # runs under cluster CI and not on a pull request.
             affinity_failure = isinstance(e, AffinityConstraintUnsatisfiable)
             affinity_message = str(e)
+            refusal_stage = getattr(e, 'stage', '')
 
         except CandidateNodeNotFoundException as e:
             # This node is missing from the scheduler's active-node
@@ -221,19 +230,25 @@ class NodeInstNetdescOp(BaseClusterOperation):
                 raise AbortInstanceStart(
                     self, 'Too many start attempts, and no node satisfies '
                     'the requested affinity constraints: %s'
-                    % affinity_message)
-            raise AbortInstanceStart(self, 'Too many start attempts')
+                    % affinity_message, stage=refusal_stage)
+            raise AbortInstanceStart(
+                self, 'Too many start attempts', stage=refusal_stage)
 
         # Or if the user asked for a specific node which is now at capacity
         if inst.requested_placement:
             if affinity_failure:
                 raise AbortInstanceStart(
                     self, 'Requested node does not satisfy the requested '
-                    'affinity constraints: %s' % affinity_message)
+                    'affinity constraints: %s' % affinity_message,
+                    stage=refusal_stage)
             if node_unavailable:
+                # Not a placement refusal -- the node is missing from
+                # the scheduler's metrics -- so it carries no stage and
+                # is published as not worth waiting out.
                 raise AbortInstanceStart(
                     self, 'Requested node is not currently an active node')
-            raise AbortInstanceStart(self, 'Requested node lacks resources')
+            raise AbortInstanceStart(
+                self, 'Requested node lacks resources', stage=refusal_stage)
 
         # Try placing on another node
         try:
@@ -265,9 +280,10 @@ class NodeInstNetdescOp(BaseClusterOperation):
                 # Every candidate was refused by the capacity guard,
                 # which is the same fact the create path publishes as
                 # the capacity_guard stage. The message is unchanged;
-                # the stage is carried alongside it so that a future
-                # handler need not parse it back out (D30). Nothing
-                # reads it today: this raise never reaches the API.
+                # the stage is carried alongside it so that the handler
+                # below need not parse it back out (D30). It does not
+                # reach the API, but it does reach the instance, which
+                # publishes it as error_stage (issue 4568).
                 raise LowResourceException(
                     'No node had capacity for this instance, '
                     f'{len(denials)} candidates refused it',
@@ -310,14 +326,16 @@ class NodeInstNetdescOp(BaseClusterOperation):
                     extra={'message': str(e)})
                 raise AbortInstanceStart(
                     self, 'No node satisfies the requested affinity '
-                    'constraints: %s' % e)
+                    'constraints: %s' % e, stage=getattr(e, 'stage', ''))
 
             add_event_multi(
                 EVENT_TYPE_AUDIT,
                 [self, inst],
                 'reschedule failed, insufficient resources',
                 extra={'message': str(e)})
-            raise AbortInstanceStart(self, 'Unable to find suitable node')
+            raise AbortInstanceStart(
+                self, 'Unable to find suitable node',
+                stage=getattr(e, 'stage', ''))
 
     def _instance_start(self, inst):
         # Reconcile the instance's networks onto this node and enqueue the

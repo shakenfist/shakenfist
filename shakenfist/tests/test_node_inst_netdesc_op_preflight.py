@@ -17,6 +17,7 @@ handler must tolerate operations already in a terminal state.
 from unittest import mock
 from uuid import uuid4
 
+from shakenfist import constants
 from shakenfist import exceptions
 from shakenfist.instance import Instance
 from shakenfist.operations.node_inst_netdesc_op import AbortInstanceStart
@@ -47,6 +48,7 @@ class FakeInstance:
         self._deny_demand = set(deny_demand)
         self.state_sets = []
         self.delete_errors = []
+        self.delete_error_stages = []
         self.placement = {'placement_attempts': 0}
         self.requested_placement = None
         self.placed_on = []
@@ -70,8 +72,9 @@ class FakeInstance:
     def add_event(self, *args, **kwargs):
         pass
 
-    def enqueue_delete_due_error(self, message):
+    def enqueue_delete_due_error(self, message, stage=None):
         self.delete_errors.append(message)
+        self.delete_error_stages.append(stage)
 
     def place_instance(self, node, enforce_demand=True):
         self.placement_attempts.append(node)
@@ -514,6 +517,91 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
         self.assertIsNone(raised)
         self.assertEqual([target_node], inst.placed_on)
 
+    def test_exhausted_redirect_abort_carries_the_stage(self):
+        # Issue 4568: the abort used to publish nothing but the message,
+        # so a client had to match 'Unable to find suitable node' to
+        # recognise a capacity refusal. The stage now rides on the
+        # exception, which is what reaches the instance.
+        inst = FakeInstance('created')
+
+        raised = self._redirect_raising(
+            inst, exceptions.LowResourceException('full here'),
+            second=exceptions.LowResourceException(
+                'all full', stage='sufficient_idle_cpu'))
+
+        self.assertIsNotNone(raised)
+        self.assertEqual('sufficient_idle_cpu', raised.stage)
+
+    def test_every_candidate_denied_abort_carries_the_guard_stage(self):
+        # The guard exhaustion path raises its own LowResourceException
+        # and then aborts on it, so the stage has to survive two hops.
+        first = str(uuid4())
+        second = str(uuid4())
+        inst = FakeInstance('created', deny=[first, second])
+
+        _, _, raised = self._redirect(inst, [first, second])
+
+        self.assertIsNotNone(raised)
+        self.assertEqual('capacity_guard', raised.stage)
+
+    def test_attempt_limit_abort_carries_the_stage(self):
+        # The ":166" guard is outside the except suite, so the stage is
+        # carried in a local the same way affinity_failure is. Getting
+        # that wrong is a NameError which only the merge queue would see.
+        inst = FakeInstance('created')
+        inst.placement = {'placement_attempts': 4}
+
+        raised = self._redirect_raising(
+            inst, exceptions.LowResourceException(
+                'full here', stage='sufficient_idle_memory'))
+
+        self.assertIsNotNone(raised)
+        self.assertIn('Too many start attempts', str(raised))
+        self.assertEqual('sufficient_idle_memory', raised.stage)
+
+    def test_requested_placement_abort_carries_the_stage(self):
+        inst = FakeInstance('created')
+        inst.requested_placement = str(uuid4())
+
+        raised = self._redirect_raising(
+            inst, exceptions.LowResourceException(
+                'full here', stage='sufficient_free_disk'))
+
+        self.assertIsNotNone(raised)
+        self.assertIn('Requested node lacks resources', str(raised))
+        self.assertEqual('sufficient_free_disk', raised.stage)
+
+    def test_unavailable_node_abort_carries_no_stage(self):
+        # A node missing from the scheduler's metrics is not a placement
+        # refusal, so it publishes no stage and so reads as not worth
+        # waiting out rather than as a capacity shortage.
+        inst = FakeInstance('created')
+        inst.requested_placement = str(uuid4())
+
+        raised = self._redirect_raising(
+            inst, exceptions.CandidateNodeNotFoundException('restarting'))
+
+        self.assertIsNotNone(raised)
+        self.assertIn('not currently an active node', str(raised))
+        self.assertEqual('', raised.stage)
+
+    def test_affinity_abort_carries_the_affinity_stage(self):
+        # An affinity refusal is a real stage, and one in neither
+        # classification set, so the instance publishes it as a stage
+        # which is not worth waiting out.
+        inst = FakeInstance('created')
+
+        raised = self._redirect_raising(
+            inst,
+            exceptions.AffinityConstraintUnsatisfiable('first'),
+            second=exceptions.AffinityConstraintUnsatisfiable(
+                'no node carries require_with_tag', stage='affinity_constraints'))
+
+        self.assertIsNotNone(raised)
+        self.assertEqual('affinity_constraints', raised.stage)
+        self.assertFalse(
+            constants.capacity_refusal_is_transient(raised.stage))
+
     def _dispatch_failing_preflight(self, op):
         inst = FakeInstance('created')
         with mock.patch(
@@ -547,3 +635,40 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(NodeInstNetdescOp.STATE_ABORT, op.state.value)
         self.assertEqual(['Unhandled error: boom'], inst.delete_errors)
+
+    def test_dispatch_hands_the_abort_stage_to_the_instance(self):
+        # The one hop issue 4568 was actually about: dispatch_task used
+        # to pass e.message alone, so everything above was discarded
+        # before it reached the instance.
+        op = self._make_op()
+        inst = FakeInstance('created')
+        with mock.patch(
+                'shakenfist.operations.node_inst_netdesc_op.Instance.'
+                'from_db', return_value=inst):
+            with mock.patch(
+                    'shakenfist.operations.node_inst_netdesc_op.'
+                    'NodeInstNetdescOp._instance_preflight',
+                    side_effect=AbortInstanceStart(
+                        op, 'Unable to find suitable node',
+                        stage='sufficient_idle_cpu')):
+                op.dispatch_task(model_tasks.instance_preflight)
+
+        self.assertEqual(['Unable to find suitable node'], inst.delete_errors)
+        self.assertEqual(['sufficient_idle_cpu'], inst.delete_error_stages)
+
+    def test_dispatch_passes_no_stage_for_a_stageless_abort(self):
+        # An abort which is not a placement refusal must clear any stage
+        # an earlier refusal left on the instance, rather than leave the
+        # new error annotated with the old refusal.
+        op = self._make_op()
+        inst = FakeInstance('created')
+        with mock.patch(
+                'shakenfist.operations.node_inst_netdesc_op.Instance.'
+                'from_db', return_value=inst):
+            with mock.patch(
+                    'shakenfist.operations.node_inst_netdesc_op.'
+                    'NodeInstNetdescOp._instance_preflight',
+                    side_effect=AbortInstanceStart(op, 'Missing network')):
+                op.dispatch_task(model_tasks.instance_preflight)
+
+        self.assertEqual([None], inst.delete_error_stages)

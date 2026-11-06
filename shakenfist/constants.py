@@ -216,5 +216,71 @@ FINAL_OBJECT_STATES = [
 # path in external_api/instance.py and the preflight redirect in
 # operations/node_inst_netdesc_op.py -- so it is named once here rather
 # than written out at each. Whether it is retry-worthy is decided in
-# external_api/base.py's TRANSIENT_CAPACITY_STAGES.
+# capacity_refusal_is_transient() below.
 CAPACITY_GUARD_STAGE = 'capacity_guard'
+
+
+# Which refusal stages a retry can actually clear, and which it cannot.
+#
+# This line was originally drawn at the exception class: every
+# LowResourceException was transient. That was too coarse. The class
+# covers filter stages which are momentary shortages *and* filter
+# stages which are structural facts about the request or the cluster,
+# and telling a client to retry the second kind makes it replay an
+# impossible request until its deadline for nothing.
+#
+# These live here rather than in external_api/base.py (where they were
+# written) because the API is no longer their only consumer: a
+# preflight abort records the same classification on the instance
+# (issue 4568), and instance.py cannot import the API layer. base.py
+# re-exports both names.
+#
+# Transient -- the resource is measured, contended and returned by an
+# ordinary instance teardown within seconds (5.3-5.6 s was measured for
+# CPU):
+TRANSIENT_CAPACITY_STAGES = frozenset([
+    'sufficient_idle_cpu',
+    'sufficient_idle_memory',
+    'sufficient_free_disk',
+    'sufficient_idle_disk',
+    'queue_state',
+
+    # The guard is an accounting refusal against the capacity counters,
+    # which a concurrent delete or a reconciler pass moves on the same
+    # horizon. This holds only while mariadb.CLAIM_ENFORCEMENT_HARD is
+    # False: today a namespace claim cannot refuse a placement at all,
+    # so every guard denial is cluster or node capacity. Once that
+    # constant is flipped (see PLAN-scheduler-reservations.md) a claim
+    # denial becomes namespace quota exhaustion, which no wait clears,
+    # and claim denials must be split out of this set at that point
+    # rather than silently inheriting it.
+    CAPACITY_GUARD_STAGE,
+])
+
+# Permanent -- the cluster would refuse the identical request again in
+# fifteen seconds, in an hour, and after every instance on it had been
+# deleted. cpu_max_per_instance means the request asks for more vCPUs
+# than any single node will ever host; is_hypervisor and pre_schedule
+# mean the candidate set was empty before any resource was measured.
+# These still publish a stage and a 507 -- the refusal is real and the
+# stage is worth reading -- but they publish transient: false and no
+# Retry-After.
+PERMANENT_CAPACITY_STAGES = frozenset([
+    'pre_schedule',
+    'is_hypervisor',
+    'cpu_max_per_instance',
+])
+
+
+def capacity_refusal_is_transient(stage: str) -> bool:
+    """Whether waiting can clear a refusal published at this stage.
+
+    The stage is the sole discriminator, for the reason
+    capacity_error() gives: the alternative -- a transient= argument at
+    each call site -- puts the classification somewhere it can be got
+    wrong once per caller. A stage in neither set, including an empty
+    one and the 'unknown' fallback for a refusal which arrived carrying
+    no stage at all, is not transient: refusing to promise
+    retry-worthiness is the safe direction to be wrong in.
+    """
+    return stage in TRANSIENT_CAPACITY_STAGES

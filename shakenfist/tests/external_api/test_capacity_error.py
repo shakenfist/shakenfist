@@ -32,6 +32,7 @@ import os
 
 from shakenfist_utilities import api as sf_api
 
+from shakenfist import constants
 from shakenfist.constants import CAPACITY_GUARD_STAGE
 from shakenfist.external_api import base as api_base
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -140,6 +141,37 @@ class CapacityErrorTestCase(base.ShakenFistTestCase):
         self.assertEqual(15.0, default)
         self.assertEqual(
             float(api_base.TRANSIENT_RETRY_AFTER_SECONDS), float(default))
+
+    def test_the_api_and_the_instance_share_one_classification(self):
+        """One definition, two publishers (issue 4568).
+
+        The 507 body and the instance's error_transient field have to
+        agree about the same refusal, so the sets live in
+        shakenfist.constants and ``capacity_error()`` reads them through
+        the same helper the instance does. Re-exported here because the
+        API is where they were written and where they are still looked
+        for.
+        """
+        self.assertIs(constants.TRANSIENT_CAPACITY_STAGES,
+                      api_base.TRANSIENT_CAPACITY_STAGES)
+        self.assertIs(constants.PERMANENT_CAPACITY_STAGES,
+                      api_base.PERMANENT_CAPACITY_STAGES)
+
+    def test_the_classification_helper_answers_each_kind_of_stage(self):
+        self.assertTrue(
+            constants.capacity_refusal_is_transient('sufficient_idle_cpu'))
+        self.assertTrue(
+            constants.capacity_refusal_is_transient(CAPACITY_GUARD_STAGE))
+        self.assertFalse(
+            constants.capacity_refusal_is_transient('cpu_max_per_instance'))
+
+        # A stage in neither set -- an affinity refusal, the 'unknown'
+        # fallback, and the empty string an exception carries when
+        # nothing set one -- is not transient. Refusing to promise
+        # retry-worthiness is the safe direction to be wrong in.
+        for stage in ('affinity_constraints', 'unknown', ''):
+            self.assertFalse(
+                constants.capacity_refusal_is_transient(stage), stage)
 
     def test_every_scheduler_stage_is_classified(self):
         """No scheduler filter stage may go unclassified.
