@@ -87,14 +87,14 @@ the one pinned in `docs/glossary.md`.
    hash, a [nonce](/glossary/#nonce), an optional expiry,
    an optional [scope](/glossary/#scope) list and an
    optional provenance dict
-   (`shakenfist/schema/namespace_key_attributes.py:24-70`).
+   (`shakenfist/schema/namespace_key_attributes.py:25-81`).
    The `keys` JSON column on `namespace_attributes` that
    used to hold them is vestigial — "neither read nor
    written any more"
    (`shakenfist/namespace.py:187-190`). Beware that
    `Namespace.keys` still *synthesises* the legacy
    `{'nonced_keys': ...}` shape out of the tables
-   (`shakenfist/namespace.py:197-205`) for the handful of
+   (`shakenfist/namespace.py:206-214`) for the handful of
    call sites that still read it, so grepping `nonced_keys`
    finds a compatibility view rather than a live column.
 2. **`/auth` mints access tokens from keys.** The endpoint
@@ -110,7 +110,7 @@ the one pinned in `docs/glossary.md`.
    `shakenfist/util/access_tokens.py`. Alongside it the
    token carries `iss`, the minting key's `nonce`, and a
    `scopes` list
-   (`shakenfist/util/access_tokens.py:42-47`). The nonce is
+   (`shakenfist/util/access_tokens.py:49-54`). The nonce is
    re-verified against the stored key on every request, so
    rotating or deleting a key immediately invalidates every
    outstanding token minted from it. The default token
@@ -118,12 +118,12 @@ the one pinned in `docs/glossary.md`.
    (`config.API_TOKEN_DURATION`).
 4. **Authentication and scope enforcement are universal.**
    Both run from `Resource.method_decorators`
-   (`shakenfist/external_api/base.py:1291-1298`), so a new
+   (`shakenfist/external_api/base.py:2637-2645`), so a new
    endpoint is authenticated and scope-checked without
    anyone remembering to decorate it. `@api_base.public` is
    the only way out, and the public set is written down and
    individually justified. The scope check itself is
-   `_enforce_scope` (`shakenfist/external_api/base.py:1234`),
+   `_enforce_scope` (`shakenfist/external_api/base.py:2458-2474`),
    comparing the token's `scopes` claim against a scope
    derived from the resource class and the HTTP method.
 5. **`caller_is_admin` is two axes, not one.** An
@@ -151,11 +151,11 @@ the one pinned in `docs/glossary.md`.
    matching is **exact only**: an exact string, or
    membership of a list of exact strings, with no globbing,
    regular expressions, prefix matching or coercion
-   (`shakenfist/federation.py:347-363`).
+   (`shakenfist/federation.py:359-376`).
 8. **An external identity can already be exchanged for a
    credential.** `POST /auth/federated`
-   (`shakenfist/external_api/app.py:383`, handler at
-   `shakenfist/external_api/auth.py:1258`) is
+   (`shakenfist/external_api/app.py:645`, handler at
+   `shakenfist/external_api/auth.py:1861`) is
    unauthenticated by `@api_base.public` — its
    authentication *is* the presented token — takes
    `{token, namespace, rule}`, and returns
@@ -184,7 +184,7 @@ the one pinned in `docs/glossary.md`.
     it.
 11. **Inter-node authentication** still reuses the key
     path, via short-lived `_service_key_<rand>` keys minted
-    per request (`shakenfist/namespace.py:386-410`). Those
+    per request (`shakenfist/namespace.py:494-518`). Those
     keys now live on the new tables, use `sfk_`-format
     secrets, expire after five minutes and mint five-minute
     tokens.
@@ -378,7 +378,7 @@ Scope boundaries:
    carrying exactly `issuer_url`, `jwks_uri` and `audience`
    (`shakenfist/schema/trusted_issuer_attributes.py:45-53`),
    created and deleted by an administrator under
-   `/auth/issuers` (`shakenfist/external_api/app.py:376-378`).
+   `/auth/issuers` (`shakenfist/external_api/app.py:638-640`).
    A cluster trusts as many issuers as it has rows, so
    "internal IdP for staff, partner IdP for contractors" is
    two API calls rather than a config edit and a restart.
@@ -425,7 +425,7 @@ Scope boundaries:
    namespace. Claim matching is exact only — an exact
    string, or membership of a list of exact strings, with no
    globbing, regular expressions, prefix matching or
-   coercion (`shakenfist/federation.py:347-363`). So the
+   coercion (`shakenfist/federation.py:359-376`). So the
    policy lives in Shaken Fist, as the second option wanted,
    but it is expressed as one object per grant, owned by the
    namespace being granted into, rather than as a
@@ -461,7 +461,7 @@ Scope boundaries:
    happened, but for a different reason and only on one
    side. Authentication is now universal: it runs from
    `Resource.method_decorators`
-   (`shakenfist/external_api/base.py:1291-1298`) rather than
+   (`shakenfist/external_api/base.py:2637-2645`) rather than
    from 120 hand-applied decorators, with `@api_base.public`
    the only exemption. That was done as step 3a of the auth
    federation plan so that scope enforcement could be added
@@ -475,14 +475,14 @@ Scope boundaries:
    The description of the token is also stale. A Shaken Fist
    access token carries `iss`, the minting key's `nonce` and
    a `scopes` list alongside `sub`
-   (`shakenfist/util/access_tokens.py:42-47`). `scopes` is
+   (`shakenfist/util/access_tokens.py:49-54`). `scopes` is
    the interesting one, because it is precisely the claim an
    IdP-issued token will not have — see open question 13.
 
    What has **not** happened is the second half.
    `request_namespace()` is still a string split over a
    two-component identity
-   (`shakenfist/util/access_tokens.py:68-76`), called from
+   (`shakenfist/util/access_tokens.py:75-80`), called from
    fifty-seven sites outside the tests. Turning it into "a
    per-request authorisation decision" is entirely
    untouched, and is large enough that it is now open
@@ -623,7 +623,7 @@ Scope boundaries:
    revocation design of its own — deleting the minted key
    invalidates every token derived from it on the next
    request, exactly as for any other key
-   (`docs/developer_guide/authentication.md:411-413`).
+   (`docs/developer_guide/authentication.md:422-424`).
 
    So this stops being an independent decision and becomes a
    consequence of one. If human login follows the exchange
@@ -650,7 +650,7 @@ Scope boundaries:
    **Still open, but close to settled (2026-08-12).** The
    premise was re-checked and holds. Inter-node calls still
    mint a short-lived `_service_key_<rand>` key per request
-   (`shakenfist/namespace.py:386-410`). Phase 2 moved those
+   (`shakenfist/namespace.py:494-518`). Phase 2 moved those
    keys onto the `namespace_keys` tables and gave them
    `sfk_`-format secrets, a five minute key expiry and a
    five minute token, but the mechanism is the one this
@@ -773,7 +773,7 @@ Scope boundaries:
     comes from `Namespace.keys`, which synthesises the
     legacy `{'nonced_keys': ...}` dict out of the tables for
     the handful of call sites that still read it
-    (`shakenfist/namespace.py:197-205`).
+    (`shakenfist/namespace.py:206-214`).
 
 12. **Documentation surface.** Three audiences:
     * **Operators** — how to configure a JWKS / issuer
@@ -848,16 +848,16 @@ Scope boundaries:
     unconditionally when the held scope list is `None`
     (`shakenfist/external_api/scopes.py:137-142`), and
     `caller_is_admin` tests the same predicate
-    (`shakenfist/external_api/base.py:140-145`). That
+    (`shakenfist/external_api/base.py:291-292`). That
     default is correct and deliberate: a token minted before
     the claim existed carries no `scopes`, and refusing
     those would have invalidated every token in flight
     across an upgrade — the reasoning is written down at
-    `shakenfist/util/access_tokens.py:31-34`. But an
+    `shakenfist/util/access_tokens.py:32-35`. But an
     IdP-issued token also carries no `scopes` claim, and no
     IdP is ever going to mint one, so under direct-bearer
     such a token would reach `_enforce_scope`
-    (`shakenfist/external_api/base.py:1234`) holding `None`
+    (`shakenfist/external_api/base.py:2461-2464`) holding `None`
     and satisfy every scope, including `cluster-admin`.
 
     **This is not a bug and must not be filed as one.** No
@@ -894,7 +894,7 @@ Scope boundaries:
     namespace each request touches. Every credential Shaken
     Fist mints names exactly one: the JWT identity is
     `<namespace>:<keyname>`
-    (`shakenfist/util/access_tokens.py:49`) and a namespace
+    (`shakenfist/util/access_tokens.py:56`) and a namespace
     key belongs to a single namespace
     (`shakenfist/schema/namespace_key_data.py:60-63`). So
     exchange for a person in five namespaces means five
@@ -947,10 +947,13 @@ Scope boundaries:
     The same measurement turned up something this question did
     not ask for, and it bears on open question 14. The shape the
     question was trying to detect is already in production, for
-    a machine: the CI conductor is one actor holding fourteen
-    separate credentials, all named `conductor`, one per
-    namespace it works in, because a namespace key can name
-    exactly one namespace. That is this question's own stated
+    a machine: the CI conductor is one actor holding a separate
+    credential in every namespace it works in, all of them named
+    `conductor`, because a namespace key can name exactly one
+    namespace. The count is whatever the job population happens
+    to be -- fourteen in one sample, eight an hour later -- so
+    it is the per-namespace invariant that matters here, not the
+    number. That is this question's own stated
     cost of exchange — several exchanges and a client that knows
     which credential to present — being paid today. Meanwhile
     `ci-images` takes the other route for the same need, listing
@@ -970,7 +973,7 @@ Scope boundaries:
     construction and everywhere. `parse_jwt_identity()`
     requires exactly two colon-separated components and
     raises otherwise
-    (`shakenfist/util/access_tokens.py:68-73`),
+    (`shakenfist/util/access_tokens.py:75-80`),
     `request_namespace()` returns the first of them as a
     single string
     (`shakenfist/util/access_tokens.py:83`), and fifty-seven
@@ -990,7 +993,7 @@ Scope boundaries:
     Namespace [trust](/glossary/#trust) grants visibility
     from trusted namespaces into the trusting namespace
     (`namespace_is_trusted()`,
-    `shakenfist/namespace.py:413`), and auth federation
+    `shakenfist/namespace.py:521-531`), and auth federation
     phase 3 established that scopes compose with trust
     rather than being escaped by it. So a caller holding one
     namespace can already reach objects in another, under an
@@ -1032,6 +1035,10 @@ No phase plan has been cut yet, and phase 0 must run before
 any of the others can be. It settles open questions 13 and
 14, and what most of the rows below actually *are* depends
 on which way 13 goes.
+
+The `file:line` references throughout this plan were re-resolved
+against the tree at commit `6b0ab81b2a` (phase 0 step 0e), so they
+are true as of that commit and may drift as the code moves.
 
 The **Repo** column is not decoration. `sf-client` lives in
 the separate `client-python` repository; this repository
@@ -1278,14 +1285,14 @@ As per `PLAN-TEMPLATE.md`, plus for this plan specifically:
       those have a history, and is not obviously safe for
       tokens it did not — see open question 13.
 - [ ] Inter-node authentication is never put behind an
-      external IdP (`shakenfist/namespace.py:386-410`).
+      external IdP (`shakenfist/namespace.py:494-518`).
       Making the IdP a hard dependency of cluster operation
       is a reliability regression, not a security
       improvement.
 - [ ] Authorisation still happens in exactly one place. No
       phase adds a second path beside
       `Resource.method_decorators`
-      (`shakenfist/external_api/base.py:1291`), whatever
+      (`shakenfist/external_api/base.py:2637`), whatever
       open question 13 decides.
 - [ ] No second copy of JWT validation, JWKS fetching or
       caching. Anything new extends
@@ -1304,7 +1311,7 @@ As per `PLAN-TEMPLATE.md`, plus for this plan specifically:
 - [ ] Claim matching is still exact: an exact string, or
       membership of a list of exact strings, with no
       globbing, regular expressions, prefix matching or
-      coercion (`shakenfist/federation.py:347-363`). If a
+      coercion (`shakenfist/federation.py:359-376`). If a
       phase wants pattern matching it argues for it in the
       open, because a claim matcher that is nearly right is
       an authorisation bypass.
