@@ -65,13 +65,35 @@ def _kerbside_url_classes(path):
     """The character classes kerbside_url is checked against in path."""
     classes = []
     for task in _tasks(path):
-        assertion = task.get('ansible.builtin.assert') or {}
-        conditions = assertion.get('that') or []
-        if isinstance(conditions, str):
-            conditions = [conditions]
-        for condition in conditions:
-            classes.extend(CONDITION.findall(str(condition)))
+        for condition in _conditions(task):
+            classes.extend(CONDITION.findall(condition))
     return classes
+
+
+def _conditions(task):
+    """An assert task's conditions, as text, or nothing for another module."""
+    assertion = task.get('ansible.builtin.assert') or {}
+    conditions = assertion.get('that') or []
+    if isinstance(conditions, str):
+        conditions = [conditions]
+    return [str(condition) for condition in conditions]
+
+
+def _index_of(path, predicate):
+    """Where the first task matching predicate runs in path, or None."""
+    for index, task in enumerate(_tasks(path)):
+        if predicate(task):
+            return index
+    return None
+
+
+def _checks_kerbside_url(task):
+    return any(CONDITION.search(condition) for condition in _conditions(task))
+
+
+def _writes_the_config(task):
+    template = task.get('ansible.builtin.template') or {}
+    return template.get('dest') == '/etc/sf/config'
 
 
 class KerbsideInjectionContractTestCase(base.ShakenFistTestCase):
@@ -84,6 +106,23 @@ class KerbsideInjectionContractTestCase(base.ShakenFistTestCase):
                 '/etc/sf/config) and kerbside_source.yml (into kerbside.ini), '
                 'and each runs on hosts the other does not reach, so both need '
                 'the check.' % os.path.basename(path))
+
+    def test_the_config_guard_runs_before_the_template(self):
+        # A check that runs after the parse is not a check (coding_rules.md):
+        # config.yml's guard must refuse kerbside_url before the template task
+        # writes the injected value to /etc/sf/config, and moving it below that
+        # task would leave every other case in this module green.
+        guard = _index_of(CONFIG_TASKS, _checks_kerbside_url)
+        writes = _index_of(CONFIG_TASKS, _writes_the_config)
+        self.assertIsNotNone(
+            writes, 'config.yml no longer has a task templating /etc/sf/config, so this test '
+                    'cannot tell whether the kerbside_url guard still runs before it.')
+        self.assertIsNotNone(guard, 'config.yml does not check kerbside_url at all.')
+        self.assertLess(
+            guard, writes,
+            'config.yml checks kerbside_url at task %d but writes /etc/sf/config at task %d. The '
+            'guard must run first: after the template, the injected value is already on the host '
+            'and the check refuses a file it has written.' % (guard, writes))
 
     def test_the_two_classes_agree(self):
         config = _kerbside_url_classes(CONFIG_TASKS)

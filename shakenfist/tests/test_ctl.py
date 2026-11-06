@@ -400,8 +400,13 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         # again, so a scope the API cannot derive mints a key which answers 403
         # on its first real request. Each of these fails closed instead, and
         # mints nothing.
+        # A bare '*' is in the list on purpose: scopes.satisfies() honours it
+        # as the universal wildcard, so recording it grants exactly what a key
+        # with no scopes recorded grants -- a cluster administrator. --scope
+        # exists to narrow a key, so it fails closed on the one value that
+        # widens it, and the message points at omitting --scope instead.
         for bad in ('', '   ', 'node', 'node.', '.read', 'node.reed',
-                    'cluster_admin', 'node.read.extra'):
+                    'cluster_admin', 'node.read.extra', '*'):
             result = self.runner.invoke(
                 bootstrap_system_key, ['kerbside', 'myvalue', '--scope', bad])
             self.assertEqual(

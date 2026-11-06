@@ -223,7 +223,17 @@
 # and system_key the database host sees -- the key is minted there, from that
 # host's values -- so kerbside_source can refuse a Kerbside host whose
 # kerbside_system_key is not the minted one, or is the deploy key, without
-# either secret leaving the database host. Shaken Fist is not deployed yet,
+# either secret leaving the database host. kerbside_db_host is the first
+# REACHABLE database-tier host, the same derivation as the Deploy Kerbside
+# play's kerbside_sf_ca_host, because the key is minted by a run_once task in
+# the 'Write the cluster configuration' play, whose hosts are the reachable
+# database tier. Taking the first host in the inventory instead would compare
+# these hashes against a host which is not the one minting, whenever the
+# inventory's first database host is absent from the run and carries a
+# host_vars override -- a check which passes on the wrong value. The reachable
+# group is built two plays above, and the cluster shape play has already
+# refused an inventory with no reachable database-tier host, so the list is
+# never empty here. Shaken Fist is not deployed yet,
 # so the CA its /admin/cacert serves is not known: kerbside_sf_ca_cert is null,
 # the source carries a placeholder, and the Deploy Kerbside play builds it
 # again with the CA.
@@ -289,7 +299,9 @@
         kerbside_url_on_sf_nodes: "{{ hostvars[groups['allsf'][0]]['kerbside_url'] | default('') }}"
         kerbside_minted_key_hash: "{{ hostvars[kerbside_db_host]['kerbside_system_key'] | default('', true) | hash('sha256') }}"
         kerbside_deploy_key_hash: "{{ hostvars[kerbside_db_host]['system_key'] | default('', true) | hash('sha256') }}"
-        kerbside_db_host: "{{ (groups.get('database_node', []) + groups.get('etcd_master', [])) | unique | first }}"
+        kerbside_db_host: >-
+          {{ ((groups.get('database_node', []) + groups.get('etcd_master', []))
+              | unique | intersect(groups['reachable'] | default([]))) | first }}
         kerbside_sf_ca_cert: null
 
     - name: Validate the Kerbside configuration with the kerbside role
@@ -1018,7 +1030,9 @@
         kerbside_url_on_sf_nodes: "{{ hostvars[groups['allsf'][0]]['kerbside_url'] | default('') }}"
         kerbside_minted_key_hash: "{{ hostvars[kerbside_db_host]['kerbside_system_key'] | default('', true) | hash('sha256') }}"
         kerbside_deploy_key_hash: "{{ hostvars[kerbside_db_host]['system_key'] | default('', true) | hash('sha256') }}"
-        kerbside_db_host: "{{ (groups.get('database_node', []) + groups.get('etcd_master', [])) | unique | first }}"
+        kerbside_db_host: >-
+          {{ ((groups.get('database_node', []) + groups.get('etcd_master', []))
+              | unique | intersect(groups['reachable'] | default([]))) | first }}
         kerbside_sf_ca_cert: "{{ kerbside_sf_ca_slurp.content | b64decode }}"
 
     # Creates the kerbside group the certificate's key is readable by.

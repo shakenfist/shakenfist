@@ -139,11 +139,11 @@ config = sf_config.config
 from shakenfist import exceptions                          # noqa
 from shakenfist import mariadb                             # noqa
 from shakenfist.constants import EVENT_TYPE_AUDIT          # noqa
+from shakenfist.external_api import scopes as api_scopes   # noqa
 from shakenfist.namespace import Namespace                 # noqa
 from shakenfist.node import Node                           # noqa
 from shakenfist.schema.object_state import State           # noqa
 from shakenfist.schema.object_types import ObjectType      # noqa
-from shakenfist.external_api import scopes as api_scopes   # noqa
 from shakenfist.schema import database_load_budget         # noqa
 from shakenfist.util import metrics_scrape                 # noqa
 from shakenfist.util.grpc_channel import make_database_channel  # noqa
@@ -193,8 +193,11 @@ def _check_scope_shape(scope: str) -> None:
             '%r is not a scope. Use %s for the administrative axis, or '
             '<family>.<verb> with <verb> one of %s -- for example node.read '
             'or instance.%s. A scope the API cannot derive satisfies nothing, '
-            'so a key holding it is refused on every request.'
-            % (scope, api_scopes.ADMIN, ', '.join(verbs), api_scopes.WILDCARD))
+            'so a key holding it is refused on every request. For a key with '
+            'no restriction at all, omit --scope entirely rather than passing '
+            'a bare %s.'
+            % (scope, api_scopes.ADMIN, ', '.join(verbs), api_scopes.WILDCARD,
+               api_scopes.WILDCARD))
 
 
 @click.command()

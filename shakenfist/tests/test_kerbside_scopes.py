@@ -40,6 +40,17 @@ VDI_CONSOLE_TOKENS_DOC = os.path.join(
 # The endpoints Kerbside reads while scraping a Shaken Fist cluster: the CA and
 # the console token signing key's public half, then the nodes and instances it
 # builds its console list from.
+#
+# Read from Kerbside's own source, kerbside/sources/shakenfist.py at Kerbside
+# v0.8.0 -- the range examples/_shared/requirements.yml pins, and unchanged at
+# v0.9.0 -- which is the whole of what that file asks a Shaken Fist cluster
+# for: get_cluster_cacert(), get_vdi_token_public_keys() (in ShakenFistSource
+# and again in refresh_all_signing_keys()), get_nodes() and get_instances().
+# Re-read it when that pin moves. This list is what cannot drift from the
+# deploy; a Kerbside version which calls a FIFTH endpoint is the case no test
+# on this side can see, and it would 403 against a cluster deployed from this
+# collection -- which is why the scopes are documented rather than only
+# minted.
 SCRAPED = [
     api_admin.AdminClusterCaCertificateEndpoint,
     api_admin.AdminVDITokenPublicKeyEndpoint,

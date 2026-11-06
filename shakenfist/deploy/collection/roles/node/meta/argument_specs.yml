@@ -13,13 +13,13 @@ argument_specs:
         names and no other host's facts; the consuming playbook maps its
         inventory onto these variables and orders database-tier hosts first.
     options: &node_options
-      node_name:
+      node_name: &node_name_option
         type: str
         default: "localhost"
         description:
           - This node's Shaken Fist name. Becomes SHAKENFIST_NODE_NAME and the
             node identity used by sf-ctl initialise-node and register-daemon.
-      node_egress_ip:
+      node_egress_ip: &node_egress_ip_option
         type: str
         default: "127.0.0.1"
         description:
@@ -31,7 +31,7 @@ argument_specs:
         description:
           - This node's egress network interface. Becomes
             SHAKENFIST_NODE_EGRESS_NIC.
-      node_mesh_ip:
+      node_mesh_ip: &node_mesh_ip_option
         type: str
         default: "127.0.0.1"
         description:
@@ -309,8 +309,14 @@ argument_specs:
             kerbside_source reserves the ports Shaken Fist's daemons listen on
             (13000, 13001 and 13005-13007 by default) as well as the instance
             console range; when it is not, kerbside_source refuses a loopback
-            api_url, since nothing answers there. The example playbook sets it
-            per host, from the allsf group.
+            api_url, since nothing answers there. It also decides whether an
+            api_url naming this host's own address (node_mesh_ip,
+            node_egress_ip, node_name or ansible_host) counts as local for the
+            cleartext refusal below: sf-api answers locally on a Shaken Fist
+            node, while on a dedicated Kerbside host whatever answers that
+            address forwards the request, and kerbside_system_key with it,
+            over the network. The example playbook sets it per host, from the
+            allsf group.
       kerbside_allow_insecure_api_url: &kerbside_allow_insecure_api_url_option
         type: bool
         default: false
@@ -324,9 +330,14 @@ argument_specs:
             scheme, or whose host urlsplit reads as one, is refused too rather
             than passing a check it does not satisfy. Set it true only when the
             network between the Kerbside host and the API is trusted, such as a
-            private CI network. A loopback api_url is unaffected, since that
-            traffic never leaves the host, whether or not the host is also a
-            Shaken Fist node.
+            private CI network. Most multi-node clusters need it, or an
+            https:// api_url, because the deploy puts no TLS in front of
+            sf-api. An api_url which points at this host is unaffected, since
+            that traffic never leaves it: a loopback address whether or not the
+            host is also a Shaken Fist node, and on one which is, this host's
+            own node_mesh_ip, node_egress_ip, node_name or ansible_host too.
+            Only inventory values are compared, never gathered facts, which
+            neither of the example playbook's Kerbside plays collects.
       kerbside_minted_key_hash: &kerbside_minted_key_hash_option
         type: str
         default: null
@@ -532,9 +543,9 @@ argument_specs:
       - >-
         Fails when kerbside_system_key is empty; when kerbside_sf_ca_cert is
         not null and holds no PEM certificate; when api_url is a loopback URL
-        and kerbside_colocated is false; when api_url is http:// and
-        kerbside_colocated is false, unless kerbside_allow_insecure_api_url is
-        true; when kerbside_url_on_sf_nodes is supplied and differs from
+        and kerbside_colocated is false; when api_url is http:// and does not
+        point at this host, unless kerbside_allow_insecure_api_url is true;
+        when kerbside_url_on_sf_nodes is supplied and differs from
         kerbside_url; or, when the database host's hashes are supplied, when
         kerbside_system_key is not the minted key (kerbside_minted_key_hash) or
         is the deploy key (kerbside_deploy_key_hash). No message includes the
@@ -562,3 +573,8 @@ argument_specs:
       kerbside_allow_insecure_api_url: *kerbside_allow_insecure_api_url_option
       kerbside_minted_key_hash: *kerbside_minted_key_hash_option
       kerbside_deploy_key_hash: *kerbside_deploy_key_hash_option
+      # Read only to tell whether api_url names this host, for the cleartext
+      # refusal, on a host which is also a Shaken Fist node.
+      node_name: *node_name_option
+      node_egress_ip: *node_egress_ip_option
+      node_mesh_ip: *node_mesh_ip_option

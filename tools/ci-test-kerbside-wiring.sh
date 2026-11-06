@@ -19,13 +19,16 @@
 # kerbside group is absent; that kerbside_source builds a source Kerbside's own
 # checker accepts, field by field, reserves the ports Shaken Fist uses, and
 # refuses an empty key, a CA which is not a PEM, a loopback api_url on a host
-# which is not a Shaken Fist node and a kerbside_url the two sides see
-# differently; that the cluster shape play refuses a kerbside_url which ends in
-# a slash, or which Shaken Fist's nodes see differently, before any host is
-# changed; that the validation play checks every Kerbside host with the
-# variables that host sees, and that a refusal on any host ends the run; that
-# without the collection it names the install command when there is a Kerbside
-# host, and does nothing when there is none; that it accepts a release in the
+# which is not a Shaken Fist node, a cleartext api_url which does not point at
+# this host (while accepting one which names this node's own inventory
+# address), a PKI directory equal to or inside the SPICE one, and a
+# kerbside_url the two sides see differently; that the cluster shape play
+# refuses a kerbside_url which ends in a slash, or which Shaken Fist's nodes
+# see differently, before any host is changed; that the validation play checks
+# every Kerbside host with the variables that host sees, and that a refusal on
+# any host ends the run; that without the collection it names the install
+# command when there is a Kerbside host, and does nothing when there is none;
+# that it accepts a release in the
 # range requirements.yml pins, refuses one outside it, and accepts a checkout
 # with a warning; that kerbside_extra_sources follow this cluster's source;
 # that the Deploy play's source carries the CA byte for byte; that internal_ca
@@ -386,9 +389,18 @@ for play, tasks in ((validate, v_tasks), (deploy, d_tasks)):
 # every case in this script still green (#4700).
 for play, tasks in ((validate, v_tasks), (deploy, d_tasks)):
     source_vars = tasks[0].get('vars') or {}
-    if 'database_node' not in str(source_vars.get('kerbside_db_host', '')):
+    db_host = str(source_vars.get('kerbside_db_host', ''))
+    if 'database_node' not in db_host:
         sys.exit(f'{play["name"]!r} does not derive kerbside_db_host from the database tier, '
                  'so the key hashes do not come from the host which mints the key')
+    # The mint is a run_once task over database_node:etcd_master:&reachable,
+    # so the first host in the inventory is the wrong one whenever it is
+    # absent from the run: the hashes would then be compared against a host
+    # which is not minting.
+    if 'reachable' not in db_host:
+        sys.exit(f'{play["name"]!r} derives kerbside_db_host without intersecting the reachable '
+                 'group, so the key hashes come from the first database host in the inventory '
+                 'rather than the first the run_once mint actually uses')
     for var, key in (('kerbside_minted_key_hash', "['kerbside_system_key']"),
                      ('kerbside_deploy_key_hash', "['system_key']")):
         value = str(source_vars.get(var, ''))
@@ -819,6 +831,35 @@ PYEOF
         '"kerbside_colocated": true, "api_url": "http://localhost:13000"')" \
         "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused a loopback cleartext api_url'
 
+    # A co-located host's own address is as local as loopback: sf-api listens
+    # on every node, so the request never leaves the host and the key is not
+    # exposed. The addresses compared are the inventory's (node_mesh_ip,
+    # node_egress_ip, node_name, ansible_host), never gathered facts, because
+    # neither Kerbside play gathers them. The case below is a co-located
+    # Kerbside host naming its own routable address, api_url
+    # http://10.0.0.1:13000, which is sf-1's node_mesh_ip in
+    # examples/cluster (whose own api_url is the load-balanced https one).
+    local own
+    for own in '"node_mesh_ip": "10.0.0.1"' '"node_egress_ip": "10.0.0.1"' \
+               '"node_name": "10.0.0.1"' '"ansible_host": "10.0.0.1"'; do
+        CURRENT_CASE="case 6: kerbside_source accepts a cleartext api_url which is this node's own address (${own})"
+        run "${WITHOUT}" -i localhost, -e "$(source_vars insecure-own-address \
+            "\"kerbside_colocated\": true, \"api_url\": \"http://10.0.0.1:13000\", ${own}")" \
+            "${WORK}/kerbside-source.yml" \
+            || fail "kerbside_source refused a cleartext api_url which is this node's own address"
+    done
+
+    # But only on a Shaken Fist node: a dedicated Kerbside host runs no
+    # sf-api, so whatever answers its own address forwards the request, and
+    # the key, onwards.
+    source_refuses "a cleartext api_url which is a dedicated host's own address" \
+        '"api_url": "http://10.0.0.1:13000", "node_mesh_ip": "10.0.0.1"' \
+        'has the scheme "http", not https'
+    # And only this host's own address: another node's is a network hop.
+    source_refuses "a cleartext api_url which is another node's address" \
+        '"kerbside_colocated": true, "api_url": "http://10.0.0.2:13000", "node_mesh_ip": "10.0.0.1"' \
+        'has the scheme "http", not https'
+
     # #4700: this host's kerbside_system_key must be the one minted on the
     # database host, and must not be the deploy key. The hashes are what the
     # consuming playbook passes; sha256 them the way ansible's hash('sha256')
@@ -869,6 +910,19 @@ PYEOF
     source_refuses 'a Kerbside PKI directory equal to the SPICE one with a trailing slash' \
         '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice/"' \
         'would overwrite'
+    source_refuses 'a Kerbside PKI directory inside the SPICE one' \
+        '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice/kerbside"' \
+        'would overwrite'
+    source_refuses 'a Kerbside PKI directory inside the SPICE one by a dot' \
+        '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice/."' \
+        'would overwrite'
+
+    # The containment test must not catch a sibling whose name merely starts
+    # with the SPICE directory's.
+    CURRENT_CASE='case 6: kerbside_source accepts a PKI directory beside the SPICE one'
+    run "${WITHOUT}" -i localhost, -e "$(source_vars pki-sibling \
+        '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice-kerbside"')" \
+        "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused a PKI directory beside the SPICE one'
 
     CURRENT_CASE='case 6: kerbside_source refuses a public FQDN equal to a Shaken Fist host name'
     printf 'localhost ansible_connection=local\n[allsf]\nlocalhost\n' > "${WORK}/inv-allsf.ini"

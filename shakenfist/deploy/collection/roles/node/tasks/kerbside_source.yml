@@ -51,9 +51,9 @@
 
 # Kerbside fetches the console token signing key from api_url, as this host
 # sees it, and posts kerbside_system_key in the body of every POST /auth it
-# makes there. Both refusals below turn on one property of api_url -- does it
-# name this host? -- so it is derived once, as block vars. Block vars rather
-# than set_fact: a fact would be durable state at a precedence outranking the
+# makes there. Both refusals below turn on where api_url points -- at this
+# host, or away from it -- so that is derived once, as block vars. Block vars
+# rather than set_fact: a fact would be durable state at a precedence outranking the
 # shakenfist.kerbside role's own variables, and that role owns this prefix
 # (kerbside_api_address, kerbside_api_port, kerbside_api_workers), so a future
 # kerbside_api_host there would be silently overridden by this derivation.
@@ -76,6 +76,32 @@
          or kerbside_api_host is match('^127([.][0-9]+){0,3}$')
          or kerbside_api_host is match('^[0:]*:0{0,3}1$')
          or kerbside_api_host is match('^(0{0,4}:)*:?ffff:127[.]') }}
+    # Whether api_url reaches Shaken Fist without leaving this host, which is
+    # what decides whether an unencrypted api_url exposes kerbside_system_key.
+    # Loopback always is. So is a Shaken Fist node's own address: sf-api
+    # listens on every node, so the kernel delivers the packets locally and
+    # they never reach a wire. kerbside_colocated gates that second case
+    # because a dedicated Kerbside host runs no sf-api, so whatever answers
+    # that host's own address is a proxy which forwards the request -- and
+    # kerbside_system_key with it -- over the network after all.
+    #
+    # Compared against the names and addresses the INVENTORY gives this host,
+    # never gathered facts: neither of the consuming playbook's two Kerbside
+    # plays gathers them (the validation play runs before any host is
+    # touched), so a fact-based exemption would refuse in the validation play
+    # and pass in the deploy play, which an operator stopped by the first
+    # never reaches. node_name, node_mesh_ip and node_egress_ip default to
+    # loopback in this role, which is already exempt above, so an inventory
+    # which sets none of them loses nothing. An api_url naming this host by
+    # some other name -- a DNS alias, or an address only the host itself knows
+    # -- is still refused, which fails closed and leaves
+    # kerbside_allow_insecure_api_url as the opt-out.
+    kerbside_api_is_local: >-
+      {{ kerbside_api_is_loopback | bool
+         or (kerbside_colocated | bool
+             and kerbside_api_host in ([inventory_hostname, node_name, ansible_host | default(''),
+                                        node_mesh_ip, node_egress_ip]
+                                       | map('string') | map('lower') | select | list)) }}
   block:
     # api_url's default, http://localhost:13000, works on a Kerbside host
     # which is also a Shaken Fist node, since sf-api listens on every node,
@@ -113,19 +139,22 @@
     - name: Refuse an api_url which is neither this host nor https
       ansible.builtin.assert:
         that: >-
-          kerbside_api_is_loopback | bool
+          kerbside_api_is_local | bool
           or kerbside_allow_insecure_api_url | bool
           or kerbside_api_scheme == 'https'
         fail_msg: >-
           api_url on {{ inventory_hostname }} has the scheme
           "{{ kerbside_api_scheme }}", not https, and its host
-          {{ kerbside_api_host }} is not this host, so Kerbside posts
-          kerbside_system_key over the network in cleartext on every scrape.
-          Use an https:// api_url, such as the cluster's load balancer or an
-          API node's address, or set kerbside_allow_insecure_api_url to true
-          to accept the risk, for example on a trusted private network or in
-          CI. An api_url with no scheme at all is refused here too: give it
-          one.
+          {{ kerbside_api_host }} is neither a loopback address nor a name or
+          address this inventory gives {{ inventory_hostname }}, so Kerbside
+          posts kerbside_system_key over the network in cleartext on every
+          scrape. Use an https:// api_url, such as the cluster's load balancer
+          or an API node's address; or, if it is this host, name it as the
+          inventory does (node_mesh_ip, node_egress_ip, node_name or
+          ansible_host) on a host which is also a Shaken Fist node; or set
+          kerbside_allow_insecure_api_url to true to accept the risk, for
+          example on a trusted private network or in CI. An api_url with no
+          scheme at all is refused here too: give it one.
         quiet: true
 
 # The kerbside role renders these raw into kerbside.ini, so a newline would
@@ -250,8 +279,14 @@
 # directory on a co-located hypervisor, Kerbside's key and certificate (group
 # kerbside) overwrite QEMU's SPICE key and certificate, and every deploy flips
 # the files and restarts Kerbside. A dedicated Kerbside host runs no QEMU, so
-# the collision only matters when co-located. Trailing slashes are stripped
-# from both sides, so '/etc/pki/libvirt-spice/' does not walk past the check.
+# the collision only matters when co-located. Trailing slashes are stripped,
+# so '/etc/pki/libvirt-spice/' does not walk past the check, and the test is
+# for containment rather than equality: a directory *under* the SPICE one
+# ('/etc/pki/libvirt-spice/kerbside') also puts Kerbside's files in that tree,
+# and hands group kerbside a directory inside the hypervisor's key material.
+# A path which only reaches the tree through '..' or a symlink is not caught;
+# resolving one would need the remote host, which this entry point never
+# touches, and it is not the mistake an operator makes.
 # The SPICE path is the literal internal_ca's cert_dest_dir defaults to, and
 # is spelled out here rather than read from that variable because the Deploy
 # Kerbside play overrides cert_dest_dir to kerbside_pki_dir itself, which
@@ -260,14 +295,15 @@
 - name: Refuse a Kerbside PKI directory which overwrites the SPICE one
   ansible.builtin.assert:
     that: >-
-      (kerbside_pki_dir | default('', true) | regex_replace('/+$', ''))
-      != '/etc/pki/libvirt-spice'
+      not ((kerbside_pki_dir | default('', true) | regex_replace('/+$', ''))
+           is match('/etc/pki/libvirt-spice($|/)'))
     fail_msg: >-
       kerbside_pki_dir is Shaken Fist's SPICE directory,
-      /etc/pki/libvirt-spice, on {{ inventory_hostname }}, which is also a
-      Shaken Fist node, so Kerbside would overwrite QEMU's
-      SPICE key and certificate and every deploy would flip the files. Give
-      Kerbside its own PKI directory.
+      /etc/pki/libvirt-spice, or a directory inside it, on
+      {{ inventory_hostname }}, which is also a Shaken Fist node, so Kerbside
+      would overwrite QEMU's SPICE key and certificate, or put its own key
+      where group kerbside can read that tree, and every deploy would flip the
+      files. Give Kerbside its own PKI directory.
     quiet: true
   when: kerbside_colocated | bool
 

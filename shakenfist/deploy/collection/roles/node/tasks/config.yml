@@ -49,38 +49,21 @@
     group: sudo
     mode: u=r,g=r,o=
 
-# The config template ships with this role, so it is rendered directly on the
-# target host. The legacy deployer fetched a control-node-rendered config back
-# and re-templated it; that round trip is unnecessary now that the template is
-# role-local and reads only role variables.
-#
-# It is rendered on EVERY run, not just when absent: a config that is written
-# only once never picks up new keys added upstream, nor a change in this node's
-# role -- most importantly joining or leaving the database tier, which flips
-# NODE_IS_DATABASE_NODE and the MARIADB_HOST/gateway lines. ansible rewrites
-# the file only when the rendered content actually differs, and sets the
-# ownership and mode every run, so this also subsumes the old separate
-# permission-tightening step for configs written by earlier (world-readable)
-# releases. The config contains secrets (the Loki auth header everywhere, the
-# MariaDB password on database-tier nodes), so it must not be world-readable;
-# the sudo group matches the global auth file above, letting the daemons read
-# it as root via systemd EnvironmentFile while administrators (and the CI test
-# scripts) read it as sudo-group users.
-# The config file and the systemd units below are each registered so that
-# kerbside_url renders into the config below as the value of
+# kerbside_url renders into the config written below as the value of
 # SHAKENFIST_KERBSIDE_URL, unescaped and inside double quotes, on every node
 # which has it set -- including a cluster pointing at an externally managed
 # Kerbside, with no kerbside inventory group and so no kerbside_source run to
-# judge it. The guard therefore lives here, beside the template that renders
+# judge it. The guard therefore lives here, before the template that renders
 # it, rather than in kerbside_source (which only sees Kerbside hosts) or
 # kerbside_preflight (which runs two plays later, after this file has already
-# been written).
+# been written). A check which ran after the template would not be a check:
+# the injected config would already be on the host.
 #
 # kerbside_source checks the same variable against the same character class,
 # for the kerbside role's kerbside.ini, which a dedicated Kerbside host
 # renders and this entry point never reaches.
 # shakenfist/tests/test_kerbside_injection_contract.py pins the two classes
-# to each other.
+# to each other, and pins this task ahead of the template.
 #
 # A newline would inject whatever directive followed it, as internal_ca's
 # validate.yml already refuses for the certtool templates. The rest of the
@@ -102,6 +85,24 @@
     quiet: true
   when: kerbside_url | default('', true) | length > 0
 
+# The config template ships with this role, so it is rendered directly on the
+# target host. The legacy deployer fetched a control-node-rendered config back
+# and re-templated it; that round trip is unnecessary now that the template is
+# role-local and reads only role variables.
+#
+# It is rendered on EVERY run, not just when absent: a config that is written
+# only once never picks up new keys added upstream, nor a change in this node's
+# role -- most importantly joining or leaving the database tier, which flips
+# NODE_IS_DATABASE_NODE and the MARIADB_HOST/gateway lines. ansible rewrites
+# the file only when the rendered content actually differs, and sets the
+# ownership and mode every run, so this also subsumes the old separate
+# permission-tightening step for configs written by earlier (world-readable)
+# releases. The config contains secrets (the Loki auth header everywhere, the
+# MariaDB password on database-tier nodes), so it must not be world-readable;
+# the sudo group matches the global auth file above, letting the daemons read
+# it as root via systemd EnvironmentFile while administrators (and the CI test
+# scripts) read it as sudo-group users.
+# The config file and the systemd units below are each registered so that
 # register.yml can restart daemons ONLY when something they depend on actually
 # changed (restart-on-change, 2 of 2). The config is the daemons' shared systemd
 # EnvironmentFile, so a change to it requires restarting every daemon; a changed

@@ -306,11 +306,21 @@ class CiDeployProfilesTestCase(base.ShakenFistTestCase):
                 'its own node. Point it at another node.' % (name, host))
 
     def test_kerbside_cleartext_api_url_carries_the_opt_out(self):
-        # kerbside_source refuses an http api_url whose host is not the
+        # kerbside_source refuses an http api_url which does not point at the
         # Kerbside host itself, because the system key is in the body of every
         # POST /auth it makes there. A lane which wants that must say so with
         # kerbside_allow_insecure_api_url, and the deploy fails at the
         # validation play without it (#4699).
+        #
+        # Only loopback is treated as local here, while kerbside_source also
+        # exempts a co-located host's own node_mesh_ip, node_egress_ip,
+        # node_name or ansible_host. That makes this check stricter than the
+        # role, never laxer: a profile pointing a Kerbside host at its own
+        # routable address would be asked for an opt-out it does not strictly
+        # need. Deliberate -- a profile's api_url is one value shared by every
+        # host in the group, so which host it names is not decidable here, and
+        # guessing wrong in the other direction would let a lane deploy a
+        # configuration this test had declared safe.
         for name, _, profile, group in self._kerbside_profiles():
             api_url = str(self._effective(profile, group, 'api_url', ROLE_DEFAULT_API_URL))
             split = urllib.parse.urlsplit(api_url)
@@ -318,8 +328,9 @@ class CiDeployProfilesTestCase(base.ShakenFistTestCase):
                 continue
             self.assertTrue(
                 self._effective(profile, group, 'kerbside_allow_insecure_api_url', False),
-                '%s: api_url on the Kerbside hosts is cleartext (%s) and is not the '
-                'Kerbside host itself, so kerbside_source refuses it. Set '
+                '%s: api_url on the Kerbside hosts is cleartext (%s) and is not a '
+                'loopback address, so kerbside_source refuses it unless it is this '
+                "host's own address on a co-located host. Set "
                 'kerbside_allow_insecure_api_url to accept the risk, or use https.'
                 % (name, api_url))
 
