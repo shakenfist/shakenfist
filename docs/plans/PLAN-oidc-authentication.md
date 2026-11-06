@@ -20,7 +20,7 @@ All planning documents should go into `docs/plans/`.
 
 Consult `ARCHITECTURE.md` for the system architecture
 overview, object types, and daemon structure. Consult
-`CLAUDE.md` for build commands, project conventions, and
+`AGENTS.md` for build commands, project conventions, and
 database access patterns. Consult `GOALS.md` for current
 development priorities. Key references inside the repo:
 
@@ -56,7 +56,7 @@ development priorities. Key references inside the repo:
 
 `sf-client` is **not** in this repository. It lives in
 `client-python`; this repo ships only `sf-ctl` and
-`sf-backup` (`pyproject.toml:157-158`). Anything to do with
+`sf-backup` (`pyproject.toml:190-191`). Anything to do with
 client-side login flows or credential caching happens
 there, not here.
 
@@ -81,7 +81,7 @@ the one pinned in `docs/glossary.md`.
 
 1. **Namespace keys are first-class objects.** A
    [namespace key](/glossary/#namespace-key) is a
-   `NamespaceKey` DBO (`shakenfist/namespace_key.py:62`)
+   `NamespaceKey` DBO (`shakenfist/namespace_key.py:63`)
    living in the `namespace_keys` and
    `namespace_key_attributes` tables, carrying a bcrypt
    hash, a [nonce](/glossary/#nonce), an optional expiry,
@@ -129,7 +129,7 @@ the one pinned in `docs/glossary.md`.
 5. **`caller_is_admin` is two axes, not one.** An
    administrative endpoint now requires **both** the
    `system` namespace and the `cluster-admin` scope
-   (`shakenfist/external_api/base.py:128-148`), so a key
+   (`shakenfist/external_api/base.py:279-299`), so a key
    scoped to, say, `blob.read` but minted into `system`
    cannot escalate. Legacy unscoped keys carry the wildcard
    and are unaffected.
@@ -170,7 +170,7 @@ the one pinned in `docs/glossary.md`.
    pinned RS/ES/PS algorithm allowlist with HS deliberately
    absent (`shakenfist/federation.py:39-51`), requires
    `exp`, `iss` and `aud`, and allows zero clock skew
-   (`shakenfist/federation.py:321-340`). JWKS fetching goes
+   (`shakenfist/federation.py:325-352`). JWKS fetching goes
    through `PyJWKClient` with per-issuer caching and a
    per-issuer lock, so a key rotation collapses concurrent
    misses into one fetch rather than a stampede
@@ -241,14 +241,14 @@ What it does not give us:
 * **One namespace per credential.** Every credential Shaken
   Fist mints names exactly one namespace, and
   `request_namespace()` is a string split returning one
-  name (`shakenfist/util/access_tokens.py:76`). A human is
+  name (`shakenfist/util/access_tokens.py:83`). A human is
   typically in several namespaces. The open questions below
   take this up; it is recorded here because it is a fact
   about the code, not because it is settled.
 * **Nothing on the client side.** `sf-client` lives in the
   separate `client-python` repository and has no login or
   OIDC code; this repo ships only `sf-ctl` and `sf-backup`
-  (`pyproject.toml:157-158`). None of phase 3's new route
+  (`pyproject.toml:190-191`). None of phase 3's new route
   families are wrapped by the client either.
 
 ### Relationship to the auth federation plan
@@ -504,7 +504,7 @@ Scope boundaries:
    (`shakenfist/schema/trusted_issuer_attributes.py:52-53`),
    and validation requires `exp`, `iss` and `aud` to be
    present, verifies all three, and allows zero clock leeway
-   (`shakenfist/federation.py:321-340`, with
+   (`shakenfist/federation.py:325-352`, with
    `LEEWAY_SECONDS = 0` at `shakenfist/federation.py:68`).
 
    Per-issuer rather than per-cluster because the audience
@@ -530,7 +530,7 @@ Scope boundaries:
    (2026-08-12).** Half of the change is built.
    `caller_is_admin` now requires **both** the `system`
    namespace and a `cluster-admin` scope
-   (`shakenfist/external_api/base.py:128-148`), so the
+   (`shakenfist/external_api/base.py:279-299`), so the
    administrative role already exists as something a token
    carries rather than as something a namespace name
    implies. Legacy unscoped keys hold the wildcard and are
@@ -583,8 +583,8 @@ Scope boundaries:
    by construction — anything publishing a JWKS works — and
    an Authentik service account is named as a supported
    source in both the operator and developer guides
-   (`docs/operator_guide/authentication.md:142`,
-   `docs/developer_guide/authentication.md:418`). Keycloak
+   (`docs/operator_guide/authentication.md:143-144`,
+   `docs/developer_guide/authentication.md:429`). Keycloak
    is expected to work identically, since no code is
    issuer-specific, but nothing in the tree or the
    documentation exercises it yet.
@@ -710,7 +710,7 @@ Scope boundaries:
    The second constraint is where the work lands.
    `sf-client` is in the separate `client-python`
    repository; this repository ships only `sf-ctl` and
-   `sf-backup` (`pyproject.toml:157-158`). Neither flow can
+   `sf-backup` (`pyproject.toml:190-191`). Neither flow can
    be implemented in this checkout, and the Execution table
    says so per row.
 
@@ -751,7 +751,7 @@ Scope boundaries:
     migration already happened, for reasons that had nothing
     to do with the rename: keys are first-class objects in
     the `namespace_keys` and `namespace_key_attributes`
-    tables (`shakenfist/namespace_key.py:62`), carrying
+    tables (`shakenfist/namespace_key.py:63`), carrying
     expiry, scopes and provenance, and the `keys` JSON
     column on `namespace_attributes` is neither read nor
     written any more (`shakenfist/namespace.py:187-190`).
@@ -813,7 +813,7 @@ Scope boundaries:
     operator through configuring one, and Keycloak appears
     in the documentation only as an example of a service
     likely to present a private CA certificate
-    (`docs/operator_guide/authentication.md:330`).
+    (`docs/operator_guide/authentication.md:384`).
     End-to-end worked examples for both, including how a
     group claim reaches a namespace grant, remain to be
     written — and they are the part that cannot be written
@@ -926,6 +926,40 @@ Scope boundaries:
     "authorisation lives in one place" is a constraint this
     plan will not trade away.
 
+    **The first of those two is not in fact obtainable, and
+    phase 0's planning pass established that rather than
+    discovering it halfway through (2026-11-07).** The
+    distribution was measured against sfcbr, the only real
+    deployment there is: sixteen namespaces, twelve of them
+    ephemeral per-CI-job `sfcbr-*`, and exactly one key in the
+    whole cluster held by a person (`roberto`, in `system`). A
+    sample of size one, drawn from a cluster that has no staff
+    because it is a CI cloud, cannot discriminate between the
+    two options — and it must not be read as "usually one",
+    which is the reading that would hand exchange the win. So
+    the weight falls on the second piece of evidence and on open
+    question 14's call-site audit, both of which are facts about
+    our own code rather than about other people's deployments.
+    See
+    [phase 0](PLAN-oidc-authentication-phase-00-decisions.md),
+    decisions D2 and D3.
+
+    The same measurement turned up something this question did
+    not ask for, and it bears on open question 14. The shape the
+    question was trying to detect is already in production, for
+    a machine: the CI conductor is one actor holding fourteen
+    separate credentials, all named `conductor`, one per
+    namespace it works in, because a namespace key can name
+    exactly one namespace. That is this question's own stated
+    cost of exchange — several exchanges and a client that knows
+    which credential to present — being paid today. Meanwhile
+    `ci-images` takes the other route for the same need, listing
+    every live job namespace in its
+    [trust](/glossary/#trust) list so jobs can read shared
+    images with no second credential at all. Both mechanisms are
+    live side by side, serving one need, chosen differently in
+    two places by the same operator.
+
 14. **Multi-namespace authorisation.** Promoted from a
     settled-sounding sentence in an earlier draft of this
     plan to a question of its own, because it is the single
@@ -939,7 +973,7 @@ Scope boundaries:
     (`shakenfist/util/access_tokens.py:68-73`),
     `request_namespace()` returns the first of them as a
     single string
-    (`shakenfist/util/access_tokens.py:76`), and fifty-seven
+    (`shakenfist/util/access_tokens.py:83`), and fifty-seven
     call sites outside the tests compare that string against
     an object's namespace — seventeen in
     `shakenfist/external_api/artifact.py` alone. Letting a
@@ -1002,7 +1036,7 @@ on which way 13 goes.
 The **Repo** column is not decoration. `sf-client` lives in
 the separate `client-python` repository; this repository
 ships only `sf-ctl` and `sf-backup`
-(`pyproject.toml:157-158`). A phase that adds a login
+(`pyproject.toml:190-191`). A phase that adds a login
 command therefore cannot be executed in this checkout at
 all, and an agent handed such a brief in the wrong tree
 finds that out only after it has read the codebase. Every
@@ -1011,7 +1045,7 @@ not land anywhere else.
 
 | Phase | Repo | Plan | Status | Merged |
 |-------|------|------|--------|--------|
-| 0. Research and decisions | shakenfist | TBD | Not started | — |
+| 0. Research and decisions | shakenfist | [PLAN-oidc-authentication-phase-00-decisions.md](PLAN-oidc-authentication-phase-00-decisions.md) | In progress | — |
 | 1. JWT validation refactor (split issuance from validation; introduce per-issuer validators) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as `PLAN-auth-federation.md` phase 3 steps 3a-3c and 3f: `72187d2ff` (#3556), `c64269e63` (#3625) |
 | 2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as `PLAN-auth-federation.md` phase 3 step 3f: `c64269e63` (#3625), `1e7a167ea` (#3641) |
 | 3. OIDC discovery | shakenfist | TBD | Not started | — |
@@ -1064,7 +1098,7 @@ fetch, caching and rotation are `JWKSCache`
 (`shakenfist/federation.py:120-210`), and its signature and
 claim verification is the decode call that requires `exp`,
 `iss` and `aud` and allows zero clock leeway
-(`shakenfist/federation.py:321-340`). The rows are struck
+(`shakenfist/federation.py:325-352`). The rows are struck
 rather than deleted so that a reader six months from now
 can see that this work was done and where, instead of
 concluding from a shorter table that it is still to do.
@@ -1091,7 +1125,7 @@ validation keeps reading them from the object.
 
 **Phase 4 — claim-driven namespace authorisation.** This is
 where `request_namespace()` stops being a string split
-(`shakenfist/util/access_tokens.py:76`). Blocked on open
+(`shakenfist/util/access_tokens.py:83`). Blocked on open
 question 14, and it cannot be planned before that question's
 call-site audit exists, because the audit is what decides
 whether this phase is a mechanical rename with a handful of
@@ -1101,7 +1135,7 @@ model. Open question 2's human half closes here.
 **Phase 5 — admin as a claim.** Half done already:
 `caller_is_admin` requires the `cluster-admin` scope as well
 as the `system` namespace
-(`shakenfist/external_api/base.py:128-148`), so the
+(`shakenfist/external_api/base.py:279-299`), so the
 administrative role is already something a token carries.
 What remains is the decision in open question 5 — whether
 the namespace half can be dropped so that holding
@@ -1113,7 +1147,7 @@ it matter.
 **Phase 6 — service-account framing of namespace keys.**
 Naming and CLI surface only. Phase 2 of the federation plan
 already made keys first-class objects with expiry, scopes
-and provenance (`shakenfist/namespace_key.py:62`), so the
+and provenance (`shakenfist/namespace_key.py:63`), so the
 storage migration open question 11 worried about has
 happened for unrelated reasons. What is left is words,
 command names, a documentation pass and a deprecation
@@ -1134,14 +1168,14 @@ after the flow completes is precisely what 13 decides.
 **Phase 8 — worked operator examples.** Care is needed about
 what is genuinely new here. The operator guide already has
 an issuer-configuration section and a worked GitHub Actions
-example (`docs/operator_guide/authentication.md:201`), and
+example (`docs/operator_guide/authentication.md:203`), and
 Authentik is named in both the operator and developer guides
 as a supported source for the *workload exchange*
-(`docs/operator_guide/authentication.md:142`,
-`docs/developer_guide/authentication.md:418`). Keycloak
+(`docs/operator_guide/authentication.md:143-144`,
+`docs/developer_guide/authentication.md:429`). Keycloak
 appears in the documentation exactly once, as an example of
 a service likely to present a private CA certificate
-(`docs/operator_guide/authentication.md:330`), and nothing
+(`docs/operator_guide/authentication.md:384`), and nothing
 in the tree exercises it. So what this phase owes is: a
 first end-to-end walkthrough of configuring either provider,
 for a *human* login rather than a workload exchange, for
@@ -1318,7 +1352,7 @@ When this plan is successfully implemented:
   settled one way or the other: either `caller_is_admin`
   drops its namespace half so that holding `cluster-admin`
   is sufficient, or this plan records why the two-axis
-  check (`shakenfist/external_api/base.py:128-148`) is
+  check (`shakenfist/external_api/base.py:279-299`) is
   kept. The mechanism already exists; what is missing is
   the decision.
 * Inter-node authentication continues to work without
