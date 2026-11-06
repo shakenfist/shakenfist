@@ -358,6 +358,7 @@ table entirely (decision D8).
 | 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete | `c27ad9bf2` (#3930), `a5014b6ba` (#3949) |
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Complete | `c273627a2` (#3952), `948055063` (#4008), `8fc8ba961` (#4139), `2b767a9b1` (#4154) |
 | 5. Caller migration and hard ceiling | [PLAN-scheduler-reservations-phase-05-callers.md](PLAN-scheduler-reservations-phase-05-callers.md) | Complete | `660d4f65e7` (#4800) |
+| 5a. The calibration re-run and the hard ceiling | [PLAN-scheduler-reservations-phase-05a-hard-ceiling.md](PLAN-scheduler-reservations-phase-05a-hard-ceiling.md) | In progress | — |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
 | 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
@@ -540,12 +541,31 @@ is here.
   b13 was still waiting at execution time. Its own plan says that
   step lands as a later commit on the phase branch, which is no
   longer possible because the branch merged and was deleted, so the
-  flip passes to a successor phase rather than being dropped.
-  Complete here means "what this phase put on `develop`", which is
-  what the `Merged` column records. Two refinements its execution
-  forced are in its Execution notes: D4's "reads no instance state"
-  was imprecise about the metrics snapshot, and its DoD item 5 named
-  a cluster-CI test which is not locally runnable.
+  flip moved to **phase 5a** rather than being dropped. Complete
+  here means "what this phase put on `develop`", which is what the
+  `Merged` column records; the flip's status is phase 5a's row.
+  Two refinements its execution forced are in its Execution notes:
+  D4's "reads no instance state" was imprecise about the metrics
+  snapshot, and its DoD item 5 named a cluster-CI test which is not
+  locally runnable.
+
+- **Phase 5a** was inserted on 2026-11-07 to carry phase 5's step 3.
+  Its survey found seven of that step's premises wrong or stale, two
+  of them load-bearing: there is no claim stage to split out of
+  `TRANSIENT_CAPACITY_STAGES`, because `CAPACITY_GUARD_STAGE` is the
+  single stage every guard denial publishes, so one has to be
+  created; and the create path refuses only after walking every
+  candidate, holding a dict of per-candidate denials rather than one
+  exception, so the 403 is well defined only because the claim guard
+  runs before either node guard and is node-independent. It also
+  found `claim_uuid` unpopulated on the denial path, which D16's
+  refusal body needs. Phase 4c's three entry conditions are all met
+  -- two by different mechanisms than it named -- the claim
+  population is finally real, and `CLAIM_EXACT_MIN_RUNS = 5` means
+  some dimensions are claimed at exactly their peak with no
+  headroom, which the phase measures as its own gated arm. Its
+  decision rule for the flip is pre-registered before the window is
+  read.
 
 - **Phase 6** was executed out of order, ahead of phases 4c and 5,
   and completed on 2026-09-01. It merged as #3972 (the validator
@@ -918,6 +938,27 @@ node is missing from `per_node`). The rewrite must keep both,
 and 7a's functional tests in `test_nodes.py` fail if it does not.
 7a deliberately left the endpoint's `Scheduler()` construction
 alone so that the migration stays this phase's (7a's H7).
+
+*Correction (2026-11-07), from the phase 5a survey:* this stub's
+caller work landed as #4800 and the flip did not, so the flip is
+now **phase 5a**
+([PLAN-scheduler-reservations-phase-05a-hard-ceiling.md](PLAN-scheduler-reservations-phase-05a-hard-ceiling.md)),
+and phase 5's own step 3 row is superseded rather than live. Three
+of the things that row says are no longer true. There is no claim
+stage to split out of `TRANSIENT_CAPACITY_STAGES`:
+`CAPACITY_GUARD_STAGE` is the one stage every guard denial
+publishes, node, cluster and claim alike, so the split means
+introducing a stage rather than editing a frozenset. Those sets
+have moved to `shakenfist/constants.py` and not
+`external_api/base.py`, because a preflight abort records the same
+classification on the instance (issue 4568) and `instance.py`
+cannot import the API layer. And the create path refuses only
+after the walk has tried every candidate, holding a dict of
+per-candidate denials rather than one exception -- what makes a
+403 well defined there is that the claim guard runs before either
+node guard and is namespace-denominated, so it refuses on every
+candidate or on none. Every line number in that row has also
+drifted, because step 1 of the same phase moved the code.
 
 What survives for phase 6 is real but weaker: `cpu_load_1`
 measures activity rather than occupancy, so a node packed with
