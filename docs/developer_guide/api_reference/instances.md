@@ -96,7 +96,16 @@ A `diskspec` consists of the following fields as a JSON dictionary:
 * base (string): the base image for the disk. This can be a variety of URL-like strings,
   as documented on [the artifacts page in the user guide](/user_guide/artifacts/).
   For a blank disk, omit this value, send null, or send the literal string
-  "none" -- all three mean the same thing here.
+  "none" -- all three mean the same thing here. A base the cluster could never
+  fetch is refused with a 400 naming the supported forms: an `http` or `https`
+  URL, an image shortcut such as `debian:12`, `label:<name>`,
+  `sf://artifact/<uuid>`, `sf://blob/<uuid>`, `sf://label/<namespace>/<name>`,
+  `sf://snapshot/<uuid>` or `sf://upload/<namespace>/<name>`. A bare artifact
+  uuid is the common mistake here and its refusal suggests
+  `sf://artifact/<uuid>`; so is a snapshot artifact's own `sf://instance/...`
+  source URL, which is not a base -- use `sf://snapshot/<uuid>` instead. These
+  used to be accepted and scheduled, and failed only once the instance reached a
+  hypervisor, leaving it in `error`.
 * bus (enum): the hardware bus the disk device should be attached to on the instance.
   In general you shouldn't care about this and can omit this value. However, in
   some cases, such as unmodified Microsoft Windows images it is required. The options

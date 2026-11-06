@@ -4,6 +4,7 @@ import pathlib
 import re
 import shutil
 import time
+import urllib.parse
 import uuid
 
 import requests
@@ -34,21 +35,86 @@ LOG, _ = logs.setup(__name__)
 
 VALID_SF_IMAGES = ['centos', 'debian', 'fedora', 'rocky', 'ubuntu']
 
+# The schemes _open_connection() can actually fetch, because it hands the
+# string to requests.get() and requests has no adapter for anything else.
+FETCHABLE_SCHEMES = ['http', 'https']
+
+
+def is_image_shortcut(url):
+    """Is this one of the shortcut forms _resolve_image() expands?
+
+    A shortcut names an image on config.IMAGE_DOWNLOAD_URL (or a cirros
+    release) rather than a URL: 'debian', 'debian:11', 'cirros:0.4.0'.
+    Shortcuts have no subdirectory, which is how they are told apart
+    from a URL.
+
+    _resolve_image() is the only consumer of this distinction and calls
+    it rather than restating it, because this is also what decides
+    whether a scheme-less base is fetchable at all (see is_fetchable).
+    """
+    if url.find('/') != -1:
+        return False
+
+    if url.startswith('cirros'):
+        return True
+
+    for valid in VALID_SF_IMAGES:
+        if url.startswith(valid):
+            return True
+
+    return False
+
+
+def is_fetchable(url):
+    """Could an image fetch of this source URL ever succeed?
+
+    A fetch resolves the URL and hands the result to requests.get(),
+    which raises MissingSchema or InvalidSchema for anything which is
+    not http or https -- on a hypervisor, long after the API accepted
+    it, and the artifact is retried and then errored (issue 4557). A
+    shortcut is fetchable because _resolve_image() turns it into an
+    http(s) URL before requests sees it.
+
+    This says nothing about whether the URL resolves, responds, or
+    serves an image: those are all answered on the node. It answers
+    only the question an API handler can answer for itself.
+
+    It is also not the whole question for an *artifact's* source url,
+    which transfer_image() serves from within the cluster when it is a
+    BLOB_URL rather than fetching it at all. A caller who means "may
+    this artifact's source url be refetched" needs that case too; this
+    one is for a disk base, where the sf:// prefixes are dispatched to
+    a blob before the plain URL branch is reached.
+    """
+    if not isinstance(url, str):
+        return False
+
+    if is_image_shortcut(url):
+        return True
+
+    # urlparse raises on a string it cannot parse at all -- an unbalanced
+    # bracket in the authority, for example. A disk base is not format
+    # validated (validation._format_url explains why the published `url`
+    # format cannot be applied to it), so this is reachable from a
+    # request body and must be an answer rather than a server error.
+    try:
+        scheme = urllib.parse.urlparse(url).scheme
+    except ValueError:
+        return False
+
+    return scheme in FETCHABLE_SCHEMES
+
 
 def _resolve_image(url):
     # Short cut URLs do not have subdirectories
-    if url.find('/') != -1:
+    if not is_image_shortcut(url):
         return url
 
     if url.startswith('cirros'):
         # cirros is a special case as we can't rebuild the images yet
         return _resolve_cirros(url)
 
-    for valid in VALID_SF_IMAGES:
-        if url.startswith(valid):
-            return f'{config.IMAGE_DOWNLOAD_URL}{url}/latest.qcow2'
-
-    return url
+    return f'{config.IMAGE_DOWNLOAD_URL}{url}/latest.qcow2'
 
 
 def _resolve_cirros(name):
