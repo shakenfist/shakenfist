@@ -1725,3 +1725,64 @@ result and not a non-answer.
 - The phase 2 bullet already requires private-ci's shadow counts to be
   read before phase 3. `D13` makes that requirement load-bearing
   rather than merely useful, and the master plan now says so.
+
+## Execution notes
+
+Executed 2026-11-07 (AEDT) by a management session running the step
+table through sub-agents, on branch
+`placeable-capacity-phase-00-decisions` from `develop` at
+`32de6cec7f`.
+
+*Gates answered at the back brief.* The measurement was taken from
+Prometheus history alone, with no sfcbr database or cluster access;
+placeable-claims phase 4a's shape-hold constraint was folded into
+this phase's decisions rather than raised as a separate issue (it is
+`D15`); and this session was given leave to open the pull request.
+
+*The measurement became retrospective, and `D3`'s ask of 33fl was
+withdrawn.* `D2`–`D4` were written for a prospective scrape of each
+hypervisor's `:13001` endpoint over a future working day. Every gauge
+they name is already in maui's Prometheus with 93 days of history, so
+0a chose its window from the past instead. The requirement `D2`
+imposed was still met — the window holds the three highest
+runner-create refusal days in all 93 — and the plan's first risk, that
+the measurement needs host access this session does not have, does not
+arise. `D4`'s *expectation* was wrong, which is a result and is
+recorded as one.
+
+*Step order.* 0a and 0b ran in parallel, since one reads Prometheus
+and the other reads the tree, and neither writes the worktree. Each
+wrote its section to scratch; this session reviewed, assembled and
+committed one commit per step. 0c then ran its consistency pass
+against the committed document rather than against loose sections,
+which is stronger than the plan's description of it.
+
+*What the review changed.* 0a's figures were reproduced by re-running
+its script, which gave 216 reservation-only refusals against its 215 —
+sampling drift at the window edge, so the finding is quoted as "about
+27%" rather than to three digits. Its cluster-level paragraph read the
+proxy's "some node always had room" as support for fragmentation; real
+refusals did occur in that window, so that paragraph now says the
+proxy is loose there and credits the fragmentation evidence to
+placeable-claims phase 4a. `D8`'s visibility bullet named
+`summarize_resources()`, whose own docstring records it as retained
+for the test suite and called by no production code; it now names the
+shared payload builder, so phase 3 adds the fields where both callers
+see them. The brief this session gave 0c mislabelled phase 4a's
+latest-segment node-drop table as its seven-day one; 0c caught the
+error and `D13` records both windows, labelled, because the verdict
+holds on either.
+
+*Facts corrected at source.* `F1`, `F2` and `F3`'s line citations were
+re-pointed at `32de6cec7f` (`_has_sufficient_ram` had moved from
+`:520` to `:753`, among others). In the master plan, shakenfist#4207
+is recorded as closed rather than open at all five places that cited
+it, `Q7`'s premise is replaced — the claim verbs shipped in
+client-python `v0.8.4` and the page it called stale was already
+fixed — and `Q1`, `Q2` and `Q7` are marked answered by this phase.
+
+*Carried out of this phase.* An issue still needs filing for the claim
+refusal contract, deliberately not filed here so that it is written
+against the design phase 5 ships; phase 5 owns it. The per-host RAM
+reservation retune is handed to 33fl with its lever and its figure,
+and gates nothing.
