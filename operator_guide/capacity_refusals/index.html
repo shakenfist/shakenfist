@@ -15474,6 +15474,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-refusal-on-the-instance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The refusal on the instance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#retry-after-header" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16103,6 +16114,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-refusal-on-the-instance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The refusal on the instance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#retry-after-header" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16337,11 +16359,38 @@ rather than settled.</p>
 plausibly succeed. It is <code>true</code> only for the stages listed as transient above.
 Read this field rather than inferring retry-worthiness from the status code or
 the <code>stage</code> name: the classification lives in one place in the server
-(<code>TRANSIENT_CAPACITY_STAGES</code> in <code>shakenfist/external_api/base.py</code>), and a
-client that reproduces the list will drift from it.</p>
+(<code>TRANSIENT_CAPACITY_STAGES</code> in <code>shakenfist/constants.py</code>, re-exported by
+<code>shakenfist/external_api/base.py</code>), and a client that reproduces the list will
+drift from it.</p>
+<h2 id="the-refusal-on-the-instance">The refusal on the instance<a class="headerlink" href="#the-refusal-on-the-instance" title="Permanent link">&para;</a></h2>
+<p>Not every refusal is a <code>507</code>. A create which the scheduler accepted can still
+be refused later, when the chosen node runs preflight and finds it no longer
+has room: there is no request left to answer by then, so the server errors the
+instance and queues its delete instead. The instance carries the same two
+fields in that case, beside the message:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"state"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"error_message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Unable to find suitable node"</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">"error_stage"</span><span class="p">:</span><span class="w"> </span><span class="s2">"capacity_guard"</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">"error_transient"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">}</span>
+</code></pre></div>
+<p><code>error_stage</code> and <code>error_transient</code> mean exactly what <code>stage</code> and <code>transient</code>
+mean in a <code>507</code> body, and are computed by the same helper, so the two cannot
+disagree about the same refusal. They describe the error the instance is
+carrying now: an error which is not a placement refusal publishes
+<code>error_stage: null</code> and <code>error_transient: false</code>, and a placement which is
+later admitted clears them. A refused <code>POST /instances</code> leaves its instance
+record behind in an error state too, and that record carries the same fields as
+the <code>507</code> which refused it.</p>
+<p>A client waiting out a refusal reads <code>error_transient</code> rather than matching
+<code>error_message</code>, for the same reason it reads <code>transient</code> rather than the
+status code. The Ansible collection's <code>sf_instance</code> <code>capacity_wait</code> does; it
+falls back to matching the two historical abort messages only against a server
+which does not publish the field.</p>
 <h2 id="retry-after-header">Retry-After header<a class="headerlink" href="#retry-after-header" title="Permanent link">&para;</a></h2>
 <p>A transient <code>507</code> includes an HTTP <code>Retry-After</code> header:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Retry-After: 15
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Retry-After: 15
 </code></pre></div>
 <p>The value is <strong>always 15 seconds</strong> for all transient capacity refusals. It is not
 computed per-refusal.</p>
@@ -16377,9 +16426,9 @@ transient refusals. It is <strong>off by default</strong>.</p>
 <h3 id="enabling-the-retry">Enabling the retry<a class="headerlink" href="#enabling-the-retry" title="Permanent link">&para;</a></h3>
 <p>To enable automatic retry on transient refusals, pass the <code>retry_transient_capacity=True</code>
 flag when constructing a <code>Client</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">Client</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">client</span> <span class="o">=</span> <span class="n">Client</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">retry_transient_capacity</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">Client</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">client</span> <span class="o">=</span> <span class="n">Client</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">retry_transient_capacity</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="retry-behavior">Retry behavior<a class="headerlink" href="#retry-behavior" title="Permanent link">&para;</a></h3>
 <p>When enabled, the client will:</p>

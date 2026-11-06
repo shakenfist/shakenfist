@@ -16332,10 +16332,16 @@ as we assume a caller must acknowledge an error occurred. To remove them, delete
 the instance in <code>error</code> state.</p>
 <p>The error message recorded when the instance entered its <code>*-error</code> transition
 state is carried across the move to <code>error</code>, so an errored instance still
-reports why it failed. Callers rely on this: the <code>sf_instance</code> Ansible module
-recognises a preflight capacity abort (<code>Unable to find suitable node</code>) by that
-message, and replays the create rather than failing. Leaving the error states,
-for example by a delete which ends in <code>deleted</code>, clears the message.</p>
+reports why it failed. Leaving the error states, for example by a delete which
+ends in <code>deleted</code>, clears the message.</p>
+<p>An error which was a placement refusal carries two more fields beside the
+message: <code>error_stage</code>, the scheduling stage which refused the instance, and
+<code>error_transient</code>, whether waiting can clear that refusal. Both are published
+in the instance's API view and survive the move to <code>error</code> the same way the
+message does. Callers rely on this: the <code>sf_instance</code> Ansible module replays a
+create which preflight aborted when <code>error_transient</code> says a wait can clear it,
+rather than matching the message text. See
+<a href="../../operator_guide/capacity_refusals/#the-refusal-on-the-instance">capacity refusals</a>.</p>
 <p>An instance whose start can never run is errored the same way. If the
 operation carrying its preflight, start and create tasks is ended by a
 <code>depends_on</code> dependency that is missing, failed, or never reaches a terminal
