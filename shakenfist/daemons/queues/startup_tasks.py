@@ -21,6 +21,8 @@ from shakenfist.exceptions import InvalidStateException
 from shakenfist.network.interface import interfaces_for_instance
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import get_general_background_node_queues
+from shakenfist.operations.baseoperation import get_general_user_facing_node_queues
 from shakenfist.operations.baseoperation import get_node_background_node_queues
 from shakenfist.operations.baseoperation import get_node_user_facing_node_queues
 from shakenfist.util import concurrency as util_concurrency
@@ -389,10 +391,14 @@ def recover_interrupted_operations(node_uuid):
     as the reaper would, so an operation which kills sf-queues cannot keep
     killing it.
 
-    The shared any-* queues are left alone: nothing reliably records which
-    node claimed an item there (over gRPC, claimed_by names the database
-    daemon's node, not the worker's), so an executing operation behind one
-    may be running on another node right now.
+    A claim this node left on one of the shared any-* queues is recovered on
+    the same basis, but only once claimed_by says it is ours. Every node's
+    sf-queues drains those queues, so a claim there which names another node
+    may be an item that node is running right now. claimed_by is only
+    trustworthy because the dequeue RPC now carries the caller's node name;
+    before that the database daemon recorded its own (#4652). A claim written
+    by an older sf-queues therefore names the database node and is left to
+    the reaper, which is what happened to every such claim before this.
 
     This is best effort, item by item: an item which cannot be recovered --
     its operation type no longer exists, say, or the database fails part way
@@ -404,8 +410,19 @@ def recover_interrupted_operations(node_uuid):
     """
     own_queues = set(get_node_user_facing_node_queues(node_uuid) +
                      get_node_background_node_queues(node_uuid))
+    shared_queues = set(get_general_user_facing_node_queues() +
+                        get_general_background_node_queues())
+    # Fail closed on an unset node name rather than matching every claim
+    # whose claimed_by is empty: a shared queue is only ours by name.
+    node_name = config.NODE_NAME or None
     for row in mariadb.list_stuck_work_queue_rows(0, strict=True):
-        if row['queue_name'] not in own_queues:
+        queue_name = row['queue_name']
+        # A claim on one of our own queues is ours whatever claimed_by
+        # says -- nothing else drains them. On a shared queue only
+        # claimed_by can tell us apart from a live peer.
+        if not (queue_name in own_queues or
+                (queue_name in shared_queues and node_name and
+                 row['claimed_by'] == node_name)):
             continue
         try:
             _recover_interrupted_operation(row)
@@ -495,21 +512,41 @@ def startup_tasks():
     # Check in early and often
     locks.clear_stale_locks()
 
-    # Reset this node's own queues. They are named by its uuid, not its
-    # name: looked up by name, they matched no queue, so a claim left by a
-    # stopped sf-queues was never cleared. Recovering interrupted operations
-    # reads those claims, so it goes first. The shared any-* queues are not
-    # reset: other nodes' workers hold live claims there, and clearing one
-    # hands work which is still running to a second worker. A claim a
-    # stopped sf-queues left on one is cleared by the cluster daemon's
-    # reaper once it is CLUSTER_OP_STUCK_THRESHOLD old.
+    # Reset the claims this node's previous sf-queues left behind.
+    # Recovering interrupted operations reads those claims, so it goes
+    # first.
+    #
+    # This node's own queues are named by its uuid, not its name: looked
+    # up by name, they matched no queue, so a claim left by a stopped
+    # sf-queues was never cleared (#4543). Nothing else drains them, so
+    # every claim on one is ours and the reset is unfiltered.
+    #
+    # The shared any-* queues are drained by every node's sf-queues, so
+    # the reset there names us: clearing a peer's claim hands work which
+    # is still running to a second worker (#4652). It can name us
+    # because the dequeue RPC now carries the caller's node name --
+    # before that, claimed_by was the database daemon's node for every
+    # claim made over gRPC. A claim an older sf-queues left on a shared
+    # queue is therefore still the cluster daemon reaper's to clear,
+    # once it is CLUSTER_OP_STUCK_THRESHOLD old.
+    resets = []
     if not config.NODE_UUID:
         LOG.warning('NODE_UUID is not set, cannot recover interrupted '
-                    'operations or reset this node\'s own queues')
-        own_queues = []
+                    'operations or reset this node\'s queue claims')
     else:
-        own_queues = (get_node_user_facing_node_queues(config.NODE_UUID) +
-                      get_node_background_node_queues(config.NODE_UUID))
+        resets = [(q, '') for q in
+                  get_node_user_facing_node_queues(config.NODE_UUID) +
+                  get_node_background_node_queues(config.NODE_UUID)]
+        if config.NODE_NAME:
+            resets += [(q, config.NODE_NAME) for q in
+                       get_general_user_facing_node_queues() +
+                       get_general_background_node_queues()]
+        else:
+            # An unnamed node cannot say which shared-queue claims are
+            # its own, and an unfiltered reset there is the defect this
+            # guard exists to prevent. Leave them to the reaper.
+            LOG.warning('NODE_NAME is not set, not resetting this node\'s '
+                        'claims on the shared queues')
         try:
             recover_interrupted_operations(config.NODE_UUID)
         except Exception as e:
@@ -519,9 +556,9 @@ def startup_tasks():
             util_exceptions.ignore_exception(
                 'recovering interrupted operations; leaving this node\'s '
                 'claims to the reaper', e)
-            own_queues = []
-    for queue in own_queues:
-        mariadb.restart_work_queue(queue)
+            resets = []
+    for queue, claimed_by in resets:
+        mariadb.restart_work_queue(queue, claimed_by=claimed_by)
         processing, queued, deferred = mariadb.get_work_queue_length(queue)
         LOG.with_fields({
             'processing': processing,

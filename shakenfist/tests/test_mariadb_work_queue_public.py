@@ -16,6 +16,7 @@ import grpc
 
 from shakenfist import exceptions
 from shakenfist import mariadb
+from shakenfist.config import config
 from shakenfist.tests import base
 
 
@@ -44,17 +45,21 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
         direct.assert_called_once_with('q', {'a': 1}, 0.0)
         grpc.assert_not_called()
 
+    @mock.patch('shakenfist.mariadb.config')
     @mock.patch('shakenfist.mariadb._grpc_work_queue_dequeue_batch')
     @mock.patch('shakenfist.mariadb._direct_work_queue_dequeue_batch')
     @mock.patch(
         'shakenfist.mariadb._use_database_service',
         return_value=True)
     def test_dequeue_service_mode_goes_to_grpc(
-            self, _svc, direct, grpc):
+            self, _svc, direct, grpc, mock_config):
+        # Issue 4652: the gRPC path carries this node's name too, so
+        # claimed_by names the worker rather than the database node.
+        mock_config.NODE_NAME = 'node-alpha'
         grpc.return_value = [('q', '42', {'payload': True})]
         result = mariadb.dequeue_work_items(['q'], limit=5)
         self.assertEqual([('q', '42', {'payload': True})], result)
-        grpc.assert_called_once_with(['q'], 5)
+        grpc.assert_called_once_with(['q'], 'node-alpha', 5)
         direct.assert_not_called()
 
     @mock.patch('shakenfist.mariadb.config')
@@ -137,8 +142,13 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
     def test_restart_service_mode_goes_to_grpc(
             self, _svc, direct, grpc):
         mariadb.restart_work_queue('q')
-        grpc.assert_called_once_with('q')
+        grpc.assert_called_once_with('q', '')
         direct.assert_not_called()
+
+        grpc.reset_mock()
+        mariadb.restart_work_queue('any-clusteroperation-background', 'sf-3')
+        grpc.assert_called_once_with(
+            'any-clusteroperation-background', 'sf-3')
 
     @mock.patch('shakenfist.mariadb._grpc_work_queue_restart')
     @mock.patch('shakenfist.mariadb._direct_work_queue_restart')
@@ -148,8 +158,13 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
     def test_restart_direct_mode_goes_to_direct(
             self, _svc, direct, grpc):
         mariadb.restart_work_queue('q')
-        direct.assert_called_once_with('q')
+        direct.assert_called_once_with('q', '')
         grpc.assert_not_called()
+
+        direct.reset_mock()
+        mariadb.restart_work_queue('any-clusteroperation-background', 'sf-3')
+        direct.assert_called_once_with(
+            'any-clusteroperation-background', 'sf-3')
 
     @mock.patch('shakenfist.mariadb._grpc_work_queue_list_stuck')
     @mock.patch('shakenfist.mariadb._direct_work_queue_list_stuck')
@@ -358,3 +373,29 @@ class MockMariaDBWorkQueueTestCase(base.ShakenFistTestCase):
 
         items2 = mariadb.dequeue_work_items(['q'], limit=1)
         self.assertEqual(1, len(items2))
+
+    def test_a_dequeue_records_the_claiming_node(self):
+        # Issue 4652: nothing could tell one node's claim from
+        # another's, because the database daemon recorded its own name.
+        mariadb.enqueue_work_item('q', {'task': 't'})
+        mariadb.dequeue_work_items(['q'], limit=1)
+        rows = mariadb.list_stuck_work_queue_rows(0)
+        self.assertEqual([config.NODE_NAME],
+                         [r['claimed_by'] for r in rows])
+
+    def test_restart_for_another_node_leaves_our_claim(self):
+        # A shared any-* queue is drained by every node, so a reset
+        # there names the node whose claims it clears. A peer's reset
+        # must not hand our running item to a second worker.
+        queue = 'any-clusteroperation-background'
+        mariadb.enqueue_work_item(queue, {'task': 't'})
+        self.assertEqual(
+            1, len(mariadb.dequeue_work_items([queue], limit=1)))
+
+        mariadb.restart_work_queue(queue, 'some-other-node')
+        processing, queued, _ = mariadb.get_work_queue_length(queue)
+        self.assertEqual((1, 0), (processing, queued))
+
+        mariadb.restart_work_queue(queue, config.NODE_NAME)
+        processing, queued, _ = mariadb.get_work_queue_length(queue)
+        self.assertEqual((0, 1), (processing, queued))

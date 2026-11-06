@@ -267,7 +267,7 @@ class GrpcCallRetryExhaustionTestCase(base.ShakenFistTestCase):
 
         self.assertRaises(
             exceptions.DatabaseUnavailable,
-            mariadb._grpc_work_queue_dequeue_batch, ['queue-1'], 1)
+            mariadb._grpc_work_queue_dequeue_batch, ['queue-1'], 'sf-3', 1)
 
     @mock.patch('shakenfist.mariadb.time')
     @mock.patch('shakenfist.mariadb._reset_database_stub')
