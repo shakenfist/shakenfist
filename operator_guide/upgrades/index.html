@@ -15917,6 +15917,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#migrations-run-while-the-cluster-is-serving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migrations run while the cluster is serving
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#manual-schema-verification" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16196,6 +16207,17 @@
   
     <nav class="md-nav" aria-label="MariaDB schema migrations">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#migrations-run-while-the-cluster-is-serving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migrations run while the cluster is serving
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#manual-schema-verification" class="md-nav__link">
@@ -16555,6 +16577,27 @@ the old behaviour where migrations ran silently inside the daemon on
 startup.</p>
 <p>See <a href="../database/#mariadb-compatibility-requirements">MariaDB compatibility requirements</a>
 in the database reference for the full list of server requirements.</p>
+<h3 id="migrations-run-while-the-cluster-is-serving">Migrations run while the cluster is serving<a class="headerlink" href="#migrations-run-while-the-cluster-is-serving" title="Permanent link">&para;</a></h3>
+<p><code>sf-ctl ensure-mariadb-schema</code> runs before any node restarts onto the
+new code, so every daemon in the cluster is still reading and writing
+the tables it migrates. A migration which has to rewrite existing rows
+— adding a column and filling it from somewhere else, for example —
+therefore does so in batches, each of which is a separate transaction
+covering a bounded range of the table. A concurrent writer can be made
+to wait for one batch, but not for the whole migration.</p>
+<p>This matters because a single table-wide <code>UPDATE</code> holds row locks on
+everything it examines until it commits. One did: the
+<code>event_objects.timestamp</code> backfill held 71.9 million row locks for 31
+minutes on a production cluster, and for all of that time every node's
+event writes failed with <code>Lock wait timeout exceeded</code>. Batching it
+trades a slightly longer migration for a cluster which keeps working
+through it. The progress of each batched backfill is logged by the
+command, as <code>Backfill of &lt;table&gt;.&lt;column&gt;: N rows in M batches</code>.</p>
+<p>A migration which rewrites a large table is still the slowest part of an
+upgrade, so run <code>sf-ctl ensure-mariadb-schema</code> when you can afford to
+let it finish rather than interrupting it. If it does fail part way
+through, the table's schema version is not advanced and re-running the
+command resumes where it stopped.</p>
 <h3 id="manual-schema-verification">Manual schema verification<a class="headerlink" href="#manual-schema-verification" title="Permanent link">&para;</a></h3>
 <p>You can manually check or apply schema migrations by running on a node
 with direct database access:</p>
