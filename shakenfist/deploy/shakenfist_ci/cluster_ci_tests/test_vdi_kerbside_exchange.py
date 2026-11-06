@@ -117,13 +117,37 @@ class TestVDIKerbsideExchange(vdi.BaseVDIConsoleTestCase):
         kwargs['namespace_prefix'] = 'vdiexchange'
         super().__init__(*args, **kwargs)
 
+    def _record_exchange_diagnostics(self, url, response):
+        """Attach what a refused exchange leaves behind, before failing.
+
+        Kerbside's status and body alone cannot separate a key set which
+        does not hold the minting key from a wrong key or from clock skew
+        (see vdi.exchange_diagnostics, and #4598, where they could not
+        be). The published key document is fetched here rather than
+        earlier so a healthy run never pays for it, and a failure to
+        fetch it is recorded instead of raised: the exchange failure is
+        the one the reader needs, not this one.
+        """
+        try:
+            material = self.test_client.get_vdi_token_public_keys()
+        except Exception as e:
+            material = 'unreadable: %s: %s' % (type(e).__name__, e)
+        self.addDetail(
+            'exchange_diagnostics',
+            content.text_content(
+                json.dumps(
+                    vdi.exchange_diagnostics(
+                        url, response, material, time.time()),
+                    indent=4, sort_keys=True, default=str)))
+
     def _exchange(self, instance_uuid):
         """Exchange a fresh token for instance_uuid at Kerbside.
 
         Returns the exchange URL and Kerbside's 200 response. A console
         Kerbside has not scraped yet is retried, each time with a newly
         minted token, for up to SCRAPE_WAIT seconds; any other refusal fails
-        the test at once with its status and body.
+        the test at once with its status and body, and with the diagnostics
+        which say which refusal it was.
         """
         attempts = []
 
@@ -144,6 +168,9 @@ class TestVDIKerbsideExchange(vdi.BaseVDIConsoleTestCase):
         self.addDetail(
             'exchange_attempts',
             content.text_content(json.dumps(attempts)))
+
+        if status != 200:
+            self._record_exchange_diagnostics(url, r)
 
         if status == CONSOLE_NOT_FOUND:
             self.fail(
@@ -234,6 +261,10 @@ class TestVDIKerbsideExchange(vdi.BaseVDIConsoleTestCase):
 
         url, _ = self._exchange(instance_uuid)
         r = requests.get(url, timeout=EXCHANGE_REQUEST_TIMEOUT)
+        if r.status_code != 401 or TOKEN_ALREADY_USED not in r.text:
+            # A replay refused for some other reason, or not refused at
+            # all, needs the same evidence a refused first exchange does.
+            self._record_exchange_diagnostics(url, r)
         self.assertEqual(
             401, r.status_code,
             'a second exchange of the same token was not refused: %s'

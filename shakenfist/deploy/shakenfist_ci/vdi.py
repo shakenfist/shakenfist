@@ -10,9 +10,12 @@ cluster-ci.conf's test path, so stestr never runs it on its own.
 """
 
 import configparser
+import email.utils
 import json
 import re
+import urllib.parse
 
+import jwt
 from testtools import content
 
 from shakenfist_ci import base
@@ -69,6 +72,109 @@ def redact_vv(vv_text):
         if cp[section].get('password', '<redacted>') != '<redacted>':
             return VV_WITHHELD
     return redacted
+
+
+# The query parameter the exchange URL carries the console token in
+# (instance.py's vdiconsoleproxy endpoint builds
+# <KERBSIDE_URL>/sf-console.vv?token=<jwt>).
+EXCHANGE_TOKEN_PARAM = 'token'
+
+
+def _http_date_epoch(value):
+    """An HTTP Date header as epoch seconds, or None if unreadable."""
+    if not value:
+        return None
+    try:
+        parsed = email.utils.parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed.timestamp()
+
+
+def exchange_token(url):
+    """The console token carried by an exchange URL, or None."""
+    query = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+    values = query.get(EXCHANGE_TOKEN_PARAM) or []
+    return values[0] if values else None
+
+
+def exchange_diagnostics(url, response, material, now):
+    """What a refused console token exchange needs on the record.
+
+    Kerbside answers a key set which does not yet contain the minting
+    key, a key set which contains the wrong one, and a clock it does not
+    share with the minting host all with the same 401 "invalid token
+    signature", so its status and body cannot tell them apart (issue
+    4706, and #4598 where they could not be). This collects the evidence
+    which can, as a JSON-ready dict:
+
+    * the token's unverified header and claims -- the kid it was signed
+      with, and the instants the minting host stamped on it. Read
+      without verifying, which is the point, and never alongside the
+      token itself: the token is a live credential and these logs are
+      public.
+    * the kids the cluster publishes at /admin/vditokenpubkey and which
+      of them is active, so a token signed with a kid Kerbside cannot
+      have fetched is visible as exactly that.
+    * Kerbside's Date header against the token's own ``iat`` and
+      ``exp``, which are the minting host's clock, and against the
+      caller's. Clock skew then reads as a number of seconds rather
+      than an inference.
+
+    material is the published key document, or any non-dict (a reason
+    string, or None) when it could not be fetched. Every parse failure
+    is recorded as a value instead of raised: this runs on the way to a
+    test failure and must not displace it with its own.
+    """
+    diagnostics = {
+        'status': response.status_code,
+        'exchange_url_host': urllib.parse.urlsplit(url).hostname,
+        'caller_clock': int(now),
+    }
+
+    claims = {}
+    kid = None
+    token = exchange_token(url)
+    if not token:
+        diagnostics['token'] = 'the exchange URL carries no token parameter'
+    else:
+        try:
+            header = jwt.get_unverified_header(token)
+            kid = header.get('kid')
+        except jwt.PyJWTError as e:
+            header = 'unreadable: %s' % e
+        diagnostics['token_header'] = header
+        try:
+            claims = jwt.decode(token, options={'verify_signature': False})
+            diagnostics['token_claims'] = claims
+        except jwt.PyJWTError as e:
+            diagnostics['token_claims'] = 'unreadable: %s' % e
+
+    if isinstance(material, dict):
+        kids = [key.get('kid') for key in material.get('keys') or []]
+        diagnostics['published_kids'] = kids
+        diagnostics['published_active_kid'] = material.get('active_kid')
+        diagnostics['token_kid_published'] = kid in kids
+    else:
+        diagnostics['published_kids'] = material or 'not fetched'
+
+    date = response.headers.get('Date')
+    diagnostics['kerbside_date'] = date
+    kerbside_clock = _http_date_epoch(date)
+    if kerbside_clock is None:
+        diagnostics['kerbside_clock'] = 'no readable Date header'
+    else:
+        diagnostics['kerbside_clock'] = int(kerbside_clock)
+        diagnostics['kerbside_clock_minus_caller_seconds'] = int(
+            kerbside_clock - now)
+        for claim in ('iat', 'exp'):
+            # A claim which is absent, or which is not a number, has
+            # nothing to compare: a token may carry anything here.
+            value = claims.get(claim)
+            if isinstance(value, (int, float)):
+                diagnostics['kerbside_clock_minus_%s_seconds' % claim] = int(
+                    kerbside_clock - value)
+    return diagnostics
 
 
 class BaseVDIConsoleTestCase(base.BaseNamespacedTestCase):
