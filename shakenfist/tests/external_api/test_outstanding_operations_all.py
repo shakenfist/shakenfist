@@ -22,6 +22,7 @@ import sys
 from unittest import mock
 
 from shakenfist.artifact import Artifact
+from shakenfist import baseobject
 from shakenfist.baseobject import TargetedOperation
 from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
@@ -105,7 +106,12 @@ class OutstandingOperationsAllTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             [{'uuid': 'fake-op', 'observational': False}], resp.get_json())
-        self.mock_get_ops.assert_called_once_with(outstanding_only=expected)
+        # The listing is capped, uncapped reads being for callers which
+        # act on every outstanding operation rather than report them
+        # (issue 4667).
+        self.mock_get_ops.assert_called_once_with(
+            outstanding_only=expected,
+            limit=baseobject.MAX_TARGETED_OPERATIONS)
         self.mock_get_ops.reset_mock()
 
     def test_all_in_body(self):

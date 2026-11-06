@@ -33,6 +33,7 @@ from werkzeug.exceptions import HTTPException
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import baseobject
 from shakenfist import constants
 from shakenfist import exceptions
 from shakenfist import mariadb
@@ -1644,7 +1645,9 @@ CLUSTER_OPERATIONS_ALL_DESCRIPTION = (
     'Also include finished operations which have not yet been removed. '
     'Finished operations become eligible for removal thirty seconds '
     'after they finish, and errored ones are kept for up to seven '
-    'days, so this is not a history.')
+    'days, so this is not a history. The newest %d operations are '
+    'listed and older ones are not reported.'
+    % baseobject.MAX_TARGETED_OPERATIONS)
 
 
 def arg_is_instance_ref(func):

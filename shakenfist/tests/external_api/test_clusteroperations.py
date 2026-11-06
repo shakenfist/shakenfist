@@ -5,6 +5,7 @@ import sys
 from unittest import mock
 from uuid import uuid4
 
+from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
 from shakenfist.constants import get_object_class
@@ -543,43 +544,57 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
         self.admin_token = 'Bearer %s' % resp.get_json()['access_token']
 
-    def _patch_list_and_hydrate(self, op_records, observational=None):
-        """Patch list_cluster_operations_for_target and op hydration.
+    def _patch_target_rows(self, op_records, observational=None):
+        """Patch the target rows the shared listing helper reads.
 
-        ``op_records``: list of (uuid, operation_type, created_at) tuples
-        in the order list_cluster_operations_for_target should return.
+        The endpoint is ``baseobject.targeted_cluster_operation_views()``,
+        which reads ``cluster_operation_targets`` rows and hydrates each
+        row's operation. These patches stand in for both.
 
-        ``observational``: optional dict of uuid to the flag the listing
-        reports for that op. An op not in it has no ``observational``
-        key, as when an older database service did not report one.
+        ``op_records``: list of (uuid, operation_type, sequence_number)
+        tuples, in any order -- the helper is what decides the order it
+        reports them in.
+
+        ``observational``: optional dict of uuid to the flag that op's
+        target row carries. An op not in it gets the schema default,
+        which is what a database service too old to store the flag
+        reports.
         """
         observational = observational or {}
-        records = []
-        for u, op_type, created_at in op_records:
-            record = {
-                'uuid': u,
-                'operation_type': op_type,
-                'created_at': created_at,
-            }
+        rows = []
+        for u, op_type, seq in op_records:
+            kwargs = {}
             if u in observational:
-                record['observational'] = observational[u]
-            records.append(record)
+                kwargs['observational'] = observational[u]
+            rows.append(ClusterOperationTargetData(
+                operation_uuid=u,
+                operation_type=op_type,
+                target_object_type='network',
+                target_uuid=self.network_uuid,
+                sequence_number=seq,
+                created_at=1.0,
+                **kwargs))
+
         fakes = {
-            u: _fake_op(u, op_type, created_at=created_at)
-            for u, op_type, created_at in op_records
+            u: _fake_op(u, op_type)
+            for u, op_type, _seq in op_records
         }
 
-        def fake_hydrate_op(uuid_):
-            return fakes.get(uuid_)
+        class _FakeOpClass:
+            @staticmethod
+            def from_db(uuid_, suppress_failure_audit=False):
+                return fakes.get(uuid_)
+
+        def fake_get_object_class(op_type):
+            return _FakeOpClass
 
         patches = [
             mock.patch(
-                'shakenfist.external_api.clusteroperation.mariadb'
-                '.list_cluster_operations_for_target',
-                return_value=records),
+                'shakenfist.mariadb.get_cluster_operation_targets_for_object',
+                return_value=rows),
             mock.patch(
-                'shakenfist.external_api.clusteroperation._hydrate_op',
-                side_effect=fake_hydrate_op),
+                'shakenfist.baseobject.get_object_class',
+                side_effect=fake_get_object_class),
         ]
         for p in patches:
             p.start()
@@ -588,9 +603,9 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
     def test_happy_path_returns_op_list(self):
         op_uuid_1 = str(uuid4())
         op_uuid_2 = str(uuid4())
-        self._patch_list_and_hydrate([
-            (op_uuid_1, 'net_op', 2.0),
-            (op_uuid_2, 'net_op', 1.0),
+        self._patch_target_rows([
+            (op_uuid_2, 'net_op', 1),
+            (op_uuid_1, 'net_op', 2),
         ])
 
         resp = self.client.get(
@@ -612,7 +627,7 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
         # client call, surfaced to the client as a 400. Exercise the body
         # path explicitly so that regression cannot return.
         op_uuid = str(uuid4())
-        self._patch_list_and_hydrate([(op_uuid, 'net_op', 1.0)])
+        self._patch_target_rows([(op_uuid, 'net_op', 1)])
 
         resp = self.client.get(
             '/clusteroperations',
@@ -629,9 +644,9 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
         # op reports the observational flag its target row carries.
         observing_uuid = str(uuid4())
         mutating_uuid = str(uuid4())
-        self._patch_list_and_hydrate(
-            [(observing_uuid, 'node_blob_op', 2.0),
-             (mutating_uuid, 'node_blob_op', 1.0)],
+        self._patch_target_rows(
+            [(observing_uuid, 'node_blob_op', 2),
+             (mutating_uuid, 'node_blob_op', 1)],
             observational={observing_uuid: True, mutating_uuid: False})
 
         resp = self.client.get(
@@ -645,11 +660,15 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
             [(entry['uuid'], entry['observational'])
              for entry in resp.get_json()])
 
-    def test_observational_omitted_when_not_reported(self):
-        # An older database service does not report the flag. Omit it
-        # rather than claim the op is mutating.
+    def test_observational_is_false_when_unreported(self):
+        # A database service too old to store the flag reports nothing,
+        # which the target row reads as false (mutating) -- the same
+        # reading last_cluster_operation and has_pending_operations make
+        # of that silence. The key is reported either way, as the three
+        # per-object listings have always reported it, so a client never
+        # has to tell an absent key from a false one (issue 4667).
         op_uuid = str(uuid4())
-        self._patch_list_and_hydrate([(op_uuid, 'net_op', 1.0)])
+        self._patch_target_rows([(op_uuid, 'net_op', 1)])
 
         resp = self.client.get(
             '/clusteroperations',
@@ -659,11 +678,54 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         body = resp.get_json()
         self.assertEqual([op_uuid], [entry['uuid'] for entry in body])
-        self.assertNotIn('observational', body[0])
+        self.assertFalse(body[0]['observational'])
+
+    def test_newest_first_is_by_sequence_number(self):
+        # The endpoint used to order by the operation header's
+        # created_at while the per-object listings ordered by the target
+        # rows' sequence number, so two listings of the same object
+        # could disagree (issue 4667). Equal created_at values, which
+        # the header order cannot break, are ordered by sequence here.
+        op_uuids = [str(uuid4()) for _ in range(3)]
+        self._patch_target_rows([
+            (op_uuids[1], 'net_op', 2),
+            (op_uuids[2], 'net_op', 3),
+            (op_uuids[0], 'net_op', 1),
+        ])
+
+        resp = self.client.get(
+            '/clusteroperations?target_object_type=network'
+            '&target_uuid=%s' % self.network_uuid,
+            headers={'Authorization': self.foo_token})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(
+            list(reversed(op_uuids)),
+            [entry['uuid'] for entry in resp.get_json()])
+
+    def test_listing_is_capped(self):
+        # The by-target listing was unbounded: it hydrated every
+        # retained target row, and errored operations are kept for seven
+        # days (issue 4667).
+        rows = [(str(uuid4()), 'net_op', seq)
+                for seq in range(1, baseobject.MAX_TARGETED_OPERATIONS + 10)]
+        self._patch_target_rows(rows)
+
+        resp = self.client.get(
+            '/clusteroperations?target_object_type=network'
+            '&target_uuid=%s' % self.network_uuid,
+            headers={'Authorization': self.foo_token})
+        self.assertEqual(200, resp.status_code)
+        body = resp.get_json()
+        self.assertEqual(baseobject.MAX_TARGETED_OPERATIONS, len(body))
+        # The newest are the ones kept.
+        self.assertEqual(
+            [u for u, _t, _s in reversed(
+                rows[-baseobject.MAX_TARGETED_OPERATIONS:])],
+            [entry['uuid'] for entry in body])
 
     def test_non_admin_foreign_namespace_returns_403(self):
         # No hydration patches needed -- the access check fails before
-        # we'd consult mariadb.list_cluster_operations_for_target.
+        # we'd read any target row.
         resp = self.client.get(
             '/clusteroperations?target_object_type=network'
             '&target_uuid=%s' % self.other_network_uuid,
@@ -672,7 +734,7 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
 
     def test_admin_bypasses_namespace_check(self):
         op_uuid = str(uuid4())
-        self._patch_list_and_hydrate([(op_uuid, 'net_op', 1.0)])
+        self._patch_target_rows([(op_uuid, 'net_op', 1)])
 
         resp = self.client.get(
             '/clusteroperations?target_object_type=network'
@@ -683,7 +745,7 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
         self.assertEqual([op_uuid], [entry['uuid'] for entry in body])
 
     def test_empty_result_when_no_ops(self):
-        self._patch_list_and_hydrate([])
+        self._patch_target_rows([])
 
         resp = self.client.get(
             '/clusteroperations?target_object_type=network'

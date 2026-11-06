@@ -18,6 +18,7 @@ from uuid import uuid4
 import sqlalchemy as sa
 
 from shakenfist.baseobject import DatabaseBackedObjectWithOperations
+from shakenfist.baseobject import targeted_cluster_operation_views
 from shakenfist import mariadb
 from shakenfist.operations.node_inst_op import NodeInstOp
 from shakenfist.schema.object_types import ObjectType
@@ -232,6 +233,51 @@ class ObjectClusterOperationsTestCase(
                         outstanding_only=outstanding_only)
                 self.assertEqual(expected, self._uuids(views))
                 self.assertEqual(reads, from_db.call_count)
+
+    def test_limit_caps_the_listing_and_the_reads_it_costs(self):
+        # The listing was unbounded: with all=true it hydrated every
+        # retained target row, and an errored operation's rows are kept
+        # for seven days (issue 4667). The cap is applied to the rows
+        # before they are hydrated, so it bounds the operation reads and
+        # not merely the reply.
+        ops = [self._enqueue_inst(MUTATING_TASKS) for _ in range(5)]
+        instance = _Instance(INSTANCE_UUID)
+
+        with mock.patch.object(NodeInstOp, 'from_db',
+                               side_effect=NodeInstOp.from_db) as from_db:
+            views = instance.cluster_operation_views(limit=2)
+        self.assertEqual(list(reversed(ops))[:2], self._uuids(views))
+        self.assertEqual(2, from_db.call_count)
+
+        # An uncapped read is the default for the operation objects,
+        # because Instance.enqueue_delete() aborts every outstanding
+        # operation it finds and a dropped row there would leave one
+        # running against an instance being torn down.
+        self.assertEqual(
+            list(reversed(ops)),
+            [str(t.op.uuid) for t in instance.get_cluster_operations()])
+
+    def test_both_listing_routes_give_the_same_answer(self):
+        # GET /clusteroperations?target_object_type=&target_uuid= is
+        # targeted_cluster_operation_views() and the per-object routes
+        # are cluster_operation_views(); the two used to be separate
+        # implementations which ordered differently and disagreed about
+        # the observational key (issue 4667).
+        self._enqueue_inst(SWEEP_TASKS)
+        self._set_op_state(self._enqueue_inst(MUTATING_TASKS), 'complete')
+        self._enqueue_inst(MUTATING_TASKS)
+
+        instance = _Instance(INSTANCE_UUID)
+        for outstanding_only in (True, False):
+            with self.subTest(outstanding_only=outstanding_only):
+                views = instance.cluster_operation_views(
+                    outstanding_only=outstanding_only)
+                self.assertNotEqual([], views)
+                self.assertEqual(
+                    views,
+                    targeted_cluster_operation_views(
+                        ObjectType.INSTANCE, INSTANCE_UUID,
+                        outstanding_only=outstanding_only))
 
     def test_in_memory_object_lists_nothing(self):
         self._enqueue_inst(MUTATING_TASKS)

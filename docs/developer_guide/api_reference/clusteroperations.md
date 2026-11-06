@@ -48,6 +48,20 @@ and errored operations are kept for up to
 `CLUSTER_OPERATION_TARGET_RETENTION`, seven days by default, so `all=true` is
 a bounded window onto recent work and not a history.
 
+The retention window is not a size, though, and an object which errors
+operations repeatedly accumulates them, so a listing reports at most the
+newest 256 operations (`baseobject.MAX_TARGETED_OPERATIONS`) and older ones
+are not reported. That is the same kind of ceiling `MAX_CHAIN_NODES` puts on
+the `depends_on` chain. Newest first is by the operation's target row, the
+same order `last_cluster_operation` picks its winner in.
+
+The per-object sub-resources and `GET /clusteroperations?target_object_type=`
+are one listing reached two ways, and answer identically for the same object:
+same order, same cap, and the same keys on each entry. They were separate
+implementations earlier in v0.8's development, and the by-target one ordered
+by the operation's creation time instead and omitted `observational` entirely
+when sf-database was too old to store the flag.
+
 ???+ tip "REST API calls"
 
     * [GET /clusteroperations/{operation_type}/{operation_uuid}](https://openapi.shakenfist.com/#/clusteroperations/get_clusteroperations__operation_type___operation_uuid_):
@@ -68,6 +82,8 @@ a bounded window onto recent work and not a history.
       `target_object_type` query parameter is a Shaken Fist object type
       string (e.g. `network`, `instance`, `artifact`). The caller's
       namespace must own the target object, or the caller must be admin.
+      This is the per-object listing with `all=true`, reachable for any
+      object type rather than only the three which have a sub-resource.
       Each op in the response carries an `observational` boolean: true
       when every task of the op only observes the target (a checksum or
       health check) rather than changing it. Observational ops are

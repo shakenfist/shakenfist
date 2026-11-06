@@ -23378,6 +23378,13 @@ def list_cluster_operations_for_target(
     flag stored on the operation's target row, except when an older
     database service did not report it, in which case the key is absent.
 
+    No longer read by sf-api: the REST listing is
+    ``baseobject.targeted_cluster_operation_views()``, which reads the
+    target rows directly so that it can order by sequence number, push
+    the pending filter into SQL, and bound what it hydrates (issue
+    4667). The RPC stays because sf-database still serves it to an
+    sf-api which predates that change.
+
     Args:
         target_object_type: The ObjectType of the target object.
         target_uuid: UUID of the target object.
