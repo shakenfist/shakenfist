@@ -5,6 +5,7 @@ from unittest import mock
 
 from shakenfist import constants
 from shakenfist.daemons.sidechannel import main as sidechannel
+from shakenfist import instance
 from shakenfist.protos import agent_pb2
 from shakenfist.tests import base
 from shakenfist.util import libvirt as util_libvirt
@@ -24,12 +25,22 @@ class _FakeInstance:
     The real setter skips a write which would not change the stored
     value; these tests care about what the monitor asks for, so every
     assignment is kept.
+
+    record_observed_agent_state() is the real implementation, bound to
+    this fake: it is what decides whether a reading from the agent is
+    recorded at all, so a fake of its own would test nothing.
     """
 
-    def __init__(self):
+    record_observed_agent_state = \
+        instance.Instance.record_observed_agent_state
+    _agent_state_when_not_running = \
+        instance.Instance._agent_state_when_not_running
+
+    def __init__(self, power_state='on'):
         self.uuid = 'fake-instance'
         self.agent_state_writes = []
         self.add_event = mock.MagicMock()
+        self.power_state = {'power_state': power_state}
 
     @property
     def agent_state(self):
@@ -92,21 +103,13 @@ def _running_reply(result=True, message=''):
         result=result, message=message))
 
 
-class SideChannelMonitorReplyGapTestCase(base.ShakenFistTestCase):
-    """A gap in agent replies makes the monitor re-check the agent's state.
-
-    The monitor writes agent_state only when its cached view changes, but
-    pause() and unpause() write it too. A pause short enough that the
-    management loop never tears the monitor down left the cache at ready
-    and the database at "no contact" for good, because ping replies never
-    touch agent_state. The gap is the only sign the monitor gets that the
-    guest was frozen.
-    """
+class _MonitorScriptTestCase(base.ShakenFistTestCase):
+    """Runs one monitor against a script of agent behaviour."""
 
     NOW = 1700000000.0
 
-    def _run(self, cached_state, script):
-        inst = _FakeInstance()
+    def _run(self, cached_state, script, power_state='on'):
+        inst = _FakeInstance(power_state=power_state)
         with mock.patch.object(sidechannel.daemon, 'clear_abort_path'):
             monitor = sidechannel.SideChannelMonitorJob(inst)
         monitor.log = mock.MagicMock()
@@ -127,6 +130,18 @@ class SideChannelMonitorReplyGapTestCase(base.ShakenFistTestCase):
         self.assertEqual('hypervisor_welcome', sock.sent[0])
         self.sent_at = sock.sent_at[1:]
         return monitor, inst, sock.sent[1:]
+
+
+class SideChannelMonitorReplyGapTestCase(_MonitorScriptTestCase):
+    """A gap in agent replies makes the monitor re-check the agent's state.
+
+    The monitor writes agent_state only when its cached view changes, but
+    pause() and unpause() write it too. A pause short enough that the
+    management loop never tears the monitor down left the cache at ready
+    and the database at "no contact" for good, because ping replies never
+    touch agent_state. The gap is the only sign the monitor gets that the
+    guest was frozen.
+    """
 
     def test_a_gap_makes_the_next_ping_ask_whether_the_system_is_running(self):
         # The guest freezes, answers a ping once it is thawed, and is then
@@ -190,6 +205,102 @@ class SideChannelMonitorReplyGapTestCase(base.ShakenFistTestCase):
 
         self.assertEqual([degraded], inst.agent_state_writes)
         self.assertEqual('gather_facts_request', sent[-1])
+
+
+def _welcome_reply(boot_time=1699999000):
+    return _reply(agent_welcome=agent_pb2.AgentWelcome(
+        version='1.0', boot_time=boot_time))
+
+
+class SideChannelMonitorNotRunningTestCase(_MonitorScriptTestCase):
+    """The monitor does not write a reading of a guest which is not running.
+
+    The monitor and the power methods write agent_state with no lock
+    between them, so an is_system_running reply in flight as the vCPUs
+    froze could land after pause() or power_off() had written "instance
+    paused" or "instance powered off". The management loop then tears the
+    monitor down and nothing rewrites the value, leaving power_state
+    reading paused or off while agent_state reads ready -- which passes
+    the readiness gates in external_api/instance.py and leaves agent
+    operations queued until their deadline (issue 4485).
+    """
+
+    def test_a_reply_which_lands_after_a_pause_is_not_written(self):
+        monitor, inst, sent = self._run(
+            constants.AGENT_NEVER_TALKED,
+            [_running_reply()] + _silence(3), power_state='paused')
+
+        # The agent said it was ready, but the instance is recorded as
+        # paused, so that is what the database keeps.
+        self.assertEqual(
+            [constants.AGENT_INSTANCE_PAUSED], inst.agent_state_writes)
+
+        # No facts are gathered from a guest which is not running, and the
+        # cache is not advanced, so the next round trip asks whether the
+        # system is running rather than merely pinging. power_state is a
+        # cache too, and a guest resumed outside Shaken Fist is running
+        # while power_state still says paused.
+        self.assertEqual(['is_system_running_request'], sent)
+        self.assertEqual(
+            constants.AGENT_NEVER_TALKED, monitor.instance_ready)
+
+    def test_a_reply_which_lands_after_a_power_off_is_not_written(self):
+        _, inst, _ = self._run(
+            constants.AGENT_NEVER_TALKED, [_running_reply()],
+            power_state='off')
+
+        self.assertEqual(
+            [constants.AGENT_INSTANCE_OFF], inst.agent_state_writes)
+
+    def test_the_monitor_asks_again_on_the_next_reply(self):
+        # Two replies while the instance reads paused means two attempts,
+        # because not caching the refused state is what lets the monitor
+        # recover once the cleaner has noticed the guest is running again.
+        _, inst, sent = self._run(
+            constants.AGENT_NEVER_TALKED,
+            [_running_reply()] + _silence(3) + [_running_reply()],
+            power_state='paused')
+
+        self.assertEqual(
+            [constants.AGENT_INSTANCE_PAUSED] * 2, inst.agent_state_writes)
+        self.assertEqual(['is_system_running_request'], sent)
+
+    def test_a_welcome_from_a_paused_guest_is_not_written(self):
+        monitor, inst, _ = self._run(
+            constants.AGENT_NEVER_TALKED, [_welcome_reply()],
+            power_state='paused')
+
+        self.assertEqual(
+            [constants.AGENT_INSTANCE_PAUSED], inst.agent_state_writes)
+        self.assertEqual(
+            constants.AGENT_NEVER_TALKED, monitor.instance_ready)
+
+    def test_a_running_guests_reply_is_written_as_observed(self):
+        monitor, inst, sent = self._run(
+            constants.AGENT_NEVER_TALKED, [_running_reply()])
+
+        self.assertEqual([constants.AGENT_READY], inst.agent_state_writes)
+        self.assertEqual(constants.AGENT_READY, monitor.instance_ready)
+        self.assertIn('gather_facts_request', sent)
+
+    def test_the_constructor_does_not_overwrite_a_paused_instance(self):
+        # The management loop can list a domain as running just before a
+        # pause() or power_off() finishes. An unconditional "no contact"
+        # write then replaces the truer value those wrote.
+        inst = _FakeInstance(power_state='paused')
+        with mock.patch.object(sidechannel.daemon, 'clear_abort_path'):
+            sidechannel.SideChannelMonitorJob(inst)
+
+        self.assertEqual(
+            [constants.AGENT_INSTANCE_PAUSED], inst.agent_state_writes)
+
+    def test_the_constructor_writes_no_contact_for_a_running_instance(self):
+        inst = _FakeInstance()
+        with mock.patch.object(sidechannel.daemon, 'clear_abort_path'):
+            sidechannel.SideChannelMonitorJob(inst)
+
+        self.assertEqual(
+            [constants.AGENT_NEVER_TALKED], inst.agent_state_writes)
 
 
 class _FakeLibvirtError(Exception):

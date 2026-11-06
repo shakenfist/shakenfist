@@ -18,6 +18,7 @@ LOG = logging.getLogger()
 # cluster_ci_tests/test_networking.py's FLOATING_NETWORK_UUID, which does the
 # same).
 AGENT_INSTANCE_OFF = 'not ready (instance powered off)'
+AGENT_INSTANCE_PAUSED = 'not ready (instance paused)'
 
 
 class TestStateChanges(base.BaseNamespacedTestCase):
@@ -265,6 +266,61 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             'instance_uuid': inst['uuid']
         })
         self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+
+        # A pause made outside Shaken Fist must reach agent_state too. The
+        # cleaner is the only thing which notices one, and it used to
+        # record power_state alone -- leaving agent_state reading ready on
+        # a frozen guest, which passes the readiness gates and has agent
+        # operations accepted and then queued until their deadline (issue
+        # 4485). The suspend is done with virsh rather than the API
+        # precisely because the API path writes agent_state itself.
+        #
+        # This runs on the instance's hypervisor, so it skips loudly when
+        # node exec is unavailable -- see _require_node_exec()'s docstring.
+        node = self._node_by_uuid(inst['node'])
+        self._require_node_exec(node)
+        domain = 'sf:%s' % inst['uuid']
+
+        self._node_exec(node, ['virsh', 'suspend', domain], sudo=True)
+        self._emit_tracing_event({
+            'msg': 'Suspended instance outside Shaken Fist',
+            'instance_uuid': inst['uuid']
+        })
+        try:
+            self._await_out_of_band_agent_state(
+                inst['uuid'], AGENT_INSTANCE_PAUSED)
+            self._assert_power_state(
+                inst['uuid'], 'paused', 'after virsh suspend')
+        finally:
+            self._node_exec(node, ['virsh', 'resume', domain], sudo=True)
+
+        self._emit_tracing_event({
+            'msg': 'Resumed instance outside Shaken Fist',
+            'instance_uuid': inst['uuid']
+        })
+        self._await_agent_state(inst['uuid'], ready=True)
+        self._assert_power_state(inst['uuid'], 'on', 'after virsh resume')
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+
+    def _await_out_of_band_agent_state(self, instance_uuid, expected):
+        """Wait for agent_state to reach expected, with a short bound.
+
+        _await_agent_state() is not used here: its windows are sized for
+        an instance booting, and this is one daemon pass of work, so a
+        regression should fail in a minute rather than renew its progress
+        window off the power state writes and run to the ceiling.
+        """
+        start_time = time.time()
+        while time.time() - start_time < 120:
+            i = self.system_client.get_instance(instance_uuid)
+            if i['agent_state'] == expected:
+                return
+            time.sleep(5)
+
+        self.fail(
+            'Instance %s agent_state is %r, expected %r two minutes after '
+            'the guest was frozen outside Shaken Fist'
+            % (instance_uuid, i['agent_state'], expected))
 
     def test_lifecycle_pause_semantics(self):
         # One instance covers every pause/unpause edge the power API

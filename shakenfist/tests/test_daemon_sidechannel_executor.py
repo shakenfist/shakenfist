@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from shakenfist import constants
 from shakenfist import exceptions
+from shakenfist import instance
 from shakenfist.config import SFConfig
 from shakenfist.daemons.sidechannel import main as sidechannel
 from shakenfist.operations import node_aop_op
@@ -111,8 +112,19 @@ class _FakeAgentOp:
 
 
 class _FakeInstance:
+    """The monitor's constructor records an agent state, so this carries
+    the real reconciliation of such a write against power_state (issue
+    4485) rather than a fake of it."""
+
+    record_observed_agent_state = \
+        instance.Instance.record_observed_agent_state
+    _agent_state_when_not_running = \
+        instance.Instance._agent_state_when_not_running
+
     def __init__(self):
         self.uuid = 'fake-instance'
+        self.agent_state = None
+        self.power_state = {'power_state': 'on'}
 
 
 class _FakeStatResultReply:

@@ -167,6 +167,15 @@ metrics. The headlines:
   Changing one means changing all three — see
   [docs/developer_guide/subsystem_internals.md](docs/developer_guide/subsystem_internals.md).
 
+- **`agent_state` is written against `power_state`.** The sidechannel
+  monitor records what the agent said with
+  `Instance.record_observed_agent_state()`, not by assigning
+  `agent_state`, and every writer of a paused or off `power_state` writes
+  it before `agent_state`. Breaking either leaves `agent_state` reading
+  ready on a frozen guest, which the agent operation endpoints gate on —
+  see
+  [docs/developer_guide/agent_protocol.md](docs/developer_guide/agent_protocol.md#recording-what-the-agent-said).
+
 - **Node error never clears automatically.** `sf-ctl clear-node-error` is
   the operator recovery path; see
   [docs/operator_guide/node_health.md](docs/operator_guide/node_health.md).

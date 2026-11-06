@@ -80,6 +80,17 @@ LOG, _ = logs.setup(__name__)
 # How many times power_on() tries to start a domain before giving up.
 POWER_ON_ATTEMPTS = 5
 
+# What agent_state must read for each power_state in which the guest's
+# vCPUs are not executing, and so in which nothing the agent said can
+# still be true. record_observed_agent_state() reconciles the sidechannel
+# monitor's writes against this. 'crashed' has no entry: there is no
+# agent state for it, and with no panic device and on_crash=restart in
+# libvirt.tmpl the state is unreachable anyway (issue 4307).
+AGENT_STATE_WHEN_NOT_RUNNING = {
+    'paused': constants.AGENT_INSTANCE_PAUSED,
+    'off': constants.AGENT_INSTANCE_OFF,
+}
+
 
 def _get_defaulted_disk_bus(disk):
     bus = disk.get('bus')
@@ -972,6 +983,41 @@ class Instance(dbowo):
 
         new_state = baseobject.State(value=new_value, update_time=time.time())
         self._db_set_attribute('agent_state', new_state)
+
+    def record_observed_agent_state(self, new_value):
+        """Record an agent state the sidechannel monitor observed.
+
+        Nothing the agent said is still true of a guest whose vCPUs are
+        frozen, so a reading which disagrees with the recorded power state
+        is replaced by the value that power state demands. Returns True if
+        new_value is what ended up recorded, and False if it was replaced,
+        in which case the caller must not cache new_value: see
+        docs/developer_guide/agent_protocol.md, which has the two rules
+        this depends on and what happens without them (issue 4485).
+
+        The power state is read again after the write, which is what makes
+        this safe without a lock; the read before it only keeps an already
+        paused instance from having a reading of ready written and then
+        immediately replaced.
+        """
+        not_running = self._agent_state_when_not_running()
+        if not not_running:
+            self.agent_state = new_value
+            not_running = self._agent_state_when_not_running()
+            if not not_running:
+                return True
+
+        if not_running == new_value:
+            return True
+
+        self.agent_state = not_running
+        return False
+
+    def _agent_state_when_not_running(self):
+        """The agent state the recorded power state demands, or None if the
+        guest is recorded as running."""
+        return AGENT_STATE_WHEN_NOT_RUNNING.get(
+            self.power_state.get('power_state'))
 
     @property
     def agent_start_time(self):
@@ -2648,8 +2694,13 @@ class Instance(dbowo):
                     EVENT_TYPE_AUDIT, 'instance autostart configuration error',
                     extra={'message': str(e)})
 
-            self.agent_state = constants.AGENT_INSTANCE_OFF
+            # power_state first, then agent_state. That order is what lets
+            # the sidechannel monitor reconcile its own writes against
+            # power_state without a lock -- see
+            # record_observed_agent_state(). pause(), power_on() and the
+            # cleaner's detected power off all write in this order too.
             self.update_power_state('off')
+            self.agent_state = constants.AGENT_INSTANCE_OFF
             self.add_event(EVENT_TYPE_AUDIT, 'poweroff', extra=extra)
 
     def _check_domain_stopped_after_failed_destroy(self, lc, domain, error):

@@ -13,6 +13,8 @@ from shakenfist import instance
 from shakenfist import node
 from shakenfist.config import BaseSettings
 from shakenfist.constants import AGENT_INSTANCE_OFF
+from shakenfist.constants import AGENT_INSTANCE_PAUSED
+from shakenfist.constants import AGENT_READY
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.daemons.cleaner import main as cleaner_main
@@ -807,6 +809,34 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
 
         self.assertEqual([], self.locks.get_lock_calls)
         self.assertFalse(mock_update.called)
+
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_a_pause_this_loop_is_first_to_see_records_the_agent_state(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists):
+        """A pause made outside Shaken Fist also stops agent_state reading
+        ready.
+
+        pause() writes agent_state itself, but nothing did for a domain
+        suspended with virsh, so agent_state kept saying ready while the
+        vCPUs were frozen -- which passes the readiness gates in
+        external_api/instance.py and leaves agent operations queued until
+        their deadline (issue 4485). This loop is the only thing which
+        notices such a pause.
+        """
+        inst_uuid = self._create_instances(['paused'])['paused']
+        inst = instance.Instance.from_db(inst_uuid)
+        inst.update_power_state('on')
+        inst.agent_state = AGENT_READY
+
+        cleaner_st.update_power_states()
+
+        self.assertEqual('paused', self._power_state(inst_uuid))
+        self.assertEqual(
+            AGENT_INSTANCE_PAUSED,
+            instance.Instance.from_db(inst_uuid).agent_state.value)
 
     def _run_sweep(self, profiles, instance_dirs=()):
         """Run a pass over apparmor profiles old enough to be swept, and
