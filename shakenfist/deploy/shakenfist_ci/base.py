@@ -1425,6 +1425,42 @@ class BaseTestCase(testtools.TestCase):
             f'After time {after}, instance {instance_uuid} had no event '
             f'"{operation}:{message}"')
 
+    def _await_domain_xml(self, instance_uuid):
+        """The libvirt domain XML a hypervisor actually generated.
+
+        Instance._create_domain_xml() emits what it handed libvirt as a
+        mutate event, which is the only view of that from outside the
+        hypervisor -- and therefore the only way a test can tell a stale
+        copy of libvirt.tmpl on a node from a correct template in this
+        repository.
+
+        Filter to mutate events rather than reading the default page of
+        everything: a booting instance emits well over a hundred events and
+        the domain XML is written early, so an unfiltered read can
+        legitimately not contain it. Poll for eventual consistency.
+        """
+        xml_events = []
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            xml_events = [
+                e for e in self.test_client.get_instance_events(
+                    instance_uuid, event_type='mutate', limit=1000)
+                if str(e.get('message', '')) == 'libvirt domain XML']
+            if xml_events:
+                break
+            time.sleep(1)
+
+        self.addDetail('domain xml events', content.text_content(json.dumps(
+            xml_events, indent=4, sort_keys=True, default=str)))
+        self.assertNotEqual(
+            0, len(xml_events),
+            'instance create emitted no "libvirt domain XML" mutate event')
+
+        # Events come back newest first, and a power on retry can generate
+        # more than one, so [0] is the XML libvirt was most recently handed.
+        # "extra" can be present and null, hence the or rather than a default.
+        return (xml_events[0].get('extra') or {}).get('xml', '')
+
     def _await_object_operations_complete(
             self, object_type, object_uuid, poll_interval, label):
         # last_cluster_operation names only the newest operation, so a

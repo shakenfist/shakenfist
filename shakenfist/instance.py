@@ -113,6 +113,31 @@ def _get_defaulted_disk_type(disk):
     return 'disk'
 
 
+# When a domain has a bus='scsi' disk and declares no SCSI controller of its
+# own, libvirt adds its default one, which on x86 is the LSI Logic
+# lsi53c895a. OVMF has no driver for that controller, so a UEFI guest finds
+# no block device behind it, tries the network instead, and lands in the EFI
+# shell with "map: No mapping found" (issue 4579). OVMF does ship a
+# virtio-scsi driver, so a UEFI domain names that controller explicitly.
+UEFI_SCSI_CONTROLLER_MODEL = 'virtio-scsi'
+
+
+def _get_scsi_controller_model(devices, uefi):
+    """The SCSI controller model a domain declares, or None to leave it to libvirt.
+
+    BIOS domains deliberately keep libvirt's default: SeaBIOS has an LSI
+    driver, so they boot from bus='scsi' today, and appliance images which
+    ask for LSI Logic ship only that driver. A domain with no SCSI disk
+    needs no SCSI controller at all.
+    """
+    if not uefi:
+        return None
+    for d in devices or []:
+        if d.get('bus') == 'scsi':
+            return UEFI_SCSI_CONTROLLER_MODEL
+    return None
+
+
 def _safe_int_cast(i):
     if i:
         return int(i)
@@ -2367,6 +2392,8 @@ class Instance(dbowo):
             memory=self.memory * 1024,
             vcpus=self.cpus,
             disks=block_devices.get('devices'),
+            scsi_model=_get_scsi_controller_model(
+                block_devices.get('devices'), self.uefi),
             networks=networks,
             instance_path=self.instance_path,
             console_port=ports.get('console_port'),

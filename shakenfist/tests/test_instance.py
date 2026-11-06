@@ -1921,6 +1921,141 @@ class InstanceDomainXMLEscapingTestCase(base.ShakenFistTestCase):
             'the hotplugged model did not round-trip as data')
 
 
+class InstanceScsiControllerTestCase(base.ShakenFistTestCase):
+    """A UEFI domain with a SCSI disk declares a controller OVMF can boot from.
+
+    Issue 4579: the domain template named no SCSI controller, so libvirt
+    added its default, which on x86 is LSI Logic. OVMF has no driver for
+    that, so a UEFI guest found no block device, tried the network, and
+    dropped to the EFI shell. These tests render through
+    _create_domain_xml() rather than the template alone, because the
+    defect is as easy to reintroduce by not passing the model as it is by
+    losing the element.
+    """
+
+    def setUp(self):
+        super().setUp()
+        storage_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, storage_path, ignore_errors=True)
+        shutil.copyfile(
+            os.path.abspath(os.path.join(
+                os.path.dirname(__file__), '..', 'deploy', 'collection',
+                'roles', 'hypervisor', 'files', 'libvirt.tmpl')),
+            os.path.join(storage_path, 'libvirt.tmpl'))
+
+        fake_config = SFConfig(
+            STORAGE_PATH=storage_path,
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance('cirros', self.instance_uuid)
+        self.inst = instance.Instance.from_db(self.instance_uuid)
+
+        # A firmware directory with only the 4 MB pair installed, as Debian 13
+        # ships, so the UEFI renders find something.
+        ovmf_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, ovmf_dir, ignore_errors=True)
+        for name, size in (('OVMF_CODE_4M.fd', 3653632),
+                           ('OVMF_VARS_4M.fd', 540672)):
+            with open(os.path.join(ovmf_dir, name), 'wb') as f:
+                f.truncate(size)
+        self.ovmf = mock.patch('shakenfist.instance.OVMF_DIR', ovmf_dir)
+        self.ovmf.start()
+        self.addCleanup(self.ovmf.stop)
+
+    def _scsi_controllers(self, uefi, bus):
+        device = 'sda' if bus == 'scsi' else 'vda'
+        pm = mock.PropertyMock
+        patches = [
+            mock.patch.object(instance.Instance, 'uefi', new_callable=pm,
+                              return_value=uefi),
+            mock.patch.object(instance.Instance, 'secure_boot',
+                              new_callable=pm, return_value=False),
+            mock.patch.object(instance.Instance, 'nvram_template',
+                              new_callable=pm, return_value=None),
+            mock.patch.object(instance.Instance, 'interfaces',
+                              new_callable=pm, return_value=[]),
+            mock.patch.object(instance.Instance, 'block_devices',
+                              new_callable=pm,
+                              return_value={
+                                  'devices': [{
+                                      'type': 'qcow2',
+                                      'present_as': 'disk',
+                                      'source_type': 'file',
+                                      'source': '',
+                                      'backing': '',
+                                      'cache_mode': 'none',
+                                      'device': device,
+                                      'bus': bus,
+                                  }],
+                                  'extracommands': []}),
+            mock.patch.object(instance.Instance, 'ports', new_callable=pm,
+                              return_value={'console_port': 30000,
+                                            'vdi_port': 30001}),
+            mock.patch.object(instance.Instance, 'video', new_callable=pm,
+                              return_value={'model': 'qxl',
+                                            'memory': 16384, 'vdi': 'vnc'}),
+            mock.patch.object(instance.Instance, 'add_event'),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+        root = ET.fromstring(self.inst._create_domain_xml())
+        return [c for c in root.findall('./devices/controller')
+                if c.get('type') == 'scsi']
+
+    def test_uefi_scsi_disk_gets_a_virtio_scsi_controller(self):
+        controllers = self._scsi_controllers(True, 'scsi')
+        self.assertEqual(
+            1, len(controllers),
+            'a UEFI domain with a SCSI disk declared no SCSI controller, so '
+            'libvirt will add an LSI Logic one which OVMF cannot boot from')
+        self.assertEqual('virtio-scsi', controllers[0].get('model'))
+
+    def test_bios_scsi_disk_keeps_the_libvirt_default(self):
+        self.assertEqual(
+            [], self._scsi_controllers(False, 'scsi'),
+            'a BIOS domain with a SCSI disk no longer gets libvirt default '
+            'controller, which moves existing guests off the LSI Logic bus '
+            'they boot from today')
+
+    def test_uefi_without_a_scsi_disk_gets_no_scsi_controller(self):
+        self.assertEqual([], self._scsi_controllers(True, 'virtio'))
+
+    def test_get_scsi_controller_model(self):
+        scsi = {'bus': 'scsi'}
+        virtio = {'bus': 'virtio'}
+
+        self.assertEqual(
+            'virtio-scsi',
+            instance._get_scsi_controller_model([virtio, scsi], True))
+        self.assertIsNone(
+            instance._get_scsi_controller_model([virtio, scsi], False))
+        self.assertIsNone(
+            instance._get_scsi_controller_model([virtio], True))
+
+        # An instance whose block devices have not been initialized yet, and
+        # a disk with no bus at all, must not raise here. The template is
+        # rendered on every power on, not only at create time.
+        self.assertIsNone(instance._get_scsi_controller_model(None, True))
+        self.assertIsNone(instance._get_scsi_controller_model([{}], True))
+
+
 class InstancesTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()

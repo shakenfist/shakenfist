@@ -77,7 +77,11 @@ BASE_CONTEXT = {
     'spice_concurrent': False,
     'spice_debug': False,
     'extradevices': [],
+    'scsi_model': None,
 }
+
+# The same single disk, on the SCSI bus instead of virtio.
+SCSI_DISKS = [dict(BASE_CONTEXT['disks'][0], device='sda', bus='scsi')]
 
 # The template's jinja conditionals gate large blocks on these, so a single
 # render never sees the whole file.
@@ -99,6 +103,15 @@ VARIANTS = [
         'nvram_template_attribute':
             "template='/usr/share/OVMF/OVMF_VARS_4M.fd'",
         'ovmf_code': '/usr/share/OVMF/OVMF_CODE_4M.fd',
+    }),
+    ('q35 spice uefi scsi', {
+        'machine_type': 'q35',
+        'uefi': True,
+        'nvram_template_attribute':
+            "template='/usr/share/OVMF/OVMF_VARS_4M.fd'",
+        'ovmf_code': '/usr/share/OVMF/OVMF_CODE_4M.fd',
+        'disks': SCSI_DISKS,
+        'scsi_model': 'virtio-scsi',
     }),
 ]
 
@@ -174,3 +187,38 @@ class LibvirtTemplateTestCase(base.ShakenFistTestCase):
             self.assertEqual(
                 'yes' if overrides.get('secure_boot') else None,
                 loaders[0].get('secure'))
+
+    def _scsi_controllers(self, **overrides):
+        root = ET.fromstring(render(**overrides))
+        return [c for c in root.findall('./devices/controller')
+                if c.get('type') == 'scsi']
+
+    def test_scsi_model_names_the_controller(self):
+        # Issue 4579: libvirt's default SCSI controller is LSI Logic, which
+        # OVMF cannot boot from, so a UEFI domain with a SCSI disk has to
+        # name a controller OVMF has a driver for.
+        controllers = self._scsi_controllers(
+            disks=SCSI_DISKS, uefi=True, scsi_model='virtio-scsi')
+        self.assertEqual(
+            1, len(controllers),
+            'a domain which was given a SCSI controller model declared no '
+            'SCSI controller, so libvirt will add its default LSI Logic one '
+            'and a UEFI guest will not boot (issue 4579)')
+        self.assertEqual('virtio-scsi', controllers[0].get('model'))
+
+    def test_no_scsi_model_declares_no_controller(self):
+        # A BIOS domain, and any domain without a SCSI disk, keeps libvirt's
+        # default behaviour. That is deliberate rather than incidental: SeaBIOS
+        # boots LSI Logic, and some appliance images ship only its driver.
+        for name, overrides in VARIANTS:
+            if overrides.get('scsi_model'):
+                continue
+            self.assertEqual(
+                [], self._scsi_controllers(**overrides),
+                f'{name} variant asked for no SCSI controller model but got '
+                'a SCSI controller anyway')
+
+        self.assertEqual(
+            [], self._scsi_controllers(disks=SCSI_DISKS, scsi_model=None),
+            'a BIOS domain with a SCSI disk no longer gets libvirt default '
+            'SCSI controller, which changes the bus of existing guests')
