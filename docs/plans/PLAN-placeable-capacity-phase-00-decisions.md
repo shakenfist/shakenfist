@@ -675,3 +675,606 @@ double-subtraction `Q2` asks about is real and costs about 27% of
 memory refusals, but it costs them in the committed ledger rather
 than in the live check, and the live check — the one `Q1` is about
 — was the sole reason a node was dropped in 1 node-sample in 4968.
+
+### Decisions this phase produces: `Q3` to `Q8`
+
+Researched against `develop` at `32de6cec7f` on 2026-11-07. Every
+citation below was re-found in that tree rather than carried from
+the master plan or the brief, because the line numbers in both had
+drifted — `_has_sufficient_ram()` is now
+`shakenfist/scheduler.py:753`, not `:520`, and
+`_claim_capacity_guard()` is `shakenfist/mariadb.py:29927`, not
+`:29563`. Four citations had drifted in substance as well as in
+line number — two in the master plan's `Q7`, two in the brief — and
+each is named where it bears.
+
+`D7` to `D12` answer `Q3`, `Q4`, `Q5`, `Q7` and `Q8` and defer
+`Q6`. Each states what it leaves to its implementing phase, so no
+later phase finds the question re-opened.
+
+#### `D7` (`Q3`): the hold reference and its lifetime
+
+**Decision. A hold is a row with its own uuid4, and the reference
+on `POST /instances` is one new optional body parameter carrying
+that uuid and nothing else. A hold is created with its claim and
+ends only when the claim is deleted, when the reconciler's expiry
+sweep lapses it, or when an operator shrinks the claim below the
+sum of its holds — not when its instance is deleted, not on a
+preflight abort, and not on a refused create. A create larger than
+every hold on every dimension is an unheld create. An explicit
+reference that cannot be honoured is a `409` carrying a reason
+token; a reference to another namespace's hold is a `404`.**
+
+*The reference is a uuid, resolved namespace-scoped.* A claim
+already has no name and is addressed by uuid alone, and
+`arg_is_claim_ref()` (`shakenfist/external_api/auth.py:1504-1541`)
+spells out why the namespace segment is checked against the
+object's own: "a uuid on its own would let a caller address a claim
+through any namespace's URL, which would make the namespace segment
+decorative". A hold has the same property, so it takes the same
+treatment — a uuid that is not a hold of the request's namespace
+answers the same `404` a missing hold does, disclosing nothing
+about what other namespaces hold. A shape expression
+(`cpus=4,memory=8192`) is rejected as a reference because a shape
+is not a key: two holds of one claim can share a shape, and `G3`'s
+best fit exists precisely because a create and a hold need not be
+the same size.
+
+*The parameter is a body key with a handler guard, like every other
+one.* `POST /instances` takes flat body parameters
+(`shakenfist/external_api/instance.py:718-721`) and the handler is
+"a chain of handler guards, one block per body parameter"
+(`:745-757`), which is also where
+`docs/developer_guide/writing_an_endpoint.md` says a guard for a
+new body key belongs. The hold reference is one more block, and it
+answers before `Instance.new()` so a refused reference creates
+nothing.
+
+*Lifetime: the claim's coverage, not the instance's.* A hold ends
+when its claim is deleted (`NamespaceClaim.hard_delete()`,
+`shakenfist/namespace_claim.py:387-397`, which "gives the capacity
+back inside the same transaction that removes the row"), when the
+reconciler's expiry sweep moves it to coverage `expired`
+(`shakenfist/mariadb.py:27223-27228`), or under the shrink rule
+below. It does **not** end when its instance is deleted: the
+release path returns the hold to unconsumed, booked on the node the
+instance was last on, which is the brief's `D3` and the reason
+three `G2` callers can delete and recreate under one claim.
+
+*An expired claim's holds are released, not displaced.*
+Displacement (brief `D8`) keeps a hold inside its claim's aggregate
+limits. An expired claim has no aggregate limits to sit inside —
+the reconciler sums `claimed_*` from active claims only, which
+`_direct_update_namespace_claim()` states in terms
+(`shakenfist/mariadb.py:30384-30388`) — so there is nothing for a
+displaced hold to be inside, and the honest outcome is release.
+
+*A re-dated claim keeps its holds; a replaced one does not.*
+`sf_claim`'s `state=present` path re-dates the existing claim
+rather than replacing it
+(`shakenfist/deploy/collection/plugins/modules/sf_claim.py:43-47`),
+so the 30-day `static-runners` and `static-ci` claims keep their
+bookings across every run of the play. Its *lapsed* path creates a
+replacement and then deletes the lapsed rows (`:59-67`), and holds
+belong to a claim uuid, so the replacement starts with none. The
+holder re-books, exactly as it does for a displaced hold under the
+brief's `D8`.
+
+*A shrink below `used + held` releases holds rather than being
+refused.* The shrink floor today is `used_*` and no further, tested
+as a SQL guard so a concurrent create cannot slip under it
+(`shakenfist/mariadb.py:30368-30374`, diagnosed by
+`_blocked_by_shrink_floor()` at `:30534-30556`). That floor stays
+where it is, and a shrink that leaves `sum(holds)` above the new
+limit releases holds, most recently booked first, until the claim
+fits — each release an event on the claim and named in the update's
+reply. This is what the brief's `D3` means by a hold ending because
+its claim was "shrunk below it".
+
+*Consumption edges.*
+
+- **A create larger than every hold is an unheld create in a
+  claimed namespace.** It charges the claim row as today and is
+  placed against node room net of every hold on the node, its own
+  namespace's included (`G6`). No hold is split: labelling part of
+  a node's room held when it is not, to serve a case whose remedy
+  is a larger hold, is the brief's `D3` rejection and it stands.
+- **Two creates cannot take one hold.** The hold is taken by a
+  guarded `UPDATE` inside the admission transaction, which is the
+  same mechanism every other counter there uses
+  (`_direct_admit_instance_placement()`,
+  `shakenfist/mariadb.py:28750-29038`); the loser of the race falls
+  through to the next matching hold, or becomes an unheld create.
+- **A displaced hold cannot be consumed.** It is booked on no node,
+  so it is not a match for implicit consumption, and an explicit
+  reference to one is refused with the `409` below.
+- **A hold carries no affinity.** Hard affinity matches the tags of
+  instances *already placed on a candidate hypervisor*, in the
+  creator's own namespace (`shakenfist/scheduler.py:623-665`;
+  `docs/user_guide/affinity.md:134-139`); it is re-evaluated on
+  every schedule, restarts included (`affinity.md:148-161`); and
+  the first member of a `require_with_tag` group cannot be created
+  under the constraint that defines it (`affinity.md:194-208`). A
+  booking made before any instance exists therefore has nothing to
+  evaluate. Affinity is tested at consumption instead: a hold whose
+  node does not satisfy the create's `require_*` constraints is not
+  a match, which is the brief's `D3`, and the hold itself never
+  carries one, which this decision adds.
+- **An explicit reference that cannot be honoured is a `409` with a
+  reason token** — consumed, expired, displaced, too small, or
+  affinity. `409` is the status this API already gives when "a
+  request conflicts with the durable state of a resource"
+  (`shakenfist/external_api/auth.py:1378-1382`), and the refusal is
+  not a `507` and carries no `Retry-After` because no wait makes
+  that hold usable. The brief's `D3` asked for a non-capacity,
+  non-transient error naming why; this names the status and says
+  the reason is a token rather than prose.
+
+*Rejected: release the hold when its instance is deleted.* It turns
+every delete-and-recreate into a race the holder can lose, which is
+the thing a hold exists to prevent, and three `G2` callers do
+exactly that. The brief's `D3` rejected it and nothing in the code
+has changed to reopen it.
+
+*Rejected: raise the shrink floor to `used + held` and answer
+`below_usage`.* It would make returning capacity harder than taking
+it — an operator would have to find and release each hold before
+the claim could shrink — and the API already treats a shrink as the
+operator's explicit instruction. `D15`'s "there is no auto-grow:
+every change here is one an operator asked for"
+(`shakenfist/mariadb.py:30355-30357`) is a statement about growth,
+not about refusing to give room back.
+
+*Rejected: a name or a shape expression as the reference.* A hold
+has no name to give it, and a shape is not unique within a claim.
+
+*Left to the implementing phases.* Phase 4 owns the best-fit
+comparator's tie-breaks beyond memory, then vCPUs, then disk; the
+wire names of the hold fields on the create's reply and on the
+refusal; whether the reason token rides in its own key or in
+`error`; and where a consumed hold's uuid is surfaced on the
+instance. Phase 3 owns where the hold-taking statement sits in the
+transaction's canonical table order. Phase 6 owns the client and
+`sf_claim` spelling of the reference (`D11`).
+
+#### `D8` (`Q4`): the per-node held column's shape
+
+**Decision. Holds are stored as one row per hold in a new table —
+uuid, claim uuid, namespace, the three dimensions, the booked node
+(nullable, where `NULL` means displaced), and the consuming
+instance uuid when it has one. That table is the ground truth. The
+per-node held dimension is three columns on
+`scheduler_node_capacity` — `held_cpus`, `held_memory_mb`,
+`held_disk_gb`, `BIGINT NOT NULL DEFAULT 0`, beside `used_*` — and
+nothing else: no held column on `namespace_claims` and none on
+`cluster_capacity`. The reconciler recomputes the three counters
+from the hold rows in the same pass and from the same read as
+`used_*`. Claim migration carries no bookings.**
+
+*Why rows, and why also columns.* The node guard is one `WHERE`
+clause inside one `UPDATE` (`_claim_node()`,
+`shakenfist/mariadb.py:29013-29037`), so `used + held + request <=
+limit` needs `held` as a column on the row the guard already locks.
+But a column cannot be recomputed from itself: the reconciler is
+"the authority on every counter it writes, because it recomputes
+each one from ground truth" rather than adjusting it incrementally
+(`shakenfist/mariadb.py:27196-27205`), and for `used_*` that ground
+truth is the `instance_location` reference rows that
+`_RECONCILE_USAGE_SQL` (`:26872`) folds up. Holds need the same
+split: rows to recompute from, counters to guard against. The
+brief's `D3` asked for exactly this when it said the reconciler
+"must recompute `held_*` from hold rows too, or a pass will
+overwrite the bookings".
+
+*The counters are also what the live checks narrow against.* The
+brief's `D2` requires that every other create's live memory check
+count a node's unconsumed holds as if resident.
+`_has_sufficient_ram()` already reads the node's capacity row for
+its third sub-check (`shakenfist/scheduler.py:808-826`), so a
+`held_memory_mb` column on that row is readable from the live check
+without a second query. Holds stored only as rows would make the
+live check join on the hot path.
+
+*What a consumed hold contributes.* A consumption moves the
+create's request from `held_*` to `used_*` and leaves the hold row
+at its full size, so the difference stays booked while the instance
+runs (brief `D3`). `used + held` therefore never double-counts a
+consumed hold, and the reconciler's recompute is `SUM` over the
+node's hold rows of the hold's size less the consuming instance's
+request, which is zero for an unconsumed hold. That is why the hold
+row records the consuming instance and not merely a boolean: the
+residue cannot be derived without it. The consumed hold's node
+follows its instance on a move, so a later delete returns the hold
+to the node the instance was actually on.
+
+*No namespace-side and no cluster-side held counter.* A hold sits
+inside its claim's `limit_*`, and a claim's limits are already
+inside `cluster_capacity.claimed_*`, so a second held counter on
+either row would be a ledger that agrees with the first only until
+the next write — the reason `_summarize_resources()` gives for
+publishing the singleton rather than recomputing it from the claims
+(`shakenfist/scheduler.py:358-373`). The claim-side invariant
+`sum(holds) <= limit_*` is tested as a SQL aggregate over the hold
+rows inside the claim's own transaction. Claim create and update
+are not a hot path, unlike instance admission, so an aggregate
+there costs nothing the design has to recover.
+
+*A correction to the brief.* The brief's `D3` says the claim's
+limits are validated against the sum of its holds "through the same
+aggregate guard (`_claim_capacity_guard()`)". That guard tests
+whether the *cluster* can keep the claim — `claimed + requested +
+GREATEST(0, unclaimed_used - migrated) <= total`
+(`shakenfist/mariadb.py:29927-29972`) — and must not gain a hold
+term; its docstring warns twice against adding to the migrated
+term. The hold-sum invariant is a different test, in the same
+transaction. The brief's intent (validated in SQL, inside the claim
+transaction, at creation and update) is honoured; its naming of the
+guard is not.
+
+*Reconciler recomputation.* `held_*` for a node is the `SUM` above
+over hold rows whose node is that node and whose claim is in
+coverage `active`, computed in the pass that already recomputes
+usage (`_reconcile_fetch_usage()`, `:27085-27108`, called at
+`:27327`) and written with the node's limits. The pass's `removals`
+list (`:27360-27368`) is the trigger for re-place-or-displace; see
+`D9`.
+
+*One trap worth naming here so phase 3 does not fall into it.*
+`held_disk_gb` must not feed `_derive_disk_limit_gb()`
+(`:26676-26712`). That limit is `used_disk_gb` plus the headroom
+the filesystem reports, so held disk is deliberately outside it;
+adding held to the `used` term would raise the limit by the holds
+and the guard would then admit them a second time.
+
+*Claim migration carries no bookings.* The migrated-drawdown term
+moves a namespace's existing *instance* usage off
+`unclaimed_used_*` and onto the claim at claim creation, and is
+pinned at zero for a grow (`:29927-29957`). A namespace with no
+claim can hold nothing, so there are no hold rows at the only
+moment that term is non-zero. The other reading of "migration" — a
+placement move — is answered above: a move updates the hold row's
+node and touches no `held_*` arithmetic, because a consumed hold's
+room is in `used_*`, which the existing floored decrement and
+guarded increment already move (`_floored_node_decrement()`,
+`:28284-28310`).
+
+*Visibility (`G8`).* `summarize_resources()` publishes `cpu_held`,
+`memory_held_mb` and `disk_held_gb` per node beside the committed
+figures it already publishes (`shakenfist/scheduler.py:461-540`),
+and nets held room out of `cpu_available`, `ram_available` and
+`disk_available`, because those are the figures a client-side
+ledger model reads.
+
+*Rejected: holds as a JSON document on the claim.*
+`namespace_claims` doubles as the claim's static-values table and
+has no attributes table (`shakenfist/mariadb.py:3955-3983`; there
+is no `namespace_claim_attributes` anywhere), the guard cannot sum
+a JSON blob per node in SQL, and the reconciler could not recompute
+`held_*` without parsing it in Python.
+
+*Rejected: holds as `object_references` rows.* A reference row
+carries `relationship_value` and nothing else
+(`shakenfist/schema/object_reference.py:7-9,24-28`), so three
+dimensions, a consumption state and a consuming instance would
+have to be encoded into one string.
+
+*Rejected: a per-namespace held column on the node row.* It would
+let the guard answer "held by whom" in SQL, at the cost of a row
+per (node, namespace) pair and a second recompute fold. The guard
+never needs the holder: a hold binds every create including the
+holder's own unheld ones (`G6`), and the consuming create excludes
+its own hold by uuid, not by namespace.
+
+*Left to phase 3.* The table's name and exact DDL, its index set,
+its entry in `EXPECTED_SCHEMA_VERSIONS`
+(`shakenfist/mariadb.py:575-622`) and its place in
+`ensure_schema()`'s canonical list; the
+`SCHEDULER_NODE_CAPACITY_VERSION` bump from 1 to 2
+(`:546`) and the existence-guarded `ADD COLUMN` migration, for
+which `_add_missing_namespace_claims_columns()` (`:4117-4144`) and
+`_ensure_namespace_claims_schema()` (`:4146-4179`) are the
+precedent rather than a specification; the proto fields; and
+whether the consumption state is its own column or is read from the
+nullable instance uuid alone. This decision settles the shape —
+rows plus three node counters, nowhere else — and deliberately not
+the migration.
+
+#### `D9` (`Q5`): whether `degraded` nodes stop placement
+
+**Decision. A `degraded` node keeps accepting placements and keeps
+accepting holds. The nodes that stop accepting holds are the
+complement of `NODE_ACTIVE_STATES` — `error`, `missing`,
+`stopping`, `stopped` and `deleted` — plus a node that is not a
+hypervisor and a node whose metrics have aged out. The operative
+trigger is not a state list: it is the loss of the node's
+`scheduler_node_capacity` row, which the reconciler already
+computes from exactly those conditions. A node that loses its row
+re-places or displaces its unconsumed holds in that pass.**
+
+*`degraded` is active, and the code says so twice.*
+`NODE_ACTIVE_STATES` is `{'initial', 'created', 'degraded'}`
+(`shakenfist/constants.py:47`), under a comment that reads
+"degraded is active: a node with one unhealthy store still runs
+instances" (`:38-40`), and
+`docs/developer_guide/state_machine.md:400-401` says "a degraded
+node is still a scheduling candidate". The state means only that
+some registered daemon reports stopping or stopped
+(`Node.get_degraded_daemons()`, `shakenfist/node.py:705-715`), and
+the registered set includes daemons an instance does not need —
+`eventlog`, `checksums`, `cleaner`, `transfers`
+(`shakenfist/node.py:246-249`).
+
+*The state that means the hypervisor has actually failed is
+`error`, and it is not active.* `Node.INACTIVE_STATES` is
+`{deleted, error, missing}` (`shakenfist/node.py:242`), a
+resource-health error clears only through `sf-ctl clear-node-error`
+(`docs/developer_guide/state_machine.md:402-409`), and
+`Node.set_daemon_state()` carries a `no_reconcile` list whose whole
+purpose is to stop an errored node being downgraded to degraded —
+"which is a schedulable `ACTIVE_STATE`" — the moment one of its
+daemons reports stopped (`shakenfist/node.py:637-650`). That
+comment names the sf-6 failure: without it the node "would flap
+error<->degraded and keep receiving instances". Holds must follow
+placement here, because a hold that refused a node placement
+accepts would be booked nowhere while creates landed freely, which
+inverts what a hold is for.
+
+*The trigger is the capacity row, not a state test.* The
+reconciler removes a node's capacity row when the node is not in
+`NODE_ACTIVE_STATES`, is a known non-hypervisor, has no metrics row
+fresher than `RECONCILE_METRICS_MAX_AGE_SECONDS`, or is not in the
+`nodes` table at all (`shakenfist/mariadb.py:27295-27368`, with the
+active-state query at `:27313-27321` and `removals` at
+`:27360-27364`). That one list already covers every case the
+brief's `D8` enumerated and two it did not, and it is recomputed on
+the same pass that `D8` asks to recompute `held_*` on — so
+re-place-or-displace needs no new condition of its own. The
+freshness window is 900 seconds (`:716`, "fifteen minutes absorbs
+any skew a working NTP setup produces"), so a momentary metrics gap
+does not displace a holder's bookings.
+
+*A correction to the brief.* The brief's `D8` lists the node states
+as `missing`, `stopping`, `stopped` and `degraded`
+(`shakenfist/node.py:233-236` — still those lines) and leaves
+`degraded` to this plan. The list is incomplete in the direction
+that matters: it omits `error`, which is the state a failed
+hypervisor actually reaches, is the only one of the set that sticks
+until an operator clears it, and is the one the sf-6 outage
+produced. `D9` adds `error` and `deleted` and takes `degraded` out.
+The brief asked the question rather than answering it, so nothing in
+it needs to yield.
+
+*Rejected: a new no-new-holds node state.* A lame-duck or
+maintenance state is #1364's (`D10`), and minting one here would
+ship a state with no operator verb to set it and no evacuate
+operation to use it.
+
+*Rejected: holds refuse `degraded`, placement does not.* Two
+admission rules for one node, differing on a signal — a stopped
+eventlog daemon — that has nothing to do with capacity.
+
+*Rejected: treat the conductor's maintenance drain as a node state.*
+It is not one: it stops the conductor creating namespaces, so it
+books no holds, which is the brief's `D8` and unchanged by this.
+
+*Left to phase 4.* The re-place-or-displace transaction itself, the
+most-recently-booked-first ordering, the event names on the claim,
+the metric, and the displaced-hold fields in the claim's view and
+in `GET /admin/resources`. Phase 3 owes it only the `held_*`
+recompute in the pass whose `removals` list it reuses.
+
+#### `D10` (`Q6`): the admin-scoped hold for evacuate
+
+**Decision. Deferred. #1364 carries no design to design against,
+and there is no lame-duck state, no drain state and no evacuate
+operation in the tree to attach an admin hold to. The owner is the
+##1364 implementation, which the master plan already carries in
+Future work rather than as a phase. Phase 3 owes it one thing: the
+hold row's claim uuid must be nullable, so an admin hold can later
+be booked against an aggregate that is not a namespace claim
+without a migration.**
+
+*What #1364 actually says.* Read with `gh issue view 1364` on
+2026-11-07: node delete exists, and the residual is "no
+lame-duck/maintenance/drain state and no evacuate operation",
+rescoped in 2026-06, with one comment pointing at a partial fix in
+two old pull requests. There is no proposed state, no proposed
+operation and no destination-selection rule.
+
+*And the tree agrees.* A search of `shakenfist/` for lame-duck,
+evacuate and drain finds only the log and eventlog drainer threads;
+the sole mention of evacuation in the documentation is
+`docs/developer_guide/state_machine.md:394`, where a node is
+"manually evacuated and removed" by an operator before being
+deleted. `PLAN-scheduler-reservations.md:1544-1549` already reached
+the same conclusion about the same question — the node-scoped case
+that justifies this is an operator's, and "design it then, against
+the claims as they stand after phase 5, not before".
+
+*What would settle it.* #1364 shipping a node lifecycle state that
+means "accept no new placements" and an evacuate operation that
+names its destinations. Until both exist, an admin hold has no
+caller and no aggregate limit to be drawn from: a claim is
+per-namespace (`shakenfist/mariadb.py:3993-4024`), and an evacuate
+books room for instances in namespaces it does not own.
+
+*What this plan must not foreclose.* `held_*` is per node and
+dimension-only (`D8`): it does not record who holds the room, so a
+cluster-scoped holder needs no column there. The only thing that
+ties a hold to a namespace is the hold row's claim uuid, so phase 3
+must not make that column the table's primary key or its only
+non-null parent. A nullable claim uuid leaves #1364 free to book
+against the cluster singleton (`cluster_capacity`,
+`shakenfist/mariadb.py:4056-4086`), which is where an admin's
+aggregate would have to live. That is a constraint on phase 3's
+DDL, not a design for the admin hold.
+
+*Rejected: deciding it now anyway* — an `admin: true` flag on a
+hold, or admin holds in the `system` namespace's claim. Both fix
+where an evacuate's aggregate room comes from before anything can
+say how an evacuate chooses destinations, and the master plan's
+"designed with #1364 rather than guessed at here" exists to stop
+precisely that.
+
+#### `D11` (`Q7`): expressing shapes, and the stale claim verbs
+
+**Decision. `sf-client` and `sf_claim` express a shape as a
+comma-separated `key=value` list — `cpus`, `memory` in MB, `disk`
+in GB, `count` — repeated once per shape, which is the idiom both
+already use for a long-form networkspec, diskspec and videospec.
+The hold reference is a single `--hold <uuid>` option on `instance
+create` and a `hold:` key on `sf_instance`. The operator guide's
+claim-verbs statement has already been corrected on `develop`; the
+stale statements phase 6 must fix are in three other files.**
+
+*The expression, in the repository's own idiom.* `sf-client`
+already takes a structured multi-valued argument as a repeatable
+option whose value is a comma-separated `key=value` list:
+`--networkspec` and `--diskspec`
+(`client-python/shakenfist_client/commandline/instance.py:358-364`,
+parsed by `_parse_detailed_netspec()` at `:317-331`), documented
+for the collection as `size=20,base=debian:11,bus=sata`
+(`docs/user_guide/ansible.md:267`) and for video as
+`model=qxl,memory=65536` (`:275`). So:
+
+- `sf-client namespace claim create ... --shape
+  'cpus=4,memory=8192,disk=200,count=3'`, repeatable, and the same
+  option on `claim update`. The units are those the claim's own
+  fields already use — `limit_memory_mb` and `limit_disk_gb`
+  (`client-python/shakenfist_client/commandline/namespace.py:353-386`)
+  — so a shape and a limit are denominated the same way in one
+  command.
+- `sf_claim` gains `shapes:`, a list of mappings with those four
+  keys, each of which may also be written as the `key=value` string
+  the collection already accepts elsewhere. Shapes join the set the
+  module reconciles: a run whose shape multiset differs from the
+  server's is a change, exactly as a differing limit is
+  (`LIMIT_FIELDS`,
+  `shakenfist/deploy/collection/plugins/modules/sf_claim.py:265`).
+- `--hold <uuid>` on `sf-client instance create`, and `hold:` on
+  `sf_instance`. Both are sent only against a server that
+  advertises the capability, as `_require_claim_verbs()` already
+  establishes the pattern for
+  (`sf_claim.py:275-302`).
+
+*The stale statement is not where the plan says it is.* The master
+plan's `Q7` says the claim verbs are unreleased since client-python
+`v0.8.3` and that `docs/operator_guide/scheduler.md` still says
+`sf-client` has no claim verbs. Both halves have drifted:
+
+- client-python `v0.8.4` was tagged on 2026-10-28 and published on
+  2026-10-31, and it carries all five verbs
+  (`client-python/shakenfist_client/apiclient.py:1645-1700`;
+  `client-python/shakenfist_client/commandline/namespace.py:251-450`).
+  The verbs are released.
+- `docs/operator_guide/scheduler.md:445-449` has already been
+  corrected: it says claims are administered with `sf-client
+  namespace claim` and its `create`, `show`, `list`, `update` and
+  `delete` verbs, "which need `shakenfist-client` 0.8.4 or later".
+
+What is still stale, and is therefore what phase 6 fixes, is three
+other places that still say no release carries the verbs and tell
+the operator to install the client from git:
+
+- `docs/user_guide/ansible.md:24-30`
+- `shakenfist/deploy/collection/requirements.txt:16-20`
+- `shakenfist/deploy/collection/plugins/modules/sf_claim.py:27-32`
+  (the `requirements:` block) and `:275-302`
+  (`_require_claim_verbs()`'s failure message)
+
+`_require_claim_verbs()` itself stays. It is a feature probe
+against the client that was actually built, and its docstring
+already says it "starts passing on its own once a release does
+carry the verbs"; only its prose changes, to name 0.8.4 rather than
+a git URL.
+
+*Rejected: a positional triple (`--shape 4:8192:200`).* Unreadable
+at the point of use, and it cannot gain a fifth key without
+breaking every caller. The `key=value` spec idiom already exists
+here and already has a parser.
+
+*Rejected: shapes as a JSON string argument.* `sf-client` takes
+JSON only where the server's own value is JSON — affinity metadata,
+`docs/user_guide/affinity.md:129`. Under `D8` the server stores
+shapes as rows, not as a document, so a JSON argument would be a
+shape of its own invention.
+
+*Left to phase 6.* The option letters, where the shape parser lives
+and whether it is shared with the diskspec parser, the version floor
+the collection's `requirements.txt` asks for, and the client's own
+`docs/namespace-claims.md` page that the operator guide links to.
+
+#### `D12` (`Q8`): whether `C` is retired once `A` ships
+
+**Decision. The placement dry run (`C`) is kept once `A` ships. It
+is a general query, not scaffolding.**
+
+*The caller table says so.* Of the ten callers in the master plan's
+Callers (`G2`) table, eight get something from `C` and only the
+conductor's runner path and the ci-images builder get little or
+nothing. Three of those uses are ones `A` cannot serve at all: the
+operator building a cloud by hand wants "would this fit?" before
+ten creates, 33fl's `static-runners` wants it as a pre-flight task,
+and lame-duck/evacuate wants "fit with node N excluded?" — a
+question a hold cannot answer, because booking the room to find out
+whether a drain is possible would take the room being asked about.
+`A` answers "is the room mine"; `C` answers "is there room", and
+the second question does not stop being asked once the first is
+answerable.
+
+*And it is the core's only read-only entry point.* `C` writes
+nothing, so it cannot strand capacity, deadlock admission or
+desynchronise the reconciler (master plan, phase 2), which is what
+makes it safe for private-ci to score in shadow and safe for a
+client-side ledger model to poll. The brief's `D1` puts `C` first
+for the same reason.
+
+*Rejected: retire `C` once `A` ships.* It would leave the eight
+advisory callers nothing, remove the only way to ask the question
+without taking the room, and leave the shared set-placement core
+with a single consumer — which would make phase 1's extraction
+pointless in retrospect.
+
+*Left to the implementing phases.* Phase 2 owns `C`'s route,
+request and reply shapes and its capability token; phase 6 owns its
+client verb. Neither re-opens whether it exists.
+
+#### Cross-check against the placeable-claims brief
+
+Each decision above was read against the brief's `D2` (what a hold
+promises), `D3` (consuming a hold) and `D8` (a node that leaves
+service).
+
+- **`D7` against brief `D3`.** Consistent, and narrower in four
+  places the brief left open: the reference is a uuid resolved
+  namespace-scoped, the unhonourable explicit reference is a `409`
+  with a reason token, an expired claim's holds are released rather
+  than displaced, and a shrink releases holds rather than being
+  refused. The brief's rejections (exact matching, first fit,
+  release on delete, a silently falling-back reference) are
+  untouched.
+- **`D8` against brief `D3`.** Consistent on substance, with one
+  correction stated in the decision: the hold-sum invariant is a
+  new SQL aggregate in the claim transaction, not a term in
+  `_claim_capacity_guard()`, which tests cluster totals and whose
+  docstring warns against adding to its migrated term. The brief's
+  intent is honoured; its naming of the guard is not. `D8` also
+  supplies the column the brief's `D2` narrowings need on the live
+  check's own hot path.
+- **`D9` against brief `D8`.** `D9` answers the question the brief
+  explicitly delegated, and extends the brief's state list with
+  `error` and `deleted` while taking `degraded` out. The brief's
+  re-place-or-displace rule, its displacement semantics and its
+  four rejections stand unchanged; `D9` only gives the rule a
+  concrete trigger that the reconciler already computes.
+- **`D10` against brief `D8`.** The brief listed a lame-duck node
+  among the cases but marked it "not built"; the deferral agrees
+  and names the one DDL constraint that keeps it cheap later.
+- **`D11` and `D12`.** Neither touches the brief's `D2`, `D3` or
+  `D8`. `D12` agrees with the brief's `D1`.
+
+No decision here contradicts the brief. The two corrections — the
+guard named in brief `D3`, and the state list in brief `D8` — are
+both places where the brief's own text points at this plan for the
+answer, so neither document needs to yield; both are recorded so
+the brief's readers are not misled by them.
