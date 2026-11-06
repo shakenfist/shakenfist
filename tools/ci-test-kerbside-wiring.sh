@@ -795,10 +795,19 @@ PYEOF
     # too, and a loopback api_url is exempt however the host is classified.
     source_refuses 'a cleartext http api_url on a host which is not a Shaken Fist node' \
         '"api_url": "http://sf-api.example.com:13000"' \
-        'uses http:// and its host sf-api.example.com is not this host'
+        'has the scheme "http", not https'
     source_refuses 'a cleartext http api_url on a co-located host, pointed elsewhere' \
         '"kerbside_colocated": true, "api_url": "http://sf-api.example.com:13000"' \
-        'uses http:// and its host sf-api.example.com is not this host'
+        'has the scheme "http", not https'
+    # Stated as https rather than as "not http", so a formatting accident
+    # fails closed: urlsplit reads "sf-api.example.com:13000" as a scheme of
+    # its own, and "//sf-api.example.com:13000" as no scheme at all.
+    source_refuses 'an api_url with no scheme' \
+        '"api_url": "//sf-api.example.com:13000"' \
+        'has the scheme "", not https'
+    source_refuses 'an api_url whose host looks like a scheme' \
+        '"api_url": "sf-api.example.com:13000"' \
+        'not https'
 
     CURRENT_CASE='case 6: kerbside_source accepts a cleartext api_url with the opt-out set'
     run "${WITHOUT}" -i localhost, -e "$(source_vars insecure-optin \
@@ -835,7 +844,16 @@ PYEOF
         'contains a newline'
     source_refuses 'a double quote in kerbside_url' \
         '"kerbside_url": "https://console.example.com/\"x"' \
-        'contains a newline'
+        'contains a newline, a double quote'
+    source_refuses 'a command substitution in kerbside_url' \
+        '"kerbside_url": "https://console.example.com/$(id)"' \
+        'contains a newline, a double quote'
+    source_refuses 'a backtick in kerbside_url' \
+        '"kerbside_url": "https://console.example.com/`id`"' \
+        'contains a newline, a double quote'
+    source_refuses 'a backslash in kerbside_url' \
+        '"kerbside_url": "https://console.example.com/\\\\x"' \
+        'contains a newline, a double quote'
     source_refuses 'a newline in kerbside_public_fqdn' \
         '"kerbside_public_fqdn": "console.example.com\nca"' \
         'contains a newline'

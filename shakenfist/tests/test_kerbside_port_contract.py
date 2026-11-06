@@ -7,7 +7,9 @@
 # and so does tools/ci-test-kerbside-wiring.sh. A change to sf-api.socket or to
 # one of SFConfig's *_PORT defaults would leave those copies stale, and a
 # co-located Kerbside listener could then bind a port a daemon needs. This test
-# reads the ports from their sources of truth and pins the copy (#4707).
+# reads the ports from their sources of truth and pins both copies (#4707) --
+# both, because a failure message which names a second file the test does not
+# read sends the reader to fix a copy that then fails somewhere else.
 
 import os
 import re
@@ -28,6 +30,7 @@ NODE_TASKS = os.path.join(
 SF_API_SOCKET = os.path.join(
     _repo_root(), 'shakenfist', 'deploy', 'collection', 'roles', 'node', 'templates',
     'sf-api.socket')
+WIRING_SCRIPT = os.path.join(_repo_root(), 'tools', 'ci-test-kerbside-wiring.sh')
 
 
 def _reserved_listener_ports():
@@ -42,6 +45,17 @@ def _reserved_listener_ports():
     raise AssertionError(
         'kerbside_source.yml no longer sets kerbside_sf_listener_ports; this '
         'test can no longer pin the port contract.')
+
+
+def _wiring_script_ports():
+    """The co-located port list ci-test-kerbside-wiring.sh expects."""
+    with open(WIRING_SCRIPT) as f:
+        match = re.search(r'^want_ports = \(\[([0-9,\s]*)\]', f.read(), re.MULTILINE)
+    if match is None:
+        raise AssertionError(
+            'ci-test-kerbside-wiring.sh no longer has a want_ports list of the '
+            'co-located ports; this test can no longer pin that copy.')
+    return {int(port) for port in match.group(1).split(',') if port.strip()}
 
 
 def _sf_api_socket_port():
@@ -72,3 +86,9 @@ class KerbsidePortContractTestCase(base.ShakenFistTestCase):
             'longer match sf-api.socket and SFConfig\'s *_PORT defaults. Update '
             'kerbside_sf_listener_ports (and the copy in '
             'tools/ci-test-kerbside-wiring.sh) to match.')
+        self.assertEqual(
+            want, _wiring_script_ports(),
+            "The want_ports list in tools/ci-test-kerbside-wiring.sh no longer "
+            "matches sf-api.socket and SFConfig's *_PORT defaults. Update it to "
+            'match, along with kerbside_sf_listener_ports in '
+            'kerbside_source.yml.')

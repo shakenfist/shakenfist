@@ -32,6 +32,10 @@ def _repo_root():
 CREDENTIALS_TASKS = os.path.join(
     _repo_root(), 'shakenfist', 'deploy', 'collection', 'roles', 'node', 'tasks',
     'kerbside_credentials.yml')
+# Operators of clusters not deployed from the collection mint the credential by
+# hand, from this page, which says it is "the same way the deploy does".
+VDI_CONSOLE_TOKENS_DOC = os.path.join(
+    _repo_root(), 'docs', 'operator_guide', 'vdi_console_tokens.md')
 
 # The endpoints Kerbside reads while scraping a Shaken Fist cluster: the CA and
 # the console token signing key's public half, then the nodes and instances it
@@ -63,6 +67,20 @@ def _minted_scopes():
     raise AssertionError(
         'kerbside_credentials.yml no longer runs bootstrap-system-key for the '
         '"kerbside" key; this test can no longer pin the scope contract.')
+
+
+def _documented_scopes():
+    """The scopes the operator guide's hand-mint command passes."""
+    with open(VDI_CONSOLE_TOKENS_DOC) as f:
+        doc = f.read()
+    commands = [block for block in re.findall(r'```bash\n(.*?)```', doc, re.S)
+                if 'bootstrap-system-key' in block and 'kerbside' in block]
+    if len(commands) != 1:
+        raise AssertionError(
+            'docs/operator_guide/vdi_console_tokens.md has %d bash blocks running '
+            'bootstrap-system-key for the "kerbside" key, not one; this test can '
+            'no longer pin the documented command.' % len(commands))
+    return re.findall(r'--scope\s+(\S+)', commands[0])
 
 
 def _required(resource_class, method):
@@ -123,3 +141,16 @@ class KerbsideScopeContractTestCase(base.ShakenFistTestCase):
                 'satisfies %s for %s %s. Kerbside only reads, and the operator '
                 'guide promises this credential cannot change the cluster.'
                 % (minted, required, method.upper(), resource_class.__name__))
+
+    def test_the_documented_hand_mint_matches_the_deploy(self):
+        # The page tells operators of clusters the collection does not deploy
+        # to mint the credential "the same way the deploy does". If the deploy's
+        # scopes change and the page's do not, those clusters silently get a
+        # differently privileged credential -- which is how the page came to
+        # document a wildcard key in the first place (#4698).
+        self.assertEqual(
+            _minted_scopes(), _documented_scopes(),
+            'docs/operator_guide/vdi_console_tokens.md documents '
+            '%s for the hand-built Kerbside credential, but the deploy mints '
+            '%s. The page says it is the same way the deploy does it, so the '
+            'two must agree.' % (_documented_scopes(), _minted_scopes()))

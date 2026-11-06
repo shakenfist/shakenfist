@@ -219,7 +219,13 @@ argument_specs:
             token audience, so it must equal the Kerbside deployment's
             SF_CONSOLE_TOKEN_AUDIENCE exactly; the cluster shape play
             refuses a value which ends in a slash, or which differs between
-            Shaken Fist's nodes.
+            Shaken Fist's nodes. The config entry point refuses a value
+            containing a newline, a double quote, a dollar sign, a backtick
+            or a backslash, because it is rendered unescaped inside double
+            quotes into /etc/sf/config, which is sourced by shell as well as
+            read by systemd. That check is in config, not kerbside_source, so
+            it also covers a cluster pointing at an externally managed
+            Kerbside with no kerbside inventory group.
           - >-
             When set, kerbside_credentials ensures the console token signing
             key exists with sf-ctl ensure-kerbside-signing-key, and
@@ -310,14 +316,17 @@ argument_specs:
         default: false
         description:
           - >-
-            Opt out of kerbside_source's refusal of a cleartext (http://)
-            api_url whose host is not the Kerbside host itself. False, the
-            default, refuses it, since Kerbside posts kerbside_system_key over
-            the network in cleartext on every POST /auth scrape. Set it true
-            only when the network between the Kerbside host and the API is
-            trusted, such as a private CI network. A loopback api_url is
-            unaffected, since that traffic never leaves the host, whether or
-            not the host is also a Shaken Fist node.
+            Opt out of kerbside_source's refusal of an api_url which is
+            neither https:// nor the Kerbside host itself. False, the default,
+            refuses it, since Kerbside posts kerbside_system_key over the
+            network in cleartext on every POST /auth scrape. The condition is
+            stated as https rather than as "not http", so an api_url with no
+            scheme, or whose host urlsplit reads as one, is refused too rather
+            than passing a check it does not satisfy. Set it true only when the
+            network between the Kerbside host and the API is trusted, such as a
+            private CI network. A loopback api_url is unaffected, since that
+            traffic never leaves the host, whether or not the host is also a
+            Shaken Fist node.
       kerbside_minted_key_hash: &kerbside_minted_key_hash_option
         type: str
         default: null

@@ -370,8 +370,14 @@ Consoles work. Kerbside's own management does not, without more work.
   `kerbside_system_key`, including from a Kerbside host's `sources.yaml`, can
   read the whole cluster but cannot change it
   ([#4698](https://github.com/shakenfist/shakenfist/issues/4698)). Kerbside's
-  own adversarial CI driver needs a writing credential and uses the `deploy`
-  key instead.
+  own adversarial CI driver still reads this key out of its source
+  configuration and writes with it, so Kerbside's `sf-e2e` lane is expected
+  to fail against a cluster deployed from this collection until that driver
+  is given a credential of its own
+  ([kerbside#697](https://github.com/shakenfist/kerbside/issues/697)). That
+  affects only Kerbside's own CI, not an operator's cluster -- but any local
+  automation which reused the `kerbside` key to *write* is in the same
+  position, and should move to its own credential.
   [The Kerbside credential](vdi_console_tokens.md#the-kerbside-credential)
   covers rotating and revoking it.
 

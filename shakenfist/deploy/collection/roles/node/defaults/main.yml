@@ -105,11 +105,12 @@ kerbside_sf_ca_cert: ""
 kerbside_url_on_sf_nodes: null
 kerbside_colocated: false
 
-# Opt out of the refusal of a cleartext (http://) api_url whose host is not
-# the Kerbside host itself. False, the default, refuses it, since Kerbside
-# would post kerbside_system_key across the network in cleartext on every
-# scrape. Set it true only when the network between the Kerbside host and the
-# API is trusted, such as a private CI network. A loopback api_url is
+# Opt out of the refusal of an api_url which is neither https:// nor the
+# Kerbside host itself. False, the default, refuses it, since Kerbside would
+# post kerbside_system_key across the network in cleartext on every scrape.
+# Stated as https rather than as "not http", so an api_url with no scheme is
+# refused too. Set it true only when the network between the Kerbside host and
+# the API is trusted, such as a private CI network. A loopback api_url is
 # unaffected: that traffic never leaves the host.
 kerbside_allow_insecure_api_url: false
 

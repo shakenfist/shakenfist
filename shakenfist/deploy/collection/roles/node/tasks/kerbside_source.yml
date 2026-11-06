@@ -51,94 +51,116 @@
 
 # Kerbside fetches the console token signing key from api_url, as this host
 # sees it, and posts kerbside_system_key in the body of every POST /auth it
-# makes there. Both of the next two refusals turn on one property of api_url
-# -- does it name this host? -- so it is derived once, here. Loopback is
-# localhost and any name under it, 127.0.0.0/8 (including the short forms such
-# as 127.1 which the resolver accepts), ::1 in any spelling, its IPv4-mapped
-# form, and the unspecified addresses 0.0.0.0 and ::, which Linux connects to
-# the local host. Neither the host nor the scheme is a secret, so the messages
-# below name them; neither names the whole URL, in case it carries a
-# credential.
-- name: Read api_url's host and scheme
-  ansible.builtin.set_fact:
+# makes there. Both refusals below turn on one property of api_url -- does it
+# name this host? -- so it is derived once, as block vars. Block vars rather
+# than set_fact: a fact would be durable state at a precedence outranking the
+# shakenfist.kerbside role's own variables, and that role owns this prefix
+# (kerbside_api_address, kerbside_api_port, kerbside_api_workers), so a future
+# kerbside_api_host there would be silently overridden by this derivation.
+# Block vars are evaluated lazily and in order, so the predicate may read the
+# host parsed above it.
+#
+# Loopback is localhost and any name under it, 127.0.0.0/8 (including the
+# short forms such as 127.1 which the resolver accepts), ::1 in any spelling,
+# its IPv4-mapped form, and the unspecified addresses 0.0.0.0 and ::, which
+# Linux connects to the local host. Neither the host nor the scheme is a
+# secret, so the messages name them; neither names the whole URL, in case it
+# carries a credential.
+- name: Judge api_url
+  vars:
     kerbside_api_host: "{{ api_url | urlsplit('hostname') | default('', true) | lower }}"
     kerbside_api_scheme: "{{ api_url | urlsplit('scheme') | default('', true) | lower }}"
-
-# A separate task because it reads the fact the one above sets, which is not
-# guaranteed within a single set_fact.
-- name: Decide whether api_url names this host
-  ansible.builtin.set_fact:
     kerbside_api_is_loopback: >-
       {{ kerbside_api_host in ['0.0.0.0', '::']
          or kerbside_api_host is match('^(.*[.])?localhost[.]?$')
          or kerbside_api_host is match('^127([.][0-9]+){0,3}$')
          or kerbside_api_host is match('^[0:]*:0{0,3}1$')
          or kerbside_api_host is match('^(0{0,4}:)*:?ffff:127[.]') }}
+  block:
+    # api_url's default, http://localhost:13000, works on a Kerbside host
+    # which is also a Shaken Fist node, since sf-api listens on every node,
+    # and reaches nothing from one which is not. So it is judged per host: a
+    # co-located host may use loopback even when another Kerbside host is
+    # dedicated and uses a routable address.
+    - name: Refuse a loopback api_url on a Kerbside host which is not a Shaken Fist node
+      ansible.builtin.assert:
+        that: kerbside_colocated | bool or not (kerbside_api_is_loopback | bool)
+        fail_msg: >-
+          api_url's host on {{ inventory_hostname }} is {{ kerbside_api_host }},
+          a loopback address, but {{ inventory_hostname }} is not a Shaken Fist
+          node, so nothing answers there. Kerbside reaches Shaken Fist at
+          api_url, so on this host it must be an address of the Shaken Fist
+          API which this host can reach, such as the cluster's load balancer
+          or an API node's address.
+        quiet: true
 
-# api_url's default, http://localhost:13000, works on a Kerbside host which is
-# also a Shaken Fist node, since sf-api listens on every node, and reaches
-# nothing from one which is not. So it is judged per host: a co-located host
-# may use loopback even when another Kerbside host is dedicated and uses a
-# routable address.
-- name: Refuse a loopback api_url on a Kerbside host which is not a Shaken Fist node
-  ansible.builtin.assert:
-    that: kerbside_colocated | bool or not (kerbside_api_is_loopback | bool)
-    fail_msg: >-
-      api_url's host on {{ inventory_hostname }} is {{ kerbside_api_host }},
-      a loopback address, but {{ inventory_hostname }} is not a Shaken Fist
-      node, so nothing answers there. Kerbside reaches Shaken Fist at
-      api_url, so on this host it must be an address of the Shaken Fist
-      API which this host can reach, such as the cluster's load balancer
-      or an API node's address.
-    quiet: true
+    # kerbside_system_key is in the body of every POST /auth Kerbside makes to
+    # api_url, so an api_url which is not this host and is not encrypted sends
+    # the cluster credential across the network in cleartext on every scrape.
+    # What decides that is api_url, not kerbside_colocated: a co-located host
+    # pointed at a remote http api_url leaks the key exactly as badly as a
+    # dedicated host does, and that is the one configuration this repository
+    # ships (tools/ci-deploy-profiles/kerbside-slim-tier.yml.j2), so keying
+    # the refusal on co-location would leave it firing on nothing (#4699).
+    #
+    # Stated positively, as https rather than as "not http", so it fails
+    # closed on a formatting accident: urlsplit gives api_url
+    # "sf-api.example.com:13000" the scheme "sf-api.example.com" and
+    # "//host:13000" no scheme at all, and a "not http" test would pass both
+    # while proving nothing about encryption. The opt-out is
+    # kerbside_allow_insecure_api_url, for a trusted private network or for
+    # CI, which sets it deliberately.
+    - name: Refuse an api_url which is neither this host nor https
+      ansible.builtin.assert:
+        that: >-
+          kerbside_api_is_loopback | bool
+          or kerbside_allow_insecure_api_url | bool
+          or kerbside_api_scheme == 'https'
+        fail_msg: >-
+          api_url on {{ inventory_hostname }} has the scheme
+          "{{ kerbside_api_scheme }}", not https, and its host
+          {{ kerbside_api_host }} is not this host, so Kerbside posts
+          kerbside_system_key over the network in cleartext on every scrape.
+          Use an https:// api_url, such as the cluster's load balancer or an
+          API node's address, or set kerbside_allow_insecure_api_url to true
+          to accept the risk, for example on a trusted private network or in
+          CI. An api_url with no scheme at all is refused here too: give it
+          one.
+        quiet: true
 
-# kerbside_system_key is in the body of every POST /auth Kerbside makes to
-# api_url, so an http:// api_url which is not this host sends the cluster
-# credential across the network in cleartext on every scrape. What decides
-# that is api_url, not kerbside_colocated: a co-located host pointed at a
-# remote http api_url leaks the key exactly as badly as a dedicated host
-# does, and that is the one configuration this repository ships
-# (tools/ci-deploy-profiles/kerbside-slim-tier.yml.j2), so keying the refusal
-# on co-location would leave it firing on nothing (#4699). The opt-out is
-# kerbside_allow_insecure_api_url, for a trusted private network or for CI,
-# which sets it deliberately.
-- name: Refuse a cleartext api_url which is not this host
-  ansible.builtin.assert:
-    that: >-
-      kerbside_api_is_loopback | bool
-      or kerbside_allow_insecure_api_url | bool
-      or kerbside_api_scheme != 'http'
-    fail_msg: >-
-      api_url on {{ inventory_hostname }} uses http:// and its host
-      {{ kerbside_api_host }} is not this host, so Kerbside posts
-      kerbside_system_key over the network in cleartext on every scrape. Use
-      an https:// api_url, such as the cluster's load balancer or an API
-      node's address, or set kerbside_allow_insecure_api_url to true to accept
-      the risk, for example on a trusted private network or in CI.
-    quiet: true
-
-# kerbside_url renders unescaped into /etc/sf/config (config template) and the
-# kerbside role renders raw values into kerbside.ini, so a newline would inject
-# whatever directive followed it, as internal_ca's validate.yml already refuses
-# for the certtool templates. Checked before kerbside_url is compared or built
-# into the source. kerbside_sql_url and kerbside_auth_secret_seed are secrets,
-# so they are named in the conditions (which print as their source text, never
-# their rendered value, under quiet) but never in the message, and the task is
-# not looped, so no value reaches the task result. The two kerbside_* values
-# here belong to the kerbside role; they are read defensively because the node
-# role does not own them.
-- name: Refuse newlines or double quotes in the Kerbside wiring values
+# The kerbside role renders these raw into kerbside.ini, so a newline would
+# inject whatever directive followed it, as internal_ca's validate.yml already
+# refuses for the certtool templates. Checked before kerbside_url is compared
+# or built into the source.
+#
+# kerbside_url carries the wider class, because it is also rendered into
+# /etc/sf/config, which is sourced by shell as well as read by systemd. That
+# is the same class the config entry point applies, and the one it applies it
+# to: a dedicated Kerbside host never runs config, and a Shaken Fist node
+# which is not in the kerbside group never runs this, so each file needs its
+# own copy of the check. shakenfist/tests/test_kerbside_injection_contract.py
+# pins the two classes to each other.
+#
+# kerbside_sql_url and kerbside_auth_secret_seed are secrets, so they are
+# named in the conditions (which print as their source text, never their
+# rendered value, under quiet) but never in the message, and the task is not
+# looped, so no value reaches the task result. The two kerbside_* values here
+# belong to the kerbside role; they are read defensively because the node role
+# does not own them.
+- name: Refuse newlines or shell metacharacters in the Kerbside wiring values
   ansible.builtin.assert:
     that:
-      - kerbside_url is not search('[\r\n"]')
+      - kerbside_url is not search('[\r\n"$`\\\\]')
       - (kerbside_public_fqdn | default('', true)) is not search('[\r\n]')
       - (kerbside_sql_url | default('', true)) is not search('[\r\n]')
       - (kerbside_auth_secret_seed | default('', true)) is not search('[\r\n]')
     fail_msg: >-
-      One of kerbside_url, kerbside_public_fqdn, kerbside_sql_url or
-      kerbside_auth_secret_seed contains a newline (and kerbside_url a double
-      quote). They are rendered unescaped into /etc/sf/config and Kerbside's
-      kerbside.ini, where a newline would inject the directive that followed it.
+      kerbside_public_fqdn, kerbside_sql_url or kerbside_auth_secret_seed
+      contains a newline, or kerbside_url contains a newline, a double quote,
+      a dollar sign, a backtick or a backslash. They are rendered unescaped
+      into Kerbside's kerbside.ini, and kerbside_url into /etc/sf/config as
+      well: a newline would inject the directive that followed it, and the
+      rest are expanded by the shell, which also sources that file.
     quiet: true
 
 # kerbside_url is the single source of truth for the console token audience:
