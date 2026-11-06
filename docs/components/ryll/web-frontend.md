@@ -6,7 +6,7 @@ WebRTC. Single-viewer for MVP; multi-viewer is future work.
 
 ## Quick start
 
-    ryll --web session.vv
+    ryll --web --file session.vv
 
 Optional flags:
 
@@ -148,7 +148,7 @@ tears down cleanly.
 
 ryll supports HTTPS natively via two flags:
 
-    ryll --web session.vv \
+    ryll --web --file session.vv \
         --web-tls-cert /path/to/cert.pem \
         --web-tls-key  /path/to/key.pem
 
@@ -288,7 +288,7 @@ pattern.
       browser about both. Pass `--web-media-addr` — repeatably,
       with an address or an interface name — to narrow that:
 
-          ryll --web session.vv \
+          ryll --web --file session.vv \
               --web-media-addr eth0 \
               --web-media-port 41000
 

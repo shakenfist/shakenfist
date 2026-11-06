@@ -327,10 +327,12 @@ ReadOnlyPaths=/etc/ryll
 
 Things a unit has to get right:
 
-- **`KillSignal=SIGINT`.** SIGINT is the clean stop: ryll disconnects the
-  client, closes the listener and exits 0. ryll does not handle SIGTERM, so
-  systemd's default `KillSignal` ends the process at once, with no goodbye to
-  the client.
+- **The stop signal.** systemd's default `KillSignal=SIGTERM` is the clean
+  stop: ryll disconnects the client, closes the listener and exits 0. SIGINT
+  and SIGHUP do the same, so a unit needs no `KillSignal` override. (Before
+  [issue 642](https://github.com/shakenfist/ryll/issues/642) SIGTERM was
+  unhandled and a unit had to set `KillSignal=SIGINT`; that override is now
+  redundant, though harmless.)
 - **A fixed password.** A generated one changes at every restart, so the
   service wants `--rdp-password` from an `EnvironmentFile`. Create it
   `root:ryll`, mode `0640`, and keep the password out of the unit file. It is
