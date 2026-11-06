@@ -1,3 +1,5 @@
+# Copyright 2026 Michael Still and contributors
+
 # The ports kerbside_source.yml reserves on a co-located Kerbside host are the
 # ports Shaken Fist's daemons actually listen on.
 #
@@ -46,7 +48,8 @@ def _sf_api_socket_port():
     """The port sf-api.socket binds, which systemd hands sf-api."""
     with open(SF_API_SOCKET) as f:
         match = re.search(r'^ListenStream=.*?:(\d+)\s*$', f.read(), re.MULTILINE)
-    assert match is not None, 'sf-api.socket has no ListenStream <addr>:<port>'
+    if match is None:
+        raise AssertionError('sf-api.socket has no ListenStream <addr>:<port>')
     return int(match.group(1))
 
 

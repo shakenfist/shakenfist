@@ -305,6 +305,24 @@ class CiDeployProfilesTestCase(base.ShakenFistTestCase):
                 '%s: api_url on the Kerbside hosts is loopback (%s), so Kerbside would scrape '
                 'its own node. Point it at another node.' % (name, host))
 
+    def test_kerbside_cleartext_api_url_carries_the_opt_out(self):
+        # kerbside_source refuses an http api_url whose host is not the
+        # Kerbside host itself, because the system key is in the body of every
+        # POST /auth it makes there. A lane which wants that must say so with
+        # kerbside_allow_insecure_api_url, and the deploy fails at the
+        # validation play without it (#4699).
+        for name, _, profile, group in self._kerbside_profiles():
+            api_url = str(self._effective(profile, group, 'api_url', ROLE_DEFAULT_API_URL))
+            split = urllib.parse.urlsplit(api_url)
+            if split.scheme != 'http' or is_loopback_host(split.hostname):
+                continue
+            self.assertTrue(
+                self._effective(profile, group, 'kerbside_allow_insecure_api_url', False),
+                '%s: api_url on the Kerbside hosts is cleartext (%s) and is not the '
+                'Kerbside host itself, so kerbside_source refuses it. Set '
+                'kerbside_allow_insecure_api_url to accept the risk, or use https.'
+                % (name, api_url))
+
     def test_kerbside_profile_rechecks_units_and_expects_the_proxy(self):
         # A profile deploying Kerbside redeploys the cluster and asserts no
         # unit restarted the second time; dropping kerbside-*.service from

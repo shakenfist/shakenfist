@@ -311,13 +311,13 @@ argument_specs:
         description:
           - >-
             Opt out of kerbside_source's refusal of a cleartext (http://)
-            api_url on a Kerbside host which is not a Shaken Fist node
-            (kerbside_colocated false). False, the default, refuses it, since
-            Kerbside posts kerbside_system_key over the network in cleartext
-            on every POST /auth scrape. Set it true only when the network
-            between the Kerbside host and the API is trusted, such as a
-            private CI network. A co-located host is unaffected, since its
-            loopback traffic never leaves the host.
+            api_url whose host is not the Kerbside host itself. False, the
+            default, refuses it, since Kerbside posts kerbside_system_key over
+            the network in cleartext on every POST /auth scrape. Set it true
+            only when the network between the Kerbside host and the API is
+            trusted, such as a private CI network. A loopback api_url is
+            unaffected, since that traffic never leaves the host, whether or
+            not the host is also a Shaken Fist node.
       kerbside_minted_key_hash: &kerbside_minted_key_hash_option
         type: str
         default: null
@@ -329,8 +329,11 @@ argument_specs:
             a Kerbside host whose own kerbside_system_key does not hash to it,
             since that host would authenticate with a credential the cluster
             never minted. A hash so the key does not leave the database host;
-            null, the default, skips the check, as in the validation play
-            before Shaken Fist is deployed.
+            null, the default, skips the check, for a caller which does not
+            pass the database host's value. The comparison is of inventory
+            values, so the consuming playbook passes it in the validation play
+            too, before Shaken Fist is deployed; it cannot see an out-of-band
+            change to the key already stored in the database.
       kerbside_deploy_key_hash: &kerbside_deploy_key_hash_option
         type: str
         default: null
@@ -470,6 +473,15 @@ argument_specs:
         then mints it as the "kerbside" key in the system namespace with sf-ctl
         bootstrap-system-key --key-from-stdin, on every run. The key reaches
         sf-ctl on stdin only and never appears in the output.
+      - >-
+        The key is minted read-only, with --scope cluster-admin --scope
+        admin.read --scope node.read --scope instance.read: least privilege for
+        the endpoints Kerbside scrapes, so the credential can read the whole
+        cluster but cannot change it. The scopes are not secrets, so they pass
+        as arguments. They are what shakenfist/tests/test_kerbside_scopes.py
+        pins against the scopes those endpoints derive; widening them is
+        widening what a stolen Kerbside credential can do, and dropping them
+        altogether restores a wildcard cluster-administrator key.
       - >-
         Every sf-ctl call is delegated to cluster_db_host. Reads no inventory
         groups.

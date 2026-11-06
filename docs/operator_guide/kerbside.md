@@ -357,11 +357,12 @@ Consoles work. Kerbside's own management does not, without more work.
   and the units set no `REQUESTS_CA_BUNDLE`, so it may not consult the
   host's store at all
   ([#4699](https://github.com/shakenfist/shakenfist/issues/4699)). Until that
-  is resolved, the deploy refuses a cleartext (`http://`) `api_url` on a
-  dedicated (non-co-located) Kerbside host, since the system key would cross
-  the network in cleartext on every scrape; set
+  is resolved, the deploy refuses a cleartext (`http://`) `api_url` whose host
+  is not the Kerbside host itself, since the system key would cross the
+  network in cleartext on every scrape; set
   `kerbside_allow_insecure_api_url: true` to accept that on a trusted network
-  or in CI.
+  or in CI. A loopback `api_url` is exempt, because that traffic never leaves
+  the host.
 * **A read-only `system` credential.** Kerbside scrapes the whole cluster
   with a key in the `system` namespace. The deploy mints it with only the
   scopes the production scrape needs -- `cluster-admin`, `admin.read`,

@@ -380,6 +380,22 @@ for play, tasks in ((validate, v_tasks), (deploy, d_tasks)):
     source_vars = tasks[0].get('vars') or {}
     if source_vars.get('kerbside_colocated') != COLOCATED:
         sys.exit(f'{play["name"]!r} passes kerbside_colocated {source_vars.get("kerbside_colocated")!r}')
+# Both plays also pass the SHA-256 of the database host's kerbside_system_key
+# and system_key. kerbside_source skips each of its two key checks when the
+# hash is null, so dropping these play vars would disable both silently, with
+# every case in this script still green (#4700).
+for play, tasks in ((validate, v_tasks), (deploy, d_tasks)):
+    source_vars = tasks[0].get('vars') or {}
+    if 'database_node' not in str(source_vars.get('kerbside_db_host', '')):
+        sys.exit(f'{play["name"]!r} does not derive kerbside_db_host from the database tier, '
+                 'so the key hashes do not come from the host which mints the key')
+    for var, key in (('kerbside_minted_key_hash', "['kerbside_system_key']"),
+                     ('kerbside_deploy_key_hash', "['system_key']")):
+        value = str(source_vars.get(var, ''))
+        if not ('kerbside_db_host' in value and key in value and "hash('sha256')" in value):
+            sys.exit(f'{play["name"]!r} does not pass {var} as the sha256 of the database '
+                     f"host's {key}, so kerbside_source would skip its check")
+
 slurps = [t for t in deploy['tasks'] if 'ansible.builtin.slurp' in t]
 if len(slurps) != 1 or deploy['tasks'].index(slurps[0]) > deploy['tasks'].index(d_tasks[0]):
     sys.exit(f'{DEPLOY!r} does not read the CA once, before kerbside_source')
@@ -772,17 +788,27 @@ PYEOF
     run "${WITHOUT}" -i localhost, -e "$(source_vars url-unknown '"kerbside_url_on_sf_nodes": null')" \
         "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused it'
 
-    # #4699: a cleartext api_url on a host which is not a Shaken Fist node sends
-    # the system key over the network in the clear, and is refused unless opted
-    # out of.
+    # #4699: a cleartext api_url which is not this host sends the system key
+    # over the network in the clear, and is refused unless opted out of. Keyed
+    # on api_url rather than on co-location, so a co-located host pointed at
+    # another host's http sf-api -- which is what the CI lane does -- is caught
+    # too, and a loopback api_url is exempt however the host is classified.
     source_refuses 'a cleartext http api_url on a host which is not a Shaken Fist node' \
         '"api_url": "http://sf-api.example.com:13000"' \
-        'uses http://, but localhost is not a Shaken Fist node'
+        'uses http:// and its host sf-api.example.com is not this host'
+    source_refuses 'a cleartext http api_url on a co-located host, pointed elsewhere' \
+        '"kerbside_colocated": true, "api_url": "http://sf-api.example.com:13000"' \
+        'uses http:// and its host sf-api.example.com is not this host'
 
     CURRENT_CASE='case 6: kerbside_source accepts a cleartext api_url with the opt-out set'
     run "${WITHOUT}" -i localhost, -e "$(source_vars insecure-optin \
         '"api_url": "http://sf-api.example.com:13000", "kerbside_allow_insecure_api_url": true')" \
         "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused the opted-out cleartext api_url'
+
+    CURRENT_CASE='case 6: kerbside_source accepts a cleartext loopback api_url'
+    run "${WITHOUT}" -i localhost, -e "$(source_vars insecure-loopback \
+        '"kerbside_colocated": true, "api_url": "http://localhost:13000"')" \
+        "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused a loopback cleartext api_url'
 
     # #4700: this host's kerbside_system_key must be the one minted on the
     # database host, and must not be the deploy key. The hashes are what the
@@ -790,7 +816,7 @@ PYEOF
     # does.
     source_refuses 'a Kerbside key which is not the one minted for the cluster' \
         "\"kerbside_minted_key_hash\": \"$(printf '%s' 'a-different-key' | sha256sum | cut -d' ' -f1)\"" \
-        'is not the value minted as the system namespace'
+        'is not the value the database host will mint'
     source_refuses 'a Kerbside key equal to the deploy key' \
         "\"kerbside_deploy_key_hash\": \"$(printf '%s' "${SYSTEM_KEY}" | sha256sum | cut -d' ' -f1)\"" \
         "is the same as the cluster's deploy key"
@@ -807,8 +833,23 @@ PYEOF
     source_refuses 'a newline in kerbside_url' \
         '"kerbside_url": "https://console.example.com\nca"' \
         'contains a newline'
+    source_refuses 'a double quote in kerbside_url' \
+        '"kerbside_url": "https://console.example.com/\"x"' \
+        'contains a newline'
+    source_refuses 'a newline in kerbside_public_fqdn' \
+        '"kerbside_public_fqdn": "console.example.com\nca"' \
+        'contains a newline'
+    source_refuses 'a newline in kerbside_sql_url' \
+        '"kerbside_sql_url": "mysql://u:p@db.example.com/kerbside\nca"' \
+        'contains a newline'
+    source_refuses 'a newline in kerbside_auth_secret_seed' \
+        '"kerbside_auth_secret_seed": "seed-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nca"' \
+        'contains a newline'
     source_refuses 'a Kerbside PKI directory equal to the SPICE one on a co-located host' \
         '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice"' \
+        'would overwrite'
+    source_refuses 'a Kerbside PKI directory equal to the SPICE one with a trailing slash' \
+        '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice/"' \
         'would overwrite'
 
     CURRENT_CASE='case 6: kerbside_source refuses a public FQDN equal to a Shaken Fist host name'
