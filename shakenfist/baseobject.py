@@ -828,6 +828,116 @@ class TargetedOperation(NamedTuple):
     observational: bool
 
 
+# The most operations a cluster operation listing reports. A target row
+# outlives its operation's completion, and an errored operation's rows are
+# retained for seven days (issue 3922), so "every operation which has ever
+# targeted this object" is a reply whose size, and the number of database
+# reads which build it, are decided by how much history the object
+# accumulated. The newest MAX_TARGETED_OPERATIONS are listed and older ones
+# are not reported, which is the ceiling MAX_CHAIN_NODES puts on the
+# depends_on walk applied to the other listing.
+#
+# Only the listings cap. A caller which acts on every outstanding
+# operation, as the instance delete does when it aborts what targets the
+# instance, asks for no limit: dropping a row there would leave an
+# operation running against an object being torn down.
+MAX_TARGETED_OPERATIONS = 256
+
+
+def targeted_cluster_operations(
+        target_object_type: ObjectType, target_uuid: str,
+        outstanding_only: bool = True, raise_on_error: bool = False,
+        limit: Optional[int] = None) -> list[TargetedOperation]:
+    """Every cluster operation which targets an object, newest first.
+
+    Newest first is by the target rows' sequence number, which is the
+    same order ``get_latest_cluster_operation_target()`` picks a winner
+    in, and unlike ``created_at`` cannot tie.
+
+    Each operation is paired with the observational flag stored on its
+    target row. Only operations which target this object are returned:
+    what they depend on or run after is not followed, so an op on a
+    network that an instance op waits for is in the network's list and
+    not the instance's.
+
+    With ``limit``, only that many of the newest target rows are read
+    at all, so the cap bounds the operation reads and not merely the
+    reply. Without one every row is hydrated.
+
+    A listing that cannot be read is empty, which a reader cannot tell
+    from an object with nothing outstanding. A caller which acts on
+    that emptiness, as the instance delete does, passes raise_on_error
+    and gets DatabaseUnavailable instead.
+    """
+    rows = mariadb.get_cluster_operation_targets_for_object(
+        target_object_type, target_uuid, pending_only=outstanding_only,
+        raise_on_error=raise_on_error)
+
+    rows = sorted(rows, key=lambda r: r.sequence_number or 0, reverse=True)
+    if limit is not None:
+        rows = rows[:limit]
+
+    # All ``from_db`` lookups here are best-effort: an op can be
+    # hard-deleted between when we read its target row and when we
+    # try to load it. The "non-existent object" audit event is
+    # therefore suppressed for these lookups -- treating the absent op
+    # as not-outstanding is the correct behaviour. The state filter in
+    # the query is repeated here because an op can finish between the
+    # two reads, and because a database service which predates the
+    # filter ignores it.
+    targeted = []
+    for row in rows:
+        try:
+            op_class = get_object_class(row.operation_type)
+        except NoSuchObject:
+            continue
+        op = op_class.from_db(
+            row.operation_uuid, suppress_failure_audit=True)
+        if not op:
+            continue
+        if outstanding_only and not op.is_outstanding():
+            continue
+        targeted.append(TargetedOperation(op, row.observational))
+    return targeted
+
+
+def cluster_operation_views_of(
+        targeted: list[TargetedOperation]) -> list[dict[str, Any]]:
+    """The REST view of a targeted_cluster_operations() result.
+
+    ``observational`` is always reported. An sf-database too old to
+    store the flag leaves it false, which is the same reading of that
+    silence as ``last_cluster_operation`` and ``has_pending_operations``
+    make: the operation is treated as mutating.
+    """
+    return [
+        {**t.op.external_view(), 'observational': t.observational}
+        for t in targeted
+    ]
+
+
+def targeted_cluster_operation_views(
+        target_object_type: ObjectType, target_uuid: str,
+        outstanding_only: bool = True,
+        limit: Optional[int] = MAX_TARGETED_OPERATIONS
+) -> list[dict[str, Any]]:
+    """The REST listing of the operations targeting an object.
+
+    Both ``/{instances,networks,artifacts}/<ref>/clusteroperations`` and
+    ``/clusteroperations?target_object_type=&target_uuid=`` are this one
+    listing, so the two cannot drift apart in ordering, in what they say
+    about an operation, or in how much they return (issue 4667). The
+    per-object routes reach it through
+    ``DatabaseBackedObjectWithOperations.cluster_operation_views()``,
+    which has an object in hand; this entry point takes a type and a
+    uuid so that the by-target route can list a target whose type is not
+    one of the three which carry operations.
+    """
+    return cluster_operation_views_of(targeted_cluster_operations(
+        target_object_type, target_uuid,
+        outstanding_only=outstanding_only, limit=limit))
+
+
 class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
     @property
     def last_cluster_operation(self):
@@ -868,59 +978,27 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
 
     def get_cluster_operations(
             self, outstanding_only: bool = True,
-            raise_on_error: bool = False) -> list[TargetedOperation]:
-        """Every cluster operation which targets this object, newest first.
+            raise_on_error: bool = False,
+            limit: Optional[int] = None) -> list[TargetedOperation]:
+        """This object's targeted_cluster_operations().
 
-        Each operation is paired with the observational flag stored on its
-        target row. Only operations which target this object are returned:
-        what they depend on or run after is not followed, so an op on a
-        network that an instance op waits for is in the network's list and
-        not the instance's.
-
-        A listing that cannot be read is empty, which a reader cannot tell
-        from an object with nothing outstanding. A caller which acts on
-        that emptiness, as the instance delete does, passes raise_on_error
-        and gets DatabaseUnavailable instead.
+        Uncapped by default, because the callers which ask for operation
+        objects rather than views act on all of them.
         """
         if self.in_memory_only:
             return []
-
-        rows = mariadb.get_cluster_operation_targets_for_object(
-            self.object_type, str(self.uuid), pending_only=outstanding_only,
-            raise_on_error=raise_on_error)
-
-        # All ``from_db`` lookups here are best-effort: an op can be
-        # hard-deleted between when we read its target row and when we
-        # try to load it. The "non-existent object" audit event is
-        # therefore suppressed for these lookups -- treating the absent op
-        # as not-outstanding is the correct behaviour. The state filter in
-        # the query is repeated here because an op can finish between the
-        # two reads, and because a database service which predates the
-        # filter ignores it.
-        targeted = []
-        for row in sorted(rows, key=lambda r: r.sequence_number or 0,
-                          reverse=True):
-            try:
-                op_class = get_object_class(row.operation_type)
-            except NoSuchObject:
-                continue
-            op = op_class.from_db(
-                row.operation_uuid, suppress_failure_audit=True)
-            if not op:
-                continue
-            if outstanding_only and not op.is_outstanding():
-                continue
-            targeted.append(TargetedOperation(op, row.observational))
-        return targeted
+        return targeted_cluster_operations(
+            self.object_type, str(self.uuid),
+            outstanding_only=outstanding_only,
+            raise_on_error=raise_on_error, limit=limit)
 
     def cluster_operation_views(
-            self, outstanding_only: bool = True) -> list[dict[str, Any]]:
-        """External views of get_cluster_operations(), each with its flag."""
-        return [
-            {**t.op.external_view(), 'observational': t.observational}
-            for t in self.get_cluster_operations(
-                outstanding_only=outstanding_only)
-        ]
+            self, outstanding_only: bool = True,
+            limit: Optional[int] = MAX_TARGETED_OPERATIONS
+    ) -> list[dict[str, Any]]:
+        """This object's targeted_cluster_operation_views()."""
+        return cluster_operation_views_of(self.get_cluster_operations(
+            outstanding_only=outstanding_only, limit=limit))
 
     def hard_delete(self):
         # The batch deletes a batchable type's targets itself.

@@ -149,6 +149,28 @@ class TestPerObjectClusterOperations(base.BaseNamespacedTestCase):
         for op in self.test_client.get_instance_clusteroperations(inst['uuid']):
             self.assertNotIn(op['uuid'], completed)
 
+        # The by-target listing answers the same question by a different
+        # route, and used to answer it differently: ordered by the
+        # operation's created_at rather than by its target row's
+        # sequence number, and with no observational key when
+        # sf-database did not report one (issue 4667). Both routes are
+        # one helper now. Only the operations terminal in both reads are
+        # compared, because the cleaner enqueues observational sweeps on
+        # its own cadence and one which arrives or advances between the
+        # two reads is not this test's finding.
+        by_target = self.system_client.list_cluster_operations_for_target(
+            'instance', inst['uuid'])
+        self._record('by-target', by_target)
+        settled = ({op['uuid'] for op in every
+                    if op['state'] in TERMINAL_STATES}
+                   & {op['uuid'] for op in by_target
+                      if op['state'] in TERMINAL_STATES})
+        self.assertNotEqual(set(), settled)
+        self.assertEqual(
+            [op for op in every if op['uuid'] in settled],
+            [op for op in by_target if op['uuid'] in settled],
+            'The two listings of one instance disagree')
+
         view = self.test_client.get_instance(inst['uuid'])
         self.assertFalse(
             view.get('has_pending_operations'),

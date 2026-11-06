@@ -13,6 +13,7 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import baseobject
 from shakenfist import mariadb
 from shakenfist.constants import NoSuchObject
 from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
@@ -327,6 +328,13 @@ class ClusterOperationsEndpoint(api_base.Resource):
     confirmed authorised to see ops on this specific target, the ops
     list follows without additional namespace filtering at the SQL
     layer.
+
+    The listing itself is ``baseobject.targeted_cluster_operation_views()``,
+    which is also what the per-object
+    ``/{instances,networks,artifacts}/<ref>/clusteroperations?all=true``
+    routes return. Both are newest first by the target rows' sequence
+    number and both report at most ``MAX_TARGETED_OPERATIONS``
+    operations.
     """
 
     scope_family = 'clusteroperation'
@@ -340,7 +348,8 @@ class ClusterOperationsEndpoint(api_base.Resource):
             ('target_uuid', 'query', 'uuid',
              'The UUID of the target object.', True),
         ],
-        [(200, 'A list of cluster operation summary dicts, newest-first.',
+        [(200, 'The cluster operations targeting this object, newest '
+          'first, at most %d of them.' % baseobject.MAX_TARGETED_OPERATIONS,
           clusteroperations_for_target_example),
          (400, 'Invalid target_object_type or missing target_uuid.', None),
          (403, 'Target object is in a namespace you cannot see.', None),
@@ -406,20 +415,10 @@ class ClusterOperationsEndpoint(api_base.Resource):
                     403,
                     'target object is in a namespace you cannot see')
 
-        records = mariadb.list_cluster_operations_for_target(
-            object_type_enum, target_uuid)
-
-        retval = []
-        for record in records:
-            op = _hydrate_op(record.get('uuid'))
-            if op is None:
-                continue
-            view = op.external_view()
-            # The flag stored on this op's target row, which decides
-            # whether has_pending and last_cluster_operation see it. It is
-            # absent only when an older database service did not report
-            # it; omit it then rather than guess.
-            if 'observational' in record:
-                view['observational'] = record['observational']
-            retval.append(view)
-        return retval
+        # The same helper the per-object listings use. This endpoint used
+        # to read the operation headers itself, ordered by created_at
+        # rather than by the target rows' sequence number, and hydrated
+        # each one twice; the two listings answered the same question
+        # differently (issue 4667).
+        return baseobject.targeted_cluster_operation_views(
+            object_type_enum, target_uuid, outstanding_only=False)
