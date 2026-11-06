@@ -357,7 +357,7 @@ table entirely (decision D8).
 | 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete | `b02ec6e5e` (#3843), `921573c47` (#3888) |
 | 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete | `c27ad9bf2` (#3930), `a5014b6ba` (#3949) |
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Complete | `c273627a2` (#3952), `948055063` (#4008), `8fc8ba961` (#4139), `2b767a9b1` (#4154) |
-| 5. Caller migration and hard ceiling | [PLAN-scheduler-reservations-phase-05-callers.md](PLAN-scheduler-reservations-phase-05-callers.md) | In progress | — |
+| 5. Caller migration and hard ceiling | [PLAN-scheduler-reservations-phase-05-callers.md](PLAN-scheduler-reservations-phase-05-callers.md) | Complete | `660d4f65e7` (#4800) |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
 | 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
@@ -530,6 +530,22 @@ is here.
   conductor's own documentation of claims, which does not exist.
   The phase is not blocked on it and the writing of that
   documentation passes to the successor plan.
+
+- **Phase 5** landed three of its four steps as #4800 (merge
+  `660d4f65e7`, 2026-11-05) and held the fourth deliberately. Steps
+  1, 2 and 4 -- the shared `Instance.place_on_candidates()` walk,
+  the de-Schedulered admin capacity view, and their documentation --
+  are on `develop`. Step 3, the advisory->hard flip of
+  `CLAIM_ENFORCEMENT_HARD`, was **not** implemented: plan-blocker
+  b13 was still waiting at execution time. Its own plan says that
+  step lands as a later commit on the phase branch, which is no
+  longer possible because the branch merged and was deleted, so the
+  flip passes to a successor phase rather than being dropped.
+  Complete here means "what this phase put on `develop`", which is
+  what the `Merged` column records. Two refinements its execution
+  forced are in its Execution notes: D4's "reads no instance state"
+  was imprecise about the metrics snapshot, and its DoD item 5 named
+  a cluster-CI test which is not locally runnable.
 
 - **Phase 6** was executed out of order, ahead of phases 4c and 5,
   and completed on 2026-09-01. It merged as #3972 (the validator
