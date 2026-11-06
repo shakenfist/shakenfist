@@ -18432,6 +18432,16 @@ object, each with an <code>observational</code> key, are advertised by the new
   network's list; <code>GET /clusteroperations/{op_uuid}/chain</code> traces what an
   operation waits on. An agent operation's preflight (<code>node_aop_op</code>) is in
   the instance's list, and its view carries <code>instance_uuid</code>.</li>
+<li><code>GET /clusteroperations?target_object_type=...&amp;target_uuid=...</code> is now the
+  same listing as the per-object sub-resources with <code>all=true</code>, and answers
+  identically for the same object. It previously ordered by the operation's
+  creation time rather than by its target row, and left <code>observational</code> out
+  of an entry entirely when sf-database was too old to store the flag; it
+  now reports the key on every entry, <code>false</code> where the flag is unknown, as
+  the per-object listings always have.</li>
+<li>Both listings report at most the newest 256 operations for an object.
+  Neither was bounded before, and an object which has errored operations
+  repeatedly keeps their target rows for seven days.</li>
 <li>By default only queued, preflight and executing operations are listed.
   <code>all=true</code> adds finished operations which have not yet been removed
   (eligible for removal thirty seconds after finishing and removed by the
