@@ -77,6 +77,28 @@ Provision MariaDB on (or reachable by) the database tier and point
 `/etc/sf/config`. The playbook runs `sf-ctl ensure-mariadb-schema` itself
 (once, on the first database host) before any node registers.
 
+### 5. A load balancer in front of the API
+
+Every node runs an `sf-api` worker on port `13000`, and any of them can answer
+any request, but Shaken Fist does not ship a load balancer. Put your own in
+front of them and point `api_url` at it. A load-balanced `api_url` ends in
+`/api` — the prefix your proxy strips before forwarding to a backend on
+`:13000` — which is why `group_vars/all.yml` sets
+`api_url: "https://sf.example.com/api"`. That is the name the shipped
+`examples/apache-loadbalancer.conf` and `examples/nginx-loadbalancer.conf`
+serve, and their backend pools are mesh addresses from this inventory, so
+those files are the quickest way to stand the proxy up — add `sf-3`, which
+they do not list.
+
+The prefix-less `http://10.0.0.1:13000` form is the single-node escape hatch
+for a deploy with no proxy at all, not a cluster endpoint: it reaches only one
+node's `sf-api`, so every client stops working when that node does. See
+[Load Balancing](../../docs/operator_guide/load_balancing.md).
+
+`api_url` is written into `sfrc` and the global auth file on each node, so
+`sf-client` there uses it too. The deploy's own sanity checks talk to
+`http://localhost:13000` directly and do not need the proxy to exist yet.
+
 ## Running
 
 ```bash

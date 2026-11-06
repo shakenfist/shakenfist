@@ -4,8 +4,15 @@
 
 deploy_name: sf
 
-# The cluster API URL (point at your load balancer in front of the API nodes).
-api_url: "http://10.0.0.1:13000"
+# The cluster API URL, as clients should reach it: your own load balancer in
+# front of the API nodes, ending in the "/api" prefix the proxy strips before
+# forwarding to an sf-api worker on port 13000. CHANGE THIS -- sf.example.com
+# is only the name the shipped examples/apache-loadbalancer.conf and
+# examples/nginx-loadbalancer.conf serve. See
+# docs/operator_guide/load_balancing.md: a prefix-less ":13000" URL is the
+# single-node escape hatch for a deploy with no proxy at all, and names one
+# node's sf-api rather than a cluster endpoint.
+api_url: "https://sf.example.com/api"
 
 # Secrets. CHANGE THESE.
 auth_secret: "change-me-auth-secret-change-me-auth-secret-change"
