@@ -39,12 +39,13 @@ that plan's, not this one's.
 
 The brief's code citations are into shakenfist `develop` at
 `ea39dff7c9` (2026-10-17). This repository has moved since: at the
-time of writing `develop` is at `61a14af571`, and line numbers have
-already drifted (for example `_claim_capacity_guard()` is now near
-`shakenfist/mariadb.py:29563`, not `:28044`). The structural facts
-hold — `API_CAPABILITIES`/`advertised_capabilities()`,
+time of writing `develop` was at `61a14af571`, and line numbers had
+already drifted (for example `_claim_capacity_guard()` moved from
+`shakenfist/mariadb.py:28044` to `:29563`, and by phase 0's survey at
+`32de6cec7f` it was `:29927`). The structural facts hold —
+`API_CAPABILITIES`/`advertised_capabilities()`,
 `CLAIM_ENFORCEMENT_HARD = False`, `admit_instance_placement()`,
-`find_candidates()`, `summarize_resources()` are all present — but
+`find_candidates()` and the resources summary are all present — but
 **every phase plan must re-survey its own citations against current
 `develop`** rather than trusting the line numbers copied here from
 the brief.
@@ -125,7 +126,14 @@ this plan stands alone, but the brief has the working.
 - **Refusal contracts differ.** An instance 507 carries `stage`,
   `transient` and `Retry-After: 15` (`capacity_error()`,
   `shakenfist/external_api/base.py`). A claim 507 is prose with
-  none of them (`shakenfist/external_api/auth.py`; #4207).
+  none of them: `_claim_refusal()`
+  (`shakenfist/external_api/auth.py`) folds the per-dimension detail
+  into the message and returns a bare `sf_api.error()`. **No open
+  issue tracks this.** #4207 was the issue cited here; it was closed
+  on 2026-10-29 by the transient-capacity-refusals plan, which gave
+  the *instance* 507 its contract and left the claim 507 alone. The
+  requirement stands (`G7`, phase 5) and needs an issue of its own
+  filed against it.
 
 ### S2. What changed, and what fragmentation looks like
 
@@ -236,7 +244,8 @@ repository to find them.
   `capacity_error()`. A held create refused on a live check gets
   that check's stage, `transient: true`, `Retry-After: 15`, and
   fields naming the hold and saying it was retained. Claim refusals
-  gain the contract too (#4207).
+  gain the contract too — see `S1`: the issue that used to track
+  that gap (#4207) is closed and an issue still needs filing.
 - **G8. Inspectable.** Held room per node, consumed and unconsumed,
   and displaced holds with the node they left and why, in the
   claim's view and in `GET /admin/resources`; `summarize_resources()`
@@ -291,15 +300,30 @@ Load-bearing for the phase table:
   share (24 of 68 in-job and 229 of 453 runner-create memory
   node-drops were live after the change), the live-memory question
   is sequenced ahead of `A`. Phase 0's sfcbr measurement (below)
-  is what answers this.
-- **Q2. Is the live/ledger memory margin double-counted?** Not
-  established. The live check subtracts the reservation from
-  psutil's `available` (already net of host use); the ledger
-  subtracts it from physical memory. On a ratio of 1.0 the host may
-  be counted twice. Phase 0 measures it on sfcbr. The answer decides
-  how much of the live third is margin and how much is shortage, and
-  whether 33fl retunes the ratio or per-host reservations before `A`
-  is designed.
+  is what answers this. **Answered by phase 0 (`D13`), in that
+  phase's Results: no — `A` proceeds and this plan's order is
+  unamended.** The live share of memory node-drops has collapsed to
+  4.1% in-job and 9.3% runner-create over 2026-10-30 to 11-06, and to
+  1.3% and 9.1% over 2026-11-01 to 11-06; and in phase 0's per-sample
+  reading the live check was the sole reason a node was dropped once
+  in 4968 node-samples. The question is deferred, not closed: phase
+  2's shadow counts re-apply this test before phase 3 is written.
+- **Q2. Is the live/ledger memory margin double-counted?** The live
+  check subtracts the reservation from psutil's `available` (already
+  net of host use); the ledger subtracts it from physical memory. On
+  a ratio of 1.0 the host may be counted twice. **Answered by phase
+  0 (`D14`), in that phase's Results: the double subtraction is
+  real, but not between the live check and the ledger.** At a ratio
+  of 1.0 those two reservation terms cancel algebraically, so the
+  live/ledger margin was never a function of the reservation; the two
+  places the reservation is subtracted are the committed ledger and
+  the KSM ceiling. It costs about 27% of per-node memory refusals of
+  a 16 GiB shape on sfcbr, an upper bound, all of it through
+  `limit_memory_mb`, and about one node-sample in 4968 through the
+  live check. The retune is handed to 33fl with one lever, per-host
+  `node_ram_reservation_gb`, and it does **not** gate `A`; the only
+  coupling runs the other way, in that a retune relaxes the binding
+  check and so requires `Q1`'s shares to be re-read.
 - **Q3. The hold reference format and lifetime, and the consumption
   rule's edges** (`D3`): what a `POST /instances` hold reference
   looks like, when a deleted instance's hold returns and for how
@@ -317,10 +341,20 @@ Refinements:
 
 - **Q6. The admin-scoped hold for evacuate**, designed with #1364
   rather than guessed at here.
-- **Q7. How `sf_claim` and `sf-client` express shapes** (their claim
-  verbs are unreleased since client-python `v0.8.3`), and the
-  operator guide's stale statement that `sf-client` has no claim
-  verbs (`docs/operator_guide/scheduler.md`).
+- **Q7. How `sf_claim` and `sf-client` express shapes**, and the
+  stale statements that no release carries the claim verbs.
+  **Answered by phase 0 (`D11`).** The premise this question was
+  written on has since changed twice over: the claim verbs *are*
+  released — client-python `v0.8.4` was tagged on 2026-10-28 — and
+  `docs/operator_guide/scheduler.md:445-449` has already been
+  corrected to say the verbs need `shakenfist-client` 0.8.4 or
+  later, so the statement named here is no longer stale. The
+  statements that *are* still stale, and are therefore what phase 6
+  fixes, are `docs/user_guide/ansible.md:24-30`,
+  `shakenfist/deploy/collection/requirements.txt:16-20` and
+  `shakenfist/deploy/collection/plugins/modules/sf_claim.py:27-32`
+  and `:275-302`, all of which still tell the operator to install
+  the client from git.
 - **Q8. Whether `C` is retired once `A` ships** or kept as the
   stateless query it also serves other callers as. The expectation
   is kept: `C` is a general query, not scaffolding for `A`.
@@ -379,9 +413,17 @@ before either admission change.
 
 - **Phase 0** resolves the open questions above and takes the sfcbr
   live-memory-against-ledger reading (`D9`). It ships no production
-  code. It gates the sequence: its answer to `Q1`/`Q2` decides
-  whether the live-memory question is sequenced ahead of `A`, and
-  33fl owns any ratio or per-host-reservation retune that follows.
+  code. It gated the sequence, and **the gate is open**: its `D13`
+  answers `Q1` by leaving this order as it stands, so the
+  live-memory question is not sequenced ahead of `A`. Its `D14`
+  hands 33fl a per-host-reservation retune, which 33fl owns and
+  which is not a prerequisite for any later phase. Its `D15` carries
+  in a design constraint from placeable-claims phase 4a: a hold must
+  defend a slot for a *shape* on a node, because the scheduler's
+  node ranking deliberately spreads allocation away from the most
+  committed nodes (shakenfist#3937, correctly), which is what turns
+  aggregate headroom into per-node fragments. Phases 3 and 4 own
+  that constraint.
 - **Phase 1** extracts the duplicated placement walk (`POST
   /instances` and preflight) into one all-or-nothing multiset walk
   through the scheduler's filters, with no behaviour change. Both
@@ -392,18 +434,28 @@ before either admission change.
   cannot strand capacity, deadlock admission or desynchronise the
   reconciler. private-ci scores it in shadow against what jobs'
   creates met minutes later; those counts are read before phase 3.
+  Phase 0's `D13` makes that reading load-bearing rather than merely
+  useful: it is where `Q1`'s live-memory test is re-applied, so a
+  live share anywhere near the baseline's reopens `Q1` before phase
+  3 is written.
 - **Phase 3** gives the core the right to book: the per-node held
   column, the node guard term (`G6`), claim-limit validation
   against the sum of holds, and the reconciler and release paths.
+  Phase 0's `D15` constrains it: a hold row books one shape onto one
+  node and the node guard is what defends that slot, so neither may
+  be weakened into an aggregate reservation.
 - **Phase 4** is the hold lifecycle: implicit best-fit and explicit
   consumption (`G3`), holds that return on delete for the claim's
   life, re-placement in the same transaction or displacement when a
-  node leaves service (`D8`), and ground-truth overbooking.
+  node leaves service (`D8`), and ground-truth overbooking. A
+  displaced hold defends no slot, which is why phase 0's `D15` has
+  it reported rather than quietly retained as an aggregate.
 - **Phase 5** gives claim refusals the `stage`/`transient`/
-  `Retry-After` contract (#4207), adds the held-create refusal
-  fields (`G7`), and states the split of claim denials out of the
-  transient stages that `CLAIM_ENFORCEMENT_HARD` flipping would
-  require, keeping `G6`'s node-guard switch apart from it.
+  `Retry-After` contract (no open issue; see `S1`), adds the
+  held-create refusal fields (`G7`), and states the split of claim
+  denials out of the transient stages that `CLAIM_ENFORCEMENT_HARD`
+  flipping would require, keeping `G6`'s node-guard switch apart
+  from it.
 - **Phase 6** adds the `sf_claim`/`sf-client` shape verbs and the
   affinity expression (`G4`), writes the operator and user guides,
   and fixes the stale claim-verbs documentation (`Q7`).
@@ -489,7 +541,10 @@ node is then overbooked, which the reconciler records.
 ### Phase 5: the refusal contract
 
 Give claim refusals the `stage`/`transient`/`Retry-After` contract
-instance creates already have (`capacity_error()`; #4207). A held
+instance creates already have (`capacity_error()`). This phase opens
+by filing the issue for that gap: #4207 used to track it and was
+closed on 2026-10-29 having fixed only the instance side, so the
+requirement is live and untracked (`S1`). A held
 create refused on a live check gets that check's stage, `transient:
 true`, `Retry-After: 15`, and fields naming the hold and saying it
 was retained (`G7`). No new stage names (`G5`). State the split of
@@ -499,13 +554,21 @@ claim denials out of the transient stages that flipping
 
 ### Phase 6: client, modules and documentation
 
-Add shape expression to `sf_claim`/`sf-client` (`Q7`) and the
-affinity model (`G4`, `prefer_*`/`require_*`). Document both
-capabilities in the operator and user guides, including `GET
-/admin/resources`' new fields and the affinity semantics, and
-correct the stale statement that `sf-client` has no claim verbs
-(`docs/operator_guide/scheduler.md`). `docs/operator_guide/
-database.md` covers the schema change.
+Add shape expression to `sf_claim`/`sf-client` (`Q7`, phase 0's
+`D11`) and the affinity model (`G4`, `prefer_*`/`require_*`).
+Document both capabilities in the operator and user guides,
+including `GET /admin/resources`' new fields and the affinity
+semantics. Correct the stale claim-verb statements, which are **not**
+in `docs/operator_guide/scheduler.md` — that page was fixed before
+phase 0 read it — but in `docs/user_guide/ansible.md:24-30`,
+`shakenfist/deploy/collection/requirements.txt:16-20` and
+`shakenfist/deploy/collection/plugins/modules/sf_claim.py:27-32`
+and `:275-302`: each still says no release carries the verbs and
+tells the operator to install client-python from git, where `v0.8.4`
+(2026-10-28) carries them. `_require_claim_verbs()` itself stays — it
+is a probe against the client that was actually built — and only its
+prose changes. `docs/operator_guide/database.md` covers the schema
+change.
 
 ### Phase 7: push audit
 
@@ -524,7 +587,11 @@ not complete until they are resolved or declined in writing.
   back to today's aggregate claim. private-ci's phase 4 wait in the
   collection's `sf_instance` (30 minutes single-instance, 10
   multi-instance, on `transient: true` only; with #4474) is a
-  separate change that is **not** part of this plan.
+  separate change that is **not** part of this plan. Its phase 4a
+  (`PLAN-placeable-claims-phase-04a-regression.md`) repaired the
+  instrument the baseline above was taken with and referred one
+  design constraint inward, which this plan's phase 0 absorbed as
+  `D15`; its `F8` is also half the evidence for phase 0's `D13`.
 - **`PLAN-scheduler-reservations`** (`In progress`). `D14`, its step
   3 addendum and its "Node-scoped claims" future work are the
   decisions this plan revisits: aggregate claims stay, holds are
@@ -627,12 +694,25 @@ stale (see the Prompt).
 
 ### Bugs fixed during this work
 
-None yet. Directly related open issues: shakenfist/shakenfist#4207
-(claim refusals carry no machine-readable contract),
-shakenfist/shakenfist#1364 (lame-duck and evacuate),
-shakenfist/shakenfist#4474 (the functional suite's wrapper waits on
-the exception class, ignoring `transient`). The baseline and caller
-survey are shakenfist/private-ci `PLAN-placeable-claims` phase 0.
+None yet. Directly related open issues: shakenfist/shakenfist#1364
+(lame-duck and evacuate), shakenfist/shakenfist#4474 (the functional
+suite's wrapper waits on the exception class, ignoring `transient`).
+
+**An issue still needs filing**, and phase 5 owns filing it: claim
+refusals carry no machine-readable contract. shakenfist#4207 was
+cited for this throughout an earlier draft of this plan, but it was
+closed as completed on 2026-10-29 by the transient-capacity-refusals
+plan, which gave the *instance* 507 its `stage`/`transient`/
+`Retry-After` fields and did not touch the claim 507. Phase 0
+re-checked the code: `_claim_refusal()` still returns a bare
+`sf_api.error()` with the per-dimension detail folded into the prose
+message. The gap is real and the requirement (`G7`, phase 5) stands;
+only the issue that tracked it is gone. Phase 0 deliberately did not
+file it — that is phase 5's first task, so the issue is written
+against the design phase 5 actually ships.
+
+The baseline and caller survey are shakenfist/private-ci
+`PLAN-placeable-claims` phase 0.
 
 ### Back brief
 

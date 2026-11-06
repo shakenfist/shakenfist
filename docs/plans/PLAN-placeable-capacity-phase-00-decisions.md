@@ -52,32 +52,38 @@ Out:
 
 Grounded against `develop` at `61a14af` by a read-only survey on
 2026-11-04. The master plan's Prompt warned that the brief's line
-numbers (from `ea39dff7c9`) had drifted; these are the current ones.
+numbers (from `ea39dff7c9`) had drifted. The findings below are that
+survey's; **their line citations have since been repointed to
+`32de6cec7f`**, the commit this phase's Results were taken at, because
+they had drifted again between the two. What each finding says is
+unchanged; only where it points.
 
 **F1. The double-subtraction hypothesis is real, and the code
 documents it.** The scheduler's three memory sub-checks, in order
 (`shakenfist/scheduler.py`, `_has_sufficient_ram`):
 
-- Live free memory (`:520-523`): `available =
+- Live free memory (`:760-771`): `available =
   metrics[node]['memory_available'] - reserved`, refuse if
   `available - memory < 0`. `memory_available` is
   `psutil.virtual_memory().available`
   (`shakenfist/daemons/resources/main.py:407-410`); `reserved` is
-  the node's `memory_reserved_mb` (`scheduler.py:328-334`).
-- KSM ceiling (`:536-546`): `(memory_total_instance_actual +
+  the node's `memory_reserved_mb` (`scheduler.py:279-285`, read
+  through the method at `:615-617`).
+- KSM ceiling (`:775-794`): `(memory_total_instance_actual +
   memory) / memory_max > RAM_OVERCOMMIT_RATIO`. **No reservation
-  term.** `memory_max` is `psutil.virtual_memory().total`.
-- Committed ledger (`:569-586`): `used_memory_mb (+ memory, less the
+  term.** `memory_max` is `psutil.virtual_memory().total`
+  (`main.py:407,409`).
+- Committed ledger (`:808-824`): `used_memory_mb (+ memory, less the
   create's own prior placement) > limit_memory_mb`.
 
 The ledger limit is derived in `_derive_cpu_memory_limits`
-(`shakenfist/mariadb.py:26302-26307`): `limit_memory_mb = max(0,
+(`shakenfist/mariadb.py:26668-26671`): `limit_memory_mb = max(0,
 floor(memory_max * ram_overcommit_ratio) - memory_reserved_mb)`.
 Here `memory_reserved_mb` is subtracted from **physical**
 `memory_max`. The live check subtracts the **same** reservation
 from `psutil.available`, which already excludes memory the host is
 using — so host/reserved memory is charged twice. The docstring at
-`mariadb.py:26264-26293` spells the distinction out. At a ratio of
+`mariadb.py:26624-26661` spells the distinction out. At a ratio of
 1.0 the ledger limit is `memory_max - reserved`, the KSM ceiling is
 `memory_max` (no reservation), and the live check independently
 subtracts the reservation from an already-host-adjusted figure.
@@ -87,7 +93,7 @@ is to quantify it, not to discover it.
 **F2. The measurement needs no new code.** The resources daemon
 exports every raw input as a per-node Prometheus gauge: it calls
 `start_http_server(config.RESOURCES_METRICS_PORT)`
-(`main.py:324`, default port 13001, `config.py:537-538`) and sets a
+(`main.py:324`, default port 13001, `config.py:592-595`) and sets a
 `Gauge` per published metric (`main.py:782-785`). So
 `memory_available`, `memory_max`, `memory_reserved_mb`,
 `memory_total_instance_actual` (summed guest resident memory,
@@ -96,23 +102,24 @@ max, `main.py:536,592`) are all scrapeable on each hypervisor at
 `:13001` over a working day with no probe to write. The same dict
 is persisted to the `node_metrics` table (`main.py:787`) and the
 derived ledger (`limit_memory_mb`, `used_memory_mb`) lives in
-`scheduler_node_capacity` (`mariadb.py:3822-3837`,
-`_derive_cpu_memory_limits` `:27016-27074`). `GET /admin/resources`
-→ `summarize_resources()` (`scheduler.py:1138`, per-node payload
-`:1300-1321`) gives the derived view but not a bare
+`scheduler_node_capacity` (`mariadb.py:3917-3939`,
+`_derive_cpu_memory_limits` `:26618-26671`). `GET /admin/resources`
+→ `summarize_cluster_resources()` (`scheduler.py:550-559`, which
+delegates to `_summarize_resources()` at `:338`, per-node payload
+`:457-545`) gives the derived view but not a bare
 `memory_available` or raw `limit_memory_mb` per node — those come
 from the gauges or the DB. **Decision follows (`D3`): the
 measurement is a scrape-and-analyse task against existing gauges,
 not a code change.**
 
 **F3. The capability mechanism is where the master plan said.**
-`API_CAPABILITIES` (`shakenfist/external_api/app.py:390-478`) is a
-family→tokens dict; `advertised_capabilities()` (`:481-494`)
+`API_CAPABILITIES` (`shakenfist/external_api/app.py:440-528`) is a
+family→tokens dict; `advertised_capabilities()` (`:531-544`)
 flattens it and drops `ConditionalCapability` tokens whose predicate
 is false. A static token is a string appended to a family list
-(example today: `'cluster-capacity'` under `'admin'`, `:398`); a
+(example today: `'cluster-capacity'` under `'admin'`, `:448`); a
 runtime-gated one is `ConditionalCapability('token', lambda: ...)`
-(`:452-453`). Phases 2 and 3 use this for `C`'s and `A`'s capability
+(`:502-503`). Phases 2 and 3 use this for `C`'s and `A`'s capability
 strings; nothing in phase 0 touches it.
 
 Nothing in the survey contradicted the master plan. The one thing it
@@ -820,10 +827,11 @@ has changed to reopen it.
 `below_usage`.* It would make returning capacity harder than taking
 it — an operator would have to find and release each hold before
 the claim could shrink — and the API already treats a shrink as the
-operator's explicit instruction. `D15`'s "there is no auto-grow:
-every change here is one an operator asked for"
-(`shakenfist/mariadb.py:30355-30357`) is a statement about growth,
-not about refusing to give room back.
+operator's explicit instruction. The claim-update docstring's "there
+is no auto-grow: every change here is one an operator asked for"
+(`shakenfist/mariadb.py:30355-30357`, where the `D15` it cites is
+scheduler-reservations', not this plan's) is a statement about
+growth, not about refusing to give room back.
 
 *Rejected: a name or a shape expression as the reference.* A hold
 has no name to give it, and a shape is not unique within a claim.
@@ -938,12 +946,16 @@ room is in `used_*`, which the existing floored decrement and
 guarded increment already move (`_floored_node_decrement()`,
 `:28284-28310`).
 
-*Visibility (`G8`).* `summarize_resources()` publishes `cpu_held`,
+*Visibility (`G8`).* `_summarize_resources()` publishes `cpu_held`,
 `memory_held_mb` and `disk_held_gb` per node beside the committed
-figures it already publishes (`shakenfist/scheduler.py:461-540`),
-and nets held room out of `cpu_available`, `ram_available` and
-`disk_available`, because those are the figures a client-side
-ledger model reads.
+figures it already publishes
+(`shakenfist/scheduler.py:457-545`), and nets held room out of
+`cpu_available`, `ram_available` and `disk_available`, because
+those are the figures a client-side ledger model reads. The fields
+go in that shared payload builder, not in the bound
+`Scheduler.summarize_resources()` at `:1377`, whose own docstring
+records it as retained for the test suite and called by no
+production code.
 
 *Rejected: holds as a JSON document on the claim.*
 `namespace_claims` doubles as the claim's static-values table and
@@ -1278,3 +1290,438 @@ guard named in brief `D3`, and the state list in brief `D8` — are
 both places where the brief's own text points at this plan for the
 answer, so neither document needs to yield; both are recorded so
 the brief's readers are not misled by them.
+
+### The `Q1` and `Q2` verdict
+
+Written 2026-11-07 against `develop` at `32de6cec7f`. The inputs are
+the measurement subsection above, `D7`–`D12`, and shakenfist/private-ci
+`docs/plans/PLAN-placeable-claims-phase-04a-regression.md` (`F8` and
+`D5`), read at that repository's `origin/master`.
+
+`D13` answers `Q1`, `D14` answers `Q2`, and `D15` records the
+constraint placeable-claims phase 4a referred inward to this plan. The
+measurement subsection deliberately stopped short of both verdicts
+("What this section deliberately does not say"); this is where they are
+made, so each of `Q1` and `Q2` is answered exactly once in this
+document.
+
+#### `D13` (`Q1`): `A` proceeds, live memory does not come first
+
+**Decision. The master plan's order stands unamended: measure, then
+`C`, then `A`. The live-memory question is not sequenced ahead of `A`,
+because live memory is no longer refusing at anything like the share
+`Q1`'s test was written against — it has fallen from a third to a few
+percent, and in 0a's per-sample attribution the live check was the
+sole reason a node was dropped once in 4968 node-samples. The question
+is deferred rather than dismissed: phase 2's shadow counts, which `C`
+was already going to produce, re-apply `Q1`'s own test before phase 3
+is written, and `D14`'s retune is the one foreseeable event that could
+reopen it.**
+
+*`Q1`'s test, applied to the same quantity in three windows.* `Q1` asks
+whether live-memory refusals run "at anything like the baseline's live
+share", and names the baseline figures. Memory-stage node-drops by
+reason:
+
+| Family | Window | KSM | Ledger | Live | Live share |
+|---|---|---|---|---|---|
+| in-job | baseline, to 2026-10-17 | 32 | 12 | 24 | 35.3% |
+| in-job | 2026-10-30 to 11-06 | 937 | 377 | 56 | 4.1% |
+| in-job | 2026-11-01 to 11-06 | 538 | 281 | 11 | 1.3% |
+| runner-create | baseline, to 2026-10-17 | 109 | 115 | 229 | 50.6% |
+| runner-create | 2026-10-30 to 11-06 | 514 | 228 | 76 | 9.3% |
+| runner-create | 2026-11-01 to 11-06 | 468 | 179 | 65 | 9.1% |
+
+The baseline rows are the master plan's own (`Q1`: 24 of 68 in-job and
+229 of 453 runner-create memory node-drops were live). The 7-day rows
+are placeable-claims phase 4a's `F8`; the 5-day rows are its "Why each
+node was dropped, latest segment" table. Disk-bandwidth drops are
+excluded from every row, because `Q1`'s denominator is memory
+node-drops. Both later windows are given because they are not the same
+window and the share is worth reading at each: 4a's own narrative
+figure — `insufficient memory` fell from 138 in the middle segment
+to 11 in the latest — belongs to the 5-day rows.
+
+A 35.3% live share becomes 4.1% and then 1.3%; a 50.6% share becomes
+9.3% and then 9.1%. The absolute counts of the other two reasons rose
+by an order of magnitude over the same period. That is `Q1`'s test
+failing to trigger, on `Q1`'s own terms, on either of the later
+windows.
+
+*Why the baseline and the later windows disagree, which matters more
+than the arithmetic.* They are not equally good reads of the same
+thing. The baseline's
+post-change window is **1.31 days**, and it ends on 2026-10-17 — the
+day private-ci's phase 1 stopped emitting the `Error in main loop` line
+that `tools/measure-placement-refusals.py` joined the runner-create
+family on. Phase 4a's `F3` and `F5` establish that every reading taken
+after that date read **zero** runner-create refusals where the truth
+was first eight and later seventy a day, until 4a repaired the join.
+So the baseline's runner-create row is the last one the old instrument
+could produce, taken over a day and a third, and the later rows are
+seven and five days taken with the repaired instrument and cross-checked
+against `conductor_runner_create_refused_total` to within 2%. Where
+they disagree, the later ones are the better measurement, and this
+verdict rests on them.
+
+*What 0a's measurement adds, and it is the independent half.* Phase
+4a's counts are of refusals the scheduler actually emitted; 0a's are of
+what each sub-check would have done to a 16384 MB shape at every
+node-sample in 72 hours. The two are methodologically independent and
+agree: the committed ledger refuses in 789 of the 790 node-samples
+where anything refuses, and the live check is the sole refuser in 1 of
+4968 (2 of 7911 at 60 s on the busiest day). The live check is the
+loosest of the three sub-checks almost always.
+
+*Which of those conclusions survive the `used_memory_mb` proxy, and
+which do not.* 0a's ledger figures use `memory_total_instance_max` as a
+proxy for `used_memory_mb`, and the proxy can only undercount, so proxy
+ledger room is an **upper** bound on real ledger room. For this verdict
+that bias runs the safe way on every load-bearing figure:
+
+- **Robust.** The live check's own refusal count (65 of 4968) is
+  computed from gauges alone and does not touch the proxy at all.
+- **Robust.** "Live is the sole refuser in 1 of 4968" is an upper
+  bound: correcting the proxy can only make the ledger refuse *more*
+  often, which can only reduce the set of samples in which live refuses
+  alone. The same holds for the ledger being the tightest of the three.
+- **Not robust, and not relied on here.** `D14`'s 27.2% is an upper
+  bound for the same reason (see `D14`), and 0a's "at no sample did
+  every node refuse the shape" is explicitly not treated as evidence
+  by 0a itself.
+
+No conclusion in `D13` needs ledger room to be large, which is the
+direction in which the proxy would mislead.
+
+*What would falsify this.* Stated so phase 2 and phase 3 can check it
+rather than inherit it:
+
+- **Phase 2's shadow counts are the re-test.** If `C` answers "fits"
+  and the create minutes later is refused on `insufficient memory` at
+  anything like 24 in 68 or 229 in 453, `Q1` is reopened and the
+  live-memory question is sequenced ahead of phase 3. That is the test
+  `Q1` wrote and the master plan's phase 2 already commits to reading
+  those counts before phase 3.
+- **`D14`'s retune is the one foreseeable event that could flip this.**
+  Lowering `node_ram_reservation_gb` raises `limit_memory_mb`
+  one-for-one and relaxes the check that is actually binding. Relieve
+  the binding check and whichever check is next becomes binding; on
+  sf-4 and sf-6 the live check already refuses a 16 GiB shape on 2.7%
+  and 1.2% of samples. So a reservation retune on sfcbr must be
+  followed by a re-read of these shares before phase 3 is written, and
+  the retune's own effect is the reason `D13` defers the question
+  instead of closing it.
+- **Moving `RAM_OVERCOMMIT_RATIO` off 1.0** invalidates the algebra
+  `D14` rests on (the two reservation subtractions no longer cancel),
+  so the whole `Q1`/`Q2` reading would need retaking. 33fl's reasoning
+  against moving it stands and nothing here asks for it.
+- **A different cluster or a different shape.** Everything above is
+  sfcbr, at ratio 1.0, against a single 16 GiB shape, with
+  `memory_total_instance_max - memory_total_instance_actual` measuring
+  exactly zero at every percentile. A deployment where guests balloon,
+  or where host non-guest use approaches the reservation, would read
+  differently.
+
+*Rejected: sequence the live-memory question ahead of `A`.* It would
+buy a narrowing worth about one node-sample in five thousand, and it
+would do so ahead of the mechanism that addresses the refusals actually
+being counted — which are allocation-cap refusals and, in 374 of 461
+in-job cases in phase 4a's latest segment, packing failures. Phase 4a's
+`D5` is explicit that waiting does not defragment and that the only
+mechanism in sight that can defend a large-shape slot is a hold. Making
+the smallest of the three memory constraints the gate on the largest
+would invert the priority the measurement establishes.
+
+*Rejected: close `Q1` outright rather than deferring it to phase 2.*
+One of the falsifiers above is something this plan's own hand-off can
+cause — `D14`'s retune — and one risk is not in that list at all,
+because 0a cannot see it: a transient inside the 300 s sampling
+interval, which the gauges smooth over, is exactly what the live check
+would catch and what a retrospective reading cannot count. `C`'s
+shadow counts cost nothing extra to read, and they are the only
+instrument that sees a live refusal at the moment a create meets
+it.
+
+*Left to the implementing phases.* Phase 2 owns what the shadow
+comparison records and how a "fits, then refused live" event is
+counted; it does not re-open whether `C` comes before `A`. Phase 3 owns
+reading those counts before it is written, which the master plan
+already requires.
+
+#### `D14` (`Q2`): what the double-subtraction costs, and where
+
+**Decision. The host's reservation is subtracted twice on sfcbr, as
+`F1` said — but the two places are the committed ledger
+(`limit_memory_mb`) and the KSM ceiling, not the ledger and the live
+check. At `RAM_OVERCOMMIT_RATIO = 1.0` the live check's and the
+ledger's reservation terms cancel algebraically, so the live/ledger
+margin `Q2` asks about was never a function of the reservation at all.
+The cost is about 27% of per-node memory refusals of a 16 GiB shape, an
+upper bound, incurred through `limit_memory_mb`; the live-side cost is
+worth one node-sample in 4968. The second subtraction is an extra
+buffer of the reservation's size rather than a duplicate of a cost the
+host is incurring, and whether it is the right buffer is 33fl's
+judgement, not this plan's. The retune is handed to 33fl with one
+lever, `node_ram_reservation_gb`, and it is not a gate on `A`.**
+
+*Where the arithmetic actually lands.* 0a's identity is the whole
+answer: at ratio 1.0, `ledger room - live room = host_use -
+used_memory_mb`. The reservation appears on both sides and cancels.
+What remains is the difference between what the host has faulted in and
+what the ledger has committed, and on sfcbr the second term dominates,
+because guests are charged at nominal allocation and
+`memory_total_instance_max - memory_total_instance_actual` is exactly
+zero at every percentile on every node. So live room sits
+**persistently above** ledger room — median gap negative on all six
+nodes by 1.7 to 6.7 GB — which is the opposite of the signature `D4`
+predicted. Correcting the `used_memory_mb` proxy would push the gap
+further negative, so the finding is not an artefact of the proxy.
+
+With `actual == nominal`, proxy ledger room is exactly the KSM headroom
+less the reservation on every node. That is the second subtraction,
+and it is between the ledger and the KSM ceiling.
+
+*What it costs.* 215 of 790 refusing node-samples (27.2%) are ones the
+ledger refuses while both the KSM ceiling and the live check admit,
+which is to say refusals that exist only because of the reservation
+term in `limit_memory_mb`. A second 72-hour window gives 27.1% and a
+60 s re-run of the busiest day 22.5%. **This figure is an upper
+bound**, for the same reason `D13`'s sole-refuser count is one: a truer
+`used_memory_mb` tightens both the ledger and the reservation-free
+ledger it is compared against, so some of those 215 would be refused
+either way. The one figure the proxy does not touch is the capacity
+withheld — 46680 MB (45.6 GiB) of `limit_memory_mb` across the six
+nodes — because that is the sum of the reservations themselves.
+
+*And what it does not cost.* The live-side half of the double
+subtraction is worth 1 node-sample in 4968: removing it takes
+live-check refusals of a 16 GiB shape from 0.0-2.7% of samples to
+0.0-0.8%. So `Q2`'s question "how much of the live third is margin and
+how much is shortage" has a different answer than it anticipated: by
+the time it is asked there is almost no live third left (`D13`), and
+the margin the double subtraction creates sits almost entirely in a
+check that is not the live one.
+
+*It is not a duplicate of a cost actually incurred.* Separating guest
+RSS out of `memory_max - memory_available` with `process-exporter`, the
+host's own non-guest footprint is 0.7 to 3.3 GiB at the median against
+a 6.2 to 10.3 GiB reservation, and exceeds the reservation on under
+1.5% of samples on every node. So the ledger's subtraction is not
+re-charging memory the live check has already removed; it is adding a
+second buffer the size of the whole reservation on top of a genuinely
+measured host use a third to a quarter of it. That buffer has a
+rationale — both `33fl/group_vars/allsf.yml:22-25` and
+`shakenfist/scheduler.py:796-808` note that the measurements lag
+placement — so "duplicate" is the wrong word for it and "is it the
+right buffer?" is a tuning question rather than a correctness one.
+
+*The hand-off, and why it is not a gate.* The lever is the per-host
+`node_ram_reservation_gb` override in the 33fl inventory
+(`NODE_RAM_RESERVATION_GB`, `shakenfist/config.py:719-727`, templated
+at `shakenfist/deploy/collection/roles/node/templates/config:29`), and
+the figure it withholds is the 46680 MB above. Raising
+`RAM_OVERCOMMIT_RATIO` is **not** the recommended lever: it is a
+deliberate OOM defence, placeable-claims phase 4a declined to touch it,
+and dropping the reservation from `limit_memory_mb` would make the
+ledger exactly as permissive as the KSM ceiling the same ratio already
+sets, which is a far smaller change. The retune is 33fl's (`D1`, out of
+scope) and it does **not** gate `A`: it relaxes the binding check,
+which makes placement easier, and nothing in `A`'s design depends on
+its value. `D13`'s third falsifier is the one coupling in the other
+direction — if the retune lands, the live shares must be re-read before
+phase 3.
+
+*Rejected: treating the 27% as a reason to defer `A` until the retune
+lands.* The retune relieves saturation of the allocation ledger; it
+does not defragment, and `D15` is why. A node whose `limit_memory_mb`
+rose by 6 GB is still a node the ranker will spread a 4 GB guest onto
+before a 16 GB one arrives.
+
+*Rejected: recording `Q2` as "not established", which is where the
+master plan left it.* It is established in both directions now: the
+double subtraction exists and is quantified, and the place `Q2`
+expected to find it is not where it is.
+
+*Left to 33fl and the implementing phases.* 33fl owns whether and by
+how much to retune, and owns re-reading `D13`'s shares afterwards. One
+optional ask remains open from 0a: a single `SELECT node_uuid,
+limit_memory_mb, used_memory_mb FROM scheduler_node_capacity` would
+replace the proxy with the ledger's own figure and turn both of the
+bounds above into exact figures. No conclusion in `D13` or `D14` waits
+on it.
+
+#### `D15`: a hold defends a slot for a shape, not an aggregate
+
+**Decision. This plan carries the constraint placeable-claims phase 4a
+`D5` referred inward: a hold must defend a slot for a *shape* on a
+*node*, not a quantity in an aggregate, because the scheduler's node
+ranking is deliberately spreading allocation away from the nodes a
+large shape needs. Phase 3 owns it — it is a constraint on the node
+guard and on what a hold row is — and phase 4 inherits the half about
+keeping a booking across re-placement. Nothing here asks for a change
+to ranking, and nothing here is in tension with shakenfist#3937.**
+
+*What the ranker does today, re-read at `32de6cec7f`.* `find_candidates()`
+buckets each surviving candidate by the worse of two pressures: its
+CPU load normalised by schedulable threads, and its committed-memory
+fraction, in coarse 0.25-wide bands —
+
+```
+bucket = max(
+    math.floor(normalised / 0.25),
+    math.floor(ram_fraction / 0.25))
+```
+
+at `shakenfist/scheduler.py:1310-1312`, with the memory fraction read
+from the `scheduler_node_capacity` row the capacity guard itself draws
+down (`:1301-1307`) rather than from the lagging metrics, and the
+reasoning in the comment at `:1290-1300`. That is shakenfist#3937
+(merged 2026-08-28), which closed shakenfist#3636 — "scheduler RAM
+gates race placement and ranking ignores RAM, funnelling large VMs onto
+the most-committed node". A node near its allocation cap now ranks
+worst.
+
+*Both behaviours are correct, and they pull apart.* Ranking by the
+worse of two pressures spreads allocation across the fleet, which is
+exactly right for the OOM kills #3636 was filed about: it is what stops
+a burst funnelling onto the node that already carries the RAM-heavy,
+CPU-idle guests. It is also what converts aggregate headroom into
+per-node fragments, and a 16 GiB guest needs its 16 GiB on one node.
+Six nodes each 80% allocated at `RAM_OVERCOMMIT_RATIO = 1.0` have tens
+of gigabytes free between them and no room for a single
+`12/16384/160`. Phase 4a measured that this is what is happening: 374
+of 461 in-job and 330 of 347 runner-create refusals in its latest
+segment are fragmentation, both surviving its pessimistic reading. So
+OOM safety and large-guest admission are both served correctly and in
+opposite directions, and nothing in the scheduler reconciles them.
+**This is not a defect in #3937 and not an argument for changing
+ranking**; it is the reason a reconciling mechanism has to exist
+somewhere else, and `A` is that mechanism.
+
+*The consequence for this plan, stated as a design constraint.* A hold
+that reserved only ledger headroom in aggregate would not keep a node
+able to accept the shape the hold was taken for: the ranker would
+refill any gap that opened with whatever create asked next, and the
+holder would arrive to find its room spread into fragments. So:
+
+- A hold is booked **onto a node, for one shape**. `D8` already stores
+  it that way — one row per hold carrying the three dimensions and the
+  booked node — and `D15` is why that storage shape is load-bearing
+  rather than merely convenient. A per-claim aggregate held counter
+  would not satisfy this constraint, which is a second, independent
+  reason `D8` rejects a namespace-side and a cluster-side held column.
+- The node guard term is what defends the slot against the ranker.
+  `G6`'s `used + held + request <= limit` for **every** create,
+  including the holder's own unheld ones, is exactly the mechanism:
+  the ranker may still prefer the held node, but the guard refuses the
+  create that would eat the booking. The ranker is left alone and the
+  guard does the reconciling.
+- Displacement must not quietly become an aggregate. When a node leaves
+  service, a displaced hold is booked on no node (`D9`, phase 4), and
+  while displaced it defends nothing — which is why phase 4's rule is
+  re-place first and report the displacement, rather than falling back
+  to an aggregate reservation that would look like a hold and not
+  behave like one.
+
+*What this does not claim.* It does not claim ranking is wrong, that
+#3937 should be revisited, or that a comment belongs on #3636 — phase
+4a deliberately left that issue alone, and so does this. It also does
+not claim `C` can satisfy the constraint: a dry run defends nothing,
+by construction, which is `D12`'s point about it writing nothing.
+
+*Left to the implementing phases.* Phase 3 owns the node guard term and
+the hold row's DDL, and must not weaken either into an aggregate.
+Phase 4 owns re-placement and displacement, and owes this decision only
+that a displaced hold is reported rather than silently kept as an
+aggregate. Phase 2 owes it nothing.
+
+#### Consistency pass
+
+*Each of `Q1`–`Q8` is answered or deferred exactly once in this
+document.*
+
+| Question | Where | Verdict |
+|---|---|---|
+| `Q1` | `D13` | Answered: `A` proceeds; re-tested by phase 2's shadow counts |
+| `Q2` | `D14` | Answered: real, ~27%, in the ledger and the KSM ceiling |
+| `Q3` | `D7` | Answered |
+| `Q4` | `D8` | Answered |
+| `Q5` | `D9` | Answered |
+| `Q6` | `D10` | Deferred to #1364, with one DDL constraint on phase 3 |
+| `Q7` | `D11` | Answered |
+| `Q8` | `D12` | Answered |
+
+The measurement subsection records `Q2`'s figures and says in terms
+that it does not answer `Q1`; `D14` is where `Q2`'s verdict is drawn,
+so neither question has two answers.
+
+*Every `D` against every other.* `D1`–`D6` govern how the phase runs
+and `D7`–`D15` are what it produced.
+
+- `D1` (no code) holds: nothing in `D13`–`D15` changes the tree
+  outside `docs/`.
+- `D2`/`D3`/`D4` were written for a prospective scrape. 0a found the
+  gauges already in maui's Prometheus and took the measurement
+  retrospectively, withdrawing `D3`'s ask of 33fl. That is a recorded
+  amendment in 0a's subsection, not a contradiction: `D2`'s working-day
+  and CI-busy requirement became a window-selection criterion and was
+  met (the three highest runner-create refusal days in 93), and `D4`'s
+  two comparisons were taken as specified. `D4`'s expectation about
+  what they would show was wrong, which is a result rather than a
+  conflict.
+- `D5` is satisfied exactly as written: `Q1` is answered from `D4` plus
+  the baseline's live share, not in the abstract. `D5`'s first branch
+  ("the fix is 33fl's retune and `A` proceeds") is the one taken, with
+  one correction to its premise — the double-subtraction does not
+  explain the live-memory refusal third, because that third has
+  collapsed for reasons unrelated to the reservation. `D5`'s second
+  branch would have amended the master plan's order; it is not taken,
+  so the order is unamended.
+- `D6` is satisfied by `D7`–`D12`, each with its reasoning and
+  rejected alternative, and each naming what it leaves to its
+  implementing phase. `D13`–`D15` follow the same form.
+- `D7` and `D15` agree: `D7`'s "a hold carries no affinity, and
+  affinity is tested at consumption" is compatible with defending a
+  slot for a shape, because the slot is a node plus three dimensions
+  and affinity is a property of the create, not of the booking.
+- `D8` and `D15` agree and reinforce: `D15` is a second, independent
+  reason for `D8`'s rejection of a namespace-side or cluster-side held
+  counter.
+- `D9` and `D15` agree: a displaced hold defends nothing, which `D9`
+  already treats as a reportable outcome rather than a silent one.
+- `D13`/`D14` against `D10`, `D11`, `D12`: no interaction. `D12`'s
+  reason for keeping `C` is strengthened by `D13`, which gives `C` a
+  second job — carrying `Q1`'s re-test — but `D12` does not depend on
+  it.
+- `D14` against `D8`'s warning that `held_disk_gb` must not feed
+  `_derive_disk_limit_gb()`: both are about not letting a reservation
+  or a hold be counted twice in a derived limit. No conflict; the
+  memory and disk limits are derived by different functions.
+
+*One ambiguity resolved.* `D7` quoted an unqualified `D15` from
+`shakenfist/mariadb.py:30355-30357` ("there is no auto-grow"), which is
+another plan's decision number carried in a code comment. With this
+plan now having its own `D15`, that citation has been reworded to name
+its source rather than read as a cross-reference inside this document.
+
+*No contradiction was left unresolved.*
+
+#### Definition-of-done item 3: the master plan's ordering
+
+Read the master plan's Execution ordering prose against `D13`: it
+needs **no amendment**. Recording that explicitly, because it is a
+result and not a non-answer.
+
+- The phase table's order (0, 1, 2, 3, 4, 5, 6, 7) stands.
+- "The order follows placeable-claims phase 0's `D1` and `D9`: `C`
+  first, `A` second, on one core, and the live-memory measurement
+  before either admission change" stands, and is now a statement about
+  work that has been done rather than work planned.
+- The phase 0 bullet's conditional — "its answer to `Q1`/`Q2` decides
+  whether the live-memory question is sequenced ahead of `A`" — has
+  been rewritten in the master plan to record the answer, which is the
+  only ordering prose this verdict moves. It moves it by resolving a
+  condition, not by changing a sequence.
+- The phase 2 bullet already requires private-ci's shadow counts to be
+  read before phase 3. `D13` makes that requirement load-bearing
+  rather than merely useful, and the master plan now says so.
