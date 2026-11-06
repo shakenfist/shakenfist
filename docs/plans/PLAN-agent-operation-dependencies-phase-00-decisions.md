@@ -194,8 +194,29 @@ after the back brief.
    are gated behind an `API_CAPABILITIES` token the way
    `deadline_seconds` was (#4005), so an operation can only reach
    `abort` if it was created by a client that declared a dependency,
-   which is a client that knows the state. No released client can be
-   hung by a state it cannot cause.
+   which is a client that knows the state.
+
+   Step 0b found that argument to be half true, and it is corrected
+   here rather than in the step's own section. It holds for a client
+   which polls the operations it created itself —
+   `_await_agentop` in `client-python` — and fails for a client which
+   polls an instance's whole operation list. `client-python-k3s`'s
+   `await_idle()` (`shakenfist_client_k3s/cluster.py:2321`) reads
+   every operation on an instance, including other callers' and
+   historical ones, deliberately treats a state it does not recognise
+   as still running, and has no timeout of its own; its comment
+   justifies that with "the server moves every operation out of
+   whatever state it is in within its deadline", which a terminal
+   state falsifies. So one aborted operation created by a new client
+   stalls a released k3s plugin polling the same instance until the
+   hard-delete sweep removes the operation — `CLEANER_DELAY`, an hour
+   by default — after which the listing stops reporting it and the
+   wait proceeds. Bounded, diagnosable (it notes the unrecognised
+   state once), and still an hour of silence inside a cluster
+   install. The plan's answer is that `client-python-k3s` is a
+   repository we own and is already phase 5's business, so it learns
+   the state there; whether it should learn it *before* the server
+   can emit one is a question for the back brief.
 2. **Strict FIFO is preserved: a dependency-blocked head blocks the
    operations behind it** (open question 1), and declaring a
    dependency does *not* opt an operation out of queue ordering.
@@ -396,6 +417,313 @@ safe, and survey finding 2, since it removes the stated reason this
 plan was gated on the deadlines plan at all without removing the
 gate's substance.
 
+## Execution notes
+
+- **2026-11-07 (AEDT).** Steps 0a and 0b ran in parallel as
+  sub-agents: both are read-only, neither writes to the worktree, and
+  each delivered its section as a file for the management session to
+  review and commit. Nothing ran `git` or `pre-commit` in the
+  worktree but the management session.
+- **0a's data sources were narrowed by the operator** before it ran.
+  Loki (via the read-only `loki-query` helper) and CI node journals
+  only; no live API read against `sfcbr`, which the step's brief had
+  offered as an option. Queue depth is therefore inferred from
+  dispatch timing rather than read from the instance attribute.
+- **This session may push the branch and open the pull request** once
+  the definition of done passes; the operator granted that up front
+  rather than at the end.
+- **Decision 1 was corrected at source by step 0b's findings** — the
+  capability-gate argument protects a client which polls its own
+  operations and not one which polls an instance's whole list. See the
+  decision itself; the audit row is in the results below.
+- **0d gained a third issue.** Step 0b found a pre-existing defect
+  while auditing: `Instance.external_view()`
+  (`shakenfist/instance.py:793`) reads the `queued` key of the
+  `agent_operations` attribute, but the key written by
+  `agent_operation_enqueue()` and read everywhere else is `queue`, so
+  `agent_operations_queue` in an instance's view is always empty and
+  the `include-queued-agent-operations` capability token advertises
+  nothing. It is out of this plan's scope and is filed rather than
+  fixed.
+
 ## Results
 
-Nothing yet: this phase has been planned and not executed.
+### State audit (step 0b)
+
+Audited against the tree as it stands on 2026-11-07, after the
+deadlines plan landed. Two changes are assessed: (i) a new terminal
+state `abort` on `AgentOperation`, and (ii) a queued operation at the
+head of its instance's queue that is deliberately not dispatchable
+for minutes because a declared dependency has not finished.
+
+Two facts frame the table. First, `abort` is not new vocabulary:
+`BaseOperation.STATE_ABORT = 'abort'` already exists
+(`shakenfist/operations/baseoperation.py:53`) and is inherited by
+`AgentOperation`, which simply has no `state_targets` edge to it.
+Second, the 2026-08 audit's "unguarded `state = STATE_ERROR`" rows no
+longer exist: every error write in the sidechannel daemon and
+`node_aop_op` now goes through `AgentOperation.fail()`
+(`agentoperation.py:410-430`), which returns early from any state in
+`TERMINAL_STATES`. That makes membership of `TERMINAL_STATES` the one
+fact most verdicts below hang on: with `abort` in it, those sites are
+safe for free; without it, `fail()` and `expire()` would raise
+`InvalidStateException` from `abort` (no edge) and
+`agent_operation_next()` would wedge the queue on its unknown-state
+branch.
+
+Phase numbers refer to the master plan's table as it stands before the
+re-cut (1 schema and API, 2 dispatch evaluation, 4 client-python,
+5 documentation and `client-python-k3s`); the cross-instance phase is
+treated as folded into 2.
+
+#### Server repository: state consumers
+
+| Site | file:line | Verdict | Notes |
+|---|---|---|---|
+| `AgentOperation.state_targets` | `shakenfist/operations/agentoperation.py:66-90` | NEEDS UPDATE (1) | Needs `abort` as a target of at least `queued` (the dispatcher cascades from there) and an `abort -> deleted` edge. The edge matters: `delete()` (`:553-561`) removes the MariaDB rows and then assigns `deleted`, so without it the API DELETE of an aborted operation raises `InvalidStateException` after the data is already gone. Values must stay tuples (see the NOTE at `:57-60`). The cascade write itself must be a no-op from a terminal state, in the manner of `fail()`, because `deleted` has no edge to `abort` and a user DELETE can race the dispatcher. |
+| `AgentOperation.TERMINAL_STATES` | `shakenfist/operations/agentoperation.py:51-52` | NEEDS UPDATE (1) | Load bearing, see the framing above. Add `BaseOperation.STATE_ABORT`. Every guard in the sidechannel daemon that says "terminal" reads this tuple. |
+| `AgentOperation.external_view()` | `shakenfist/operations/agentoperation.py:196-212` | NEEDS UPDATE (1) | Carries `expiry_reason` and `error_message`. `error_message` is `self.error`, whose setter refuses any state not ending in `error` (see `expire()`'s comment at `:372-376`), so the prose cause of an abort lives only on the state row and the instance audit event, neither of which a client sees. A client told `abort` cannot learn which dependency failed unless the view gains a field analogous to `expiry_reason`. |
+| `BaseOperation.ACTIVE_STATES` | `shakenfist/operations/baseoperation.py:55-56` | IGNORES SAFELY | `{created, queued, executing, complete}`; `abort` absent, exactly as `error` and `expired` are. Agent operations have no names, so the `from_db_by_ref` name lookup (`baseobject.py:423`) never applies to them. The only default-prefilter consumer is the instance delete sweep, next row. Note this set also omits `initial` and `preflight`, which pre-dates this work. |
+| Prefilter resolution | `shakenfist/baseobject.py:1021-1030` | IGNORES SAFELY | `prefilter=None` resolves to `ACTIVE_STATES`; aborted operations drop out of default iteration like errored and expired ones. |
+| Instance delete sweep of agent operations | `shakenfist/instance.py:1745-1748` | IGNORES SAFELY | `AgentOperations([...])` uses the active prefilter, so a queued (blocked) operation is deleted with its instance, while an aborted one is not soft-deleted -- the hard-delete sweep reaps it instead because `abort` is in `FINAL_OBJECT_STATES`. A deleted instance's blocked operations become `deleted`, which is the "failed dependency" outcome for any cross-instance dependent (see the queue list). |
+| `constants.FINAL_OBJECT_STATES` | `shakenfist/constants.py:204-209` | IGNORES SAFELY | Already `{deleted, complete, abort, expired}`. An aborted operation is hard-deleted after `CLEANER_DELAY` (`config.py:826`, 3600 s; `_deleted_object_delay()` at `scheduled_tasks.py:939-942` only shortens it for `*_op` types, and `agentoperation` is not one). Consequence worth documenting: `GET /agentoperations/<uuid>` for an aborted operation returns 404 after an hour, same as `complete` today. |
+| Hard-delete sweep | `shakenfist/daemons/cluster/scheduled_tasks.py:1000,1090,1146,1185` | IGNORES SAFELY | All four read `FINAL_OBJECT_STATES` and are type-agnostic. Aborted operations are counted, paged and deleted with no change. |
+| `Instance.agent_operation_next` terminal branch | `shakenfist/instance.py:3279-3286` | IGNORES SAFELY | Pops any state in `TERMINAL_STATES` and continues, so an aborted head is retired on the next pass and the following entry considered. Safe only because of the `TERMINAL_STATES` change; see the framing. |
+| `Instance.agent_operation_next` unknown-state branch | `shakenfist/instance.py:3288-3301` | BREAKS (if `abort` is added to `state_targets` but not to `TERMINAL_STATES`) | Logs an error and `break`s without popping, by design ("preserve order rather than guessing"). An aborted head would then block its instance's queue permanently and log an error every five seconds. Not reachable today; becomes reachable the moment the cascade writes the state. The branch is correct and should stay; the phase that adds the state must update `TERMINAL_STATES` in the same commit. |
+| `Instance.agent_operation_next` queued branch and deadline check | `shakenfist/instance.py:3228-3246` | NEEDS UPDATE (2) | A `queued` head whose `deadline_passed()` is expired and popped, and the next entry considered. This is the enforcement point that fires for a dependency-blocked head, and it fires before any dependency evaluation provided the dispatcher calls `agent_operation_next()` first (it does, `main.py:2071`). The deadline is an absolute time computed at request receipt, so queue time accrues, and time spent blocked is queue time. Two gaps for the evaluation phase: a blocked operation that is *not* the head is not deadline-checked until it reaches the head; and an operation with `deadline_seconds=0` and a live progress timeout has no stored deadline and falls back to `AGENT_OPERATION_MAX_DEADLINE` (86400 s) anchored on its last state transition (`agentoperation.py:262-320`), so the deadline alone is no bound on a stall. |
+| `Instance.agent_operation_next` initial/preflight branch | `shakenfist/instance.py:3248-3269` | IGNORES SAFELY | Breaks without popping and without a deadline check, leaving enforcement to preflight and the reaper. An aborted operation is not in these states. The note for evaluation: a blocked operation must stay `queued`. If it were held in `preflight` it would be exempt from `agent_operation_next()`'s deadline check and eventually expired by `expire_unpromoted_head()` (`main.py:710-755`) at deadline plus `UNPROMOTED_HEAD_GRACE` (60 s), with the wrong reason text. |
+| Instance external view queue | `shakenfist/instance.py:792-797` | NEEDS UPDATE (5) | Pre-existing bug, relevant here: it reads `ops.get('queued', [])` but the attribute key is `queue` (`:3204,3315`), so `agent_operations_queue` is always empty and no test references it. The capability token `include-queued-agent-operations` (`external_api/app.py:508`) therefore advertises nothing. If queue visibility matters for explaining a blocked head, this needs fixing; the per-instance listing `GET /instances/<ref>/agentoperations` (`external_api/agentoperation.py:211-228`) reads the right key and is the working surface. |
+| `STATE_ABORT` users elsewhere | `shakenfist/daemons/network/maintain.py:68`, `shakenfist/schema/operations/baseclusteroperation.py:33`, `operations/baseoperation.py:289-295,680,1049-1060`, `daemons/queues/workitem.py:153`, `daemons/network/workitem.py:542,573` | IGNORES SAFELY | All are about cluster operations, whose `state_targets` are separate from `AgentOperation`'s. No code branches on the object type's state being `abort` for agent operations. |
+| `node_aop_op._preflight` | `shakenfist/operations/node_aop_op.py:110-155` | IGNORES SAFELY | `!= STATE_PREFLIGHT` early returns at `:121` and `:151` make an aborted (or expired, or deleted) operation a silent no-op. |
+| `node_aop_op.dispatch_task` error path | `shakenfist/operations/node_aop_op.py:105-108` | IGNORES SAFELY | Was unguarded in the earlier audit; now `aop.fail()`, a no-op from `TERMINAL_STATES`. Same for `:134`. |
+| Sidechannel executor exit guard | `shakenfist/daemons/sidechannel/main.py:844-853` | IGNORES SAFELY | `== STATE_EXECUTING` guard; an operation in any other state is left alone. |
+| Sidechannel terminal-during-dispatch check | `shakenfist/daemons/sidechannel/main.py:1383-1392` | IGNORES SAFELY | `in TERMINAL_STATES`: covers `abort` for free, and is the backstop for a replaced dispatcher generation that starts an executor on an operation the current generation has just aborted. |
+| Sidechannel executing write and completion write | `shakenfist/daemons/sidechannel/main.py:1426-1428,1583-1587` | IGNORES SAFELY | Both guarded by the terminal check above or by `== STATE_EXECUTING`. |
+| Sidechannel `fail()` call sites | `shakenfist/daemons/sidechannel/main.py:490,495,852,889,1349,1559,1904` | IGNORES SAFELY | All via `fail()`, which returns early from a terminal state. |
+| Sidechannel error-abort check | `shakenfist/daemons/sidechannel/main.py:1303-1330` | IGNORES SAFELY | Tests `ERROR` and `EXPIRED` only, deliberately not the whole of `TERMINAL_STATES` (see its docstring). `abort` is only written to a `queued` operation the dispatcher has not handed to an executor, so no running executor can observe it. Adding `abort` here is harmless and would be defensible if an `executing -> abort` edge were ever added; do not add that edge. |
+| `reap_instance_executors` and `_resolve_stuck_queue_head` | `shakenfist/daemons/sidechannel/main.py:1727,1793-1900` | IGNORES SAFELY | Acts only on an `initial`/`preflight` head (`:1862`) or an `executing` head (`:1870`). A `queued` head returns at `:1870` untouched, so a blocked head is never expired, resolved or disturbed by the reaper. |
+| `expire_unpromoted_head` | `shakenfist/daemons/sidechannel/main.py:703-755` | IGNORES SAFELY | Keyed on `UNPROMOTED_HEAD_REASONS` (`initial`, `preflight`); never sees `queued` or `abort`. |
+| `resolve_abandoned_operation` and `operation_is_retryable` | `shakenfist/daemons/sidechannel/main.py:591-690` | IGNORES SAFELY | Reached only for an `executing` operation; the requeue write at `:677` is `executing -> queued`. Retry of a dependent re-enters the queue at the head it already holds. |
+| Agent operation API: get, delete | `shakenfist/external_api/agentoperation.py:107-126` | IGNORES SAFELY | State passed through opaquely. `delete()` works provided `abort -> deleted` is in `state_targets`. |
+| Agent operation API: instance listing | `shakenfist/external_api/agentoperation.py:211-228` | IGNORES SAFELY | Renders `external_view()` of every entry in `queue` or `all`. An aborted operation stays in `queue` until the next `agent_operation_next()` pass pops it, so a client can briefly see an `abort` in the "still in flight" list; same as `error` today. |
+| Agent operation API: creating endpoints | `shakenfist/external_api/instance.py:2334-2342,2401-2409,2467-2475` | NEEDS UPDATE (1) | Today they only set `preflight`/`queued` on fresh operations and never read state. The new parameters land here; the capability token gate belongs in `external_api/app.py` beside `agentoperation-deadlines` (`:508-515`). Each endpoint also refuses unless the instance's agent is `ready` at submission (`:2283,2381,2444`), which says nothing about whether it stays ready while the operation waits. |
+| `sf-ctl` object type list | `shakenfist/client/ctl.py:843` | IGNORES SAFELY | Type names only. |
+| Metrics, health checks, eventlog, cleaner | (none found) | IGNORES SAFELY | No Prometheus metric, gauge or health check enumerates agent operations, their states or queue lengths. The only counters touching them are the generic deleted-object sweep metrics in `scheduled_tasks.py`, which are type-labelled. |
+| `docs/developer_guide/state_machine.md` | `docs/developer_guide/state_machine.md:20-84` | NEEDS UPDATE (5) | Documents the current eight states and the mermaid graph; needs an `abort` node, `queued --> abort` (and any other source edge) and `abort --> deleted`, plus prose distinguishing it from `error` and `expired`. Its closing sentence that "only `expired` is currently swept for hard deletion" is already stale: `complete` and `abort` are in `FINAL_OBJECT_STATES` too. |
+| `docs/operator_guide/agent_operations.md` | `docs/operator_guide/agent_operations.md:15-28,41-47,215-230` | NEEDS UPDATE (5) | "Every other queued operation against the same instance, however unrelated, waits behind it" is written about a wedged operation; it becomes true of a deliberate wait too and needs a section on the dependency-wait budget, since the deadline paragraphs treat queue time as incidental. |
+| `docs/developer_guide/api_reference/agentoperations.md` | `docs/developer_guide/api_reference/agentoperations.md:1-30` | NEEDS UPDATE (5) | Describes the timing fields and `expiry_reason`; needs the dependency parameters, the `abort` state and whatever field carries its cause. |
+
+#### CI suite (`shakenfist/deploy/shakenfist_ci/`)
+
+| Site | file:line | Verdict | Notes |
+|---|---|---|---|
+| `AGENT_OPERATION_FAILED_STATES` | `base.py:1612` | NEEDS UPDATE (2) | `('error', 'expired', 'deleted')`. Three consumers share it: `_await_command` (`:1618-1634`), `_await_agentop_complete` (`:1981-1997`) and `_await_agentop_state` (`smoke_ci_tests/test_agentop_deadlines.py:208`). A test awaiting an aborted operation would poll to its timeout (900 s for `_await_command`) instead of failing at once. Add `'abort'` in the same phase as the first functional test that cascades. |
+| `AGENT_OPERATION_TIMEOUT` | `base.py:1605` | IGNORES SAFELY | 900 s backstop; comfortably above a bounded dependency wait. |
+| Agent exception tuple | `base.py:91-110` | IGNORES SAFELY | Enumerates the three client exceptions; `abort` surfaces as `AgentOperationFailed` once the client knows the state. |
+| Other agent operation awaits | `smoke_ci_tests/test_agentops.py`, `guest_ci_tests/test_agentops.py`, `instance_hotplug.py`, `cluster_ci_tests/test_floating_ips.py:63` | IGNORES SAFELY | All go through the helpers above or the client's `await_agent_command` and `await_agent_fetch`. None submits a dependency, so none can see an `abort`. |
+| Cluster operation terminal sets | `cluster_ci_tests/test_api.py:49,62`, `test_per_object_operations.py:12`, `test_observational_sweeps.py:23` | IGNORES SAFELY | Cluster operations; already include `abort`. |
+| `load_budget.py` | `load_budget.py:187,354,387` | NEEDS UPDATE (2) | Budgets the suite's agent operation polling against the database load budget. A blocked head adds a steady read load (see the queue list), and `shakenfist/data/database_load_budget.yaml:311-323` derives the sidechannel per-instance term from `DISPATCH_CHECK_INTERVAL`; a unit test fails on drift. |
+
+#### client-python
+
+| Site | file:line | Verdict | Notes |
+|---|---|---|---|
+| `TERMINAL_AGENT_OPERATION_STATES` | `shakenfist_client/apiclient.py:230-234` | NEEDS UPDATE (4) | Hand-maintained copy of `AgentOperation.TERMINAL_STATES`. A released client does not list `abort`, so `_await_agentop` would poll an aborted operation to its full deadline (the client-python#363 shape). Capability gating makes this unreachable *for the creating client*; see the BREAKS summary for who else polls these operations. Update the set, and keep the comment accurate. |
+| `_await_agentop` | `apiclient.py:1418-1456` | IGNORES SAFELY | Once `abort` is in the set above, any non-`complete` terminal state raises `AgentOperationFailed` with the state in the message. No change beyond the set. |
+| `await_agent_command` / `await_agent_fetch` | `apiclient.py:1877-1970,1972-2030` | IGNORES SAFELY | Catch `AgentOperationFailed` and enrich it; the "state" in the message is opaque. A blocked dependent simply consumes the caller's `timeout` and raises `AgentAwaitTimeout` with its non-terminal state, which reads correctly. |
+| Failure enrichment helpers | `apiclient.py:1514-1550` | IGNORES SAFELY | `_agent_failure_context` and `_enriched_agent_failure` print `op["state"]` verbatim. |
+| CLI exception handler | `shakenfist_client/main.py:163-170` | IGNORES SAFELY | Catches `AgentOperationFailed` generically. |
+| CLI renderers | `shakenfist_client/commandline/instance.py:276-298` | IGNORES SAFELY | Print `agentop['state']` as an opaque string. |
+
+#### client-python-k3s
+
+| Site | file:line | Verdict | Notes |
+|---|---|---|---|
+| State constants | `shakenfist_client_k3s/cluster.py:118-122` | NEEDS UPDATE (5) | `AGENT_OP_FAILED_STATES = ('error', 'expired')`, `AGENT_OP_FINISHED_STATES = ('complete', 'deleted')`, `AGENT_OP_KNOWN_STATES` the union plus pending. `abort` is in none of them. |
+| `await_idle` | `cluster.py:2321-2443` | BREAKS | Waits while any of the instance's operations (`all=True`, so including other clients' and historical ones) is in neither the finished nor the failed set (`:2384-2385`); an unrecognised state is deliberately treated as "still running" with a note (`:2391-2397`), and the loop has no timeout (only a stall warning, `:2428-2437`). The comment at `:107-110` justifies this with "the server moves every operation out of whatever state it is in within its deadline", which is false for a terminal state. A single `abort` operation left on an instance, created by any newer client, holds every released `await_idle` against that instance, and the `own_operations` failure check at `:2367` cannot raise because `abort` is not in `AGENT_OP_FAILED_STATES`. The wait is bounded rather than permanent, but only by the hard-delete sweep: the aborted operation's rows go after `CLEANER_DELAY` (3600 s) and the listing endpoint skips an entry whose rows are gone (`external_api/agentoperation.py:224`), at which point the wait proceeds. An hour of silent waiting inside a cluster install is still a break. |
+| `await_fetch` | `cluster.py:2445-2460` | IGNORES SAFELY | Loops while pending; `abort` leaves the loop and `!= 'complete'` raises. |
+| `await_execute` and `reap_execute` | `cluster.py:2462-2560` | IGNORES SAFELY | `await_execute` returns as soon as the state leaves the pending set, and `reap_execute` raises for anything not `complete`; an `abort` is reported as a failure. The docstring's claim that the check is "exhaustive" holds. |
+| `execute_and_await` | `cluster.py:2593-2606` | NEEDS UPDATE (5) | Submits one operation per instance and then calls `await_idle`, so it inherits the `await_idle` hang; it is also the fan-out a declared chain replaces. |
+| Health probe collection | `cluster.py:2820-2880` | IGNORES SAFELY | Pending operations are reported as abandoned; an unrecognised terminal state is reported as "not one this version recognises" (`:2870-2873`). |
+
+#### sfui
+
+The sfui repository (`/srv/kasm_profiles/mikal/vscode/src/shakenfist/sfui`)
+still contains no references to agent operations (recursive grep for
+`agent_operation|agentoperation|agentop`, case insensitive, is empty):
+IGNORES SAFELY.
+
+**Queue-order assumptions: does anything assume the queue drains promptly?**
+
+Each item states what would misbehave if a healthy instance's queue
+head sat undispatched for minutes, and where the obligation lands.
+
+1. **The deadline fires, and it is the only enforcement point that
+   does.** A blocked head is `queued`; `agent_operation_next()`
+   (`instance.py:3228-3246`) expires and pops it when
+   `deadline_passed()`, with the reason "the operation deadline passed
+   while queued" and `expiry_reason = deadline`. The reaper ignores
+   `queued` heads (`main.py:1870`) and `_preflight` has already run.
+   Time spent blocked accrues against the deadline because it is
+   absolute from request receipt. Consequences: (a) the dependency
+   evaluation must run *after* `agent_operation_next()` in the
+   dispatcher or an expired head could be cascaded rather than
+   expired; (b) a dedicated wait budget is genuinely needed, because
+   the default deadline is 600 s but a caller may ask for 86400 s, and
+   `deadline_seconds=0` with a live progress timeout is unbounded up
+   to the 86400 s backstop (obligation: evaluation phase); (c) only
+   the *head* is deadline-checked, so a blocked operation behind
+   another blocked operation is not expired until it becomes head.
+2. **The dispatcher only looks at ready agents.** `_dispatch_loop`
+   (`main.py:2008-2110`) skips an instance whose agent is not
+   `ready` or `ready-degraded` (`:2060-2064`) before ever calling
+   `agent_operation_next()`. A blocked head on an instance whose agent
+   went away is neither evaluated nor deadline-expired for as long as
+   the agent is away. Pre-existing for any queued head, but a
+   dependency wait makes it likelier to be observed.
+3. **Per-instance throttle and database cost.** `DISPATCH_CHECK_INTERVAL
+   = 5` (`main.py:94`) is claimed before the read, so a blocked head
+   is re-examined every five seconds. Today a dispatchable head is
+   read once and handed to an executor; a blocked head costs an
+   attributes read, an operation read and a state read every five
+   seconds for the whole wait, plus the dependency's own state read(s),
+   per blocked instance. The budget term at
+   `shakenfist/data/database_load_budget.yaml:311-323` must be
+   amended, and a terminal dependency should be cached in process.
+4. **Dispatcher pass duration and the supervisor.** The dispatcher
+   evaluates instances serially in one thread and records
+   `dispatcher_last_pass` once per pass (`main.py:2096`);
+   `supervise_dispatcher()` replaces it after 120 s of no pass
+   (`:2122-2142`). The loop's own docstring records that a wedged gRPC
+   read can consume about 90 s. Extra dependency reads inside the pass
+   enlarge the window in which one wedged call starves every other
+   instance on the node; the 300 s heartbeat log is unaffected. A
+   dependency read that blocks must not be allowed to approach 120 s.
+5. **`reap_instance_executors` does not disturb a blocked head**
+   (see the table), but it also does not help one: if a blocked head
+   is somehow left blocked forever there is no reaper for it. The
+   dedicated budget is the only bound, which is why it must be
+   enforced somewhere that runs without a live executor (the
+   dispatcher pass is the candidate).
+6. **Strict FIFO, and the stall it accepts.** Everything behind a
+   blocked head waits, including a second operation that the same
+   caller submitted *without* a dependency and operations from other
+   callers. `agent_operation_next()` has no notion of a claim: it
+   returns the head or nothing, and an `initial`/`preflight` head also
+   returns nothing (`:3248-3269`).
+7. **Cascade is lazy and ordered by queue position.** The dispatcher
+   can only observe a dependency failure for an operation that has
+   reached the head. A dependent that sits behind a long-running head
+   remains `queued` in the API (not `abort`) for as long as the head
+   runs, even though its dependency failed minutes earlier, and a chain
+   (C depends on B depends on A) propagates one hop per head-arrival.
+   Clients awaiting the tail see `queued` for the duration. The
+   dedicated wait budget bounds the stall once the dependent is head
+   but does not make a failure visible earlier.
+8. **Hard-delete of a dependency looks like a missing one.** A
+   dependency that completed, expired, aborted or was deleted is swept
+   from the database after `CLEANER_DELAY` (3600 s,
+   `FINAL_OBJECT_STATES`); an *errored* dependency is never swept
+   (issue #3922). A dependent that reaches the head more than an hour
+   after its dependency finished (possible because a caller may set a
+   deadline of up to 86400 s) will find the dependency absent, and
+   absence is ambiguous between "completed successfully" and
+   "failed". Separately, `delete()` (`agentoperation.py:553-561`)
+   removes the operation's static and attribute rows *before* setting
+   `deleted`, so `AgentOperation.from_db()` returns nothing for a
+   user-deleted dependency while its state row still reads
+   `deleted`: the evaluator must read the dependency's *state* by
+   UUID, not hydrate the object, or it will misclassify a deleted
+   dependency as missing.
+9. **A deleted blocked operation pops, but a deleted dependency
+   cascades.** A user DELETE of the blocked head removes its static
+   rows, so `agent_operation_next()` finds `from_db()` empty and pops
+   it (`instance.py:3215-3220`): no change needed. The dependent of a
+   deleted operation is the case in item 8.
+10. **Retry interaction.** A retried operation is re-queued at the
+    head it already holds (`main.py:677`), and `attempts` counts
+    dispatches, so a blocked operation does not consume attempts.
+    A dependency that is in a terminal state stays there, so re-evaluation
+    after a retry is cheap and need not be repeated if cached.
+11. **No metric or health check exists to be misled.** Nothing exports
+    queue length or oldest-queued age, so a multi-minute head wait is
+    invisible to operators except through the instance audit events and
+    the INFO "Dispatching agent operation" log. Not an incompatibility,
+    but the evaluation phase should log (and probably event) the first
+    blocked evaluation and the cascade, or a stalled instance is hard
+    to diagnose. The existing `inst.add_event('dispatching agent
+    operation')` (`main.py:2082`) is emitted only on dispatch.
+12. **CI awaits.** `_await_command` allows 900 s and
+    `_await_agentop_complete` takes a per-call timeout, so a bounded
+    wait fits. Any test that submits a dependent and a follower on one
+    instance, expecting the follower to run, will be held for the
+    budget; tests of the cascade should assert on `abort` using
+    `_await_agentop_state` once `abort` is classified (see CI table).
+13. **Instance externally visible queue is empty.** See the
+    `agent_operations_queue` row: the key bug means the one surface
+    designed to show "what is queued behind what" does not work.
+14. **Other callers: `client-python-k3s`.** `await_idle` waits for an
+    instance's *entire* operation list to settle, so a dependent
+    waiting in the queue is simply waited for, which is correct; the
+    hazard is the terminal-state one in the table.
+
+**BREAKS verdicts**
+
+Two things break, and neither is in the dispatcher. The first is
+`client-python-k3s` `await_idle` (`cluster.py:2321-2443`): it classifies
+an unknown state as still running, has no timeout of its own, and
+justifies that with a premise (every state leaves within its deadline)
+that `abort` falsifies. This matters beyond the k3s plugin because the
+capability gate protects only the *creating* client: `await_idle` and
+the CLI both read an instance's whole operation list (`all=True`), so a
+single aborted operation created by a newer client stalls every
+released client that polls the same instance -- for up to
+`CLEANER_DELAY`, an hour by default, after which the hard-delete sweep
+removes the operation and the listing stops reporting it. The claim that no released client
+can be hung by a state it cannot cause holds for the clients that poll
+their own operations (`_await_agentop`) and fails for list-polling
+clients. Whether to treat that as acceptable, or to add the state to
+`client-python-k3s` and ship it before the server change, is a
+decision for the plan, not for this audit. The second is the
+conditional BREAK in `agent_operation_next()`'s unknown-state branch
+(`instance.py:3288-3301`): adding `abort` to `state_targets` without
+adding it to `TERMINAL_STATES` wedges the queue permanently; this is a
+single-commit obligation rather than a design question. The
+unguarded error writes that the 2026-08 audit worried about no longer
+exist (all go through `fail()`), so nothing in the sidechannel daemon
+breaks on `abort`. Two further hazards are design obligations rather
+than breakage: the ambiguity between a hard-deleted and a failed
+dependency (queue list item 8) and the unbounded dedicated budget
+interaction with `deadline_seconds=0` (item 1).
+
+**Grep patterns used**
+
+Server repository (`shakenfist/`, `docs/`, including
+`shakenfist/deploy/shakenfist_ci/`, excluding `tests/` where noted):
+`ACTIVE_STATES|state_targets|TERMINAL_STATES|FINAL_OBJECT_STATES`,
+`STATE_(QUEUED|PREFLIGHT|EXECUTING|COMPLETE|ERROR|EXPIRED|DELETED|ABORT)`,
+`'abort'|STATE_ABORT`, `'complete'|'executing'|'queued'|'preflight'`
+(and double-quoted forms), `agentop|agent_operation|AgentOperation|AGENTOPERATION|agentoperation`,
+`agent_operation_next|agent_operations|'queue'`,
+`state\.value|\.state\b` within `daemons/sidechannel/main.py` and
+`operations/node_aop_op.py`, `\.fail\(|\.expire\(`,
+`hard_delete|STATE_DELETED|_deleted_object_delay|CLEANER_DELAY`,
+`Gauge|Counter|Histogram|prometheus` intersected with files mentioning
+agent operations, `AGENT_OPERATION_FAILED_STATES|\['state'\]`, and
+`agent_operations_queue`.
+
+client-python (`shakenfist_client/`): `TERMINAL_AGENT_OPERATION_STATES`,
+`_await_agentop|await_agent_command|await_agent_fetch`,
+`AgentOperationFailed|AgentAwaitTimeout`,
+`agentop|agent_op|\['state'\]`, `expired|expiry_reason`.
+
+client-python-k3s (`shakenfist_client_k3s/`):
+`AGENT_OP_(PENDING|FAILED|FINISHED|KNOWN)_STATES`,
+`aop\['state'\]|\.get\('state'\)|TERMINAL|'complete'|'error'|'expired'`.
+
+sfui: recursive, case insensitive `agent_operation|agentoperation|agentop`.
+
+Not checked: runtime behaviour on a live cluster (this audit is
+static); the unit tests under `shakenfist/tests/` and the client test
+suites were not audited, on the grounds that they use existing states
+and gain new cases rather than failing.
