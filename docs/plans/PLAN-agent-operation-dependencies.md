@@ -8,7 +8,9 @@ dependency machinery (`depends_on` / `runs_after` on
 `BaseClusterOperation` in `shakenfist/operations/baseoperation.py`,
 the `dependency` schema model in
 `shakenfist/schema/operations/baseclusteroperation.py`, and the
-dequeue-time evaluation in `shakenfist/daemons/queues/workitem.py`),
+dequeue-time evaluation, of which there are two near-identical
+copies, in `shakenfist/daemons/queues/workitem.py` and
+`shakenfist/daemons/network/workitem.py`),
 the agent operation object and its queue
 (`shakenfist/operations/agentoperation.py`,
 `Instance.agent_operation_next` in `shakenfist/instance.py`), the
@@ -27,10 +29,12 @@ This plan is a **placeholder**. It captures intent, the decisions
 already made in discussion, and the known open questions, and is
 intentionally light on implementation detail. Phase 0 will resolve
 the open questions into a decisions section and re-cut the phase
-table accordingly. It must not begin until
-`PLAN-agent-operation-deadlines` has landed, because it builds
+table accordingly. It could not begin until
+`PLAN-agent-operation-deadlines` had landed, because it builds
 directly on that plan's expiry semantics, terminal-only queue pop,
-and per-command capability registry.
+and per-command capability registry. That plan is now complete (its
+nine phases all merged, the last of them `9bca46412`), so the gate
+is clear and phase 0 is in progress.
 
 When we get to detailed planning, I prefer a separate plan file per
 detailed phase, named for the master plan with `-phase-NN-descriptive`
@@ -54,7 +58,12 @@ vocabulary, evaluated at dequeue in `daemons/queues/workitem.py`:
 
 - `depends_on` — fate-sharing. A missing dependency errors the
   dependent operation; a dependency in `ERROR`/`DELETED`/`ABORT`
-  aborts it (the cascade); an in-flight dependency defers it.
+  aborts it (the cascade); an in-flight dependency defers it, but
+  not forever — once the defer budget is spent
+  (`DEPENDENCY_DEFER_BUDGET`, 30 defers of exponential backoff and
+  so roughly six minutes) `abandon_dependency_wait()` aborts the
+  dependent operation, because a dependency which never goes
+  terminal must not park one indefinitely (issue #3992).
 - `runs_after` — ordering only. Wait for the named operation to
   finish; its outcome is irrelevant; a missing operation is a logged
   warning, not fatal.
@@ -109,15 +118,35 @@ deadlines plan) and not open questions:
    treatment of the agent operation model (ordering, independence,
    deadlines, dependencies, retry) plus a curated example-application
    suite starting with `client-python-k3s`, updated as features land.
+   Note that this is no longer greenfield:
+   `PLAN-agent-operation-deadlines` phase 7 wrote
+   `docs/operator_guide/agent_operations.md` (one executor per
+   instance, the two budgets and where they are enforced, `expired`
+   versus `error`, retry and the reaper, what to tune), and the API
+   surface is in `docs/developer_guide/api_reference/`. What does not
+   exist is a developer-guide page for the model itself.
 
 ## Design sketch
 
 Mechanically, the extension is: add `depends_on` / `runs_after` (and
 per-edge settle seconds) to `AgentOperation` static values and the
-creating API endpoints; admit `ObjectType.AGENTOPERATION` to the
-`dependency` schema's permitted operation types; and evaluate edges
-at dispatch time in the sidechannel dispatcher, before an operation
-is handed to an executor. The evaluation semantics mirror
+creating API endpoints; admit `ObjectType.AGENTOPERATION` as a
+permitted dependency target; and evaluate edges at dispatch time in
+the sidechannel dispatcher, before an operation is handed to an
+executor.
+
+Two notes on that sketch, from phase 0's survey of the tree. The
+permitted-types set is `VALID_CLUSTER_OPERATIONS` in the dependency
+schema, whose only consumer is the `dependency` model's own
+validator — so widening it is mechanically cheap, but it admits the
+edge in both directions and so answers open question 2 by accident,
+in favour of mixed-type edges, with no evaluator on the cluster side
+which can read agent operation state. The API parameter has a worked
+precedent rather than being novel: an array of structured objects is
+declared the way `arrayofdiskspec` and `arrayofnetworkspec` are
+(`shakenfist/external_api/base.py:821-829`), each nesting a schema
+which `shakenfist/external_api/validation.py:626` compiles into a
+list of nested fields. The evaluation semantics mirror
 `workitem.py`: missing dependency errors, failed dependency cascades
 (abort/skip), in-flight dependency waits. The sidechannel has no
 defer machinery — a blocked operation simply stays queued and is
@@ -184,15 +213,15 @@ report per-operation outcomes from the chain on failure.
 
 ## Phases (to be re-cut by phase 0)
 
-| Phase | Content | Merged |
-|-------|---------|--------|
-| 0 | Resolve open questions; record decisions; re-cut this table | — |
-| 1 | Schema and object: dependency fields on `AgentOperation`, `AGENTOPERATION` admitted to the dependency model, API parameters | — |
-| 2 | Dispatch evaluation: same-instance edges, cascade, settle attribute | — |
-| 3 | Cross-instance edges and namespace enforcement | — |
-| 4 | client-python: chain submission helpers, await-the-chain UX, failure reporting | — |
-| 5 | Documentation: developer-guide agent operation model, worked examples; `client-python-k3s` adopts dependencies (rolling update via one submitted chain) as the first example application | — |
-| 6 | Push audit: runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence | — |
+| Phase | Plan | Status | Content | Merged |
+|-------|------|--------|---------|--------|
+| 0 | [PLAN-agent-operation-dependencies-phase-00-decisions.md](PLAN-agent-operation-dependencies-phase-00-decisions.md) | In progress | Resolve open questions; record decisions; re-cut this table. Its survey found five of this plan's factual claims wrong or incomplete, four corrected at source here; the two which are really decisions (that dependency cycles are structurally impossible, so decision 4's cycle-breaker rationale does not hold, and which mechanism admits an agent operation as a dependency target) are the phase's own to record | — |
+| 1 | — | Not started | Schema and object: dependency fields on `AgentOperation`, an agent-operation dependency target type, API parameters | — |
+| 2 | — | Not started | Dispatch evaluation: same-instance edges, cascade, settle attribute | — |
+| 3 | — | Not started | Cross-instance edges and namespace enforcement | — |
+| 4 | — | Not started | client-python: chain submission helpers, await-the-chain UX, failure reporting | — |
+| 5 | — | Not started | Documentation: developer-guide agent operation model, worked examples; `client-python-k3s` adopts dependencies (rolling update via one submitted chain) as the first example application | — |
+| 6 | — | Not started | Push audit: runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence | — |
 
 The `Merged` column records what put each phase on `develop`:
 the merge commit of its pull request, or an explicit
