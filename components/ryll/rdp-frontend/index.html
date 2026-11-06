@@ -16864,10 +16864,12 @@ and is a starting point, not something the project tests:</p>
 </code></pre></div>
 <p>Things a unit has to get right:</p>
 <ul>
-<li><strong><code>KillSignal=SIGINT</code>.</strong> SIGINT is the clean stop: ryll disconnects the
-  client, closes the listener and exits 0. ryll does not handle SIGTERM, so
-  systemd's default <code>KillSignal</code> ends the process at once, with no goodbye to
-  the client.</li>
+<li><strong>The stop signal.</strong> systemd's default <code>KillSignal=SIGTERM</code> is the clean
+  stop: ryll disconnects the client, closes the listener and exits 0. SIGINT
+  and SIGHUP do the same, so a unit needs no <code>KillSignal</code> override. (Before
+  <a href="https://github.com/shakenfist/ryll/issues/642">issue 642</a> SIGTERM was
+  unhandled and a unit had to set <code>KillSignal=SIGINT</code>; that override is now
+  redundant, though harmless.)</li>
 <li><strong>A fixed password.</strong> A generated one changes at every restart, so the
   service wants <code>--rdp-password</code> from an <code>EnvironmentFile</code>. Create it
   <code>root:ryll</code>, mode <code>0640</code>, and keep the password out of the unit file. It is

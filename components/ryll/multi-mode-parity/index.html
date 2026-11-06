@@ -16519,7 +16519,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>USB redirection channel (protocol layer)</td>
 <td>available</td>
 <td>available (<code>--usb-disk</code>, <code>--usb-disk-ro</code> CLI flags work in headless)</td>
-<td>missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope)</td>
+<td>available (<code>run_web</code> passes <code>virtual_disks</code> and <code>share_dir</code> to <code>run_connection</code> in <code>ryll/src/main.rs</code>, as headless does, so the CLI flags reach the guest. The browser cannot drive it)</td>
 <td>available (the channel links; <code>--usb-disk</code> and <code>--usb-disk-ro</code> reach it, as below. The RDP client cannot drive it)</td>
 </tr>
 <tr>
@@ -16540,14 +16540,14 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>Connect virtual USB disk (<code>--usb-disk</code>)</td>
 <td>available</td>
 <td>available</td>
-<td>missing (out of MVP scope)</td>
+<td>available (the flag reaches the guest as in headless; not tested through <code>--web</code>)</td>
 <td>available (<code>run_rdp</code> hands the disks to every SPICE attempt, and the usbredir channel connects them at its hello; not yet tested through <code>--rdp</code>)</td>
 </tr>
 <tr>
 <td>Connect read-only virtual USB disk (<code>--usb-disk-ro</code>)</td>
 <td>available</td>
 <td>available</td>
-<td>missing (out of MVP scope)</td>
+<td>available (as <code>--usb-disk</code>)</td>
 <td>available (as <code>--usb-disk</code>)</td>
 </tr>
 <tr>
@@ -16575,7 +16575,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>WebDAV folder sharing channel (protocol layer)</td>
 <td>available</td>
 <td>available (<code>--share-dir</code>, <code>--share-dir-ro</code> CLI flags work in headless)</td>
-<td>missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope)</td>
+<td>available (<code>run_web</code> passes <code>virtual_disks</code> and <code>share_dir</code> to <code>run_connection</code> in <code>ryll/src/main.rs</code>, as headless does, so the CLI flags reach the guest. The browser cannot drive it)</td>
 <td>available (the channel links; <code>--share-dir</code> and <code>--share-dir-ro</code> reach it, as below. The RDP client cannot drive it)</td>
 </tr>
 <tr>
@@ -16589,14 +16589,14 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>Share directory (<code>--share-dir</code>)</td>
 <td>available</td>
 <td>available</td>
-<td>missing (out of MVP scope)</td>
+<td>available (the flag reaches the guest as in headless; not tested through <code>--web</code>)</td>
 <td>available (<code>run_rdp</code> hands the share to every SPICE attempt, and the WebDAV channel serves it from the start; not yet tested through <code>--rdp</code>)</td>
 </tr>
 <tr>
 <td>Read-only share (<code>--share-dir-ro</code>)</td>
 <td>available</td>
 <td>available</td>
-<td>missing (out of MVP scope)</td>
+<td>available (as <code>--share-dir</code>)</td>
 <td>available (as <code>--share-dir</code>)</td>
 </tr>
 <tr>
@@ -16631,7 +16631,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>PING interval sparkline (inter-PING interval graph)</td>
 <td>available</td>
 <td>partial (no graph; raw samples are reachable as control-socket <code>latency</code> events)</td>
-<td>missing (out of MVP scope)</td>
+<td>partial (no graph; raw samples are reachable as control-socket <code>latency</code> events, as in headless)</td>
 <td>partial (no graph; raw samples are reachable as control-socket <code>latency</code> events)</td>
 </tr>
 <tr>
@@ -16659,14 +16659,14 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>Channel state snapshots (for bug reports)</td>
 <td>available</td>
 <td>available</td>
-<td>missing (out of MVP scope)</td>
+<td>available (<code>run_web</code> builds <code>ChannelSnapshots</code> and hands it to <code>run_connection</code>; the <code>stats</code> verb reads it)</td>
 <td>available (<code>run_rdp</code> keeps <code>ChannelSnapshots</code> for every attempt; <code>--pedantic</code> reports and the <code>stats</code> verb read them)</td>
 </tr>
 <tr>
 <td>Traffic ring buffer (always active)</td>
 <td>available</td>
 <td>available</td>
-<td>missing (out of MVP scope)</td>
+<td>available (<code>run_web</code> builds the <code>TrafficBuffers</code> the session records into)</td>
 <td>available (<code>run_rdp</code> builds the <code>TrafficBuffers</code> every attempt records into)</td>
 </tr>
 <tr>
@@ -16833,7 +16833,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <tr>
 <td>Reconnect on disconnect (Reconnect button)</td>
 <td>available</td>
-<td>n/a — intrinsic (no GUI; headless exits when main channel disconnects)</td>
+<td>missing (not intrinsic: there is no GUI button, but headless could reconnect and does not — it exits when the main channel disconnects. Listed as future work in PLAN-rdp-frontend.md; see <a href="https://github.com/shakenfist/ryll/issues/230">ryll#230</a>)</td>
 <td>available (SPICE session held while PeerConnection is dead; browser auto-reconnects with 1 s/2 s/4 s/8 s/16 s backoff, max 5 attempts then a manual button)</td>
 <td>available (automatic, with no button: SPICE is retried after 1, 4 and 16 s while the RDP client stays connected; see the RDP frontend section below)</td>
 </tr>
@@ -16863,7 +16863,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available</td>
 <td>available</td>
 <td>available (SIGTERM/Ctrl-C drains axum then explicitly closes the active bridge so DTLS/SRTP tears down cleanly before the process exits)</td>
-<td>available (SIGINT only: the RDP server is stopped first, each client is asked to end, then SPICE is torn down and ryll exits 0)</td>
+<td>available (SIGINT, SIGTERM or SIGHUP: the RDP server is stopped first, each client is asked to end, then SPICE is torn down and ryll exits 0)</td>
 </tr>
 <tr>
 <td>Cancel superseded connection attempt</td>
@@ -16946,7 +16946,7 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>Intimate logging (<code>--intimate</code>, keystrokes/mouse)</td>
 <td>available</td>
 <td>available</td>
-<td>missing (no interactive input to log in web MVP that wouldn't also appear in the browser console)</td>
+<td>available (the same global log config as every other mode; <code>run_web</code> passes it to <code>run_connection</code>, so the inputs channel logs the browser's input)</td>
 <td>available (<code>run_rdp</code> passes the global log config to each attempt, so the inputs channel logs the RDP client's input as it does the GUI's)</td>
 </tr>
 <tr>

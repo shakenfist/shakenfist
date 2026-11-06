@@ -16255,9 +16255,12 @@ reconnection machinery: what is recreated, what survives, how superseded
 attempts are cancelled, and when reconnection happens automatically
 rather than through a modal.</p>
 <h2 id="graceful-shutdown">Graceful Shutdown<a class="headerlink" href="#graceful-shutdown" title="Permanent link">&para;</a></h2>
-<p>Ryll installs a SIGINT handler (via <code>libc::signal</code>) in <code>main.rs</code> that sets a
-global <code>AtomicBool</code> flag (<code>SHUTDOWN_REQUESTED</code>). This allows Ctrl+C to trigger
-a clean shutdown instead of killing the process immediately.</p>
+<p>Ryll installs a shutdown handler (via the <code>ctrlc</code> crate, with its
+<code>termination</code> feature) in <code>main.rs</code> that sets a global <code>AtomicBool</code> flag
+(<code>SHUTDOWN_REQUESTED</code>). On unix the handler fires for SIGINT, SIGTERM and
+SIGHUP, so both Ctrl+C and a service manager's stop trigger a clean shutdown
+instead of killing the process immediately. Ryll has no configuration reload,
+so SIGHUP shutting down costs nothing.</p>
 <ul>
 <li><strong>GUI mode</strong>: <code>RyllApp::logic</code> in <code>ryll/src/app/</code> checks the flag on every pass
   and calls <code>ctx.send_viewport_cmd(ViewportCommand::Close)</code> when set, which

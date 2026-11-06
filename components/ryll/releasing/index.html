@@ -16527,9 +16527,15 @@ is published (see that repo's <code>RELEASE-SETUP.md</code>).</p>
    publisher matches on it), and it becomes ready later than
    <code>sign-tag</code>, so a release asks for approval <strong>twice</strong>.</li>
 </ol>
-<p>Without the <code>release</code> environment configured, the workflow run
-stalls waiting for an environment that can never be approved.
-Without the trusted-publisher registration, <code>publish-ryll-pypi</code>
+<p>The <code>release</code> environment must exist, with its required reviewers,
+<em>before</em> the first tag is pushed. A job that names an environment
+which does not exist does not stall: GitHub
+<a href="https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment">creates it on the fly</a>,
+with no protection rules, and the job runs at once. So a release run
+made before the environment exists, or after it has been deleted,
+signs the tag and publishes everywhere <strong>without asking anyone for
+approval</strong>.</p>
+<p>Without the trusted-publisher registration, <code>publish-ryll-pypi</code>
 fails with a "publisher not found" error; the
 <code>.deb</code>/<code>.rpm</code>/tarball/zip artifacts, GitHub Release, and
 crates.io publishes are unaffected.</p>

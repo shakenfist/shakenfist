@@ -16814,7 +16814,7 @@
 serving a browser shell that talks to the SPICE server via
 WebRTC. Single-viewer for MVP; multi-viewer is future work.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>ryll --web session.vv
+<div class="highlight"><pre><span></span><code>ryll --web --file session.vv
 </code></pre></div>
 <p>Optional flags:</p>
 <ul>
@@ -16960,7 +16960,7 @@ tears down cleanly.</p>
 </ul>
 <h2 id="native-tls">Native TLS<a class="headerlink" href="#native-tls" title="Permanent link">&para;</a></h2>
 <p>ryll supports HTTPS natively via two flags:</p>
-<div class="highlight"><pre><span></span><code>ryll --web session.vv \
+<div class="highlight"><pre><span></span><code>ryll --web --file session.vv \
     --web-tls-cert /path/to/cert.pem \
     --web-tls-key  /path/to/key.pem
 </code></pre></div>
@@ -17072,7 +17072,7 @@ The proxy carries only the HTTP signalling page and the
   host with both a public IP and a private LAN IP tells the
   browser about both. Pass <code>--web-media-addr</code> — repeatably,
   with an address or an interface name — to narrow that:</p>
-<p>ryll --web session.vv \
+<p>ryll --web --file session.vv \
       --web-media-addr eth0 \
       --web-media-port 41000</p>
 </li>
