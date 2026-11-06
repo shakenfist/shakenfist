@@ -16157,7 +16157,16 @@ already a 400.</p>
 <li>base (string): the base image for the disk. This can be a variety of URL-like strings,
   as documented on <a href="/user_guide/artifacts/">the artifacts page in the user guide</a>.
   For a blank disk, omit this value, send null, or send the literal string
-  "none" -- all three mean the same thing here.</li>
+  "none" -- all three mean the same thing here. A base the cluster could never
+  fetch is refused with a 400 naming the supported forms: an <code>http</code> or <code>https</code>
+  URL, an image shortcut such as <code>debian:12</code>, <code>label:&lt;name&gt;</code>,
+  <code>sf://artifact/&lt;uuid&gt;</code>, <code>sf://blob/&lt;uuid&gt;</code>, <code>sf://label/&lt;namespace&gt;/&lt;name&gt;</code>,
+  <code>sf://snapshot/&lt;uuid&gt;</code> or <code>sf://upload/&lt;namespace&gt;/&lt;name&gt;</code>. A bare artifact
+  uuid is the common mistake here and its refusal suggests
+  <code>sf://artifact/&lt;uuid&gt;</code>; so is a snapshot artifact's own <code>sf://instance/...</code>
+  source URL, which is not a base -- use <code>sf://snapshot/&lt;uuid&gt;</code> instead. These
+  used to be accepted and scheduled, and failed only once the instance reached a
+  hypervisor, leaving it in <code>error</code>.</li>
 <li>bus (enum): the hardware bus the disk device should be attached to on the instance.
   In general you shouldn't care about this and can omit this value. However, in
   some cases, such as unmodified Microsoft Windows images it is required. The options

@@ -17182,6 +17182,29 @@
   serves.</li>
 </ul>
 </li>
+<li><strong>Behaviour change: a disk <code>base</code> the cluster could never fetch is now
+  refused with a 400 at create time.</strong> The <code>base</code> of a <code>diskspec</code> is
+  dispatched on its prefix — <code>label:</code>, <code>sf://snapshot/</code>, <code>sf://upload/</code>,
+  <code>sf://label/</code>, <code>sf://artifact/</code> and <code>sf://blob/</code> are resolved to a blob by
+  the API, and anything else was treated as a URL to be fetched from the
+  internet. A string which is neither an <code>http</code>/<code>https</code> URL nor an image
+  shortcut such as <code>debian:12</code> therefore reached <code>requests.get()</code> on a
+  hypervisor, minutes later and long after the caller had been told the
+  request was accepted: the fetch raised, the operation was retried, and the
+  instance ended in <code>error</code>. The refusal names every supported form, and a
+  bare artifact uuid — the one string an artifact listing shows, and the
+  mistake which prompted this — is additionally told to try
+  <code>sf://artifact/&lt;uuid&gt;</code>. A snapshot artifact's own
+  <code>sf://instance/&lt;uuid&gt;/&lt;device&gt;</code> source URL is refused the same way, and
+  <code>sf://snapshot/&lt;uuid&gt;</code> is the form which works. Two kinds of caller see a
+  change rather than a tidier error: one who was relying on a cached version
+  being served for an artifact whose source URL was never fetchable (an
+  artifact uploaded with an explicit, scheme-less or custom-scheme
+  <code>source_url</code>), and one who had an instance create failing late and will
+  now see it fail immediately. Both should name the artifact or blob
+  directly. This is a handler guard, so <code>API_VALIDATION_MODE=warn</code> and <code>off</code>
+  do not roll it back. The artifact upload route's <code>source_url</code> is
+  deliberately unchanged: an uploaded artifact is never refetched.</li>
 <li>You can now reserve a specific address in a network with
   <code>POST /networks/...networkref.../addresses/...address...</code>, and release it
   again with the matching <code>DELETE</code>. A reservation takes the address out of
