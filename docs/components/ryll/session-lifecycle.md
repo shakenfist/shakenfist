@@ -9,9 +9,12 @@ rather than through a modal.
 
 ## Graceful Shutdown
 
-Ryll installs a SIGINT handler (via `libc::signal`) in `main.rs` that sets a
-global `AtomicBool` flag (`SHUTDOWN_REQUESTED`). This allows Ctrl+C to trigger
-a clean shutdown instead of killing the process immediately.
+Ryll installs a shutdown handler (via the `ctrlc` crate, with its
+`termination` feature) in `main.rs` that sets a global `AtomicBool` flag
+(`SHUTDOWN_REQUESTED`). On unix the handler fires for SIGINT, SIGTERM and
+SIGHUP, so both Ctrl+C and a service manager's stop trigger a clean shutdown
+instead of killing the process immediately. Ryll has no configuration reload,
+so SIGHUP shutting down costs nothing.
 
 - **GUI mode**: `RyllApp::logic` in `ryll/src/app/` checks the flag on every pass
   and calls `ctx.send_viewport_cmd(ViewportCommand::Close)` when set, which

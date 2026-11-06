@@ -120,8 +120,15 @@ is published (see that repo's `RELEASE-SETUP.md`).
    publisher matches on it), and it becomes ready later than
    `sign-tag`, so a release asks for approval **twice**.
 
-Without the `release` environment configured, the workflow run
-stalls waiting for an environment that can never be approved.
+The `release` environment must exist, with its required reviewers,
+*before* the first tag is pushed. A job that names an environment
+which does not exist does not stall: GitHub
+[creates it on the fly](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment),
+with no protection rules, and the job runs at once. So a release run
+made before the environment exists, or after it has been deleted,
+signs the tag and publishes everywhere **without asking anyone for
+approval**.
+
 Without the trusted-publisher registration, `publish-ryll-pypi`
 fails with a "publisher not found" error; the
 `.deb`/`.rpm`/tarball/zip artifacts, GitHub Release, and
