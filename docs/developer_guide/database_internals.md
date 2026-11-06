@@ -593,12 +593,20 @@ run by the process it replaces. It moves the operation back to
 makes -- so the row re-runs it from the first task once the claims are
 cleared, or, if the row has been claimed `CLUSTER_OP_MAX_ATTEMPTS`
 times, deletes the row and errors the operation as the reaper would.
-Rows on the shared `any-*` queues are left to the reaper, because
-nothing records which node claimed them: over gRPC, `claimed_by` is
-the database daemon's node name, not the caller's. For the same reason
-startup clears the claims on its own queues only. A claim on an
-`any-*` queue may be another node's worker running that item right
-now, and clearing it would hand the item to a second worker.
+It then does the same for the rows this node claimed on the shared
+`any-*` queues, and clears those claims too. A claim on an `any-*`
+queue may be another node's worker running that item right now, so
+both the recovery and the reset there are narrowed to rows whose
+`claimed_by` is this node's name -- and `claimed_by` can be trusted
+because the `Dequeue` RPC carries the caller's node name in
+`worker_id`, which the server records. Before that it recorded its own
+node name, so every claim made over gRPC looked like the database
+node's, and these claims had to be left to the reaper
+(issue 4652). A claim an sf-queues from before that change left on a
+shared queue still names the database node, so it is still the
+reaper's. The reset of this node's own queues is deliberately not
+narrowed: nothing else drains them, so every claim on one is this
+node's regardless of what `claimed_by` says.
 Recovery is best effort, one item at a time. An item it cannot recover,
 for example because its operation type no longer exists, is logged and
 left for the reaper. If the claims cannot be listed at all, startup

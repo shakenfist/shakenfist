@@ -77,10 +77,19 @@ class DequeueRequest(_message.Message):
 
     QUEUE_NAMES_FIELD_NUMBER: _builtins.int
     LIMIT_FIELD_NUMBER: _builtins.int
+    WORKER_ID_FIELD_NUMBER: _builtins.int
     limit: _builtins.int
     """Maximum number of items to claim in this call. Callers that
     want one-at-a-time behaviour pass 1; pool workers pass their
     free-slot count so they fill the pool in one round trip.
+    """
+    worker_id: _builtins.str
+    """The node name of the worker claiming these items, recorded in
+    work_queue.claimed_by. Without it the server recorded its own
+    node name, so nothing could tell one node's abandoned claim on a
+    shared any-* queue from another node's live one (issue 4652). A
+    client from before this field existed sends nothing, and the
+    server falls back to its own node name as it always did.
     """
     @_builtins.property
     def queue_names(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
@@ -95,10 +104,11 @@ class DequeueRequest(_message.Message):
         *,
         queue_names: _abc.Iterable[_builtins.str] | None = ...,
         limit: _builtins.int = ...,
+        worker_id: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["limit", b"limit", "queue_names", b"queue_names"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["limit", b"limit", "queue_names", b"queue_names", "worker_id", b"worker_id"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -221,15 +231,24 @@ class RestartQueueRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     QUEUE_NAME_FIELD_NUMBER: _builtins.int
+    CLAIMED_BY_FIELD_NUMBER: _builtins.int
     queue_name: _builtins.str
+    claimed_by: _builtins.str
+    """When set, only claims whose claimed_by matches are cleared. The
+    shared any-* queues are drained by every node, so sf-queues'
+    startup reset asks for its own claims by name rather than
+    clearing a live peer's (issue 4652). Empty clears every claim on
+    the queue, which is what a single-consumer queue wants.
+    """
     def __init__(
         self,
         *,
         queue_name: _builtins.str = ...,
+        claimed_by: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["queue_name", b"queue_name"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claimed_by", b"claimed_by", "queue_name", b"queue_name"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

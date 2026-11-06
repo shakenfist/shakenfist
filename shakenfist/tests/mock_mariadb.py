@@ -3913,7 +3913,9 @@ class MockMariaDB():
         result = []
         for row in claimed:
             row['claimed_at'] = now
-            row['claimed_by'] = 'mock'
+            # The real dequeue records the claiming node, on both the
+            # direct and the gRPC path (issue 4652).
+            row['claimed_by'] = config.NODE_NAME
             row['attempts'] = row.get('attempts', 0) + 1
             result.append(
                 (row['queue_name'], str(row['id']),
@@ -3963,18 +3965,23 @@ class MockMariaDB():
             f'deferred={deferred}')
         return processing, queued, deferred
 
-    def _mariadb_restart_work_queue(self, queue_name):
-        """Mock implementation of mariadb.restart_work_queue()."""
+    def _mariadb_restart_work_queue(self, queue_name, claimed_by=''):
+        """Mock implementation of mariadb.restart_work_queue().
+
+        A non-empty ``claimed_by`` clears only that worker's claims,
+        as the real SQL does (issue 4652).
+        """
         cleared = 0
         for r in self.work_queue_store:
             if (r['queue_name'] == queue_name
-                    and r['claimed_at'] is not None):
+                    and r['claimed_at'] is not None
+                    and (not claimed_by or r['claimed_by'] == claimed_by)):
                 r['claimed_at'] = None
                 r['claimed_by'] = None
                 cleared += 1
         self._trace(
-            f'MockMariaDB.restart_work_queue({queue_name}): '
-            f'cleared {cleared}')
+            f'MockMariaDB.restart_work_queue({queue_name}, '
+            f'claimed_by={claimed_by!r}): cleared {cleared}')
 
     def _mariadb_list_stuck_work_queue_rows(self, threshold_seconds, strict=False):
         """Mock implementation of mariadb.list_stuck_work_queue_rows().

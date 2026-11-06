@@ -391,6 +391,43 @@ class WorkQueueRestartTestCase(base.ShakenFistTestCase):
         self.assertNotIn('attempts', compiled.params)
 
     @mock.patch('shakenfist.mariadb._get_engine')
+    def test_restart_without_a_worker_clears_every_claim(
+            self, mock_get_engine):
+        # A queue only one node drains wants this: whatever claimed_by
+        # says, every claim on it belongs to the restarting node.
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_result = mock.Mock()
+        mock_result.rowcount = 1
+        mock_conn.execute.return_value = mock_result
+        mock_get_engine.return_value = mock_engine
+
+        mariadb._direct_work_queue_restart('my-queue')
+
+        compiled = mock_conn.execute.call_args[0][0].compile()
+        self.assertNotIn('claimed_by_1', compiled.params)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_restart_for_one_worker_only_clears_its_claims(
+            self, mock_get_engine):
+        # Issue 4652: the shared any-* queues are drained by every
+        # node, so a reset there must not clear a live peer's claim.
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_result = mock.Mock()
+        mock_result.rowcount = 1
+        mock_conn.execute.return_value = mock_result
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_work_queue_restart(
+            'any-clusteroperation-user_facing', 'sf-3')
+
+        self.assertEqual(result, 1)
+        compiled = mock_conn.execute.call_args[0][0].compile()
+        self.assertEqual(compiled.params['claimed_by_1'], 'sf-3')
+        self.assertEqual(compiled.params['claimed_by'], None)
+        compiled_sql = str(compiled).replace('`', '')
+        self.assertIn('work_queue.claimed_by = ', compiled_sql)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
     def test_restart_returns_zero_on_error(self, mock_get_engine):
         mock_engine, mock_conn = _make_mock_engine()
         mock_conn.execute.side_effect = OperationalError(

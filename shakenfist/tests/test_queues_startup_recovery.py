@@ -8,6 +8,11 @@ queues named after the node's name, but they are named after its uuid), and
 had it done so the next worker would have skipped the executing operation and
 resolved its item, stranding it. The reaper errored it 30 minutes later, long
 after the instance waiting on it had given up (#4543).
+
+The same recovery now reaches the shared any-* queues, which every node's
+sf-queues drains. It could not before, because claimed_by named the database
+daemon's node rather than the worker's, so a stopped node's claim there was
+indistinguishable from a live peer's (#4652).
 """
 
 import types
@@ -18,6 +23,8 @@ from shakenfist.constants import NoSuchObject
 from shakenfist.daemons.queues import startup_tasks
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import get_general_background_node_queues
+from shakenfist.operations.baseoperation import get_general_user_facing_node_queues
 from shakenfist.operations.baseoperation import get_node_background_node_queues
 from shakenfist.operations.baseoperation import get_node_user_facing_node_queues
 from shakenfist.tests import base
@@ -49,12 +56,12 @@ class FakeOp:
         self.events.append(message)
 
 
-def row(queue_name, op_uuid, attempts=1, row_id=1):
+def row(queue_name, op_uuid, attempts=1, row_id=1, claimed_by='sf-6'):
     return {
         'id': row_id,
         'queue_name': queue_name,
         'claimed_at': 1000.0,
-        'claimed_by': 'sf-1',
+        'claimed_by': claimed_by,
         'attempts': attempts,
         'payload': {'operation_type': 'artifact_fetch_op', 'operation_uuid': op_uuid},
     }
@@ -68,6 +75,7 @@ class RecoverInterruptedOperationsTestCase(base.ShakenFistTestCase):
 
         fake_config = mock.MagicMock()
         fake_config.CLUSTER_OP_MAX_ATTEMPTS = 5
+        fake_config.NODE_NAME = 'sf-6'
         self.mariadb = mock.MagicMock()
         self.mariadb.list_stuck_work_queue_rows.side_effect = lambda threshold, strict=False: self.rows
         self.mariadb.delete_work_queue_row.return_value = True
@@ -106,15 +114,52 @@ class RecoverInterruptedOperationsTestCase(base.ShakenFistTestCase):
         startup_tasks.recover_interrupted_operations(NODE_UUID)
         self.assertEqual(BaseClusterOperation.STATE_QUEUED, op.state.value)
 
-    def test_shared_and_other_node_queues_are_left_alone(self):
-        # An executing operation behind a shared queue's claim may be running
-        # on another node right now.
+    def test_our_own_claim_on_a_shared_queue_is_requeued(self):
+        # #4652: claimed_by now names the node whose worker claimed the row,
+        # so a shared queue claim this node's previous sf-queues abandoned is
+        # recoverable rather than the reaper's 30 minutes later.
+        op = self.ops['op'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
+        self.rows.append(row(SHARED_QUEUE, 'op', claimed_by='sf-6'))
+        startup_tasks.recover_interrupted_operations(NODE_UUID)
+        self.assertEqual(BaseClusterOperation.STATE_QUEUED, op.state.value)
+
+    def test_another_nodes_claim_on_a_shared_queue_is_left_alone(self):
+        # Its worker may be running that operation right now.
         shared = self.ops['shared'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
-        other = self.ops['other'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
-        self.rows.extend([row(SHARED_QUEUE, 'shared'), row(OTHER_NODE_QUEUE, 'other')])
+        # And a claim written by an sf-queues from before worker_id existed
+        # names the database node, which is nobody's to recover.
+        legacy = self.ops['legacy'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
+        self.rows.extend([
+            row(SHARED_QUEUE, 'shared', claimed_by='sf-9'),
+            row('any-clusteroperation-background', 'legacy', row_id=2,
+                claimed_by='sf-database-1')])
         startup_tasks.recover_interrupted_operations(NODE_UUID)
         self.assertEqual(BaseClusterOperation.STATE_EXECUTING, shared.state.value)
+        self.assertEqual(BaseClusterOperation.STATE_EXECUTING, legacy.state.value)
+
+    def test_another_nodes_own_queue_is_left_alone(self):
+        other = self.ops['other'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
+        self.rows.append(row(OTHER_NODE_QUEUE, 'other'))
+        startup_tasks.recover_interrupted_operations(NODE_UUID)
         self.assertEqual(BaseClusterOperation.STATE_EXECUTING, other.state.value)
+
+    def test_an_unnamed_node_claims_nothing_on_a_shared_queue(self):
+        # Fail closed: without a node name there is nothing to match a
+        # shared queue's claimed_by against, and an empty name must not
+        # match every row.
+        startup_tasks.config.NODE_NAME = ''
+        shared = self.ops['shared'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
+        self.rows.append(row(SHARED_QUEUE, 'shared', claimed_by=''))
+        startup_tasks.recover_interrupted_operations(NODE_UUID)
+        self.assertEqual(BaseClusterOperation.STATE_EXECUTING, shared.state.value)
+
+    def test_our_own_queue_is_ours_whatever_claimed_by_says(self):
+        # Nothing else drains it, and the cluster daemon's drain of a deleted
+        # node's queues writes its own name into claimed_by there.
+        op = self.ops['op'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
+        self.rows.append(row(OWN_QUEUE, 'op', claimed_by='sf-database-1'))
+        startup_tasks.recover_interrupted_operations(NODE_UUID)
+        self.assertEqual(BaseClusterOperation.STATE_QUEUED, op.state.value)
 
     def test_ops_not_executing_are_left_alone(self):
         # A queued operation re-runs once its claim is cleared anyway.
@@ -211,26 +256,54 @@ class StartupResetTestCase(base.ShakenFistTestCase):
             p.start()
             self.addCleanup(p.stop)
 
+    def _resets(self):
+        return {c.args[0]: c.kwargs['claimed_by']
+                for c in self.mariadb.restart_work_queue.call_args_list}
+
     def test_resets_queues_named_by_uuid_after_recovering(self):
         startup_tasks.startup_tasks().join(10)
 
-        reset = [c.args[0] for c in self.mariadb.restart_work_queue.call_args_list]
-        self.assertIn(OWN_QUEUE, reset)
-        self.assertNotIn('sf-6-clusteroperation-user_facing', reset)
+        resets = self._resets()
+        self.assertIn(OWN_QUEUE, resets)
+        self.assertNotIn('sf-6-clusteroperation-user_facing', resets)
 
         names = [c[0] for c in self.calls.mock_calls]
         self.assertLess(names.index('recover'), names.index('mariadb.restart_work_queue'))
         self.calls.recover.assert_called_once_with(NODE_UUID)
 
-    def test_leaves_the_shared_queues_to_the_reaper(self):
-        # Other nodes' workers hold live claims on the any-* queues; clearing
-        # one hands an item which is still running to a second worker.
+    def test_own_queues_are_reset_unfiltered(self):
+        # Nothing else drains them, so every claim on one is this node's
+        # whatever claimed_by says -- including one an older sf-queues wrote
+        # over gRPC, which carries the database node's name.
         startup_tasks.startup_tasks().join(10)
 
-        reset = [c.args[0] for c in self.mariadb.restart_work_queue.call_args_list]
-        self.assertNotIn(SHARED_QUEUE, reset)
-        self.assertCountEqual(
-            get_node_user_facing_node_queues(NODE_UUID) + get_node_background_node_queues(NODE_UUID), reset)
+        resets = self._resets()
+        for queue in (get_node_user_facing_node_queues(NODE_UUID) +
+                      get_node_background_node_queues(NODE_UUID)):
+            self.assertEqual('', resets[queue])
+
+    def test_an_unnamed_node_does_not_reset_the_shared_queues(self):
+        # An unfiltered reset there is the defect itself, so leave them
+        # to the reaper rather than clearing a live peer's claim.
+        self.config.NODE_NAME = ''
+        startup_tasks.startup_tasks().join(10)
+
+        resets = self._resets()
+        self.assertNotIn(SHARED_QUEUE, resets)
+        self.assertEqual(5, len(resets))
+
+    def test_shared_queues_are_reset_for_this_node_only(self):
+        # #4652: every node's sf-queues drains the any-* queues, so an
+        # unfiltered reset there hands a peer's running item to a second
+        # worker. Now that claimed_by names the claiming node, this node can
+        # clear its own abandoned claims instead of waiting for the reaper.
+        startup_tasks.startup_tasks().join(10)
+
+        resets = self._resets()
+        for queue in (get_general_user_facing_node_queues() +
+                      get_general_background_node_queues()):
+            self.assertEqual('sf-6', resets[queue])
+        self.assertEqual(10, len(resets))
 
     def test_resets_nothing_without_a_node_uuid(self):
         # Not "None-clusteroperation-*", and not the shared queues either.

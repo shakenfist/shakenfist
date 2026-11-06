@@ -470,6 +470,13 @@ message DequeueRequest {
   // want one-at-a-time behaviour pass 1; pool workers pass their
   // free-slot count so they fill the pool in one round trip.
   int32 limit = 2;
+  // The node name of the worker claiming these items, recorded in
+  // work_queue.claimed_by. Without it the server recorded its own
+  // node name, so nothing could tell one node's abandoned claim on a
+  // shared any-* queue from another node's live one (issue 4652). A
+  // client from before this field existed sends nothing, and the
+  // server falls back to its own node name as it always did.
+  string worker_id = 3;
 }
 
 message DequeuedItem {
@@ -499,6 +506,12 @@ message QueueLengthReply {
 
 message RestartQueueRequest {
   string queue_name = 1;
+  // When set, only claims whose claimed_by matches are cleared. The
+  // shared any-* queues are drained by every node, so sf-queues'
+  // startup reset asks for its own claims by name rather than
+  // clearing a live peer's (issue 4652). Empty clears every claim on
+  // the queue, which is what a single-consumer queue wants.
+  string claimed_by = 2;
 }
 
 message ListStuckWorkQueueRowsRequest {
