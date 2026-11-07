@@ -60,7 +60,7 @@ class PlacementShape(NamedTuple):
     The filter, affinity and ranking stages are denominated in a
     requested shape rather than in an Instance, so a placement decision
     can be evaluated for a request which has no instance row of its own.
-    The six figures below are everything those stages ever read about
+    The five figures below are everything those stages ever read about
     the thing being placed.
 
     instance_uuid and placed_on describe a request which does already
@@ -69,6 +69,13 @@ class PlacementShape(NamedTuple):
     presently placed on, which the capacity filters must not charge a
     second time when a reschedule lands it back where it already is.
     Both are None for a request which is not placed anywhere.
+
+    disk_spec is read by no stage at all. It is carried because the
+    audit event recording the inputs to a decision publishes the disks
+    which produced disk_gb as well as the total, and an operator reading
+    a refusal wants both. A request with no disk list to show -- one
+    sized rather than specified -- leaves it None rather than inventing
+    one.
     """
 
     cpus: int
@@ -78,6 +85,7 @@ class PlacementShape(NamedTuple):
     namespace: str
     instance_uuid: uuid.UUID | None = None
     placed_on: str | None = None
+    disk_spec: list | None = None
 
     @classmethod
     def from_instance(cls, inst):
@@ -93,6 +101,16 @@ class PlacementShape(NamedTuple):
         placed_on is the same field instance.placement_filter() compares
         a node against, so the reschedule self-charge exemption cannot
         drift from the placement it is exempting.
+
+        cpus and memory are cast, as the disk sizes already are. The
+        create API deliberately accepts a numeric string for an integer
+        body field -- a validator which refused "2" would be narrower
+        than the handler behind it -- so an instance can carry its vCPU
+        count as a string, and this is the one place which reads a
+        request out of an instance and therefore the place where it
+        becomes the integer this type says it is. Arithmetic on a
+        string that looks like a number is a question nothing
+        downstream should have to ask.
         """
         disk_gb = 0
         for disk in inst.disk_spec:
@@ -102,10 +120,159 @@ class PlacementShape(NamedTuple):
                 disk_gb += int(disk['size'])
 
         return cls(
-            cpus=inst.cpus, memory_mb=inst.memory, disk_gb=disk_gb,
+            cpus=int(inst.cpus), memory_mb=int(inst.memory), disk_gb=disk_gb,
             affinity=inst.affinity, namespace=inst.namespace,
             instance_uuid=inst.uuid,
-            placed_on=inst.placement.get('node'))
+            placed_on=inst.placement.get('node'),
+            disk_spec=inst.disk_spec)
+
+
+class PlacementSnapshot:
+    """The figures a placement decision reads, with its own charges applied.
+
+    Placement draws on two separate accounts. The measured figures the
+    resources daemons publish say what each node is actually doing, and
+    the committed counters the capacity reconciler maintains say what
+    has already been admitted to it. Every capacity filter reads both,
+    because either one alone is wrong: the measurement lags admission by
+    as long as an instance spends fetching its image, and a node the
+    reconciler has not sized has no counters at all.
+
+    Placing a set of shapes charges each shape to the node it was
+    assigned before the next shape is evaluated, so the set cannot spend
+    the same headroom twice. Charging only one of the two accounts would
+    still allow exactly that, because the filters reading the other
+    would see an unchanged node -- which is issue 3636's failure mode
+    one level up. Charging goes through this object for that reason, and
+    this object always charges both.
+
+    The charges are tentative. Nothing has been admitted, the real guard
+    is still the atomic UPDATE that place_instance() makes, and this
+    object is discarded when the decision ends. It holds copies for the
+    same reason: the Scheduler which lent it its metrics outlives the
+    decision and other decisions read the same dicts, and the committed
+    counters may be a caller's fixture, so charging either in place
+    would corrupt something outside this decision.
+    """
+
+    def __init__(self, metrics, capacity_reader):
+        # The outer mapping is copied now and a node's own figures are
+        # copied when that node is first charged, so an uncharged node
+        # costs nothing and nothing handed in here is ever written to.
+        self._metrics = dict(metrics)
+        self._capacity_reader = capacity_reader
+        self._capacity = None
+        self._degraded = False
+
+    def nodes(self):
+        """Every node with usable metrics, in the order they were read."""
+        return list(self._metrics.keys())
+
+    def has_node(self, node):
+        """Whether a node offered to this decision has usable metrics."""
+        return node in self._metrics
+
+    def node_metrics(self, node):
+        """A node's measured figures, charged for what has been placed on it.
+
+        Raises KeyError for a node which was not in the active node
+        list, exactly as reading the scheduler's own snapshot does: a
+        caller naming a node this decision was never offered has made a
+        mistake, and must not be told the node measures as empty.
+        """
+        return self._metrics[node]
+
+    def ensure_capacity(self):
+        """Read the committed counters once, and say whether the read failed.
+
+        Read where the first filter which needs them runs rather than
+        when the decision starts, so a decision refused on measurement
+        alone -- a candidate which is not a hypervisor, a request larger
+        than any node's per-instance ceiling -- does not pay for a query
+        it never looks at. Every shape in a set then reads that one
+        read, charged with the set's own earlier assignments.
+
+        A failed read degrades the capacity filters to measurement only
+        rather than raising, so it is reported rather than acted on
+        here.
+        """
+        if self._capacity is None:
+            capacity, self._degraded = self._capacity_reader()
+            self._capacity = dict(capacity)
+        return self._degraded
+
+    def capacity_row(self, node):
+        """A node's committed counters, or None if it has no row.
+
+        A node with no row is unguarded at admission and must not be
+        refused on a ledger which does not exist (P7), so it is never
+        given one here either -- not even a zeroed one, which would read
+        as a node with no headroom at all. Such a node is still charged
+        on the measured figures, which is all a filter has to go on
+        there.
+        """
+        self.ensure_capacity()
+        return self._capacity.get(node)
+
+    def charge(self, shape, node):
+        """Charge a shape to a node, on both accounts at once.
+
+        The debits below are every figure the capacity filters and the
+        load ordering read, each in its own units, so a shape which has
+        been assigned is invisible to none of the filters the next shape
+        walks through.
+
+        No "free" figure can be driven negative by this, because a shape
+        is only ever charged to a node whose filters it has already
+        passed and each of those filters refuses a request larger than
+        the figure it reads.
+
+        used_disk_gb is in the committed row and is deliberately not
+        debited: no filter reads it, and a figure charged here but read
+        nowhere would be a second ledger which nothing could catch
+        drifting.
+        """
+        self.ensure_capacity()
+
+        measured = dict(self._metrics[node])
+        measured['cpu_total_instance_vcpus'] = (
+            measured.get('cpu_total_instance_vcpus', 0) + shape.cpus)
+        measured['memory_available'] = (
+            measured.get('memory_available', 0) - shape.memory_mb)
+        measured['memory_total_instance_actual'] = (
+            measured.get('memory_total_instance_actual', 0) + shape.memory_mb)
+        # disk_free_instances is published in bytes, and arrives as a
+        # string from some metrics rows, which is why the disk filter
+        # casts it before dividing by GiB. A shape's disk is denominated
+        # in GB, so the debit is scaled rather than subtracted.
+        measured['disk_free_instances'] = (
+            int(measured.get('disk_free_instances', '0'))
+            - shape.disk_gb * GiB)
+        self._metrics[node] = measured
+
+        row = self._capacity.get(node)
+        if row is None:
+            return
+        charged = dict(row)
+        charged['used_cpus'] = row['used_cpus'] + shape.cpus
+        charged['used_memory_mb'] = row['used_memory_mb'] + shape.memory_mb
+        self._capacity[node] = charged
+
+
+def _shapes_largest_first(shapes):
+    """The indexes of a set of shapes, largest shape first.
+
+    Memory, then vCPUs, then disk, each descending, with the order the
+    caller gave as the final tie break so that two identical shapes are
+    walked in the order they were asked for. Placing the largest first
+    is first-fit-decreasing: a small shape placed first can leave a
+    cluster with room for nothing large, where the reverse order leaves
+    the small one the choice of whatever is left.
+    """
+    return sorted(
+        range(len(shapes)),
+        key=lambda index: (-shapes[index].memory_mb, -shapes[index].cpus,
+                           -shapes[index].disk_gb, index))
 
 
 def get_network_node():
@@ -654,22 +821,14 @@ class Scheduler:
             return None
         return round(oldest, 2)
 
-    def _has_reasonable_queue_state(self, log_ctx, node):
-        reason = _queue_exclusion_reason(self.metrics[node])
+    def _has_reasonable_queue_state(self, log_ctx, node, snapshot):
+        reason = _queue_exclusion_reason(snapshot.node_metrics(node))
         if reason:
             log_ctx.with_fields({'node': node, **reason}).debug(
                 'Excluding node with many queued jobs')
             return False, reason
 
         return True, None
-
-    def _schedulable_threads(self, node):
-        """Schedulable threads for a node: see the module-level helper."""
-        return _schedulable_threads(self.metrics[node])
-
-    def _memory_reserved_mb(self, node):
-        """The node's memory reservation: see the module-level helper."""
-        return _memory_reserved_mb(self.metrics[node])
 
     def _capacity_by_node(self):
         """The counters keyed by node uuid, and whether the read failed."""
@@ -736,7 +895,7 @@ class Scheduler:
                     for instance_uuid in n.instances]
         return memo[node]
 
-    def _has_sufficient_cpu(self, log_ctx, shape, node, capacity):
+    def _has_sufficient_cpu(self, log_ctx, shape, node, snapshot):
         """A cheap CPU pre-filter, denominated in both ledgers.
 
         This is not the admission decision. The real guard is the
@@ -759,21 +918,23 @@ class Scheduler:
         whichever of the two is larger, which is the same arithmetic
         summarize_resources() publishes.
 
-        ``capacity`` is the counters keyed by node uuid. A node with no
-        row is charged nothing and measured against the live figure: it
+        ``snapshot`` carries both, charged for anything this decision
+        has already placed. A node with no committed row is charged
+        nothing on that account and measured against the live figure: it
         is a node mid-upgrade, or one the reconciler declined to size,
         and admission will let it through unguarded, so this
         filter must not refuse on a ledger which does not exist.
         """
-        cpu_base, from_fallback = self._schedulable_threads(node)
+        node_metrics = snapshot.node_metrics(node)
+        cpu_base, from_fallback = _schedulable_threads(node_metrics)
         hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
-        measured_cpus = self.metrics[node].get('cpu_total_instance_vcpus', 0)
+        measured_cpus = node_metrics.get('cpu_total_instance_vcpus', 0)
         cpus = shape.cpus
 
         # A node with a capacity row is guarded by that row's own limit,
         # so test the guard's arithmetic exactly rather than a live
         # re-derivation which can differ from it by a floor().
-        row = capacity.get(node)
+        row = snapshot.capacity_row(node)
         limit_cpus = row['limit_cpus'] if row else hard_max_cpus
         committed_cpus = row['used_cpus'] if row else 0
 
@@ -805,15 +966,16 @@ class Scheduler:
 
         return True, None
 
-    def _has_sufficient_ram(self, log_ctx, shape, node, capacity):
+    def _has_sufficient_ram(self, log_ctx, shape, node, snapshot):
         # There are two things to track here... We must always leave the
         # node's published memory reservation (operating system tasks, plus
         # cluster-wide daemons on infra-role nodes) untouched -- assume
         # there is no overlap with existing VMs when checking this. Note as
         # well that metrics are in MB...
+        node_metrics = snapshot.node_metrics(node)
         memory = shape.memory_mb
-        reserved = self._memory_reserved_mb(node)
-        available = self.metrics[node].get('memory_available', 0) - reserved
+        reserved = _memory_reserved_mb(node_metrics)
+        available = node_metrics.get('memory_available', 0) - reserved
         if available - memory < 0.0:
             reason = {
                 'reason': 'insufficient memory',
@@ -828,8 +990,8 @@ class Scheduler:
         # ...Secondly, if we're using KSM and over committing memory, we
         # shouldn't overcommit more than by RAM_OVERCOMMIT_RATIO
         instance_memory = (
-            self.metrics[node].get('memory_total_instance_actual', 0) + memory)
-        memory_max = self.metrics[node].get('memory_max', 0)
+            node_metrics.get('memory_total_instance_actual', 0) + memory)
+        memory_max = node_metrics.get('memory_max', 0)
         if not memory_max:
             reason = {
                 'reason': 'no memory_max in node metrics',
@@ -860,7 +1022,7 @@ class Scheduler:
         # to attract, and then be refused, an entire burst. A node with
         # no row is guarded by nothing and must not be refused on a
         # ledger which does not exist (P7).
-        row = capacity.get(node)
+        row = snapshot.capacity_row(node)
         if row:
             committed_mb = row['used_memory_mb']
             # An instance already placed here is in used_memory_mb, and a
@@ -881,15 +1043,16 @@ class Scheduler:
 
         return True, None
 
-    def _has_sufficient_disk(self, log_ctx, shape, node):
+    def _has_sufficient_disk(self, log_ctx, shape, node, snapshot):
         requested_disk = shape.disk_gb
+        node_metrics = snapshot.node_metrics(node)
 
         # The candidate node publishes its own disk reservation as a metric, so
         # a remote evaluator honours that node's per-host floor (falling back to
         # our config default only for a stale metrics row mid-upgrade).
-        reservation = self.metrics[node].get(
+        reservation = node_metrics.get(
             'disk_reservation_gb', config.NODE_DISK_RESERVATION_GB)
-        disk_free = int(self.metrics[node].get('disk_free_instances', '0')) / GiB
+        disk_free = int(node_metrics.get('disk_free_instances', '0')) / GiB
         disk_free -= reservation
         if requested_disk > disk_free:
             reason = {
@@ -903,13 +1066,13 @@ class Scheduler:
             return False, reason
         return True, None
 
-    def _has_idle_disk_bandwidth(self, log_ctx, shape, node):
+    def _has_idle_disk_bandwidth(self, log_ctx, shape, node, snapshot):
         # We also avoid starting new instances on hypervisors with busy disk.
         # busy_time is in milliseconds per second, so a value of 1,000 is 100%
         # busy. You can record more than 100% if there is more than one disk
         # in the system doing IO at the time.
         busy_time = float(
-            self.metrics[node].get(DISK_BUSY_PER_SECOND_METRIC, 0))
+            snapshot.node_metrics(node).get(DISK_BUSY_PER_SECOND_METRIC, 0))
         if busy_time > 1200:
             reason = {
                 'reason': 'disk bandwidth saturated',
@@ -961,467 +1124,571 @@ class Scheduler:
             f'schedule at stage {stage}', extra=extra)
 
     def find_candidates(self, inst, candidates=None):
+        """Candidate nodes for one instance, best first.
+
+        The one-shape caller of find_candidates_for_shapes(). It turns
+        the instance into a shape, holds the attribute memo open for the
+        whole decision, and addresses the decision's audit events to the
+        instance and to any node the caller forced.
+        """
         related_objects = [inst]
         if candidates:
             for node_uuid in candidates:
                 related_objects.append(('node', node_uuid))
+
+        # PlacementShape.from_instance() reads several of this instance's
+        # attributes -- its placement and its affinity among them -- and
+        # every one of those reads fetches the same instance_attributes
+        # row. Memoising for the duration of the decision makes it one
+        # fetch. Nothing in this block writes an attribute, and the memo
+        # is discarded on the way out, so no caller observes different
+        # staleness than it did before.
+        with util_general.RecordedOperation('schedule', inst), \
+                inst.attribute_memo():
+            assignment = self.find_candidates_for_shapes(
+                [PlacementShape.from_instance(inst)], candidates=candidates,
+                related_objects=related_objects,
+                log_ctx=self.log.with_fields({'instance': inst}))
+            return assignment[0]
+
+    def find_candidates_for_shapes(self, shapes, candidates=None,
+                                   related_objects=None, log_ctx=None):
+        """Candidate nodes for a set of requested shapes, all or nothing.
+
+        Every shape is walked through the whole filter, affinity and
+        ranking pipeline in its own right, and is then charged to the
+        node at the head of its own ranked list before the next shape is
+        walked. A set therefore cannot spend the same headroom twice:
+        each shape sees the ones before it already sitting on their
+        nodes, on the measured figures and on the committed counters
+        both. Those charges live in a snapshot built for this call and
+        discarded with it -- nothing here admits anything, and the real
+        guard is still the atomic UPDATE at admission.
+
+        All or nothing. A shape which runs out of candidates at any
+        stage raises exactly what that stage raises for a single
+        request, with the same exception class and the same stage, and
+        the assignment built so far is discarded. A caller is given a
+        placement for every shape it asked for, or none at all. There is
+        nothing to roll back when that happens, because the charges were
+        never anywhere but the snapshot.
+
+        Shapes are walked largest first -- by memory, then vCPUs, then
+        disk. That is first-fit-decreasing, and it is greedy: a set this
+        refuses may still be one which some other assignment could have
+        hosted, so a refusal here is a lower bound on what the cluster
+        will take rather than a proof that it will not take it. Searching
+        for an assignment instead would describe a cluster we do not
+        run, because the ranker which chooses each shape's node spreads
+        allocation away from the most committed nodes rather than
+        packing, and that is the behaviour a caller will actually meet.
+
+        A set's own members are charged for capacity but are not
+        affinity neighbours of each other. Both affinity stages match
+        the tags of the instances already placed on a node, which they
+        read as rows, and a shape has no row; so a shape assigned
+        earlier in this call is invisible to the affinity stages of the
+        shapes after it. A caller asking for a set whose members prefer
+        each other's company gets that preference scored against the
+        cluster as it stands, not against the set.
+
+        ``related_objects`` addresses the decision's audit events, in
+        the form add_event_multi() takes them, and a call given none
+        publishes none -- which is how a speculative evaluation stays
+        out of the event log.
+
+        Returns a mapping of each shape's index in ``shapes`` to its
+        ordered candidate list, best first, in the order the shapes were
+        given. The head of each list is the node that shape was charged
+        to.
+        """
+        if related_objects is None:
+            related_objects = []
+        if log_ctx is None:
+            log_ctx = self.log
+
         add_event_multi(
             EVENT_TYPE_AUDIT, related_objects, 'started scheduling')
 
-        # The filter passes below read this instance's attributes once
-        # per candidate -- placement_filter() in the CPU stage, affinity
-        # in the stage after it -- and every one of those reads fetches
-        # the same instance_attributes row. Memoising for the duration of
-        # the decision makes it one fetch. Nothing in this block writes an
-        # attribute, and the memo is discarded on the way out, so no
-        # caller observes different staleness than it did before.
-        with util_general.RecordedOperation('schedule', inst), \
-                inst.attribute_memo():
-            log_ctx = self.log.with_fields({'instance': inst})
-            shape = PlacementShape.from_instance(inst)
+        # Refresh metrics if its too old, or there are no nodes. Once for
+        # the whole set, because a set is one decision: every shape in it
+        # is placed against one reading of the cluster, charged with the
+        # set's own earlier assignments and with nothing else.
+        metrics_refreshed = False
+        diff = time.time() - self.metrics_updated
+        if diff > config.SCHEDULER_CACHE_TIMEOUT or len(self.metrics) == 0:
+            self.refresh_metrics()
+            metrics_refreshed = True
 
-            # Refresh metrics if its too old, or there are no nodes.
-            metrics_refreshed = False
-            diff = time.time() - self.metrics_updated
-            if diff > config.SCHEDULER_CACHE_TIMEOUT or len(self.metrics) == 0:
-                self.refresh_metrics()
-                metrics_refreshed = True
+        snapshot = PlacementSnapshot(self.metrics, self._capacity_by_node)
 
-            # Record the inputs to the scheduling decision so failures can be
-            # diagnosed from the event log alone. The disk spec itself is
-            # published alongside the shape's summed figure, because an
-            # operator reading a refusal wants to see the disks which
-            # produced the total.
+        assignment = {}
+        for index in _shapes_largest_first(shapes):
+            shape = shapes[index]
+            assignment[index] = self._find_candidates_for_shape(
+                shape, candidates, related_objects, log_ctx, snapshot,
+                metrics_refreshed)
+            # The head of the list is where the caller will put this
+            # shape, so that is what the shapes after it are told to
+            # expect. Charged even for the last shape in a set, so that
+            # the snapshot a decision ends with describes the whole of
+            # what it handed out.
+            snapshot.charge(shape, assignment[index][0])
+
+        return {index: assignment[index] for index in range(len(shapes))}
+
+    def _find_candidates_for_shape(self, shape, candidates, related_objects,
+                                   log_ctx, snapshot, metrics_refreshed):
+        """Walk one shape through the filter, affinity and ranking stages.
+
+        Every figure comes from the snapshot rather than from this
+        scheduler's own metrics, which is what makes a shape see the
+        shapes charged before it in the same set.
+        """
+        # Record the inputs to the scheduling decision so failures can be
+        # diagnosed from the event log alone. The disk spec itself is
+        # published alongside the shape's summed figure, because an
+        # operator reading a refusal wants to see the disks which
+        # produced the total.
+        add_event_multi(
+            EVENT_TYPE_AUDIT, related_objects,
+            'schedule inputs',
+            extra={
+                'requested_affinity': shape.affinity,
+                'requested_cpus': shape.cpus,
+                'requested_memory_mb': shape.memory_mb,
+                'requested_disk_gb': shape.disk_gb,
+                'disk_spec': shape.disk_spec,
+                'namespace': shape.namespace,
+                'forced_candidates': candidates is not None,
+                # Measured after the decision's refresh, so this is the
+                # age of the snapshot it reads. The pre-refresh
+                # age is usually old precisely because exceeding the
+                # cache timeout is what triggers the refresh, and
+                # publishing it read as placement on hour-old metrics
+                # when the decision used fresh ones (issue 4521).
+                'metrics_age_seconds': round(
+                    time.time() - self.metrics_updated, 2),
+                'metrics_refreshed': metrics_refreshed,
+                'oldest_node_metrics_age_seconds':
+                    self._oldest_node_metrics_age(),
+            })
+
+        # An empty forced list is still forced: the preflight
+        # redirect builds "every node except this one", and when
+        # that set is empty it means there is nowhere else to go,
+        # not "choose from the whole cluster" -- falling open here
+        # re-offered the one node the caller built the list to
+        # exclude (issue 4001). The pre_schedule stage below turns
+        # the empty set into a LowResourceException.
+        if candidates is not None:
+            # Copied, because a forced list belongs to the caller and
+            # the stages below filter in place -- and because every
+            # shape in a set starts from the whole of it.
+            candidates = list(candidates)
             add_event_multi(
                 EVENT_TYPE_AUDIT, related_objects,
-                'schedule inputs',
-                extra={
-                    'requested_affinity': shape.affinity,
-                    'requested_cpus': shape.cpus,
-                    'requested_memory_mb': shape.memory_mb,
-                    'requested_disk_gb': shape.disk_gb,
-                    'disk_spec': inst.disk_spec,
-                    'namespace': shape.namespace,
-                    'forced_candidates': candidates is not None,
-                    # Measured after the refresh above, so this is the age
-                    # of the snapshot the decision reads. The pre-refresh
-                    # age is usually old precisely because exceeding the
-                    # cache timeout is what triggers the refresh, and
-                    # publishing it read as placement on hour-old metrics
-                    # when the decision used fresh ones (issue 4521).
-                    'metrics_age_seconds': round(
-                        time.time() - self.metrics_updated, 2),
-                    'metrics_refreshed': metrics_refreshed,
-                    'oldest_node_metrics_age_seconds':
-                        self._oldest_node_metrics_age(),
-                })
-
-            # An empty forced list is still forced: the preflight
-            # redirect builds "every node except this one", and when
-            # that set is empty it means there is nowhere else to go,
-            # not "choose from the whole cluster" -- falling open here
-            # re-offered the one node the caller built the list to
-            # exclude (issue 4001). The pre_schedule stage below turns
-            # the empty set into a LowResourceException.
-            if candidates is not None:
-                add_event_multi(
-                    EVENT_TYPE_AUDIT, related_objects,
-                    'schedule forced candidates',
-                    extra={'candidates': candidates})
-                for n in candidates:
-                    if n not in self.metrics:
-                        # The metrics dict carries a key for every node
-                        # the active prefilter returned, even one whose
-                        # metrics were stale or empty, so a missing key
-                        # means the candidate was not in the active-node
-                        # list at all (or its metrics row was
-                        # unreadable). Say so: the exception's message
-                        # is recorded against the user's instance, and a
-                        # bare node UUID explains nothing (issue 4113).
-                        add_event_multi(
-                            EVENT_TYPE_AUDIT, related_objects,
-                            f'schedule candidate {n} is not an active node, '
-                            'aborting',
-                            extra={'candidates': candidates})
-                        raise exceptions.CandidateNodeNotFoundException(
-                            f'candidate node {n} is not in the active node '
-                            'list, or its metrics were unreadable')
-            else:
-                candidates = []
-                for n in self.metrics.keys():
-                    candidates.append(n)
-            add_event_multi(
-                EVENT_TYPE_AUDIT, related_objects,
-                'schedule initial candidates',
+                'schedule forced candidates',
                 extra={'candidates': candidates})
-            self._log_and_raise_on_error(
-                related_objects, 'pre_schedule', candidates)
+            for n in candidates:
+                if not snapshot.has_node(n):
+                    # The metrics dict carries a key for every node
+                    # the active prefilter returned, even one whose
+                    # metrics were stale or empty, so a missing key
+                    # means the candidate was not in the active-node
+                    # list at all (or its metrics row was
+                    # unreadable). Say so: the exception's message
+                    # is recorded against the user's instance, and a
+                    # bare node UUID explains nothing (issue 4113).
+                    add_event_multi(
+                        EVENT_TYPE_AUDIT, related_objects,
+                        f'schedule candidate {n} is not an active node, '
+                        'aborting',
+                        extra={'candidates': candidates})
+                    raise exceptions.CandidateNodeNotFoundException(
+                        f'candidate node {n} is not in the active node '
+                        'list, or its metrics were unreadable')
+        else:
+            candidates = snapshot.nodes()
+        add_event_multi(
+            EVENT_TYPE_AUDIT, related_objects,
+            'schedule initial candidates',
+            extra={'candidates': candidates})
+        self._log_and_raise_on_error(
+            related_objects, 'pre_schedule', candidates)
 
-            # Ensure all specified nodes are hypervisors
+        # Ensure all specified nodes are hypervisors
+        dropped = {}
+        for c in list(candidates):
+            if not snapshot.node_metrics(c).get('is_hypervisor', False):
+                dropped[c] = {'reason': 'not a hypervisor'}
+                candidates.remove(c)
+        self._log_and_raise_on_error(
+            related_objects, 'is_hypervisor', candidates, dropped=dropped)
+
+        # Can we host that many vCPUs?
+        dropped = {}
+        for c in list(candidates):
+            max_cpu = snapshot.node_metrics(c).get(
+                'cpu_max_per_instance', 0)
+            if shape.cpus > max_cpu:
+                dropped[c] = {
+                    'reason': 'requested vCPUs exceed per-instance max',
+                    'cpu_max_per_instance': max_cpu,
+                    'requested_cpus': shape.cpus,
+                }
+                candidates.remove(c)
+        self._log_and_raise_on_error(
+            related_objects, 'cpu_max_per_instance', candidates,
+            dropped=dropped)
+
+        # Do we have enough idle CPU? This reads the capacity
+        # counters as well as the metrics, because a node whose
+        # ledger is full measures as idle until its instances boot.
+        #
+        # A failed read is published before the stage runs, and only
+        # then: an empty-but-readable table is the ordinary state of
+        # a cluster the reconciler has not reached yet (P7), so
+        # eventing on emptiness would fire on every create there and
+        # say nothing. Nothing below behaves differently either way
+        # -- the counters this decision cannot see simply do not
+        # prune anything, and the guard still refuses correctly --
+        # so this records that the pre-filter was flying on
+        # measurement alone, which is otherwise invisible in the
+        # instance's event trail.
+        capacity_degraded = snapshot.ensure_capacity()
+        if capacity_degraded:
+            add_event_multi(
+                EVENT_TYPE_AUDIT, related_objects,
+                'schedule could not read the capacity counters',
+                extra={
+                    'candidates': candidates,
+                    'degraded_stages': ['sufficient_idle_cpu',
+                                        'sufficient_idle_memory'],
+                    'effect': ('capacity pre-filtering falls back to '
+                               'measurement only; admission is '
+                               'unchanged and still guarded'),
+                })
+        dropped = {}
+        for c in list(candidates):
+            ok, reason = self._has_sufficient_cpu(
+                log_ctx, shape, c, snapshot)
+            if not ok:
+                dropped[c] = reason
+                candidates.remove(c)
+        self._log_and_raise_on_error(
+            related_objects, 'sufficient_idle_cpu', candidates,
+            dropped=dropped)
+
+        # Do we have enough idle RAM? Like the CPU stage this reads
+        # the capacity counters as well as the metrics, because a
+        # node whose RAM ledger is full measures as unchanged until
+        # its instances boot and fault their allocations in.
+        dropped = {}
+        for c in list(candidates):
+            ok, reason = self._has_sufficient_ram(
+                log_ctx, shape, c, snapshot)
+            if not ok:
+                dropped[c] = reason
+                candidates.remove(c)
+        self._log_and_raise_on_error(
+            related_objects, 'sufficient_idle_memory', candidates,
+            dropped=dropped)
+
+        # Do we have enough free disk?
+        dropped = {}
+        for c in list(candidates):
+            ok, reason = self._has_sufficient_disk(
+                log_ctx, shape, c, snapshot)
+            if not ok:
+                dropped[c] = reason
+                candidates.remove(c)
+        self._log_and_raise_on_error(
+            related_objects, 'sufficient_free_disk', candidates,
+            dropped=dropped)
+
+        # Each candidate's placements are read once and memoised, so
+        # a node considered twice is only fetched once. The memo is
+        # shared by the hard constraint stage below and the scorer
+        # after it, so a create which uses both pays for one read.
+        placements = {}
+
+        requested_affinity = shape.affinity
+        require_with, require_without = _hard_affinity_constraints(
+            requested_affinity)
+
+        # Hard affinity constraints are admission, not ranking: a node
+        # which does not satisfy them cannot host the instance at all,
+        # so they filter here rather than contributing to a score.
+        #
+        # This stage returns without touching the placements memo when
+        # no hard constraint was requested. That matters because it
+        # runs before the load shedding filters have pruned anything,
+        # so populating the memo here would read placements for the
+        # full candidate set on every create -- including the great
+        # majority which request no affinity at all.
+        if require_with or require_without:
             dropped = {}
             for c in list(candidates):
-                if not self.metrics[c].get('is_hypervisor', False):
-                    dropped[c] = {'reason': 'not a hypervisor'}
-                    candidates.remove(c)
-            self._log_and_raise_on_error(
-                related_objects, 'is_hypervisor', candidates, dropped=dropped)
-
-            # Can we host that many vCPUs?
-            dropped = {}
-            for c in list(candidates):
-                max_cpu = self.metrics[c].get('cpu_max_per_instance', 0)
-                if shape.cpus > max_cpu:
-                    dropped[c] = {
-                        'reason': 'requested vCPUs exceed per-instance max',
-                        'cpu_max_per_instance': max_cpu,
-                        'requested_cpus': shape.cpus,
-                    }
-                    candidates.remove(c)
-            self._log_and_raise_on_error(
-                related_objects, 'cpu_max_per_instance', candidates,
-                dropped=dropped)
-
-            # Do we have enough idle CPU? This reads the capacity
-            # counters as well as the metrics, because a node whose
-            # ledger is full measures as idle until its instances boot.
-            #
-            # A failed read is published before the stage runs, and only
-            # then: an empty-but-readable table is the ordinary state of
-            # a cluster the reconciler has not reached yet (P7), so
-            # eventing on emptiness would fire on every create there and
-            # say nothing. Nothing below behaves differently either way
-            # -- the counters this decision cannot see simply do not
-            # prune anything, and the guard still refuses correctly --
-            # so this records that the pre-filter was flying on
-            # measurement alone, which is otherwise invisible in the
-            # instance's event trail.
-            capacity, capacity_degraded = self._capacity_by_node()
-            if capacity_degraded:
-                add_event_multi(
-                    EVENT_TYPE_AUDIT, related_objects,
-                    'schedule could not read the capacity counters',
-                    extra={
-                        'candidates': candidates,
-                        'degraded_stages': ['sufficient_idle_cpu',
-                                            'sufficient_idle_memory'],
-                        'effect': ('capacity pre-filtering falls back to '
-                                   'measurement only; admission is '
-                                   'unchanged and still guarded'),
-                    })
-            dropped = {}
-            for c in list(candidates):
-                ok, reason = self._has_sufficient_cpu(
-                    log_ctx, shape, c, capacity)
+                ok, reason = self._satisfies_hard_affinity(
+                    shape, c, placements, require_with, require_without)
                 if not ok:
                     dropped[c] = reason
                     candidates.remove(c)
             self._log_and_raise_on_error(
-                related_objects, 'sufficient_idle_cpu', candidates,
-                dropped=dropped)
+                related_objects, 'affinity_constraints', candidates,
+                dropped=dropped,
+                exception_class=exceptions.AffinityConstraintUnsatisfiable,
+                detail=_hard_affinity_description(
+                    require_with, require_without))
 
-            # Do we have enough idle RAM? Like the CPU stage this reads
-            # the capacity counters as well as the metrics, because a
-            # node whose RAM ledger is full measures as unchanged until
-            # its instances boot and fault their allocations in.
-            dropped = {}
-            for c in list(candidates):
-                ok, reason = self._has_sufficient_ram(log_ctx, shape, c, capacity)
-                if not ok:
-                    dropped[c] = reason
-                    candidates.remove(c)
-            self._log_and_raise_on_error(
-                related_objects, 'sufficient_idle_memory', candidates,
-                dropped=dropped)
+        # Filter by affinity, if any has been specified. This runs on the
+        # set of nodes which can actually fit the instance, but before the
+        # queue depth and disk bandwidth filters below, which describe how
+        # busy a node is right now rather than whether it can host the
+        # instance at all. We record the full per-candidate scoring
+        # breakdown so that incorrect placement decisions (e.g. a tagged
+        # neighbour being invisible) can be diagnosed from audit events.
+        by_affinity = defaultdict(list)
+        affinity_detail = {}
+        binary_spec = _binary_affinity_spec(requested_affinity)
+        scoring_tags = (
+            binary_spec[instance.Instance.AFFINITY_PREFER_WITH]
+            + binary_spec[instance.Instance.AFFINITY_PREFER_WITHOUT])
 
-            # Do we have enough free disk?
-            dropped = {}
-            for c in list(candidates):
-                ok, reason = self._has_sufficient_disk(log_ctx, shape, c)
-                if not ok:
-                    dropped[c] = reason
-                    candidates.remove(c)
-            self._log_and_raise_on_error(
-                related_objects, 'sufficient_free_disk', candidates,
-                dropped=dropped)
+        # A scorer with no tags to score cannot change the ordering,
+        # but the walk below reads every candidate's placements --
+        # one Node.from_db() plus one Instance.from_db() per placed
+        # instance -- so running it for the great majority of creates
+        # which request no affinity at all was pure cost. Skipping it
+        # reduces the measured database load rather than holding it
+        # flat. Everything downstream sees what it saw before: one
+        # tier, containing every candidate, scoring zero.
+        if not scoring_tags:
+            by_affinity[0] = list(candidates)
 
-            # Each candidate's placements are read once and memoised, so
-            # a node considered twice is only fetched once. The memo is
-            # shared by the hard constraint stage below and the scorer
-            # after it, so a create which uses both pays for one read.
-            placements = {}
-
-            requested_affinity = shape.affinity
-            require_with, require_without = _hard_affinity_constraints(
-                requested_affinity)
-
-            # Hard affinity constraints are admission, not ranking: a node
-            # which does not satisfy them cannot host the instance at all,
-            # so they filter here rather than contributing to a score.
-            #
-            # This stage returns without touching the placements memo when
-            # no hard constraint was requested. That matters because it
-            # runs before the load shedding filters have pruned anything,
-            # so populating the memo here would read placements for the
-            # full candidate set on every create -- including the great
-            # majority which request no affinity at all.
-            if require_with or require_without:
-                dropped = {}
-                for c in list(candidates):
-                    ok, reason = self._satisfies_hard_affinity(
-                        shape, c, placements, require_with, require_without)
-                    if not ok:
-                        dropped[c] = reason
-                        candidates.remove(c)
-                self._log_and_raise_on_error(
-                    related_objects, 'affinity_constraints', candidates,
-                    dropped=dropped,
-                    exception_class=exceptions.AffinityConstraintUnsatisfiable,
-                    detail=_hard_affinity_description(
-                        require_with, require_without))
-
-            # Filter by affinity, if any has been specified. This runs on the
-            # set of nodes which can actually fit the instance, but before the
-            # queue depth and disk bandwidth filters below, which describe how
-            # busy a node is right now rather than whether it can host the
-            # instance at all. We record the full per-candidate scoring
-            # breakdown so that incorrect placement decisions (e.g. a tagged
-            # neighbour being invisible) can be diagnosed from audit events.
-            by_affinity = defaultdict(list)
-            affinity_detail = {}
-            binary_spec = _binary_affinity_spec(requested_affinity)
-            scoring_tags = (
-                binary_spec[instance.Instance.AFFINITY_PREFER_WITH]
-                + binary_spec[instance.Instance.AFFINITY_PREFER_WITHOUT])
-
-            # A scorer with no tags to score cannot change the ordering,
-            # but the walk below reads every candidate's placements --
-            # one Node.from_db() plus one Instance.from_db() per placed
-            # instance -- so running it for the great majority of creates
-            # which request no affinity at all was pure cost. Skipping it
-            # reduces the measured database load rather than holding it
-            # flat. Everything downstream sees what it saw before: one
-            # tier, containing every candidate, scoring zero.
-            if not scoring_tags:
-                by_affinity[0] = list(candidates)
-
-            for c in (list(candidates) if scoring_tags else []):
-                node_instances = self._placed_instances(c, placements)
-                affinity = 0
-                considered = []
-                if node_instances is None:
-                    affinity_detail[c] = {
-                        'score': 0,
-                        'reason': 'node row not found',
-                    }
-                    by_affinity[affinity].append(c)
-                    continue
-
-                for instance_uuid, i in node_instances:
-                    skipped = _affinity_neighbour_skip(shape, instance_uuid, i)
-                    if skipped:
-                        considered.append(skipped)
-                        continue
-
-                    # Count proportional, not set membership: a node
-                    # carrying five instances of a group really is more
-                    # "with the group" than one carrying a single
-                    # instance, and the same in reverse for the avoid
-                    # direction. Note the score is a sum across
-                    # neighbours *and* across tags, so a
-                    # prefer_without_tag match can be outweighed by
-                    # neighbour count on the other axis.
-                    #
-                    # Weighted specifications reach here already mapped,
-                    # so there is one scoring path and not two.
-                    matched = {}
-                    contribution = 0
-                    for tag in binary_spec[
-                            instance.Instance.AFFINITY_PREFER_WITH]:
-                        if tag in i.tags:
-                            matched[tag] = matched.get(tag, 0) + 1
-                            contribution += 1
-                    for tag in binary_spec[
-                            instance.Instance.AFFINITY_PREFER_WITHOUT]:
-                        if tag in i.tags:
-                            matched[tag] = matched.get(tag, 0) - 1
-                            contribution -= 1
-                    considered.append({
-                        'instance_uuid': instance_uuid,
-                        'tags': list(i.tags),
-                        'matched': matched,
-                        'contribution': contribution,
-                    })
-                    affinity += contribution
-
+        for c in (list(candidates) if scoring_tags else []):
+            node_instances = self._placed_instances(c, placements)
+            affinity = 0
+            considered = []
+            if node_instances is None:
                 affinity_detail[c] = {
-                    'score': affinity,
-                    'instance_count': len(node_instances),
-                    'considered': considered,
+                    'score': 0,
+                    'reason': 'node row not found',
                 }
                 by_affinity[affinity].append(c)
+                continue
 
-            highest_affinity = sorted(by_affinity, reverse=True)[0]
-            preferred = by_affinity[highest_affinity]
+            for instance_uuid, i in node_instances:
+                skipped = _affinity_neighbour_skip(shape, instance_uuid, i)
+                if skipped:
+                    considered.append(skipped)
+                    continue
+
+                # Count proportional, not set membership: a node
+                # carrying five instances of a group really is more
+                # "with the group" than one carrying a single
+                # instance, and the same in reverse for the avoid
+                # direction. Note the score is a sum across
+                # neighbours *and* across tags, so a
+                # prefer_without_tag match can be outweighed by
+                # neighbour count on the other axis.
+                #
+                # Weighted specifications reach here already mapped,
+                # so there is one scoring path and not two.
+                matched = {}
+                contribution = 0
+                for tag in binary_spec[
+                        instance.Instance.AFFINITY_PREFER_WITH]:
+                    if tag in i.tags:
+                        matched[tag] = matched.get(tag, 0) + 1
+                        contribution += 1
+                for tag in binary_spec[
+                        instance.Instance.AFFINITY_PREFER_WITHOUT]:
+                    if tag in i.tags:
+                        matched[tag] = matched.get(tag, 0) - 1
+                        contribution -= 1
+                considered.append({
+                    'instance_uuid': instance_uuid,
+                    'tags': list(i.tags),
+                    'matched': matched,
+                    'contribution': contribution,
+                })
+                affinity += contribution
+
+            affinity_detail[c] = {
+                'score': affinity,
+                'instance_count': len(node_instances),
+                'considered': considered,
+            }
+            by_affinity[affinity].append(c)
+
+        highest_affinity = sorted(by_affinity, reverse=True)[0]
+        preferred = by_affinity[highest_affinity]
+        add_event_multi(
+            EVENT_TYPE_AUDIT, related_objects,
+            'schedule have highest affinity',
+            extra={
+                'candidates': preferred,
+                'requested_affinity': requested_affinity,
+                'highest_affinity': highest_affinity,
+                'by_affinity': {
+                    str(k): v for k, v in by_affinity.items()},
+                'affinity_detail': affinity_detail,
+            })
+
+        # Don't use nodes which aren't keeping up with queue jobs
+        dropped = {}
+        for c in list(candidates):
+            ok, reason = self._has_reasonable_queue_state(
+                log_ctx, c, snapshot)
+            if not ok:
+                dropped[c] = reason
+                candidates.remove(c)
+        self._log_and_raise_on_error(
+            related_objects, 'queue_state', candidates, dropped=dropped)
+
+        # Are the disks really busy?
+        dropped = {}
+        for c in list(candidates):
+            ok, reason = self._has_idle_disk_bandwidth(
+                log_ctx, shape, c, snapshot)
+            if not ok:
+                dropped[c] = reason
+                candidates.remove(c)
+        self._log_and_raise_on_error(
+            related_objects, 'sufficient_idle_disk', candidates,
+            dropped=dropped)
+
+        # The two filters above are load shedding, not admission: they say
+        # a node is momentarily busy, not that it cannot host the
+        # instance. They may therefore narrow the winning affinity tier,
+        # but must never move placement out of it. Previously they ran
+        # before affinity scoring, so a transient burst on the node an
+        # instance was affine to silently placed it anywhere at all, and
+        # the mirror case left an anti-affinity instance on the single
+        # node it was asked to avoid (issue 3565). If every node is busy
+        # we still refuse to schedule, above.
+        narrowed = [c for c in candidates if c in preferred]
+        if not narrowed:
             add_event_multi(
                 EVENT_TYPE_AUDIT, related_objects,
-                'schedule have highest affinity',
+                'schedule keeping affinity despite transient load',
                 extra={
                     'candidates': preferred,
-                    'requested_affinity': requested_affinity,
+                    'load_shed_candidates': candidates,
                     'highest_affinity': highest_affinity,
-                    'by_affinity': {
-                        str(k): v for k, v in by_affinity.items()},
-                    'affinity_detail': affinity_detail,
                 })
+            narrowed = preferred
+        candidates = narrowed
 
-            # Don't use nodes which aren't keeping up with queue jobs
-            dropped = {}
-            for c in list(candidates):
-                ok, reason = self._has_reasonable_queue_state(log_ctx, c)
-                if not ok:
-                    dropped[c] = reason
-                    candidates.remove(c)
-            self._log_and_raise_on_error(
-                related_objects, 'queue_state', candidates, dropped=dropped)
+        # Order candidates by current CPU load, normalised by the
+        # schedulable thread count so that differently sized machines
+        # are comparable. The buckets are deliberately coarse (0.25
+        # load per thread wide): the metrics snapshot can be up to a
+        # minute stale, so fine-grained ranking would stack an entire
+        # burst of requests onto whichever node looked best at the
+        # last refresh. Nodes without the reservation-aware
+        # cpu_schedulable field (written by an older resources daemon)
+        # fall back to the raw thread count in cpu_max.
+        by_load = defaultdict(list)
+        load_detail = {}
+        denominators = {}
+        ram_headrooms = {}
+        for c in list(candidates):
+            raw_load = snapshot.node_metrics(c).get('cpu_load_1', 0)
+            denom, from_fallback = _schedulable_threads(
+                snapshot.node_metrics(c))
+            denom = denom or 1
+            normalised = raw_load / denom
 
-            # Are the disks really busy?
-            dropped = {}
-            for c in list(candidates):
-                ok, reason = self._has_idle_disk_bandwidth(log_ctx, shape, c)
-                if not ok:
-                    dropped[c] = reason
-                    candidates.remove(c)
-            self._log_and_raise_on_error(
-                related_objects, 'sufficient_idle_disk', candidates,
-                dropped=dropped)
+            # RAM commitment ranks alongside CPU load (issue 3636): a
+            # node carrying RAM-heavy but CPU-idle instances otherwise
+            # looks like the best candidate precisely because of the
+            # workload that makes it dangerous, and attracts every
+            # large instance in a burst until the capacity guard
+            # finally refuses it. The committed fraction is read from
+            # the same counters the guard draws down, so unlike the
+            # metrics it moves with every admission. A node ranks by
+            # whichever of its two pressures is worse, in the same
+            # coarse 0.25-wide bands so that similar nodes stay
+            # interchangeable and a burst still spreads.
+            ram_fraction = 0.0
+            row = snapshot.capacity_row(c)
+            if row and row['limit_memory_mb'] > 0:
+                committed_mb = max(
+                    row['used_memory_mb'],
+                    snapshot.node_metrics(c).get(
+                        'memory_total_instance_actual', 0))
+                ram_fraction = committed_mb / row['limit_memory_mb']
+            ram_headrooms[c] = max(0.1, 1.0 - ram_fraction)
 
-            # The two filters above are load shedding, not admission: they say
-            # a node is momentarily busy, not that it cannot host the
-            # instance. They may therefore narrow the winning affinity tier,
-            # but must never move placement out of it. Previously they ran
-            # before affinity scoring, so a transient burst on the node an
-            # instance was affine to silently placed it anywhere at all, and
-            # the mirror case left an anti-affinity instance on the single
-            # node it was asked to avoid (issue 3565). If every node is busy
-            # we still refuse to schedule, above.
-            narrowed = [c for c in candidates if c in preferred]
-            if not narrowed:
-                add_event_multi(
-                    EVENT_TYPE_AUDIT, related_objects,
-                    'schedule keeping affinity despite transient load',
-                    extra={
-                        'candidates': preferred,
-                        'load_shed_candidates': candidates,
-                        'highest_affinity': highest_affinity,
-                    })
-                narrowed = preferred
-            candidates = narrowed
+            bucket = max(
+                math.floor(normalised / 0.25),
+                math.floor(ram_fraction / 0.25))
+            denominators[c] = denom
+            load_detail[c] = {
+                'cpu_load_1': raw_load,
+                'cpu_schedulable': denom,
+                'cpu_schedulable_from_fallback': from_fallback,
+                'normalised_load': normalised,
+                'ram_committed_fraction': ram_fraction,
+                'bucket': bucket,
+            }
+            by_load[bucket].append(c)
 
-            # Order candidates by current CPU load, normalised by the
-            # schedulable thread count so that differently sized machines
-            # are comparable. The buckets are deliberately coarse (0.25
-            # load per thread wide): the metrics snapshot can be up to a
-            # minute stale, so fine-grained ranking would stack an entire
-            # burst of requests onto whichever node looked best at the
-            # last refresh. Nodes without the reservation-aware
-            # cpu_schedulable field (written by an older resources daemon)
-            # fall back to the raw thread count in cpu_max.
-            by_load = defaultdict(list)
-            load_detail = {}
-            denominators = {}
-            ram_headrooms = {}
-            for c in list(candidates):
-                raw_load = self.metrics[c].get('cpu_load_1', 0)
-                denom, from_fallback = self._schedulable_threads(c)
-                denom = denom or 1
-                normalised = raw_load / denom
+        lowest_load = sorted(by_load)[0]
+        add_event_multi(
+            EVENT_TYPE_AUDIT, related_objects,
+            'schedule have lowest cpu load',
+            extra={
+                'candidates': by_load[lowest_load],
+                'lowest_load': lowest_load,
+                'load_detail': load_detail,
+            })
 
-                # RAM commitment ranks alongside CPU load (issue 3636): a
-                # node carrying RAM-heavy but CPU-idle instances otherwise
-                # looks like the best candidate precisely because of the
-                # workload that makes it dangerous, and attracts every
-                # large instance in a burst until the capacity guard
-                # finally refuses it. The committed fraction is read from
-                # the same counters the guard draws down, so unlike the
-                # metrics it moves with every admission. A node ranks by
-                # whichever of its two pressures is worse, in the same
-                # coarse 0.25-wide bands so that similar nodes stay
-                # interchangeable and a burst still spreads.
-                ram_fraction = 0.0
-                row = capacity.get(c)
-                if row and row['limit_memory_mb'] > 0:
-                    committed_mb = max(
-                        row['used_memory_mb'],
-                        self.metrics[c].get('memory_total_instance_actual', 0))
-                    ram_fraction = committed_mb / row['limit_memory_mb']
-                ram_headrooms[c] = max(0.1, 1.0 - ram_fraction)
-
-                bucket = max(
-                    math.floor(normalised / 0.25),
-                    math.floor(ram_fraction / 0.25))
-                denominators[c] = denom
-                load_detail[c] = {
-                    'cpu_load_1': raw_load,
-                    'cpu_schedulable': denom,
-                    'cpu_schedulable_from_fallback': from_fallback,
-                    'normalised_load': normalised,
-                    'ram_committed_fraction': ram_fraction,
-                    'bucket': bucket,
-                }
-                by_load[bucket].append(c)
-
-            lowest_load = sorted(by_load)[0]
-            add_event_multi(
-                EVENT_TYPE_AUDIT, related_objects,
-                'schedule have lowest cpu load',
-                extra={
-                    'candidates': by_load[lowest_load],
-                    'lowest_load': lowest_load,
-                    'load_detail': load_detail,
-                })
-
-            # Return every candidate, ordered best bucket first, and
-            # within a bucket a weighted shuffle where a node's weight
-            # is its load headroom toward the target sustained load --
-            # so bigger or idler machines draw a proportionally larger
-            # share of a burst. This is weighted sampling without
-            # replacement (Efraimidis-Spirakis A-Res).
-            #
-            # The bucketing orders rather than filters, because a
-            # bucket says a node looks busier right now, not that it
-            # cannot host the instance -- every node still here has
-            # passed every admission filter above. The caller walks this
-            # list against a capacity guard which can refuse the head of
-            # it, so discarding the rest turns one refusal into a failed
-            # create on a cluster with room: in merge CI on 2026-08-14
-            # three viable nodes were cut to one, that one was refused,
-            # and five tests got a 507 apiece.
-            # Callers walk the list on failure, so the tail order
-            # matters as much as the head.
-            weights = {}
-            ordered = []
-            for bucket in sorted(by_load):
-                tier = by_load[bucket]
-                for c in tier:
-                    raw_load = self.metrics[c].get('cpu_load_1', 0)
-                    # Load headroom toward the target, scaled by the
-                    # node's uncommitted RAM fraction, so that within a
-                    # band a RAM-committed node draws a proportionally
-                    # smaller share of a burst.
-                    weights[c] = max(
-                        0.1,
-                        (config.SCHEDULER_TARGET_LOAD * denominators[c] -
-                         raw_load)) * ram_headrooms[c]
-                tier.sort(
-                    key=lambda c: random.random() ** (1.0 / weights[c]),
-                    reverse=True)
-                ordered.extend(tier)
-            candidates = ordered
-            add_event_multi(
-                EVENT_TYPE_AUDIT, related_objects,
-                'schedule final candidates',
-                extra={'candidates': candidates, 'weights': weights})
-            return candidates
+        # Return every candidate, ordered best bucket first, and
+        # within a bucket a weighted shuffle where a node's weight
+        # is its load headroom toward the target sustained load --
+        # so bigger or idler machines draw a proportionally larger
+        # share of a burst. This is weighted sampling without
+        # replacement (Efraimidis-Spirakis A-Res).
+        #
+        # The bucketing orders rather than filters, because a
+        # bucket says a node looks busier right now, not that it
+        # cannot host the instance -- every node still here has
+        # passed every admission filter above. The caller walks this
+        # list against a capacity guard which can refuse the head of
+        # it, so discarding the rest turns one refusal into a failed
+        # create on a cluster with room: in merge CI on 2026-08-14
+        # three viable nodes were cut to one, that one was refused,
+        # and five tests got a 507 apiece.
+        # Callers walk the list on failure, so the tail order
+        # matters as much as the head.
+        weights = {}
+        ordered = []
+        for bucket in sorted(by_load):
+            tier = by_load[bucket]
+            for c in tier:
+                raw_load = snapshot.node_metrics(c).get('cpu_load_1', 0)
+                # Load headroom toward the target, scaled by the
+                # node's uncommitted RAM fraction, so that within a
+                # band a RAM-committed node draws a proportionally
+                # smaller share of a burst.
+                weights[c] = max(
+                    0.1,
+                    (config.SCHEDULER_TARGET_LOAD * denominators[c] -
+                     raw_load)) * ram_headrooms[c]
+            tier.sort(
+                key=lambda c: random.random() ** (1.0 / weights[c]),
+                reverse=True)
+            ordered.extend(tier)
+        candidates = ordered
+        add_event_multi(
+            EVENT_TYPE_AUDIT, related_objects,
+            'schedule final candidates',
+            extra={'candidates': candidates, 'weights': weights})
+        return candidates
 
     def summarize_resources(self):
         """Summarize cluster resources from this scheduler's metrics snapshot.

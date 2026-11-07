@@ -715,6 +715,25 @@ stale (see the Prompt).
 
 ### Bugs fixed during this work
 
+- **A `POST /instances` with a JSON string vCPU or memory count
+  returned 500.** The API deliberately accepts `{"cpus": "2"}` --
+  `shakenfist/external_api/validation.py` declines to refuse it on
+  the grounds that the handler copes -- and the create path passes
+  it to `Instance.new()` untouched, where `Instance.__init__`
+  stores static values as handed. The typed column means a later
+  read gives an integer back, so the string survives exactly as
+  long as the in-memory object a create's scheduling decision runs
+  against, and `inst.cpus > max_cpu` raised `TypeError` in the
+  `cpu_max_per_instance` filter. Phase 1 closes it at the shape
+  factory, which has to type those figures anyway to order a set
+  largest first. The root cause is a request value reaching a
+  handler untyped, which is
+  [PLAN-api-input-validation.md](PLAN-api-input-validation.md)'s
+  subject; the note for that plan is that `validation.py`'s
+  justification for accepting the string -- that pydantic's lax
+  mode converts it -- is true of the database row and not of the
+  object the scheduler reads.
+
 None yet. Directly related open issues: shakenfist/shakenfist#1364
 (lame-duck and evacuate), shakenfist/shakenfist#4474 (the functional
 suite's wrapper waits on the exception class, ignoring `transient`).

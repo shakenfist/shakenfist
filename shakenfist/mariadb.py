@@ -26644,8 +26644,8 @@ def _derive_cpu_memory_limits(
     resources daemon mid-upgrade) derives as None so the caller keeps
     the previous limit rather than zeroing it. Note that the mirroring
     of scheduler.py covers the arithmetic but deliberately not the
-    inputs: Scheduler._schedulable_threads() and
-    Scheduler._memory_reserved_mb() substitute per-node fallbacks for a
+    inputs: scheduler.py's _schedulable_threads() and
+    _memory_reserved_mb() substitute per-node fallbacks for a
     metrics row written before the typed capacity columns existed, where
     this returns None and the caller prefers no capacity row to a
     guessed one. So mid-upgrade the scheduler may place on a node that
