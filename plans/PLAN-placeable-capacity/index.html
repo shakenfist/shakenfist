@@ -16227,12 +16227,13 @@ decision as "placeable-claims phase 0 <code>D2</code>", that <code>D</code> numb
 that plan's, not this one's.</p>
 <p>The brief's code citations are into shakenfist <code>develop</code> at
 <code>ea39dff7c9</code> (2026-10-17). This repository has moved since: at the
-time of writing <code>develop</code> is at <code>61a14af571</code>, and line numbers have
-already drifted (for example <code>_claim_capacity_guard()</code> is now near
-<code>shakenfist/mariadb.py:29563</code>, not <code>:28044</code>). The structural facts
-hold — <code>API_CAPABILITIES</code>/<code>advertised_capabilities()</code>,
+time of writing <code>develop</code> was at <code>61a14af571</code>, and line numbers had
+already drifted (for example <code>_claim_capacity_guard()</code> moved from
+<code>shakenfist/mariadb.py:28044</code> to <code>:29563</code>, and by phase 0's survey at
+<code>32de6cec7f</code> it was <code>:29927</code>). The structural facts hold —
+<code>API_CAPABILITIES</code>/<code>advertised_capabilities()</code>,
 <code>CLAIM_ENFORCEMENT_HARD = False</code>, <code>admit_instance_placement()</code>,
-<code>find_candidates()</code>, <code>summarize_resources()</code> are all present — but
+<code>find_candidates()</code> and the resources summary are all present — but
 <strong>every phase plan must re-survey its own citations against current
 <code>develop</code></strong> rather than trusting the line numbers copied here from
 the brief.</p>
@@ -16334,7 +16335,14 @@ this plan stands alone, but the brief has the working.</p>
 <li><strong>Refusal contracts differ.</strong> An instance 507 carries <code>stage</code>,
   <code>transient</code> and <code>Retry-After: 15</code> (<code>capacity_error()</code>,
   <code>shakenfist/external_api/base.py</code>). A claim 507 is prose with
-  none of them (<code>shakenfist/external_api/auth.py</code>; #4207).</li>
+  none of them: <code>_claim_refusal()</code>
+  (<code>shakenfist/external_api/auth.py</code>) folds the per-dimension detail
+  into the message and returns a bare <code>sf_api.error()</code>. <strong>No open
+  issue tracks this.</strong> #4207 was the issue cited here; it was closed
+  on 2026-10-29 by the transient-capacity-refusals plan, which gave
+  the <em>instance</em> 507 its contract and left the claim 507 alone. The
+  requirement stands (<code>G7</code>, phase 5) and needs an issue of its own
+  filed against it.</li>
 </ul>
 <h3 id="s2-what-changed-and-what-fragmentation-looks-like">S2. What changed, and what fragmentation looks like<a class="headerlink" href="#s2-what-changed-and-what-fragmentation-looks-like" title="Permanent link">&para;</a></h3>
 <p>sfcbr's <code>RAM_OVERCOMMIT_RATIO</code> went from 3.0 to 1.0 at 08:36 AEDT
@@ -16471,7 +16479,8 @@ repository to find them.</p>
   <code>capacity_error()</code>. A held create refused on a live check gets
   that check's stage, <code>transient: true</code>, <code>Retry-After: 15</code>, and
   fields naming the hold and saying it was retained. Claim refusals
-  gain the contract too (#4207).</li>
+  gain the contract too — see <code>S1</code>: the issue that used to track
+  that gap (#4207) is closed and an issue still needs filing.</li>
 <li><strong>G8. Inspectable.</strong> Held room per node, consumed and unconsumed,
   and displaced holds with the node they left and why, in the
   claim's view and in <code>GET /admin/resources</code>; <code>summarize_resources()</code>
@@ -16590,15 +16599,30 @@ the conductor can use is the failure <code>G2</code> exists to catch.</p>
   share (24 of 68 in-job and 229 of 453 runner-create memory
   node-drops were live after the change), the live-memory question
   is sequenced ahead of <code>A</code>. Phase 0's sfcbr measurement (below)
-  is what answers this.</li>
-<li><strong>Q2. Is the live/ledger memory margin double-counted?</strong> Not
-  established. The live check subtracts the reservation from
-  psutil's <code>available</code> (already net of host use); the ledger
-  subtracts it from physical memory. On a ratio of 1.0 the host may
-  be counted twice. Phase 0 measures it on sfcbr. The answer decides
-  how much of the live third is margin and how much is shortage, and
-  whether 33fl retunes the ratio or per-host reservations before <code>A</code>
-  is designed.</li>
+  is what answers this. <strong>Answered by phase 0 (<code>D13</code>), in that
+  phase's Results: no — <code>A</code> proceeds and this plan's order is
+  unamended.</strong> The live share of memory node-drops has collapsed to
+  4.1% in-job and 9.3% runner-create over 2026-10-30 to 11-06, and to
+  1.3% and 9.1% over 2026-11-01 to 11-06; and in phase 0's per-sample
+  reading the live check was the sole reason a node was dropped once
+  in 4968 node-samples. The question is deferred, not closed: phase
+  2's shadow counts re-apply this test before phase 3 is written.</li>
+<li><strong>Q2. Is the live/ledger memory margin double-counted?</strong> The live
+  check subtracts the reservation from psutil's <code>available</code> (already
+  net of host use); the ledger subtracts it from physical memory. On
+  a ratio of 1.0 the host may be counted twice. <strong>Answered by phase
+  0 (<code>D14</code>), in that phase's Results: the double subtraction is
+  real, but not between the live check and the ledger.</strong> At a ratio
+  of 1.0 those two reservation terms cancel algebraically, so the
+  live/ledger margin was never a function of the reservation; the two
+  places the reservation is subtracted are the committed ledger and
+  the KSM ceiling. It costs about 27% of per-node memory refusals of
+  a 16 GiB shape on sfcbr, an upper bound, all of it through
+  <code>limit_memory_mb</code>, and about one node-sample in 4968 through the
+  live check. The retune is handed to 33fl with one lever, per-host
+  <code>node_ram_reservation_gb</code>, and it does <strong>not</strong> gate <code>A</code>; the only
+  coupling runs the other way, in that a retune relaxes the binding
+  check and so requires <code>Q1</code>'s shares to be re-read.</li>
 <li><strong>Q3. The hold reference format and lifetime, and the consumption
   rule's edges</strong> (<code>D3</code>): what a <code>POST /instances</code> hold reference
   looks like, when a deleted instance's hold returns and for how
@@ -16616,10 +16640,20 @@ the conductor can use is the failure <code>G2</code> exists to catch.</p>
 <ul>
 <li><strong>Q6. The admin-scoped hold for evacuate</strong>, designed with #1364
   rather than guessed at here.</li>
-<li><strong>Q7. How <code>sf_claim</code> and <code>sf-client</code> express shapes</strong> (their claim
-  verbs are unreleased since client-python <code>v0.8.3</code>), and the
-  operator guide's stale statement that <code>sf-client</code> has no claim
-  verbs (<code>docs/operator_guide/scheduler.md</code>).</li>
+<li><strong>Q7. How <code>sf_claim</code> and <code>sf-client</code> express shapes</strong>, and the
+  stale statements that no release carries the claim verbs.
+  <strong>Answered by phase 0 (<code>D11</code>).</strong> The premise this question was
+  written on has since changed twice over: the claim verbs <em>are</em>
+  released — client-python <code>v0.8.4</code> was tagged on 2026-10-28 — and
+  <code>docs/operator_guide/scheduler.md:445-449</code> has already been
+  corrected to say the verbs need <code>shakenfist-client</code> 0.8.4 or
+  later, so the statement named here is no longer stale. The
+  statements that <em>are</em> still stale, and are therefore what phase 6
+  fixes, are <code>docs/user_guide/ansible.md:24-30</code>,
+  <code>shakenfist/deploy/collection/requirements.txt:16-20</code> and
+  <code>shakenfist/deploy/collection/plugins/modules/sf_claim.py:27-32</code>
+  and <code>:275-302</code>, all of which still tell the operator to install
+  the client from git.</li>
 <li><strong>Q8. Whether <code>C</code> is retired once <code>A</code> ships</strong> or kept as the
   stateless query it also serves other callers as. The expectation
   is kept: <code>C</code> is a general query, not scaffolding for <code>A</code>.</li>
@@ -16723,9 +16757,17 @@ before either admission change.</p>
 <ul>
 <li><strong>Phase 0</strong> resolves the open questions above and takes the sfcbr
   live-memory-against-ledger reading (<code>D9</code>). It ships no production
-  code. It gates the sequence: its answer to <code>Q1</code>/<code>Q2</code> decides
-  whether the live-memory question is sequenced ahead of <code>A</code>, and
-  33fl owns any ratio or per-host-reservation retune that follows.</li>
+  code. It gated the sequence, and <strong>the gate is open</strong>: its <code>D13</code>
+  answers <code>Q1</code> by leaving this order as it stands, so the
+  live-memory question is not sequenced ahead of <code>A</code>. Its <code>D14</code>
+  hands 33fl a per-host-reservation retune, which 33fl owns and
+  which is not a prerequisite for any later phase. Its <code>D15</code> carries
+  in a design constraint from placeable-claims phase 4a: a hold must
+  defend a slot for a <em>shape</em> on a node, because the scheduler's
+  node ranking deliberately spreads allocation away from the most
+  committed nodes (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3937" title="GitHub Issue: shakenfist/shakenfist #3937">shakenfist#3937</a>, correctly), which is what turns
+  aggregate headroom into per-node fragments. Phases 3 and 4 own
+  that constraint.</li>
 <li><strong>Phase 1</strong> extracts the duplicated placement walk (<code>POST
   /instances</code> and preflight) into one all-or-nothing multiset walk
   through the scheduler's filters, with no behaviour change. Both
@@ -16735,19 +16777,29 @@ before either admission change.</p>
   client method, and in <code>GET /admin/resources</code>. No writes, so it
   cannot strand capacity, deadlock admission or desynchronise the
   reconciler. private-ci scores it in shadow against what jobs'
-  creates met minutes later; those counts are read before phase 3.</li>
+  creates met minutes later; those counts are read before phase 3.
+  Phase 0's <code>D13</code> makes that reading load-bearing rather than merely
+  useful: it is where <code>Q1</code>'s live-memory test is re-applied, so a
+  live share anywhere near the baseline's reopens <code>Q1</code> before phase
+  3 is written.</li>
 <li><strong>Phase 3</strong> gives the core the right to book: the per-node held
   column, the node guard term (<code>G6</code>), claim-limit validation
-  against the sum of holds, and the reconciler and release paths.</li>
+  against the sum of holds, and the reconciler and release paths.
+  Phase 0's <code>D15</code> constrains it: a hold row books one shape onto one
+  node and the node guard is what defends that slot, so neither may
+  be weakened into an aggregate reservation.</li>
 <li><strong>Phase 4</strong> is the hold lifecycle: implicit best-fit and explicit
   consumption (<code>G3</code>), holds that return on delete for the claim's
   life, re-placement in the same transaction or displacement when a
-  node leaves service (<code>D8</code>), and ground-truth overbooking.</li>
+  node leaves service (<code>D8</code>), and ground-truth overbooking. A
+  displaced hold defends no slot, which is why phase 0's <code>D15</code> has
+  it reported rather than quietly retained as an aggregate.</li>
 <li><strong>Phase 5</strong> gives claim refusals the <code>stage</code>/<code>transient</code>/
-  <code>Retry-After</code> contract (#4207), adds the held-create refusal
-  fields (<code>G7</code>), and states the split of claim denials out of the
-  transient stages that <code>CLAIM_ENFORCEMENT_HARD</code> flipping would
-  require, keeping <code>G6</code>'s node-guard switch apart from it.</li>
+  <code>Retry-After</code> contract (no open issue; see <code>S1</code>), adds the
+  held-create refusal fields (<code>G7</code>), and states the split of claim
+  denials out of the transient stages that <code>CLAIM_ENFORCEMENT_HARD</code>
+  flipping would require, keeping <code>G6</code>'s node-guard switch apart
+  from it.</li>
 <li><strong>Phase 6</strong> adds the <code>sf_claim</code>/<code>sf-client</code> shape verbs and the
   affinity expression (<code>G4</code>), writes the operator and user guides,
   and fixes the stale claim-verbs documentation (<code>Q7</code>).</li>
@@ -16821,7 +16873,10 @@ with <code>enforce=False</code> may book past holds; ground truth wins and the
 node is then overbooked, which the reconciler records.</p>
 <h3 id="phase-5-the-refusal-contract">Phase 5: the refusal contract<a class="headerlink" href="#phase-5-the-refusal-contract" title="Permanent link">&para;</a></h3>
 <p>Give claim refusals the <code>stage</code>/<code>transient</code>/<code>Retry-After</code> contract
-instance creates already have (<code>capacity_error()</code>; #4207). A held
+instance creates already have (<code>capacity_error()</code>). This phase opens
+by filing the issue for that gap: #4207 used to track it and was
+closed on 2026-10-29 having fixed only the instance side, so the
+requirement is live and untracked (<code>S1</code>). A held
 create refused on a live check gets that check's stage, <code>transient:
 true</code>, <code>Retry-After: 15</code>, and fields naming the hold and saying it
 was retained (<code>G7</code>). No new stage names (<code>G5</code>). State the split of
@@ -16829,13 +16884,21 @@ claim denials out of the transient stages that flipping
 <code>CLAIM_ENFORCEMENT_HARD</code> would require (scheduler-reservations phase
 5's territory), so the two switches do not get conflated.</p>
 <h3 id="phase-6-client-modules-and-documentation">Phase 6: client, modules and documentation<a class="headerlink" href="#phase-6-client-modules-and-documentation" title="Permanent link">&para;</a></h3>
-<p>Add shape expression to <code>sf_claim</code>/<code>sf-client</code> (<code>Q7</code>) and the
-affinity model (<code>G4</code>, <code>prefer_*</code>/<code>require_*</code>). Document both
-capabilities in the operator and user guides, including <code>GET
-/admin/resources</code>' new fields and the affinity semantics, and
-correct the stale statement that <code>sf-client</code> has no claim verbs
-(<code>docs/operator_guide/scheduler.md</code>). <code>docs/operator_guide/
-database.md</code> covers the schema change.</p>
+<p>Add shape expression to <code>sf_claim</code>/<code>sf-client</code> (<code>Q7</code>, phase 0's
+<code>D11</code>) and the affinity model (<code>G4</code>, <code>prefer_*</code>/<code>require_*</code>).
+Document both capabilities in the operator and user guides,
+including <code>GET /admin/resources</code>' new fields and the affinity
+semantics. Correct the stale claim-verb statements, which are <strong>not</strong>
+in <code>docs/operator_guide/scheduler.md</code> — that page was fixed before
+phase 0 read it — but in <code>docs/user_guide/ansible.md:24-30</code>,
+<code>shakenfist/deploy/collection/requirements.txt:16-20</code> and
+<code>shakenfist/deploy/collection/plugins/modules/sf_claim.py:27-32</code>
+and <code>:275-302</code>: each still says no release carries the verbs and
+tells the operator to install client-python from git, where <code>v0.8.4</code>
+(2026-10-28) carries them. <code>_require_claim_verbs()</code> itself stays — it
+is a probe against the client that was actually built — and only its
+prose changes. <code>docs/operator_guide/database.md</code> covers the schema
+change.</p>
 <h3 id="phase-7-push-audit">Phase 7: push audit<a class="headerlink" href="#phase-7-push-audit" title="Permanent link">&para;</a></h3>
 <p>Run <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase against
 <code>develop</code>, reading each phase's <code>Merged</code> cell for its range. Phases
@@ -16851,7 +16914,11 @@ not complete until they are resolved or declined in writing.</p>
   back to today's aggregate claim. private-ci's phase 4 wait in the
   collection's <code>sf_instance</code> (30 minutes single-instance, 10
   multi-instance, on <code>transient: true</code> only; with #4474) is a
-  separate change that is <strong>not</strong> part of this plan.</li>
+  separate change that is <strong>not</strong> part of this plan. Its phase 4a
+  (<code>PLAN-placeable-claims-phase-04a-regression.md</code>) repaired the
+  instrument the baseline above was taken with and referred one
+  design constraint inward, which this plan's phase 0 absorbed as
+  <code>D15</code>; its <code>F8</code> is also half the evidence for phase 0's <code>D13</code>.</li>
 <li><strong><code>PLAN-scheduler-reservations</code></strong> (<code>In progress</code>). <code>D14</code>, its step
   3 addendum and its "Node-scoped claims" future work are the
   decisions this plan revisits: aggregate claims stay, holds are
@@ -16949,12 +17016,23 @@ stale (see the Prompt).</p>
   the design is called "every caller".</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>None yet. Directly related open issues: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4207" title="GitHub Issue: shakenfist/shakenfist #4207">shakenfist#4207</a>
-(claim refusals carry no machine-readable contract),
-<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/1364" title="GitHub Issue: shakenfist/shakenfist #1364">shakenfist#1364</a> (lame-duck and evacuate),
-<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4474" title="GitHub Issue: shakenfist/shakenfist #4474">shakenfist#4474</a> (the functional suite's wrapper waits on
-the exception class, ignoring <code>transient</code>). The baseline and caller
-survey are shakenfist/private-ci <code>PLAN-placeable-claims</code> phase 0.</p>
+<p>None yet. Directly related open issues: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/1364" title="GitHub Issue: shakenfist/shakenfist #1364">shakenfist#1364</a>
+(lame-duck and evacuate), <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4474" title="GitHub Issue: shakenfist/shakenfist #4474">shakenfist#4474</a> (the functional
+suite's wrapper waits on the exception class, ignoring <code>transient</code>).</p>
+<p><strong>An issue still needs filing</strong>, and phase 5 owns filing it: claim
+refusals carry no machine-readable contract. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4207" title="GitHub Issue: shakenfist/shakenfist #4207">shakenfist#4207</a> was
+cited for this throughout an earlier draft of this plan, but it was
+closed as completed on 2026-10-29 by the transient-capacity-refusals
+plan, which gave the <em>instance</em> 507 its <code>stage</code>/<code>transient</code>/
+<code>Retry-After</code> fields and did not touch the claim 507. Phase 0
+re-checked the code: <code>_claim_refusal()</code> still returns a bare
+<code>sf_api.error()</code> with the per-dimension detail folded into the prose
+message. The gap is real and the requirement (<code>G7</code>, phase 5) stands;
+only the issue that tracked it is gone. Phase 0 deliberately did not
+file it — that is phase 5's first task, so the issue is written
+against the design phase 5 actually ships.</p>
+<p>The baseline and caller survey are shakenfist/private-ci
+<code>PLAN-placeable-claims</code> phase 0.</p>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
 <p>Before executing any step of this plan, please back brief the
 operator as to your understanding of the plan and how the work you
