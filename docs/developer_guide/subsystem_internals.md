@@ -61,7 +61,9 @@ ranking the next — on both accounts, because a filter which read a
 figure the snapshot did not debit would let the whole set spend the
 same headroom. So a figure added to any capacity filter has to be
 added to `PlacementSnapshot.charge()` in `shakenfist/scheduler.py` as
-well. Admission
+well, and so does an exemption: a shape assigned to the node it is
+already on is charged nothing at all, because a reschedule which lands
+an instance back where it started moves neither account. Admission
 uses the ledger, and is the guarded UPDATE the
 `AdmitInstancePlacement` RPC makes against `scheduler_node_capacity`,
 in the same transaction that writes the `placement` attribute and

@@ -558,6 +558,24 @@ the mutation covers the half of it that can be mutated.
 Script at `review-r2-mutations/run_mutations.py`, logs beside it,
 uncommitted.
 
+### Review round 3: the self-charge exemption
+
+**Twelve mutations now, all caught.** Baseline clean at 161 tests,
+tree byte-identical afterwards.
+
+| Mutation | Tests failed | Named tests |
+|----------|--------------|-------------|
+| No self-charge exemption | 2 | `test_a_shapes_own_node_is_charged_nothing_at_all`, `test_a_set_mate_can_still_use_a_rescheduled_shapes_own_node` |
+| The committed account exempted, the measured figures charged | 1 | `test_a_shapes_own_node_is_charged_nothing_at_all` |
+
+The second is the interesting one. It is the narrower fix the review
+suggested, applied as a mutation on purpose: the tests have to tell
+the full exemption apart from a committed-only one, or the choice
+between them would have been untested either way. They do, and the
+direct snapshot test is what does it — the end-to-end test passes
+under the narrower fix, because the ledger is the only account
+deciding that refusal.
+
 ### Step 1d: is the documented diagnostic procedure still true?
 
 Yes, unchanged. `docs/operator_guide/scheduler.md:1080-1100` tells an
@@ -712,6 +730,52 @@ list, which is dict construction with nothing to win until a dry run
 is measured as hot. Recorded in the master plan's phase 2 section
 with the refused-set event trail, since phase 2 is the caller that
 would feel either.
+
+**Review round 3 (2026-11-07, AEDT) raised no `fix` and no
+`document` items — seven `consider` and three informational — which
+is the exit condition, and one of the seven was taken anyway.**
+`PlacementSnapshot.charge()` applied no reschedule self-charge
+exemption, where both capacity filters do: a shape carrying
+`placed_on == X` assigned to X had its figures added on top of a row
+which already counted them, so every later shape in the set saw X as
+fuller than it was. Not reachable in production — one shape per
+call, and the last shape's charge is discarded with the snapshot —
+and pessimistic rather than over-placing when it becomes reachable,
+which is why it was not a `fix`. It was still a latent defect in
+this phase's own new code and a three-line fix, so it was taken
+rather than carried into phase 2.
+
+The fix is wider than the review suggested. The review proposed
+exempting the committed account, mirroring the filters. The
+exemption here covers both accounts: a reschedule which lands an
+instance back where it started changes nothing about that node at
+all, on the ledger because `place_instance()` early-outs on an
+unchanged placement, and on the measurement because it counted the
+instance before the decision and counts it after. The filters exempt
+only the committed account, and that asymmetry is theirs and
+predates the snapshot; a phase which promises behaviour preservation
+is the wrong place to change it. The narrower fix was run as a
+mutation to prove the tests tell the two apart.
+
+The invariant `AGENTS.md` and the developer guide gained in round 2
+stated only its forward half — a figure a filter reads must be
+debited. Both now carry the mirror: an exemption a filter applies
+must be applied to the charge.
+
+The other six `consider` items were declined. Two were re-raises of
+items already handled in rounds 1 and 2 (the per-shape
+`schedule inputs` comment, which exists, and the event-payload
+construction, which is recorded in the master plan's phase 2
+section). One was about the parameter this round's predecessor
+added, which is the point at which a review is reviewing its own
+earlier advice. The two test gaps — hard affinity and the degraded
+capacity read, neither exercised by a *multiset* test — are both
+exercised through the new core by the existing single-shape tests,
+because `find_candidates()` is now a caller of
+`find_candidates_for_shapes()`: every one of those tests runs the
+multiset path at n=1. And restating `instance.placement_filter()` as
+`shape.placed_on == node` is the conversion this phase exists to
+make, not duplication to remove.
 
 **One repository-level flake, unrelated to this phase.** The
 `Test the internal_ca role` pre-commit hook fails on the first

@@ -272,7 +272,27 @@ class PlacementSnapshot:
         measurement would ever produce, and the filters still refuse
         correctly, so such a set is less evenly spread rather than
         over-placed.
+
+        A shape assigned to the node it is already on is charged
+        nothing, on either account. A reschedule which lands an
+        instance back where it started changes nothing about that node:
+        place_instance() early-outs on an unchanged placement so the
+        ledger does not move, and the measurement counted the instance
+        before the decision and counts it after. Charging it would make
+        the node look fuller to every later shape in the set by the
+        size of a request that was never added. This is the mirror of
+        the exemption _has_sufficient_cpu() and _has_sufficient_ram()
+        apply to the committed account, and the rule it belongs to: an
+        exemption a filter applies has to be applied to the charge, or
+        the two disagree about the same node. Those filters exempt only
+        the committed account, and that asymmetry is theirs and
+        predates the snapshot -- it is not copied here, because a
+        charge is answering what the node looks like afterwards rather
+        than deciding a refusal.
         """
+        if shape.placed_on == node:
+            return
+
         self.ensure_capacity()
 
         measured = dict(self._metrics[node])

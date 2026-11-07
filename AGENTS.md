@@ -163,11 +163,13 @@ metrics. The headlines:
   `_compute_reservations()` in the resources daemon, the module-level
   `scheduler._schedulable_threads()` / `_memory_reserved_mb()`, and the
   reconciler's limit-derivation helpers in `mariadb.py`. Changing one
-  means changing all three. A fourth rule rides on top: a figure any
-  capacity filter reads must also be debited in
-  `scheduler.PlacementSnapshot.charge()`, or placing a set of shapes in
-  one decision spends the same headroom twice through whichever figure
-  was missed — see
+  means changing all three. A fourth rule rides on top, in both
+  directions: a figure any capacity filter reads must also be debited
+  in `scheduler.PlacementSnapshot.charge()`, or placing a set of shapes
+  in one decision spends the same headroom twice through whichever
+  figure was missed; and an exemption a filter applies must be applied
+  to the charge as well, or the filter and the charge disagree about
+  the same node — see
   [docs/developer_guide/subsystem_internals.md](docs/developer_guide/subsystem_internals.md).
 
 - **`agent_state` is written against `power_state`.** The sidechannel

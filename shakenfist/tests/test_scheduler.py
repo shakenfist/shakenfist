@@ -3029,7 +3029,8 @@ class MultisetPlacementTestCase(SchedulerTestCase):
         metrics.update(overrides)
         return metrics
 
-    def _shape(self, cpus=1, memory_mb=1024, disk_gb=0, affinity=None):
+    def _shape(self, cpus=1, memory_mb=1024, disk_gb=0, affinity=None,
+               placed_on=None):
         """A requested shape with no instance behind it.
 
         Which is the point of the type: nothing here has a row, a uuid
@@ -3037,7 +3038,8 @@ class MultisetPlacementTestCase(SchedulerTestCase):
         """
         return scheduler.PlacementShape(
             cpus=cpus, memory_mb=memory_mb, disk_gb=disk_gb,
-            affinity=affinity or {}, namespace='unittest')
+            affinity=affinity or {}, namespace='unittest',
+            placed_on=placed_on)
 
     def _targets(self):
         """Somewhere for the decision's audit events to be addressed."""
@@ -3389,6 +3391,70 @@ class MultisetPlacementTestCase(SchedulerTestCase):
             counts[shape_count] = from_db.call_count
 
         self.assertEqual(counts[1], counts[4])
+
+    def test_a_shapes_own_node_is_charged_nothing_at_all(self):
+        # The mirror of the exemption the capacity filters apply: an
+        # instance rescheduled back onto the node it is already on
+        # changes nothing there, so neither account moves. Charging it
+        # would make the node look fuller to every later shape in the
+        # set by the size of a request that was never added.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        home = self._node_uuid('node3')
+        elsewhere = self._node_uuid('node2')
+        for node in ('node2', 'node3', 'node4'):
+            self.mock_mariadb.set_node_capacity(
+                self._node_uuid(node), limit_cpus=64, limit_memory_mb=65536,
+                used_cpus=2, used_memory_mb=4096)
+        s = scheduler.Scheduler()
+        capacity, _ = s._capacity_by_node()
+        snapshot = scheduler.PlacementSnapshot(
+            s.metrics, lambda: (capacity, False))
+        shape = self._shape(cpus=2, memory_mb=4096, placed_on=home)
+
+        snapshot.charge(shape, home)
+
+        self.assertEqual(2, snapshot.capacity_row(home)['used_cpus'])
+        self.assertEqual(
+            4096, snapshot.capacity_row(home)['used_memory_mb'])
+        self.assertEqual(
+            32768, snapshot.node_metrics(home)['memory_available'])
+        self.assertEqual(
+            0, snapshot.node_metrics(home)['cpu_total_instance_vcpus'])
+
+        # The exemption is about that one node, not about the shape: the
+        # same shape charged anywhere else is charged in full.
+        snapshot.charge(shape, elsewhere)
+
+        self.assertEqual(4, snapshot.capacity_row(elsewhere)['used_cpus'])
+        self.assertEqual(
+            8192, snapshot.capacity_row(elsewhere)['used_memory_mb'])
+        self.assertEqual(
+            32768 - 4096,
+            snapshot.node_metrics(elsewhere)['memory_available'])
+
+    def test_a_set_mate_can_still_use_a_rescheduled_shapes_own_node(self):
+        # End to end, and the ledger is the only thing deciding it.
+        # node3 has room for exactly one more shape; node2 and node4
+        # have none. The first shape is already on node3, so the filter
+        # exempts its own charge and node3 is its only candidate. The
+        # second shape then needs node3's ledger to read what it really
+        # is -- charging the first shape to the node it was already on
+        # would fill it and refuse the whole set.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        home = self._node_uuid('node3')
+        self.mock_mariadb.set_node_capacity(
+            home, limit_cpus=64, limit_memory_mb=16384, used_memory_mb=8192)
+        for node in ('node2', 'node4'):
+            self.mock_mariadb.set_node_capacity(
+                self._node_uuid(node), limit_cpus=64,
+                limit_memory_mb=16384, used_memory_mb=16384)
+
+        assignment = scheduler.Scheduler().find_candidates_for_shapes(
+            [self._shape(memory_mb=8192, placed_on=home),
+             self._shape(memory_mb=8192)])
+
+        self.assertEqual([home], assignment[0])
+        self.assertEqual([home], assignment[1])
 
     def test_shapes_are_walked_largest_first(self):
         # Memory, then vCPUs, then disk, each descending, with the order
