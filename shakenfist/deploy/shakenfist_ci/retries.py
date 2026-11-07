@@ -52,9 +52,9 @@ DIMENSIONS = ('cpus', 'memory_mb', 'disk_gb')
 def requested_disk_gb(disk_spec):
     """How much disk a create asks for, counted as the scheduler counts it.
 
-    _has_sufficient_disk() sums the 'size' of each disk which has one and
-    ignores the sizeless ones (a CD ROM is exactly the size of its base
-    image), so this does the same. A caller which passes no disk spec at
+    PlacementShape.from_instance() sums the 'size' of each disk which has
+    one and ignores the sizeless ones (a CD ROM is exactly the size of its
+    base image), so this does the same. A caller which passes no disk spec at
     all asks for nothing.
     """
     requested = 0

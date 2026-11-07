@@ -82,6 +82,17 @@ class SchedulerTestCase(base.ShakenFistTestCase):
                 for n in self.mock_mariadb.node_names
                 if n != 'node1_net'}
 
+    def _snapshot(self, s, capacity=None):
+        """The two accounts a filter reads, as the decision hands them over.
+
+        A filter called directly still has to be given both the measured
+        figures and the committed counters, because it reads both. The
+        counters default to an empty but readable table, which is the
+        state of a cluster the reconciler has not sized.
+        """
+        rows = {} if capacity is None else capacity
+        return scheduler.PlacementSnapshot(s.metrics, lambda: (rows, False))
+
 
 class LowResourceTestCase(SchedulerTestCase):
     """Test low resource exceptions."""
@@ -963,7 +974,8 @@ class SummaryExclusionsTestCase(SchedulerTestCase):
         self.assertNotIn(node3, resources['excluded'])
 
         # The candidate filter reports the same reason for the same node.
-        ok, reason = s._has_reasonable_queue_state(s.log, node2)
+        ok, reason = s._has_reasonable_queue_state(
+            s.log, node2, self._snapshot(s))
         self.assertFalse(ok)
         self.assertEqual(reason, resources['excluded'][node2])
 
@@ -1234,10 +1246,11 @@ class CapacityCounterTestCase(SchedulerTestCase):
 
     def test_prefilter_reads_the_placement_attribute_once(self):
         # The self-charge check calls placement_filter(), which reads
-        # inst.placement -- an instance_attributes fetch -- and it runs
-        # for every candidate carrying a non-zero used_cpus. The value is
-        # identical for all of them, so the decision memoises the row
-        # rather than re-fetching it per candidate.
+        # inst.placement -- an instance_attributes fetch. The shape is
+        # built once, at the top of the decision, and carries the
+        # placement with it, so the read happens once however many
+        # candidates there are, and the bound also covers a cluster
+        # whose ledgers are all zero.
         self.mock_mariadb.set_node_metrics_same(self._baseline())
         for node in ('node2', 'node3', 'node4'):
             self.mock_mariadb.set_node_capacity(
@@ -2443,7 +2456,9 @@ class HasSufficientCPUPredicateTestCase(SchedulerTestCase):
         self.mock_mariadb.set_node_metrics_same(self._baseline(**metrics_overrides))
         s = scheduler.Scheduler()
         log_ctx = s.log.with_fields({'instance': inst})
-        return s._has_sufficient_cpu(log_ctx, inst, node, capacity)
+        return s._has_sufficient_cpu(
+            log_ctx, scheduler.PlacementShape.from_instance(inst), node,
+            self._snapshot(s, capacity))
 
     def test_exactly_at_the_capacity_row_limit_is_sufficient(self):
         # committed (4) + requested (4) == limit (8). Landing exactly on
@@ -2605,7 +2620,9 @@ class CpuCeilingAgreementTestCase(SchedulerTestCase):
         inst = self.mock_mariadb.create_instance(
             'ceiling-%d' % cpus, cpus=cpus)
         ok, _ = s._has_sufficient_cpu(
-            s.log.with_fields({'instance': inst}), inst, self.node, capacity)
+            s.log.with_fields({'instance': inst}),
+            scheduler.PlacementShape.from_instance(inst), self.node,
+            self._snapshot(s, capacity))
         return ok
 
     def _assert_all_three_agree(self, expected):
@@ -2696,7 +2713,9 @@ class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
         self.mock_mariadb.set_node_metrics_same(self._baseline(**metrics_overrides))
         s = scheduler.Scheduler()
         log_ctx = s.log.with_fields({'instance': inst})
-        return s._has_sufficient_ram(log_ctx, inst, node, capacity)
+        return s._has_sufficient_ram(
+            log_ctx, scheduler.PlacementShape.from_instance(inst), node,
+            self._snapshot(s, capacity))
 
     def test_exactly_the_available_memory_is_sufficient(self):
         # available - memory == 0.0, not < 0.0, so landing exactly on the
@@ -2831,7 +2850,9 @@ class HasSufficientDiskPredicateTestCase(SchedulerTestCase):
         self.mock_mariadb.set_node_metrics_same(self._baseline(**metrics_overrides))
         s = scheduler.Scheduler()
         log_ctx = s.log.with_fields({'instance': inst})
-        return s._has_sufficient_disk(log_ctx, inst, node)
+        return s._has_sufficient_disk(
+            log_ctx, scheduler.PlacementShape.from_instance(inst), node,
+            self._snapshot(s))
 
     def test_exactly_the_free_disk_is_sufficient(self):
         # requested (100) > disk_free (100.0) is False at the boundary, so
@@ -2878,7 +2899,9 @@ class HasIdleDiskBandwidthPredicateTestCase(SchedulerTestCase):
             {DISK_BUSY_PER_SECOND_METRIC: busy_time})
         s = scheduler.Scheduler()
         log_ctx = s.log.with_fields({'instance': inst})
-        return s._has_idle_disk_bandwidth(log_ctx, inst, node)
+        return s._has_idle_disk_bandwidth(
+            log_ctx, scheduler.PlacementShape.from_instance(inst), node,
+            self._snapshot(s))
 
     def test_exactly_1200ms_per_second_is_idle(self):
         # The comparison is strictly greater-than, so 1200 exactly is NOT
@@ -2972,3 +2995,566 @@ class SchedulerStageAttributeTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage affinity_constraints: '
             'requires tag nonexistent', str(exc))
+
+
+class MultisetPlacementTestCase(SchedulerTestCase):
+    """Placing a set of requested shapes, all or nothing.
+
+    Every assertion here is about a candidate *set*, a load bucket, an
+    exception class and stage, or a sequence of audit events. The
+    candidate list ends in a weighted random shuffle, so two calls with
+    identical inputs legitimately return the same nodes in a different
+    order and a test which pinned that order would pass today and flake
+    later.
+    """
+
+    def _baseline(self, **overrides):
+        # Four schedulable threads and the fake config's overcommit ratio
+        # of 16 cap each node at 64 vCPUs, and 32 GB of measured memory
+        # with nothing reserved leaves room for several shapes. Disk is
+        # deliberately roomy: the tests which care about disk say so.
+        metrics = {
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'cpu_schedulable': 4,
+            'cpu_total_instance_vcpus': 0,
+            'cpu_load_1': 0,
+            'memory_available': 32768,
+            'memory_reserved_mb': 0,
+            'memory_max': 65536,
+            'memory_total_instance_actual': 0,
+            'disk_free_instances': 1000 * GiB,
+            'disk_reservation_gb': 0,
+        }
+        metrics.update(overrides)
+        return metrics
+
+    def _shape(self, cpus=1, memory_mb=1024, disk_gb=0, affinity=None,
+               placed_on=None):
+        """A requested shape with no instance behind it.
+
+        Which is the point of the type: nothing here has a row, a uuid
+        or a placement, and the pipeline still evaluates it.
+        """
+        return scheduler.PlacementShape(
+            cpus=cpus, memory_mb=memory_mb, disk_gb=disk_gb,
+            affinity=affinity or {}, namespace='unittest',
+            placed_on=placed_on)
+
+    def _targets(self):
+        """Somewhere for the decision's audit events to be addressed."""
+        return [('node', self._node_uuid('node2'))]
+
+    def _seed_memory_ledger(self, limit_memory_mb):
+        for node in ('node2', 'node3', 'node4'):
+            self.mock_mariadb.set_node_capacity(
+                self._node_uuid(node), limit_cpus=64,
+                limit_memory_mb=limit_memory_mb)
+
+    def _events(self, aem, name):
+        """Every call which published this event, in the order published."""
+        return [c for c in aem.call_args_list if c.args[2] == name]
+
+    def test_a_set_which_fits_places_every_shape(self):
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        assignment = scheduler.Scheduler().find_candidates_for_shapes(
+            [self._shape(), self._shape()])
+
+        self.assertEqual([0, 1], list(assignment.keys()))
+        for index in (0, 1):
+            self.assertSetEqual(
+                self._all_hypervisor_uuids(), set(assignment[index]),
+                'shape %d' % index)
+
+    def test_the_committed_ledger_charge_excludes_a_set_mates_node(self):
+        # Each node's ledger has room for exactly one of these shapes,
+        # and every node measures as having room for both. Only the
+        # committed charge can take the first shape's node away from the
+        # second, so this fails if the charge misses the counters.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self._seed_memory_ledger(8192)
+
+        assignment = scheduler.Scheduler().find_candidates_for_shapes(
+            [self._shape(memory_mb=8192), self._shape(memory_mb=8192)])
+
+        taken = assignment[0][0]
+        self.assertSetEqual(
+            self._all_hypervisor_uuids() - {taken}, set(assignment[1]))
+
+    def test_the_measured_charge_excludes_a_set_mates_node(self):
+        # No node has a capacity row here, so the committed counters say
+        # nothing at all and the measurement is the whole story: each
+        # node measures room for exactly one of these shapes. This is
+        # the mirror of the test above, and it fails if the charge
+        # reaches the counters but not the measurements -- which is the
+        # mistake that would let a whole set pass the live checks against
+        # one unchanged snapshot.
+        self.mock_mariadb.set_node_metrics_same(
+            self._baseline(memory_available=8192))
+
+        assignment = scheduler.Scheduler().find_candidates_for_shapes(
+            [self._shape(memory_mb=8192), self._shape(memory_mb=8192)])
+
+        taken = assignment[0][0]
+        self.assertSetEqual(
+            self._all_hypervisor_uuids() - {taken}, set(assignment[1]))
+
+    def test_the_committed_cpu_charge_excludes_a_set_mates_node(self):
+        # The CPU mirror of the committed memory test above, because
+        # used_cpus is the other half of the committed charge and was
+        # otherwise only ever asserted directly on the snapshot. Each
+        # node's ledger already carries four vCPUs which nothing has
+        # measured, so the committed figure stays ahead of the
+        # measurement for the whole call: the first shape takes its
+        # node's ledger to eight of the eleven it is allowed, and only
+        # the committed charge can take that node away from the second
+        # shape. Removing the measured charge instead leaves this
+        # outcome unchanged, which is what makes this the CPU half.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        for node in ('node2', 'node3', 'node4'):
+            self.mock_mariadb.set_node_capacity(
+                self._node_uuid(node), limit_cpus=11,
+                limit_memory_mb=65536, used_cpus=4)
+
+        assignment = scheduler.Scheduler().find_candidates_for_shapes(
+            [self._shape(cpus=4), self._shape(cpus=4)])
+
+        taken = assignment[0][0]
+        self.assertSetEqual(
+            self._all_hypervisor_uuids() - {taken}, set(assignment[1]))
+
+    def test_a_set_bigger_than_any_one_node_still_fits_the_cluster(self):
+        # Three shapes, three nodes, and room for exactly one shape on
+        # each: the set fits only if it is spread, which is what
+        # charging each shape before ranking the next one produces.
+        self.mock_mariadb.set_node_metrics_same(
+            self._baseline(memory_available=8192))
+
+        assignment = scheduler.Scheduler().find_candidates_for_shapes(
+            [self._shape(memory_mb=8192)] * 3)
+
+        self.assertSetEqual(
+            self._all_hypervisor_uuids(),
+            {assignment[index][0] for index in (0, 1, 2)})
+
+    def test_a_set_bigger_than_the_cluster_raises_rather_than_part_placing(self):
+        # One shape more than the cluster can hold. The whole call fails
+        # with the stage and the exception class a single request of the
+        # fourth shape would have failed with, and the caller is given no
+        # assignment at all rather than three quarters of one.
+        self.mock_mariadb.set_node_metrics_same(
+            self._baseline(memory_available=8192))
+        s = scheduler.Scheduler()
+
+        exc = self.assertRaises(
+            exceptions.LowResourceException,
+            s.find_candidates_for_shapes, [self._shape(memory_mb=8192)] * 4)
+
+        self.assertEqual('sufficient_idle_memory', exc.stage)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage sufficient_idle_memory',
+            str(exc))
+
+    def test_a_disk_charge_is_debited_in_bytes(self):
+        # disk_free_instances is published in bytes and a shape's disk is
+        # denominated in GB, so the debit is scaled. Charging the raw GB
+        # figure against the bytes one would debit a seventieth of a
+        # millionth of what was asked for.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        node = self._node_uuid('node2')
+        s = scheduler.Scheduler()
+        snapshot = scheduler.PlacementSnapshot(s.metrics, lambda: ({}, False))
+
+        snapshot.charge(self._shape(disk_gb=7), node)
+
+        self.assertEqual(
+            1000 * GiB - 7 * GiB,
+            snapshot.node_metrics(node)['disk_free_instances'])
+
+    def test_a_disk_charge_excludes_a_set_mates_node(self):
+        # The end of the same arithmetic. Each node publishes 100 GB of
+        # free disk, which hosts one of these shapes but not two, so the
+        # second shape can only be placed elsewhere. The margin is
+        # deliberately wide rather than exact: a debit of 60 *bytes*
+        # against a bytes figure also moves a node off an exact
+        # boundary, so a boundary fixture would refuse the node whether
+        # the units were right or wrong and would distinguish nothing.
+        self.mock_mariadb.set_node_metrics_same(
+            self._baseline(disk_free_instances=100 * GiB))
+
+        assignment = scheduler.Scheduler().find_candidates_for_shapes(
+            [self._shape(disk_gb=60), self._shape(disk_gb=60)])
+
+        taken = assignment[0][0]
+        self.assertSetEqual(
+            self._all_hypervisor_uuids() - {taken}, set(assignment[1]))
+
+    def test_a_node_with_no_capacity_row_is_charged_on_measurement_only(self):
+        # A node the reconciler has not sized is unguarded at admission,
+        # so a charge must not invent a ledger for it -- a zeroed row
+        # would read as a node with no headroom at all. It is still
+        # charged on the measurement, which is all a filter has to go on
+        # there.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        unsized = self._node_uuid('node2')
+        sized = self._node_uuid('node3')
+        self.mock_mariadb.set_node_capacity(
+            sized, limit_cpus=64, limit_memory_mb=65536)
+        s = scheduler.Scheduler()
+        capacity, _ = s._capacity_by_node()
+        snapshot = scheduler.PlacementSnapshot(
+            s.metrics, lambda: (capacity, False))
+
+        snapshot.charge(self._shape(cpus=2, memory_mb=4096), unsized)
+        snapshot.charge(self._shape(cpus=2, memory_mb=4096), sized)
+
+        self.assertIsNone(snapshot.capacity_row(unsized))
+        self.assertEqual(
+            32768 - 4096, snapshot.node_metrics(unsized)['memory_available'])
+        self.assertEqual(
+            2, snapshot.node_metrics(unsized)['cpu_total_instance_vcpus'])
+        self.assertEqual(2, snapshot.capacity_row(sized)['used_cpus'])
+        self.assertEqual(
+            4096, snapshot.capacity_row(sized)['used_memory_mb'])
+
+    def test_an_unguarded_node_still_refuses_a_second_shape_it_cannot_measure(
+            self):
+        # The same node end to end, and the only candidate offered: it
+        # has no capacity row, it measures room for one shape, and the
+        # second shape is refused on the measured ledger the charge
+        # moved.
+        self.mock_mariadb.set_node_metrics_same(
+            self._baseline(memory_available=8192))
+        node = self._node_uuid('node2')
+        s = scheduler.Scheduler()
+
+        exc = self.assertRaises(
+            exceptions.LowResourceException, s.find_candidates_for_shapes,
+            [self._shape(memory_mb=8192)] * 2, candidates=[node])
+
+        self.assertEqual('sufficient_idle_memory', exc.stage)
+
+    def test_charging_leaves_the_scheduler_and_the_counters_untouched(self):
+        # The charges are a per-call overlay. The Scheduler outlives the
+        # decision and other decisions read the same metrics dicts, so
+        # charging either account in place would make one request's
+        # tentative arithmetic permanent for every request after it.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self._seed_memory_ledger(65536)
+        s = scheduler.Scheduler()
+        metrics_before = {node: dict(figures)
+                          for node, figures in s.metrics.items()}
+        ledger_before = {node: dict(row) for node, row
+                         in self.mock_mariadb.node_capacity.items()}
+
+        s.find_candidates_for_shapes(
+            [self._shape(cpus=2, memory_mb=4096, disk_gb=11)] * 2)
+
+        self.assertEqual(metrics_before, s.metrics)
+        self.assertEqual(ledger_before, self.mock_mariadb.node_capacity)
+
+    def test_a_forced_candidate_list_is_not_consumed_by_the_first_shape(self):
+        # Every shape in a set starts from the whole of the caller's
+        # forced list, and the caller's own list is still intact
+        # afterwards.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        forced = [self._node_uuid('node2'), self._node_uuid('node3')]
+
+        assignment = scheduler.Scheduler().find_candidates_for_shapes(
+            [self._shape(), self._shape()], candidates=list(forced))
+
+        self.assertSetEqual(set(forced), set(assignment[0]))
+        self.assertSetEqual(set(forced), set(assignment[1]))
+
+    def test_a_charge_reranks_the_node_it_was_charged_to(self):
+        # Each shape is ranked against the charges applied so far, not
+        # packed onto whichever node ranked best at the start. Half of
+        # this node's ledger goes to the first shape, which puts it two
+        # buckets behind its siblings for the second -- still a
+        # candidate, because it can host the shape, but no longer in the
+        # winning tier.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self._seed_memory_ledger(16384)
+
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            assignment = scheduler.Scheduler().find_candidates_for_shapes(
+                [self._shape(memory_mb=8192)] * 2,
+                related_objects=self._targets())
+
+        taken = assignment[0][0]
+        self.assertSetEqual(
+            self._all_hypervisor_uuids(), set(assignment[1]))
+        published = self._events(aem, 'schedule have lowest cpu load')
+        self.assertEqual(2, len(published))
+        extra = published[1].kwargs['extra']
+        self.assertEqual(0, extra['lowest_load'])
+        self.assertEqual(2, extra['load_detail'][taken]['bucket'])
+        self.assertSetEqual(
+            self._all_hypervisor_uuids() - {taken}, set(extra['candidates']))
+
+    def test_a_charge_cannot_rerank_a_node_with_no_committed_row(self):
+        # The limit of what a charge does to the ranking, and the
+        # mirror of the test above. No node has a capacity row here, so
+        # ram_fraction is zero whatever is charged, and cpu_load_1 --
+        # the other half of the bucket -- is never charged at all. The
+        # node the first shape was charged to is therefore still in the
+        # winning load bucket for the second. The capacity filters do
+        # see the charge, so this is about how evenly a set spreads on
+        # an unsized cluster rather than whether it is over-placed.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            assignment = scheduler.Scheduler().find_candidates_for_shapes(
+                [self._shape(memory_mb=8192)] * 2,
+                related_objects=self._targets())
+
+        taken = assignment[0][0]
+        published = self._events(aem, 'schedule have lowest cpu load')
+        self.assertEqual(2, len(published))
+        extra = published[1].kwargs['extra']
+        self.assertEqual(0, extra['lowest_load'])
+        self.assertEqual(0, extra['load_detail'][taken]['bucket'])
+        self.assertIn(taken, extra['candidates'])
+
+    def test_an_empty_set_is_refused(self):
+        # Rather than answered with an empty assignment, which a caller
+        # asking whether a set fits would read as "all of it does".
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        self.assertRaises(
+            ValueError,
+            scheduler.Scheduler().find_candidates_for_shapes, [])
+
+    def test_a_set_is_not_its_own_affinity_neighbour(self):
+        # D6, which the entry point's docstring promises and nothing
+        # asserted: a set's members are charged for capacity but are
+        # invisible to each other's affinity stages, because both
+        # stages read placed instance rows and a shape has none. One
+        # tagged instance sits on node3, so node3 wins the tier for
+        # both shapes -- and the second shape sees node3 carrying one
+        # instance, not two, so the first shape being assigned there
+        # scored nothing.
+        #
+        # This is also the first coverage of a shape with no
+        # instance_uuid reaching _affinity_neighbour_skip(): the
+        # tagged neighbour is scored rather than skipped as self,
+        # which is the right answer for a shape and the normal case
+        # for every caller after this phase.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['socialite']})
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        affinity = {'prefer_with_tag': ['socialite']}
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            assignment = scheduler.Scheduler().find_candidates_for_shapes(
+                [self._shape(affinity=affinity)] * 2,
+                related_objects=self._targets())
+
+        node3 = self._node_uuid('node3')
+        self.assertEqual(node3, assignment[0][0])
+        self.assertEqual(node3, assignment[1][0])
+
+        published = self._events(aem, 'schedule have highest affinity')
+        self.assertEqual(2, len(published))
+        for index, call in enumerate(published):
+            extra = call.kwargs['extra']
+            self.assertEqual(1, extra['highest_affinity'], 'shape %d' % index)
+            self.assertEqual([node3], extra['candidates'],
+                             'shape %d' % index)
+            self.assertEqual(
+                1, extra['affinity_detail'][node3]['instance_count'],
+                'shape %d' % index)
+
+    def test_a_nodes_placements_are_read_once_for_a_whole_set(self):
+        # The memo lives beside the snapshot, so it spans the decision
+        # rather than each shape: a node every shape considers is read
+        # once however many shapes there are. Asserted against a
+        # one-shape call rather than a fixed number, so the bound is
+        # "no more than one shape costs", which is the property, and
+        # not a count that a change to the stage order would move.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['socialite']})
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        affinity = {'prefer_with_tag': ['socialite']}
+
+        real_from_db = scheduler.Node.from_db
+        counts = {}
+        for shape_count in (1, 4):
+            with mock.patch('shakenfist.scheduler.Node.from_db',
+                            side_effect=real_from_db) as from_db:
+                scheduler.Scheduler().find_candidates_for_shapes(
+                    [self._shape(affinity=affinity)] * shape_count,
+                    related_objects=self._targets())
+            counts[shape_count] = from_db.call_count
+
+        self.assertEqual(counts[1], counts[4])
+
+    def test_a_shapes_own_node_is_charged_nothing_at_all(self):
+        # The mirror of the exemption the capacity filters apply: an
+        # instance rescheduled back onto the node it is already on
+        # changes nothing there, so neither account moves. Charging it
+        # would make the node look fuller to every later shape in the
+        # set by the size of a request that was never added.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        home = self._node_uuid('node3')
+        elsewhere = self._node_uuid('node2')
+        for node in ('node2', 'node3', 'node4'):
+            self.mock_mariadb.set_node_capacity(
+                self._node_uuid(node), limit_cpus=64, limit_memory_mb=65536,
+                used_cpus=2, used_memory_mb=4096)
+        s = scheduler.Scheduler()
+        capacity, _ = s._capacity_by_node()
+        snapshot = scheduler.PlacementSnapshot(
+            s.metrics, lambda: (capacity, False))
+        shape = self._shape(cpus=2, memory_mb=4096, placed_on=home)
+
+        snapshot.charge(shape, home)
+
+        self.assertEqual(2, snapshot.capacity_row(home)['used_cpus'])
+        self.assertEqual(
+            4096, snapshot.capacity_row(home)['used_memory_mb'])
+        self.assertEqual(
+            32768, snapshot.node_metrics(home)['memory_available'])
+        self.assertEqual(
+            0, snapshot.node_metrics(home)['cpu_total_instance_vcpus'])
+
+        # The exemption is about that one node, not about the shape: the
+        # same shape charged anywhere else is charged in full.
+        snapshot.charge(shape, elsewhere)
+
+        self.assertEqual(4, snapshot.capacity_row(elsewhere)['used_cpus'])
+        self.assertEqual(
+            8192, snapshot.capacity_row(elsewhere)['used_memory_mb'])
+        self.assertEqual(
+            32768 - 4096,
+            snapshot.node_metrics(elsewhere)['memory_available'])
+
+    def test_a_set_mate_can_still_use_a_rescheduled_shapes_own_node(self):
+        # End to end, and the ledger is the only thing deciding it.
+        # node3 has room for exactly one more shape; node2 and node4
+        # have none. The first shape is already on node3, so the filter
+        # exempts its own charge and node3 is its only candidate. The
+        # second shape then needs node3's ledger to read what it really
+        # is -- charging the first shape to the node it was already on
+        # would fill it and refuse the whole set.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        home = self._node_uuid('node3')
+        self.mock_mariadb.set_node_capacity(
+            home, limit_cpus=64, limit_memory_mb=16384, used_memory_mb=8192)
+        for node in ('node2', 'node4'):
+            self.mock_mariadb.set_node_capacity(
+                self._node_uuid(node), limit_cpus=64,
+                limit_memory_mb=16384, used_memory_mb=16384)
+
+        assignment = scheduler.Scheduler().find_candidates_for_shapes(
+            [self._shape(memory_mb=8192, placed_on=home),
+             self._shape(memory_mb=8192)])
+
+        self.assertEqual([home], assignment[0])
+        self.assertEqual([home], assignment[1])
+
+    def test_shapes_are_walked_largest_first(self):
+        # Memory, then vCPUs, then disk, each descending, with the order
+        # the caller gave as the final tie break. Read off the sequence
+        # of inputs events, which is the only place the walk order is
+        # observable -- the returned assignment is keyed by the caller's
+        # own indexes.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        shapes = [
+            self._shape(cpus=1, memory_mb=1024, disk_gb=10),
+            self._shape(cpus=1, memory_mb=8192, disk_gb=10),
+            self._shape(cpus=4, memory_mb=1024, disk_gb=10),
+            self._shape(cpus=1, memory_mb=1024, disk_gb=50),
+        ]
+
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            assignment = scheduler.Scheduler().find_candidates_for_shapes(
+                shapes, related_objects=self._targets())
+
+        walked = [(c.kwargs['extra']['requested_memory_mb'],
+                   c.kwargs['extra']['requested_cpus'],
+                   c.kwargs['extra']['requested_disk_gb'])
+                  for c in self._events(aem, 'schedule inputs')]
+        self.assertEqual(
+            [(8192, 1, 10), (1024, 4, 10), (1024, 1, 50), (1024, 1, 10)],
+            walked)
+        # The assignment is keyed by the caller's indexes regardless.
+        self.assertEqual([0, 1, 2, 3], list(assignment.keys()))
+
+    def test_a_numeric_string_request_becomes_an_integer_shape(self):
+        # The create API accepts a numeric string for an integer body
+        # field on purpose, and Instance.__init__ stores what it was
+        # handed, so an instance really can carry its vCPU count as '2'
+        # for as long as the in-memory object lives -- which is exactly
+        # the window a create's scheduling decision runs in. The typed
+        # column means a later read from the database gives an integer
+        # back, which is why this was only ever reachable on the create
+        # path. The shape says those figures are integers, and
+        # everything downstream of it does arithmetic on them --
+        # ordering a set largest first, and charging a node -- so the
+        # factory is where the string stops.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        inst = self.mock_mariadb.create_instance(
+            'stringy-inst', cpus='2', memory='4096')
+
+        shape = scheduler.PlacementShape.from_instance(inst)
+
+        self.assertEqual(2, shape.cpus)
+        self.assertEqual(4096, shape.memory_mb)
+        # And a set of them orders and charges without complaint.
+        assignment = scheduler.Scheduler().find_candidates_for_shapes(
+            [shape, shape])
+        self.assertSetEqual(
+            self._all_hypervisor_uuids(), set(assignment[0]))
+
+    def test_a_call_with_no_event_targets_addresses_nothing(self):
+        # A speculative evaluation stays out of the event log, and off
+        # the database load budget, because the core publishes only to
+        # the targets it was handed.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            scheduler.Scheduler().find_candidates_for_shapes([self._shape()])
+
+        self.assertEqual(
+            [], [c.args[2] for c in aem.call_args_list if c.args[1]])
+        self.assertNotEqual([], aem.call_args_list)
+
+    def test_a_one_shape_call_publishes_the_create_path_events(self):
+        # find_candidates() is the one-shape caller of the core, and the
+        # create path's event trail is a documented diagnostic
+        # interface: an operator picks the create-path pass out by the
+        # schedule inputs event whose forced_candidates is false, then
+        # reads that pass's schedule have highest affinity. Both must
+        # still be there, in this order, with the rest of the sequence
+        # unchanged around them.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        inst = self.mock_mariadb.create_instance('fake-inst')
+
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            scheduler.Scheduler().find_candidates(inst)
+
+        self.assertEqual([
+            'started scheduling',
+            'schedule inputs',
+            'schedule initial candidates',
+            'schedule at stage pre_schedule',
+            'schedule at stage is_hypervisor',
+            'schedule at stage cpu_max_per_instance',
+            'schedule at stage sufficient_idle_cpu',
+            'schedule at stage sufficient_idle_memory',
+            'schedule at stage sufficient_free_disk',
+            'schedule have highest affinity',
+            'schedule at stage queue_state',
+            'schedule at stage sufficient_idle_disk',
+            'schedule have lowest cpu load',
+            'schedule final candidates',
+        ], [c.args[2] for c in aem.call_args_list])
+        inputs = self._events(aem, 'schedule inputs')[0].kwargs['extra']
+        self.assertFalse(inputs['forced_candidates'])
+        self.assertEqual(
+            [{'base': 'cirros', 'size': 21}], inputs['disk_spec'])
+        self.assertEqual(21, inputs['requested_disk_gb'])
