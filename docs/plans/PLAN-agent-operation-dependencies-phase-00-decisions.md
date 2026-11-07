@@ -432,6 +432,13 @@ gate's substance.
 - **This session may push the branch and open the pull request** once
   the definition of done passes; the operator granted that up front
   rather than at the end.
+- **0a read two CI runs, not the five its brief asked for.**
+  `ci-status` returns at most the newest 100 workflow runs with no
+  event filter and no pagination, and that page held three successful
+  `merge_group` functional runs, one of which skipped every functional
+  lane. The step says so in its own section rather than presenting two
+  runs as five. It makes little difference to the finding: CI queues
+  are depth 1 by construction, in both runs and in all 154 instances.
 - **Decision 1 was corrected at source by step 0b's findings** — the
   capability-gate argument protects a client which polls its own
   operations and not one which polls an instance's whole list. See the
@@ -447,6 +454,229 @@ gate's substance.
   fixed.
 
 ## Results
+
+### Measurement results (step 0a)
+
+**Short answer.** The objection to decision 2 is not theoretical as
+far as queue depth goes, and it is untestable as far as submitters
+go. On `sfcbr`, half of all agent operations arrived at an instance
+that already had an unfinished operation, queues reached 11 deep,
+and the worst observed wait behind the head was 100.6 s. In CI the
+queue never held more than one operation. But no log line records who
+submitted an operation, so the data cannot say whether any deep queue
+held work from more than one submitter. Every deep queue seen is
+consistent with one client fanning out a burst of different commands.
+
+**Sources and how much data.**
+
+| Source | What | Volume |
+|---|---|---|
+| Loki, tenant `sfcbr`, `daemon="sidechannel"` / `"sf-api"` | 'Dispatching agent operation', API-side audit events, 'commands complete', 'Dispatcher heartbeat' | 1,805 dispatch lines, 1,804 distinct operations, 56 instances, 2026-10-15 09:25 to 2026-11-06 22:32 UTC (22.5 days) |
+| CI journals, run 42190825350 (pr-4810) | `journalctl-sf-units`, four lane bundles | 252 operations, 77 instances, 2026-11-06 |
+| CI journals, run 42181923881 (pr-4811) | as above | 252 operations, 77 instances, 2026-11-06 |
+
+The Loki window is the whole reachable history, not a sample: the
+helper refuses lookbacks of 24 days or more, and 23 days returns
+everything back to 2026-10-15. It is complete for these events: the
+API audit log shows 1,804 agent operations created, the dispatcher
+logged 1,805 dispatches (one operation was dispatched twice), and
+1,802 logged 'commands complete'. The three independent counts
+agree, so no ingestion gap is visible. Queue depth below means
+operations created on an instance and not yet finished (finish is
+the sidechannel's 'commands complete' event).
+
+**CI runs: only two usable of the five asked for.** `ci-status`
+returns at most the newest 100 workflow runs, has no event filter and
+no pagination, and `--branch` needs an exact queue-branch name. The
+newest 100 runs held three successful `merge_group` "Functional
+tests" runs: 42190825350, 42181923881 and 42294554568. The third
+(pr-4812, a documentation sync) skipped every functional lane, so it
+has no cluster journals and was excluded. I did not find older runs
+by other means (no git in any checkout was allowed), so the CI half
+rests on two runs, not five. Both ran the same tests, which is why
+their counts are identical. Of the four bundles per run, only
+`bundle-shakenfist-full-guests` and
+`bundle-shakenfist-full-debian-13-slim-primary` contain agent
+operations; the ansible-modules and node-lifecycle bundles contain
+none. Each bundle is a separate cluster.
+
+**Dispatch volume and window.**
+
+| Source | Dispatches | Instances | Ops/instance (median / max) | Busy instance-seconds |
+|---|---|---|---|---|
+| sfcbr (Loki) | 1,805 | 56 | 10 / 317 | 10,689 |
+| CI, both runs (4 bundles x 2) | 504 | 154 | 2 / 16 | 1,987 |
+
+sfcbr traffic is bursty: over 23 calendar days, 8 days with 75 or
+more operations carry 1,466 of the 1,804 (475 on 2026-10-16 alone)
+and 12 days carry 24 or fewer. Busy instance-seconds is the time
+during which an instance had at least one unfinished operation, summed
+over instances: 10,689 s is 3.0 hours across 22.5 days.
+
+**Time between consecutive dispatches on the same instance.**
+
+| Gap | sfcbr (n=1,748) | CI (n=350) |
+|---|---|---|
+| minimum | 5.03 s | 5.04 s |
+| p50 | 5.98 s | 5.07 s |
+| p95 | 246 s | 39.1 s |
+| maximum | 98,172 s (27 h) | 236.6 s |
+| 5 to 10 s | 1,010 (57.8%) | 302 (86.3%) |
+| 10 to 30 s | 357 (20.4%) | 29 (8.3%) |
+| 30 to 60 s | 182 (10.4%) | 3 (0.9%) |
+| 60 to 300 s | 115 (6.6%) | 16 (4.6%) |
+| over 300 s | 84 (4.8%) | 0 |
+
+The floor of about 5.0 s is `DISPATCH_CHECK_INTERVAL`; no two
+dispatches on one instance have ever been closer, so a gap of
+5 to 10 s is the signature of a backlog draining one operation per
+pass. On sfcbr that is 58% of all gaps. In CI the 5 to 10 s gaps are
+sequential tests (submit, await, submit) with no overlap, which the
+next table shows; a tight gap alone does not prove a deep queue,
+the arrival table does.
+
+**Arrival depth: what an operation found when it was created.**
+
+| Source | Arrived to an empty queue | Arrived behind an op still queued (undispatched) | Behind an op still executing only | Behind both |
+|---|---|---|---|---|
+| sfcbr | 891 (49.4%) | 849 (47.1%) | 16 (0.9%) | 48 (2.7%) |
+| CI | 504 (100%) | 0 | 0 | 0 |
+
+On sfcbr 913 of 1,804 operations (50.6%) were certainly queued
+behind another operation on the same instance: when they were
+created, an earlier operation on that instance had not yet finished.
+For 897 of those, the earlier operation had not even been dispatched
+yet. That is dominated by the 5 s dispatch interval: two operations
+submitted within about 5 s of each other always overlap. It is real
+queueing, but most of it is not a stall caused by slow execution.
+
+**Queue depth, weighted by time (sfcbr).** Share of busy
+instance-seconds spent at each depth:
+
+| Depth | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10+ |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Seconds | 5,701 | 2,622 | 1,039 | 548 | 472 | 101 | 98 | 49 | 35 | 23 |
+| Share | 53.3% | 24.5% | 9.7% | 5.1% | 4.4% | 0.9% | 0.9% | 0.5% | 0.3% | 0.2% |
+
+Depth above 1 accounts for 46.7% of busy instance-seconds (4,988 s,
+1.4 hours). Against all time it is negligible: 4,988 s out of
+56 instances x 22.5 days is 0.005% (an upper-bound denominator,
+since instance lifetimes are not in the logs). Maximum depth per
+instance over the window: 6 of 56 instances never exceeded 1, 4 hit
+2, 2 hit 3, 14 hit 4, 14 hit 5, 4 hit 7, 5 hit 8, 2 hit 9, 3 hit 10
+and 2 hit 11. In CI, 100% of 1,987 busy instance-seconds were at
+depth 1 and every one of 154 instances had a maximum depth of 1.
+
+**The stall that decision 2 accepts, as observed (sfcbr).** Time from
+creation to dispatch, 1,804 operations: p50 6.2 s, p90 17.5 s,
+p95 28.1 s, p99 60.8 s, maximum 100.6 s. 552 operations waited more
+than 10 s, 85 more than 30 s and 21 more than 60 s. Execution time
+(dispatch to 'commands complete') is p50 0.57 s, p95 11.0 s, p99 33.7 s,
+maximum 41.8 s, with 107 operations over 10 s. The long waits are
+the cumulative execution time of several operations ahead (the 101 s
+wait had seven operations ahead of it, the slowest running 39.8 s).
+So the head-of-line effect that decision 2 would extend to dependency
+blocks already exists today at up to 100 s, bounded by execution
+time. The proposed 300 s dependency-wait budget would allow a stall
+three times longer than anything observed. In CI, creation to
+dispatch is p50 3.9 s and maximum 5.10 s, i.e. nothing but the
+dispatch interval.
+
+**Concurrent executors.** Dispatcher heartbeats report `executors`
+(instances with a running executor on that node). Over the last two
+days on sfcbr, 1 of 3,365 heartbeats (300 s apart per node) showed a
+non-zero count. In CI, 3 of 212 did, with a maximum of 1. This is
+consistent with the busy-time figure: executors exist for a tiny
+fraction of wall time, so deep queues are brief bursts, not a standing
+condition.
+
+**Can two operations on one instance be attributed to different
+submitters?** Not with what is logged. Checked, not assumed:
+
+| Candidate signal | Present? | Verdict |
+|---|---|---|
+| API audit event 'agent operation `<cmd>` request from REST API' | Yes, in Loki and in the CI primary journal, with `request-id` and `instance` | Reaches the logs, but carries no caller identity |
+| `request-id` | Yes, unique to every operation (0 of 1,873 overlapping pairs share one) | One HTTP request per operation; cannot group or separate callers |
+| 'API request handled' `identity` field | Present but null on all 5,000 sampled lines (the newest 20 minutes) and on all 87 agent-execute POSTs | Caller identity is not logged |
+| Operation `namespace` | Yes, in the 'db record created' event | Useless: `AgentOperation.new` is given `instance_from_db.namespace` (`external_api/instance.py:2334`, `:2401`, `:2467`), so it is the instance's namespace, not the caller's. All 56 instances have exactly one namespace, so "no cross-namespace overlap" is true by construction |
+| Command type | Yes | 1,756 execute and 48 get-file on sfcbr; every one of the 1,873 overlapping pairs is execute vs execute, so no mix of types to suggest two callers |
+| API user agent, token subject | No | Not in any log line |
+
+What the data does show about the overlapping operations: 448 bursts
+(runs of creations on one instance no more than 10 s apart) contain
+two or more operations, covering 1,451 of the 1,804 operations. Burst
+sizes are 2 (153), 3 (198), 4 (24), 5 (47), 6 (5), 7 (4), 8 (8),
+10 (1) and 11 (8). In every one of the 448 bursts the operations carry
+different commands (0 bursts repeat an identical command), which looks
+like one client running a set of different checks in parallel and
+not like retries or duplicate pollers. It is equally what several
+cooperating clients would look like, so this is a weak hint at one
+submitter, not a finding. 82 of the 448 bursts mix commands that
+mention k3s with commands that do not (see below), which is the only
+sign of possibly distinct logic.
+
+**Is sfcbr dominated by one client?** Probably, by inference only.
+The k3s plugin cannot be identified from the logs, so I classified
+operations by whether the command text or file path contains the
+substring `kubectl` or `k3s`. By that rule 1,270 of 1,804 operations
+(70.4%; 1,222 execute and 48 get-file) are k3s-flavoured, which is
+76.2% of the non-`system` traffic. All 138 operations in the `system`
+namespace (7 instances, active on 2 days, 26 distinct command shapes)
+are non-k3s. Of the 913 operations that arrived behind another, 646
+(71%) are k3s-flavoured, about the same share as overall, so k3s
+traffic is not over-represented in the deep-queue cases. Only 14 of
+the 85 operations that waited over 30 s are k3s-flavoured, so the long
+stalls are mostly non-k3s traffic. By namespace, 1,166 operations are
+in 8 namespaces whose names look like per-run CI namespaces, 500 are in one
+long-lived namespace (4 instances; one of them took 317 operations)
+and 138 are in `system`. So the traffic is also mostly test-driven,
+not production use.
+
+**What the data cannot settle, and why.**
+
+- Whether any queue held work from two submitters. No submitter
+  identity exists in any log, and the namespace is inherited from the
+  instance. Settling it needs a submitter field on the audit event
+  or the operation, which is a code change, and the constraint on
+  this step ruled out the live API reads (instance `agent_operations`
+  attribute, operation records) that would also not carry one.
+- Whether the k3s plugin specifically is the dominant client; the
+  70% figure is a command-text heuristic.
+- Anything about the five-run CI sample as specified; two runs were
+  reachable, identical in shape, and CI queues are depth 1 by
+  construction (sequential tests), so more runs would be very unlikely
+  to change that.
+- Dependency-blocked heads: no operation today can be blocked, so the
+  waits above are execution waits, not a measurement of the proposed
+  budget.
+
+**What the measurement says about decision 3's budget (management
+session's reading, not the step's).** The step compares the proposed
+300 s against the worst wait observed today, 100.6 s, and calls it
+three times longer than anything seen. That is the right comparison
+for a wait caused by execution and the wrong one for a dependency
+wait, which legitimately contains the dependency's *own* queue wait
+and execution as well: on these numbers a one-hop wait is p95
+28.1 + 11.0 = 39 s and worst-case 100.6 + 41.8 = 142 s, and a
+two-hop chain roughly doubles the p95. So 300 s is about twice the
+worst single-hop latency this cluster has produced, which is a
+margin rather than an indulgence -- and it is now a number with
+evidence behind it instead of an analogy to the cluster-operation
+defer budget. A chain more than two hops deep on a busy instance
+could legitimately exceed it, which is a thing to document rather
+than to design around: the budget aborts, it does not corrupt.
+
+**Reading for decision 2.** The data does not say the objection is
+theoretical, and does not say it is real. Queues do get deep on sfcbr
+(50.6% of operations arrive behind another), but the depth comes from
+bursts of different commands on one instance within seconds, and
+nothing distinguishes that from a single caller. If the operator
+treats "one caller at a time per instance" as an acceptable operating
+assumption, strict FIFO costs nothing measurable beyond what the
+dispatch interval already imposes. If cross-caller isolation on one
+instance matters, this step provides no evidence either way, and
+decision 2 should be taken on the structural argument already in the
+plan, recorded as not measured.
 
 ### State audit (step 0b)
 
