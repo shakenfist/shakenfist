@@ -1198,6 +1198,9 @@ class Monitor(daemon.Daemon):
             schedule.every(60).minutes, 'reconcile_orphaned_objects',
             scheduled_tasks.reconcile_orphaned_objects)
         self._register_anchored_job(
+            schedule.every(60).minutes, 'reconcile_namespace_trust',
+            scheduled_tasks.reconcile_namespace_trust)
+        self._register_anchored_job(
             schedule.every(1).days, 'prune_events',
             scheduled_tasks.prune_events)
 

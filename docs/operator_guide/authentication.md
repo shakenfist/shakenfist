@@ -473,6 +473,12 @@ inherit your trust without you doing anything or being told. You will see a
 `trust revoked, trusted namespace is gone` event on your namespace when this
 happens.
 
+For the same reason you cannot grant a trust to a namespace which does not
+exist: the request is refused with `external namespace not found`. Create the
+namespace first. The cluster maintainer also checks hourly for trust entries
+naming namespaces which are gone and removes them, with the same event, which
+is how entries predating these checks are cleaned up.
+
 Giving is a separate question from taking, and it is still allowed: a
 namespace you trust may *create* an object in your namespace, which is exactly
 the "gift" step in the `ci-images` example above. Creation is additive, you

@@ -29,6 +29,7 @@ from shakenfist.schema.operations import node_blob_op as nbo_schema
 from shakenfist.schema.operations import node_inst_op as nio_schema
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespaces
+from shakenfist.namespace import revoke_trusts_naming_missing_namespaces
 from shakenfist.namespace_key import keys_with_attributes
 from shakenfist.namespace_key import NamespaceKey
 from shakenfist.node import Node
@@ -910,6 +911,23 @@ def reap_federation_records() -> None:
         int(time.time()) - RATE_LIMIT_REAP_GRACE)
     if windows:
         LOG.info(f'Removed {windows} closed federation rate limit windows')
+
+
+def reconcile_namespace_trust() -> None:
+    """Revoke trust entries which name a namespace that does not exist.
+
+    Revocation on delete (namespace.revoke_inbound_trust(), called from
+    the REST namespace delete handler and Namespace.hard_delete()) is
+    forward looking only: it cannot clean up a trust granted before it
+    existed, or one granted for a name which never existed, or one
+    missed by a delete path which does not call it. A trust naming a
+    gone namespace is a latent privilege escalation -- the name is free
+    for anybody to create, and whoever does inherits the trust -- so it
+    needs a sweep which reconciles rather than reacting.
+
+    Runs only on the elected cluster node.
+    """
+    revoke_trusts_naming_missing_namespaces('stale trust reconciliation')
 
 
 def prune_events() -> None:

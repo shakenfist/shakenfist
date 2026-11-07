@@ -75,19 +75,30 @@ daemon.set_log_level(LOG, 'api')
 NAMESPACE_NAME_PATTERN = '^[a-zA-Z0-9_-]{1,63}$'
 
 
+def _live_namespace(name):
+    """Return the named namespace if it exists and is not deleted.
+
+    Factored out of arg_is_namespace so a handler which names a second
+    namespace in its body -- the trust grant -- tests it with the same
+    predicate as the one in the path, rather than restating it.
+    """
+    ns = Namespace.from_db(name, suppress_failure_audit=True)
+    if not ns:
+        return None
+    if ns.state.value == dbo.STATE_DELETED:
+        return None
+    return ns
+
+
 def arg_is_namespace(func):
     def wrapper(*args, **kwargs):
         if 'namespace' not in kwargs:
             return sf_api.error(400, 'missing namespace in request')
 
-        ns = Namespace.from_db(kwargs.get('namespace'), suppress_failure_audit=True)
+        ns = _live_namespace(kwargs.get('namespace'))
         if not ns:
             LOG.with_fields({'namespace': kwargs.get('namespace')}).info(
                 'Namespace not found, missing or deleted')
-            return sf_api.error(404, 'namespace not found')
-        if ns.state.value == dbo.STATE_DELETED:
-            LOG.with_fields({'namespace': kwargs.get('namespace')}).info(
-                'Namespace is deleted')
             return sf_api.error(404, 'namespace not found')
 
         kwargs['namespace_from_db'] = ns
@@ -793,7 +804,7 @@ class AuthNamespaceTrustsEndpoint(api_base.Resource):
         ],
         [(200, 'The current state of the namespace.', namespace_get_example),
          (400, 'No external namespace specified.', None),
-         (404, 'Namespace not found.', None)]))
+         (404, 'Namespace or external namespace not found.', None)]))
     @arg_is_namespace
     @api_base.log_token_use
     def post(self, namespace=None, external_namespace=None, namespace_from_db=None):
@@ -804,6 +815,18 @@ class AuthNamespaceTrustsEndpoint(api_base.Resource):
             LOG.with_fields({'namespace': namespace}).info(
                 'Namespace not found, trust test failed')
             return sf_api.error(404, 'namespace not found')
+
+        # A trust names a namespace by name, and a name with no
+        # namespace behind it is free for anyone to create -- so
+        # granting one is granting a trust to whoever takes the name
+        # next. That is the hazard revoke_inbound_trust() exists to
+        # prevent on the delete side; refuse to create it here.
+        if not _live_namespace(external_namespace):
+            LOG.with_fields({
+                'namespace': namespace,
+                'external_namespace': external_namespace
+            }).info('Refusing trust naming a namespace which does not exist')
+            return sf_api.error(404, 'external namespace not found')
 
         namespace_from_db.add_event(
             EVENT_TYPE_AUDIT, 'add trust request from REST API')

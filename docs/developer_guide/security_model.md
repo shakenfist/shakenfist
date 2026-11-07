@@ -217,6 +217,33 @@ Both revocations are audited: the trusting namespace records
 `trust revoked, trusted namespace is gone`, and the namespace being
 deleted records which namespaces it was removed from.
 
+Revoking on delete is necessary and not sufficient, because it is
+event driven: it only ever fires for a namespace deleted after it was
+written, from one of those two call sites. Two more things therefore
+hold the invariant up (issue 4829):
+
+- **A trust cannot be granted for a name which does not exist.**
+  `POST /auth/namespaces/<namespace>/trust` refuses with a 404 unless
+  the namespace named in the body exists and is not deleted, tested
+  with the same predicate `arg_is_namespace` applies to the path.
+  Without it the hazard simply arrives by the other door — any string
+  went into the trust list, and a string with no namespace behind it is
+  a name anybody may create.
+- **The cluster maintainer reconciles hourly.**
+  `scheduled_tasks.reconcile_namespace_trust()` calls
+  `namespace.revoke_trusts_naming_missing_namespaces()`, which removes
+  every trust entry naming a name no namespace static row carries —
+  which is precisely the condition under which the create handler
+  will let somebody else take it. It knows nothing about how an entry
+  came to be wrong, so it covers residue from before the delete-time
+  revocation existed, anything granted before the check above, and any
+  future delete path which forgets to revoke. Entries naming an
+  existing-but-deleted namespace are left alone: that name is not
+  reusable yet, and `hard_delete()` revokes at the moment it becomes
+  so. An empty namespace listing is treated as a failed read rather
+  than an empty cluster, because the alternative is revoking every
+  trust in the cluster when the database tier hiccups.
+
 ## VDI console token trust model
 
 The Kerbside VDI console proxy integration uses **offline signature
