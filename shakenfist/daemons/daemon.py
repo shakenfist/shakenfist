@@ -32,7 +32,6 @@ from shakenfist.operations.baseoperation import get_all_background_node_queues
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util.signals import signal_safe
 from shakenfist.util.caller_identity import set_caller_identity
-from shakenfist.util import libvirt as util_libvirt
 
 
 LOG, _ = logs.setup(__name__)
@@ -703,7 +702,14 @@ class WorkerPoolDaemon(Daemon):
     def __init__(self, name):
         super().__init__(name)
         self.workers = {}
-        self.present_cpus = util_libvirt.get_cpu_count()
+        # The CPUs this process may actually run on, which is what sizes a
+        # worker pool: a daemon pinned to two of ninety-six cannot use the
+        # rest. This was libvirt's count of present CPUs, read by opening
+        # qemu:///system in this constructor with no retry, so a libvirtd
+        # restart in that instant exited the daemon before run() -- and
+        # sf-database, which wants libvirt for nothing else, was exposed
+        # to it too (#4785).
+        self.usable_cpus = len(os.sched_getaffinity(0))
 
         self.metrics = {}
         self.metrics_acquired_at = 0
@@ -789,7 +795,7 @@ class WorkerPoolDaemon(Daemon):
         Returns True if at least one job was started, False if the
         pool is full or there was nothing eligible to claim.
         """
-        max_workers = max(3, self.present_cpus / 2)
+        max_workers = max(3, self.usable_cpus / 2)
         num_workers = len(self.workers)
 
         if num_workers > max_workers:

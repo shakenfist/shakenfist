@@ -117,10 +117,59 @@ def _block_until_healthy(abort_path=None):
 
 
 class Monitor(daemon.WorkerPoolDaemon):
+    def _reap_stray_locks(self):
+        """Clear locks on this node whose holder process is gone.
+
+        Returns the lock keys reaped, for the caller's logging.
+
+        This used to warn once per holder pid and then report the same
+        row at ERROR on every later pass, because the escalation stored
+        the time of its first warning and never updated it -- so the
+        elif was permanently true. Nothing cleared the row either: one
+        lock left by an sf-queues restart taken mid-replication logged
+        1,567 ERROR lines in 13 hours, and only the next restart ended
+        it (#3432).
+
+        The startup tasks run the same reap, but a reap there cannot be
+        relied on: the gRPC client returns silently when there is no
+        database stub yet, which is exactly the state after the
+        watchdog kills a daemon during a database stall. Reaping from
+        the sweep, as the stray vxlan detector was taught to do
+        (#3597), means the next pass clears what the last one could
+        not.
+
+        The lease on a lock row (expires_at, server-side) already stops
+        a dead holder stranding a lock for anyone else, so this is
+        about the row and the log volume, not about availability.
+        """
+        reaped = []
+        for lock, holder in sf_locks.get_existing_locks().items():
+            if holder.get('node') != config.NODE_NAME:
+                continue
+            if psutil.pid_exists(holder.get('pid')):
+                continue
+
+            reaped.append(lock)
+            # The holder goes under a key of its own: with_fields(holder)
+            # overwrote this record's pid with the dead holder's, so
+            # these lines meant something different by pid than every
+            # other line the daemon logs.
+            LOG.with_fields({
+                'lock': lock,
+                'holder': holder,
+            }).warning('Clearing lock held by missing process')
+
+        if reaped:
+            # One call clears every stale lock this node holds, and it
+            # re-reads the live pids itself, so a pid recycled since the
+            # check above cannot have its lock deleted.
+            sf_locks.clear_stale_locks()
+
+        return reaped
+
     def _run_inner(self):
         _block_until_healthy(abort_path=self.abort_path)
 
-        warned_locks = {}
         last_third_party_health_check = 0
         last_stray_lock_check = 0.0
         poll_backoff = daemon.IdlePollBackoff()
@@ -145,23 +194,7 @@ class Monitor(daemon.WorkerPoolDaemon):
                 # there is no need to re-read every lock on every poll (that was
                 # ~19 GetExistingLocks/s cluster-wide at idle). See issue #3499.
                 if time.time() - last_stray_lock_check > STRAY_LOCK_CHECK_INTERVAL:
-                    existing_locks = sf_locks.get_existing_locks()
-                    for lock in existing_locks:
-                        lock_details = existing_locks[lock]
-                        if lock_details.get('node') != config.NODE_NAME:
-                            continue
-
-                        pid = lock_details.get('pid')
-                        if psutil.pid_exists(pid):
-                            continue
-                        if pid not in warned_locks:
-                            LOG.with_fields(lock_details).warning(
-                                'Lock held by missing process on this node')
-                            warned_locks[pid] = time.time()
-                        elif time.time() - warned_locks[pid] > 30:
-                            LOG.with_fields(lock_details).error(
-                                'Lock held by missing process on this node for '
-                                'more than 30 seconds')
+                    self._reap_stray_locks()
                     last_stray_lock_check = time.time()
 
                 # Adaptive backoff: poll fast while there is work, back off

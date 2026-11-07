@@ -69,13 +69,6 @@ def get_libvirt() -> ModuleType:
     return LIBVIRT
 
 
-def get_cpu_count() -> int:
-    with LibvirtConnection() as lc:
-        present_cpus, _, _ = lc.get_cpu_map()
-
-    return present_cpus
-
-
 class LibvirtConnection():
     def __init__(self) -> None:
         self.libvirt: ModuleType | None = None

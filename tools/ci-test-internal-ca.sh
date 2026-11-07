@@ -399,6 +399,40 @@ case_9_upgrade_and_checkout() {
     [ "${#copies[@]}" -eq 2 ] || fail "expected two set-aside copies of ${HOST_CERT}, found ${#copies[@]}"
 }
 
+case_10_certtool_failure_keeps_the_certificate() {
+    CURRENT_CASE='case 10: a certtool failure during reissue keeps the certificate'
+    # 192.0.2.300 is a single line, so validate.yml passes it, and certtool
+    # rejects it. The reissue used to move the old certificate aside and
+    # rewrite the template before running certtool, so a value like this
+    # left the control node with no certificate at all (#4435).
+    local template="${CA}/testhost-server-template.pem"
+    local before_serial before_template
+    before_serial="$(serial "${HOST_CERT}")"
+    before_template="$(sha1sum < "${template}")"
+    echo '{"cert_san_ip": ["192.0.2.300"]}' > "${WORK}/bad-san-ip.json"
+    run_play_fails '^fatal: ' "${WORK}/bad-san-ip.json"
+    grep '^TASK \[' "${LAST_LOG}" | tail -n 1 | grep -q 'Create the new host certificate' \
+        || fail 'the run did not fail at the certtool step'
+    [ -f "${HOST_CERT}" ] || fail 'a rejected reissue left the control node with no certificate'
+    assert_verifies "${HOST_CERT}"
+    [ "$(serial "${HOST_CERT}")" = "${before_serial}" ] || fail 'the failed reissue replaced the certificate'
+    [ "$(sha1sum < "${template}")" = "${before_template}" ] \
+        || fail 'the failed reissue recorded a template its certificate was not issued from'
+    cmp -s "${HOST_CERT}" "${DEST}/testhost/server-cert.pem" || fail 'the installed copy changed'
+
+    # The same reissue with a value certtool accepts completes, and leaves
+    # neither half of the swap behind.
+    echo '{"cert_san_ip": ["192.0.2.11"]}' > "${WORK}/good-san-ip.json"
+    run_play "${WORK}/good-san-ip.json"
+    [ "$(serial "${HOST_CERT}")" != "${before_serial}" ] || fail 'the corrected run did not reissue'
+    sans "${HOST_CERT}" | grep -q 'IP Address:192.0.2.11' || fail 'the new IP SAN is missing'
+    assert_verifies "${HOST_CERT}"
+    [ ! -e "${HOST_CERT}.new" ] || fail "${HOST_CERT}.new was left behind"
+    [ ! -e "${template}.new" ] || fail "${template}.new was left behind"
+    local copies=("${HOST_CERT}".*)
+    [ "${#copies[@]}" -eq 3 ] || fail "expected three set-aside copies of ${HOST_CERT}, found ${#copies[@]}"
+}
+
 case_1_fresh_issue
 case_2_idempotent
 case_3_sans_and_stem
@@ -408,5 +442,6 @@ case_6_no_renewal
 case_7_interrupted_reissue
 case_8_rejects_bad_values
 case_9_upgrade_and_checkout
+case_10_certtool_failure_keeps_the_certificate
 
-echo "internal_ca: all nine cases passed (${RUNS} ansible runs)"
+echo "internal_ca: all ten cases passed (${RUNS} ansible runs)"
