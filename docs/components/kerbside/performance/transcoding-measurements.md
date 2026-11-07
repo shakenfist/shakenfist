@@ -287,9 +287,10 @@ the animating activity, as Ryll does.
   Relaying with `streaming-video=all` is as fast or two to five times faster
   on every link except 150 ms / 2 Mbit heavy. It costs the proxy almost
   nothing, and its loss of text is confined to a 16-pixel strip during
-  animation. It also has a cost transcoding avoids: spice-server 0.15.2
-  crashes qemu when a client connects while a stream exists, which
-  happened here twice.
+  animation. It also has a cost transcoding avoids: spice-server
+  crashes qemu when a client that states a codec preference connects
+  while a stream exists, which happened here twice. Every released
+  version and master are affected, not just the 0.15.2 measured here.
 - It loses to relaying with streaming off on smooth, compressible activity
   at 80 ms / 10 Mbit, and only roughly matches it at lower rates. Both fill
   the link there.
@@ -326,7 +327,8 @@ the animating activity, as Ryll does.
   control socket: the rig reads every `surface_drawn` event through it,
   hundreds a second.
 - **qemu crashed twice** at 150 ms / 2 Mbit with streaming on, the known
-  spice-server 0.15.2 crash on connecting while streams exist. Connecting
+  spice-server crash on connecting while streams exist with a client that
+  states a codec preference, as Ryll does. Connecting
   over that link took longer than the 8 s activity delay. The rerun of that
   link used a 12 s delay.
 - **The bandwidth test varies at 20 ms / 50 Mbit.** spice-server chose an

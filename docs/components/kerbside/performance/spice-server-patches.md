@@ -252,8 +252,8 @@ Nothing here has been sent or filed.
   clients that send their codec preference at connect.
 - **H.265.** spice-server names it but rejects it, and Ryll cannot
   decode it, so it was not measured.
-- **Rate control.** Delivered stream frames held at 4 to 12 a second
-  whatever the frame-rate ceiling. That is the lead for any work on how
+- **Rate control.** Delivered display messages held at 4 to 12 a
+  second whatever the frame-rate ceiling. That is the lead for any work on how
   quickly spice-server's bitrate ramps up.
 - **Decode H.264 in Ryll** (ryll#398), so the H.264 rows can be
   re-measured with a client that draws them.

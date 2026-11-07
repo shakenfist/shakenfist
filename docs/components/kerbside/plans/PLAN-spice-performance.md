@@ -315,7 +315,7 @@ first phase.
 | 3. Display transcoding in Kerbside: feasibility spike (verdict: no-go) | [PLAN-spice-performance-phase-03-transcoding.md](/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/) | Complete | 2e19d737aa (#489), ryll fdb5ead5b4 (#406), eab2c572cf (#494), 9d1b64deae (#505), 13e9e2eb (#581), bba71155 (#616), 7919eadf73 (#630) |
 | 4. Son of SPICE: D-Bus display feasibility spike (verdict: no-go, as measured) | [PLAN-spice-performance-phase-04-dbus-spike.md](/components/kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike/) | Complete | andris 9a997a3 (#56), a90f17ff90 (#637) |
 | 5. spice-server patches, measured: codec choice, the connect crash, trace ring, 60 fps, hardware probing | [PLAN-spice-performance-phase-05-spice-server.md](/components/kerbside/plans/PLAN-spice-performance-phase-05-spice-server/) | Complete | 46c3e9857c (#654), kerbside-patches 2d7b626422 (#2024) |
-| 6. Push audit of phases 1-5 (kerbside, kerbside-patches and ryll #406) | [PLAN-spice-performance-phase-06-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/) | In progress | |
+| 6. Push audit of phases 1-5 (kerbside, kerbside-patches and ryll #406) | [PLAN-spice-performance-phase-06-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/) | Complete | 2a34fe7ea9 (#668) |
 | 7. QUIC client leg: experiments | | Not started | |
 | 8. QUIC client leg: implementation, if phase 7 says go | | Not started | |
 | 9. Push audit of phases 7-8 (kerbside and ryll) | | Not started | |
@@ -901,6 +901,15 @@ cells.
   phase plan
   ([PLAN-spice-performance-phase-06-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/))
   has the full survey.
+- *Outcome:* the audit merged as 2a34fe7ea9 (#668) on 2026-10-31.
+  Nothing critical or medium anywhere; one high, an out-of-bounds read
+  in the carried qemu v2 series, which is in no image
+  (kerbside-patches#2032). Its decision 7 follow-ups closed the phase
+  out on 2026-11-05: all 14 kerbside items fixed bar the
+  capability-masking half of item 6, which is declined with its
+  reasoning in the phase plan's *Follow-up outcome*, and the six
+  kerbside-patches items in that repository's own pull request. The
+  plan stays `In progress` for phase 2 and phases 7 to 9.
 
 **Phases 7 and 8** (added 2026-09-27) put the ryll-to-Kerbside
 client leg on QUIC, so that one UDP connection carries every

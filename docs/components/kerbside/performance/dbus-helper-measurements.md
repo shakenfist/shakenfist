@@ -68,8 +68,9 @@ link profiles, so the tables line up with that page's. Measured on
   22 to 30 ms slower where andris streamed, and like it, it was seconds
   behind at 80 ms / 10 Mbit heavy (4400 ms p50, one repeat of two).
 - **No server crashed.** No qemu or andris exited in any of the 108
-  matrix repeats or the 10 reference repeats, and spice-server 0.15.2's
-  crash on connecting while streams exist did not recur. The 13 repeats
+  matrix repeats or the 10 reference repeats, and the spice-server crash
+  on stating a codec preference at connect while streams exist (0.15.2
+  here, but every released version) did not recur. The 13 repeats
   lost were all first key presses that took over 15 s. See
   [Caveats](#caveats).
 
@@ -382,8 +383,15 @@ p50, 29 ms behind the virtio-gpu helper.
   moved, and spice-server's rate control had reports from 16 of its 21
   streams. The key box is never streamed, so its latency is unaffected.
   The earlier pages on this rig, with the same Ryll and the same proxy,
-  report spice-server's streams as H.264 that Ryll did not decode. Why
-  spice-server chose MJPEG here was not established.
+  report spice-server's streams as H.264 that Ryll did not decode. Those
+  pages were wrong and have been corrected; only the re-baseline, which
+  ran an older Ryll, really saw H.264. MJPEG here is the client's own
+  choice: qemu 10.0.13 cannot select a codec, so spice-server starts
+  from its `spice:mjpeg`-first default and reorders only on the client's
+  preference, and the Ryll these runs used asks for MJPEG first. The
+  proxy relayed that preference correctly. See
+  [spice-server patches](/components/kerbside/performance/spice-server-patches/), "Which codec the
+  streams used".
 - **The guest flushes its whole plane.** The guest's kernel (Linux 6.12,
   with the stock `drm_kms_helper`) carries the bug that ignores damage
   clips, so every flush from this guest covers all 1280x800 pixels,
@@ -422,10 +430,11 @@ p50, 29 ms behind the virtio-gpu helper.
   with streaming off at a p50 of 13.6 s on that cell, so its first press
   is near the limit. The same happened in one std-vga repeat at
   80 ms / 10 Mbit heavy, at load 22.
-- **No crashes.** No qemu or andris exited during a case. spice-server
-  0.15.2's crash on connecting while streams exist did not recur in any
-  `all` repeat, with the activity delayed 8 s, or 12 s on the second
-  150 ms / 2 Mbit run.
+- **No crashes.** No qemu or andris exited during a case. The
+  spice-server crash on stating a codec preference at connect while
+  streams exist (0.15.2 here, but every released version) did not recur
+  in any `all` repeat, with the activity delayed 8 s, or 12 s on the
+  second 150 ms / 2 Mbit run.
 - **Repeat counts are small.** Two repeats of 40 presses per cell, four at
   150 ms / 2 Mbit.
 - **The helper's listener has no lag watchdog.** If andris stopped reading,

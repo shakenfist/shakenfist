@@ -555,6 +555,71 @@ progress` until phase 2 is done.
   design: the client leg never carries GLZ, and the first transcoded
   frame clears streams. The mutant removing that guard was killed.
 
+### Follow-up outcome (2026-11-05)
+
+Decision 7's kerbside follow-up. It records #668's merge commit,
+2a34fe7ea9, in the master plan's Execution table and sets phase 6 to
+`Complete`. The plan itself stays `In progress`: phase 2's dri-devel
+submission is still outstanding, as decision 6 anticipated, and phases 7
+to 9 have not started.
+
+Every kerbside item above is fixed as written, except item 6, which is
+fixed in part and declined in part:
+
+| # | Outcome |
+|---|---------|
+| 1 | Fixed. The bullet now says the earlier pages were wrong, that only the re-baseline saw H.264, and that MJPEG was the client's own choice, citing `spice-server-patches.md`. |
+| 2 | Fixed. The caveat now attributes H.264 to Ryll 50a9cc0's codec order, and says #477 was a real bug but not what chose the codec. |
+| 3 | Fixed in five places across the spike and measurement pages: the crash is no longer 0.15.2's alone, and no longer triggered by any connect. The "every switch" claim is kept, with the reason (the transcoder's backend dial always sends a preference). The *Weighing them* paragraph no longer says the crash still needs reproducing, which #654 had already overtaken. **Round 2 of review widened this**: the first pass fixed the two pages the audit named and left the same sentence verbatim in `transcoding-switching.md` (twice), and the version-only framing in `tools/shaped-link/run-matrix.sh` and `guest/keydraw.c`, where it is operational guidance for whoever sets `ACTIVITY_DELAY` on whatever spice-server they have. All four are fixed. The two `dbus-helper-measurements.md` mentions keep 0.15.2, because that rig really ran it, but no longer describe the trigger as any connect. The plan sketches that discuss the crash historically are left as dated records. |
+| 4 | Fixed. The bold lead now reads "A side finding, since refuted", so the correction is not only further down. **Round 3 of review found the bullet still asserting the withdrawn reasoning** in the present tense before the correction withdraws it, so a reader who stopped mid-bullet took it away as fact. The withdrawn steps are now past tense, and the lead, the body and the correction agree. |
+| 5 | Fixed. "stream frames" to "display messages", matching the page's own line 198. |
+| 6 | **Fixed as documentation and a test; the masking change is declined.** See below. **Round 3 of review found the argument one-directional and the seam unbound.** The documented case was an unoffered capability admitting a server message; the inverse -- spice-server sending an opcode gated behind a capability Kerbside never offered, which fail-closed would terminate on -- was the load-bearing fact and went unstated. It is safe only because the L1 table derives from ryll's complete per-channel tables rather than from `reply_channel_caps`, and the module now says so, with the pointer that the fix for an unmodelled opcode is the table and not the verdict (`AGENTS.md`, "Never widen a firewall verdict to make traffic pass"). Separately, `backend_channel_caps` is an identity function, so its test bound nothing in `backend.rs`: inlining the clone back into either arm would compile, behave identically and leave the test green. A second test reads `backend.rs` with `include_str!` and asserts both arms call the seam and neither clones directly. |
+| 7 | Fixed. `QUALITY_VENV` defaults under `${XDG_CACHE_HOME:-$HOME/.cache}`, and a venv or interpreter this user does not own is refused rather than executed. `docs/testing.md` follows. **Round 2 of review found the manual case only half covered**: the ownership loop tests with `-e`, so it had nothing to say about a venv that does not exist yet, and the script would still create one in a directory another user can write and then execute it. Creation now requires a parent directory this user owns and that no *other* local user can write, and makes the venv itself mode 700. Group-writable is deliberately allowed: with a umask of 002 and a user-private group, the Debian default, `~/.cache` is 775, so refusing that -- which is what the review suggested -- would have rejected the default path (measured on this host before taking it). A parent whose group is genuinely shared is the one case left to the operator, since a group's members cannot be enumerated portably; the header comment and the check now say that rather than claiming the case is covered. The same round found the new default aborts with "HOME: unbound variable" under `set -u` where the old `/tmp` one worked, so an explicit guard names the tool and the variables to set. **Round 3 of review found the location guard in the wrong place and too shallow**: it ran only inside the creation branch, so an existing venv of ours sitting under a world-writable directory was executed unchecked, and it looked at the immediate parent only, so an attacker-owned directory further up could still swap the subtree. The ownership and writability checks now run on every invocation, before anything is created, starting at the deepest ancestor that exists; writability is checked all the way to `/`, while ownership is required of that one directory only, because `/home` and `/` are root-owned everywhere. The `find -perm` probe also read a failed probe as a pass, so the mode is read with `stat` and its exit status checked. |
+| 8 | Fixed. Both settings cap at 2^31-1 in `config.py`, and a `sockopt_bytes` parser caps the matching clap flags, with `MAX_SOCKOPT_BYTES` naming the reason. The flag test moved to the new bound and now also rejects a negative value. **Round 2 of review found the generalisation incomplete at both ends**: `docs/configuration.md` still told operators the limit was 4294967295, which is also the kernel's own `net.ipv4.tcp_notsent_lowat` "unlimited" sentinel and so a value a deployment could have copied, and `--transcode-notsent-lowat-bytes` still took anything up to `u32::MAX` into the same `setsockopt`. The reference rows carry the new bound and say the old values are now refused; the transcoder's flag shares `sockopt_bytes`, keeping its own floor of 1, and a test pins it. **Round 3 of review found two further defects.** The stated reason was wrong, and was wrong in six places: a value above `i32::MAX` is not simply "reinterpreted as negative" -- `TCP_NOTSENT_LOWAT` stores it into an unsigned field, where 4294967295 is the sysctl's own "unlimited" default, and `SO_RCVBUF` clamps through an unsigned comparison. The bound is still right and the migration advice still behaviourally equivalent, but the rationale would have misled anyone re-deriving it; all six sites now say the meaning is per-option and that one bound is imposed instead. And both `-1` assertions were vacuous: clap refuses a hyphen-led value for a long option before either parser sees the string, so they would have passed even if the parsers started accepting negatives. `sockopt_bytes` and `lowat_bytes` now have direct unit tests, with the flag-level assertions kept as the end-to-end check. |
+| 9 | Fixed. `saturating_sub`, with a comment that saturation rules out an i64 underflow and deliberately does *not* clamp at zero, because a negative count is the documented behaviour. Two tests added: over-ACK drives the count negative, and a zero window credits nothing. The clamp-at-zero mutant the audit found surviving is now killed by the first of them (verified). **Round 2 of review found the second test's rationale unsupported**: it opened by asserting that a window of zero is what spice-server sends to disable acknowledgement, which nothing in the cited sources says, in a module that cites `server/red-channel-client.cpp` for every other claim about server behaviour. Reworded to the conditional the test actually proves -- a boundary case of `threshold()` -- and it now also records that the tracker would report such a channel as permanently stalled. |
+| 10 | Fixed. Both settings are tested for negative rejection, not just `PROXY_BACKEND_RCVBUF_BYTES`. |
+| 11 | Fixed. The comment no longer claims the crate has no timeout. At the pinned rev the crate bounds the dial and each handshake stage at 15 s *separately*, so a staged stall reaches about a minute; Kerbside's 30 s whole-attempt budget is what binds, and the comment now says so. |
+| 12 | Fixed. `tools/build-proxy-wheel.sh` refuses a non-empty cargo `default` feature list and any maturin `features` key, with the reason that neither shows in the wheel's name. **Round 2 of review showed the line matches were both loose and brittle**: `grep -qx 'default = []'` matched that line anywhere in the manifest, missed a reformatted `default=[]`, and refused a correct manifest that omits `default` entirely, which cargo reads as empty. Both checks now parse the tables with `tomllib`. **Round 3 of review found the enumeration itself incomplete**, which is what defeated the check rather than how it matched: maturin also accepts `all-features` and `cargo-extra-args`, either of which compiles `transcode` into the wheel while passing both assertions. maturin's schema cannot be enumerated from this host, so `[tool.maturin]` is now deny-by-default -- only `bindings` is allowed, and any other key, feature-selecting or not, has to edit the allowlist. Verified against five shapes. |
+| 13 | Fixed. `relay::TERMINATED_BY_CONTROL_PLANE` is the one definition; the transcoder formats it. **Round 2 of review showed the test did not do what its docstring promised**: it compared the constant with a literal copy of itself, so editing both together left the three CI tools broken and only the lanes would say so. It now reads each tool's source with `include_str!`, inside `#[cfg(test)]` so that only `cargo test` needs `tools/` in the build context, and asserts the prefix appears in each. |
+| 14 | Fixed. The description is rejoined. |
+
+**Item 6: why the forwarded caps are not masked.** The item asked to
+document that the reply mask is not a security boundary, to test what the
+allowlist does with a server message only an unoffered capability enables,
+and *if that message is relayed*, to mask the forwarded caps to the reply
+set plus the codec bits. The first two are done: `caps.rs` now has a
+"The reply mask is not a security boundary" section, and
+`unoffered_client_cap_still_admits_its_server_message` pins the case.
+
+The test's answer is that the message **is** relayed:
+`DISPLAY_SIZED_STREAM` is absent from `DISPLAY_CAPS`, and
+`classify(Display, ServerToClient, STREAM_DATA_SIZED)` is `Allowed`. The
+masking change is still declined, on two grounds found while checking it:
+
+- **It would regress every client.** A SPICE capability is effective only
+  where both ends advertise it, which is why #477 forwards the client's
+  set. ryll's own `DEFAULT_DISPLAY` asks for `COMPOSITE`, `A8_SURFACE`,
+  `LZ4_COMPRESSION` and `SIZED_STREAM`, none of which this reply table
+  offers. ryll's own comment on that constant records what losing two of
+  them costs: without `COMPOSITE` the guest QXL driver "falls back to a
+  software path that produces far fewer display updates", and
+  `LZ4_COMPRESSION` is what lets the server pick LZ4 over Zlib for static
+  regions. Masking would take both away from every session.
+- **It would buy no enforcement.** The L1 allowlist classifies by opcode
+  and never consults the negotiated capability set, and it is fail-closed:
+  an unmodeled opcode is `Disallowed`, which the firewall observes or
+  terminates on. A capability cannot talk a message past it. Message
+  bodies are unchecked, but that is L2 (kerbside#682), and the reply mask
+  does not bear on it either way.
+
+So the defect was the claim, not the behaviour, and it is fixed where the
+claim was made: the `caps.rs` module docs and the forwarding site in
+`backend.rs`. This reverses the item's conditional instruction, which was
+written before the cost of masking was measured, so it is the part of this
+follow-up most worth arguing with.
+
+The kerbside-patches follow-up carries that repository's six items.
+
 ## Back brief
 
 Before executing any step of this plan, back brief the operator on
