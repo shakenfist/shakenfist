@@ -25,7 +25,7 @@ class WorkerPoolHighIOGateTestCase(base.ShakenFistTestCase):
         # to now so dequeue_job() does not try to refresh from the database.
         d = daemon.WorkerPoolDaemon.__new__(daemon.WorkerPoolDaemon)
         d.workers = {}
-        d.present_cpus = 8
+        d.usable_cpus = 8
         d.metrics = {'metrics': metrics_values}
         d.metrics_acquired_at = time.time()
         return d

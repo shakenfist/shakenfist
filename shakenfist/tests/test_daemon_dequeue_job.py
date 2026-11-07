@@ -25,7 +25,7 @@ class DequeueJobDiskPressureTestCase(base.ShakenFistTestCase):
         the queue names it asked mariadb.dequeue_work_items() for."""
         pool = daemon.WorkerPoolDaemon.__new__(daemon.WorkerPoolDaemon)
         pool.workers = {}
-        pool.present_cpus = 8
+        pool.usable_cpus = 8
         pool.metrics = {}
         pool.metrics_acquired_at = 0
 
