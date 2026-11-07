@@ -2382,6 +2382,140 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
             self.assertEqual([], self._queue())
 
 
+class InstanceAgentOperationViewTestCase(base.ShakenFistTestCase):
+    """What an instance's external view says is queued on it.
+
+    external_view() read the 'queued' key of the agent_operations
+    attribute, which no writer has ever created -- agent_operation_enqueue()
+    writes 'queue' and 'all' -- so agent_operations_queue was reported
+    empty however much work an instance had outstanding, and the
+    include-queued-agent-operations capability advertised a field which
+    never carried anything (issue #4826). Nothing noticed because
+    nothing tested the field, so these tests assert against what
+    enqueue actually wrote rather than against a key name.
+    """
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        # Object reference grouping asks who is making the request, which
+        # outside of a Flask request context has no answer. Both the
+        # instance's view and the agent operation views nested inside it
+        # need it.
+        self.request_namespace = mock.patch(
+            'shakenfist.schema.object_reference.request_namespace',
+            return_value='system')
+        self.mock_request_namespace = self.request_namespace.start()
+        self.addCleanup(self.request_namespace.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'cirros', self.instance_uuid,
+            set_state=instance.Instance.STATE_CREATED)
+        self.inst = instance.Instance.from_db(self.instance_uuid)
+
+    def _make_agentop(self, state=None):
+        op = AgentOperation.new(
+            str(uuid.uuid4()), 'unittest', self.instance_uuid,
+            [{'command': 'execute', 'commandline': 'true'}])
+        if state:
+            op.state = state
+        self.inst.agent_operation_enqueue(op.uuid)
+        return op
+
+    def _queued_uuids(self):
+        return [aop['uuid'] for aop
+                in self.inst.external_view()['agent_operations_queue']]
+
+    def test_view_is_empty_with_nothing_queued(self):
+        self.assertEqual([], self._queued_uuids())
+
+    def test_view_lists_queued_operations_in_order(self):
+        op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        self.assertEqual(
+            [str(op1.uuid), str(op2.uuid)], self._queued_uuids())
+
+    def test_view_matches_what_enqueue_wrote(self):
+        # The assertion the missing test would have made: whatever key
+        # agent_operation_enqueue() writes the dispatch queue under,
+        # this view reports that queue and not a different one.
+        self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        self.assertEqual(
+            self.inst.agent_operations['queue'], self._queued_uuids())
+        self.assertEqual(
+            self.inst.agent_operations_queued(), self._queued_uuids())
+
+    def test_view_carries_the_operation_detail(self):
+        # The field exists so a client can see what is queued behind
+        # what without a request per operation, so an entry has to be a
+        # whole agent operation view rather than a uuid.
+        op = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        view = self.inst.external_view()['agent_operations_queue']
+
+        self.assertEqual(1, len(view))
+        self.assertEqual(str(op.uuid), view[0]['uuid'])
+        self.assertEqual(AgentOperation.STATE_QUEUED, view[0]['state'])
+        self.assertEqual(
+            [{'command': 'execute', 'commandline': 'true'}],
+            view[0]['commands'])
+
+    def test_view_includes_the_executing_head(self):
+        # The queue entry lives at the head until its operation is
+        # terminal, so the operation being worked on right now is part
+        # of what the instance has outstanding. A client reading this
+        # field to see why its own operation has not started yet needs
+        # to be shown the one in front of it.
+        op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op1.state = AgentOperation.STATE_EXECUTING
+
+        self.assertEqual(
+            [str(op1.uuid), str(op2.uuid)], self._queued_uuids())
+
+    def test_view_skips_a_queue_entry_with_no_operation(self):
+        self.inst.agent_operation_enqueue(str(uuid.uuid4()))
+        op = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        self.assertEqual([str(op.uuid)], self._queued_uuids())
+
+    def test_view_does_not_list_a_retired_operation(self):
+        # Completed operations leave the queue, and the view is the
+        # in-flight surface -- the agentoperations endpoint with
+        # all=true is where the permanent log is read.
+        op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op1.state = AgentOperation.STATE_EXECUTING
+        op1.state = AgentOperation.STATE_COMPLETE
+
+        # agent_operation_next() is what lazily retires the entry.
+        self.assertEqual(
+            str(op2.uuid), str(self.inst.agent_operation_next().uuid))
+        self.assertEqual([str(op2.uuid)], self._queued_uuids())
+        self.assertIn(str(op1.uuid), self.inst.agent_operations['all'])
+
+
 class AgentOperationDeadlineTestCase(base.ShakenFistTestCase):
     """The deadline and progress bookkeeping an operation carries.
 

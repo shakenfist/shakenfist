@@ -798,11 +798,11 @@ class Instance(dbowo):
                 'snapshot_ignores': disk.get('snapshot_ignores')
             })
 
-        # Mix in not yet executed agent operations. If you want to see _all_
-        # agent operations, then use the agentoperation REST API instead.
+        # Mix in the agent operations which have not finished yet. If you want
+        # to see _all_ agent operations, then use the agentoperation REST API
+        # instead.
         i['agent_operations_queue'] = []
-        ops = self.agent_operations
-        for agentop_uuid in ops.get('queued', []):
+        for agentop_uuid in self.agent_operations_queued():
             aop = AgentOperation.from_db(agentop_uuid)
             if aop:
                 i['agent_operations_queue'].append(aop.external_view())
@@ -3211,6 +3211,23 @@ class Instance(dbowo):
     @property
     def agent_operations(self):
         return self._db_get_attribute('agent_operations')
+
+    def agent_operations_queued(self):
+        """The uuids of this instance's unfinished agent operations, in order.
+
+        The attribute holds two lists, written by
+        agent_operation_enqueue(): "queue" is the dispatch queue, whose
+        entries are retired once their operation reaches a terminal
+        state, and "all" is the permanent log of every operation the
+        instance has ever had. Every reader which only wants to look at
+        the queue comes through here, so that which key that is lives in
+        one place -- the external view asked for a key nobody writes
+        ("queued") and so silently reported an empty queue for every
+        instance until issue #4826. agent_operation_next() is the
+        exception and reads the attribute itself, because it rewrites
+        the queue under the attribute's lock.
+        """
+        return self.agent_operations.get('queue', [])
 
     def agent_operation_next(self):
         """Return the next dispatchable agent operation, leaving it queued.

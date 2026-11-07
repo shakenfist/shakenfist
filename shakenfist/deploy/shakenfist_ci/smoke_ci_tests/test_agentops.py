@@ -10,6 +10,15 @@ from shakenfist_ci import instance_hotplug
 from shakenfist_client import apiclient
 
 
+# How long the blocking operation in
+# test_instance_view_lists_queued_agent_operations holds the instance's
+# single executor slot. The test only has to read the instance back
+# inside that window, so this is many times what is strictly needed --
+# cheap insurance in a suite which runs on every pull request, where the
+# alternative is a test that occasionally proves nothing.
+QUEUE_BLOCKER_SECONDS = 60
+
+
 class TestAgentOperations(instance_hotplug.InstanceHotplugTestsMixin,
                           base.BaseNamespacedTestCase):
     # The interface hot plug tests live on InstanceHotplugTestsMixin so the
@@ -66,6 +75,87 @@ class TestAgentOperations(instance_hotplug.InstanceHotplugTestsMixin,
             'root\n', aop['results']['0']['stdout'],
             f'Agent operation result "0" stdout value lacks expected value '
             f'"root\\n": {aop}')
+
+    def test_instance_view_lists_queued_agent_operations(self):
+        # The instance view built agent_operations_queue from a key no
+        # writer has ever written, so it reported an empty queue however
+        # much work an instance had outstanding (issue #4826). The field
+        # only says anything while something is actually waiting, which
+        # is what the blocking operation below is for.
+        inst = self.create_instance(
+            'test-instance-agentop-queue', 1, 1024, None,
+            [
+                {
+                    'size': 8,
+                    'base': base.CLUSTER_CI_IMAGE,
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        # Wait for the instance agent to report in
+        self._await_instance_ready(inst['uuid'])
+
+        # A client which branches on this token and finds the field
+        # always empty is no better off than one which does not look, so
+        # the token and the content are a single claim.
+        self.assertTrue(
+            self.test_client.check_capability(
+                'include-queued-agent-operations'),
+            'The API server does not advertise the '
+            'include-queued-agent-operations capability, which is what '
+            'tells a client this field is worth reading.')
+
+        # self.test_client blocks until an operation is terminal, which
+        # is the opposite of what this test needs: it has to look at the
+        # instance while work is still outstanding. An ASYNC_CONTINUE
+        # client returns the operation as the POST described it and never
+        # polls.
+        nonblocking_client = apiclient.Client(
+            base_url=self.system_client.base_url,
+            namespace=self.namespace, key=self.namespace_key,
+            async_strategy=apiclient.ASYNC_CONTINUE)
+
+        # The sidechannel dispatcher runs at most one executor per
+        # instance, so the second of these cannot start until the first
+        # has finished sleeping.
+        blocker = nonblocking_client.instance_execute(
+            inst['uuid'], f'sleep {QUEUE_BLOCKER_SECONDS}')
+        follower = nonblocking_client.instance_execute(
+            inst['uuid'], 'whoami')
+
+        view = self.test_client.get_instance(inst['uuid'])
+        queued = {aop['uuid']: aop
+                  for aop in view['agent_operations_queue']}
+
+        # The follower cannot have left the queue: a queue entry is only
+        # retired once its own operation is terminal, and this one cannot
+        # even be dispatched while the blocker sleeps. There is
+        # deliberately no assertion that the blocker is still listed --
+        # it is a lever to keep the queue non-empty, not the claim here --
+        # and none about which state anything is in, which is whatever
+        # the dispatcher has reached by now.
+        self.assertIn(
+            follower['uuid'], queued,
+            f'Agent operation {follower["uuid"]} is queued on the instance '
+            f'but missing from the instance view: {view}')
+        self.assertEqual(
+            'whoami',
+            queued[follower['uuid']]['commands'][0].get('commandline'),
+            'The queued agent operation in the instance view does not carry '
+            f'its commands: {queued[follower["uuid"]]}')
+
+        # The field is the instance's queue, not every operation it has
+        # ever run -- that is the agentoperations endpoint with all=true.
+        for aop_uuid in queued:
+            self.assertIn(
+                aop_uuid, (blocker['uuid'], follower['uuid']),
+                f'Instance view lists agent operation {aop_uuid}, which this '
+                f'test did not create: {queued}')
+
+        self._await_agentop_complete(
+            inst['uuid'], blocker, 300, f'sleep {QUEUE_BLOCKER_SECONDS}')
+        self._await_agentop_complete(
+            inst['uuid'], follower, 300, 'whoami')
 
     def test_instance_execute_large(self):
         inst = self.create_instance(
