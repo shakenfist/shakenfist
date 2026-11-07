@@ -1,0 +1,126 @@
+# Tests: sf_instance, state: present against a record which cannot run
+#
+# Regression coverage for issue 4814. The module compared every field of the
+# requested specification against the existing instance and never its state,
+# so state: present against a name whose only record was in state error --
+# which is where the server parks a refused create, and where it stays until
+# somebody deletes it -- exited changed: false. The play then carried on
+# against an instance which would never boot, and nothing replaced it.
+#
+# The errored record here is made by asking for a disk smaller than the image
+# it is based on, which fails on the hypervisor while the instance is being
+# created, exactly as cluster CI's test_resize_image_too_small does. The
+# instance never runs, and the record keeps the name.
+#
+# Only the real shakenfist_client and a real cluster show the whole sequence:
+# the record settling in state error through the server's own delete, the
+# module's acknowledging delete of it, and the name being reused by the
+# replacement. The unit tests script the client, so they can assert which
+# calls the module makes but never what the cluster does with them.
+
+- hosts: localhost
+  gather_facts: no
+  collections:
+    - shakenfist.shakenfist
+
+  tasks:
+    - name: Ensure the instance doesn't exist at the start
+      sf_instance:
+        name: "ansibleci-007"
+        state: "absent"
+
+    # debian:11 is cached by the time this scenario runs (scenario 004 pays
+    # the cold fetch), but the blob may still have to reach this hypervisor
+    # inside the await, so the budget is generous. The await is expected to
+    # fail: it is how this task knows the instance errored rather than
+    # leaving the next task racing the failure.
+    - name: Create an instance which cannot possibly be created
+      sf_instance:
+        name: "ansibleci-007"
+        cpu: 1
+        ram: 1024
+        disks:
+          - 1@debian:11
+        state: present
+        await: true
+        await_timeout: 1200
+      register: ci_broken
+      ignore_errors: true
+
+    - name: Assert the instance failed to create
+      assert:
+        that: ci_broken['failed']
+        fail_msg: >-
+          a 1GB disk based on debian:11 was expected to fail,
+          got {{ ci_broken }}
+
+    # Check mode, and the identical specification: every field compares
+    # equal, so the record's state is the only thing which can make this
+    # task report a change. This is the defect exactly -- before the fix it
+    # reported changed: false -- and check mode asserts it without deleting
+    # anything, so the state is still readable in meta.
+    - name: Check whether the errored record is judged replaceable
+      sf_instance:
+        name: "ansibleci-007"
+        cpu: 1
+        ram: 1024
+        disks:
+          - 1@debian:11
+        state: present
+      register: ci_dead
+      check_mode: true
+
+    - name: Assert the errored record is not adopted
+      assert:
+        that:
+          - ci_dead['changed']
+          - ci_dead['meta']['state'] in ['creating-error', 'error']
+          - ci_dead['log'] | select('search', 'not a state an existing instance') | list | length > 0
+        fail_msg: "errored record was adopted in {{ ci_dead }}"
+
+    # And now for real, with a disk the image fits in. The replacement has
+    # to get the errored record off its name before it can create: the
+    # server's delete of an instance which errored while being created ends
+    # in state error rather than deleted, so the module waits for it to
+    # settle there, deletes it itself, and waits for that delete to finish.
+    - name: Replace the errored record
+      sf_instance:
+        name: "ansibleci-007"
+        cpu: 1
+        ram: 1024
+        disks:
+          - 10@debian:11
+        state: present
+        await: true
+        await_timeout: 1200
+      register: ci_replaced
+
+    - name: Assert no errors
+      assert:
+        that: not ci_replaced['failed']
+        fail_msg: "failed should be false in {{ ci_replaced }}"
+
+    - name: Assert the errored record was cleared off its name
+      assert:
+        that:
+          - ci_replaced['changed']
+          - ci_replaced['meta']['state'] == 'created'
+          - ci_replaced['meta']['uuid'] != ci_dead['meta']['uuid']
+          - ci_replaced['log'] | select('search', 'Deleting the errored instance') | list | length > 0
+        fail_msg: "the errored record was not replaced in {{ ci_replaced }}"
+
+    - name: Delete the instance
+      sf_instance:
+        uuid: "{{ ci_replaced['meta']['uuid'] }}"
+        state: "absent"
+      register: ci_replaced
+
+    - name: Assert the instance was changed
+      assert:
+        that: ci_replaced['changed']
+        fail_msg: "changed should be true in {{ ci_replaced }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_replaced['failed']
+        fail_msg: "failed should be false in {{ ci_replaced }}"
