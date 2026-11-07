@@ -139,6 +139,7 @@ config = sf_config.config
 from shakenfist import exceptions                          # noqa
 from shakenfist import mariadb                             # noqa
 from shakenfist.constants import EVENT_TYPE_AUDIT          # noqa
+from shakenfist.external_api import scopes as api_scopes   # noqa
 from shakenfist.namespace import Namespace                 # noqa
 from shakenfist.node import Node                           # noqa
 from shakenfist.schema.object_state import State           # noqa
@@ -170,14 +171,49 @@ def _read_stdin_value() -> str:
     return sys.stdin.read().rstrip('\n')
 
 
+def _check_scope_shape(scope: str) -> None:
+    """Refuse a --scope value which cannot name an operation.
+
+    A scope is either the admin axis, which carries no dot by design, or
+    "<family>.<verb>" with a verb the API derives from an HTTP method, or that
+    family's wildcard. Anything else -- an empty value, a bare family, an
+    unknown verb -- is a mistake rather than a narrower grant.
+    """
+    if scope == api_scopes.ADMIN:
+        return
+
+    # One condition, not a special case per mistake: an empty value, a bare
+    # family and an unknown verb all fail the same three tests, and one
+    # message which names the whole vocabulary is more use than three which
+    # each name part of it.
+    verbs = sorted(set(api_scopes.VERBS.values()) | {api_scopes.WILDCARD})
+    family, dot, verb = scope.partition('.')
+    if not dot or not family or verb not in verbs:
+        raise click.BadParameter(
+            '%r is not a scope. Use %s for the administrative axis, or '
+            '<family>.<verb> with <verb> one of %s -- for example node.read '
+            'or instance.%s. A scope the API cannot derive satisfies nothing, '
+            'so a key holding it is refused on every request. For a key with '
+            'no restriction at all, omit --scope entirely rather than passing '
+            'a bare %s.'
+            % (scope, api_scopes.ADMIN, ', '.join(verbs), api_scopes.WILDCARD,
+               api_scopes.WILDCARD))
+
+
 @click.command()
 @click.argument('keyname')
 @click.argument('key', required=False)
 @click.option('--key-from-stdin', is_flag=True, default=False,
               help='Read the key from stdin instead of an argument, keeping '
                    'it out of the process table.')
+@click.option('--scope', 'scopes', multiple=True,
+              help='Grant only this scope (repeatable), for example '
+                   '--scope cluster-admin --scope node.read. Omitting every '
+                   '--scope records no scopes, which mints a wildcard '
+                   'cluster-administrator key, as it always has.')
 def bootstrap_system_key(keyname: str, key: Optional[str],
-                         key_from_stdin: bool) -> None:
+                         key_from_stdin: bool,
+                         scopes: tuple[str, ...]) -> None:
     if key_from_stdin == (key is not None):
         raise click.UsageError(
             'Provide the key either as an argument or via --key-from-stdin, '
@@ -186,9 +222,22 @@ def bootstrap_system_key(keyname: str, key: Optional[str],
         key = _read_stdin_value()
     assert key is not None
 
+    # A scope is never validated again: add_key records what it is handed, and
+    # an unrecognised scope satisfies nothing, so a typo mints a key which
+    # answers 403 on its first real request and gives no hint why. Refuse the
+    # shapes which cannot be right rather than fail that late -- a formatting
+    # accident is exactly what should fail closed here. The family is not
+    # checked, because the vocabulary is derived from every endpoint class at
+    # request time and sf-ctl does not load the API.
+    for scope in scopes:
+        _check_scope_shape(scope)
+
     click.echo('Creating key %s' % keyname)
     ns = Namespace.new('system')
-    ns.add_key(keyname, key)
+    # add_key treats scopes=None as "record no scopes" (the historical
+    # wildcard); an empty list would be a key that can do nothing, which is
+    # never what the absence of --scope means, so collapse it back to None.
+    ns.add_key(keyname, key, scopes=list(scopes) or None)
     click.echo('Done')
 
 

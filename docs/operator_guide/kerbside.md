@@ -356,13 +356,30 @@ Consoles work. Kerbside's own management does not, without more work.
   the `requests` in Kerbside's virtualenv ships its own certificate bundle,
   and the units set no `REQUESTS_CA_BUNDLE`, so it may not consult the
   host's store at all
-  ([#4699](https://github.com/shakenfist/shakenfist/issues/4699)).
-* **A full `system` credential.** Kerbside scrapes the whole cluster with a
-  key in the `system` namespace, which the deploy mints with no scopes, so
-  it is a cluster administrator credential
-  ([#4698](https://github.com/shakenfist/shakenfist/issues/4698) tracks
-  narrowing it). Anyone who can read `kerbside_system_key`, including from a
-  Kerbside host's `sources.yaml`, can act as `system`.
+  ([#4699](https://github.com/shakenfist/shakenfist/issues/4699)). Until that
+  is resolved, the deploy refuses a cleartext (`http://`) `api_url` which does
+  not point at the Kerbside host itself, since the system key would cross the
+  network in cleartext on every scrape; set
+  `kerbside_allow_insecure_api_url: true` to accept that on a trusted network
+  or in CI. A loopback `api_url` is exempt, and so is one naming the host's
+  own `node_mesh_ip`, `node_egress_ip`, `node_name` or `ansible_host` on a
+  Kerbside host which is also a Shaken Fist node, because that traffic never
+  leaves the host.
+* **A read-only `system` credential.** Kerbside scrapes the whole cluster
+  with a key in the `system` namespace. The deploy mints it with only the
+  scopes the production scrape needs -- `cluster-admin`, `admin.read`,
+  `node.read` and `instance.read` -- so anyone who can read
+  `kerbside_system_key`, including from a Kerbside host's `sources.yaml`, can
+  read the whole cluster but cannot change it
+  ([#4698](https://github.com/shakenfist/shakenfist/issues/4698)). Kerbside's
+  own adversarial CI driver still reads this key out of its source
+  configuration and writes with it, so Kerbside's `sf-e2e` lane is expected
+  to fail against a cluster deployed from this collection until that driver
+  is given a credential of its own
+  ([kerbside#697](https://github.com/shakenfist/kerbside/issues/697)). That
+  affects only Kerbside's own CI, not an operator's cluster -- but any local
+  automation which reused the `kerbside` key to *write* is in the same
+  position, and should move to its own credential.
   [The Kerbside credential](vdi_console_tokens.md#the-kerbside-credential)
   covers rotating and revoking it.
 

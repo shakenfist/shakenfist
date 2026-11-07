@@ -12,6 +12,16 @@ deploy_name: sf
 # docs/operator_guide/load_balancing.md: a prefix-less ":13000" URL is the
 # single-node escape hatch for a deploy with no proxy at all, and names one
 # node's sf-api rather than a cluster endpoint.
+#
+# The deploy puts no TLS in front of sf-api -- that is the load balancer's
+# job -- so that escape hatch is cleartext. If you add a kerbside inventory
+# group, the deploy refuses a cleartext api_url which does not point at the
+# Kerbside host itself, because Kerbside posts kerbside_system_key to it on
+# every scrape: keep an https:// endpoint, or set
+# kerbside_allow_insecure_api_url: true to accept the risk on a trusted
+# private network. A Kerbside host which is also a Shaken Fist node and names
+# its own address (its node_mesh_ip, node_egress_ip, node_name or
+# ansible_host) is unaffected, since the request never leaves the host.
 api_url: "https://sf.example.com/api"
 
 # Secrets. CHANGE THESE.

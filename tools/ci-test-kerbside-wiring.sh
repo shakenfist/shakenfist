@@ -19,13 +19,16 @@
 # kerbside group is absent; that kerbside_source builds a source Kerbside's own
 # checker accepts, field by field, reserves the ports Shaken Fist uses, and
 # refuses an empty key, a CA which is not a PEM, a loopback api_url on a host
-# which is not a Shaken Fist node and a kerbside_url the two sides see
-# differently; that the cluster shape play refuses a kerbside_url which ends in
-# a slash, or which Shaken Fist's nodes see differently, before any host is
-# changed; that the validation play checks every Kerbside host with the
-# variables that host sees, and that a refusal on any host ends the run; that
-# without the collection it names the install command when there is a Kerbside
-# host, and does nothing when there is none; that it accepts a release in the
+# which is not a Shaken Fist node, a cleartext api_url which does not point at
+# this host (while accepting one which names this node's own inventory
+# address), a PKI directory equal to or inside the SPICE one, and a
+# kerbside_url the two sides see differently; that the cluster shape play
+# refuses a kerbside_url which ends in a slash, or which Shaken Fist's nodes
+# see differently, before any host is changed; that the validation play checks
+# every Kerbside host with the variables that host sees, and that a refusal on
+# any host ends the run; that without the collection it names the install
+# command when there is a Kerbside host, and does nothing when there is none;
+# that it accepts a release in the
 # range requirements.yml pins, refuses one outside it, and accepts a checkout
 # with a warning; that kerbside_extra_sources follow this cluster's source;
 # that the Deploy play's source carries the CA byte for byte; that internal_ca
@@ -234,18 +237,22 @@ site_inventory() {
     } > "${WORK}/site/hosts.ini"
 }
 
-# A valid configuration: the Kerbside settings in group_vars/kerbside, and
-# kerbside_url and api_url for every host, with no host_vars, and the real
-# requirements.yml. Cases change them, and call this again when they are done.
+# A valid configuration: the Kerbside-host-only settings in group_vars/kerbside,
+# the cluster-wide ones (kerbside_url and kerbside_system_key, which the Shaken
+# Fist nodes read too) and api_url for every host, with no host_vars, and the
+# real requirements.yml. kerbside_system_key is cluster-wide because it is
+# minted on the database host and the Kerbside host must present the same
+# value (#4700); in group_vars/kerbside the database host would see none.
+# Cases change them, and call this again when they are done.
 reset_site_vars() {
     rm -f "${WORK}"/site/host_vars/*.yml
     cat > "${WORK}/site/group_vars/kerbside.yml" << EOF
 kerbside_public_fqdn: ${FQDN}
-kerbside_system_key: ${SYSTEM_KEY}
 kerbside_auth_secret_seed: ${SEED}
 kerbside_sql_url: '${SQL_URL}'
 EOF
-    printf "kerbside_url: '%s'\napi_url: %s\n" "${URL}" "${API_URL}" > "${WORK}/site/group_vars/all.yml"
+    printf "kerbside_url: '%s'\nkerbside_system_key: %s\napi_url: %s\n" \
+        "${URL}" "${SYSTEM_KEY}" "${API_URL}" > "${WORK}/site/group_vars/all.yml"
     cp "${REQUIREMENTS}" "${WORK}/site/requirements.yml"
 }
 
@@ -376,6 +383,31 @@ for play, tasks in ((validate, v_tasks), (deploy, d_tasks)):
     source_vars = tasks[0].get('vars') or {}
     if source_vars.get('kerbside_colocated') != COLOCATED:
         sys.exit(f'{play["name"]!r} passes kerbside_colocated {source_vars.get("kerbside_colocated")!r}')
+# Both plays also pass the SHA-256 of the database host's kerbside_system_key
+# and system_key. kerbside_source skips each of its two key checks when the
+# hash is null, so dropping these play vars would disable both silently, with
+# every case in this script still green (#4700).
+for play, tasks in ((validate, v_tasks), (deploy, d_tasks)):
+    source_vars = tasks[0].get('vars') or {}
+    db_host = str(source_vars.get('kerbside_db_host', ''))
+    if 'database_node' not in db_host:
+        sys.exit(f'{play["name"]!r} does not derive kerbside_db_host from the database tier, '
+                 'so the key hashes do not come from the host which mints the key')
+    # The mint is a run_once task over database_node:etcd_master:&reachable,
+    # so the first host in the inventory is the wrong one whenever it is
+    # absent from the run: the hashes would then be compared against a host
+    # which is not minting.
+    if 'reachable' not in db_host:
+        sys.exit(f'{play["name"]!r} derives kerbside_db_host without intersecting the reachable '
+                 'group, so the key hashes come from the first database host in the inventory '
+                 'rather than the first the run_once mint actually uses')
+    for var, key in (('kerbside_minted_key_hash', "['kerbside_system_key']"),
+                     ('kerbside_deploy_key_hash', "['system_key']")):
+        value = str(source_vars.get(var, ''))
+        if not ('kerbside_db_host' in value and key in value and "hash('sha256')" in value):
+            sys.exit(f'{play["name"]!r} does not pass {var} as the sha256 of the database '
+                     f"host's {key}, so kerbside_source would skip its check")
+
 slurps = [t for t in deploy['tasks'] if 'ansible.builtin.slurp' in t]
 if len(slurps) != 1 or deploy['tasks'].index(slurps[0]) > deploy['tasks'].index(d_tasks[0]):
     sys.exit(f'{DEPLOY!r} does not read the CA once, before kerbside_source')
@@ -417,7 +449,7 @@ operator_args = set(node_specs['kerbside_source'].get('options') or {})
 for spec in specs.values():
     operator_args |= set(spec.get('options') or {})
 derived = {'kerbside_hosts', 'kerbside_sources', 'kerbside_colocated', 'kerbside_url_on_sf_nodes',
-           'kerbside_sf_ca_cert'}
+           'kerbside_sf_ca_cert', 'kerbside_minted_key_hash', 'kerbside_deploy_key_hash'}
 for play in (validate, deploy):
     bad = (set(play.get('vars') or {}) & operator_args) - derived
     if bad:
@@ -767,6 +799,139 @@ PYEOF
     CURRENT_CASE="case 6: kerbside_source skips the kerbside_url check without the Shaken Fist nodes' value"
     run "${WITHOUT}" -i localhost, -e "$(source_vars url-unknown '"kerbside_url_on_sf_nodes": null')" \
         "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused it'
+
+    # #4699: a cleartext api_url which is not this host sends the system key
+    # over the network in the clear, and is refused unless opted out of. Keyed
+    # on api_url rather than on co-location, so a co-located host pointed at
+    # another host's http sf-api -- which is what the CI lane does -- is caught
+    # too, and a loopback api_url is exempt however the host is classified.
+    source_refuses 'a cleartext http api_url on a host which is not a Shaken Fist node' \
+        '"api_url": "http://sf-api.example.com:13000"' \
+        'has the scheme "http", not https'
+    source_refuses 'a cleartext http api_url on a co-located host, pointed elsewhere' \
+        '"kerbside_colocated": true, "api_url": "http://sf-api.example.com:13000"' \
+        'has the scheme "http", not https'
+    # Stated as https rather than as "not http", so a formatting accident
+    # fails closed: urlsplit reads "sf-api.example.com:13000" as a scheme of
+    # its own, and "//sf-api.example.com:13000" as no scheme at all.
+    source_refuses 'an api_url with no scheme' \
+        '"api_url": "//sf-api.example.com:13000"' \
+        'has the scheme "", not https'
+    source_refuses 'an api_url whose host looks like a scheme' \
+        '"api_url": "sf-api.example.com:13000"' \
+        'not https'
+
+    CURRENT_CASE='case 6: kerbside_source accepts a cleartext api_url with the opt-out set'
+    run "${WITHOUT}" -i localhost, -e "$(source_vars insecure-optin \
+        '"api_url": "http://sf-api.example.com:13000", "kerbside_allow_insecure_api_url": true')" \
+        "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused the opted-out cleartext api_url'
+
+    CURRENT_CASE='case 6: kerbside_source accepts a cleartext loopback api_url'
+    run "${WITHOUT}" -i localhost, -e "$(source_vars insecure-loopback \
+        '"kerbside_colocated": true, "api_url": "http://localhost:13000"')" \
+        "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused a loopback cleartext api_url'
+
+    # A co-located host's own address is as local as loopback: sf-api listens
+    # on every node, so the request never leaves the host and the key is not
+    # exposed. The addresses compared are the inventory's (node_mesh_ip,
+    # node_egress_ip, node_name, ansible_host), never gathered facts, because
+    # neither Kerbside play gathers them. The case below is a co-located
+    # Kerbside host naming its own routable address, api_url
+    # http://10.0.0.1:13000, which is sf-1's node_mesh_ip in
+    # examples/cluster (whose own api_url is the load-balanced https one).
+    local own
+    for own in '"node_mesh_ip": "10.0.0.1"' '"node_egress_ip": "10.0.0.1"' \
+               '"node_name": "10.0.0.1"' '"ansible_host": "10.0.0.1"'; do
+        CURRENT_CASE="case 6: kerbside_source accepts a cleartext api_url which is this node's own address (${own})"
+        run "${WITHOUT}" -i localhost, -e "$(source_vars insecure-own-address \
+            "\"kerbside_colocated\": true, \"api_url\": \"http://10.0.0.1:13000\", ${own}")" \
+            "${WORK}/kerbside-source.yml" \
+            || fail "kerbside_source refused a cleartext api_url which is this node's own address"
+    done
+
+    # But only on a Shaken Fist node: a dedicated Kerbside host runs no
+    # sf-api, so whatever answers its own address forwards the request, and
+    # the key, onwards.
+    source_refuses "a cleartext api_url which is a dedicated host's own address" \
+        '"api_url": "http://10.0.0.1:13000", "node_mesh_ip": "10.0.0.1"' \
+        'has the scheme "http", not https'
+    # And only this host's own address: another node's is a network hop.
+    source_refuses "a cleartext api_url which is another node's address" \
+        '"kerbside_colocated": true, "api_url": "http://10.0.0.2:13000", "node_mesh_ip": "10.0.0.1"' \
+        'has the scheme "http", not https'
+
+    # #4700: this host's kerbside_system_key must be the one minted on the
+    # database host, and must not be the deploy key. The hashes are what the
+    # consuming playbook passes; sha256 them the way ansible's hash('sha256')
+    # does.
+    source_refuses 'a Kerbside key which is not the one minted for the cluster' \
+        "\"kerbside_minted_key_hash\": \"$(printf '%s' 'a-different-key' | sha256sum | cut -d' ' -f1)\"" \
+        'is not the value the database host will mint'
+    source_refuses 'a Kerbside key equal to the deploy key' \
+        "\"kerbside_deploy_key_hash\": \"$(printf '%s' "${SYSTEM_KEY}" | sha256sum | cut -d' ' -f1)\"" \
+        "is the same as the cluster's deploy key"
+
+    CURRENT_CASE='case 6: kerbside_source accepts the minted key, not the deploy key'
+    run "${WITHOUT}" -i localhost, -e "$(source_vars key-hashes-ok \
+        "\"kerbside_minted_key_hash\": \"$(printf '%s' "${SYSTEM_KEY}" | sha256sum | cut -d' ' -f1)\", \
+         \"kerbside_deploy_key_hash\": \"$(printf '%s' 'the-deploy-key' | sha256sum | cut -d' ' -f1)\"")" \
+        "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused the minted key'
+
+    # #4709: wiring values rendered unescaped must be single lines; a co-located
+    # Kerbside PKI directory must not be the SPICE one; and the proxy FQDN must
+    # not be a Shaken Fist host name.
+    source_refuses 'a newline in kerbside_url' \
+        '"kerbside_url": "https://console.example.com\nca"' \
+        'contains a newline'
+    source_refuses 'a double quote in kerbside_url' \
+        '"kerbside_url": "https://console.example.com/\"x"' \
+        'contains a newline, a double quote'
+    source_refuses 'a command substitution in kerbside_url' \
+        '"kerbside_url": "https://console.example.com/$(id)"' \
+        'contains a newline, a double quote'
+    source_refuses 'a backtick in kerbside_url' \
+        '"kerbside_url": "https://console.example.com/`id`"' \
+        'contains a newline, a double quote'
+    source_refuses 'a backslash in kerbside_url' \
+        '"kerbside_url": "https://console.example.com/\\\\x"' \
+        'contains a newline, a double quote'
+    source_refuses 'a newline in kerbside_public_fqdn' \
+        '"kerbside_public_fqdn": "console.example.com\nca"' \
+        'contains a newline'
+    source_refuses 'a newline in kerbside_sql_url' \
+        '"kerbside_sql_url": "mysql://u:p@db.example.com/kerbside\nca"' \
+        'contains a newline'
+    source_refuses 'a newline in kerbside_auth_secret_seed' \
+        '"kerbside_auth_secret_seed": "seed-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nca"' \
+        'contains a newline'
+    source_refuses 'a Kerbside PKI directory equal to the SPICE one on a co-located host' \
+        '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice"' \
+        'would overwrite'
+    source_refuses 'a Kerbside PKI directory equal to the SPICE one with a trailing slash' \
+        '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice/"' \
+        'would overwrite'
+    source_refuses 'a Kerbside PKI directory inside the SPICE one' \
+        '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice/kerbside"' \
+        'would overwrite'
+    source_refuses 'a Kerbside PKI directory inside the SPICE one by a dot' \
+        '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice/."' \
+        'would overwrite'
+
+    # The containment test must not catch a sibling whose name merely starts
+    # with the SPICE directory's.
+    CURRENT_CASE='case 6: kerbside_source accepts a PKI directory beside the SPICE one'
+    run "${WITHOUT}" -i localhost, -e "$(source_vars pki-sibling \
+        '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice-kerbside"')" \
+        "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused a PKI directory beside the SPICE one'
+
+    CURRENT_CASE='case 6: kerbside_source refuses a public FQDN equal to a Shaken Fist host name'
+    printf 'localhost ansible_connection=local\n[allsf]\nlocalhost\n' > "${WORK}/inv-allsf.ini"
+    if run "${WITHOUT}" -i "${WORK}/inv-allsf.ini" \
+        -e "$(source_vars fqdn-clash '"kerbside_public_fqdn": "localhost"')" "${WORK}/kerbside-source.yml"; then
+        fail 'kerbside_source accepted a public FQDN equal to a host name'
+    fi
+    assert_output_has 'the name of a host in'
+    assert_output_has 'fatal: [localhost]: FAILED!'
 }
 
 case_7_site_validation_runs() {
@@ -774,7 +939,11 @@ case_7_site_validation_runs() {
     reset_site_vars
     site_inventory kb-1
     echo "kerbside_url: '${URL}'" >> "${WORK}/site/group_vars/kerbside.yml"
-    echo "api_url: ${API_URL}" > "${WORK}/site/group_vars/all.yml"
+    # kerbside_url only the Kerbside hosts see, but kerbside_system_key still
+    # cluster-wide, so the kerbside_url check fires rather than the empty-key
+    # or minted-key one.
+    printf "kerbside_system_key: %s\napi_url: %s\n" "${SYSTEM_KEY}" "${API_URL}" \
+        > "${WORK}/site/group_vars/all.yml"
     run_site_head "${WITH}" && fail 'the validation play passed it'
     assert_output_has "Shaken Fist's nodes render no kerbside_url at all"
     assert_output_has 'fatal: [kb-1]: FAILED!'
@@ -815,7 +984,11 @@ case_7_site_validation_runs() {
     CURRENT_CASE="case 7: site.yml refuses the default, loopback, api_url on a dedicated Kerbside host"
     site_inventory kb-1
     reset_site_vars
-    echo "kerbside_url: '${URL}'" > "${WORK}/site/group_vars/all.yml"
+    # No api_url, so it falls back to the role default (loopback); keep
+    # kerbside_url and kerbside_system_key cluster-wide so the loopback check
+    # is what fires.
+    printf "kerbside_url: '%s'\nkerbside_system_key: %s\n" "${URL}" "${SYSTEM_KEY}" \
+        > "${WORK}/site/group_vars/all.yml"
     run_site_head "${WITH}" && fail 'the validation play passed it'
     assert_output_has 'a loopback address, but kb-1 is not a Shaken Fist node'
     assert_later_play_did_not_run
