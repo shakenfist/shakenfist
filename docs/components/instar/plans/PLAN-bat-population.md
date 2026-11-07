@@ -717,8 +717,8 @@ rather than merge requests.
 | 6. Streaming BAT emitter and the fixed `plan_vhdx` | [PLAN-bat-population-phase-06-emitter.md](/components/instar/plans/PLAN-bat-population-phase-06-emitter/) | Complete | `aef757d2` (#853) |
 | 7. `create -f vhdx -o subformat=fixed`: guest streaming and host CLI | [PLAN-bat-population-phase-07-create.md](/components/instar/plans/PLAN-bat-population-phase-07-create/) | Complete | `03269d7f` (#858) |
 | 8. `convert -O vhdx --subformat fixed` | [PLAN-bat-population-phase-08-convert.md](/components/instar/plans/PLAN-bat-population-phase-08-convert/) | Complete | `e49b6275` (#874) |
-| 9. `measure -O vhdx -o subformat=fixed` | [PLAN-bat-population-phase-09-measure.md](/components/instar/plans/PLAN-bat-population-phase-09-measure/) | In progress | |
-| 10. Cross-version matrix and derived-profile validation | PLAN-bat-population-phase-10-matrix.md | Not started | |
+| 9. `measure -O vhdx -o subformat=fixed` | [PLAN-bat-population-phase-09-measure.md](/components/instar/plans/PLAN-bat-population-phase-09-measure/) | Complete | `3b74ba8d` (#877) |
+| 10. Cross-version matrix and derived-profile validation | [PLAN-bat-population-phase-10-matrix.md](/components/instar/plans/PLAN-bat-population-phase-10-matrix/) | In progress | |
 | 11. Coverage and differential fuzzing | PLAN-bat-population-phase-11-fuzz.md | Not started | |
 | 12. Documentation | PLAN-bat-population-phase-12-docs.md | Not started | |
 | 13. Push audit: `PUSH-AUDIT.md` over every phase above | PLAN-bat-population-phase-13-push-audit.md | Not started | |
@@ -928,17 +928,31 @@ backwards claim sits in the comment on
 allocated"), reported by phase 4's implementing session.
 
 **Phase 10** is the cross-version matrix for everything above:
-create and convert fixed cases across every profile (including the
-vhdx fixed cases in `generate-baselines.py`'s `CREATE_CASES` and
-instar's mirror of it, which phase 2's survey moved here because
-adding them before instar can create fixed VHDX breaks
-`test_create_cases_match_baselines` and they cannot see fixed-ness),
-per-image cross-version baselines for phase 2's fixtures, the
-preallocation and monolithicFlat create cases, and the
-derived-profile validation the Situation warns about. It is separate from the feature phases because
-regenerating baselines in instar-testdata and validating `profiles/`
-against `raw/` is its own procedure, and because each feature phase
-already carries the host-version tests that prove it works.
+create cases across every profile (the vhdx fixed cases in
+`generate-baselines.py`'s `CREATE_CASES` and instar's mirror of it,
+which phase 2's survey moved here because adding them before instar
+can create fixed VHDX breaks `test_create_cases_match_baselines` and
+they cannot see fixed-ness, plus the preallocation and monolithicFlat
+cases phase 3's survey moved here for the same reason), per-image
+cross-version baselines for phase 2's fixtures, and the
+derived-profile validation the Situation warns about. It is separate
+from the feature phases because regenerating baselines in
+instar-testdata and validating the derived profiles against the
+per-version baselines is its own procedure, and because each feature
+phase already carries the host-version tests that prove it works.
+
+Phase 10's survey corrected three things this paragraph used to
+assume. The generator takes no `--image` or `--case` filter and skips
+nothing that already exists, so aiming it at five fixtures or ten new
+cases means first adding those filters -- otherwise the same command
+regenerates every safe image, and the baselines are a long way behind
+the manifest (`check-human` covers 38 of the 124 safe images). There
+is no validator for the derived profiles and no CI in instar-testdata
+to run one, so phase 10 writes the script rather than running an
+existing procedure. And "convert fixed cases across every profile" was
+never possible: `CREATE_CASES` drives `qemu-img create` plus `info`,
+and the generator has no convert matrix; the cross-version oracle for
+fixed convert output is the create baselines plus phase 1's pin.
 
 **Phase 11** extends `fuzz_create_emitters` to the fixed subformat
 and the filler's invariants (every payload entry in range, every
@@ -1559,8 +1573,22 @@ chosen to defer to here, so that we do not forget them.
   do instar's raw/dynamic/qcow2 targets, so it is an instar-specific
   defect in the phase 8 writer (`convert_to_vhdx_fixed`); `measure` is
   unaffected (it returns the fixed file length without reading the
-  source). Found while adding phase 9's measure tests. (GitHub issue to
-  be filed.)
+  source). Found while adding phase 9's measure tests. Filed as #879.
+* The safe manifest images that have no cross-version baselines at
+  all. `tests/manifest.json` holds 124 `safe` images;
+  `expected-outputs/check-human` baselines 38 of them and
+  `qemu-img-json` 71, and the `check-human` version map is stamped
+  2026-08-29. Generating the rest un-skips tests across the whole
+  suite, each of which may have a real failure behind it, so it is a
+  phase of its own rather than a side effect of phase 10 (#845 is the
+  measure-shaped half of it).
+* `expected-outputs/create-info-json` keeps 80 profiles for 80
+  versions -- no deduplication at all -- because qemu-img writes a
+  random VMDK `cid` on every create and `detect-profiles.py` hashes
+  `stdout` whole. Nothing consumes it wrongly (every consumer strips
+  `cid`), so it costs disk rather than correctness. Excluding the
+  field from the profile hash would collapse it, at the price of
+  rewriting all 80 profiles.
 * A failed `instar convert` leaves a zero-byte output file (seen on the
   #626 geometry). Measure what qemu-img leaves behind on the same
   failure before calling it a defect; if qemu removes or never creates

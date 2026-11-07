@@ -3052,6 +3052,89 @@ header-id) prevent dedup from collapsing duplicate-output
 versions, so each version gets its own profile; the comparison logic excludes those random fields from the
 field-equivalence check.
 
+### Adding or refreshing one baseline
+
+`scripts/generate-baselines.py` in `instar-testdata` takes repeatable,
+exact-match filters, so a new fixture or create case no longer needs a
+full run across all 80 versions. `--image ID` selects manifest images
+and applies to `info`, `check`, `compare`, `measure`, `map` and
+`snapshot-list`; `--case NAME` selects case names and applies to
+`create`, `resize`, `amend`, `bitmap`, `dd`, `rebase`, `commit` and
+`measure`. `measure` takes both (a `--size` axis and a source-image
+axis); one filter runs the sub-mode it names, both run both. A filter
+that matches nothing exits 1 rather than running empty.
+
+Both filters match by name across every target that defines one, so
+`--case 16M-fixed` regenerates the vhd case of that name as well as the
+vhdx one; three of the current case names are shared that way. Check
+`git status --porcelain expected-outputs` after a run to see what
+actually moved rather than assuming the target you had in mind. Run
+from the `instar-testdata` checkout:
+
+```bash
+scripts/generate-baselines.py --command map --no-commit --image vhdx-fixed-16M
+scripts/generate-baselines.py --command create --no-commit --case 16M-fixed
+scripts/detect-profiles.py --no-commit
+make validate-profiles
+```
+
+`make baselines-create` and `make baselines-map` run the unfiltered
+form; neither is part of the umbrella `baselines` target, because they
+write real disk blocks (create) or walk every safe image at every
+version (map), so prefer the filtered form.
+
+**Always run `make validate-profiles` after a regeneration**, in the
+`instar-testdata` checkout — it is a target there, not in instar. It
+checks, for every version in each output type's `version-map.json`, that
+the mapped profile holds a byte-identical copy of each of that version's
+source files, and it exits non-zero on any mismatch, orphan file or
+*profiled* output type that compared nothing. An output type with no
+`version-map.json` is reported as "not a profiled output type" and
+skipped, which is not a failure: several output types have no profiles
+directory at all. The derived profiles have gone
+silently wrong twice while the raw baselines were fine and the suite
+stayed green: once by stamping a stale snapshot into every profile, once
+by flattening buckets so a third of the files were dropped. Two
+defects of the same shape have since been fixed in `detect-profiles.py`
+(a raw change that never reached the profiles, and hand-authored goldens
+dropped when a profile boundary moved). Nothing else notices these, so
+the validator is the check.
+
+**The create-case list is mirrored in two repositories.** `CREATE_CASES`
+in `tests/test_create.py` mirrors the generator's `CREATE_CASES`, and
+the two must land together. Drift shows as
+`test_create_cases_match_baselines` failing in one direction: "baselines
+on disk not in CREATE_CASES" means the generator and testdata moved
+ahead of instar; "CREATE_CASES entries with no baseline" means instar
+moved ahead of testdata. The coupling holds for reverts too, and that
+is the direction that catches people: reverting the instar-side case
+list needs the matching testdata commit reverted with it, and vice
+versa, because `tools/ci/prepare-testdata.sh` clones testdata's
+default branch unpinned and the assertion runs both ways.
+
+**So is the placeholder vocabulary in recorded output.** A baseline has
+the image's own path rewritten to `$FILENAME`, and a file a create
+subformat wrote beside it — vmdk's monolithicFlat extent — rewritten to
+`$FILENAME` plus the suffix its name adds, so a flat extent reads
+`$FILENAME-flat`. The generator writes it from `sibling_placeholder()`
+in `scripts/generate-baselines.py`; instar reproduces it in
+`_placeholder_for()` in `tests/helpers/info_json.py`. The two rules are
+deliberately not identical, and `_placeholder_for`'s docstring says how:
+instar's is the stricter side, accepting only the suffixes it knows, so
+an unrecognised neighbour fails the comparison with a visible path
+rather than being normalised away. A new multi-file subformat has to be
+taught to both.
+
+**Reading a baseline failure: which side is "reference"?** In
+`tests/test_map.py` and `tests/test_measure.py` the baseline
+comparisons call `assertEqual(instar_output, baseline, ...)`, so
+testtools labels *instar's output* "reference" and the baseline
+"actual". That is the reverse of what the words suggest; read a
+divergence there as "reference = instar, actual = qemu-img baseline".
+`assert_info_equivalent` in `tests/test_create.py` passes the baseline
+first and reads the conventional way. Check the argument order before
+deciding which side moved.
+
 ### qemu-img create pins
 
 `tests/golden/qemu-create-pins.json` records what every static
