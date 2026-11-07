@@ -106,6 +106,22 @@ filters (`:729`, `:814`) to avoid charging a reschedule twice.
 Nothing else about the instance is used. That is a short enough
 list to replace with a value type.
 
+**`F2a`, found while executing step 1a.** `F2` enumerated what
+`find_candidates()` reads from the instance but not who else calls
+the predicates it reads them in. Five helpers in
+`shakenfist/tests/test_scheduler.py` call them directly with a real
+`Instance`: `HasSufficientCPUPredicateTestCase._call` (`:2446`),
+`CpuCeilingAgreementTestCase._admits` (`:2607`),
+`HasSufficientRAMPredicateTestCase._call` (`:2699`),
+`HasSufficientDiskPredicateTestCase._call` (`:2834`) and
+`HasIdleDiskBandwidthPredicateTestCase._call` (`:2881`). Twelve tests
+across three of them fail on the converted signature; the other two
+pass by accident rather than by design — `_admits` because its
+fixture sets `used_cpus=0`, which short-circuits the `placed_on`
+comparison, and the bandwidth helper because that predicate never
+reads its shape argument at all. `D8` has been amended to say what
+this means.
+
 **`F3`. The filters that would need to see a tentative charge
 read five different figures across two ledgers.** For a multiset
 this matters more than it looks: charge only the committed ledger
@@ -288,12 +304,25 @@ production callers are unchanged at their call sites. The fake at
 `shakenfist/tests/test_external_api.py:35` also keeps working.
 
 **`D8`. Behaviour preservation is proved in two different ways,
-because `F5` rules out the obvious one.** At step 1a, the entire
-existing test suite passes *unmodified* — any test edit in that
-step's diff is a behaviour change until argued otherwise, and the
-review treats it that way. At step 1b, the new multiset tests
-assert candidate *sets*, bucket tiers, exception types and stages,
-and event sequences; never list order.
+because `F5` rules out the obvious one.** At step 1a the entire
+existing test suite passes, and the only edit permitted to a test
+file is the construction of the argument passed to a converted
+predicate — one line per helper, as `F2a` names them. No assertion,
+no expected value, no test name and no fixture may change, and any
+other test edit in that step's diff is a behaviour change until
+argued otherwise. At step 1b, the new multiset tests assert
+candidate *sets*, bucket tiers, exception types and stages, and
+event sequences; never list order.
+
+*Amended during execution.* This decision first read that no test
+file may change at all, which `F2a` showed to be unachievable:
+converting a private predicate's parameter changes the type its
+direct callers must pass, and five of those callers are test
+helpers. The rule's purpose survives the amendment — a test edit
+still signals a behaviour change — because the amendment admits
+only argument construction, which carries no assertion. Reverting
+to the original rule would have meant leaving the predicates
+`Instance`-bound, which is the phase.
 
 **`D9`. The multiset path carries production traffic from the
 first commit.** Both callers route through it at one shape rather
@@ -313,9 +342,9 @@ and each depends on its predecessor's code.
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
 | 1a | high | opus | none | **The shape type, and the filters converted to read it.** Read this phase plan's `F2`, `F3`, `D1` and `D8` first. In `shakenfist/scheduler.py`: add `PlacementShape` as a `NamedTuple` (`cpus`, `memory_mb`, `disk_gb`, `affinity`, `namespace`, `instance_uuid=None`, `placed_on=None`) with a `from_instance(inst)` factory that sums `disk_spec` exactly as `find_candidates()` does at `:942-945` and `_has_sufficient_disk()` does at `:830-836` — note those are two copies of the same sum today, and the factory becomes the one copy. Convert `_has_sufficient_cpu` (`:684`), `_has_sufficient_ram` (`:753`), `_has_sufficient_disk` (`:829`), `_has_idle_disk_bandwidth` (`:857`), `_satisfies_hard_affinity` (`:623`) and the module-level `_affinity_neighbour_skip` (`:193`) to take a shape in place of `inst`. The two `instance.placement_filter(node, inst)` calls (`:729`, `:814`) become a comparison against `shape.placed_on`; preserve the "a reschedule onto the same node is not charged twice" behaviour exactly. `find_candidates()` keeps its name and signature (`D7`), builds a shape via the factory, and keeps `inst.attribute_memo()` around the whole decision. Do **not** add the multiset walk, change any stage name or literal, change any event's name, subject, order or payload, or touch `place_on_candidates()`. Do not restate `_affinity_neighbour_skip()`'s predicate anywhere (`docs/developer_guide/coding_rules.md:7`). Checks: `tox -epy3` and `pre-commit run --all-files` from the repository root, and `shakenfist/tests/test_scheduler.py` (2974 lines) must pass **with no edits to any test file** — if a test needs changing, stop and report which and why rather than changing it. Commit subject: `Denominate placement in a requested shape.` |
-| 1b | high | opus | none | **The multiset core.** Read `F3`, `F5`, `D2`, `D3`, `D4`, `D5`, `D9` first, and step 1a's diff. Add one entry point beside `find_candidates()` that takes a list of `PlacementShape`, an optional forced candidate list, and an explicit event-target list, and returns a per-shape assignment (shape index to ordered candidate list, or to the chosen node) all-or-nothing: if any shape has no candidate left at any stage, the whole call raises, with the same exception classes and `stage=` values the single-shape path raises today (`_log_and_raise_on_error`, `:876`). Walk shapes largest-first by memory, then vCPUs, then disk (`D4`). After each shape is assigned, apply its tentative charge to a per-call overlay covering all six figures in `F3`'s table, in their own units — `disk_free_instances` is bytes, so debit `disk_gb * GiB` — and rank the next shape against the overlay. Copy the dicts; never mutate `self.metrics` or the rows from `_capacity_by_node()` in place, because the `Scheduler` outlives the call. A node with no capacity row stays uncharged on the ledger terms and charged on the measured terms (`P7`). `find_candidates()` becomes the one-shape caller (`D9`), passing exactly today's event targets. Tests in `shakenfist/tests/test_scheduler.py`: a two-shape set that fits; a two-shape set where the second shape fits only because the first was charged elsewhere; a set that fails all-or-nothing and raises with the right stage; a set whose total exceeds one node but fits the cluster; the bytes-versus-GiB debit; and a case proving an absent capacity row is charged on measurement but not on the ledger. Assert candidate *sets*, tiers, exception types and stages, and event sequences — never list order (`F5`, `D8`). Checks as 1a, plus the full `tox` default envlist. Commit subject: `Place a multiset of shapes all or nothing.` |
+| 1b | high | opus | none | **The multiset core.** Read `F3`, `F5`, `D2`, `D3`, `D4`, `D5`, `D9` first, and step 1a's diff. Add one entry point beside `find_candidates()` that takes a list of `PlacementShape`, an optional forced candidate list, and an explicit event-target list, and returns a per-shape assignment (shape index to ordered candidate list, or to the chosen node) all-or-nothing: if any shape has no candidate left at any stage, the whole call raises, with the same exception classes and `stage=` values the single-shape path raises today (`_log_and_raise_on_error`, `:876`). Walk shapes largest-first by memory, then vCPUs, then disk (`D4`). After each shape is assigned, apply its tentative charge to a per-call overlay covering all six figures in `F3`'s table, in their own units — `disk_free_instances` is bytes, so debit `disk_gb * GiB` — and rank the next shape against the overlay. Copy the dicts; never mutate `self.metrics` or the rows from `_capacity_by_node()` in place, because the `Scheduler` outlives the call. A node with no capacity row stays uncharged on the ledger terms and charged on the measured terms (`P7`). `find_candidates()` becomes the one-shape caller (`D9`), passing exactly today's event targets. Tests in `shakenfist/tests/test_scheduler.py`: a two-shape set that fits; a two-shape set where the second shape fits only because the first was charged elsewhere; a set that fails all-or-nothing and raises with the right stage; a set whose total exceeds one node but fits the cluster; the bytes-versus-GiB debit; and a case proving an absent capacity row is charged on measurement but not on the ledger. Assert candidate *sets*, tiers, exception types and stages, and event sequences — never list order (`F5`, `D8`). Checks as 1a, plus the full `tox` default envlist. Step 1a left one thing for you: the `schedule inputs` event publishes the raw `disk_spec` list and the shape carries only the summed `disk_gb`, so the wrapper still reads `inst.disk_spec` for that one field. If the core emits that event, add `disk_spec` to `PlacementShape` as an optional field defaulting to `None` and have `from_instance()` fill it, so a dry-run shape in phase 2 can leave it unset rather than inventing one. Do not drop the field from the event: `F6` makes it a documented diagnostic. Commit subject: `Place a multiset of shapes all or nothing.` |
 | 1c | medium | sonnet | none | **Prove the new tests would catch the core's removal.** Use the `mutation-check` skill's method against the step 1b code only. At least these five mutations, each reverted from a copy and never with `git checkout`: delete the tentative charge entirely; charge the ledger figures but not the measured ones (`F3`'s real failure mode); charge disk in GiB against a bytes figure; make the all-or-nothing unwind return the partial assignment instead of raising; reverse the largest-first shape ordering. For each, run `shakenfist/tests/test_scheduler.py` under `timeout 900` and record which test failed and on which assertion. A mutation that no test catches is a finding: report it with the test that should have caught it, and do not write the test yourself. Write the script and its output to the scratch directory this step is given, and report its full path. Report counts only; change no file under `shakenfist/`. Commit subject: none — this step's output is a report, and the management session records it in the plan's Results. |
-| 1d | medium | sonnet | none | **Document the core where the scheduler is already documented.** `docs/operator_guide/scheduler.md:363-370` describes the shared placement walk; add to that passage, in its voice, that the filter pipeline in front of the walk now evaluates a requested shape and can evaluate several all-or-nothing, and that the only production caller today asks for one. Do not document an API, a capability or a dry run: none exists yet, and `docs/plans/` is the only place a plan phase may be named (the `Check documentation cites no plan phase numbers` pre-commit hook enforces this). Check `:1086-1092`'s diagnostic procedure is still literally true after steps 1a and 1b and say so, or fix it if it is not. Leave `AGENTS.md` and `ARCHITECTURE.md` alone: no convention and no component boundary changed. Checks: `pre-commit run --all-files`, and the `Check documentation links and anchors resolve` hook must pass. Commit subject: `Document shape-denominated placement.` |
+| 1d | medium | sonnet | none | **Document the core where the scheduler is already documented.** `docs/operator_guide/scheduler.md:363-370` describes the shared placement walk; add to that passage, in its voice, that the filter pipeline in front of the walk now evaluates a requested shape and can evaluate several all-or-nothing, and that the only production caller today asks for one. Do not document an API, a capability or a dry run: none exists yet, and `docs/plans/` is the only place a plan phase may be named (the `Check documentation cites no plan phase numbers` pre-commit hook enforces this). Check `:1086-1092`'s diagnostic procedure is still literally true after steps 1a and 1b and say so, or fix it if it is not. Leave `AGENTS.md` and `ARCHITECTURE.md` alone: no convention and no component boundary changed. Checks: `pre-commit run --all-files`, and the `Check documentation links and anchors resolve` hook must pass. Then fix the two prose citations step 1a made stale, both found during its review and neither touched by it, because `D8` confined that step to argument construction. `shakenfist/deploy/shakenfist_ci/retries.py:53` says "`_has_sufficient_disk()` sums the 'size' of each disk which has one" — that sum is now `PlacementShape.from_instance()`, and the point of the sentence is that the CI helper counts disk the way the scheduler does, so repoint it rather than rewriting it. `shakenfist/tests/test_scheduler.py:1235`'s docstring explains that the placement attribute is read once because the self-charge check "runs for every candidate carrying a non-zero used_cpus" and the decision memoises the row; it is now read once by construction, at the top of the decision. Fix the explanation and leave the `assertLessEqual(gia.call_count, 1)` assertion alone — its bound already covers the all-zero-ledger cluster, where the count went from 0 to 1. Commit subject: `Document shape-denominated placement.` |
 
 ## Risks and mitigations
 
@@ -360,8 +389,11 @@ and each depends on its predecessor's code.
    requested shape: `grep -n 'inst\.' shakenfist/scheduler.py`
    returns hits only inside `find_candidates()`'s wrapper layer
    and `PlacementShape.from_instance()`.
-2. Step 1a's commit changes no file under `shakenfist/tests/`:
-   `git show --stat <1a sha> -- shakenfist/tests/` is empty.
+2. Step 1a's only change under `shakenfist/tests/` is argument
+   construction in the five helpers `F2a` names, per the amended
+   `D8`: `git show <1a sha> -- shakenfist/tests/` adds and removes
+   one line per helper and touches no assertion, expected value,
+   fixture or test name.
 3. A multiset entry point exists, and both production callers
    reach the filters through it. `grep -rn 'find_candidates('
    shakenfist/ --include=*.py | grep -v tests/` still shows the
