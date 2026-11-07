@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -16297,9 +16297,18 @@ Kerbside is not disturbed.</p>
 </code></pre></div>
 <p>Clusters not deployed with the collection create the key by hand, on a
 database node, the same way the deploy does -- on stdin, so the key never
-appears in the process table or shell history:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sf-ctl<span class="w"> </span>bootstrap-system-key<span class="w"> </span>--key-from-stdin<span class="w"> </span>kerbside<span class="w"> </span>&lt;<span class="w"> </span>kerbside-key-file
+appears in the process table or shell history, and with the same scopes, so
+the credential can read the whole cluster but cannot change it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sf-ctl<span class="w"> </span>bootstrap-system-key<span class="w"> </span>--key-from-stdin<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span>--scope<span class="w"> </span>cluster-admin<span class="w"> </span>--scope<span class="w"> </span>admin.read<span class="w"> </span>--scope<span class="w"> </span>node.read<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span>--scope<span class="w"> </span>instance.read<span class="w"> </span>kerbside<span class="w"> </span>&lt;<span class="w"> </span>kerbside-key-file
 </code></pre></div>
+<p>Those four scopes are least privilege for what Kerbside reads: <code>cluster-admin</code>
+for the administrative axis, <code>admin.read</code> for the CA and the public signing
+key, and <code>node.read</code> and <code>instance.read</code> for the console list. Omitting
+<code>--scope</code> altogether records no scopes, which is a wildcard -- a full
+cluster-administrator key, as every key minted before 0.8 is. Clusters
+upgrading from 0.7 should re-mint the <code>kerbside</code> key with the scopes above.</p>
 <h2 id="publishing-the-public-keys">Publishing the public keys<a class="headerlink" href="#publishing-the-public-keys" title="Permanent link">&para;</a></h2>
 <p>Kerbside verifies tokens with the <strong>public</strong> half of the signing key, which
 Shaken Fist serves to any authenticated caller at
@@ -16466,7 +16475,7 @@ node logs <code>empty subject</code>.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>

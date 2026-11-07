@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -16340,6 +16340,10 @@ are:</p>
 <td>Only with a <code>kerbside</code> group. Seeds Kerbside's token signing. At least 32 characters, and not Kerbside's placeholder <code>~~unconfigured~~</code>. Treat as a secret.</td>
 </tr>
 <tr>
+<td><code>kerbside_allow_insecure_api_url</code></td>
+<td>Only with a <code>kerbside</code> group. Accept a cleartext (<code>http://</code>) <code>api_url</code> which does not point at the Kerbside host itself, which the deploy otherwise refuses because Kerbside posts <code>kerbside_system_key</code> to it on every scrape. Defaults to false. Most multi-node clusters need this (or an <code>https://</code> <code>api_url</code>) before they can add a <code>kerbside</code> group, since the deploy does not put TLS in front of <code>sf-api</code>. Set it only when the network between the Kerbside hosts and the API is trusted, such as a private CI network.</td>
+</tr>
+<tr>
 <td><code>extra_config</code></td>
 <td>A JSON list of additional cluster configuration settings, for example <code>[{"name": "INCLUDE_TRACEBACKS", "value": "1"}]</code>. Optional.</td>
 </tr>
@@ -16371,12 +16375,27 @@ See <a href="../upgrades/#upgrade-process">Upgrades</a>.</p>
 <code>kerbside_sql_url</code> and <code>kerbside_auth_secret_seed</code>. <code>kerbside_url</code> and
 <code>kerbside_system_key</code> must be visible to both the Shaken Fist and the Kerbside
 hosts (put them in <code>group_vars/all</code>). On a Kerbside host which is not a Shaken
-Fist node, <code>api_url</code> must not be a loopback address. Each Kerbside host is
-checked with its own variables, so a <code>host_vars</code> override is checked too. The
-playbook builds this cluster's console source for Kerbside itself, and
-<code>kerbside_extra_sources</code> adds sources for other clusters or platforms. Every
-other Kerbside variable (its ports, packages and certificate, for example) is
-documented in the
+Fist node, <code>api_url</code> must not be a loopback address, since nothing answers
+there; and on any Kerbside host whose <code>api_url</code> does not point at that host,
+it must be <code>https://</code> unless you set <code>kerbside_allow_insecure_api_url</code>, since
+Kerbside posts <code>kerbside_system_key</code> in the body of every authentication it
+makes there. An <code>api_url</code> points at the host when its host part is a loopback
+address, or -- on a host which is also a Shaken Fist node, where <code>sf-api</code>
+answers locally -- one of that host's <code>node_mesh_ip</code>, <code>node_egress_ip</code>,
+<code>node_name</code> or <code>ansible_host</code>. <strong>Most multi-node clusters have a cleartext
+<code>api_url</code></strong>, because the deploy does not put TLS in front of <code>sf-api</code> (that is
+a load balancer's job), so adding a <code>kerbside</code> group to such a cluster means
+either giving <code>api_url</code> an <code>https://</code> endpoint or setting
+<code>kerbside_allow_insecure_api_url: true</code>; this is checked on every deploy, not
+just the first, so an existing cluster meets it at upgrade time.
+<code>kerbside_public_fqdn</code> must also not be the name of a host in <code>allsf</code>, and on
+a Kerbside host which is also a Shaken Fist node <code>kerbside_pki_dir</code> must not
+be <code>/etc/pki/libvirt-spice</code>, or a directory inside it, which holds that node's
+SPICE certificate. Each Kerbside host is checked with its own variables, so a
+<code>host_vars</code> override is checked too. The playbook builds this cluster's console
+source for Kerbside itself, and <code>kerbside_extra_sources</code> adds sources for other
+clusters or platforms. Every other Kerbside variable (its ports, packages and
+certificate, for example) is documented in the
 <a href="https://github.com/shakenfist/kerbside/tree/develop/ansible">collection's README</a>.
 For where to place Kerbside, the network it needs and load balancing, see
 <a href="../kerbside/">Running Kerbside beside a cluster</a>.</p>
@@ -16561,7 +16580,7 @@ It is customized per installation, setting the following variables:</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>

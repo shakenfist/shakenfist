@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -16749,6 +16749,43 @@
   for where to place Kerbside, the network it needs and load balancing.
   See the <a href="/developer_guide/ci/#deploy-profiles">CI developer guide</a> and the
   <a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/deploy/collection/README.md#kerbside">collection README</a>.</li>
+<li><strong>Kerbside's credential is now minted read-only, and five more deploy-time
+  refusals were added.</strong> The <code>kerbside</code> key in the system namespace is minted
+  with <code>--scope cluster-admin --scope admin.read --scope node.read --scope
+  instance.read</code>, which is least privilege for what Kerbside scrapes: it can
+  read the whole cluster but cannot change it. An existing <code>kerbside</code> key is
+  re-minted with those scopes on the next deploy, so any local automation
+  which reused that key to <em>write</em> must move to a credential of its own.
+  <code>sf-ctl bootstrap-system-key</code> takes the same repeatable <code>--scope</code> option;
+  omitting it still records no scopes, which is the wildcard every key minted
+  before 0.8 carries. The deploy also now refuses, before changing any host:
+  an <code>api_url</code> which does not point at the Kerbside host itself and whose
+  scheme is not <code>https</code> -- including one with no scheme at all (set
+  <code>kerbside_allow_insecure_api_url</code> to accept cleartext, as CI does, or use
+  <code>https://</code>). <strong>That one applies at upgrade time, not only to new
+  deployments</strong>: the deploy does not put TLS in front of <code>sf-api</code>, so a
+  multi-node cluster's <code>api_url</code> is usually <code>http://</code>, and the next deploy of
+  an existing cluster with a <code>kerbside</code> group refuses in the validation play,
+  before any host is changed, until it has an <code>https://</code> <code>api_url</code> or the
+  opt-out. An <code>api_url</code> pointing at the Kerbside host itself -- a loopback
+  address, or that host's own <code>node_mesh_ip</code>, <code>node_egress_ip</code>, <code>node_name</code> or
+  <code>ansible_host</code> where it is also a Shaken Fist node -- is unaffected, since
+  the request never leaves the host. The deploy also refuses: a
+  <code>kerbside_system_key</code> the database host cannot see, or which
+  equals <code>system_key</code> (set it once where both tiers read it, such as
+  <code>group_vars/all</code>); a <code>kerbside_public_fqdn</code> equal to a host name in <code>allsf</code>
+  (give the proxy a distinct name, such as <code>console.&lt;host&gt;</code>, or the host's
+  address); a newline in <code>kerbside_public_fqdn</code>, <code>kerbside_sql_url</code> or
+  <code>kerbside_auth_secret_seed</code>, which would inject a directive into
+  <code>kerbside.ini</code>; a newline, double quote, <code>$</code>, backtick or backslash in
+  <code>kerbside_url</code>, which would inject into <code>/etc/sf/config</code> -- that one is
+  refused on every node which renders it, so it applies to a cluster pointing
+  at an externally managed Kerbside with no <code>kerbside</code> group too; and
+  a <code>kerbside_pki_dir</code> of <code>/etc/pki/libvirt-spice</code>, or a directory inside it,
+  on a Kerbside host which is also a Shaken Fist node, where Kerbside would
+  overwrite that node's SPICE certificate. Each is checked per host, so a
+  <code>host_vars</code> override is caught too. See the <a href="/operator_guide/vdi_console_tokens/">VDI console tokens operator
+  guide</a>.</li>
 <li>There are now API calls for managing trusted issuers
   (<code>GET</code>/<code>POST /auth/issuers</code>, <code>GET</code>/<code>PUT</code>/<code>DELETE /auth/issuers/...issuerref...</code>).
   These are administrative: only the system namespace may register or remove an
@@ -18547,7 +18584,7 @@ from the API, because every object view now makes one more indexed query.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>
