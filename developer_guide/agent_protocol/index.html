@@ -14837,6 +14837,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Initial connection to the agent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recording-what-the-agent-said" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recording what the agent said
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15983,6 +16000,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Initial connection to the agent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recording-what-the-agent-said" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recording what the agent said
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -16099,6 +16133,32 @@ a <code>GatherFactsResponse</code>.</p>
 <p>When then sidechannel daemon process is instructed to terminate by systemd, it
 will silently terminate the connection to the in-guest agent and sends no
 further packets.</p>
+<h3 id="recording-what-the-agent-said">Recording what the agent said<a class="headerlink" href="#recording-what-the-agent-said" title="Permanent link">&para;</a></h3>
+<p>What the monitor learns about the agent is recorded in the instance's
+<code>agent_state</code> attribute, which the power methods in <code>instance.py</code> and the
+cleaner write too, with no lock between them. The monitor therefore writes
+through <code>Instance.record_observed_agent_state()</code> rather than assigning
+<code>agent_state</code> directly: nothing the agent said is still true of a guest whose
+vCPUs are frozen, so a reading which disagrees with the recorded <code>power_state</code>
+is replaced by the value that power state demands. Without that, an
+<code>IsSystemRunningReply</code> in flight as a guest froze could land after <code>pause()</code> or
+<code>power_off()</code>, leaving <code>agent_state</code> reading ready on a paused or powered off
+instance until the next unpause or power on — and a ready <code>agent_state</code> is what
+the agent operation endpoints gate on
+(<a href="https://github.com/shakenfist/shakenfist/issues/4485">issue 4485</a>).</p>
+<p>Two rules follow for anyone adding a writer:</p>
+<ul>
+<li><strong>A writer of a "not running" power state writes <code>power_state</code> before
+  <code>agent_state</code>.</strong> That order is what lets the monitor's write be reconciled
+  without a lock: it re-reads <code>power_state</code> after writing, so either it sees
+  the new power state and corrects itself, or the power method's own
+  <code>agent_state</code> write is still to come and wins.</li>
+<li><strong>The monitor does not cache a reading which was refused.</strong> <code>power_state</code> is
+  a cache as well, and can be stale in the other direction — a guest resumed
+  with <code>virsh</code> is running while <code>power_state</code> still says paused — so the
+  monitor asks the agent again, and records the truth once the cleaner has
+  caught up.</li>
+</ul>
 <h2 id="agentoperation-execution">AgentOperation execution<a class="headerlink" href="#agentoperation-execution" title="Permanent link">&para;</a></h2>
 <p>AgentOperations are executed with a separate connection to the in-guest agent.
 For any instance which has a healthy initial connection and no AgentOperations
