@@ -17,6 +17,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import GiB
 from shakenfist.constants import NODE_ACTIVE_STATES
 from shakenfist.eventlog import add_event
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import NoSuchDaemon
 from shakenfist.exceptions import NoSuchDaemonState
 from shakenfist.schema.node_attributes import NodeAttributesData
@@ -432,6 +433,20 @@ class Node(dbo):
             'version': cls.current_version
         })
         n = Node.from_db(str(node_uuid))
+        if not n:
+            # mariadb.create_node() reports a failed create by returning
+            # False, which _db_create() discards, so a create which did not
+            # happen is only visible here as a read which finds nothing.
+            # Returning None instead of raising made that an AttributeError
+            # in the caller: during a two minute network outage on
+            # 2026-11-06 both sentinels died this way on all six nodes,
+            # reporting neither the node nor the database (#4819). Callers
+            # which can carry on without recording the node already handle
+            # DatabaseUnavailable; see daemon.check_in_this_node().
+            raise DatabaseUnavailable(
+                f'Node {name} could not be read back after its record was '
+                'created, so the database did not accept the create')
+
         n.state = cls.STATE_INITIAL
         n.add_event(EVENT_TYPE_AUDIT, 'node created')
         return n

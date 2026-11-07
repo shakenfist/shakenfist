@@ -136,6 +136,40 @@ class CtlStopTestCase(base.ShakenFistTestCase):
         self.assertNotEqual(0, result.exit_code)
 
 
+class NodeCreateOutageTestCase(base.ShakenFistTestCase):
+    """A create the database did not accept must not surface as a None.
+
+    mariadb.create_node() reports failure by returning False, which
+    Node._db_create() discards, so the only sign of it is the read back
+    finding nothing. Node.new() used to assign into that None and both
+    sentinels died on the AttributeError on every node in the cluster
+    during a two minute network outage (#4819).
+    """
+
+    def test_new_raises_when_the_create_cannot_be_read_back(self):
+        with mock.patch.object(Node, 'from_db', return_value=None), \
+                mock.patch.object(Node, '_db_create') as create:
+            self.assertRaises(
+                DatabaseUnavailable, Node.new, 'sf-3', '10.0.0.3')
+        create.assert_called_once()
+
+    def test_a_check_in_survives_a_create_the_database_did_not_accept(self):
+        # The whole point of raising: the sentinel's check-in already
+        # treats DatabaseUnavailable as a check-in it can skip, so the
+        # daemon stays up and the next one catches up.
+        with mock.patch.object(Node, 'this_node', return_value=None), \
+                mock.patch.object(Node, 'from_db', return_value=None), \
+                mock.patch.object(Node, '_db_create'), \
+                mock.patch.object(Node, '_persist_uuid') as persist, \
+                mock.patch.object(daemon, 'LOG') as log:
+            self.assertFalse(daemon.check_in_this_node())
+
+        # Nothing may be recorded as this node's identity from a create
+        # the database did not take.
+        persist.assert_not_called()
+        log.warning.assert_called_once()
+
+
 class SentinelMainLoopTestCase(base.ShakenFistTestCase):
     """Each sentinel runs one check-in and stops, with the database gone."""
 
