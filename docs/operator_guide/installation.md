@@ -214,6 +214,7 @@ are:
 | `kerbside_public_fqdn` | Only to deploy Kerbside onto an optional `kerbside` inventory group. The name SPICE clients use to reach the proxy; also the proxy certificate's CN. An IPv4 or IPv6 address is given an IP SAN, and a name a DNS SAN. |
 | `kerbside_sql_url` | Only with a `kerbside` group. The URL of Kerbside's own MySQL or MariaDB database, for example `mysql://kerbside:PASSWORD@db.example.com/kerbside`. Treat as a secret. |
 | `kerbside_auth_secret_seed` | Only with a `kerbside` group. Seeds Kerbside's token signing. At least 32 characters, and not Kerbside's placeholder `~~unconfigured~~`. Treat as a secret. |
+| `kerbside_allow_insecure_api_url` | Only with a `kerbside` group. Accept a cleartext (`http://`) `api_url` which does not point at the Kerbside host itself, which the deploy otherwise refuses because Kerbside posts `kerbside_system_key` to it on every scrape. Defaults to false. Most multi-node clusters need this (or an `https://` `api_url`) before they can add a `kerbside` group, since the deploy does not put TLS in front of `sf-api`. Set it only when the network between the Kerbside hosts and the API is trusted, such as a private CI network. |
 | `extra_config` | A JSON list of additional cluster configuration settings, for example `[{"name": "INCLUDE_TRACEBACKS", "value": "1"}]`. Optional. |
 
 To offer users proxied graphical consoles via Kerbside, set `kerbside_url`
@@ -248,12 +249,27 @@ Set `kerbside_url`, `kerbside_system_key`, `kerbside_public_fqdn`,
 `kerbside_sql_url` and `kerbside_auth_secret_seed`. `kerbside_url` and
 `kerbside_system_key` must be visible to both the Shaken Fist and the Kerbside
 hosts (put them in `group_vars/all`). On a Kerbside host which is not a Shaken
-Fist node, `api_url` must not be a loopback address. Each Kerbside host is
-checked with its own variables, so a `host_vars` override is checked too. The
-playbook builds this cluster's console source for Kerbside itself, and
-`kerbside_extra_sources` adds sources for other clusters or platforms. Every
-other Kerbside variable (its ports, packages and certificate, for example) is
-documented in the
+Fist node, `api_url` must not be a loopback address, since nothing answers
+there; and on any Kerbside host whose `api_url` does not point at that host,
+it must be `https://` unless you set `kerbside_allow_insecure_api_url`, since
+Kerbside posts `kerbside_system_key` in the body of every authentication it
+makes there. An `api_url` points at the host when its host part is a loopback
+address, or -- on a host which is also a Shaken Fist node, where `sf-api`
+answers locally -- one of that host's `node_mesh_ip`, `node_egress_ip`,
+`node_name` or `ansible_host`. **Most multi-node clusters have a cleartext
+`api_url`**, because the deploy does not put TLS in front of `sf-api` (that is
+a load balancer's job), so adding a `kerbside` group to such a cluster means
+either giving `api_url` an `https://` endpoint or setting
+`kerbside_allow_insecure_api_url: true`; this is checked on every deploy, not
+just the first, so an existing cluster meets it at upgrade time.
+`kerbside_public_fqdn` must also not be the name of a host in `allsf`, and on
+a Kerbside host which is also a Shaken Fist node `kerbside_pki_dir` must not
+be `/etc/pki/libvirt-spice`, or a directory inside it, which holds that node's
+SPICE certificate. Each Kerbside host is checked with its own variables, so a
+`host_vars` override is checked too. The playbook builds this cluster's console
+source for Kerbside itself, and `kerbside_extra_sources` adds sources for other
+clusters or platforms. Every other Kerbside variable (its ports, packages and
+certificate, for example) is documented in the
 [collection's README](https://github.com/shakenfist/kerbside/tree/develop/ansible).
 For where to place Kerbside, the network it needs and load balancing, see
 [Running Kerbside beside a cluster](kerbside.md).

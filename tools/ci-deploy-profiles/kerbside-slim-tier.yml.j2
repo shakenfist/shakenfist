@@ -14,7 +14,12 @@
       it shares a host with instances but not with the first database host.
     * api_url on the Kerbside host is the primary's sf-api, so Kerbside's
       fetch of the console token signing key crosses hosts rather than
-      looping back to sf2's own sf-api.
+      looping back to sf2's own sf-api. It is http, so the system key crosses
+      with it in cleartext, which kerbside_source refuses unless
+      kerbside_allow_insecure_api_url says otherwise: the lane sets it, since
+      the mesh of a disposable CI cluster is the trusted private network that
+      opt-out is for. shakenfist/tests/test_ci_deploy_profiles.py checks that
+      a profile with a cleartext api_url carries the opt-out.
     * kerbside_url, the console token audience, is sf2's mesh address, and
       kerbside_public_fqdn is that bare address, which earns the proxy
       certificate an IP SAN.
@@ -57,6 +62,10 @@ extra_vars:
   kerbside_url: 'http://{{ nodes.sf2.mesh_ip }}:13002'
   kerbside_public_fqdn: '{{ nodes.sf2.mesh_ip }}'
   kerbside_system_key: 'ci-kerbside-system-key-do-not-use-in-production'
+  # api_url above is http and is not sf2 itself, so the system key crosses the
+  # mesh in cleartext on every scrape. Deliberate, and only acceptable because
+  # the cluster is disposable.
+  kerbside_allow_insecure_api_url: true
   kerbside_auth_secret_seed: 'ci-kerbside-auth-secret-seed-do-not-use-in-production'
   # mysql:// is SQLAlchemy's mysqlclient driver, Kerbside's own default form;
   # the kerbside role installs the headers mysqlclient builds against.

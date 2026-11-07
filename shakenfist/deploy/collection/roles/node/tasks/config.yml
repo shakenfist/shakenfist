@@ -49,6 +49,42 @@
     group: sudo
     mode: u=r,g=r,o=
 
+# kerbside_url renders into the config written below as the value of
+# SHAKENFIST_KERBSIDE_URL, unescaped and inside double quotes, on every node
+# which has it set -- including a cluster pointing at an externally managed
+# Kerbside, with no kerbside inventory group and so no kerbside_source run to
+# judge it. The guard therefore lives here, before the template that renders
+# it, rather than in kerbside_source (which only sees Kerbside hosts) or
+# kerbside_preflight (which runs two plays later, after this file has already
+# been written). A check which ran after the template would not be a check:
+# the injected config would already be on the host.
+#
+# kerbside_source checks the same variable against the same character class,
+# for the kerbside role's kerbside.ini, which a dedicated Kerbside host
+# renders and this entry point never reaches.
+# shakenfist/tests/test_kerbside_injection_contract.py pins the two classes
+# to each other, and pins this task ahead of the template.
+#
+# A newline would inject whatever directive followed it, as internal_ca's
+# validate.yml already refuses for the certtool templates. The rest of the
+# class is because /etc/sf/config is not only a systemd EnvironmentFile:
+# shakenfist/deploy/nodelifecycletests.sh sources it from shell (lines 169 and
+# 354), where $(...), ${...}, a backtick or a backslash inside those double
+# quotes is expanded rather than read. URLs are not secrets, so the message
+# names the variable but not the value, which keeps it the same shape as the
+# kerbside_source copy of this check for the other three values.
+- name: Refuse a Kerbside URL which would inject into the config
+  ansible.builtin.assert:
+    that: kerbside_url is not search('[\r\n"$`\\\\]')
+    fail_msg: >-
+      kerbside_url on {{ inventory_hostname }} contains a newline, a double
+      quote, a dollar sign, a backtick or a backslash. It is rendered
+      unescaped into /etc/sf/config as SHAKENFIST_KERBSIDE_URL: a newline
+      would inject the directive that followed it, and the rest are expanded
+      by the shell, which also sources that file. Use a plain URL.
+    quiet: true
+  when: kerbside_url | default('', true) | length > 0
+
 # The config template ships with this role, so it is rendered directly on the
 # target host. The legacy deployer fetched a control-node-rendered config back
 # and re-templated it; that round trip is unnecessary now that the template is

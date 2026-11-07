@@ -105,6 +105,25 @@ kerbside_sf_ca_cert: ""
 kerbside_url_on_sf_nodes: null
 kerbside_colocated: false
 
+# Opt out of the refusal of an api_url which is neither https:// nor the
+# Kerbside host itself. False, the default, refuses it, since Kerbside would
+# post kerbside_system_key across the network in cleartext on every scrape.
+# Stated as https rather than as "not http", so an api_url with no scheme is
+# refused too. Set it true only when the network between the Kerbside host and
+# the API is trusted, such as a private CI network. A loopback api_url is
+# unaffected: that traffic never leaves the host.
+kerbside_allow_insecure_api_url: false
+
+# SHA-256 hashes, which the consuming playbook passes from the database host,
+# of the kerbside_system_key minted there and of system_key. kerbside_source
+# refuses a Kerbside host whose kerbside_system_key is not the minted one, or
+# is the deploy key. Hashes so neither secret leaves the database host; null
+# skips the check, for a caller which does not pass the database host's value.
+# Both comparisons are of inventory values, so the consuming playbook passes
+# them in the validation play too, before Shaken Fist is deployed.
+kerbside_minted_key_hash: null
+kerbside_deploy_key_hash: null
+
 # Extra certificate authorities to trust when fetching a federated identity
 # provider's JWKS. Empty means the system trust store alone. Set this to a
 # path on the nodes when the provider is behind a private CA, which a self

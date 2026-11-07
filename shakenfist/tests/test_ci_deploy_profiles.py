@@ -305,6 +305,53 @@ class CiDeployProfilesTestCase(base.ShakenFistTestCase):
                 '%s: api_url on the Kerbside hosts is loopback (%s), so Kerbside would scrape '
                 'its own node. Point it at another node.' % (name, host))
 
+    def test_kerbside_cleartext_api_url_carries_the_opt_out(self):
+        # kerbside_source refuses an http api_url which does not point at the
+        # Kerbside host itself, because the system key is in the body of every
+        # POST /auth it makes there. A lane which wants that must say so with
+        # kerbside_allow_insecure_api_url, and the deploy fails at the
+        # validation play without it (#4699).
+        #
+        # Only loopback is treated as local here, while kerbside_source also
+        # exempts a co-located host's own node_mesh_ip, node_egress_ip,
+        # node_name or ansible_host. That makes this check stricter than the
+        # role, never laxer: a profile pointing a Kerbside host at its own
+        # routable address would be asked for an opt-out it does not strictly
+        # need. Deliberate -- a profile's api_url is one value shared by every
+        # host in the group, so which host it names is not decidable here, and
+        # guessing wrong in the other direction would let a lane deploy a
+        # configuration this test had declared safe.
+        for name, _, profile, group in self._kerbside_profiles():
+            api_url = str(self._effective(profile, group, 'api_url', ROLE_DEFAULT_API_URL))
+            split = urllib.parse.urlsplit(api_url)
+            if split.scheme != 'http' or is_loopback_host(split.hostname):
+                continue
+            self.assertTrue(
+                self._effective(profile, group, 'kerbside_allow_insecure_api_url', False),
+                '%s: api_url on the Kerbside hosts is cleartext (%s) and is not a '
+                'loopback address, so kerbside_source refuses it unless it is this '
+                "host's own address on a co-located host. Set "
+                'kerbside_allow_insecure_api_url to accept the risk, or use https.'
+                % (name, api_url))
+
+    def test_kerbside_profile_rechecks_units_and_expects_the_proxy(self):
+        # A profile deploying Kerbside redeploys the cluster and asserts no
+        # unit restarted the second time; dropping kerbside-*.service from
+        # redeploy_check would let a Kerbside unit flap unnoticed, and dropping
+        # the SF_CI_EXPECT_VDI_CONSOLE_PROXY export would stop the functional
+        # tests from asserting the proxy is there. Either leaves the lane
+        # green, so pin both (#4707).
+        for name, _, profile, _ in self._kerbside_profiles():
+            units = (profile.get('redeploy_check') or {}).get('units') or []
+            self.assertIn(
+                'kerbside-*.service', units,
+                '%s deploys Kerbside but its redeploy_check does not watch '
+                'kerbside-*.service for a restart.' % name)
+            self.assertEqual(
+                '1', (profile.get('test_env') or {}).get('SF_CI_EXPECT_VDI_CONSOLE_PROXY'),
+                '%s deploys Kerbside but does not export '
+                'SF_CI_EXPECT_VDI_CONSOLE_PROXY=1 for the functional tests.' % name)
+
     def test_kerbside_database_matches_its_sql(self):
         for name, _, profile, group in self._kerbside_profiles():
             url = urllib.parse.urlsplit(str(self._effective(profile, group, 'kerbside_sql_url', '')))

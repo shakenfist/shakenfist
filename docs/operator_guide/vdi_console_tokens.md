@@ -235,11 +235,21 @@ Kerbside is not disturbed.
 
 Clusters not deployed with the collection create the key by hand, on a
 database node, the same way the deploy does -- on stdin, so the key never
-appears in the process table or shell history:
+appears in the process table or shell history, and with the same scopes, so
+the credential can read the whole cluster but cannot change it:
 
 ```bash
-sf-ctl bootstrap-system-key --key-from-stdin kerbside < kerbside-key-file
+sf-ctl bootstrap-system-key --key-from-stdin \
+    --scope cluster-admin --scope admin.read --scope node.read \
+    --scope instance.read kerbside < kerbside-key-file
 ```
+
+Those four scopes are least privilege for what Kerbside reads: `cluster-admin`
+for the administrative axis, `admin.read` for the CA and the public signing
+key, and `node.read` and `instance.read` for the console list. Omitting
+`--scope` altogether records no scopes, which is a wildcard -- a full
+cluster-administrator key, as every key minted before 0.8 is. Clusters
+upgrading from 0.7 should re-mint the `kerbside` key with the scopes above.
 
 ## Publishing the public keys
 

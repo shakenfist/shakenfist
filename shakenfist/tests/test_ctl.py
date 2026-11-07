@@ -363,8 +363,73 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result.exit_code, 0)
         mock_namespace.new.assert_called_once_with('system')
-        mock_ns.add_key.assert_called_once_with('mykey', 'myvalue')
+        # No --scope means scopes=None, the historical unscoped wildcard, so
+        # the deploy key task is unchanged by the --scope option.
+        mock_ns.add_key.assert_called_once_with('mykey', 'myvalue', scopes=None)
         self.assertIn('Done', result.output)
+
+    @mock.patch('shakenfist.client.ctl.Namespace')
+    def test_bootstrap_system_key_with_scopes(self, mock_namespace):
+        from shakenfist.client.ctl import bootstrap_system_key
+
+        mock_ns = mock.MagicMock()
+        mock_namespace.new.return_value = mock_ns
+
+        result = self.runner.invoke(
+            bootstrap_system_key,
+            ['kerbside', 'myvalue',
+             '--scope', 'cluster-admin', '--scope', 'admin.read',
+             '--scope', 'node.read', '--scope', 'instance.read'])
+
+        self.assertEqual(result.exit_code, 0)
+        # Repeated --scope collects into the ordered list passed to add_key,
+        # so the kerbside key is minted read-only rather than wildcard.
+        mock_ns.add_key.assert_called_once_with(
+            'kerbside', 'myvalue',
+            scopes=['cluster-admin', 'admin.read', 'node.read',
+                    'instance.read'])
+
+    @mock.patch('shakenfist.client.ctl.Namespace')
+    def test_bootstrap_system_key_refuses_a_malformed_scope(self, mock_namespace):
+        from shakenfist.client.ctl import bootstrap_system_key
+
+        mock_ns = mock.MagicMock()
+        mock_namespace.new.return_value = mock_ns
+
+        # add_key records whatever it is handed and nothing validates a scope
+        # again, so a scope the API cannot derive mints a key which answers 403
+        # on its first real request. Each of these fails closed instead, and
+        # mints nothing.
+        # A bare '*' is in the list on purpose: scopes.satisfies() honours it
+        # as the universal wildcard, so recording it grants exactly what a key
+        # with no scopes recorded grants -- a cluster administrator. --scope
+        # exists to narrow a key, so it fails closed on the one value that
+        # widens it, and the message points at omitting --scope instead.
+        for bad in ('', '   ', 'node', 'node.', '.read', 'node.reed',
+                    'cluster_admin', 'node.read.extra', '*'):
+            result = self.runner.invoke(
+                bootstrap_system_key, ['kerbside', 'myvalue', '--scope', bad])
+            self.assertEqual(
+                2, result.exit_code,
+                '--scope %r was accepted; output was %s' % (bad, result.output))
+            mock_ns.add_key.assert_not_called()
+
+    @mock.patch('shakenfist.client.ctl.Namespace')
+    def test_bootstrap_system_key_accepts_the_whole_vocabulary(self, mock_namespace):
+        from shakenfist.client.ctl import bootstrap_system_key
+
+        mock_namespace.new.return_value = mock.MagicMock()
+
+        # cluster-admin is the admin axis and carries no dot by design; the
+        # three verbs are what the API derives from an HTTP method, and the
+        # family wildcard grants every verb in a family.
+        for good in ('cluster-admin', 'node.read', 'instance.write',
+                     'blob.delete', 'node.*'):
+            result = self.runner.invoke(
+                bootstrap_system_key, ['kerbside', 'myvalue', '--scope', good])
+            self.assertEqual(
+                0, result.exit_code,
+                '--scope %r was refused; output was %s' % (good, result.output))
 
     @mock.patch('shakenfist.client.ctl.mariadb')
     def test_show_config_empty(self, mock_mariadb):
@@ -643,7 +708,7 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result.exit_code, 0)
         mock_namespace.new.assert_called_once_with('system')
-        mock_ns.add_key.assert_called_once_with('mykey', 'myvalue')
+        mock_ns.add_key.assert_called_once_with('mykey', 'myvalue', scopes=None)
 
     @mock.patch('shakenfist.client.ctl.sf_config')
     def test_verify_config(self, mock_sf_config):
