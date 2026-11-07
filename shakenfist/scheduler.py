@@ -4,6 +4,7 @@ import random
 import time
 import uuid
 from collections import defaultdict
+from typing import NamedTuple
 
 from shakenfist_utilities import logs  # noreorder
 
@@ -51,6 +52,60 @@ CLUSTER_CAPACITY_FIGURES = (
     ('updated_at',)
     + mariadb.CLUSTER_CAPACITY_COUNTERS
     + tuple(f'unallocated_{dim}' for dim in mariadb.CAPACITY_DIMENSIONS))
+
+
+class PlacementShape(NamedTuple):
+    """What placement has been asked to fit, as the filters read it.
+
+    The filter, affinity and ranking stages are denominated in a
+    requested shape rather than in an Instance, so a placement decision
+    can be evaluated for a request which has no instance row of its own.
+    The six figures below are everything those stages ever read about
+    the thing being placed.
+
+    instance_uuid and placed_on describe a request which does already
+    have a row. The uuid is the affinity self-skip -- an instance is not
+    its own neighbour -- and placed_on is the node the request is
+    presently placed on, which the capacity filters must not charge a
+    second time when a reschedule lands it back where it already is.
+    Both are None for a request which is not placed anywhere.
+    """
+
+    cpus: int
+    memory_mb: int
+    disk_gb: int
+    affinity: dict
+    namespace: str
+    instance_uuid: uuid.UUID | None = None
+    placed_on: str | None = None
+
+    @classmethod
+    def from_instance(cls, inst):
+        """The shape an instance is asking placement for.
+
+        The only place a shape is read out of an Instance, and therefore
+        the only place which has to know how an instance expresses its
+        request. It is also the one copy of the disk sum: the audit
+        event recording the inputs to a decision and the disk filter
+        which acts on them each summed disk_spec separately, which is
+        two chances to disagree about how large a request is.
+
+        placed_on is the same field instance.placement_filter() compares
+        a node against, so the reschedule self-charge exemption cannot
+        drift from the placement it is exempting.
+        """
+        disk_gb = 0
+        for disk in inst.disk_spec:
+            # TODO(mikal): this ignores "sizeless disks", that is ones that
+            # are exactly the size of their base image, for example CD ROMs.
+            if 'size' in disk and disk['size'] is not None:
+                disk_gb += int(disk['size'])
+
+        return cls(
+            cpus=inst.cpus, memory_mb=inst.memory, disk_gb=disk_gb,
+            affinity=inst.affinity, namespace=inst.namespace,
+            instance_uuid=inst.uuid,
+            placed_on=inst.placement.get('node'))
 
 
 def get_network_node():
@@ -190,7 +245,7 @@ def _hard_affinity_constraints(requested_affinity):
             spec[instance.Instance.AFFINITY_REQUIRE_WITHOUT])
 
 
-def _affinity_neighbour_skip(inst, instance_uuid, i):
+def _affinity_neighbour_skip(shape, instance_uuid, i):
     """Should this co-located instance be ignored when matching tags?
 
     Returns the audit record describing why it was skipped, or None if
@@ -210,7 +265,7 @@ def _affinity_neighbour_skip(inst, instance_uuid, i):
             'instance_uuid': instance_uuid,
             'skipped': 'instance row not found',
         }
-    if i.uuid == inst.uuid:
+    if i.uuid == shape.instance_uuid:
         return {
             'instance_uuid': instance_uuid,
             'skipped': 'self',
@@ -220,7 +275,7 @@ def _affinity_neighbour_skip(inst, instance_uuid, i):
             'instance_uuid': instance_uuid,
             'skipped': 'no tags',
         }
-    if i.namespace != inst.namespace:
+    if i.namespace != shape.namespace:
         return {
             'instance_uuid': instance_uuid,
             'skipped': 'different namespace',
@@ -620,9 +675,9 @@ class Scheduler:
         """The counters keyed by node uuid, and whether the read failed."""
         return _capacity_by_node()
 
-    def _satisfies_hard_affinity(self, inst, node, memo,
+    def _satisfies_hard_affinity(self, shape, node, memo,
                                  require_with, require_without):
-        """Does this node satisfy the instance's hard affinity constraints?
+        """Does this node satisfy the shape's hard affinity constraints?
 
         Constraints match the tags of *instances already placed on the
         node*, exactly as the scorer does -- which here means calling
@@ -642,7 +697,7 @@ class Scheduler:
 
         present = set()
         for instance_uuid, i in node_instances:
-            if _affinity_neighbour_skip(inst, instance_uuid, i):
+            if _affinity_neighbour_skip(shape, instance_uuid, i):
                 continue
             for tag in i.tags:
                 present.add(tag)
@@ -681,7 +736,7 @@ class Scheduler:
                     for instance_uuid in n.instances]
         return memo[node]
 
-    def _has_sufficient_cpu(self, log_ctx, inst, node, capacity):
+    def _has_sufficient_cpu(self, log_ctx, shape, node, capacity):
         """A cheap CPU pre-filter, denominated in both ledgers.
 
         This is not the admission decision. The real guard is the
@@ -713,7 +768,7 @@ class Scheduler:
         cpu_base, from_fallback = self._schedulable_threads(node)
         hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
         measured_cpus = self.metrics[node].get('cpu_total_instance_vcpus', 0)
-        cpus = inst.cpus
+        cpus = shape.cpus
 
         # A node with a capacity row is guarded by that row's own limit,
         # so test the guard's arithmetic exactly rather than a live
@@ -726,7 +781,7 @@ class Scheduler:
         # reschedule which lands it back on the same node does not
         # charge it a second time (place_instance() early-outs on an
         # unchanged placement), so neither does this filter.
-        if committed_cpus and instance.placement_filter(node, inst):
+        if committed_cpus and shape.placed_on == node:
             committed_cpus = max(0, committed_cpus - cpus)
 
         current_cpu = max(measured_cpus, committed_cpus)
@@ -750,13 +805,13 @@ class Scheduler:
 
         return True, None
 
-    def _has_sufficient_ram(self, log_ctx, inst, node, capacity):
+    def _has_sufficient_ram(self, log_ctx, shape, node, capacity):
         # There are two things to track here... We must always leave the
         # node's published memory reservation (operating system tasks, plus
         # cluster-wide daemons on infra-role nodes) untouched -- assume
         # there is no overlap with existing VMs when checking this. Note as
         # well that metrics are in MB...
-        memory = inst.memory
+        memory = shape.memory_mb
         reserved = self._memory_reserved_mb(node)
         available = self.metrics[node].get('memory_available', 0) - reserved
         if available - memory < 0.0:
@@ -811,7 +866,7 @@ class Scheduler:
             # An instance already placed here is in used_memory_mb, and a
             # reschedule which lands it back on the same node does not
             # charge it a second time.
-            if committed_mb and instance.placement_filter(node, inst):
+            if committed_mb and shape.placed_on == node:
                 committed_mb = max(0, committed_mb - memory)
             if committed_mb + memory > row['limit_memory_mb']:
                 reason = {
@@ -826,14 +881,8 @@ class Scheduler:
 
         return True, None
 
-    def _has_sufficient_disk(self, log_ctx, inst, node):
-        requested_disk = 0
-        for disk in inst.disk_spec:
-            # TODO(mikal): this ignores "sizeless disks", that is ones that
-            # are exactly the size of their base image, for example CD ROMs.
-            if 'size' in disk:
-                if not disk['size'] is None:
-                    requested_disk += int(disk['size'])
+    def _has_sufficient_disk(self, log_ctx, shape, node):
+        requested_disk = shape.disk_gb
 
         # The candidate node publishes its own disk reservation as a metric, so
         # a remote evaluator honours that node's per-host floor (falling back to
@@ -854,7 +903,7 @@ class Scheduler:
             return False, reason
         return True, None
 
-    def _has_idle_disk_bandwidth(self, log_ctx, inst, node):
+    def _has_idle_disk_bandwidth(self, log_ctx, shape, node):
         # We also avoid starting new instances on hypervisors with busy disk.
         # busy_time is in milliseconds per second, so a value of 1,000 is 100%
         # busy. You can record more than 100% if there is more than one disk
@@ -929,6 +978,7 @@ class Scheduler:
         with util_general.RecordedOperation('schedule', inst), \
                 inst.attribute_memo():
             log_ctx = self.log.with_fields({'instance': inst})
+            shape = PlacementShape.from_instance(inst)
 
             # Refresh metrics if its too old, or there are no nodes.
             metrics_refreshed = False
@@ -938,21 +988,20 @@ class Scheduler:
                 metrics_refreshed = True
 
             # Record the inputs to the scheduling decision so failures can be
-            # diagnosed from the event log alone.
-            requested_disk_gb = 0
-            for disk in inst.disk_spec:
-                if 'size' in disk and disk['size'] is not None:
-                    requested_disk_gb += int(disk['size'])
+            # diagnosed from the event log alone. The disk spec itself is
+            # published alongside the shape's summed figure, because an
+            # operator reading a refusal wants to see the disks which
+            # produced the total.
             add_event_multi(
                 EVENT_TYPE_AUDIT, related_objects,
                 'schedule inputs',
                 extra={
-                    'requested_affinity': inst.affinity,
-                    'requested_cpus': inst.cpus,
-                    'requested_memory_mb': inst.memory,
-                    'requested_disk_gb': requested_disk_gb,
+                    'requested_affinity': shape.affinity,
+                    'requested_cpus': shape.cpus,
+                    'requested_memory_mb': shape.memory_mb,
+                    'requested_disk_gb': shape.disk_gb,
                     'disk_spec': inst.disk_spec,
-                    'namespace': inst.namespace,
+                    'namespace': shape.namespace,
                     'forced_candidates': candidates is not None,
                     # Measured after the refresh above, so this is the age
                     # of the snapshot the decision reads. The pre-refresh
@@ -1021,11 +1070,11 @@ class Scheduler:
             dropped = {}
             for c in list(candidates):
                 max_cpu = self.metrics[c].get('cpu_max_per_instance', 0)
-                if inst.cpus > max_cpu:
+                if shape.cpus > max_cpu:
                     dropped[c] = {
                         'reason': 'requested vCPUs exceed per-instance max',
                         'cpu_max_per_instance': max_cpu,
-                        'requested_cpus': inst.cpus,
+                        'requested_cpus': shape.cpus,
                     }
                     candidates.remove(c)
             self._log_and_raise_on_error(
@@ -1062,7 +1111,7 @@ class Scheduler:
             dropped = {}
             for c in list(candidates):
                 ok, reason = self._has_sufficient_cpu(
-                    log_ctx, inst, c, capacity)
+                    log_ctx, shape, c, capacity)
                 if not ok:
                     dropped[c] = reason
                     candidates.remove(c)
@@ -1076,7 +1125,7 @@ class Scheduler:
             # its instances boot and fault their allocations in.
             dropped = {}
             for c in list(candidates):
-                ok, reason = self._has_sufficient_ram(log_ctx, inst, c, capacity)
+                ok, reason = self._has_sufficient_ram(log_ctx, shape, c, capacity)
                 if not ok:
                     dropped[c] = reason
                     candidates.remove(c)
@@ -1087,7 +1136,7 @@ class Scheduler:
             # Do we have enough free disk?
             dropped = {}
             for c in list(candidates):
-                ok, reason = self._has_sufficient_disk(log_ctx, inst, c)
+                ok, reason = self._has_sufficient_disk(log_ctx, shape, c)
                 if not ok:
                     dropped[c] = reason
                     candidates.remove(c)
@@ -1101,7 +1150,7 @@ class Scheduler:
             # after it, so a create which uses both pays for one read.
             placements = {}
 
-            requested_affinity = inst.affinity
+            requested_affinity = shape.affinity
             require_with, require_without = _hard_affinity_constraints(
                 requested_affinity)
 
@@ -1119,7 +1168,7 @@ class Scheduler:
                 dropped = {}
                 for c in list(candidates):
                     ok, reason = self._satisfies_hard_affinity(
-                        inst, c, placements, require_with, require_without)
+                        shape, c, placements, require_with, require_without)
                     if not ok:
                         dropped[c] = reason
                         candidates.remove(c)
@@ -1168,7 +1217,7 @@ class Scheduler:
                     continue
 
                 for instance_uuid, i in node_instances:
-                    skipped = _affinity_neighbour_skip(inst, instance_uuid, i)
+                    skipped = _affinity_neighbour_skip(shape, instance_uuid, i)
                     if skipped:
                         considered.append(skipped)
                         continue
@@ -1238,7 +1287,7 @@ class Scheduler:
             # Are the disks really busy?
             dropped = {}
             for c in list(candidates):
-                ok, reason = self._has_idle_disk_bandwidth(log_ctx, inst, c)
+                ok, reason = self._has_idle_disk_bandwidth(log_ctx, shape, c)
                 if not ok:
                     dropped[c] = reason
                     candidates.remove(c)

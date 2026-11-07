@@ -2443,7 +2443,9 @@ class HasSufficientCPUPredicateTestCase(SchedulerTestCase):
         self.mock_mariadb.set_node_metrics_same(self._baseline(**metrics_overrides))
         s = scheduler.Scheduler()
         log_ctx = s.log.with_fields({'instance': inst})
-        return s._has_sufficient_cpu(log_ctx, inst, node, capacity)
+        return s._has_sufficient_cpu(
+            log_ctx, scheduler.PlacementShape.from_instance(inst), node,
+            capacity)
 
     def test_exactly_at_the_capacity_row_limit_is_sufficient(self):
         # committed (4) + requested (4) == limit (8). Landing exactly on
@@ -2605,7 +2607,8 @@ class CpuCeilingAgreementTestCase(SchedulerTestCase):
         inst = self.mock_mariadb.create_instance(
             'ceiling-%d' % cpus, cpus=cpus)
         ok, _ = s._has_sufficient_cpu(
-            s.log.with_fields({'instance': inst}), inst, self.node, capacity)
+            s.log.with_fields({'instance': inst}),
+            scheduler.PlacementShape.from_instance(inst), self.node, capacity)
         return ok
 
     def _assert_all_three_agree(self, expected):
@@ -2696,7 +2699,9 @@ class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
         self.mock_mariadb.set_node_metrics_same(self._baseline(**metrics_overrides))
         s = scheduler.Scheduler()
         log_ctx = s.log.with_fields({'instance': inst})
-        return s._has_sufficient_ram(log_ctx, inst, node, capacity)
+        return s._has_sufficient_ram(
+            log_ctx, scheduler.PlacementShape.from_instance(inst), node,
+            capacity)
 
     def test_exactly_the_available_memory_is_sufficient(self):
         # available - memory == 0.0, not < 0.0, so landing exactly on the
@@ -2831,7 +2836,8 @@ class HasSufficientDiskPredicateTestCase(SchedulerTestCase):
         self.mock_mariadb.set_node_metrics_same(self._baseline(**metrics_overrides))
         s = scheduler.Scheduler()
         log_ctx = s.log.with_fields({'instance': inst})
-        return s._has_sufficient_disk(log_ctx, inst, node)
+        return s._has_sufficient_disk(
+            log_ctx, scheduler.PlacementShape.from_instance(inst), node)
 
     def test_exactly_the_free_disk_is_sufficient(self):
         # requested (100) > disk_free (100.0) is False at the boundary, so
@@ -2878,7 +2884,8 @@ class HasIdleDiskBandwidthPredicateTestCase(SchedulerTestCase):
             {DISK_BUSY_PER_SECOND_METRIC: busy_time})
         s = scheduler.Scheduler()
         log_ctx = s.log.with_fields({'instance': inst})
-        return s._has_idle_disk_bandwidth(log_ctx, inst, node)
+        return s._has_idle_disk_bandwidth(
+            log_ctx, scheduler.PlacementShape.from_instance(inst), node)
 
     def test_exactly_1200ms_per_second_is_idle(self):
         # The comparison is strictly greater-than, so 1200 exactly is NOT
