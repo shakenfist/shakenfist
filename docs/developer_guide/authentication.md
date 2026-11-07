@@ -423,6 +423,12 @@ The nonce is therefore the revocation mechanism for derived tokens: rotating,
 deleting or expiring a key changes or removes its nonce, and every token already
 minted from that key stops validating on its next request.
 
+There is no exception to this check. A token naming the legacy key name
+`_service_key` exactly used to skip it, which meant such a token could not be
+revoked at all; that carve out was removed, and a token of that pre-v0.7 shape
+(which carried no nonce claim) is now refused like any other token whose nonce
+does not match.
+
 ## Federated identity
 
 A workload that already has an identity somewhere else -- a GitHub
