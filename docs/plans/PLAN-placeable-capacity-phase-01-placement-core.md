@@ -458,3 +458,48 @@ touch the same file.
   a predicate `coding_rules.md` says not to restate.
 - **Whether this session may push and open the pull request** when
   the steps are done.
+
+## Results
+
+### Step 1c: do the multiset tests bite?
+
+Step 1b's tests are only worth what they catch, so each of the five
+mutations the step plan names was applied to `shakenfist/scheduler.py`
+in turn and the scheduler suite run against it. **All five were
+caught; none survived.** The run was taken twice — once by the step,
+once re-run independently by the management session — and both
+produced the figures below.
+
+The suite was run as `.tox/shared/bin/python -m unittest
+shakenfist.tests.test_scheduler` under `timeout 900`: 154 tests,
+baseline clean. Each mutation was applied to the live file by string
+replacement from a pristine copy held outside the worktree, and
+restored from that copy in a `finally` rather than with
+`git checkout`. The worktree compared byte-identical afterwards and
+`git status --short` was empty.
+
+| Mutation | Tests failed | First failure |
+|----------|--------------|---------------|
+| `charge()` made a no-op | 8 | `test_a_charge_reranks_the_node_it_was_charged_to` |
+| Committed row charged, measured figures not | 6 | `test_a_disk_charge_excludes_a_set_mates_node` |
+| Disk debited in GB against a bytes figure | 2 | `test_a_disk_charge_excludes_a_set_mates_node` |
+| All-or-nothing unwind returns the partial assignment | 21 | `KeyError: 0` at `return assignment[0]` |
+| Largest-first shape ordering reversed | 1 | `test_shapes_are_walked_largest_first` |
+
+Three readings worth keeping. The mutation that matters most is the
+second — charging the ledger and forgetting the measurements is the
+realistic mistake, and `F3` exists because of it — and it is caught by
+six tests including `test_the_measured_charge_excludes_a_set_mates
+_node`, which was written for it. The thinnest margin is the third, at
+two tests, both of them aimed at the disk debit rather than incidental.
+The fourth's 21 failures are mostly collateral: every single-shape
+caller indexes `assignment[0]` and gets a `KeyError` when the unwind
+returns early, which is a loud way to be caught but not a precise one
+— what makes it a real catch is that
+`test_a_set_bigger_than_the_cluster_raises_rather_than_part_placing`
+is among the failures.
+
+The script is re-runnable with no arguments and lives in this
+session's scratch directory as `step-1c/run_mutations.py`, with a log
+per mutation beside it. It is not committed: it mutates a working
+tree, which is not a thing to leave in the repository.
