@@ -526,3 +526,65 @@ run cannot cause this, because it is given no event targets and so
 publishes nothing. A hold evaluation that events against a claim can,
 so whichever phase builds that should decide whether a shape index
 belongs in the payload, and amend the operator procedure if it does.
+
+## Execution notes
+
+Executed 2026-11-07, AEDT, against `develop` at `90d164035d`. Four
+steps, run strictly in sequence as the step plan requires, each one
+reviewed and committed by the management session before the next was
+briefed. Every sub-agent ran at the model and effort its row names.
+
+**The back brief's three answers.** Michael took all three
+recommendations: `D4`'s greedy fit stated as a lower bound rather than
+an exact search; `D6`'s affinity blindness left for phase 2's shadow
+data to judge; and this session to push and open the pull request
+once the definition of done had been run.
+
+**`D8` was amended mid-phase, and the amendment is the phase's one
+departure from its plan.** Step 1a reported that the rule — no test
+file may change — could not be met, and left twelve tests failing
+rather than editing them. That was the right call and the rule was
+wrong: converting a private predicate's parameter changes the type its
+direct callers pass, and five of those callers are test helpers.
+`F2a` records them. The rule is narrowed to permit argument
+construction and nothing else, which keeps its purpose. See
+`acd340edaf`.
+
+**Two bugs were found rather than caused**, both recorded in the
+master plan's *Bugs fixed during this work*:
+
+- `POST /instances` with `{"cpus": "2"}` returned 500 on `develop`.
+  The API accepts the string deliberately, and `Instance.__init__`
+  stores static values as handed, so it survives as long as the
+  in-memory object a create schedules against — long enough for
+  `inst.cpus > max_cpu` to raise `TypeError`. Closed at the shape
+  factory, which has to type those figures anyway to order a set.
+- The walk removed candidates from the caller's own forced list.
+  Invisible with one shape; it would have left the second shape of a
+  set an empty list. The list is now copied.
+
+**Two changes beyond the step briefs were kept deliberately.** Step
+1b deleted the two thin `Scheduler` wrappers around
+`_schedulable_threads()` and `_memory_reserved_mb()`, which existed
+only to reach `self.metrics` and forwarded to module-level functions
+that were already the implementation; the two prose citations naming
+the methods were repointed. And the `instance_uuid`/`placed_on`
+annotations were made `| None`, matching
+`shakenfist/resource_health.py:49`, because `scheduler.py` is not in
+tox's mypy rollout and nothing was checking them.
+
+**One consequence was accepted rather than fixed.** `inst.placement`
+is now read once unconditionally rather than only when a candidate
+carries a non-zero ledger, which on a cluster whose counters are all
+zero is one `instance_attributes` fetch where there were none. It is
+bounded by the attribute memo, `place_instance()` fetches the same row
+moments later, and the existing read-once test already asserted a
+bound of at most one rather than exactly one.
+
+**One repository-level flake, unrelated to this phase.** The
+`Test the internal_ca role` pre-commit hook fails on the first
+`--all-files` run in a fresh worktree, reporting "files were modified
+by this hook" while its own output says all nine of its cases passed,
+and passes on every run after that. It left nothing dirty in the tree
+on any occasion. Seen twice, in this worktree and in phase 0's. It is
+not this plan's to fix and no issue has been filed yet.
