@@ -860,20 +860,23 @@ class NetworkAddressEndpoint(api_base.Resource):
 
         # Only manual reservations are the caller's to release. Releasing a
         # gateway or an instance's address here would hand it out again
-        # while the thing using it was still using it.
-        #
-        # This check is not atomic with the release below: release_address()
-        # takes no expected-type guard, so its UPDATE is unconditional. Two
-        # concurrent DELETEs of the same address can therefore defeat it --
-        # the first releases to the deletion halo, an instance create naming
-        # that address evicts the halo and takes it, and the second DELETE
-        # completes its release against an address an instance now holds.
-        # Closing that needs an expected_type on the RPC; until then, do not
-        # read this check as a guarantee. Tracked as issue #4261.
+        # while the thing using it was still using it. This read gives the
+        # clean 403 below for the common case of an address that is simply
+        # not a manual reservation.
         if reservation.reservation_type != ReservationType.MANUAL:
             return sf_api.error(403, 'address is not a manual reservation')
 
-        if not network_from_db.ipam.release(address):
+        # The release passes expected_type=MANUAL so the type check and the
+        # release are one atomic UPDATE (issue #4261). Without it the read
+        # above and the release were two statements: two concurrent DELETEs
+        # could both see MANUAL, the first release to the deletion halo, an
+        # instance create naming that address evict the halo and take it,
+        # and the second release complete against an address an instance now
+        # holds. A release that now finds the address no longer manual (gone,
+        # or taken by something else) matches zero rows and returns False,
+        # which is the 404 below.
+        if not network_from_db.ipam.release(
+                address, expected_type=ReservationType.MANUAL):
             return sf_api.error(404, 'address is not reserved')
 
 

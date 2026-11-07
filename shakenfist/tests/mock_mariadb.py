@@ -1409,11 +1409,24 @@ class MockMariaDB():
         return True
 
     def _mariadb_release_address(self, ipam_uuid: str, address: str,
-                                 halo_reservation: IPAMReservation) -> bool:
-        """Mock implementation of mariadb.release_address()"""
+                                 halo_reservation: IPAMReservation,
+                                 expected_type=None) -> bool:
+        """Mock implementation of mariadb.release_address()
+
+        Mirrors the guarded UPDATE in _direct_release_address: when
+        expected_type is set, a row whose type does not match is left
+        untouched and reported as zero rows updated (issue #4261).
+        """
         key = self._ipam_key(ipam_uuid, address)
-        if key not in self.ipam_reservations:
+        existing = self.ipam_reservations.get(key)
+        if existing is None:
             self._trace(f'MockMariaDB.release_address({key}): not found')
+            return False
+        if (expected_type is not None
+                and existing.reservation_type != expected_type):
+            self._trace(f'MockMariaDB.release_address({key}): type '
+                        f'{existing.reservation_type} is not expected '
+                        f'{expected_type}')
             return False
         self.ipam_reservations[key] = halo_reservation
         self._trace(f'MockMariaDB.release_address({key}): updated to halo')
