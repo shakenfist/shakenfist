@@ -513,6 +513,97 @@ class SfInstanceEmptyStringDirtinessTestCase(base.ShakenFistTestCase):
         self.assertEqual('dXNlcg==', instance_args[6])
 
 
+class SfInstanceAdoptableStateTestCase(base.ShakenFistTestCase):
+    """A record which will never run is dirty, however well it compares.
+
+    Issue 4814: _check_instance() compared every field of the requested
+    specification and never the existing instance's state, so state:
+    present against a name whose only record was in state error -- which
+    is where the server parks a refused create, and where it stays until
+    somebody deletes it -- exited changed: false. The play then carried
+    on against an instance which would never boot, and nothing replaced
+    it.
+    """
+
+    def _existing(self, state):
+        existing = {
+            'name': 'test',
+            'cpus': 1,
+            'memory': 1024,
+            'interfaces': [],
+            'disk_spec': [
+                {'base': 'cirros', 'bus': None, 'size': 8, 'type': 'disk'}
+            ],
+        }
+        if state is not None:
+            existing['state'] = state
+        return existing
+
+    def _check(self, existing):
+        log = []
+        dirty, _, _ = sf_instance._check_instance(
+            mock.MagicMock(), existing,
+            {'name': 'test', 'cpu': 1, 'ram': 1024, 'disks': ['8@cirros']},
+            log)
+        return dirty, log
+
+    def test_an_instance_on_its_way_up_or_up_is_clean(self):
+        # The states the module already names as unplaced and placed are
+        # exactly the states an instance may be adopted in, so a matching
+        # specification is still idempotent in every one of them.
+        for state in sf_instance.UNPLACED_STATES + sf_instance.PLACED_STATES:
+            dirty, log = self._check(self._existing(state))
+            self.assertFalse(dirty, '%s: %s' % (state, log))
+
+    def test_an_errored_instance_is_dirty(self):
+        # The terminal state and every -error transition state: all of
+        # them mean the instance will never run, and none of them clears
+        # without a delete.
+        for state in ['error', 'initial-error', 'preflight-error',
+                      'creating-error', 'created-error',
+                      'delete-wait-error']:
+            dirty, log = self._check(self._existing(state))
+            self.assertTrue(dirty, '%s: %s' % (state, log))
+
+    def test_an_instance_on_its_way_out_is_dirty(self):
+        # delete-wait is a lookup-by-name state too, and a record found
+        # by uuid can be deleted outright. Neither is something a play
+        # can use.
+        for state in ['delete-wait', 'deleted']:
+            dirty, log = self._check(self._existing(state))
+            self.assertTrue(dirty, '%s: %s' % (state, log))
+
+    def test_a_state_the_module_does_not_know_is_dirty(self):
+        # A state this module has never heard of is not one it can
+        # promise the play an instance can run from.
+        dirty, _ = self._check(self._existing('hibernated'))
+        self.assertTrue(dirty)
+
+    def test_the_reason_names_the_state(self):
+        # The log is the only record of why an instance was replaced, and
+        # "the specification matched but the instance was dead" is not a
+        # conclusion an operator can reach from the other lines.
+        _dirty, log = self._check(self._existing('error'))
+        self.assertIn('Instance dirty: state error is not a state an '
+                      'existing instance can be adopted in', log)
+
+    def test_an_instance_read_back_without_a_state_is_adopted(self):
+        # Replacement deletes an instance. A read which did not say what
+        # state the instance was in is not evidence that it is dead, and
+        # failing that way would delete a live instance over a missing
+        # field rather than over a real difference.
+        dirty, log = self._check(self._existing(None))
+        self.assertFalse(dirty, log)
+
+    def test_a_missing_instance_is_dirty_without_a_state_reason(self):
+        # Nothing exists, so the state says nothing: this is dirty
+        # because the name does not match, as it always was.
+        dirty, log = self._check({})
+        self.assertTrue(dirty)
+        self.assertEqual([], [line for line in log
+                              if line.startswith('Instance dirty: state')])
+
+
 class _Succeeded(SystemExit):
     """The module called exit_json()."""
 
@@ -1958,11 +2049,13 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
                       'there is no separate wait for placement',
                       module.exit_json.call_args[1]['log'])
 
-    def test_a_placement_await_fails_an_adopted_instance_in_error(self):
-        # An existing instance which matches the task is adopted rather
-        # than replaced. Adopted in state error it must fail the task, not
-        # be reported as placed -- and, not being this task's create, it is
-        # never replayed or deleted, even for a capacity message.
+    def test_a_placement_await_replaces_an_instance_found_in_error(self):
+        # An existing instance in state error is not an instance the
+        # task's specification is satisfied by, however well it compares:
+        # it is replaced, and what the placement wait then reports on is
+        # the replacement (issue 4814). The errored record is a leftover
+        # of some earlier run rather than this task's create, so clearing
+        # it is not a capacity refusal and nothing is replayed.
         existing = {
             'uuid': 'existing',
             'name': 'test',
@@ -1977,19 +2070,27 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
             'error_message': 'Unable to find suitable node',
         }
         module = self._run(
-            [], lookups={'test': [existing], 'existing': [existing]},
-            await_placement=True, expect_failure=True)
+            [self._created()],
+            lookups={
+                'test': [existing],
+                'existing': [
+                    existing,
+                    {'uuid': 'existing', 'name': 'test', 'state': 'deleted'},
+                ],
+            },
+            await_placement=True)
 
-        self.assertEqual(
-            'Waiting for instance placement failed: instance existing is in '
-            'state error: Unable to find suitable node',
-            module.fail_json.call_args[1]['msg'])
         self.assertEqual([
             ('get', 'test', 'ns'),
+            ('get', 'existing', 'ns'),
+            ('delete', 'existing', {'async_request': True}),
             ('get', 'existing', None),
+            ('create', 5, 0),
+            ('get', 'created', None),
+            ('get', 'created', None),
         ], self.calls)
-        self.assertEqual([], self._calls('create'))
-        self.assertEqual([], self._calls('delete'))
+        self.assertTrue(module.exit_json.call_args[1]['changed'])
+        self.assertEqual('not_refused', self._waited()['outcome'])
 
     def test_a_placement_wait_whose_read_fails_fails_as_an_api_error(self):
         # A failed read says nothing about where the instance went, so it
@@ -2111,3 +2212,201 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
             ('create', 0, 0),
             ('get', 'created', None),
         ], self.calls)
+
+
+class SfInstanceDeadRecordReplacementTestCase(base.ShakenFistTestCase):
+    """Replacing a dead record clears it off its name first.
+
+    The other half of issue 4814. A dead record does not come off its
+    name the way a live instance does: the server's delete of an instance
+    in an -error state ends in state error rather than deleted, and a
+    delete sent while that one is still queued cancels it and needs a
+    third. _await_record_gone() is the sequence which handles that, and
+    the capacity wait already used it for the record a refused create
+    leaves behind, so the replacement uses it too rather than the plain
+    _delete_and_wait() a live instance gets.
+    """
+
+    PARAMS = dict(SfInstanceCreateBudgetTestCase.PARAMS)
+
+    DISK_SPEC = [{'base': 'cirros', 'bus': None, 'size': 8, 'type': 'disk'}]
+
+    def _existing(self, state, uuid='dead', cpus=1):
+        return {
+            'uuid': uuid,
+            'name': 'test',
+            'cpus': cpus,
+            'memory': 1024,
+            'namespace': 'ns',
+            'interfaces': [],
+            'disk_spec': self.DISK_SPEC,
+            'state': state,
+        }
+
+    def _run(self, lookups, identify_by_uuid=False, expect_failure=False):
+        """Run a state: present task against a scripted client.
+
+        lookups maps an instance reference to the outcomes of successive
+        get_instance() calls for it; the last repeats. Every client call
+        is recorded in order in self.calls. The clock only moves when the
+        code under test sleeps, so a 180 second deletion bound costs no
+        real time.
+        """
+        params = dict(self.PARAMS)
+        params['await'] = False
+        params['await_placement'] = False
+        params['await_timeout'] = 600
+        params['capacity_wait'] = 0
+        if identify_by_uuid:
+            params['uuid'] = 'dead'
+
+        module = mock.MagicMock()
+        module.params = params
+        module.check_mode = False
+        module.exit_json.side_effect = _Succeeded
+        module.fail_json.side_effect = _Failed
+
+        clock = _FakeClock()
+        calls = []
+        lookups = {ref: list(outcomes)
+                   for ref, outcomes in lookups.items()}
+        lookups.setdefault(
+            'created', [{'uuid': 'created', 'name': 'test',
+                         'state': 'created'}])
+
+        def get_instance(ref, namespace=None):
+            calls.append(('get', ref, namespace))
+            responses = lookups[ref]
+            value = responses.pop(0) if len(responses) > 1 else responses[0]
+            if isinstance(value, Exception):
+                raise value
+            return value
+
+        def create_instance(*args, timeout=None, **kwargs):
+            calls.append(('create', args[0]))
+            return {'uuid': 'created', 'name': 'test', 'state': 'initial'}
+
+        def delete_instance(ref, **kwargs):
+            calls.append(('delete', ref, kwargs))
+
+        client = mock.MagicMock()
+        client.create_instance = mock.create_autospec(
+            create_instance, side_effect=create_instance)
+        client.get_instance.side_effect = get_instance
+        client.delete_instance.side_effect = delete_instance
+
+        with mock.patch.object(
+                sf_instance, 'AnsibleModule', return_value=module), \
+                mock.patch.object(
+                    sf_instance, 'make_client', return_value=client), \
+                mock.patch.object(
+                    sf_instance.time, 'monotonic',
+                    side_effect=clock.monotonic), \
+                mock.patch.object(
+                    sf_instance.time, 'sleep', clock.sleep), \
+                mock.patch.object(sf_instance, '_sleep', clock.sleep):
+            self.assertRaises(
+                _Failed if expect_failure else _Succeeded,
+                sf_instance.run_module)
+
+        self.module = module
+        self.calls = calls
+        self.clock = clock
+        return module
+
+    def _calls(self, kind):
+        return [c for c in self.calls if c[0] == kind]
+
+    def test_an_errored_record_is_acknowledged_then_recreated(self):
+        # The signature from the issue: the task's spec matches the
+        # record exactly, and the record is in state error. It is deleted
+        # by uuid, followed to deleted, and the name reused.
+        dead = self._existing('error')
+        module = self._run({
+            'test': [dead],
+            'dead': [dead, {'uuid': 'dead', 'state': 'deleted'}],
+        })
+
+        self.assertEqual([
+            ('get', 'test', 'ns'),
+            ('get', 'dead', 'ns'),
+            ('delete', 'dead', {'async_request': True}),
+            ('get', 'dead', None),
+            ('create', 'test'),
+            ('get', 'created', None),
+        ], self.calls)
+        self.assertTrue(module.exit_json.call_args[1]['changed'])
+        self.assertIn('Deleting the errored instance dead so that its name '
+                      'can be reused', module.exit_json.call_args[1]['log'])
+
+    def test_a_transitional_record_is_waited_out_before_the_delete(self):
+        # One delete, sent once the server's own has finished: sent into
+        # preflight-error it would cancel that delete, take its place,
+        # and itself end in error.
+        module = self._run({
+            'test': [self._existing('preflight-error')],
+            'dead': [self._existing('preflight-error'),
+                     self._existing('error'),
+                     {'uuid': 'dead', 'state': 'deleted'}],
+        })
+
+        self.assertEqual(
+            [('delete', 'dead', {'async_request': True})],
+            self._calls('delete'))
+        self.assertEqual([('create', 'test')], self._calls('create'))
+        self.assertTrue(module.exit_json.call_args[1]['changed'])
+
+    def test_an_already_deleted_record_is_not_deleted_again(self):
+        # A deleted record holds no name, so there is nothing to clear:
+        # the create goes straight out. Only a uuid lookup finds one.
+        module = self._run(
+            {'dead': [self._existing('deleted')]}, identify_by_uuid=True)
+
+        self.assertEqual([], self._calls('delete'))
+        self.assertEqual([('create', 'test')], self._calls('create'))
+        self.assertTrue(module.exit_json.call_args[1]['changed'])
+
+    def test_a_record_which_never_goes_fails_without_creating(self):
+        # The name is still held, so a create would either collide or
+        # make every lookup by that name ambiguous. Fail instead, within
+        # the bound _delete_and_wait() advertises for the live case.
+        dead = self._existing('error')
+        module = self._run(
+            {'test': [dead], 'dead': [dead]}, expect_failure=True)
+
+        self.assertEqual(
+            'Deletion of instance for update failed.',
+            module.fail_json.call_args[1]['msg'])
+        self.assertEqual([], self._calls('create'))
+        self.assertEqual(
+            sf_instance.RECORD_DELETE_TIMEOUT, self.clock.now)
+
+    def test_a_failed_lookup_while_clearing_fails_as_an_api_error(self):
+        # A failed read is not evidence that the record went away, and
+        # must not escape run_module() and discard the log.
+        dead = self._existing('error')
+        module = self._run(
+            {'test': [dead],
+             'dead': [sf_instance.apiclient.APIException('connection reset')]},
+            expect_failure=True)
+
+        self.assertEqual(
+            'Instance deletion for update failed: connection reset',
+            module.fail_json.call_args[1]['msg'])
+        self.assertEqual([], self._calls('create'))
+
+    def test_a_live_instance_still_takes_the_plain_delete_path(self):
+        # Unchanged behaviour for the dirtiness this module has always
+        # had: a healthy instance whose specification differs is deleted
+        # by identifier in its namespace, without waiting for it to
+        # settle in an error state first.
+        module = self._run({
+            'test': [self._existing('created', cpus=4),
+                     {'uuid': 'dead', 'state': 'deleted'}],
+        })
+
+        self.assertEqual(
+            [('delete', 'test', {'namespace': 'ns', 'async_request': True})],
+            self._calls('delete'))
+        self.assertEqual([('create', 'test')], self._calls('create'))
+        self.assertTrue(module.exit_json.call_args[1]['changed'])

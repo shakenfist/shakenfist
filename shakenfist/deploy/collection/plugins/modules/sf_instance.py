@@ -29,6 +29,12 @@ description:
   - Idempotently ensure a Shaken Fist instance is present or absent.
   - Shaken Fist instances are immutable. When the requested specification
     differs from the existing instance, the instance is deleted and recreated.
+  - An existing instance is only adopted unchanged when it is in a state it
+    can still run from, that is C(initial), C(preflight), C(creating) or
+    C(created). One found in an error state, in C(delete-wait), or already
+    C(deleted) is deleted and recreated however well its specification
+    matches, because a dead record is not an instance the specification is
+    satisfied by -- it merely holds the name.
   - Imports the C(shakenfist_client) SDK and talks to the Shaken Fist REST
     API directly; the control node only needs
     C(pip install shakenfist-client).
@@ -237,7 +243,12 @@ options:
     default: 0
     type: int
   state:
-    description: Whether the instance should be present or absent.
+    description:
+      - Whether the instance should be present or absent.
+      - C(present) means an instance of this name or UUID which can run
+        the requested specification, so a record found in an error state
+        or on its way out is replaced rather than adopted. See the module
+        description.
     required: false
     default: present
     choices: [present, absent]
@@ -419,6 +430,22 @@ UNPLACED_STATES = ('initial', 'preflight')
 # a failure, rather than something await_placement may report as placed.
 PLACED_STATES = ('creating', 'created')
 
+# The states an existing instance may be adopted in, that is the states in
+# which a matching specification means "nothing to do". They are the
+# server's own HEALTHY_STATES: the states an instance is in on its way up,
+# or once it is up. Every other state is a record which has stopped or is
+# going away -- an error state, which only a delete clears, delete-wait or
+# deleted -- and a dead record is not an instance the requested
+# specification is satisfied by, however well its fields compare. Judging
+# it clean reported changed: false and left the play running against an
+# instance which will never boot (issue 4814).
+ADOPTABLE_STATES = UNPLACED_STATES + PLACED_STATES
+
+# How long to wait for an instance being replaced to be deleted, the bound
+# _delete_and_wait() has always advertised and now also the bound on
+# clearing a dead record off its name.
+RECORD_DELETE_TIMEOUT = 180
+
 # The capacity wait's sleep, jitter source and wall clock. They are module
 # level names so that the tests can replace them and run a half hour wait
 # in no real time. The wait's durations are read from time.monotonic(), the
@@ -541,14 +568,36 @@ def _is_error_state(state):
     return bool(state) and (state == 'error' or state.endswith('-error'))
 
 
-def _await_record_gone(client, log, ref, namespace, deadline):
-    """Wait for a refused create's instance record to stop holding its name.
+def _is_adoptable_state(state):
+    """May a state=present run adopt an existing instance in this state?
 
-    ref is the instance's name for a 507 (the response carries no uuid,
-    although the server did create a record before refusing it) and its
-    uuid for a preflight abort. Returns True once a lookup reports the
-    record not found or deleted, and False if deadline (a time.monotonic()
-    value) passes first. Nothing else counts as gone.
+    See ADOPTABLE_STATES for which states those are. This is the one
+    predicate for it: the dirtiness comparison decides whether to replace
+    the instance with it, and the replacement decides how to get the old
+    record off its name with it, so the two cannot disagree about which
+    records are dead.
+
+    An instance read back with no state at all is adoptable. Replacement
+    deletes an instance, and a read which did not say what state the
+    instance was in is not evidence that it is dead -- failing the other
+    way would delete a live instance on a formatting accident.
+    """
+    if not state:
+        return True
+    return state in ADOPTABLE_STATES
+
+
+def _await_record_gone(client, log, ref, namespace, deadline):
+    """Wait for a dead instance record to stop holding its name.
+
+    Two callers: the capacity wait, clearing the record a refused create
+    left behind before it replays it, and the replacement of an existing
+    instance which _is_adoptable_state() says is dead. ref is the
+    instance's name for a 507 (the response carries no uuid, although the
+    server did create a record before refusing it) and its uuid
+    otherwise. Returns True once a lookup reports the record not found or
+    deleted, and False if deadline (a time.monotonic() value) passes
+    first. Nothing else counts as gone.
 
     A record left by a refusal does not go away on its own. The server
     moves it to an -error state and queues a delete, but the delete of an
@@ -577,10 +626,11 @@ def _await_record_gone(client, log, ref, namespace, deadline):
     short of another caller creating the same name concurrently, or a task
     which identifies its instance by uuid while another of the same name
     exists. A record which an interrupted earlier run left in state error
-    never reaches here: the task's first lookup by name finds it, and the
-    task either replaces it, deleting it before the create, or adopts it
-    and fails in the await. Two such records make that first lookup
-    ambiguous, and the task fails there instead.
+    reaches here as the other caller: the task's first lookup by name
+    finds it, the dirtiness comparison judges it dead, and the
+    replacement clears it through here before the create. Two such
+    records make that first lookup ambiguous, and the task fails there
+    instead.
 
     An APIException other than not found is raised to the caller: a failed
     lookup is not a refusal, and must not be replayed.
@@ -605,7 +655,7 @@ def _await_record_gone(client, log, ref, namespace, deadline):
             uuid = i['uuid']
         if uuid and state == 'error' and not acknowledged:
             acknowledged = True
-            log.append('Deleting the refused instance %s so that its name '
+            log.append('Deleting the errored instance %s so that its name '
                        'can be reused' % uuid)
             try:
                 # async_request for the reason _delete_and_wait() gives:
@@ -888,6 +938,18 @@ def _check_instance(client, existing, params, log):
     instance_args = []
     instance_kwargs = {}
 
+    # Can the existing instance be adopted at all? Every field below is
+    # still compared, so the log says everything which differs, but an
+    # instance in a state it will never leave on its own is dirty however
+    # well those fields match. This is the only check which reads the
+    # state, and without it state: present against a name whose only
+    # record was in state error exited changed: false and handed the play
+    # an instance which will never run (issue 4814).
+    if existing and not _is_adoptable_state(existing.get('state')):
+        log.append('Instance dirty: state %s is not a state an existing '
+                   'instance can be adopted in' % existing.get('state'))
+        dirty = True
+
     # Required parameters. Note the names differ between the ansible params and
     # the existing instance object for historical reasons.
     for param_name, existing_name in [('name', 'name'), ('cpu', 'cpus'),
@@ -1163,7 +1225,7 @@ def _delete_and_wait(client, log, identifier, namespace):
     try:
         client.delete_instance(
             identifier, namespace=namespace, async_request=True)
-        while time.monotonic() - start_time < 180:
+        while time.monotonic() - start_time < RECORD_DELETE_TIMEOUT:
             time.sleep(1)
             i = client.get_instance(identifier, namespace=namespace)
             if not i or i['state'] == 'deleted':
@@ -1278,7 +1340,29 @@ def run_module():
         # the budget past await_timeout or collapse it to nothing.
         operation_started = time.monotonic()
         if needs_replacement:
-            if i:
+            if i and not _is_adoptable_state(i.get('state')):
+                # A dead record does not come off its name the way a live
+                # instance does. The server's delete of an instance in an
+                # -error state ends in state error rather than deleted,
+                # and a delete sent while that one is still queued
+                # cancels it and needs a third; _await_record_gone() is
+                # the sequence which gets such a record off its name, and
+                # the capacity wait already uses it for exactly this
+                # record. One already deleted is gone the moment it is
+                # read, so this covers that too (issue 4814).
+                try:
+                    gone = _await_record_gone(
+                        client, log, i.get('uuid') or identifier, namespace,
+                        time.monotonic() + RECORD_DELETE_TIMEOUT)
+                except apiclient.APIException as e:
+                    _fail_api_error(
+                        module, log, 'Instance deletion for update failed', e)
+                if not gone:
+                    log.append('Repeated attempts at deletion failed')
+                    module.fail_json(
+                        msg='Deletion of instance for update failed.',
+                        meta=None, log=log)
+            elif i:
                 try:
                     remaining = _delete_and_wait(
                         client, log, identifier, namespace)
