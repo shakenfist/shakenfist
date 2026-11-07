@@ -3029,15 +3029,15 @@ class MultisetPlacementTestCase(SchedulerTestCase):
         metrics.update(overrides)
         return metrics
 
-    def _shape(self, cpus=1, memory_mb=1024, disk_gb=0):
+    def _shape(self, cpus=1, memory_mb=1024, disk_gb=0, affinity=None):
         """A requested shape with no instance behind it.
 
         Which is the point of the type: nothing here has a row, a uuid
         or a placement, and the pipeline still evaluates it.
         """
         return scheduler.PlacementShape(
-            cpus=cpus, memory_mb=memory_mb, disk_gb=disk_gb, affinity={},
-            namespace='unittest')
+            cpus=cpus, memory_mb=memory_mb, disk_gb=disk_gb,
+            affinity=affinity or {}, namespace='unittest')
 
     def _targets(self):
         """Somewhere for the decision's audit events to be addressed."""
@@ -3323,6 +3323,72 @@ class MultisetPlacementTestCase(SchedulerTestCase):
         self.assertRaises(
             ValueError,
             scheduler.Scheduler().find_candidates_for_shapes, [])
+
+    def test_a_set_is_not_its_own_affinity_neighbour(self):
+        # D6, which the entry point's docstring promises and nothing
+        # asserted: a set's members are charged for capacity but are
+        # invisible to each other's affinity stages, because both
+        # stages read placed instance rows and a shape has none. One
+        # tagged instance sits on node3, so node3 wins the tier for
+        # both shapes -- and the second shape sees node3 carrying one
+        # instance, not two, so the first shape being assigned there
+        # scored nothing.
+        #
+        # This is also the first coverage of a shape with no
+        # instance_uuid reaching _affinity_neighbour_skip(): the
+        # tagged neighbour is scored rather than skipped as self,
+        # which is the right answer for a shape and the normal case
+        # for every caller after this phase.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['socialite']})
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        affinity = {'prefer_with_tag': ['socialite']}
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            assignment = scheduler.Scheduler().find_candidates_for_shapes(
+                [self._shape(affinity=affinity)] * 2,
+                related_objects=self._targets())
+
+        node3 = self._node_uuid('node3')
+        self.assertEqual(node3, assignment[0][0])
+        self.assertEqual(node3, assignment[1][0])
+
+        published = self._events(aem, 'schedule have highest affinity')
+        self.assertEqual(2, len(published))
+        for index, call in enumerate(published):
+            extra = call.kwargs['extra']
+            self.assertEqual(1, extra['highest_affinity'], 'shape %d' % index)
+            self.assertEqual([node3], extra['candidates'],
+                             'shape %d' % index)
+            self.assertEqual(
+                1, extra['affinity_detail'][node3]['instance_count'],
+                'shape %d' % index)
+
+    def test_a_nodes_placements_are_read_once_for_a_whole_set(self):
+        # The memo lives beside the snapshot, so it spans the decision
+        # rather than each shape: a node every shape considers is read
+        # once however many shapes there are. Asserted against a
+        # one-shape call rather than a fixed number, so the bound is
+        # "no more than one shape costs", which is the property, and
+        # not a count that a change to the stage order would move.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['socialite']})
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        affinity = {'prefer_with_tag': ['socialite']}
+
+        real_from_db = scheduler.Node.from_db
+        counts = {}
+        for shape_count in (1, 4):
+            with mock.patch('shakenfist.scheduler.Node.from_db',
+                            side_effect=real_from_db) as from_db:
+                scheduler.Scheduler().find_candidates_for_shapes(
+                    [self._shape(affinity=affinity)] * shape_count,
+                    related_objects=self._targets())
+            counts[shape_count] = from_db.call_count
+
+        self.assertEqual(counts[1], counts[4])
 
     def test_shapes_are_walked_largest_first(self):
         # Memory, then vCPUs, then disk, each descending, with the order

@@ -532,6 +532,19 @@ that the type to return is the one phase 2's real consumer wants.
 Decide it there: either phase 2 takes only heads, or the core returns
 the chosen node distinctly from its fallbacks.
 
+Two costs to measure there rather than guess at here. The core calls
+`add_event_multi()` around fourteen times per shape and builds each
+`extra=` payload — `affinity_detail`, `load_detail`, `by_affinity`,
+the per-candidate weights — before the call, whether or not the
+caller gave it any event targets. A dry run gives none, so all of
+that is assembled and discarded, per shape and per candidate. It is
+dict construction with no I/O, so there is nothing to win until a dry
+run is measured as hot; if it is, guard the construction once at the
+top of `_find_candidates_for_shape()` rather than at fourteen call
+sites. And a refused set leaves the audit events of the shapes it had
+already assigned, which phase 3's hold evaluation has to decide what
+to do about.
+
 ### Phase 3: shape holds — schema and the node guard (`A`)
 
 Add a claim's ability to carry shapes and book them onto nodes. The
@@ -728,23 +741,37 @@ stale (see the Prompt).
 ### Bugs fixed during this work
 
 - **A `POST /instances` with a JSON string vCPU or memory count
-  returned 500.** The API deliberately accepts `{"cpus": "2"}` --
-  `shakenfist/external_api/validation.py` declines to refuse it on
-  the grounds that the handler copes -- and the create path passes
-  it to `Instance.new()` untouched, where `Instance.__init__`
-  stores static values as handed. The typed column means a later
-  read gives an integer back, so the string survives exactly as
-  long as the in-memory object a create's scheduling decision runs
-  against, and `inst.cpus > max_cpu` raised `TypeError` in the
-  `cpu_max_per_instance` filter. Phase 1 closes it at the shape
-  factory, which has to type those figures anyway to order a set
-  largest first. The root cause is a request value reaching a
-  handler untyped, which is
+  returned 500, and still does.** Phase 1 closed the scheduler's
+  half of it and not the create. The API deliberately accepts
+  `{"cpus": "2"}` -- `shakenfist/external_api/validation.py`
+  declines to refuse it on the grounds that the handler copes -- and
+  the create path passes it to `Instance.new()` untouched, where
+  `Instance.__init__` stores static values as handed. The typed
+  column means a later read gives an integer back, so the string
+  survives exactly as long as the in-memory object a create's
+  scheduling decision runs against, and `inst.cpus > max_cpu` raised
+  `TypeError` in the `cpu_max_per_instance` filter. Phase 1's shape
+  factory types those figures, because it has to in order to sort a
+  set largest first, so the walk now completes. **Admission then
+  raises on the same string**: `Instance._capacity_claim` returns
+  `self.cpus` as handed and `mariadb.admit_instance_placement()`
+  computes `cpus * config.SCHEDULER_DEMAND_PER_VCPU`, a float, so
+  `'2' * 0.6` raises `TypeError` and the create still 500s -- now
+  after the whole scheduling walk has run and published its audit
+  events. Phase 1 deliberately did not cast there as well: a second
+  cast in a third module would make the hole look closed while
+  `Instance.cpus` stayed a string for every other reader of it.
+  The root cause is a request value reaching a handler untyped,
+  which is
   [PLAN-api-input-validation.md](PLAN-api-input-validation.md)'s
-  subject; the note for that plan is that `validation.py`'s
-  justification for accepting the string -- that pydantic's lax
-  mode converts it -- is true of the database row and not of the
-  object the scheduler reads.
+  subject. Two notes for that plan. `validation.py`'s justification
+  for accepting the string -- that pydantic's lax mode converts it
+  -- is true of the database row and not of the object the scheduler
+  and the admission path read. And the one-line fix is to type the
+  value where the request becomes an instance
+  (`shakenfist/external_api/instance.py:1121`), not at either
+  reader: both of the casts a reader could add leave the next reader
+  to find the next one.
 
 None yet. Directly related open issues: shakenfist/shakenfist#1364
 (lame-duck and evacuate), shakenfist/shakenfist#4474 (the functional

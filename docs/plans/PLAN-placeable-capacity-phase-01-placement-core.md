@@ -535,6 +535,29 @@ explains it declines to do, and the test fails when it does.
 The script is `review-r1-mutations/run_mutations.py` in this session's
 scratch directory, logs beside it, uncommitted for the same reason.
 
+### Review round 2: the two new tests
+
+**Ten mutations now, all caught.** Baseline clean at 159 tests, same
+method, tree byte-identical afterwards.
+
+| Mutation | Tests failed | Named test caught it |
+|----------|--------------|----------------------|
+| The placements memo rebuilt per shape | 1 | `test_a_nodes_placements_are_read_once_for_a_whole_set` |
+| A shape skips every affinity neighbour as itself | 1 | `test_a_set_is_not_its_own_affinity_neighbour` |
+
+One honest gap. `test_a_set_is_not_its_own_affinity_neighbour`
+asserts `D6`'s blindness by reading the second shape's
+`instance_count` for the node the first was assigned to — one, not
+two — and the mutation above proves the test notices a change to the
+self-skip. It does not prove the test would notice a set which
+*did* count its own members, because there is no code to mutate in
+that direction: making a shape an affinity neighbour of its
+set-mates is new behaviour, not an edit. The assertion is the pin;
+the mutation covers the half of it that can be mutated.
+
+Script at `review-r2-mutations/run_mutations.py`, logs beside it,
+uncommitted.
+
 ### Step 1d: is the documented diagnostic procedure still true?
 
 Yes, unchanged. `docs/operator_guide/scheduler.md:1080-1100` tells an
@@ -588,8 +611,13 @@ master plan's *Bugs fixed during this work*:
   The API accepts the string deliberately, and `Instance.__init__`
   stores static values as handed, so it survives as long as the
   in-memory object a create schedules against — long enough for
-  `inst.cpus > max_cpu` to raise `TypeError`. Closed at the shape
-  factory, which has to type those figures anyway to order a set.
+  `inst.cpus > max_cpu` to raise `TypeError`. The shape factory types
+  those figures, because it has to in order to sort a set largest
+  first, so the scheduling walk now completes. **The create still
+  500s**, at admission: `Instance._capacity_claim` returns
+  `self.cpus` as handed and `admit_instance_placement()` multiplies
+  it by a float. Review round 2 found that, and the master plan's
+  *Bugs fixed during this work* now says which half is closed.
 - The walk removed candidates from the caller's own forced list.
   Invisible with one shape; it would have left the second shape of a
   set an empty list. The list is now copied.
@@ -636,6 +664,54 @@ Nothing in the round was a defect in behaviour. Three tests were
 added — the committed CPU charge end to end, the empty-set guard, and
 what a charge cannot do to the ranking on an unsized cluster — and
 all three are mutation-proved above.
+
+**Review round 2 (2026-11-07, AEDT) raised one `fix`, one
+`document` and eight `consider` items, almost all about the original
+change rather than round 1's additions — which is why it was worth
+running rather than stopping.** The `fix` was the serious one: both
+plan documents claimed the numeric-string vCPU 500 was closed, and
+it is not. The shape factory does stop the `TypeError` in
+`cpu_max_per_instance`, but admission reads the untyped instance too
+— `Instance._capacity_claim` returns `self.cpus` as handed and
+`admit_instance_placement()` computes `cpus *
+config.SCHEDULER_DEMAND_PER_VCPU`, a float, so `'2' * 0.6` raises
+and the create still 500s, now after the whole walk has run and
+published its events. Verified directly. Both documents now say
+which half is closed, and name the single place the real fix
+belongs: typing the value where the request becomes an instance.
+Casting in `_capacity_claim` as well was declined — a second cast in
+a third module makes the hole look closed while `Instance.cpus`
+stays a string for every other reader, and the API boundary is
+another plan's scope (this phase's own definition of done says
+`external_api/` is untouched).
+
+The `document` item was taken: `charge()` must debit every figure any
+capacity filter reads, which is a fourth member of the
+capacity-arithmetic-must-stay-in-sync set and was stated only in its
+own docstring. `AGENTS.md` and
+`docs/developer_guide/subsystem_internals.md` now say so.
+
+Of the eight `consider` items, six were taken and two declined. One
+was settled by checking rather than either: the `int()` casts in the
+shape factory truncate, and the review could not tell whether a
+non-integral request reaches them. It cannot —
+`validation.py`'s integer field refuses a JSON number with a
+fractional part, and an integral float is the same JSON number as
+the integer, so `int(8.0)` is exact. Recorded in the factory
+docstring so the next reader does not re-derive it. The placed-
+instances memo was hoisted to the decision, beside the snapshot and
+for the same reason, so a set pays one read per node rather than one
+per node per shape. Three docstrings were corrected where they
+overclaimed: `nodes()` and `has_node()` said "usable metrics" when
+they include a node whose metrics row is stale or empty, and the
+all-or-nothing paragraph said there is nothing to roll back when the
+audit events of the already-assigned shapes are not rolled back.
+
+Declined: guarding event-payload construction on an empty target
+list, which is dict construction with nothing to win until a dry run
+is measured as hot. Recorded in the master plan's phase 2 section
+with the refused-set event trail, since phase 2 is the caller that
+would feel either.
 
 **One repository-level flake, unrelated to this phase.** The
 `Test the internal_ca role` pre-commit hook fails on the first

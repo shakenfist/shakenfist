@@ -54,7 +54,14 @@ placed, non-deleted instance, whereas the resources daemon's
 only active libvirt domains. A powered-off instance holds its
 reservation in the ledger and is absent from the measurement, so the
 two legitimately disagree, and any counter-based admission has to
-choose between them explicitly rather than assume parity. Admission
+choose between them explicitly rather than assume parity. Placement
+reads both, and when it places a set of shapes in one decision it
+charges each shape to its chosen node in a `PlacementSnapshot` before
+ranking the next — on both accounts, because a filter which read a
+figure the snapshot did not debit would let the whole set spend the
+same headroom. So a figure added to any capacity filter has to be
+added to `PlacementSnapshot.charge()` in `shakenfist/scheduler.py` as
+well. Admission
 uses the ledger, and is the guarded UPDATE the
 `AdmitInstancePlacement` RPC makes against `scheduler_node_capacity`,
 in the same transaction that writes the `placement` attribute and

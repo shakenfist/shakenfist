@@ -115,9 +115,19 @@ class PlacementShape(NamedTuple):
         The cast closes the arithmetic and not the input: a body field
         of "abc" or "2.5" still arrives here and still fails the
         create with an unhandled 500, as a ValueError raised from this
-        factory rather than a TypeError raised later by a filter.
+        factory rather than a TypeError raised later by a filter. The
+        create 500s on a string either way -- admission reads the
+        instance too, and multiplies its vCPU count by a float.
         Typing the request where it enters the API is what closes
         that, and this type is the wrong place for it.
+
+        int() truncates, and nothing non-integral reaches it. A JSON
+        number with a fractional part is refused by the integer field
+        in shakenfist/external_api/validation.py, and an integral
+        float is the same JSON number as the integer, so int(8.0) is
+        exact. The cheap filter and the admission guard therefore
+        cannot disagree about the size of a request by a truncated
+        vCPU.
         """
         disk_gb = 0
         for disk in inst.disk_spec:
@@ -172,11 +182,23 @@ class PlacementSnapshot:
         self._degraded = False
 
     def nodes(self):
-        """Every node with usable metrics, in the order they were read."""
+        """Every node this decision was offered, in the order they were read.
+
+        Which includes a node whose metrics row was stale or empty:
+        get_active_node_metrics() maps those to an empty dict and keeps
+        the key, and leaves out only a node whose read raised. The
+        is_hypervisor stage is what refuses an empty one, so this is
+        not a list of nodes anything can be placed on.
+        """
         return list(self._metrics.keys())
 
     def has_node(self, node):
-        """Whether a node offered to this decision has usable metrics."""
+        """Whether this decision was offered a node at all.
+
+        True for a node whose metrics row was stale or empty, false
+        only for one left out of the active node list entirely. The
+        forced-candidate check reads it for exactly that distinction.
+        """
         return node in self._metrics
 
     def node_metrics(self, node):
@@ -1196,7 +1218,12 @@ class Scheduler:
         the assignment built so far is discarded. A caller is given a
         placement for every shape it asked for, or none at all. There is
         nothing to roll back when that happens, because the charges were
-        never anywhere but the snapshot.
+        never anywhere but the snapshot. The audit events are not
+        unwound, though: a set refused on its fourth shape has already
+        published a full stage sequence for the three before it, which
+        are durable records of placements that did not happen. A
+        caller which cares has to decide what to do about that, like
+        the shape index noted at the schedule inputs event below.
 
         Shapes are walked largest first -- by memory, then vCPUs, then
         disk. That is first-fit-decreasing, and it is greedy: a set this
@@ -1262,12 +1289,20 @@ class Scheduler:
 
         snapshot = PlacementSnapshot(self.metrics, self._capacity_by_node)
 
+        # One memo for the whole set, beside the snapshot and for the
+        # same reason: a set places nothing, so no node's placed
+        # instances can change while it is being walked, and a node
+        # considered by every shape should be read once rather than
+        # once per shape. The committed counters are already read this
+        # way.
+        placements = {}
+
         assignment = {}
         for index in _shapes_largest_first(shapes):
             shape = shapes[index]
             assignment[index] = self._find_candidates_for_shape(
                 shape, candidates, related_objects, log_ctx, snapshot,
-                metrics_refreshed)
+                metrics_refreshed, placements)
             # The head of the list is where the caller will put this
             # shape, so that is what the shapes after it are told to
             # expect. Charged even for the last shape in a set, so that
@@ -1278,7 +1313,8 @@ class Scheduler:
         return {index: assignment[index] for index in range(len(shapes))}
 
     def _find_candidates_for_shape(self, shape, candidates, related_objects,
-                                   log_ctx, snapshot, metrics_refreshed):
+                                   log_ctx, snapshot, metrics_refreshed,
+                                   placements):
         """Walk one shape through the filter, affinity and ranking stages.
 
         Every figure comes from the snapshot rather than from this
@@ -1459,8 +1495,9 @@ class Scheduler:
         # Each candidate's placements are read once and memoised, so
         # a node considered twice is only fetched once. The memo is
         # shared by the hard constraint stage below and the scorer
-        # after it, so a create which uses both pays for one read.
-        placements = {}
+        # after it, so a create which uses both pays for one read --
+        # and it belongs to the whole decision, so a set of shapes
+        # pays for one read however many shapes consider the node.
 
         requested_affinity = shape.affinity
         require_with, require_without = _hard_affinity_constraints(
