@@ -3098,6 +3098,30 @@ class MultisetPlacementTestCase(SchedulerTestCase):
         self.assertSetEqual(
             self._all_hypervisor_uuids() - {taken}, set(assignment[1]))
 
+    def test_the_committed_cpu_charge_excludes_a_set_mates_node(self):
+        # The CPU mirror of the committed memory test above, because
+        # used_cpus is the other half of the committed charge and was
+        # otherwise only ever asserted directly on the snapshot. Each
+        # node's ledger already carries four vCPUs which nothing has
+        # measured, so the committed figure stays ahead of the
+        # measurement for the whole call: the first shape takes its
+        # node's ledger to eight of the eleven it is allowed, and only
+        # the committed charge can take that node away from the second
+        # shape. Removing the measured charge instead leaves this
+        # outcome unchanged, which is what makes this the CPU half.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        for node in ('node2', 'node3', 'node4'):
+            self.mock_mariadb.set_node_capacity(
+                self._node_uuid(node), limit_cpus=11,
+                limit_memory_mb=65536, used_cpus=4)
+
+        assignment = scheduler.Scheduler().find_candidates_for_shapes(
+            [self._shape(cpus=4), self._shape(cpus=4)])
+
+        taken = assignment[0][0]
+        self.assertSetEqual(
+            self._all_hypervisor_uuids() - {taken}, set(assignment[1]))
+
     def test_a_set_bigger_than_any_one_node_still_fits_the_cluster(self):
         # Three shapes, three nodes, and room for exactly one shape on
         # each: the set fits only if it is spread, which is what
@@ -3266,6 +3290,39 @@ class MultisetPlacementTestCase(SchedulerTestCase):
         self.assertEqual(2, extra['load_detail'][taken]['bucket'])
         self.assertSetEqual(
             self._all_hypervisor_uuids() - {taken}, set(extra['candidates']))
+
+    def test_a_charge_cannot_rerank_a_node_with_no_committed_row(self):
+        # The limit of what a charge does to the ranking, and the
+        # mirror of the test above. No node has a capacity row here, so
+        # ram_fraction is zero whatever is charged, and cpu_load_1 --
+        # the other half of the bucket -- is never charged at all. The
+        # node the first shape was charged to is therefore still in the
+        # winning load bucket for the second. The capacity filters do
+        # see the charge, so this is about how evenly a set spreads on
+        # an unsized cluster rather than whether it is over-placed.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            assignment = scheduler.Scheduler().find_candidates_for_shapes(
+                [self._shape(memory_mb=8192)] * 2,
+                related_objects=self._targets())
+
+        taken = assignment[0][0]
+        published = self._events(aem, 'schedule have lowest cpu load')
+        self.assertEqual(2, len(published))
+        extra = published[1].kwargs['extra']
+        self.assertEqual(0, extra['lowest_load'])
+        self.assertEqual(0, extra['load_detail'][taken]['bucket'])
+        self.assertIn(taken, extra['candidates'])
+
+    def test_an_empty_set_is_refused(self):
+        # Rather than answered with an empty assignment, which a caller
+        # asking whether a set fits would read as "all of it does".
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        self.assertRaises(
+            ValueError,
+            scheduler.Scheduler().find_candidates_for_shapes, [])
 
     def test_shapes_are_walked_largest_first(self):
         # Memory, then vCPUs, then disk, each descending, with the order

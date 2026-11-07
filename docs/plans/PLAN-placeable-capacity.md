@@ -520,6 +520,18 @@ what the job's creates actually met minutes later — which measures
 how often room present at claim time is gone at create time, and on
 which check. Read those counts before writing phase 3.
 
+Phase 1's core returns a whole ordered candidate list per shape but
+charged only the head of each, and phase 2 is the first caller which
+could have more than one shape to place. A caller which walks past a
+head — which `Instance.place_on_candidates()` does today when
+admission refuses it — leaves the set's arithmetic behind, because
+every later shape was ranked as though the skipped shape were on the
+node it skipped. Phase 1 states that rule in the entry point's
+docstring rather than enforcing it in the return type, on the grounds
+that the type to return is the one phase 2's real consumer wants.
+Decide it there: either phase 2 takes only heads, or the core returns
+the chosen node distinctly from its fallbacks.
+
 ### Phase 3: shape holds — schema and the node guard (`A`)
 
 Add a claim's ability to carry shapes and book them onto nodes. The

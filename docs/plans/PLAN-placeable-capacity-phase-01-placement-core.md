@@ -504,6 +504,37 @@ session's scratch directory as `step-1c/run_mutations.py`, with a log
 per mutation beside it. It is not committed: it mutates a working
 tree, which is not a thing to leave in the repository.
 
+### Review round 1: do the three tests it added bite?
+
+The same method, carried on from step 1c, so the set now stands at
+**eight mutations, all caught**. Baseline clean at 157 tests, each
+mutation restored from a pristine copy in a `finally`, the worktree
+byte-identical afterwards.
+
+| Mutation | Tests failed | Named test caught it |
+|----------|--------------|----------------------|
+| The empty-set guard removed | 1 | `test_an_empty_set_is_refused` |
+| The committed CPU charge removed, memory charge left | 2 | `test_the_committed_cpu_charge_excludes_a_set_mates_node` |
+| A notional `cpu_load_1` charge added | 1 | `test_a_charge_cannot_rerank_a_node_with_no_committed_row` |
+
+Each is caught by exactly the test written for it, and two of the
+three by nothing else, which is the point: a one-test margin on a
+mutation whose test was written for it is precise rather than thin.
+The committed-CPU removal also fails
+`test_a_node_with_no_capacity_row_is_charged_on_measurement_only`,
+which asserts the charge directly on the snapshot — the review's
+observation was that this was the *only* place the CPU half was
+asserted, and the new test is the end-to-end half it was missing.
+
+The third mutation is the unusual one: it adds behaviour rather than
+removing it, because the property under test is what a charge
+deliberately does *not* move. Charging a notional load would make the
+ranking respond on an unsized cluster, which the charge docstring now
+explains it declines to do, and the test fails when it does.
+
+The script is `review-r1-mutations/run_mutations.py` in this session's
+scratch directory, logs beside it, uncommitted for the same reason.
+
 ### Step 1d: is the documented diagnostic procedure still true?
 
 Yes, unchanged. `docs/operator_guide/scheduler.md:1080-1100` tells an
@@ -580,6 +611,31 @@ zero is one `instance_attributes` fetch where there were none. It is
 bounded by the attribute memo, `place_instance()` fetches the same row
 moments later, and the existing read-once test already asserted a
 bound of at most one rather than exactly one.
+
+**Review round 1 (2026-11-07, AEDT) raised one `fix`, six
+`consider` and two informational items, all on code this phase
+added.** The `fix` was true and mine: step 1b's departure from its
+brief deleted the two `Scheduler` wrappers, and `AGENTS.md:162-168`
+still described them as one-line delegators. The two prose citations
+had been repointed and that one had not, because step 1d's brief said
+to leave `AGENTS.md` alone — a brief written before 1b went beyond
+its own. A grep confirms it was the last stale reference in the tree.
+
+Six `consider` items were taken, five as the comment or docstring
+sentence each asked for and one as a guard: an empty shape list now
+raises `ValueError` rather than answering with an empty assignment,
+which a caller asking whether a set fits would read as "all of it
+does". One half of one item was declined — reshaping the return value
+so a caller cannot take a tail entry by accident. The rule is stated
+in the entry point's docstring and the decision is recorded in the
+master plan's phase 2 section, where the first caller which could
+have more than one shape will meet it, on the grounds that the type
+to return is the one that caller actually wants.
+
+Nothing in the round was a defect in behaviour. Three tests were
+added — the committed CPU charge end to end, the empty-set guard, and
+what a charge cannot do to the ranking on an unsized cluster — and
+all three are mutation-proved above.
 
 **One repository-level flake, unrelated to this phase.** The
 `Test the internal_ca role` pre-commit hook fails on the first

@@ -111,6 +111,13 @@ class PlacementShape(NamedTuple):
         becomes the integer this type says it is. Arithmetic on a
         string that looks like a number is a question nothing
         downstream should have to ask.
+
+        The cast closes the arithmetic and not the input: a body field
+        of "abc" or "2.5" still arrives here and still fails the
+        create with an unhandled 500, as a ValueError raised from this
+        factory rather than a TypeError raised later by a filter.
+        Typing the request where it enters the API is what closes
+        that, and this type is the wrong place for it.
         """
         disk_gb = 0
         for disk in inst.disk_spec:
@@ -217,10 +224,9 @@ class PlacementSnapshot:
     def charge(self, shape, node):
         """Charge a shape to a node, on both accounts at once.
 
-        The debits below are every figure the capacity filters and the
-        load ordering read, each in its own units, so a shape which has
-        been assigned is invisible to none of the filters the next shape
-        walks through.
+        The debits below are every figure the capacity filters read,
+        each in its own units, so a shape which has been assigned is
+        invisible to none of the filters the next shape walks through.
 
         No "free" figure can be driven negative by this, because a shape
         is only ever charged to a node whose filters it has already
@@ -231,6 +237,19 @@ class PlacementSnapshot:
         debited: no filter reads it, and a figure charged here but read
         nowhere would be a second ledger which nothing could catch
         drifting.
+
+        The ranking stages are a weaker guarantee. Load bucketing
+        reads cpu_load_1, which nothing here can move -- a shape which
+        has not started yet has no load -- and ram_fraction, which is
+        zero on a node with no committed row. So a charge reranks a
+        node only where the reconciler has sized it; on an unsized
+        cluster the shapes after the first are ranked against an
+        unchanged node and spread by the weighted shuffle alone, until
+        a capacity filter refuses. That is deliberate: a notional load
+        for an instance which is not running would be a figure no
+        measurement would ever produce, and the filters still refuse
+        correctly, so such a set is less evenly spread rather than
+        over-placed.
         """
         self.ensure_capacity()
 
@@ -1067,6 +1086,12 @@ class Scheduler:
         return True, None
 
     def _has_idle_disk_bandwidth(self, log_ctx, shape, node, snapshot):
+        # shape is unread here, and is in the signature only so that
+        # every filter stage takes the same arguments. This stage sheds
+        # load rather than accounting for capacity: a saturated disk is
+        # a bad place to start anything at all, whatever size it is, so
+        # there is nothing about the request to read.
+        #
         # We also avoid starting new instances on hypervisors with busy disk.
         # busy_time is in milliseconds per second, so a value of 1,000 is 100%
         # busy. You can record more than 100% if there is more than one disk
@@ -1201,7 +1226,22 @@ class Scheduler:
         ordered candidate list, best first, in the order the shapes were
         given. The head of each list is the node that shape was charged
         to.
+
+        Only the heads are an assignment. A caller which walks past one
+        of them -- as place_on_candidates() does when admission refuses
+        the head -- has left this call's arithmetic behind, because
+        every shape after it was ranked as though it were on the node
+        it skipped. Two shapes of one set can then be placed on the
+        same node, each having been told the other was elsewhere, so a
+        caller which does not take a head has to ask again for the
+        shapes it has not placed.
         """
+        if not shapes:
+            # Refused rather than answered with {}, which a caller
+            # asking whether a set fits would read as "all of it does".
+            raise ValueError(
+                'find_candidates_for_shapes() needs at least one shape')
+
         if related_objects is None:
             related_objects = []
         if log_ctx is None:
@@ -1250,6 +1290,15 @@ class Scheduler:
         # published alongside the shape's summed figure, because an
         # operator reading a refusal wants to see the disks which
         # produced the total.
+        #
+        # One of these is published per shape, and they carry nothing
+        # which tells them apart: a caller asking for more than one
+        # shape with event targets has to add the shape's index to this
+        # payload, and amend the procedure in
+        # docs/operator_guide/scheduler.md, which finds a decision's
+        # inputs by looking for the pass whose forced_candidates is
+        # false. That works today only because every production caller
+        # asks for exactly one shape.
         add_event_multi(
             EVENT_TYPE_AUDIT, related_objects,
             'schedule inputs',

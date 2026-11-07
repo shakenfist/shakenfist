@@ -161,10 +161,9 @@ metrics. The headlines:
 
 - **Capacity arithmetic lives in three places that must stay in sync**:
   `_compute_reservations()` in the resources daemon, the module-level
-  `scheduler._schedulable_threads()` / `_memory_reserved_mb()` (the
-  Scheduler methods of the same name are one-line delegators to these),
-  and the reconciler's limit-derivation helpers in `mariadb.py`.
-  Changing one means changing all three — see
+  `scheduler._schedulable_threads()` / `_memory_reserved_mb()`, and the
+  reconciler's limit-derivation helpers in `mariadb.py`. Changing one
+  means changing all three — see
   [docs/developer_guide/subsystem_internals.md](docs/developer_guide/subsystem_internals.md).
 
 - **`agent_state` is written against `power_state`.** The sidechannel
