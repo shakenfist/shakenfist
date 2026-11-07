@@ -22,8 +22,8 @@ publishes `cpu_cores`, `cpu_threads`, `cpu_cores_reserved`,
 `cpu_schedulable`, `cpu_cores_schedulable`, `memory_reserved_mb`,
 `disk_reservation_gb` (and `cpu_cores_performance` /
 `cpu_cores_efficiency` on hybrid CPUs) into `node_metrics`. On the
-consuming side, `Scheduler._schedulable_threads()` and
-`Scheduler._memory_reserved_mb()` in `shakenfist/scheduler.py`
+consuming side, `_schedulable_threads()` and
+`_memory_reserved_mb()` in `shakenfist/scheduler.py`
 apply per-node fallbacks for metrics rows written by older
 resources daemons (the CPU fallback subtracts this node's own
 `NODE_CPU_RESERVATION_THREADS`, with no infra-role bump, so
@@ -54,7 +54,16 @@ placed, non-deleted instance, whereas the resources daemon's
 only active libvirt domains. A powered-off instance holds its
 reservation in the ledger and is absent from the measurement, so the
 two legitimately disagree, and any counter-based admission has to
-choose between them explicitly rather than assume parity. Admission
+choose between them explicitly rather than assume parity. Placement
+reads both, and when it places a set of shapes in one decision it
+charges each shape to its chosen node in a `PlacementSnapshot` before
+ranking the next — on both accounts, because a filter which read a
+figure the snapshot did not debit would let the whole set spend the
+same headroom. So a figure added to any capacity filter has to be
+added to `PlacementSnapshot.charge()` in `shakenfist/scheduler.py` as
+well, and so does an exemption: a shape assigned to the node it is
+already on is charged nothing at all, because a reschedule which lands
+an instance back where it started moves neither account. Admission
 uses the ledger, and is the guarded UPDATE the
 `AdmitInstancePlacement` RPC makes against `scheduler_node_capacity`,
 in the same transaction that writes the `placement` attribute and
