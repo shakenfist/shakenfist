@@ -177,13 +177,24 @@ qemu-img's:
 - **VHDX sources**: instar counts only blocks whose BAT entry is fully or
   partially present, so it reports a smaller `required` than qemu-img for
   any source with `ZERO`, `NOT_PRESENT` or unmapped blocks, and an equal
-  one when every payload block is present (as in a fixed VHDX). qemu-img
-  counts every block of a VHDX source as allocated: its `required` equals
-  its `fully allocated`, whatever the BAT says. A partially present block
-  counts as a whole block on both sides, so instar can over-report within
-  such a block. For a 64 MiB dynamic VHDX with 2 of 8 blocks written,
-  `measure -O qcow2` gives instar `required size: 17104896` and qemu-img
-  `required size: 67436544`; both report `fully allocated size: 67436544`.
+  one when every payload block is present. qemu-img counts every block of
+  a VHDX source as allocated: its `required` equals its `fully allocated`,
+  whatever the BAT says. A partially present block counts as a whole block
+  on both sides, so instar can over-report within such a block. For a
+  64 MiB dynamic VHDX with 2 of 8 blocks written, `measure -O qcow2` gives
+  instar `required size: 17104896` and qemu-img `required size: 67436544`;
+  both report `fully allocated size: 67436544`.
+
+  A `fixed` VHDX *source* is not automatically the equal case: it is
+  `block_state_zero` that decides what its BAT says. Written with
+  `block_state_zero=on`, qemu-img's default, every payload entry is `ZERO`
+  however dense the file is, so instar counts none of them and reports the
+  bare target-metadata floor — 327680 against qemu-img's 17104896 for a
+  16 MiB fixed VHDX measured to qcow2. Written with `block_state_zero=off`
+  and content in the blocks, the entries are `FULLY_PRESENT` and the two
+  agree. (This is about measuring a fixed VHDX as the *source*; measuring
+  one as the *target*, `-O vhdx -o subformat=fixed` above, is unaffected by
+  `block_state_zero`.)
 - **VMDK multi-extent source layouts**: instar's extent map propagation
   differs from qemu-img for some non-trivial layouts.
 - **VHD legacy CHS-only sources**: instar's reported virtual_size differs

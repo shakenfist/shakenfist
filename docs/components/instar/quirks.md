@@ -990,11 +990,21 @@ Categories:
   fully or partially present, so it reports a smaller
   `required` than qemu-img for a source with `ZERO`,
   `NOT_PRESENT` or unmapped blocks, and an equal one when
-  every payload block is present (as in a fixed VHDX).
-  qemu-img counts every block of the image as allocated (its
-  `required` equals its `fully allocated`, whatever the BAT
-  says). A partially present block counts as a whole block on
-  both sides.
+  every payload block is present. qemu-img counts every block
+  of the image as allocated (its `required` equals its `fully
+  allocated`, whatever the BAT says). A partially present
+  block counts as a whole block on both sides.
+
+  A `fixed` VHDX is not automatically the equal case, because
+  `block_state_zero` decides what its BAT says. Written with
+  `block_state_zero=on` (qemu-img's default) every payload
+  entry is `ZERO`, so instar counts none of them and reports
+  the bare target-metadata floor: measured on
+  `vhdx-fixed-16M` to a qcow2 target against qemu-img 10.0,
+  instar reports 327,680 bytes required where qemu-img
+  reports 17,104,896, which is also its `fully allocated`.
+  Written with `block_state_zero=off` and real content, the
+  entries are `FULLY_PRESENT` and the two agree.
 - VMDK multi-extent source layouts: instar's extent map
   propagation differs.
 - VHD legacy CHS-only sources: instar's reported
@@ -1058,6 +1068,34 @@ present VHDX blocks and emits per-sector extents. instar's vhdx walker treats `P
 present (same posture as `scan_allocation`) and reports
 the entire block as one `data: true` extent. The
 per-sector-bitmap walk is tracked as future work.
+
+### VHDX blocks in a zero state are reported as `zero: true`
+
+`qemu-img create -f vhdx -o block_state_zero=on` (the default)
+leaves every payload BAT entry in `PAYLOAD_BLOCK_ZERO`, which
+the VHDX specification says reads as zeros. instar's walker
+reads the BAT and reports such an extent `zero: true, data:
+false`; `qemu-img map --output=json` does not consult the BAT
+state and reports the same extent as `data: true`. Both
+statements are true of the same block — instar describes what
+the block contains, qemu-img describes that the file has space
+for it — so neither is being corrected. It is a `fixed`
+subformat image where this is most visible, because the blocks
+are there in full and still read as zeros.
+
+Where the blocks genuinely hold data (`block_state_zero=off`
+with content written into them) the two walkers agree that the
+extent is data, and instar additionally reports the payload
+block's offset in the file, which qemu-img leaves out of the
+extent.
+
+Both shapes are recorded in `KNOWN_MAP_DIVERGENCES`
+(`vhdx-fixed-16M`, `vhdx-fixed-17M`,
+`vhdx-dynamic-131041M-block-1M` for the first;
+`vhdx-fixed-16M-bsz-off-data`, `vhdx-fixed-17M-bsz-off-data`
+for the second), for `json` only: `qemu-img map` without
+`--output=json` exits non-zero on these files ("File contains
+external, encrypted or compressed clusters").
 
 ### VMDK multi-extent sources are refused
 
