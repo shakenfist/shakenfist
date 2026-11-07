@@ -503,3 +503,26 @@ The script is re-runnable with no arguments and lives in this
 session's scratch directory as `step-1c/run_mutations.py`, with a log
 per mutation beside it. It is not committed: it mutates a working
 tree, which is not a thing to leave in the repository.
+
+### Step 1d: is the documented diagnostic procedure still true?
+
+Yes, unchanged. `docs/operator_guide/scheduler.md:1080-1100` tells an
+operator to pick the create-path scheduling pass by finding the
+`schedule inputs` event whose `forced_candidates` is false, and then to
+read that pass's `schedule have highest affinity`. Both events are
+still emitted, each from exactly one place in the file
+(`shakenfist/scheduler.py:1255` and `:1530`), `forced_candidates` is
+still published beside the shape's figures (`:1263`), and both now sit
+inside the per-shape walk. `find_candidates()` passes one shape, so for
+both production callers that is still once per pass. The two code
+commits moved these events; they changed no name and no field.
+
+One consequence is worth writing down before a later phase meets it.
+The events are emitted once per *shape*, so a multi-shape call that is
+given event targets publishes several `schedule inputs` events whose
+`forced_candidates` are all the same, and "pick the pass whose
+`forced_candidates` is false" stops identifying a single pass. The dry
+run cannot cause this, because it is given no event targets and so
+publishes nothing. A hold evaluation that events against a claim can,
+so whichever phase builds that should decide whether a shape index
+belongs in the payload, and amend the operator procedure if it does.

@@ -377,6 +377,15 @@ scheduler has always published, now sourced from the guard that
 actually admitted or refused the placement rather than a snapshot of
 it.
 
+The filter pipeline in front of that walk is evaluated for a requested
+shape -- vCPUs, memory, disk, affinity and namespace -- rather than for
+an instance, and it can evaluate several shapes at once, all or
+nothing. Each shape is walked through every stage and charged to the
+node it was given, on both the measured figures and the committed
+counters, before the next is walked, so a set cannot spend the same
+headroom twice; if any shape runs out of candidates, none are placed.
+The only production caller today asks for one shape.
+
 For details about the 507 response format, including the `Retry-After` header,
 the `stage` field, and when a client should retry, see
 [Capacity Refusals](capacity_refusals.md).

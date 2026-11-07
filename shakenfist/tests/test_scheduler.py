@@ -1246,10 +1246,11 @@ class CapacityCounterTestCase(SchedulerTestCase):
 
     def test_prefilter_reads_the_placement_attribute_once(self):
         # The self-charge check calls placement_filter(), which reads
-        # inst.placement -- an instance_attributes fetch -- and it runs
-        # for every candidate carrying a non-zero used_cpus. The value is
-        # identical for all of them, so the decision memoises the row
-        # rather than re-fetching it per candidate.
+        # inst.placement -- an instance_attributes fetch. The shape is
+        # built once, at the top of the decision, and carries the
+        # placement with it, so the read happens once however many
+        # candidates there are, and the bound also covers a cluster
+        # whose ledgers are all zero.
         self.mock_mariadb.set_node_metrics_same(self._baseline())
         for node in ('node2', 'node3', 'node4'):
             self.mock_mariadb.set_node_capacity(
