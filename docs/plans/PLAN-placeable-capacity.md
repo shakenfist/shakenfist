@@ -399,7 +399,7 @@ landed reads `—`. Phases that land in client-python record
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 0. Decisions and the live-memory baseline | [PLAN-placeable-capacity-phase-00-decisions.md](PLAN-placeable-capacity-phase-00-decisions.md) | Complete | `ab19cf67e7` (#4822) |
-| 1. Extract the shared set-placement core | PLAN-placeable-capacity-phase-01-placement-core.md (to be written) | Not started | — |
+| 1. Extract the shared set-placement core | [PLAN-placeable-capacity-phase-01-placement-core.md](PLAN-placeable-capacity-phase-01-placement-core.md) | In progress | — |
 | 2. The placement dry run (`C`) | PLAN-placeable-capacity-phase-02-dry-run.md (to be written) | Not started | — |
 | 3. Shape holds: schema and the node guard (`A`) | PLAN-placeable-capacity-phase-03-holds-schema.md (to be written) | Not started | — |
 | 4. Shape holds: consumption, release and displacement | PLAN-placeable-capacity-phase-04-holds-lifecycle.md (to be written) | Not started | — |
@@ -424,10 +424,15 @@ before either admission change.
   committed nodes (shakenfist#3937, correctly), which is what turns
   aggregate headroom into per-node fragments. Phases 3 and 4 own
   that constraint.
-- **Phase 1** extracts the duplicated placement walk (`POST
-  /instances` and preflight) into one all-or-nothing multiset walk
-  through the scheduler's filters, with no behaviour change. Both
-  `C` and `A` build on it.
+- **Phase 1** generalises the single-instance placement
+  pipeline into one all-or-nothing multiset walk through the
+  scheduler's filters, with no behaviour change. It no longer
+  de-duplicates anything: the walk this plan was written to
+  extract was shared by scheduler-reservations phase 5 as
+  `Instance.place_on_candidates()` on 2026-11-05, the day after
+  this plan was written, so what is left is the shape
+  denomination and the tentative charge. Both `C` and `A` build
+  on it. See the phase plan's `F1`.
 - **Phase 2** builds `C` on that core: a stateless, advisory query
   behind its own capability string, surfaced in the API, in a
   client method, and in `GET /admin/resources`. No writes, so it
@@ -484,14 +489,23 @@ clear statement of whether the live-memory question comes before
 
 ### Phase 1: extract the shared set-placement core
 
-`POST /instances` and preflight run two placement walks that "must
-change together". Extract them into one function that walks a
-multiset of shapes through the scheduler's own filters, all or
-nothing, each shape's tentative charge visible to the next, with no
-behaviour change and the existing single-instance callers routed
-through it. This is the core both `C` and `A` reuse, and doing it
-first keeps the dry run and the holds from forking the placement
-logic.
+This section originally read that `POST /instances` and preflight
+run two placement walks that "must change together", and said to
+extract them. **They no longer do.** scheduler-reservations phase 5
+shared the walk as `Instance.place_on_candidates()` in
+`036f255758` on 2026-11-05, one day after this plan was written,
+and left each caller only its own candidate construction and
+after-handling, which is the right split. The phase plan's `F1`
+records the correction and this paragraph was rewritten from it.
+
+What remains is the part that was always the point. The placement
+pipeline evaluates one `Instance`: build one function that walks a
+multiset of requested *shapes* through the scheduler's own filters,
+all or nothing, each shape's tentative charge visible to the next,
+with no behaviour change and the existing single-instance callers
+routed through it at one shape. This is the core both `C` and `A`
+reuse, and doing it first keeps the dry run and the holds from
+forking the placement logic.
 
 ### Phase 2: the placement dry run (`C`)
 
@@ -691,6 +705,13 @@ stale (see the Prompt).
   `D10` found 10 post-change refusals in standing `ucs-lab-*`
   namespaces and no record of who creates them; worth knowing before
   the design is called "every caller".
+- **Affinity across a set's own members.** Phase 1's `D6` charges
+  capacity across a multiset but leaves the hard affinity filter
+  and the scorer blind to the set's tentatively placed members,
+  because both read placed `Instance` rows and a shape has none.
+  No known caller needs it; the eight-instance `kerbside-patches`
+  topology is the candidate if one does, and phase 2's shadow
+  scoring is the instrument that would show it.
 
 ### Bugs fixed during this work
 
