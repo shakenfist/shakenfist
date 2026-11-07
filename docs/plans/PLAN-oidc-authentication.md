@@ -243,8 +243,8 @@ What it does not give us:
   `request_namespace()` is a string split returning one
   name (`shakenfist/util/access_tokens.py:83`). A human is
   typically in several namespaces. The open questions below
-  take this up; it is recorded here because it is a fact
-  about the code, not because it is settled.
+  take this up and answer it: the credential stays one
+  namespace deep, and the client holds one per namespace.
 * **Nothing on the client side.** `sf-client` lives in the
   separate `client-python` repository and has no login or
   OIDC code; this repo ships only `sf-ctl` and `sf-backup`
@@ -261,14 +261,14 @@ to and including token validation — trusted issuers, JWKS
 fetch and rotation, signature and claim verification — and
 this plan should add no second copy of any of it.
 
-Where they may diverge is what happens after validation.
-The federation plan mints a key and lets every existing
-consumer carry on unchanged. This plan's original design
-authorised requests directly off the external token. Whether
-human login should follow the exchange pattern instead is
-the central unresolved question below, and the auth
-federation plan explicitly reserves it for this plan's own
-phase 0 decisions pass rather than answering it in passing.
+Where they might have diverged is what happens after
+validation. The federation plan mints a key and lets every
+existing consumer carry on unchanged. This plan's original
+design authorised requests directly off the external token.
+They do not diverge: open question 13 below settled human
+login onto the exchange pattern too, in the phase 0 decisions
+pass the auth federation plan reserved it for rather than
+answering it in passing.
 
 Two things the federation plan settled are worth restating
 because they constrain this one. Outsourcing token issuance
@@ -302,8 +302,9 @@ Concretely:
   added to or removed from groups in the IdP, with no
   SF-side per-user bookkeeping. Since a person is usually
   in several namespaces, and every credential today names
-  exactly one, this is a change to the shape of
-  authorisation rather than a new claim reader.
+  exactly one, a login mints the set of credentials the
+  person is entitled to rather than one credential naming
+  several namespaces — open question 14.
 * **Machines** keep the credential model they have. Keys
   are already first-class objects with expiry, scopes and
   provenance; what remains here is whether they are
@@ -559,6 +560,33 @@ Scope boundaries:
    IdP with no `scopes` claim at all is the case that makes
    it matter.
 
+   **Resolved by phase 0 (2026-11-07): keep both axes.**
+   `caller_is_admin` continues to require both the `system`
+   namespace and the `cluster-admin` scope
+   (`shakenfist/external_api/base.py:279-299`). The namespace
+   half is not dropped.
+
+   **This reverses the expectation the question was written
+   with**, and it is contingent on open question 14. Step 0a's
+   call-site audit established that dropping the namespace half
+   is a *prerequisite* of a multi-namespace credential rather
+   than a companion to it: the moment a credential can name
+   several namespaces, "holds `system`" comes to mean "satisfies
+   `caller_is_admin` on every request, including requests that
+   touch only a tenant namespace", and the namespace half has to
+   go to stop that escalation. Open question 14 is answered no,
+   so a credential names exactly one namespace, "holds `system`"
+   stays as unambiguous as it is today, and the escalation
+   cannot arise. There is nothing left for the change to fix,
+   and a check which requires both a bootstrap namespace and an
+   explicit scope is the stronger of the two.
+
+   If a future plan reopens question 14, this question reopens
+   with it, and on step 0a's evidence the answer then is to drop
+   the namespace half. It does not reopen on its own: the
+   namespace half costs nothing while a credential is one
+   namespace deep.
+
 6. **Service account tokens vs IdP service accounts.**
    Operators may want to outsource even machine tokens
    to their IdP (Keycloak service accounts +
@@ -634,6 +662,19 @@ Scope boundaries:
    and documented as this question asks. Open question 13 is
    where that is settled, and it is deliberately not settled
    here.
+
+   **Resolved by phase 0 (2026-11-07), as a consequence of open
+   question 13 rather than as a choice of its own: there is
+   nothing here to pick.** Human login follows the exchange
+   pattern, so what reaches the request path is a Shaken Fist
+   access token bound to a namespace key's nonce. Deleting the
+   minted key invalidates every token derived from it on the
+   next request, exactly as for any other key. No bounded-delay
+   revocation is introduced, and no recommended token lifetime
+   has to be chosen or documented. The IdP's `exp` bounds only
+   the window in which an identity token may be exchanged, which
+   is a different and much smaller thing than a window in which
+   a revoked credential still works.
 
 8. **Inter-node auth.** Today inter-node calls use the
    namespace-key path with short-lived `_service_key*`
@@ -774,6 +815,29 @@ Scope boundaries:
     legacy `{'nonced_keys': ...}` dict out of the tables for
     the handful of call sites that still read it
     (`shakenfist/namespace.py:206-214`).
+
+    **Resolved by phase 0 (2026-11-07): no rename, and phase 6
+    is repurposed.** Namespace keys keep their name and remain
+    the documented machine credential. The expensive half of
+    this question — storage — already happened for unrelated
+    reasons, so a rename would buy vocabulary at the price of a
+    documentation pass and a deprecation window across two
+    repositories, and would leave every operator who has read
+    the current guides holding the old word.
+
+    Phase 6 does not disappear, because there is something more
+    useful to do with it. The key metadata is already modelled
+    and is served nowhere: `NamespaceKey.external_view()`
+    (`shakenfist/namespace_key.py:404-418`) produces
+    `namespace`, `name`, `expiry`, `scopes` and `provenance`,
+    while `AuthNamespaceKeysEndpoint.get`
+    (`shakenfist/external_api/auth.py:591-595`) still returns
+    bare key names out of the legacy `nonced_keys` compatibility
+    view (`shakenfist/namespace.py:206-214`). That is issue
+    #3672, and it is what actually blocks operating a key as a
+    service-account credential: a credential whose expiry and
+    scopes cannot be read back cannot be audited or rotated on
+    purpose, whatever it is called. Phase 6 becomes that work.
 
 12. **Documentation surface.** Three audiences:
     * **Operators** — how to configure a JWKS / issuer
@@ -963,6 +1027,133 @@ Scope boundaries:
     live side by side, serving one need, chosen differently in
     two places by the same operator.
 
+    **Resolved by phase 0 (2026-11-07): exchange, not
+    direct-bearer.** A human completes an OIDC flow and
+    exchanges the resulting identity token for an ordinary
+    namespace key, and that key — with the access tokens minted
+    from it — is what the client holds and what every request
+    presents. This is the shape the workload half already has,
+    so the human half adds a flow rather than a second
+    authorisation path.
+
+    The reason is not that three of the four considerations
+    above favour exchange. Counting considerations would be
+    reasoning from the absence that D2 and D3 of
+    [phase 0](PLAN-oidc-authentication-phase-00-decisions.md)
+    refuse to reason from. The reason is that the single
+    consideration which favours direct-bearer —
+    multi-namespace — **provably evaporates when it is built.**
+    Step 0b's probe got direct-bearer working through the
+    existing enforcement path with no change to any downstream
+    reader, and it fitted only by forging `sub` as
+    `<namespace>:<keyname>`, derived per request by evaluating
+    mapping rules against the token's claims.
+    `parse_jwt_identity()` demands exactly two colon-separated
+    components (`shakenfist/util/access_tokens.py:75-80`), so an
+    IdP subject cannot be carried through untouched: the probe
+    measured `alice@example.com` and GitHub's `repo:x:ref:y`
+    both failing there, and a validly signed foreign token
+    answering 500 as a result. With the forgery in place
+    `request_namespace()` returns one string, measured with
+    matching rules live in two namespaces at once. So
+    direct-bearer destroys the IdP's identity in order to make
+    the request parseable at all, and buys exactly one namespace
+    per request for doing it.
+
+    **The finding most worth carrying forward is
+    counter-intuitive, and it is about the missing-`scopes`
+    default rather than about either option: the
+    issuer-dependent default this question proposes as
+    direct-bearer's answer cannot be expressed as a change to
+    `api_scopes.satisfies()` at all.** There are three
+    enforcement sites, not the two named above, and the third is
+    a cap rather than a grant. `caller_scopes()`
+    (`shakenfist/external_api/base.py:302-312`) tests
+    `held is None` itself and returns `None`, and the
+    mapping-rule scope cap
+    (`shakenfist/external_api/auth.py:1109-1118`) reads
+    `caller_scopes()` and short-circuits on `None` without ever
+    consulting `satisfies()`. Hardening `satisfies()` therefore
+    leaves that cap lifted while `caller_is_admin`
+    (`shakenfist/external_api/base.py:292`) and `_enforce_scope`
+    (`shakenfist/external_api/base.py:2464`) deny — a fail-open
+    at the one site whose whole job is to stop a caller
+    authoring a standing instruction to mint wildcard keys in
+    `system`. Normalising the claim to `[]` at the boundary
+    swings the other way: `_enforce_scope` refuses `rule.write`
+    one layer earlier, so an IdP-authenticated administrator
+    could author no mapping rule at all — not a wildcard one,
+    not a narrow one — and the refusal reads `token is not
+    scoped for this operation`, which says nothing about the
+    default that caused it. `None` is a grant at two sites and
+    the absence of a cap at the third, and one default cannot
+    serve both. Both halves of that were measured through real
+    requests in step 0b rather than reasoned about.
+
+    The only default which makes all three sites coherent is to
+    synthesise a real scope set from the mapping rule that
+    authenticated the request — at which point direct-bearer is
+    exchange without persistence, minus the nonce and minus an
+    audit row naming a credential that exists. That is the sense
+    in which the Mission's "authorisation lives in one place"
+    survives direct-bearer: it survives by making direct-bearer
+    indistinguishable from exchange at the point of enforcement.
+
+    The supporting costs are smaller than that one, and they
+    point the same way:
+
+    * Every mechanism which populates the request context
+      *while keeping `federation.validate_token()` in the path*
+      needs private or undocumented behaviour. There is no
+      public "set the verified token for this request" API in
+      the installed 4.7.4, so the choice is four undocumented
+      `flask.g._jwt_extended_*` attributes, or an undocumented
+      guarantee that the dict `verify_jwt_in_request()` returns
+      is the same object `get_jwt()` later reads.
+    * The one public route, `@jwt.decode_key_loader`, loses the
+      per-issuer audience binding, because the decode settings
+      are application-global. Demonstrated rather than deduced:
+      a token minted for another audience verified through
+      `verify_jwt_in_request()` while
+      `federation.validate_token()` refused it, and so did a
+      token carrying no `exp` at all.
+    * Audit events would name a key which does not exist.
+      `log_token_use` (`shakenfist/external_api/base.py:1511`)
+      recorded the forged namespace and key name, and the IdP's
+      subject appeared in no event.
+    * There is no nonce, so revocation degrades from immediate to
+      the token lifetime. That is open question 7, which this
+      answer therefore settles.
+
+    One property of the tree today belongs with those, because
+    it is a cost direct-bearer must pay and exchange does not.
+    `federation.TokenValidationFailed` is not caught by
+    `handle_authorization_exceptions`
+    (`shakenfist/external_api/base.py:2192`), which catches only
+    `flask_jwt_extended` and PyJWT classes, so a foreign token
+    which fails validation inside the request path answers
+    **500**. The exchange endpoint is unaffected because it
+    handles that exception in its own handler
+    (`shakenfist/external_api/auth.py:1962-1964`); anything
+    validating a foreign token inside the authorisation path
+    owes an error-translation layer before it owes anything
+    else.
+
+    What this constrains downstream. Phase 3's discovery work is
+    untouched: a human still has to start a conversation with
+    the issuer, whichever credential the conversation ends in.
+    Phase 7 caches namespace keys and the access tokens minted
+    from them rather than an IdP refresh token, which narrows
+    what open question 10 must protect without making it easier.
+    Phase 8's worked examples walk an operator through an
+    exchange, so what a human login asks an operator to
+    configure is the trusted issuers and mapping rules a
+    workload exchange already needs. Open question 6's residue
+    — whether direct acceptance of a foreign bearer token is
+    *also* wanted — is answered no for this plan. And the
+    token-introspection entry under Future work has no work in
+    it.
+
 14. **Multi-namespace authorisation.** Promoted from a
     settled-sounding sentence in an earlier draft of this
     plan to a question of its own, because it is the single
@@ -1029,12 +1220,142 @@ Scope boundaries:
     cheap, it is independent of open question 13, and it
     should be done before either question is decided.
 
+    **Resolved by phase 0 (2026-11-07): no. A credential stays
+    one namespace deep, and the multiplicity moves to the
+    client.** A login mints the set of credentials the person is
+    entitled to, one namespace key per namespace, and the client
+    holds that set and presents the right member for each
+    request. Server-side authorisation does not change:
+    `parse_jwt_identity()` keeps its two components,
+    `request_namespace()` keeps returning one string
+    (`shakenfist/util/access_tokens.py:83`), and none of the
+    fifty-seven call sites move. This is what the CI conductor
+    already does in production — one actor holding a `conductor`
+    key in each namespace it works in, eight of them when step
+    0c sampled — so the client-side shape is in service today
+    for a machine, and what a person lacks is the tooling rather
+    than the model.
+
+    **This is a refusal of an affordable change, so it owes a
+    reason which is not cost.** Step 0a's audit found the
+    server-side change would be mechanical rather than a
+    redesign: thirty-nine of the fifty-five executable call
+    sites are entitlement tests whose single-string comparison
+    becomes a set-membership test, and they are not thirty-nine
+    edits but three helper signatures —
+    `namespace_is_trusted()`, `namespace_filter` and
+    `namespace_or_shared_filter` — plus one ownership idiom
+    repeated eleven times. Affordable is not a reason to do it.
+    Three things decide it the other way.
+
+    1. **It would make `caller_is_admin` an escalation.** A
+       credential naming `system` as well as a tenant namespace
+       satisfies `caller_is_admin`
+       (`shakenfist/external_api/base.py:279-299`) on *every*
+       request, including requests which touch only the tenant,
+       because the test becomes "does the held set contain
+       `system`". Eleven other sites share that shape, and two
+       of them — `shakenfist/blob.py:299` and
+       `shakenfist/schema/object_reference.py:182` — are
+       field-level disclosure inside `external_view()`, so a
+       dual-namespace caller would start seeing blob locations
+       and node references in every object it rendered. Being in
+       two namespaces at once should confer no extra authority
+       over either, and today it cannot.
+    2. **A proxy hop would silently drop entitlements.** Four
+       sites *write* `request_namespace()` into a freshly minted
+       single-namespace `_service_key` for the next node —
+       `shakenfist/external_api/artifact.py:604`,
+       `shakenfist/external_api/base.py:1763`,
+       `shakenfist/external_api/base.py:1993` and
+       `shakenfist/external_api/blob.py:61`, all through
+       `get_api_token()` (`shakenfist/namespace.py:494-518`). A
+       multi-namespace request which crossed a node hop would be
+       re-authenticated as a single namespace on the far side
+       and would lose entitlements mid-request, with no error.
+       The audit found this; this plan had not.
+    3. **Trust already serves the cross-namespace need**, which
+       is the next three paragraphs.
+
+    **Where the line sits between trust and a multi-namespace
+    credential.** The two do not overlap, and what separates
+    them is what each one grants.
+
+    [Trust](/glossary/#trust) is a standing, deployment-level
+    grant of visibility *into* a namespace. It is administered by
+    the namespace being read, it applies to everyone that
+    namespace trusts rather than to a named person, and it
+    confers no ability to act as the trusting namespace. An
+    operator reaches for it when several actors need to see one
+    namespace's objects: `ci-images` listing every live job
+    namespace so that CI jobs can read shared images is the
+    production example, and it is why those jobs hold no second
+    credential.
+
+    A multi-credential login is a per-person *entitlement to act
+    as* a namespace. It is administered in the IdP, as a
+    consequence of group membership, it is a property of the
+    person rather than of the deployment, and it carries the full
+    authority of each namespace it names. An operator reaches
+    for it when a person must create, modify and delete in
+    several namespaces.
+
+    One grants visibility; the other grants identity. An
+    operator choosing between them should also know that trust
+    composes into its own administration:
+    `requires_namespace_ownership` gates on
+    `namespace_is_trusted()`
+    (`shakenfist/external_api/auth.py:101`), and
+    `AuthNamespaceTrustsEndpoint.post` and
+    `AuthNamespaceTrustEndpoint.delete`
+    (`shakenfist/external_api/auth.py:803`,
+    `shakenfist/external_api/auth.py:832`) re-run that same
+    owner-or-trusted test, so a namespace granted trust can
+    grant trust onward. Step 0a found that. It is a property of
+    trust rather than a defect this answer repairs, and it is a
+    reason to prefer the narrower mechanism when either would
+    serve.
+
+    One caveat on reaching for trust, from step 0c's sample:
+    `ci-images` trusts a namespace which no longer has a row,
+    and that entry outlived the revocation sweep `09e6dcdb56`
+    added by at least tens of minutes while every other entry
+    beside it churned. A standing grant administered by the
+    namespace being read needs removing when its subject goes
+    away. That is not a reason to prefer a credential set, which
+    has the same problem with the IdP owning it instead, but it
+    is a reason the operator guidance phase 8 writes should tell
+    an operator to audit a trust list. Filed as #4829: the
+    revocation sweep is forward-only and nothing backfilled the
+    residue, so entries written before 2026-09-12 survive.
+
+    The sub-questions this question lists therefore answer
+    themselves. The two-component identity neither grows a third
+    form nor is replaced. A request names its target namespace
+    exactly as it does today, because the credential presented
+    names it. `request_namespace()` survives unchanged. Listing
+    endpoints keep filtering by one namespace plus its trust
+    relationships, and a person in five namespaces lists five
+    times.
+
+    What this constrains downstream. Phase 4 stops being a
+    server-side authorisation change and becomes the minting of
+    the entitled set at login. Phase 7 absorbs the multiplicity:
+    the client holds a set of credentials and chooses between
+    them per request, which is new work there and none here.
+    Open question 5 loses its premise and is answered
+    accordingly. And open question 2's human half closes here —
+    a claim grants into several namespaces by matching a mapping
+    rule in each of them, one rule per namespace, which is the
+    object model that already exists.
+
 ## Execution
 
-No phase plan has been cut yet, and phase 0 must run before
-any of the others can be. It settles open questions 13 and
-14, and what most of the rows below actually *are* depends
-on which way 13 goes.
+Phase 0 ran first, as it had to. It settles open questions
+13 and 14, and what most of the rows below actually *are*
+depended on which way 13 went. It went to exchange, and 14
+to one namespace per credential, which rewrote phases 4, 6
+and 7 and abandoned phase 5.
 
 The `file:line` references throughout this plan were re-resolved
 against the tree at commit `6b0ab81b2a` (phase 0 step 0e), so they
@@ -1056,10 +1377,10 @@ not land anywhere else.
 | 1. JWT validation refactor (split issuance from validation; introduce per-issuer validators) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as `PLAN-auth-federation.md` phase 3 steps 3a-3c and 3f: `72187d2ff` (#3556), `c64269e63` (#3625) |
 | 2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as `PLAN-auth-federation.md` phase 3 step 3f: `c64269e63` (#3625), `1e7a167ea` (#3641) |
 | 3. OIDC discovery | shakenfist | TBD | Not started | — |
-| 4. Claim-driven namespace authorisation, including multi-namespace | shakenfist | TBD | Not started | — |
-| 5. Admin as a claim | shakenfist | TBD | Not started | — |
-| 6. Service-account framing of namespace keys | shakenfist, client-python | TBD | Not started | — |
-| 7. Interactive CLI flows and token cache | client-python | TBD | Not started | — |
+| 4. Minting the entitled set of credentials at login | shakenfist | TBD | Not started | — |
+| 5. Admin as a claim | shakenfist | TBD | Abandoned | — |
+| 6. Serving namespace key metadata (#3672) | shakenfist, client-python | TBD | Not started | — |
+| 7. Interactive CLI flows, the credential set and the token cache | client-python | TBD | Not started | — |
 | 8. Worked operator examples for Keycloak and Authentik | shakenfist | TBD | Not started | — |
 | 9. Functional coverage against a containerised IdP | shakenfist | TBD | Not started | — |
 | 10. Push audit | shakenfist | PLAN-oidc-authentication-phase-10-push-audit.md | Not started | — |
@@ -1085,15 +1406,14 @@ JWKS endpoint.
 **Phase 0 — research and decisions.** Settles open question
 13, direct-bearer versus exchange-based human sessions, and
 open question 14, multi-namespace authorisation. Both are
-posed above with the evidence that would settle them, and
-neither is answered anywhere in this document. The call-site
-audit open question 14 asks for is the cheapest useful work
-in the plan and is independent of 13, so it happens here
-regardless of how 13 is argued. Question 13 in turn gates
-questions 5, 6, 7 and 12, because what an administrator
-holds, what a machine presents, how a credential is revoked
-and what an operator configures all differ between the two
-shapes.
+answered above, as of 2026-11-07: exchange, and one
+namespace per credential with the multiplicity held by the
+client. The call-site audit open question 14 asks for was
+the cheapest useful work in the plan and was independent of
+13, so it happened here regardless of how 13 was argued, and
+it is what decided 14. Question 13 gated questions 5, 6 and
+7, which are answered alongside it, and question 12, which
+phase 8 can now be planned against.
 
 **Phases 1 and 2 — superseded, and kept on purpose.** Both
 were built as auth federation phase 3, in
@@ -1130,47 +1450,81 @@ not up for discussion here: discovery populates a
 `TrustedIssuer`'s fields at configuration time, and
 validation keeps reading them from the object.
 
-**Phase 4 — claim-driven namespace authorisation.** This is
-where `request_namespace()` stops being a string split
-(`shakenfist/util/access_tokens.py:83`). Blocked on open
-question 14, and it cannot be planned before that question's
-call-site audit exists, because the audit is what decides
-whether this phase is a mechanical rename with a handful of
-hand-written exceptions or a redesign of the authorisation
-model. Open question 2's human half closes here.
+**Phase 4 — minting the entitled set of credentials at
+login.** Open question 14 is answered no, so this is no
+longer where `request_namespace()` stops being a string
+split: it stays a string split
+(`shakenfist/util/access_tokens.py:83`), and so does every
+one of the fifty-seven sites that read it. What the phase
+builds instead is the server half of a human login — match
+the identity token's claims against the mapping rules of
+each namespace which has one, and mint one namespace key per
+match, so that a person's entitlements come back as a set
+from one exchange rather than from one exchange per
+namespace. Open question 2's human half closes here. The
+audit in
+[phase 0](PLAN-oidc-authentication-phase-00-decisions.md) is
+what sized this phase, and it also fixes its boundary: each
+minted credential still names exactly one namespace.
 
-**Phase 5 — admin as a claim.** Half done already:
-`caller_is_admin` requires the `cluster-admin` scope as well
-as the `system` namespace
-(`shakenfist/external_api/base.py:279-299`), so the
-administrative role is already something a token carries.
-What remains is the decision in open question 5 — whether
-the namespace half can be dropped so that holding
-`cluster-admin` is sufficient — which should be taken
-alongside question 13, since an administrator arriving from
-an IdP with no `scopes` claim at all is the case that makes
-it matter.
+**Phase 5 — admin as a claim, declined.** Half of it was
+done already: `caller_is_admin` requires the `cluster-admin`
+scope as well as the `system` namespace
+(`shakenfist/external_api/base.py:279-299`). The other half
+— dropping the namespace half so that holding `cluster-admin`
+is sufficient — is refused by open question 5, which keeps
+both axes, so the phase has no content left.
 
-**Phase 6 — service-account framing of namespace keys.**
-Naming and CLI surface only. Phase 2 of the federation plan
-already made keys first-class objects with expiry, scopes
-and provenance (`shakenfist/namespace_key.py:63`), so the
-storage migration open question 11 worried about has
-happened for unrelated reasons. What is left is words,
-command names, a documentation pass and a deprecation
-window — and the command names are `client-python`'s, which
-is why the row names two repositories. Open question 11
-must be answered before this is cut; it may be answered
-"no", in which case the row disappears rather than shrinks.
+The row is marked `Abandoned` rather than deleted. Phase 6's
+note used to instruct that a "no" answer should make a row
+disappear rather than shrink, and the reasoning behind that
+was that a shrunken row reads as unfinished work. A status of
+`Abandoned` does not: the `plan-status-vocabulary` shared
+block in `PLAN-TEMPLATE.md` has that term for work
+deliberately dropped without being done, which is exactly
+what this is. Keeping the row also leaves phases 6 to 10
+numbered as this document, its phase plans and
+`docs/plans/index.md` already cite them. The decision is
+contingent on open question 14: if a credential is ever
+allowed to name several namespaces, this phase comes back,
+because the namespace half then has to go.
 
-**Phase 7 — interactive CLI flows and token cache.** Device
-code, and authorisation code with PKCE where a browser is
-available, plus the credential cache open question 10
-describes. Entirely `client-python`: none of it can be
-implemented in this repository. Depends on phase 3, because
-neither flow can begin without the issuer's endpoints, and
-on question 13, because what the client caches and presents
-after the flow completes is precisely what 13 decides.
+**Phase 6 — serving namespace key metadata.** Open question
+11 is answered "no rename", and rather than disappearing the
+row is repurposed onto the work that answer exposed as the
+real obstacle. Keys keep their name; what they do not have
+is an API which serves their properties.
+`NamespaceKey.external_view()`
+(`shakenfist/namespace_key.py:404-418`) already produces
+`namespace`, `name`, `expiry`, `scopes` and `provenance`,
+and `AuthNamespaceKeysEndpoint.get`
+(`shakenfist/external_api/auth.py:591-595`) still returns
+bare names out of the legacy `nonced_keys` compatibility
+view. That is issue #3672, recorded against this row because
+it is what blocks operating a key as a service-account
+credential: a credential whose expiry and scopes cannot be
+read back cannot be audited or rotated on purpose. The row
+still names two repositories — the endpoint is this
+repository's, and whatever renders the new fields in
+`sf-client namespace show` is `client-python`'s.
+
+**Phase 7 — interactive CLI flows, the credential set and
+the token cache.** Device code, and authorisation code with
+PKCE where a browser is available, plus the credential cache
+open question 10 describes. Entirely `client-python`: none of
+it can be implemented in this repository. Depends on phase 3,
+because neither flow can begin without the issuer's
+endpoints, and on phase 4, because what the flow returns is
+the set of credentials the person is entitled to.
+
+Open question 14's multiplicity lands here. The client holds
+one namespace key per namespace and presents the right one
+for each request, which is what the CI conductor's
+provisioning automation already does for a machine and what
+a person has no tooling for at all. So the cache holds a set
+rather than a credential, every member of it is a credential
+at rest, and choosing between them is this phase's problem
+rather than the server's.
 
 **Phase 8 — worked operator examples.** Care is needed about
 what is genuinely new here. The operator guide already has
@@ -1187,9 +1541,10 @@ in the tree exercises it. So what this phase owes is: a
 first end-to-end walkthrough of configuring either provider,
 for a *human* login rather than a workload exchange, for
 both Keycloak and Authentik, including how a group claim
-reaches a namespace grant. It cannot be written before
-questions 13 and 14 are settled, because what an operator
-configures depends on which session shape was chosen.
+reaches a namespace grant. Questions 13 and 14 are settled,
+so the session shape the walkthrough documents is known: an
+exchange which mints one namespace key per namespace the
+person is entitled to.
 
 **Phase 9 — functional coverage against a containerised
 IdP.** The federation exchange already has functional
@@ -1248,18 +1603,17 @@ attached has skipped the part that mattered.
   properties already settled by the existing issuer model.
   Review at high effort anyway: it adds a network fetch
   driven by operator-supplied URLs.
-* Phase 4 (claim-driven authorisation): **high** — it
-  changes the shape of every authorisation check in the
-  codebase, and each call site has to be read to decide
-  which of three things it meant. The size is known only
-  after phase 0's audit.
-* Phase 5 (admin as a claim): **medium** — the mechanism
-  exists and the change is small. Review at high effort: it
-  is the cluster's privilege boundary, and the failure mode
-  is silent.
-* Phase 6 (service-account framing): **medium** — naming,
-  documentation and a deprecation window across two
-  repositories. No storage work; that already happened.
+* Phase 4 (minting the entitled credential set): **high** —
+  it is where an identity becomes a set of credentials, and
+  phase 0's answer to open question 14 means it must mint
+  several single-namespace keys without ever minting one into
+  `system` as a side effect. Review at high effort: it is the
+  cluster's privilege boundary, and the failure mode is
+  silent.
+* Phase 6 (serving key metadata): **medium** — one endpoint
+  serving a view that already exists, plus whatever renders
+  it client-side. No storage work and no rename; both of
+  those were settled before the phase was cut.
 * Phase 7 (CLI flows and token cache): **high** — two OAuth
   flows, a credential at rest, and a cache whose
   invalidation rules must not outlive the server's view of
@@ -1339,10 +1693,10 @@ When this plan is successfully implemented:
   exists only for the GitHub Actions workload path.
 * A human user can run a login command in `sf-client`,
   complete an OIDC flow, and thereafter make API calls
-  without holding a static key in a file. Whether what the
-  client presents afterwards is the IdP's own token or a
-  credential exchanged for it is open question 13's to
-  settle, and this criterion does not pre-judge it. The
+  without holding a static key in a file. What the client
+  presents afterwards is a namespace key exchanged for the
+  IdP's token, one per namespace the person is entitled to:
+  open question 13 chose exchange over direct-bearer. The
   command itself lands in `client-python`.
 * Namespace access for OIDC-authenticated humans is driven
   by claims in the token, with no per-person state in
@@ -1351,17 +1705,17 @@ When this plan is successfully implemented:
   answered rather than deferred again.
 * Namespace keys still work for automation and are the
   documented choice for machine credentials on a cluster
-  that runs no IdP. Whether they are re-presented to users
-  as service-account credentials, and under what command
-  names, is open question 11's to settle; this criterion
-  does not presume the rename happens.
+  that runs no IdP, under that name: open question 11
+  declined the rename. What they gain instead is an API
+  which serves their expiry, scopes and provenance, which is
+  issue #3672.
 * The privileged status of the `system` namespace is
-  settled one way or the other: either `caller_is_admin`
-  drops its namespace half so that holding `cluster-admin`
-  is sufficient, or this plan records why the two-axis
-  check (`shakenfist/external_api/base.py:279-299`) is
-  kept. The mechanism already exists; what is missing is
-  the decision.
+  settled, and open question 5 settles it: the two-axis
+  check (`shakenfist/external_api/base.py:279-299`) is kept,
+  because a credential names exactly one namespace and
+  "holds `system`" is therefore unambiguous. Dropping the
+  namespace half is what a multi-namespace credential would
+  have required, and open question 14 declined that.
 * Inter-node authentication continues to work without
   requiring an external IdP — the IdP is opt-in for
   external callers.
@@ -1421,16 +1775,15 @@ When this plan is successfully implemented:
   scope here, but the auth design should not preclude it.
 * **Token introspection / online revocation.** RFC 7662
   introspection or an SF-side revocation list. Whether this
-  matters at all is a consequence of open question 13
-  rather than an independent choice. If exchange wins, what
+  matters at all is a consequence of open question 13 rather
+  than an independent choice, and 13 chose exchange: what
   reaches the request path is a Shaken Fist access token
   bound to a namespace key's nonce, revocation is immediate
-  and inherited, and there is nothing here to build. If
-  direct-bearer wins, revocation acquires a bounded delay
-  equal to the IdP's token lifetime, the recommendation
-  becomes "keep lifetimes short", and introspection is the
-  escape hatch when that proves operationally
-  unacceptable.
+  and inherited, and there is nothing here to build. It
+  returns only if a later plan reopens 13 for
+  direct-bearer, when revocation would acquire a bounded
+  delay equal to the IdP's token lifetime and introspection
+  would be the escape hatch.
 
 ### Bugs fixed during this work
 

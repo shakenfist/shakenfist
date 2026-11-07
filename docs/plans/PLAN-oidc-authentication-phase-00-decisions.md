@@ -480,6 +480,37 @@ survey's command and the Definition of done's now exclude
 wrapped one: 57 either way. This is the second check in this
 plan that was wrong until it was run.
 
+**Step 0d corrected three claims in its own brief, and was
+right to.** The brief said every mechanism for direct-bearer
+needs private or undocumented `flask_jwt_extended` behaviour.
+That overstated step 0b: mechanism B, `@jwt.decode_key_loader`,
+is documented public API — it is *unsound* rather than
+undocumented, because the decode settings it relies on are
+global and so lose the per-issuer audience binding. The claim is
+now scoped to the mechanisms which keep `validate_token()` in
+the path. The brief also said two of the eleven
+`caller_is_admin`-shaped sites are field-level disclosure inside
+`external_view()`; only `shakenfist/blob.py:299` is, while
+`shakenfist/schema/object_reference.py:182` sits in
+`references_to_grouped_dict()`, which renders external views
+without being one. Both were checked against the tree. And
+"revocation degrades to the token lifetime" was reasoned rather
+than measured, so it is no longer listed among the measured
+costs. The error in the first of these was repeated to Michael
+in conversation before the step caught it.
+
+**A third check was wrong until it was run.** The Definition of
+done's row count anchored on `` | `<file>.py:NNN` | ``, which
+also matches survey finding 3's table and step 0b's three-site
+table — both name sites by bare filename — so it returned 61
+against 57 sites. Step 0a's rows are the only ones carrying a
+full repository-relative path, so the pattern now anchors on
+`shakenfist/` and returns 57. Counting the first two wrong
+checks in this phase, every falsifiable count written into this
+plan before it was executed was wrong in some way, which is the
+argument for running them at planning time rather than writing
+them and trusting them.
+
 **Two defects found beyond the two step 0f was authorised to
 file, neither filed.** Step 0c found a stale trust entry on
 sfcbr -- `ci-images` trusts `sfcbr-VoFFMlcdPMTKjk34`, which does
@@ -502,7 +533,7 @@ the tenant. Both were verified against the tree by the
 management session. Filing either is a decision for Michael,
 since the authorisation covered two named issues.
 
-## Results`, one row per site, and begin every row with the site in backticks so the Definition of done's row count can be taken mechanically: `` | `shakenfist/external_api/artifact.py:123` | ArtifactEndpoint.get | A | ...justification... | ``. The four columns are the site, the enclosing function or class, the bucket letter, and a one-line justification. Then write a summary: counts per bucket, and a plain statement of whether a multi-namespace credential is a mechanical change with hand-written exceptions or a redesign. Two sites need particular care and must be called out individually: `external_api/auth.py:101`, where `requires_namespace_ownership` passes `request_namespace()` to `namespace_is_trusted()` so the check is already "owner or trusted" rather than "owner", and `external_api/base.py:282` in `caller_is_admin`, where it is compared to the literal `'system'`. One thing is already checked so you do not have to: the JWT identity is minted as `f'{ns.uuid}:{keyname}'` (`access_tokens.py:54`), which *looks* like a uuid but is not — `Namespace.uuid` returns the namespace's name (`namespace.py:64-70`, created by `cls._db_create(name, {'uuid': name, ...})` at `namespace.py:164`), so the master plan's prose that the identity is `<namespace>:<keyname>` is correct and every one of these comparisons really is against a namespace name. Change no code. |
+## Results`, one row per site, and begin every row with the site in backticks, as a full repository-relative path, so the Definition of done's row count can be taken mechanically and cannot collide with the other tables in this file which name sites by bare filename: `` | `shakenfist/external_api/artifact.py:123` | ArtifactEndpoint.get | A | ...justification... | ``. The four columns are the site, the enclosing function or class, the bucket letter, and a one-line justification. Then write a summary: counts per bucket, and a plain statement of whether a multi-namespace credential is a mechanical change with hand-written exceptions or a redesign. Two sites need particular care and must be called out individually: `external_api/auth.py:101`, where `requires_namespace_ownership` passes `request_namespace()` to `namespace_is_trusted()` so the check is already "owner or trusted" rather than "owner", and `external_api/base.py:282` in `caller_is_admin`, where it is compared to the literal `'system'`. One thing is already checked so you do not have to: the JWT identity is minted as `f'{ns.uuid}:{keyname}'` (`access_tokens.py:54`), which *looks* like a uuid but is not — `Namespace.uuid` returns the namespace's name (`namespace.py:64-70`, created by `cls._db_create(name, {'uuid': name, ...})` at `namespace.py:164`), so the master plan's prose that the identity is `<namespace>:<keyname>` is correct and every one of these comparisons really is against a namespace name. Change no code. |
 | 0b | xhigh | opus | worktree | **Probe whether direct-bearer can live inside the single enforcement path.** Answer one question: can a token validated by `shakenfist/federation.py:validate_token()` be made to flow through the existing authorisation path unchanged? The obstacle is that `verify_token` (`shakenfist/external_api/base.py:1422`) calls `verify_jwt_in_request(False, False, False, ['headers'], True)` at line 1425, which validates against the cluster's own secret via `flask_jwt_extended`, so a foreign token is rejected before any Shaken Fist code runs; and everything downstream — `parse_jwt_identity()` and `request_namespace()` (`shakenfist/util/access_tokens.py:74-84`), `caller_scopes()` (`base.py:302`), `_enforce_scope` (`base.py:2458`), `caller_is_admin` (`base.py:279`) — reads that library's request context through `get_jwt()` / `get_jwt_identity()`. Build the smallest thing that works: peek at the unverified `iss` the way `federation.py:236` already does, look it up against `TrustedIssuer`, validate through `federation.validate_token()`, and then try to populate the `flask_jwt_extended` request context so the downstream readers need no change. Report, with specifics: whether that population is possible at all with the installed `flask_jwt_extended`; if it is, how ugly it is and whether it depends on private API; if it is not, how many downstream readers would need a second path. **Then test the three missing-`scopes` sites specifically** — an IdP token carries no `scopes` claim, and `api_scopes.satisfies(None, anything)` returns `True` (`shakenfist/external_api/scopes.py:137-142`). Demonstrate empirically what such a token *gets* at `base.py:292` (`caller_is_admin`), `base.py:2464` (`_enforce_scope`) and `auth.py:1109-1118` (the cap on what scopes a mapping rule may grant). The third is a narrowing check where `None` means "legacy operator, unrestricted", so an issuer-dependent default of "deny for foreign tokens" has a non-obvious consequence there — say what it is. Do not fix anything, do not file an issue (the master plan says in as many words that the wildcard default is not a bug and must not be filed as one), and **do not commit**: the worktree is discarded. The write-up is the whole deliverable, so it must name every file and function touched and include a diffstat, in enough detail that the probe can be re-created from the text alone. Append it to the phase plan under `## Results`. |
 | 0c | medium | sonnet | none | **Characterise the deployments we can actually see, and state plainly what cannot be measured.** The planning pass already measured sfcbr on 2026-11-07; survey finding 9 above has the table. Headlines: sixteen namespaces, twelve of them ephemeral per-CI-job `sfcbr-*` whose count moves with CI load; exactly one key in the cluster held by a person (`roberto`, in `system`); `deploy` in `system`; and a `conductor` key in `ci-images` and in every job namespace — one actor, fourteen credentials, because a key names one namespace. Confirm that with `sf-client namespace list` and `sf-client --json namespace list`, and `sf-client namespace show <ns>` per namespace (all read-only; credentials are already present in the environment) and report any difference, but do not re-derive the reading — that is written. What to add: how `ci-images`' trust list relates to the live job namespaces at the moment you sample (the planning pass saw a trusted namespace that no longer had a row, which is either churn or a stale trust entry, and which of those it is matters to open question 14's answer). Then add what the planning pass did not do: how many namespaces the repository's own deployment and CI tooling provisions a *person* into (search `shakenfist/deploy/`, `.github/workflows/`, and `shakenfist/deploy/shakenfist_ci/`), and what `docs/operator_guide/authentication.md` and `docs/user_guide/authentication.md` currently tell an operator to do about human credentials. Finish with one short honest paragraph: what open question 13's distribution evidence would need to come from, and why we do not have it. Do not extrapolate a distribution from a sample of one, and do not argue for either option — that is step 0d's job. Append to the phase plan under `## Results`. Change no code. |
 | 0d | high | opus | none | **Write the committed answers onto the master plan.** Gated by the back brief; do not start before the management session has released it. Read steps 0a, 0b and 0c's results in `docs/plans/PLAN-oidc-authentication-phase-00-decisions.md`, then write answers into `docs/plans/PLAN-oidc-authentication.md` under open questions 13, 14, 5, 7 and 11, in the same style the already-answered questions use: a bold lead naming the resolution and the date, then the reasoning, then what it constrains downstream. Each answer commits to one option — no "likely", no "lean", no "to be decided in a later phase". Question 14's answer must include the line between namespace trust and a multi-namespace credential: when an operator reaches for each, and why (D7). Question 11's answer decides whether phase 6 exists; if it is "no", say so and strike the row rather than shrinking it, exactly as the master plan's phase 6 note instructs. Also record #3672 as a phase 6 prerequisite in that row's note (survey finding 7). Then update the Execution table: any row whose content the answers have changed, plus phase 0's own `Status`. Keep the `Status` cell to a single vocabulary term. Do not touch `docs/plans/order.yml` — phase files are not registered there. The index row's status and `N of M` are derived by `tools/check-plan-status.py`; run it. |
@@ -585,7 +616,12 @@ there is one.
       sites=$(grep -rn 'request_namespace()' --include='*.py' . |
               grep -v '/tests/' | grep -v '/\.tox/' |
               grep -vc 'def request_namespace')
-      rows=$(grep -cE '^\| `[a-z_/]+\.py:[0-9]+` \|' \
+      # The `shakenfist/` prefix is load bearing. Without it the
+      # pattern also matches survey finding 3's table and step 0b's
+      # three-site table, both of which name sites by bare filename,
+      # and the count comes out at 61. Step 0a's rows are the only
+      # ones carrying a full repository-relative path.
+      rows=$(grep -cE '^\| `shakenfist/[a-z_/]+\.py:[0-9]+` \|' \
               docs/plans/PLAN-oidc-authentication-phase-00-decisions.md)
       echo "$sites sites, $rows rows"   # 57 and 57 at 32de6cec7f
       ```
@@ -1380,3 +1416,47 @@ shape the issue asks for and that `AuthNamespaceKeysEndpoint.get`
 still serves bare names from the legacy `nonced_keys` view, so the
 fix is plumbing rather than modelling — and that it blocks the
 service-account credential work. No labels were added to either.
+
+### Step 0d — the committed answers, and two further filings
+
+Open questions 13, 14, 5, 7 and 11 now carry committed answers on
+the master plan. Michael took all five at the back-brief gate on
+2026-11-07, on the evidence above. In summary: human sessions use
+**exchange**; a credential stays **one namespace deep** and the
+multiplicity moves to the client; `caller_is_admin` **keeps both
+axes**; revocation needs no decision because exchange inherits
+the nonce; and namespace keys are **not renamed**, with phase 6
+repurposed to serve the key metadata #3672 asks for.
+
+Three of those reverse the master plan's own expectations, and
+question 5 is the sharpest: the plan expected to drop the
+`system`-namespace half of `caller_is_admin`, and step 0a showed
+that doing so is a *prerequisite* of multi-namespace rather than
+a companion to it — so answering 14 "no" removed the reason to
+touch it. The answer records that 5 reopens if anyone revisits
+14.
+
+Phase 5 became `Abandoned` with its row kept rather than struck,
+because deleting it would renumber phases 6 to 10, which this
+plan, its phase files and `docs/plans/index.md` already cite. The
+index arithmetic stays `0 of 11`: `Abandoned` is not counted as
+done, and phase 0 stays `In progress` until this phase lands,
+which the `plan-phase-landing` convention leaves to the next
+phase's first commit.
+
+Two further defects, both verified by the management session
+against the tree and both authorised at the gate, were filed
+rather than fixed:
+[#4829](https://github.com/shakenfist/shakenfist/issues/4829),
+that trust entries naming a deleted namespace can outlive it
+because the `09e6dcdb56` sweep was forward-only with no backfill
+— observed live on sfcbr, where `ci-images` still trusts a
+namespace which no longer exists; and
+[#4830](https://github.com/shakenfist/shakenfist/issues/4830),
+that instance creation builds a `label:` URL from
+`request_namespace()` while scoping the lookup to the target
+namespace. On #4830, `Artifact.from_url()` defaults
+`create_if_new=False`, so the mismatch returns `None` and
+surfaces as a 404 rather than creating a stray record; where it
+does resolve, it resolves to `system`'s label and never to one in
+the target namespace.
