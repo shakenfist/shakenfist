@@ -451,9 +451,58 @@ gate's substance.
   `agent_operations_queue` in an instance's view is always empty and
   the `include-queued-agent-operations` capability token advertises
   nothing. It is out of this plan's scope and is filed rather than
-  fixed.
+  fixed. Step 0d therefore filed three issues rather than two:
+  [#4824](https://github.com/shakenfist/shakenfist/issues/4824)
+  (mixed-type edges, declined),
+  [#4825](https://github.com/shakenfist/shakenfist/issues/4825) (a
+  second example application) and
+  [#4826](https://github.com/shakenfist/shakenfist/issues/4826) (the
+  empty view field). All three are linked from the master plan's
+  Future work.
 
 ## Results
+
+### Back brief outcome (step 0c)
+
+The operator confirmed all three questions the back brief put, as put,
+on 2026-11-07:
+
+- **Decision 2, strict FIFO, adopted and recorded as unmeasured.** The
+  measurement showed real queue depth and could not identify a
+  submitter, so the master plan states plainly that "effectively one
+  caller at a time per instance" is an operating assumption rather
+  than a finding, and that a reader who needs it to be a fact needs a
+  submitter field on the operation first. That gap is recorded under
+  the master plan's Future work rather than taken on here.
+- **Decision 3's budget, 300 seconds, as a configuration option.**
+  Chosen against the measurement -- about twice the worst single-hop
+  dependency latency `sfcbr` has produced -- rather than by analogy to
+  the cluster-operation defer budget, which is how the phase plan
+  first proposed it.
+- **`client-python-k3s` learns `abort` first.** The operator chose the
+  option step 0b's break argued for: a small pull request in that
+  repository, landed and released before this one can emit the state,
+  rather than letting phase 4's adoption work cover it. It is recorded
+  as a prerequisite of phase 1 in the master plan's phase table, which
+  is why it appears there and not as a phase of this plan.
+
+Step 0c then rewrote the master plan: the "Open questions (resolve in
+phase 0)" section is replaced by eleven numbered decisions with their
+reasoning, decision 4 of "Decisions already made" is amended in place
+to record that there are no cycles to break and to say what the plan
+actually needs from `PLAN-agent-operation-deadlines` instead, the
+placeholder paragraph in the prompt now says which half of the
+document is the record of its conception and which half is what will
+be built, and the phase table is re-cut -- the cross-instance phase
+folded into the evaluation phase per decision 10, the phases after it
+moved up one, and each remaining row pointed at the decisions it
+implements. The table went from seven rows to six, and the index row
+arithmetic with it.
+
+The master plan edit was done in the management session rather than by
+a sub-agent, which is what this phase's step table asks for: step 0c
+reads "management session with the operator", because it is a back
+brief followed by the writing-down of what was agreed in it.
 
 ### Measurement results (step 0a)
 
@@ -701,10 +750,12 @@ safe for free; without it, `fail()` and `expire()` would raise
 `agent_operation_next()` would wedge the queue on its unknown-state
 branch.
 
-Phase numbers refer to the master plan's table as it stands before the
-re-cut (1 schema and API, 2 dispatch evaluation, 4 client-python,
-5 documentation and `client-python-k3s`); the cross-instance phase is
-treated as folded into 2.
+Phase numbers were written against the master plan's table as it
+stood before step 0c re-cut it, and the re-cut moved two of them. Read
+them as: 1 schema, object and API; 2 dispatch evaluation (which is
+where the audit's own assumption that the cross-instance phase folds
+into 2 landed); 4 as **phase 3**, client-python; 5 as **phase 4**,
+documentation and `client-python-k3s`.
 
 #### Server repository: state consumers
 
@@ -719,7 +770,7 @@ treated as folded into 2.
 | `constants.FINAL_OBJECT_STATES` | `shakenfist/constants.py:204-209` | IGNORES SAFELY | Already `{deleted, complete, abort, expired}`. An aborted operation is hard-deleted after `CLEANER_DELAY` (`config.py:826`, 3600 s; `_deleted_object_delay()` at `scheduled_tasks.py:939-942` only shortens it for `*_op` types, and `agentoperation` is not one). Consequence worth documenting: `GET /agentoperations/<uuid>` for an aborted operation returns 404 after an hour, same as `complete` today. |
 | Hard-delete sweep | `shakenfist/daemons/cluster/scheduled_tasks.py:1000,1090,1146,1185` | IGNORES SAFELY | All four read `FINAL_OBJECT_STATES` and are type-agnostic. Aborted operations are counted, paged and deleted with no change. |
 | `Instance.agent_operation_next` terminal branch | `shakenfist/instance.py:3279-3286` | IGNORES SAFELY | Pops any state in `TERMINAL_STATES` and continues, so an aborted head is retired on the next pass and the following entry considered. Safe only because of the `TERMINAL_STATES` change; see the framing. |
-| `Instance.agent_operation_next` unknown-state branch | `shakenfist/instance.py:3288-3301` | BREAKS (if `abort` is added to `state_targets` but not to `TERMINAL_STATES`) | Logs an error and `break`s without popping, by design ("preserve order rather than guessing"). An aborted head would then block its instance's queue permanently and log an error every five seconds. Not reachable today; becomes reachable the moment the cascade writes the state. The branch is correct and should stay; the phase that adds the state must update `TERMINAL_STATES` in the same commit. |
+| `Instance.agent_operation_next` unknown-state branch | `shakenfist/instance.py:3288-3301` | BREAKS (phase 1, if `abort` is added to `state_targets` but not to `TERMINAL_STATES`) | Logs an error and `break`s without popping, by design ("preserve order rather than guessing"). An aborted head would then block its instance's queue permanently and log an error every five seconds. Not reachable today; becomes reachable the moment the cascade writes the state. The branch is correct and should stay; the phase that adds the state must update `TERMINAL_STATES` in the same commit. |
 | `Instance.agent_operation_next` queued branch and deadline check | `shakenfist/instance.py:3228-3246` | NEEDS UPDATE (2) | A `queued` head whose `deadline_passed()` is expired and popped, and the next entry considered. This is the enforcement point that fires for a dependency-blocked head, and it fires before any dependency evaluation provided the dispatcher calls `agent_operation_next()` first (it does, `main.py:2071`). The deadline is an absolute time computed at request receipt, so queue time accrues, and time spent blocked is queue time. Two gaps for the evaluation phase: a blocked operation that is *not* the head is not deadline-checked until it reaches the head; and an operation with `deadline_seconds=0` and a live progress timeout has no stored deadline and falls back to `AGENT_OPERATION_MAX_DEADLINE` (86400 s) anchored on its last state transition (`agentoperation.py:262-320`), so the deadline alone is no bound on a stall. |
 | `Instance.agent_operation_next` initial/preflight branch | `shakenfist/instance.py:3248-3269` | IGNORES SAFELY | Breaks without popping and without a deadline check, leaving enforcement to preflight and the reaper. An aborted operation is not in these states. The note for evaluation: a blocked operation must stay `queued`. If it were held in `preflight` it would be exempt from `agent_operation_next()`'s deadline check and eventually expired by `expire_unpromoted_head()` (`main.py:710-755`) at deadline plus `UNPROMOTED_HEAD_GRACE` (60 s), with the wrong reason text. |
 | Instance external view queue | `shakenfist/instance.py:792-797` | NEEDS UPDATE (5) | Pre-existing bug, relevant here: it reads `ops.get('queued', [])` but the attribute key is `queue` (`:3204,3315`), so `agent_operations_queue` is always empty and no test references it. The capability token `include-queued-agent-operations` (`external_api/app.py:508`) therefore advertises nothing. If queue visibility matters for explaining a blocked head, this needs fixing; the per-instance listing `GET /instances/<ref>/agentoperations` (`external_api/agentoperation.py:211-228`) reads the right key and is the working surface. |
@@ -770,7 +821,7 @@ treated as folded into 2.
 | Site | file:line | Verdict | Notes |
 |---|---|---|---|
 | State constants | `shakenfist_client_k3s/cluster.py:118-122` | NEEDS UPDATE (5) | `AGENT_OP_FAILED_STATES = ('error', 'expired')`, `AGENT_OP_FINISHED_STATES = ('complete', 'deleted')`, `AGENT_OP_KNOWN_STATES` the union plus pending. `abort` is in none of them. |
-| `await_idle` | `cluster.py:2321-2443` | BREAKS | Waits while any of the instance's operations (`all=True`, so including other clients' and historical ones) is in neither the finished nor the failed set (`:2384-2385`); an unrecognised state is deliberately treated as "still running" with a note (`:2391-2397`), and the loop has no timeout (only a stall warning, `:2428-2437`). The comment at `:107-110` justifies this with "the server moves every operation out of whatever state it is in within its deadline", which is false for a terminal state. A single `abort` operation left on an instance, created by any newer client, holds every released `await_idle` against that instance, and the `own_operations` failure check at `:2367` cannot raise because `abort` is not in `AGENT_OP_FAILED_STATES`. The wait is bounded rather than permanent, but only by the hard-delete sweep: the aborted operation's rows go after `CLEANER_DELAY` (3600 s) and the listing endpoint skips an entry whose rows are gone (`external_api/agentoperation.py:224`), at which point the wait proceeds. An hour of silent waiting inside a cluster install is still a break. |
+| `await_idle` | `cluster.py:2321-2443` | BREAKS (prerequisite of phase 1) | Waits while any of the instance's operations (`all=True`, so including other clients' and historical ones) is in neither the finished nor the failed set (`:2384-2385`); an unrecognised state is deliberately treated as "still running" with a note (`:2391-2397`), and the loop has no timeout (only a stall warning, `:2428-2437`). The comment at `:107-110` justifies this with "the server moves every operation out of whatever state it is in within its deadline", which is false for a terminal state. A single `abort` operation left on an instance, created by any newer client, holds every released `await_idle` against that instance, and the `own_operations` failure check at `:2367` cannot raise because `abort` is not in `AGENT_OP_FAILED_STATES`. The wait is bounded rather than permanent, but only by the hard-delete sweep: the aborted operation's rows go after `CLEANER_DELAY` (3600 s) and the listing endpoint skips an entry whose rows are gone (`external_api/agentoperation.py:224`), at which point the wait proceeds. An hour of silent waiting inside a cluster install is still a break. |
 | `await_fetch` | `cluster.py:2445-2460` | IGNORES SAFELY | Loops while pending; `abort` leaves the loop and `!= 'complete'` raises. |
 | `await_execute` and `reap_execute` | `cluster.py:2462-2560` | IGNORES SAFELY | `await_execute` returns as soon as the state leaves the pending set, and `reap_execute` raises for anything not `complete`; an `abort` is reported as a failure. The docstring's claim that the check is "exhaustive" holds. |
 | `execute_and_await` | `cluster.py:2593-2606` | NEEDS UPDATE (5) | Submits one operation per instance and then calls `await_idle`, so it inherits the `await_idle` hang; it is also the fan-out a declared chain replaces. |
@@ -778,8 +829,8 @@ treated as folded into 2.
 
 #### sfui
 
-The sfui repository (`/srv/kasm_profiles/mikal/vscode/src/shakenfist/sfui`)
-still contains no references to agent operations (recursive grep for
+The `shakenfist/sfui` repository still contains no references to
+agent operations (recursive grep for
 `agent_operation|agentoperation|agentop`, case insensitive, is empty):
 IGNORES SAFELY.
 
@@ -909,12 +960,14 @@ the CLI both read an instance's whole operation list (`all=True`), so a
 single aborted operation created by a newer client stalls every
 released client that polls the same instance -- for up to
 `CLEANER_DELAY`, an hour by default, after which the hard-delete sweep
-removes the operation and the listing stops reporting it. The claim that no released client
-can be hung by a state it cannot cause holds for the clients that poll
-their own operations (`_await_agentop`) and fails for list-polling
-clients. Whether to treat that as acceptable, or to add the state to
-`client-python-k3s` and ship it before the server change, is a
-decision for the plan, not for this audit. The second is the
+removes the operation and the listing stops reporting it. The claim
+that no released client can be hung by a state it cannot cause holds
+for the clients which poll their own operations (`_await_agentop`) and
+fails for list-polling clients. Whether to treat that as acceptable,
+or to add the state to `client-python-k3s` and ship it before the
+server change, was left to the plan rather than settled here; the
+operator chose the second at the back brief, so it is now a
+prerequisite of phase 1. The second break is the
 conditional BREAK in `agent_operation_next()`'s unknown-state branch
 (`instance.py:3288-3301`): adding `abort` to `state_targets` without
 adding it to `TERMINAL_STATES` wedges the queue permanently; this is a
@@ -933,7 +986,8 @@ Server repository (`shakenfist/`, `docs/`, including
 `ACTIVE_STATES|state_targets|TERMINAL_STATES|FINAL_OBJECT_STATES`,
 `STATE_(QUEUED|PREFLIGHT|EXECUTING|COMPLETE|ERROR|EXPIRED|DELETED|ABORT)`,
 `'abort'|STATE_ABORT`, `'complete'|'executing'|'queued'|'preflight'`
-(and double-quoted forms), `agentop|agent_operation|AgentOperation|AGENTOPERATION|agentoperation`,
+(and double-quoted forms),
+`agentop|agent_operation|AgentOperation|AGENTOPERATION|agentoperation`,
 `agent_operation_next|agent_operations|'queue'`,
 `state\.value|\.state\b` within `daemons/sidechannel/main.py` and
 `operations/node_aop_op.py`, `\.fail\(|\.expire\(`,
