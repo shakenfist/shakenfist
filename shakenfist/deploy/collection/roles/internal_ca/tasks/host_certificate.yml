@@ -9,11 +9,17 @@
 # the existing key, and keeps the old certificate beside the new one as
 # {{ host_cert_path }}.<UTC timestamp>.
 #
-# The template on disk is the record of what the current certificate was
-# issued from, so it is only rewritten once that certificate has been set
-# aside. A run interrupted anywhere in between leaves either the old
-# certificate with the old template, which the next run compares again, or
-# no certificate at all, which the next run issues.
+# The new certificate and the new template are built beside the old ones and
+# moved into place only once certtool has succeeded, so a value certtool
+# rejects -- a malformed IP SAN which validate.yml does not catch, say --
+# leaves the existing certificate alone rather than having already taken it
+# away (#4435).
+#
+# The template on disk remains the record of what the current certificate was
+# issued from: it is the last thing moved. A run interrupted anywhere in the
+# swap leaves either the old certificate with the old template, which the next
+# run compares again, or the new certificate with the old template, which
+# costs one more reissue on the next run and nothing else.
 
 - name: Validate the role's parameters
   ansible.builtin.include_tasks: validate.yml
@@ -49,8 +55,7 @@
   when: host_cert.stat.exists
 
 # Compare content only: the mode is not part of what the certificate was
-# issued from, and a git checkout of a mirrored CA tree resets it. The
-# template is not written here; see the comment at the top of this file.
+# issued from, and a git checkout of a mirrored CA tree resets it.
 - name: Check the host certificate template on the control node
   ansible.builtin.stat:
     path: "{{ host_template_path }}"
@@ -60,7 +65,23 @@
   delegate_facts: true
   register: host_cert_template
 
-- name: Set aside the host certificate for reissue
+- name: Check if the host key exists
+  ansible.builtin.stat:
+    path: "{{ host_key_path }}"
+  delegate_to: localhost
+  delegate_facts: true
+  register: host_key
+
+# The key comes first: a reissue reuses it, and certtool needs it before it
+# can be asked for a certificate.
+- name: Create host key
+  ansible.builtin.shell: umask 277 && certtool --generate-privkey > "{{ host_key_path }}"
+  changed_when: true
+  delegate_to: localhost
+  delegate_facts: true
+  when: not host_key.stat.exists
+
+- name: Issue the host certificate
   vars:
     host_cert_renew_reasons: >-
       {{ (['it expires within ' ~ cert_renew_days ~ ' days']
@@ -73,13 +94,33 @@
             if not host_cert_template.stat.exists
                or host_cert_template.stat.checksum != host_cert_template_content | hash('sha1')
             else []) }}
-  when: host_cert.stat.exists and host_cert_renew_reasons | length > 0
+  when: not host_cert.stat.exists or host_cert_renew_reasons | length > 0
   delegate_to: localhost
   delegate_facts: true
   block:
     - name: Explain why the host certificate is being reissued
       ansible.builtin.debug:
         msg: "Reissuing {{ host_cert_path }}: {{ host_cert_renew_reasons | join(' and ') }}"
+      when: host_cert.stat.exists
+
+    - name: Write the new host certificate template
+      ansible.builtin.copy:
+        content: "{{ host_cert_template_content }}"
+        dest: "{{ host_template_path }}.new"
+        # No owner: see bootstrap.yml -- rootless control nodes cannot
+        # chown, and a root-run creates root-owned files anyway.
+        mode: u=r
+        force: true
+
+    - name: Create the new host certificate
+      ansible.builtin.command: >-
+        certtool --generate-certificate
+          --template "{{ host_template_path }}.new"
+          --load-privkey "{{ host_key_path }}"
+          --load-ca-certificate "{{ ca_cert_path }}"
+          --load-ca-privkey "{{ ca_key_path }}"
+          --outfile "{{ host_cert_path }}.new"
+      changed_when: true
 
     - name: Move the old host certificate aside
       ansible.builtin.command:
@@ -88,47 +129,20 @@
           - "{{ host_cert_path }}"
           - "{{ host_cert_path }}.{{ now(utc=true, fmt='%Y%m%d%H%M%S') }}"
       changed_when: true
+      when: host_cert.stat.exists
 
-- name: Write host certificate template
-  ansible.builtin.copy:
-    content: "{{ host_cert_template_content }}"
-    dest: "{{ host_template_path }}"
-    # No owner: see bootstrap.yml -- rootless control nodes cannot
-    # chown, and a root-run creates root-owned files anyway.
-    mode: u=r
-  delegate_to: localhost
-  delegate_facts: true
+    - name: Move the new host certificate into place
+      ansible.builtin.command:
+        argv:
+          - mv
+          - "{{ host_cert_path }}.new"
+          - "{{ host_cert_path }}"
+      changed_when: true
 
-- name: Check if the host certificate still exists
-  ansible.builtin.stat:
-    path: "{{ host_cert_path }}"
-  delegate_to: localhost
-  delegate_facts: true
-  register: host_cert
-
-- name: Check if the host key exists
-  ansible.builtin.stat:
-    path: "{{ host_key_path }}"
-  delegate_to: localhost
-  delegate_facts: true
-  register: host_key
-
-- name: Create host key
-  ansible.builtin.shell: umask 277 && certtool --generate-privkey > "{{ host_key_path }}"
-  changed_when: true
-  delegate_to: localhost
-  delegate_facts: true
-  when: not host_key.stat.exists
-
-- name: Create host certificate
-  ansible.builtin.command: >-
-    certtool --generate-certificate
-      --template "{{ host_template_path }}"
-      --load-privkey "{{ host_key_path }}"
-      --load-ca-certificate "{{ ca_cert_path }}"
-      --load-ca-privkey "{{ ca_key_path }}"
-      --outfile "{{ host_cert_path }}"
-  changed_when: true
-  delegate_to: localhost
-  delegate_facts: true
-  when: not host_cert.stat.exists
+    - name: Move the new host certificate template into place
+      ansible.builtin.command:
+        argv:
+          - mv
+          - "{{ host_template_path }}.new"
+          - "{{ host_template_path }}"
+      changed_when: true
