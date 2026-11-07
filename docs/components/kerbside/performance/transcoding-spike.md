@@ -29,8 +29,9 @@ but only against a relay without GLZ or streams.
 
 Leave the transcoder behind its build feature as an experiment, and
 spend the effort instead on making `streaming-video=all` safe to
-recommend. The obstacle there is spice-server 0.15.2's crash when a
-client connects while a stream exists.
+recommend. The obstacle there is spice-server's crash when a client
+that states a codec preference connects while a stream exists, which
+every released version and master share.
 [What would change the answer](#what-would-change-the-answer) lists the
 evidence that would reopen the question.
 
@@ -49,8 +50,8 @@ evidence that would reopen the question.
   At 150 ms / 2 Mbit it beats every configuration measured, streaming
   included.
 - **Streaming off is what deployments run by default.** It is qemu's
-  default, and the one setting that avoids the spice-server 0.15.2
-  connect crash. That crash killed qemu twice during the measurements.
+  default, and the one setting that avoids spice-server's connect
+  crash. That crash killed qemu twice during the measurements.
   Against relay with streaming off, transcoding wins or ties in most
   cells:
   - 38 against 116 ms (20 ms / 50 Mbit, busy);
@@ -115,15 +116,16 @@ evidence that would reopen the question.
 ### Weighing them
 
 The strongest argument for going ahead is the spice-server crash.
-While `streaming-video=all` can crash qemu when a user reconnects to a
-VM showing video, the setting that wins cannot be recommended without
-a warning. A deployment that keeps streaming off has only the
-transcoder to cut slow-link latency. But the crash can be fixed or
-avoided far more cheaply than a transcoder can be productised. It
-needs reproducing against spice-server's current master, then
-reporting upstream or patching, with any patch carried in
-kerbside-patches like the qemu damage series. That is a much smaller
-job than the productising list below. And once the crash is gone, the
+While `streaming-video=all` can crash qemu when a client that states a
+codec preference reconnects to a VM showing video, the setting that
+wins cannot be recommended without a warning. A deployment that keeps
+streaming off has only the transcoder to cut slow-link latency. But
+the crash can be fixed or avoided far more cheaply than a transcoder
+can be productised. It has since been reproduced on 0.16.0 and
+spice-server master, and a 16-line patch sits in kerbside-patches like
+the qemu damage series
+([spice-server patches](/components/kerbside/performance/spice-server-patches/)). That was a much
+smaller job than the productising list below. And once the crash is gone, the
 transcoder's remaining unique win is the heavy activity on the slowest
 link.
 
@@ -234,9 +236,10 @@ client's cache state.
   channel cheaply, but the relay that can take part is a weak one. The
   GLZ window outlives a display channel in spice-gtk, and no protocol
   message resets it, so GLZ is ruled out of a switching relay for
-  good. Streams are ruled out too, because spice-server 0.15.2 crashes
-  when a display channel connects while streams exist, which every
-  switch does. A mode that follows the link would choose between
+  good. Streams are ruled out too, because spice-server crashes when a
+  display channel that states a codec preference connects while streams
+  exist, which every switch does: the transcoder's backend dial always
+  sends a preference. A mode that follows the link would choose between
   transcoding and a relay without GLZ or streams, at the price of a
   full redraw per switch, and only with clients that restart their ACK
   count on `SET_ACK`. Choosing once keeps both modes whole.

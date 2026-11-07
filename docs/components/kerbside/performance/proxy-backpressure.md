@@ -208,13 +208,15 @@ row).
 - **No throughput cost.** Each profile runs at the same delivered rate
   in every configuration. In particular, `small`'s 32 KiB low-water
   mark still fills a 50 Mbit link at 80 ms RTT.
-- **A side finding: the ACK window also caps throughput on
-  high-BDP links.** At 80 ms / 50 Mbit the compressible (busy)
-  activity delivers only 17.9 Mbit/s. At 20 ms / 50 Mbit the same
-  activity fills the link. About 200 KiB is in flight per RTT, which
-  is roughly the ACK window's worth of these messages. The link is
-  idle-limited, not congestion-limited. *Corrected 2026-10-28:* observing
-  the window from the relay showed this is not what limits that case.
+- **A side finding, since refuted: the ACK window looked like it
+  also capped throughput on high-BDP links.** At 80 ms / 50 Mbit
+  the compressible (busy) activity delivers only 17.9 Mbit/s. At
+  20 ms / 50 Mbit the same activity fills the link. About 200 KiB
+  appeared to be in flight per RTT, which looked like roughly the
+  ACK window's worth of these messages, and so looked idle-limited
+  rather than congestion-limited. *Corrected 2026-10-28:*
+  observing the window from the relay showed this is not what
+  limits that case.
   The busy activity delivers about 93% of the messages the guest
   offers there, and the channel is at the window's limit only about a
   third of the time. Throughput is low because, on an 80 ms link,

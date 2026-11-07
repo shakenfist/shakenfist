@@ -57,9 +57,12 @@ guest and link profiles, and
   price of a full redraw per switch.** The configuration the
   measurements found best on most slow links, relaying with
   `streaming-video=all`, cannot take part: GLZ and streams both have to
-  go, and spice-server 0.15.2 crashes when a display channel connects
-  while streams exist, which every switch does. Choosing the mode once,
-  at connect, avoids all of this.
+  go, and spice-server crashes when a display channel that states a
+  codec preference connects while streams exist, which every switch does
+  (the transcoder's backend dial always sends a preference). Every
+  released version and master are affected; see [spice-server
+  patches](/components/kerbside/performance/spice-server-patches/). Choosing the mode once, at connect,
+  avoids all of this.
 
 ## How a switch works
 
@@ -234,7 +237,7 @@ similar is not known.
   serves as bitmap draws on the primary surface. A QXL guest, an
   off-screen surface or a second display was not tried.
 - Switching with `streaming-video` on was not tried, because of the
-  spice-server 0.15.2 crash above.
+  spice-server connect crash above.
 
 ## Procedure
 
