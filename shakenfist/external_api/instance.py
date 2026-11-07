@@ -349,6 +349,32 @@ def _artifact_safety_checks(a, instance_uuid=None):
     return sf_api.error(404, reason[1])
 
 
+def _label_shorthand_url(label, namespace):
+    """The artifact URL a `label:<name>` shorthand names.
+
+    `namespace` here is the namespace the instance is being created in,
+    which is not always the caller's own: `system`, or any namespace the
+    target trusts, may create an instance somewhere else. This used to
+    build the URL from request_namespace() while the resolution it feeds
+    was scoped to the target namespace, so the URL named one namespace
+    and the visibility predicate was evaluated against another. A
+    `system` caller creating an instance in `tenant` looked for
+    `sf://label/system/<name>` inside `tenant`, and because
+    Artifact.from_url() does not create, that answered 404 rather than
+    either namespace's label (issue 4830).
+
+    The shorthand means a label in the namespace the instance will live
+    in. That is the half which makes the two agree without narrowing
+    anything: every other artifact form this handler resolves is already
+    scoped to the target namespace, and the shorthand is the only one
+    which had to invent a namespace rather than being told one. A caller
+    which means some other namespace's label still says so in full, as
+    `sf://label/<namespace>/<name>`, which resolves by visibility and so
+    has to be shared with or trusted by the target namespace.
+    """
+    return f'{LABEL_URL}{namespace}/{label}'
+
+
 def _diskspec_value_absent(diskspec, key):
     """Is this diskspec key effectively not supplied?
 
@@ -677,9 +703,11 @@ class InstancesEndpoint(api_base.Resource):
             ('nvram_template', 'body', 'url',
              'A pointer to a template for the NVRAM image to be used for UEFI boot '
              'configuration. This can either be of the form "label:...label...", '
-             'or "sf://blob/...blob.uuid...". URLs from the Internet are not '
-             'currently supported unless fetched separately with an artifact cache '
-             'operation.', False),
+             'or "sf://blob/...blob.uuid...". A "label:" name means a label in the '
+             'namespace the instance is being created in, which is not the '
+             'caller\'s own namespace when the request names another. URLs from '
+             'the Internet are not currently supported unless fetched separately '
+             'with an artifact cache operation.', False),
             ('secure_boot', 'body', 'boolean',
              'True if you would like to boot this instance with secure boot. '
              'Note that secure boot requires that UEFI also be True.', False),
@@ -900,7 +928,7 @@ class InstancesEndpoint(api_base.Resource):
                 label = disk_base[len('label:'):]
                 a = Artifact.from_url(
                     Artifact.TYPE_LABEL,
-                    f'{LABEL_URL}{request_namespace()}/{label}',
+                    _label_shorthand_url(label, namespace),
                     name=label, namespace=namespace)
                 err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
                 if err:
@@ -1018,7 +1046,7 @@ class InstancesEndpoint(api_base.Resource):
             original_template = nvram_template
             if nvram_template.startswith('label:'):
                 label = nvram_template[len('label:'):]
-                url = f'{LABEL_URL}{request_namespace()}/{label}'
+                url = _label_shorthand_url(label, namespace)
                 a = Artifact.from_url(Artifact.TYPE_LABEL, url, name=label,
                                       namespace=namespace)
                 err = _artifact_safety_checks(a, instance_uuid=instance_uuid)
