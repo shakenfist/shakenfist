@@ -272,7 +272,7 @@ over-limit admissions across 101 namespaces:
 | Namespaces with any over-limit admission | 101 | ≤ 10 |
 | Namespaces where one instance exceeded the whole claim | 24 | 0 |
 | Over-limit admissions on an *exact* dimension | not measured | ≤ 1/day |
-| `conductor_claims_failed_total` | 0 | 0 |
+| `conductor_claims_failed_total`, claim-logic failures only (amended, see below) | 0 | 0 |
 | Claims created in the window (readability floor) | 2038 | ≥ 500 |
 
 Three outcomes, and no others. **Flip** if every row is
@@ -282,6 +282,25 @@ private-ci, and stops — it does not renegotiate a threshold.
 **Unreadable** if the readability floor fails, in which case the
 window extends once and the rule is read again unchanged; a
 residue cannot be measured on a thin denominator.
+
+**Amended on 2026-11-07, two days into the window and before any
+of it was read, with Michael's agreement.** The failure row now
+counts only `failed` rows attributable to claim logic. Step 1 found
+that `claim_events` holds three `failed` rows in its entire history
+-- 2026-09-22, 2026-10-22 and 2026-10-25 -- and that all three are
+sf-api reachability errors: two nginx 502s and a refused
+connection, none of them a statement about whether a claim was
+sized accurately. Left literal, the row would hold the flip on one
+unrelated 502, and the under-cloud redeploy which restarts sf-api
+is a known source of those. A `failed` row whose `detail` is a
+reachability error is therefore recorded in *Observations* with its
+detail text and excluded from this row, with the exclusion stated;
+anything else still fails it. The amendment is written here rather
+than applied at reading time because that is the whole discipline
+D2 inherited from `PLAN-transient-capacity-refusals`' D43: a rule
+may be amended before the data is seen and not after. None of the
+three rows falls inside this window, so the amendment changes no
+number today -- which is exactly why it was safe to make now.
 
 *The 10x reduction is the number a reviewer is most likely to
 argue with*, so here is the reasoning rather than the figure
@@ -394,7 +413,7 @@ until step 2 records **Flip**.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
-| 1 | low | management session | none | **Pin the window and open it.** Establish when the last claim-sizing change reached sfcbr, from the conductor's own data rather than from the merge — phase 4c pinned its window start from the first row of `claim_events` and not from its PR, and said why. The change to look for is `2ee760d` ("conductor: seed new-job claims from repo max", private-ci#287, merged 2026-11-04), running under `CLAIM_EXACT_MIN_RUNS = 5`. The conductor is on `maui`; read `conductor.db` or `/api/state` per the access note in this repository's plans, and pin the start at the first `claim_events` row written by the deployed sizer (its `exact_dimensions` column is populated, which a pre-3d sizer cannot do). Record the pinned start, the close at start + 7 days, and how it was pinned, in this plan's *Observations*. Then record the soak with `plan-blockers` so the wait is visible, and clear b13's phrasing to name this window rather than "re-run the measurement". Seven days matches phase 4c exactly, which is the point: the two readings are only comparable if the windows are. |
+| 1 | low | management session | none | **Pin the window and open it.** Establish when the last claim-sizing change reached sfcbr, from the conductor's own data rather than from the merge — phase 4c pinned its window start from the first row of `claim_events` and not from its PR, and said why. The change to look for is `2ee760d` ("conductor: seed new-job claims from repo max", private-ci#287, merged 2026-11-04), running under `CLAIM_EXACT_MIN_RUNS = 5`. The conductor is on `maui`; read `conductor.db` or `/api/state` per the access note in this repository's plans, and pin the start at the first `claim_events` row written by the deployed sizer (its `exact_dimensions` column is populated, which a pre-3d sizer cannot do). Record the pinned start, the close at start + 7 days, and how it was pinned, in this plan's *Observations*. Then record the soak with `plan-blockers` so the wait is visible, and clear b13's phrasing to name this window rather than "re-run the measurement". Seven days matches phase 4c exactly, which is the point: the two readings are only comparable if the windows are. **Corrected on 2026-11-07 while running: `exact_dimensions` pins phase 3d's deploy (2026-10-24), not #287's, so it is the wrong discriminator and was not used. The start was pinned instead from the deployed `provisioner.py`'s mtime and the md5 of the two sizing functions on the host, which hash identically to `2ee760d`. See *Observations*.** **Done: the window runs 2026-11-05 07:47:02 to 2026-11-12 07:47:02 AEDT.** |
 | 2 | high | management session | none | **Read the window against D2's rule.** Collect, for the pinned window: claims created and deleted; every `placement admitted over namespace capacity claim` audit event on sfcbr with its dimension and its namespace; the same split by whether the exceeded dimension was exact (`claim_events.exact_dimensions`, D3); the count of namespaces in which a single instance exceeded the whole claim; `conductor_claims_failed_total`; capacity refusals per day; the distribution of claim size against measured peak per `(repo, job_name)`; and whether the reconciler reported drift in `cluster_capacity.claimed_*`. The tooling exists — private-ci's `tools/measure-claim-accuracy.py` and `tools/compare-claim-sizing.py`, and `peak_used_*` on each claim through `sf-client namespace claim show` — so prefer it to fresh SQL, and say which tool produced each number. Write the record into *Observations* beside phase 4c's figures in the same units, then read it against D2's table **as written** and record Flip, Hold or Unreadable with the arithmetic shown. If Hold, name the failing rows, file the defect against `PLAN-claim-coverage-and-sizing.md` in private-ci, and stop. Note that the installed `sf-client` on the development host predates phase 7b's `claim list --all`, so an `--all` sweep needs the editable client-python checkout. |
 | 3 | medium | opus | worktree | **Name the claim on a denial.** In `shakenfist/mariadb.py`, the `_AdmissionDenied` handler (`:29170-29174`) sets `failing_stage` and `dimensions` and returns, leaving `claim_uuid` at the `''` default from `:28205`; populate it for a `'claim'` denial from the claim row `_admission_denial_dimensions()` already resolves, without adding a second query — read that function first (`:28658`) and reuse what it looks up rather than calling `_namespace_claim_row()` again. Carry the value over the wire too: `claim_uuid` is already on the RPC (`:29455` reads it back, `daemons/database/main.py:2901` writes the admitted path's), so the denial reply must set it on the same field. Tests: a forced `'claim'` denial through `tests/mock_mariadb.py` reports the charged claim's uuid (the stage is unreachable until step 4, so it must be forced — see D4); a `'node'` and a `'cluster'` denial both leave it empty; and `failing_stage == 'claim'` with an empty `claim_uuid` is asserted impossible. This lands ungated. Commit subject: `Name the claim a denial was charged against.` |
 | 4 | high | opus | worktree | **GATED ON STEP 2 RECORDING FLIP.** **The enforcement contract.** Three changes, one commit. (a) `CLAIM_ENFORCEMENT_HARD = True` at `shakenfist/mariadb.py:27715`, which makes `claim_guarded` (`:28889`) true and lets `_AdmissionDenied('claim')` (`:28971`) fire for the first time. (b) Add `CAPACITY_CLAIM_STAGE = 'capacity_claim'` to `shakenfist/constants.py` beside `CAPACITY_GUARD_STAGE` (`:220`), in neither classified set per D6, and rewrite the `CAPACITY_GUARD_STAGE` comment at `:249-256` — which instructs this very change — to record that it happened. Read `tests/external_api/test_capacity_error.py:229-241` before editing: it pins `classified - stages` to exactly `{CAPACITY_GUARD_STAGE}` and will need the new name accounted for; if it forces the new stage into a set, amend the test with a comment naming the third kind rather than mis-classifying the stage, and say so in the back brief. (c) In `shakenfist/external_api/instance.py:1261-1277`, where the walk has exhausted its candidates and holds a `denials` dict, publish 403 when *every* denial's failing stage is `'claim'` and keep today's 507 otherwise (D5, and read F4's invariant before deciding you need something cleverer). The 403 needs a sibling to `api_base.capacity_error()` in `external_api/base.py` — read that function's docstring first, because it explains why the body is built by mutating `sf_api.error()`'s response rather than by passing fields in, and the same constraint applies here — carrying `{error, status, stage, transient: false, claim, dimensions}` with the per-dimension `limit`, `used` and `shortfall` the denial already provides, and **no** `Retry-After`. The `enqueue_delete_due_error()` stage recorded on the instance becomes the new stage on this path (issue 4568's classification). Tests: an all-claim refusal returns 403 with the body; a mixed claim-and-node refusal still returns 507; the 403 carries no `Retry-After`; and `capacity_refusal_is_transient(CAPACITY_CLAIM_STAGE)` is False. Commit subject: `Make namespace claim ceilings binding.` |
@@ -520,11 +539,129 @@ needs no permission.
 
 ## Observations
 
-*To be written by step 1 (the pinned window) and step 2 (the
-reading). Phase 4c's figures are the comparison baseline and live
-in `PLAN-scheduler-reservations-phase-04c-conductor-claims.md`'s
-own Observations section.*
+Phase 4c's figures are the comparison baseline and live in
+`PLAN-scheduler-reservations-phase-04c-conductor-claims.md`'s own
+Observations section. Step 2 writes its reading here beside them in
+the same units.
+
+### Step 1 -- the window, pinned 2026-11-07
+
+**The window is open. It runs from 2026-11-05 07:47:02 AEDT to
+2026-11-12 07:47:02 AEDT**: seven days exactly, which is phase 4c's
+window length and the only reason the two readings can be compared.
+
+The start is `claim_events` row **id 134672** -- the first claim the
+conductor recorded after the deploy that put the sizer under
+measurement on `maui`. Its neighbours are row 134671 at
+2026-11-05 06:53:56 and the deploy's write of
+`conductor/provisioner.py` at 2026-11-05 07:19:38 AEDT, so 134672 is
+the first claim sized by the new code and not the last sized by the
+old.
+
+**Step 1's brief named the wrong discriminator, and this is the
+correction.** It said to pin the start at the first row whose
+`exact_dimensions` column is populated, on the reasoning that a
+pre-phase-3d sizer cannot write that column. That is true and it
+pins the wrong deploy: the first populated row is id 99440 at
+**2026-10-24 18:20:32**, phase 3d's own deploy, twelve days before
+the change this phase measures. Taking it would have opened the
+window on a sizer that predates `2ee760d` and closed it before the
+code under test had run a full day. The column marks 3d, not #287.
+
+What was used instead is the deployed file itself, which is checkable
+and which no later deploy has disturbed:
+
+| Evidence | Reading |
+|---|---|
+| `conductor/provisioner.py` mtime on `maui` | 2026-11-05 07:19:38 AEDT |
+| `get_claim_sizes()` in the deployed `db.py`, md5 of the function | `7eeefc28...`, byte-identical to `2ee760d` |
+| `claim_size_with_exact()` in the deployed `provisioner.py`, md5 | `5208c55d...`, byte-identical to `2ee760d` |
+| `CLAIM_HEADROOM` / `CLAIM_EXACT_MIN_RUNS` on the host | 1.2 / 5 |
+| `repo_seeds` occurrences in the deployed `db.py` / `provisioner.py` | 7 / 2 |
+| Deployed revision | `8eae682` (private-ci#297, 2026-11-07 09:49) |
+
+Both sizing functions on the host hash identically to their
+`2ee760d` versions, so the sizer measured over this window is
+exactly the one #287 shipped, and the three conductor deploys since
+(2026-11-06, and 2026-11-07 at 10:01 with a restart at 10:03) did
+not touch it. Of the six commits that have touched
+`conductor/db.py` or `conductor/provisioner.py` since `2ee760d`,
+only `0859d74` ("conductor: offer periodic jobs below merge and
+PR") touches `provisioner.py`, and it landed in private-ci#289 at
+2026-11-05 05:56 -- before the window opened, so it is a constant
+across the window rather than a change inside it. It is worth
+naming anyway: it excludes periodic jobs from the starvation wait,
+so it changes which jobs hold claims without changing how any
+claim is sized.
+
+The 53-minute gap in `claim_events` either side of the deploy
+(06:53:56 to 07:47:02) is **not** evidence of the restart, and
+should not be read as such: gaps of 20 to 250 minutes are ordinary
+in this table -- 2026-11-06 alone has one of 248 minutes and one of
+171. The deploy is evidenced by the file mtime, not by the silence.
+
+**Interim readability, at 55.9 of the window's 168 hours:** 1,172
+claims created and 2,457 refused on capacity. At that rate the
+window will finish near 3,500 creations, against D2's readability
+floor of 500 and phase 4c's 2,038. The floor is very unlikely to
+bind; step 2 confirms rather than assumes it.
+
+### Two cautions for step 2, found while pinning
+
+**The access path in this repository's plans has rotated and the
+key named in it no longer works.** `conductor.db` is still
+`/srv/shakenfist/private-ci/conductor.db` on `maui`, world-readable
+and in WAL mode, so it must be copied and the copy queried -- phase
+4c's method, unchanged. What has changed is the key: the RSA
+`id_ansible` is refused, and `ansible@maui` authenticates with
+`~/.ssh/id_ansible_ed25519`. The copy for this step went to a scratch
+directory and the live file was not opened. Note also that the
+`ansible` user is in neither `adm` nor `systemd-journal`, so
+`journalctl -u conductor.service` returns nothing from the
+development host; Loki's `{job="conductor"}` is the way to read the
+conductor's own log, as phase 4c did.
+
+**`claim_events` holds three `failed` rows in its whole history, and
+all three are sf-api reachability errors rather than claim defects:**
+2026-09-22 (502 from nginx), 2026-10-22 (connection refused) and
+2026-10-25 (502). None falls in this window, so D2's failure row
+reads 0 today. The hazard is that it was one unrelated nginx 502
+away from reading 1 and holding the flip for a reason that has
+nothing to do with sizing -- the under-cloud redeploy that restarts
+sf-api is a known source of exactly that. Raised with Michael on
+the day it was found, two days into the window and with none of the
+window read; **D2's failure row was narrowed accordingly**, and the
+amendment and its reasoning are recorded at D2 itself. Step 2 must
+still report any `failed` row it finds, with its `detail`, and say
+why it was excluded if it was.
 
 ## Execution notes
 
-*To be written as steps complete.*
+**2026-11-07 (AEDT).** Back brief answered by Michael before any
+step ran: D2's table binds as written; the read-only `conductor.db`
+copy from `maui` was authorised; step 3 was authorised to land today
+while the window soaks; and D5's discriminator and D6's "neither
+set" classification were both confirmed, so step 4 needs no second
+gate when it starts.
+
+**Step 1 ran in the management session, as planned.** It corrected
+its own brief's pinning discriminator -- see *Observations* -- and
+the correction is recorded there rather than only here because the
+pinned start is the figure step 2 depends on. The soak is recorded
+with `plan-blockers` as **b17**, a time wait until the pinned close
+naming the window and row 134672; **b13** was removed rather than
+re-worded, because its text asked for "re-run the measurement" and
+the measurement is now running against a fixed close. The plan's
+standing note was replaced for the same reason (n15 removed, n18
+added): it still read "phase 5 is next" and cited b13.
+
+**One decision changed: D2's failure row was narrowed**, on
+2026-11-07, two days into the window and before any of it was read.
+Step 1 found the only three `failed` rows in `claim_events`' history
+are sf-api reachability errors rather than claim defects, so the row
+as written could have held the flip on an unrelated nginx 502. Put
+to Michael the day it was found and agreed; the amendment and its
+reasoning are at D2, not only here, because that is where a reader
+checking the rule will look. No number changes today -- none of the
+three rows is inside the window -- which is what made amending it
+now honest rather than convenient.
