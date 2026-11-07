@@ -11,6 +11,7 @@ from shakenfist_utilities import logs                 # noreorder
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import AGENT_INSTANCE_OFF
+from shakenfist.constants import AGENT_INSTANCE_PAUSED
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist.exceptions import ProcessExecutionError
@@ -228,6 +229,17 @@ def _update_active_domain(lc, inst, instance_uuid, domain, log_ctx):
             inst.state = inst.state.value + '-error'
 
     elif state == 'paused':
+        # A pause this loop is the first to see was not made by pause(),
+        # which writes agent_state itself: it came from virsh, from a
+        # suspend made directly through libvirt, or from qemu stopping the
+        # guest on a disk error. Nothing else writes agent_state for those,
+        # so it can still read ready while the vCPUs are frozen, which
+        # passes the readiness gates in external_api/instance.py and leaves
+        # agent operations queued until their deadline (issue 4485). This
+        # write is after update_power_state() above for the reason
+        # Instance.record_observed_agent_state() documents.
+        inst.agent_state = AGENT_INSTANCE_PAUSED
+
         # Paused is ambiguous: operators pause instances via the
         # API, but qemu also pauses a guest when a disk operation
         # fails (error_policy='stop' in our domain XML, or qemu's

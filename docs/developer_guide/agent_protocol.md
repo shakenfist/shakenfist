@@ -39,6 +39,34 @@ When then sidechannel daemon process is instructed to terminate by systemd, it
 will silently terminate the connection to the in-guest agent and sends no
 further packets.
 
+### Recording what the agent said
+
+What the monitor learns about the agent is recorded in the instance's
+`agent_state` attribute, which the power methods in `instance.py` and the
+cleaner write too, with no lock between them. The monitor therefore writes
+through `Instance.record_observed_agent_state()` rather than assigning
+`agent_state` directly: nothing the agent said is still true of a guest whose
+vCPUs are frozen, so a reading which disagrees with the recorded `power_state`
+is replaced by the value that power state demands. Without that, an
+`IsSystemRunningReply` in flight as a guest froze could land after `pause()` or
+`power_off()`, leaving `agent_state` reading ready on a paused or powered off
+instance until the next unpause or power on — and a ready `agent_state` is what
+the agent operation endpoints gate on
+([issue 4485](https://github.com/shakenfist/shakenfist/issues/4485)).
+
+Two rules follow for anyone adding a writer:
+
+- **A writer of a "not running" power state writes `power_state` before
+  `agent_state`.** That order is what lets the monitor's write be reconciled
+  without a lock: it re-reads `power_state` after writing, so either it sees
+  the new power state and corrects itself, or the power method's own
+  `agent_state` write is still to come and wins.
+- **The monitor does not cache a reading which was refused.** `power_state` is
+  a cache as well, and can be stale in the other direction — a guest resumed
+  with `virsh` is running while `power_state` still says paused — so the
+  monitor asks the agent again, and records the truth once the cleaner has
+  caught up.
+
 ## AgentOperation execution
 
 AgentOperations are executed with a separate connection to the in-guest agent.

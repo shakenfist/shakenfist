@@ -265,7 +265,12 @@ class SideChannelMonitorJob(SideChannelJob):
         super().__init__(inst)
         self.log = LOG.with_fields({'instance': self.instance.uuid})
 
-        self.instance.agent_state = constants.AGENT_NEVER_TALKED
+        # Conditional, because the management loop can have listed this
+        # domain as running just before a pause() or power_off() finished.
+        # An unconditional write then replaces "instance paused" or
+        # "instance powered off" with "no contact", and nothing rewrites
+        # it until the next unpause or power on.
+        self.instance.record_observed_agent_state(constants.AGENT_NEVER_TALKED)
         self.system_boot_time = 0
 
     def _send_ping(self, sock):
@@ -300,8 +305,8 @@ class SideChannelMonitorJob(SideChannelJob):
                 'version': response.version,
                 'boot_time': response.boot_time
             })
-        self.instance_ready = constants.AGENT_STARTED
-        self.instance.agent_state = constants.AGENT_STARTED
+        if self.instance.record_observed_agent_state(constants.AGENT_STARTED):
+            self.instance_ready = constants.AGENT_STARTED
         self._record_system_boot_time(response.boot_time)
 
     def _handle_is_system_running(self, reply, sock):
@@ -321,8 +326,21 @@ class SideChannelMonitorJob(SideChannelJob):
         # and then trigger facts gathering when we transition
         # into the constants.AGENT_READY state.
         if self.instance_ready != new_state:
+            if not self.instance.record_observed_agent_state(new_state):
+                # The recorded power state says the guest is not running,
+                # so this reply describes an agent which was frozen under
+                # us: a pause or a power off wrote a truer value than we
+                # could, and that is what is recorded. The cache is left
+                # alone deliberately, so that the next reply asks again --
+                # power_state is a cache too, and a guest resumed outside
+                # Shaken Fist is running while it still says paused. No
+                # facts are gathered either: a frozen guest will not answer.
+                self.log.with_fields({
+                    'observed_agent_state': new_state
+                }).info('Agent state not recorded, the instance is not running')
+                return
+
             self.instance_ready = new_state
-            self.instance.agent_state = new_state
 
             request = agent_pb2.HypervisorToAgentCommand(
                 command_id=sf_random.random_id(),

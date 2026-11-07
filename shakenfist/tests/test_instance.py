@@ -1407,6 +1407,128 @@ class InstancePowerOffAutostartTestCase(InstanceLibvirtTestCase):
         self.inst.power_off()
         self.mock_add_event.assert_not_called()
 
+    def test_power_off_writes_the_power_state_before_the_agent_state(self):
+        # That order is what lets the sidechannel monitor reconcile its
+        # own writes against power_state without a lock. With agent_state
+        # written first, a monitor which read power_state in between saw a
+        # running instance and was free to write 'ready' after the power
+        # off had finished (issue 4485).
+        self._mock_libvirt(AutostartDomain())
+
+        calls = mock.Mock()
+        with mock.patch.object(instance.Instance, 'update_power_state',
+                               calls.update_power_state), \
+                mock.patch.object(instance.Instance, 'agent_state',
+                                  new_callable=mock.PropertyMock) as agent:
+            calls.attach_mock(agent, 'agent_state')
+            self.inst.power_off()
+
+        self.assertEqual(
+            [mock.call.update_power_state('off'),
+             mock.call.agent_state(constants.AGENT_INSTANCE_OFF)],
+            calls.mock_calls)
+
+
+class InstanceObservedAgentStateTestCase(InstanceLibvirtTestCase):
+    """record_observed_agent_state() reconciles what the sidechannel
+    monitor saw against the recorded power state.
+
+    agent_state has writers in the power methods, the cleaner and the
+    monitor with no lock between them, so a reply in flight as the vCPUs
+    froze could land after pause() or power_off() and leave agent_state
+    reading ready on a paused or powered off instance, which passes the
+    readiness gates in external_api/instance.py (issue 4485).
+    """
+
+    def setUp(self):
+        super().setUp()
+        p = mock.patch.object(instance.Instance, 'add_event')
+        self.mock_add_event = p.start()
+        self.addCleanup(p.stop)
+
+    def _recorded_agent_states(self):
+        return [c.kwargs['extra']['value']
+                for c in self.mock_add_event.call_args_list
+                if c.kwargs.get('extra', {}).get('attribute') == 'agent_state']
+
+    def test_a_running_instance_records_what_the_agent_said(self):
+        self.inst.update_power_state('on')
+
+        self.assertIs(
+            True,
+            self.inst.record_observed_agent_state(constants.AGENT_READY))
+        self.assertEqual(constants.AGENT_READY, self.inst.agent_state.value)
+
+    def test_an_instance_with_no_power_state_records_what_it_said(self):
+        # A monitor can hand over a reading before anything has written a
+        # power state. There is nothing to reconcile against, so the
+        # agent's own view stands.
+        self.assertIs(
+            True,
+            self.inst.record_observed_agent_state(constants.AGENT_READY))
+        self.assertEqual(constants.AGENT_READY, self.inst.agent_state.value)
+
+    def test_a_paused_instance_refuses_ready(self):
+        self.inst.update_power_state('paused')
+        self.inst.agent_state = constants.AGENT_INSTANCE_PAUSED
+        self.mock_add_event.reset_mock()
+
+        self.assertIs(
+            False,
+            self.inst.record_observed_agent_state(constants.AGENT_READY))
+        self.assertEqual(
+            constants.AGENT_INSTANCE_PAUSED, self.inst.agent_state.value)
+
+        # Not even briefly: the power state is read before the write as
+        # well as after it, so an already paused instance never has a
+        # reading of ready written and then replaced.
+        self.assertEqual([], self._recorded_agent_states())
+
+    def test_a_powered_off_instance_refuses_ready(self):
+        self.inst.update_power_state('off')
+        self.inst.agent_state = constants.AGENT_READY
+
+        self.assertIs(
+            False,
+            self.inst.record_observed_agent_state(constants.AGENT_READY))
+        self.assertEqual(
+            constants.AGENT_INSTANCE_OFF, self.inst.agent_state.value)
+
+    def test_a_paused_instance_still_records_the_paused_value(self):
+        # The monitor's constructor hands over "no contact" on a paused
+        # instance, which must not replace "instance paused" -- but
+        # agreeing with the power state is always recordable.
+        self.inst.update_power_state('paused')
+
+        self.assertIs(
+            False,
+            self.inst.record_observed_agent_state(
+                constants.AGENT_NEVER_TALKED))
+        self.assertEqual(
+            constants.AGENT_INSTANCE_PAUSED, self.inst.agent_state.value)
+
+        self.assertIs(
+            True,
+            self.inst.record_observed_agent_state(
+                constants.AGENT_INSTANCE_PAUSED))
+
+    def test_a_pause_landing_during_the_write_is_corrected(self):
+        # The interleaving the issue describes: the power state still read
+        # as running when this started, and pause() wrote both its values
+        # while the agent's reading was being written. The power state read
+        # after the write is what catches it.
+        with mock.patch.object(
+                instance.Instance, 'power_state',
+                new_callable=mock.PropertyMock,
+                side_effect=[{'power_state': 'on'},
+                             {'power_state': 'paused'}]):
+            self.assertIs(
+                False,
+                self.inst.record_observed_agent_state(constants.AGENT_READY))
+
+        self.assertEqual(
+            constants.AGENT_INSTANCE_PAUSED, self.inst.agent_state.value)
+
 
 class InstancePauseUnpauseTestCase(InstanceLibvirtTestCase):
     """pause() and unpause() judge success by the domain's own state,
