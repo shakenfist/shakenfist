@@ -3221,7 +3221,9 @@ class MockMariaDB():
         carrying the usage the claim held *before* this admission. A
         denial at any stage charges nothing at all, as the real
         transaction's rollback does, so a denied reply can never carry an
-        exceedance.
+        exceedance -- but a claim-stage denial still reports
+        ``claim_uuid``, because which claim refused is an identity rather
+        than a charge.
 
         The cluster singleton is still not modelled: an unclaimed
         namespace's charge has no caller-observable effect, so there is
@@ -3265,6 +3267,11 @@ class MockMariaDB():
             if any(d['exceeded'] for d in dimensions):
                 result['failing_stage'] = 'claim'
                 result['dimensions'] = dimensions
+                # The claim that refused, which is the claim an operator
+                # has to grow. Nothing was charged -- the real
+                # transaction rolls back -- but the identity still
+                # travels, exactly as the real reply carries it.
+                result['claim_uuid'] = claim['uuid']
                 self._trace(
                     f'MockMariaDB.admit_instance_placement('
                     f'{instance_uuid}, {node_uuid}): denied by claim')
@@ -3316,9 +3323,10 @@ class MockMariaDB():
         if claim is not None:
             # Which claim was drawn down, so a caller recording an
             # exceedance against the namespace can name it. Reported
-            # whether or not the claim went over, and left empty when
-            # there was no claim to charge (an unclaimed namespace, or a
-            # move) exactly as the real reply leaves it.
+            # whether or not the claim went over, and left empty when no
+            # claim was weighed at all (an unclaimed namespace, a move,
+            # or a denial at the node stage) exactly as the real reply
+            # leaves it. A claim-stage denial names its claim above.
             result['claim_uuid'] = claim['uuid']
             for dimension, requested in (('cpus', cpus),
                                          ('memory_mb', memory_mb),

@@ -3009,18 +3009,24 @@ message AdmitInstancePlacementReply {
   // admission's allocation, limit is the claim's ceiling.
   bool claim_over_limit = 12;
   repeated CapacityDimensionDetail claim_dimensions = 13;
-  // The claim this admission was actually charged against, so an audit
-  // event recorded on the *namespace* can name which claim it was. A
-  // namespace holds one active claim at a time, but an operator who
-  // grows a claim by delete-and-create leaves a namespace trail whose
-  // events span several claims, and the namespace name alone cannot
-  // then say which one an exceedance was against.
+  // Which claim this placement was weighed against, so an audit event
+  // or a refusal recorded on the *namespace* can name which claim it
+  // was. A namespace holds one active claim at a time, but an operator
+  // who grows a claim by delete-and-create leaves a namespace trail
+  // whose events span several claims, and the namespace name alone
+  // cannot then say which one an exceedance was against.
   //
-  // Empty -- never a zero uuid -- when no claim was drawn down: an
-  // unclaimed namespace charges the cluster singleton instead, and a
-  // move charges nothing on the namespace side at all. Read the name
-  // for absence, so a reply from an sf-database predating this field
-  // reads as "not reported" rather than as a real value.
+  // On an admission this is the claim the drawdown was charged to. On a
+  // denial with failing_stage 'claim' it is the claim that refused,
+  // which charges nothing -- the transaction rolled back -- but is
+  // still the claim that has to grow.
+  //
+  // Empty -- never a zero uuid -- when no claim was weighed: an
+  // unclaimed namespace charges the cluster singleton instead, a move
+  // charges nothing on the namespace side at all, and a denial at the
+  // 'node' or 'cluster' stage consulted no claim. Read the name for
+  // absence, so a reply from an sf-database predating this field reads
+  // as "not reported" rather than as a real value.
   string claim_uuid = 14;   // Dashed uuid form, or empty
   // Which absent row made this admission unguarded, because the two
   // are different conditions wearing the same missing row and only
