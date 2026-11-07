@@ -7,6 +7,7 @@ from unittest import mock
 from uuid import uuid4
 
 import bcrypt
+from flask_jwt_extended import create_access_token
 from pydantic import SecretStr
 
 from shakenfist import exceptions
@@ -281,11 +282,11 @@ class AuthWithServiceKeyTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertIn('access_token', resp.get_json())
 
-    def test_service_key_bypasses_existence_check(self):
-        # Pin the legacy exact-name '_service_key' bypass in verify_token
-        # (base.py:195): a token whose keyname is exactly '_service_key'
-        # skips the nonce/existence check entirely, so it keeps validating
-        # even after the underlying key is removed from the namespace.
+    def test_service_key_does_not_bypass_existence_check(self):
+        # The legacy exact-name '_service_key' nonce bypass is retired: a
+        # token whose keyname is exactly '_service_key' is now checked
+        # like any other key, and therefore stops validating once the
+        # underlying key is removed from the namespace.
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'banana', 'key': 'cheese'}))
         self.assertEqual(200, resp.status_code)
@@ -299,11 +300,35 @@ class AuthWithServiceKeyTestCase(base.ShakenFistTestCase):
         # Remove the underlying key entirely.
         Namespace.from_db('banana').remove_key('_service_key')
 
-        # The bypass means the token STILL validates despite the key being
-        # gone -- verify_token never looks it up for the exact name.
         resp = self.client.get('/auth/namespaces',
                                headers={'Authorization': service_token})
+        self.assertEqual(401, resp.status_code)
+
+    def test_service_key_rotation_invalidates_its_tokens(self):
+        # The other half of the retirement: rotating the key changes its
+        # nonce, so a token minted from the old secret is rejected. Before
+        # the bypass was removed this token kept working forever.
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 'cheese'}))
         self.assertEqual(200, resp.status_code)
+        service_token = 'Bearer %s' % resp.get_json()['access_token']
+
+        Namespace.from_db('banana').add_key('_service_key', 'brie')
+
+        resp = self.client.get('/auth/namespaces',
+                               headers={'Authorization': service_token})
+        self.assertEqual(401, resp.status_code)
+
+    def test_service_key_token_without_a_nonce_is_rejected(self):
+        # A token of the pre-v0.7 shape -- naming '_service_key' and
+        # carrying no nonce claim at all -- is refused. This is the token
+        # the bypass existed to keep working.
+        with external_api.app.test_request_context():
+            token = create_access_token(identity='banana:_service_key')
+
+        resp = self.client.get('/auth/namespaces',
+                               headers={'Authorization': 'Bearer %s' % token})
+        self.assertEqual(401, resp.status_code)
 
     def test_ordinary_key_does_not_bypass_existence_check(self):
         # Contrast with the bypass above: a token minted from an ordinary key

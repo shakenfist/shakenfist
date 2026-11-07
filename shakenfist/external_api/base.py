@@ -1446,37 +1446,33 @@ def verify_token(func):
             _reject_token('JWT token is for deleted namespace',
                           ns_name=ns_name, key_name=key_name, ns=ns)
 
-        # NOTE(mikal): the exact name '_service_key' skips the nonce
-        # check entirely. This predates nonced keys and some deployment
-        # may still be holding a token of that shape, so it is
-        # deliberately preserved here until it can be retired (see
-        # PLAN-auth-federation-phase-02-key-objects.md). Note that this is an exact match, not a prefix match -- the
-        # '_service_key_<rand>' keys get_api_token() mints are checked
-        # like any other key.
-        if key_name != '_service_key':
-            # One indexed point read of the named key, honouring
-            # expiry. This must never be cached: the nonce is the
-            # revocation handle for every token minted from the key, so
-            # a stale cache would delay revocation, which is the entire
-            # point of the mechanism.
-            key = ns.lookup_key(key_name)
-            if not key:
-                _reject_token('JWT token uses non-existent key',
-                              ns_name=ns_name, key_name=key_name, ns=ns)
+        # Every key name is checked here, with no exceptions. The exact
+        # name '_service_key' used to skip this block entirely, which
+        # meant a token naming it could not be revoked by rotating a
+        # nonce.
+        #
+        # One indexed point read of the named key, honouring expiry.
+        # This must never be cached: the nonce is the revocation handle
+        # for every token minted from the key, so a stale cache would
+        # delay revocation, which is the entire point of the mechanism.
+        key = ns.lookup_key(key_name)
+        if not key:
+            _reject_token('JWT token uses non-existent key',
+                          ns_name=ns_name, key_name=key_name, ns=ns)
 
-            # lookup_key() returns the attributes model, so the nonce is
-            # a SecretStr. It is unwrapped for the comparison because the
-            # claim side is a plain string out of the token, and
-            # SecretStr never compares equal to a str -- leaving it
-            # wrapped would reject every request rather than fail open,
-            # but it would still be wrong.
-            nonce = key.nonce.get_secret_value()
-            if 'nonce' not in jwt_data:
-                _reject_token('JWT token lacks nonce', ns_name=ns_name,
-                              key_name=key_name, ns=ns)
-            if jwt_data['nonce'] != nonce:
-                _reject_token('JWT token has incorrect nonce',
-                              ns_name=ns_name, key_name=key_name, ns=ns)
+        # lookup_key() returns the attributes model, so the nonce is a
+        # SecretStr. It is unwrapped for the comparison because the
+        # claim side is a plain string out of the token, and SecretStr
+        # never compares equal to a str -- leaving it wrapped would
+        # reject every request rather than fail open, but it would still
+        # be wrong.
+        nonce = key.nonce.get_secret_value()
+        if 'nonce' not in jwt_data:
+            _reject_token('JWT token lacks nonce', ns_name=ns_name,
+                          key_name=key_name, ns=ns)
+        if jwt_data['nonce'] != nonce:
+            _reject_token('JWT token has incorrect nonce',
+                          ns_name=ns_name, key_name=key_name, ns=ns)
 
         return func(*args, **kwargs)
     return wrapper
