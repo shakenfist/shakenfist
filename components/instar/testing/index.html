@@ -19497,6 +19497,79 @@ invocation random fields (vmdk <code>cid</code> / <code>parent-cid</code>, vhdx
 header-id) prevent dedup from collapsing duplicate-output
 versions, so each version gets its own profile; the comparison logic excludes those random fields from the
 field-equivalence check.</p>
+<h3 id="adding-or-refreshing-one-baseline">Adding or refreshing one baseline<a class="headerlink" href="#adding-or-refreshing-one-baseline" title="Permanent link">&para;</a></h3>
+<p><code>scripts/generate-baselines.py</code> in <code>instar-testdata</code> takes repeatable,
+exact-match filters, so a new fixture or create case no longer needs a
+full run across all 80 versions. <code>--image ID</code> selects manifest images
+and applies to <code>info</code>, <code>check</code>, <code>compare</code>, <code>measure</code>, <code>map</code> and
+<code>snapshot-list</code>; <code>--case NAME</code> selects case names and applies to
+<code>create</code>, <code>resize</code>, <code>amend</code>, <code>bitmap</code>, <code>dd</code>, <code>rebase</code>, <code>commit</code> and
+<code>measure</code>. <code>measure</code> takes both (a <code>--size</code> axis and a source-image
+axis); one filter runs the sub-mode it names, both run both. A filter
+that matches nothing exits 1 rather than running empty.</p>
+<p>Both filters match by name across every target that defines one, so
+<code>--case 16M-fixed</code> regenerates the vhd case of that name as well as the
+vhdx one; three of the current case names are shared that way. Check
+<code>git status --porcelain expected-outputs</code> after a run to see what
+actually moved rather than assuming the target you had in mind. Run
+from the <code>instar-testdata</code> checkout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>scripts/generate-baselines.py<span class="w"> </span>--command<span class="w"> </span>map<span class="w"> </span>--no-commit<span class="w"> </span>--image<span class="w"> </span>vhdx-fixed-16M
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>scripts/generate-baselines.py<span class="w"> </span>--command<span class="w"> </span>create<span class="w"> </span>--no-commit<span class="w"> </span>--case<span class="w"> </span>16M-fixed
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>scripts/detect-profiles.py<span class="w"> </span>--no-commit
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>make<span class="w"> </span>validate-profiles
+</code></pre></div>
+<p><code>make baselines-create</code> and <code>make baselines-map</code> run the unfiltered
+form; neither is part of the umbrella <code>baselines</code> target, because they
+write real disk blocks (create) or walk every safe image at every
+version (map), so prefer the filtered form.</p>
+<p><strong>Always run <code>make validate-profiles</code> after a regeneration</strong>, in the
+<code>instar-testdata</code> checkout — it is a target there, not in instar. It
+checks, for every version in each output type's <code>version-map.json</code>, that
+the mapped profile holds a byte-identical copy of each of that version's
+source files, and it exits non-zero on any mismatch, orphan file or
+<em>profiled</em> output type that compared nothing. An output type with no
+<code>version-map.json</code> is reported as "not a profiled output type" and
+skipped, which is not a failure: several output types have no profiles
+directory at all. The derived profiles have gone
+silently wrong twice while the raw baselines were fine and the suite
+stayed green: once by stamping a stale snapshot into every profile, once
+by flattening buckets so a third of the files were dropped. Two
+defects of the same shape have since been fixed in <code>detect-profiles.py</code>
+(a raw change that never reached the profiles, and hand-authored goldens
+dropped when a profile boundary moved). Nothing else notices these, so
+the validator is the check.</p>
+<p><strong>The create-case list is mirrored in two repositories.</strong> <code>CREATE_CASES</code>
+in <code>tests/test_create.py</code> mirrors the generator's <code>CREATE_CASES</code>, and
+the two must land together. Drift shows as
+<code>test_create_cases_match_baselines</code> failing in one direction: "baselines
+on disk not in CREATE_CASES" means the generator and testdata moved
+ahead of instar; "CREATE_CASES entries with no baseline" means instar
+moved ahead of testdata. The coupling holds for reverts too, and that
+is the direction that catches people: reverting the instar-side case
+list needs the matching testdata commit reverted with it, and vice
+versa, because <code>tools/ci/prepare-testdata.sh</code> clones testdata's
+default branch unpinned and the assertion runs both ways.</p>
+<p><strong>So is the placeholder vocabulary in recorded output.</strong> A baseline has
+the image's own path rewritten to <code>$FILENAME</code>, and a file a create
+subformat wrote beside it — vmdk's monolithicFlat extent — rewritten to
+<code>$FILENAME</code> plus the suffix its name adds, so a flat extent reads
+<code>$FILENAME-flat</code>. The generator writes it from <code>sibling_placeholder()</code>
+in <code>scripts/generate-baselines.py</code>; instar reproduces it in
+<code>_placeholder_for()</code> in <code>tests/helpers/info_json.py</code>. The two rules are
+deliberately not identical, and <code>_placeholder_for</code>'s docstring says how:
+instar's is the stricter side, accepting only the suffixes it knows, so
+an unrecognised neighbour fails the comparison with a visible path
+rather than being normalised away. A new multi-file subformat has to be
+taught to both.</p>
+<p><strong>Reading a baseline failure: which side is "reference"?</strong> In
+<code>tests/test_map.py</code> and <code>tests/test_measure.py</code> the baseline
+comparisons call <code>assertEqual(instar_output, baseline, ...)</code>, so
+testtools labels <em>instar's output</em> "reference" and the baseline
+"actual". That is the reverse of what the words suggest; read a
+divergence there as "reference = instar, actual = qemu-img baseline".
+<code>assert_info_equivalent</code> in <code>tests/test_create.py</code> passes the baseline
+first and reads the conventional way. Check the argument order before
+deciding which side moved.</p>
 <h3 id="qemu-img-create-pins">qemu-img create pins<a class="headerlink" href="#qemu-img-create-pins" title="Permanent link">&para;</a></h3>
 <p><code>tests/golden/qemu-create-pins.json</code> records what every static
 <code>qemu-img</code> build in <code>instar-testdata/qemu-img-binaries/x86_64/</code>
@@ -19519,13 +19592,13 @@ build is present that the pin does not list, when 6.0.0, 6.2.0,
 says, and when a VHDX create case gains a second group.</p>
 <p>When instar-testdata gains a qemu build, re-pin every version and
 case (about six minutes at <code>--jobs 2</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>tools/sweep-qemu-create.py<span class="w"> </span>--write<span class="w"> </span>tests/golden/qemu-create-pins.json<span class="w"> </span>--jobs<span class="w"> </span><span class="m">2</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>tools/sweep-qemu-create.py<span class="w"> </span>--write<span class="w"> </span>tests/golden/qemu-create-pins.json<span class="w"> </span>--jobs<span class="w"> </span><span class="m">2</span>
 </code></pre></div>
 <p>To replay a suspected boundary on its own, check a few versions and
 cases against the committed pin; it exits 1 and names each differing
 field:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>tools/sweep-qemu-create.py<span class="w"> </span>--check<span class="w"> </span>tests/golden/qemu-create-pins.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">    </span>--versions<span class="w"> </span><span class="m">8</span>.1.5,8.2.0<span class="w"> </span>--cases<span class="w"> </span>vhdx-fixed-64M
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>tools/sweep-qemu-create.py<span class="w"> </span>--check<span class="w"> </span>tests/golden/qemu-create-pins.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">    </span>--versions<span class="w"> </span><span class="m">8</span>.1.5,8.2.0<span class="w"> </span>--cases<span class="w"> </span>vhdx-fixed-64M
 </code></pre></div>
 <p>Host load has made qemu commands fail spuriously here before, so
 replay any new boundary before believing it. A new boundary is a
@@ -19595,28 +19668,28 @@ baseline is suspect, diff <code>profiles/</code> against <code>raw/</code> and c
 recorded <code>*_stdout_bytes</code> in each <code>.meta.json</code>, which is what
 <code>detect-profiles.py</code>'s <code>validate_profiles()</code> now does before it will
 commit anything.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Set up test environment</span>
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>make<span class="w"> </span>test-venv
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
-<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="c1"># Run safe integration tests</span>
-<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>make<span class="w"> </span><span class="nb">test</span>
-<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>
-<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="c1"># Run tests with verbose output (shows diffs on failure)</span>
-<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>make<span class="w"> </span>test-report
-<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>
-<a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a><span class="c1"># Run all tests including malicious images (use with caution)</span>
-<a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a>make<span class="w"> </span>test-malicious
-<a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a>
-<a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a><span class="c1"># Run tests inside container (as CI does)</span>
-<a id="__codelineno-25-14" name="__codelineno-25-14" href="#__codelineno-25-14"></a>make<span class="w"> </span>test-container
-<a id="__codelineno-25-15" name="__codelineno-25-15" href="#__codelineno-25-15"></a>
-<a id="__codelineno-25-16" name="__codelineno-25-16" href="#__codelineno-25-16"></a><span class="c1"># CI splits tests into three parallel jobs by format family:</span>
-<a id="__codelineno-25-17" name="__codelineno-25-17" href="#__codelineno-25-17"></a>make<span class="w"> </span>test-container-core<span class="w">              </span><span class="c1"># info, check, security, oslo-crossval</span>
-<a id="__codelineno-25-18" name="__codelineno-25-18" href="#__codelineno-25-18"></a>make<span class="w"> </span>test-container-convert-qcow2<span class="w">    </span><span class="c1"># QCOW2/VMDK/RAW convert + compare</span>
-<a id="__codelineno-25-19" name="__codelineno-25-19" href="#__codelineno-25-19"></a>make<span class="w"> </span>test-container-convert-vhd<span class="w">      </span><span class="c1"># VHD/VHDX convert (slowest)</span>
-<a id="__codelineno-25-20" name="__codelineno-25-20" href="#__codelineno-25-20"></a>
-<a id="__codelineno-25-21" name="__codelineno-25-21" href="#__codelineno-25-21"></a><span class="c1"># Clean test artifacts</span>
-<a id="__codelineno-25-22" name="__codelineno-25-22" href="#__codelineno-25-22"></a>make<span class="w"> </span>clean-tests
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1"># Set up test environment</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>make<span class="w"> </span>test-venv
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="c1"># Run safe integration tests</span>
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>make<span class="w"> </span><span class="nb">test</span>
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="c1"># Run tests with verbose output (shows diffs on failure)</span>
+<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>make<span class="w"> </span>test-report
+<a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a>
+<a id="__codelineno-26-10" name="__codelineno-26-10" href="#__codelineno-26-10"></a><span class="c1"># Run all tests including malicious images (use with caution)</span>
+<a id="__codelineno-26-11" name="__codelineno-26-11" href="#__codelineno-26-11"></a>make<span class="w"> </span>test-malicious
+<a id="__codelineno-26-12" name="__codelineno-26-12" href="#__codelineno-26-12"></a>
+<a id="__codelineno-26-13" name="__codelineno-26-13" href="#__codelineno-26-13"></a><span class="c1"># Run tests inside container (as CI does)</span>
+<a id="__codelineno-26-14" name="__codelineno-26-14" href="#__codelineno-26-14"></a>make<span class="w"> </span>test-container
+<a id="__codelineno-26-15" name="__codelineno-26-15" href="#__codelineno-26-15"></a>
+<a id="__codelineno-26-16" name="__codelineno-26-16" href="#__codelineno-26-16"></a><span class="c1"># CI splits tests into three parallel jobs by format family:</span>
+<a id="__codelineno-26-17" name="__codelineno-26-17" href="#__codelineno-26-17"></a>make<span class="w"> </span>test-container-core<span class="w">              </span><span class="c1"># info, check, security, oslo-crossval</span>
+<a id="__codelineno-26-18" name="__codelineno-26-18" href="#__codelineno-26-18"></a>make<span class="w"> </span>test-container-convert-qcow2<span class="w">    </span><span class="c1"># QCOW2/VMDK/RAW convert + compare</span>
+<a id="__codelineno-26-19" name="__codelineno-26-19" href="#__codelineno-26-19"></a>make<span class="w"> </span>test-container-convert-vhd<span class="w">      </span><span class="c1"># VHD/VHDX convert (slowest)</span>
+<a id="__codelineno-26-20" name="__codelineno-26-20" href="#__codelineno-26-20"></a>
+<a id="__codelineno-26-21" name="__codelineno-26-21" href="#__codelineno-26-21"></a><span class="c1"># Clean test artifacts</span>
+<a id="__codelineno-26-22" name="__codelineno-26-22" href="#__codelineno-26-22"></a>make<span class="w"> </span>clean-tests
 </code></pre></div>
 <p><strong>Test structure:</strong>
 - <code>tests/manifest.json</code> - Defines test images and their safety levels
@@ -19721,19 +19794,19 @@ since qemu-img cannot inspect inside LUKS without a secret object.</p>
 <h2 id="testing-prototypes">Testing Prototypes<a class="headerlink" href="#testing-prototypes" title="Permanent link">&para;</a></h2>
 <p>Each prototype has its own devcontainer with the required toolchain. Use the
 Makefile for building and testing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1"># Build a specific prototype</span>
-<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>make<span class="w"> </span>build-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>
-<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="c1"># Build the devcontainer for a prototype</span>
-<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>make<span class="w"> </span>build-prototype-devcontainer<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>
-<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="c1"># View run instructions</span>
-<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>make<span class="w"> </span>run-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># Build a specific prototype</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>make<span class="w"> </span>build-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="c1"># Build the devcontainer for a prototype</span>
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>make<span class="w"> </span>build-prototype-devcontainer<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>
+<a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a><span class="c1"># View run instructions</span>
+<a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a>make<span class="w"> </span>run-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
 </code></pre></div>
 <p>For manual testing without the Makefile:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="nb">cd</span><span class="w"> </span>prototypes/&lt;prototype-name&gt;
-<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>./build.sh<span class="w">                           </span><span class="c1"># Build the prototype</span>
-<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>sudo<span class="w"> </span>./target/release/vmm<span class="w"> </span>guest.bin<span class="w">  </span><span class="c1"># Run (requires KVM)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="nb">cd</span><span class="w"> </span>prototypes/&lt;prototype-name&gt;
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>./build.sh<span class="w">                           </span><span class="c1"># Build the prototype</span>
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>sudo<span class="w"> </span>./target/release/vmm<span class="w"> </span>guest.bin<span class="w">  </span><span class="c1"># Run (requires KVM)</span>
 </code></pre></div>
 <h2 id="testing-considerations">Testing Considerations<a class="headerlink" href="#testing-considerations" title="Permanent link">&para;</a></h2>
 <ul>

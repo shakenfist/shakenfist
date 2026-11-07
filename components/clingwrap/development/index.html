@@ -1145,6 +1145,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Continuous integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mermaid-diagrams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mermaid diagrams
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#content-scanning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Content scanning
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1174,6 +1202,17 @@
     <span class="md-ellipsis">
       
         Packaging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#documentation-link-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation link conventions
       
     </span>
   </a>
@@ -15957,6 +15996,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Continuous integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mermaid-diagrams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mermaid diagrams
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#content-scanning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Content scanning
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15986,6 +16053,17 @@
     <span class="md-ellipsis">
       
         Packaging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#documentation-link-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation link conventions
       
     </span>
   </a>
@@ -16025,6 +16103,93 @@ dependencies in <code>pyproject.toml</code> install. On a pull request the
 automated reviewer then runs, and the "Can enqueue" check collects the
 result (it also runs on a dispatched run). On a merge queue entry the
 "Can merge" check collects it instead.</p>
+<p><code>sanity_checks</code> runs on an ephemeral virtual machine, the expensive
+runner pool, so a <code>check_paths</code> job decides first whether the change
+touches anything the lane exercises. A pull request or queue entry
+that only edits <code>docs/</code> skips <code>sanity_checks</code>, and the automated
+reviewer with it. Because "Can enqueue" and "Can merge" are required
+status checks, the filtering has to be a job rather than a
+trigger-level <code>paths-ignore</code>: a required check in a filtered-out
+workflow never reports at all, and a check that never reports blocks
+the merge forever, while a skipped one satisfies it. Both gates
+therefore treat a skipped need as satisfied.</p>
+<p>That makes each gate's <code>needs:</code> list load bearing in a second way. A
+job that skipped because something it depended on failed is reported
+as <code>skipped</code> too, so a gate must directly name every job whose failure
+should block it -- <code>check_paths</code> included -- rather than reaching it
+through <code>sanity_checks</code>.</p>
+<p>A dispatched run has no diff to filter, so <code>check_paths</code> defaults its
+verdict to <code>true</code> and the lane runs.</p>
+<h3 id="mermaid-diagrams">Mermaid diagrams<a class="headerlink" href="#mermaid-diagrams" title="Permanent link">&para;</a></h3>
+<p>Mermaid fails at render time, not at commit time: a diagram with a
+syntax error commits cleanly, passes every other linter, and then
+shows an error box on GitHub and nothing at all on a mkdocs site.
+<code>mermaid-lint.yml</code> closes that gap by rendering every tracked markdown
+file that contains a <code>mermaid</code> fence, through <code>tools/mermaid-lint.sh</code>.
+Run the same check locally:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tools/mermaid-lint.sh<span class="w">                 </span><span class="c1"># every tracked markdown file</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tools/mermaid-lint.sh<span class="w"> </span>ARCHITECTURE.md<span class="w"> </span><span class="c1"># just this one</span>
+</code></pre></div>
+<p>Running it locally wants bash 4.4 or newer, for <code>mapfile -d</code>, and GNU
+coreutils, for <code>realpath --relative-to</code>: the Debian 13 runner CI uses,
+in other words. On macOS the stock bash is 3.2 and <code>realpath</code> is BSD's,
+so the script fails partway through with an error from the shell rather
+than one of its own explanatory refusals. Use a container or a Linux
+host there.</p>
+<p>Both files are copies of <code>templates/mermaid-lint/</code> in
+shakenfist/development and are synced from there rather than edited
+here. The job needs a docker daemon, so it runs on a
+<code>debian-13-docker</code> runner rather than a static one, and that label is
+listed in <code>.github/actionlint.yaml</code>.</p>
+<p>The lane is path-filtered to markdown and so is deliberately not a
+required status check: a required check in a path-filtered workflow
+never reports on the pull requests it filters out, and a check that
+never reports blocks the merge forever. It is the one job that can
+show red on a pull request without appearing in "Can enqueue" or "Can
+merge". Check it by eye before merging a diagram change.</p>
+<h3 id="content-scanning">Content scanning<a class="headerlink" href="#content-scanning" title="Permanent link">&para;</a></h3>
+<p><code>supply-chain.yml</code> scans the repository's own content rather than
+testing it, and so is a workflow of its own. Its <code>gitleaks</code> job runs
+<code>tools/gitleaks-scan.sh</code>, which scans every commit reachable from
+<code>HEAD</code> -- on a pull request that is the branch under test plus all of
+<code>develop</code> -- and fails if gitleaks reports anything. A secret committed
+and then reverted is still in the history and still needs rotating, so
+the checkout is a full one and the script refuses a shallow clone
+rather than reporting a clean history it never read.</p>
+<p>The script commits a GitHub token and an SSH private key to a scratch
+git repository first and fails unless gitleaks reports both. A scanner
+that finds nothing is otherwise indistinguishable from a scanner that
+cannot find anything: a rule set that changed shape between releases,
+or an allowlist grown wide enough to forgive everything. Green means
+"scanned and found nothing", not "did nothing".</p>
+<p>The control is a git repository, scanned with the same
+<code>--log-opts="HEAD"</code> invocation as the real scan, rather than a
+<code>--no-git</code> directory walk. Directory and history scanning are separate
+code paths in gitleaks, so a directory-mode control would stay green
+while the history scan read nothing -- and history is the mode this job
+exists for. Run it locally the same way CI does:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tools/gitleaks-scan.sh
+</code></pre></div>
+<p>Its <code>agent-context</code> job lints <code>AGENTS.md</code> and anything under
+<code>.claude/</code> with <a href="https://skillsaw.org/">skillsaw</a>, looking for
+malformed structure, smuggled unicode and pasted credentials. It runs
+the <code>skillsaw</code> pre-commit hook rather than invoking skillsaw directly,
+so <code>.pre-commit-config.yaml</code>'s <code>rev</code> is the only place the version is
+written down -- skillsaw's rule set moves between releases, and
+renovate's pre-commit manager bumps the hook on its own, so a second
+pin in the workflow would drift without anyone choosing it. It runs in
+CI as well as in pre-commit because a hook can be skipped with
+<code>--no-verify</code>, or by a clone that never ran <code>pre-commit install</code>.</p>
+<p>The workflow is deliberately not path-filtered, unlike
+<code>functional-tests.yml</code>. A credential pasted into a code sample is a
+credential, and the one real secret this fleet's scanning has found was
+published in a user guide; a document is also exactly where an
+instruction aimed at an agent would be hidden, which is why the agent
+context lint lives here rather than in <code>sanity_checks</code>. The workflow
+backs no required status check, which is why it also runs on pushes to
+<code>develop</code>: a commit that reached the branch without a pull request
+would otherwise never be scanned. The weekly cron catches a rule set
+that drifted under an unchanging tree.</p>
 <h2 id="merging">Merging<a class="headerlink" href="#merging" title="Permanent link">&para;</a></h2>
 <p>Pull requests merge through a merge queue on <code>develop</code>, not with the
 merge button directly. A pull request can be queued once its "Can
@@ -16042,7 +16207,25 @@ make each entry cancel the one ahead of it, so revisit those groups
 first.</p>
 <p>A new job in <code>functional-tests.yml</code> goes in the <code>needs:</code> of both "Can
 enqueue" and "Can merge", or the queue will merge without it. The
-automated reviewer stays out of both, because it is advisory.</p>
+automated reviewer stays out of both, because it is advisory. A new
+job on a <code>vm</code> runner also belongs behind <code>check_paths</code>; one that reads
+the repository's prose -- a content scanner, a documentation check --
+belongs in <code>supply-chain.yml</code> instead, where nothing filters it.</p>
+<p>Several jobs run a fork's own configuration on the self-hosted pool:
+<code>sanity_checks</code> runs its <code>tox.ini</code>, and <code>supply-chain.yml</code>'s
+<code>agent-context</code> job runs its <code>.pre-commit-config.yaml</code>, which chooses
+the repository, rev and entry that execute. Those jobs carry no
+same-repository guard, and the comments in both files say so. What
+makes that acceptable is not anything in the workflow files -- it is
+a repository setting, that a maintainer must approve a workflow run on
+every outside contributor's pull request, not merely a first-time
+one. Confirm it rather than assuming it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/clingwrap/actions/permissions/fork-pr-contributor-approval
+</code></pre></div>
+<p>It must report <code>all_external_contributors</code>; it was set to that on both
+the repository and the <code>shakenfist</code> organization as of November 2026.
+If it is ever relaxed to <code>first_time_contributors</code>, those two jobs
+need a same-repository guard before anything else here is trusted.</p>
 <p>Enqueueing a fork's pull request is also the point at which its code
 first runs unreviewed by GitHub's approval setting, which does not
 apply to merge queue runs. A queued commit runs all of its own code --
@@ -16092,6 +16275,23 @@ in <code>clingwrap/examples/*.cwd</code>, which <code>clingwrap gather --target 
 loads by name. <code>include-package-data</code> is off in <code>pyproject.toml</code>, so
 any other data file the code needs at runtime has to be listed under
 <code>[tool.setuptools.package-data]</code>, or it will be missing from the wheel.</p>
+<h2 id="documentation-link-conventions">Documentation link conventions<a class="headerlink" href="#documentation-link-conventions" title="Permanent link">&para;</a></h2>
+<p><code>README.md</code>'s links to other files in this repository are absolute
+<code>https://github.com/shakenfist/clingwrap/blob/develop/...</code> URLs.
+Everything else -- <code>AGENTS.md</code>, <code>ARCHITECTURE.md</code>, the pages under
+<code>docs/</code> -- uses relative links.</p>
+<p>The split is not an oversight. <code>pyproject.toml</code> sets <code>readme =
+"README.md"</code>, so README is the PyPI long description, and PyPI renders
+it on a page where a relative link resolves against <code>pypi.org</code> and
+404s. No other file in the repository is published anywhere but GitHub,
+where relative links are the ones that survive a fork, a rename and a
+tag.</p>
+<p><code>develop</code> rather than a tag because it is this repository's default
+branch, so those links show the current documentation. A reader of a
+released sdist therefore follows them to documentation newer than their
+copy, which is the right trade for a link in a PyPI description: the
+alternative is a link into a tag that will eventually describe
+behaviour nobody runs any more.</p>
 
 
 

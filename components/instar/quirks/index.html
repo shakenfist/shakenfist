@@ -6022,6 +6022,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#vhdx-blocks-in-a-zero-state-are-reported-as-zero-true" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHDX blocks in a zero state are reported as zero: true
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vmdk-multi-extent-sources-are-refused" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -20947,6 +20958,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#vhdx-blocks-in-a-zero-state-are-reported-as-zero-true" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHDX blocks in a zero state are reported as zero: true
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vmdk-multi-extent-sources-are-refused" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -24854,16 +24876,25 @@ Categories:</p>
   fully or partially present, so it reports a smaller
   <code>required</code> than qemu-img for a source with <code>ZERO</code>,
   <code>NOT_PRESENT</code> or unmapped blocks, and an equal one when
-  every payload block is present (as in a fixed VHDX).
-  qemu-img counts every block of the image as allocated (its
-  <code>required</code> equals its <code>fully allocated</code>, whatever the BAT
-  says). A partially present block counts as a whole block on
-  both sides.</li>
-<li>VMDK multi-extent source layouts: instar's extent map
-  propagation differs.</li>
-<li>VHD legacy CHS-only sources: instar's reported
-  virtual_size differs by approximately 2 MiB.</li>
+  every payload block is present. qemu-img counts every block
+  of the image as allocated (its <code>required</code> equals its <code>fully
+  allocated</code>, whatever the BAT says). A partially present
+  block counts as a whole block on both sides.</li>
 </ul>
+<p>A <code>fixed</code> VHDX is not automatically the equal case, because
+  <code>block_state_zero</code> decides what its BAT says. Written with
+  <code>block_state_zero=on</code> (qemu-img's default) every payload
+  entry is <code>ZERO</code>, so instar counts none of them and reports
+  the bare target-metadata floor: measured on
+  <code>vhdx-fixed-16M</code> to a qcow2 target against qemu-img 10.0,
+  instar reports 327,680 bytes required where qemu-img
+  reports 17,104,896, which is also its <code>fully allocated</code>.
+  Written with <code>block_state_zero=off</code> and real content, the
+  entries are <code>FULLY_PRESENT</code> and the two agree.
+- VMDK multi-extent source layouts: instar's extent map
+  propagation differs.
+- VHD legacy CHS-only sources: instar's reported
+  virtual_size differs by approximately 2 MiB.</p>
 <p>See <code>docs/measure.md</code> for the user-facing presentation of
 these divergences.</p>
 <h2 id="map-subcommand-quirks">map subcommand quirks<a class="headerlink" href="#map-subcommand-quirks" title="Permanent link">&para;</a></h2>
@@ -24911,6 +24942,30 @@ present VHDX blocks and emits per-sector extents. instar's vhdx walker treats <c
 present (same posture as <code>scan_allocation</code>) and reports
 the entire block as one <code>data: true</code> extent. The
 per-sector-bitmap walk is tracked as future work.</p>
+<h3 id="vhdx-blocks-in-a-zero-state-are-reported-as-zero-true">VHDX blocks in a zero state are reported as <code>zero: true</code><a class="headerlink" href="#vhdx-blocks-in-a-zero-state-are-reported-as-zero-true" title="Permanent link">&para;</a></h3>
+<p><code>qemu-img create -f vhdx -o block_state_zero=on</code> (the default)
+leaves every payload BAT entry in <code>PAYLOAD_BLOCK_ZERO</code>, which
+the VHDX specification says reads as zeros. instar's walker
+reads the BAT and reports such an extent <code>zero: true, data:
+false</code>; <code>qemu-img map --output=json</code> does not consult the BAT
+state and reports the same extent as <code>data: true</code>. Both
+statements are true of the same block — instar describes what
+the block contains, qemu-img describes that the file has space
+for it — so neither is being corrected. It is a <code>fixed</code>
+subformat image where this is most visible, because the blocks
+are there in full and still read as zeros.</p>
+<p>Where the blocks genuinely hold data (<code>block_state_zero=off</code>
+with content written into them) the two walkers agree that the
+extent is data, and instar additionally reports the payload
+block's offset in the file, which qemu-img leaves out of the
+extent.</p>
+<p>Both shapes are recorded in <code>KNOWN_MAP_DIVERGENCES</code>
+(<code>vhdx-fixed-16M</code>, <code>vhdx-fixed-17M</code>,
+<code>vhdx-dynamic-131041M-block-1M</code> for the first;
+<code>vhdx-fixed-16M-bsz-off-data</code>, <code>vhdx-fixed-17M-bsz-off-data</code>
+for the second), for <code>json</code> only: <code>qemu-img map</code> without
+<code>--output=json</code> exits non-zero on these files ("File contains
+external, encrypted or compressed clusters").</p>
 <h3 id="vmdk-multi-extent-sources-are-refused">VMDK multi-extent sources are refused<a class="headerlink" href="#vmdk-multi-extent-sources-are-refused" title="Permanent link">&para;</a></h3>
 <p><code>qemu-img map</code> reads the VMDK descriptor and walks the
 multi-extent layout. instar's <code>VmdkState::init</code> only parses

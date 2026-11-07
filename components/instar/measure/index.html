@@ -16414,18 +16414,28 @@ qemu-img's:</p>
 <li><strong>VHDX sources</strong>: instar counts only blocks whose BAT entry is fully or
   partially present, so it reports a smaller <code>required</code> than qemu-img for
   any source with <code>ZERO</code>, <code>NOT_PRESENT</code> or unmapped blocks, and an equal
-  one when every payload block is present (as in a fixed VHDX). qemu-img
-  counts every block of a VHDX source as allocated: its <code>required</code> equals
-  its <code>fully allocated</code>, whatever the BAT says. A partially present block
-  counts as a whole block on both sides, so instar can over-report within
-  such a block. For a 64 MiB dynamic VHDX with 2 of 8 blocks written,
-  <code>measure -O qcow2</code> gives instar <code>required size: 17104896</code> and qemu-img
-  <code>required size: 67436544</code>; both report <code>fully allocated size: 67436544</code>.</li>
-<li><strong>VMDK multi-extent source layouts</strong>: instar's extent map propagation
-  differs from qemu-img for some non-trivial layouts.</li>
-<li><strong>VHD legacy CHS-only sources</strong>: instar's reported virtual_size differs
-  by approximately 2 MiB.</li>
+  one when every payload block is present. qemu-img counts every block of
+  a VHDX source as allocated: its <code>required</code> equals its <code>fully allocated</code>,
+  whatever the BAT says. A partially present block counts as a whole block
+  on both sides, so instar can over-report within such a block. For a
+  64 MiB dynamic VHDX with 2 of 8 blocks written, <code>measure -O qcow2</code> gives
+  instar <code>required size: 17104896</code> and qemu-img <code>required size: 67436544</code>;
+  both report <code>fully allocated size: 67436544</code>.</li>
 </ul>
+<p>A <code>fixed</code> VHDX <em>source</em> is not automatically the equal case: it is
+  <code>block_state_zero</code> that decides what its BAT says. Written with
+  <code>block_state_zero=on</code>, qemu-img's default, every payload entry is <code>ZERO</code>
+  however dense the file is, so instar counts none of them and reports the
+  bare target-metadata floor — 327680 against qemu-img's 17104896 for a
+  16 MiB fixed VHDX measured to qcow2. Written with <code>block_state_zero=off</code>
+  and content in the blocks, the entries are <code>FULLY_PRESENT</code> and the two
+  agree. (This is about measuring a fixed VHDX as the <em>source</em>; measuring
+  one as the <em>target</em>, <code>-O vhdx -o subformat=fixed</code> above, is unaffected by
+  <code>block_state_zero</code>.)
+- <strong>VMDK multi-extent source layouts</strong>: instar's extent map propagation
+  differs from qemu-img for some non-trivial layouts.
+- <strong>VHD legacy CHS-only sources</strong>: instar's reported virtual_size differs
+  by approximately 2 MiB.</p>
 <p>The canonical list of test cases skipped due to these divergences is
 <code>KNOWN_SOURCE_SCANNER_DIVERGENCES</code> in <code>tests/test_measure.py</code>. Each entry
 names the divergence category.</p>

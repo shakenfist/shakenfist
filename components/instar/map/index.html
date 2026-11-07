@@ -16615,6 +16615,15 @@ rationale and the future-work pointer.</p>
   — instar treats them as fully present; qemu-img walks the
   per-sector bitmap and emits per-sector extents. See
   <a href="/components/instar/quirks/#vhdx-payload_block_partially_present-is-reported-as-data-true">docs/quirks.md § VHDX <code>PAYLOAD_BLOCK_PARTIALLY_PRESENT</code> is reported as <code>data: true</code></a>.</li>
+<li><strong>VHDX blocks in a zero state are reported as <code>zero: true</code></strong> —
+  with <code>block_state_zero=on</code>, qemu-img's default, every payload BAT
+  entry is <code>PAYLOAD_BLOCK_ZERO</code>; instar reads the BAT and reports
+  <code>zero: true, data: false</code>, where qemu-img does not and reports
+  <code>data: true</code>. Both describe the same block, one by content and one
+  by layout. Where the blocks hold real data the two agree, and
+  instar additionally reports the payload block's offset in the file,
+  which qemu-img omits from the extent. See
+  <a href="/components/instar/quirks/#vhdx-blocks-in-a-zero-state-are-reported-as-zero-true">docs/quirks.md § VHDX blocks in a zero state are reported as <code>zero: true</code></a>.</li>
 <li><strong>VMDK multi-extent sources are refused</strong> — descriptor-driven
   (monolithicFlat, 2GbMaxExtent…) sources fail host-side via
   <code>peek_is_vmdk_descriptor</code>. Use <code>qemu-img map</code> as the workaround.
