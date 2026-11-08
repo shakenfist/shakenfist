@@ -16093,9 +16093,15 @@ Measured on 2026-09-24.</p>
 <h2 id="caveats">Caveats<a class="headerlink" href="#caveats" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Every stream was H.264,</strong> and Ryll cannot decode spice-server's
-  H.264 (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/398" title="GitHub Issue: shakenfist/ryll #398">ryll#398</a>). spice-server chose H.264 because Kerbside
-  advertises Ryll's display capabilities to it, not the real
-  client's (#477). Key-box latency is unaffected, because the key
+  H.264 (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/398" title="GitHub Issue: shakenfist/ryll #398">ryll#398</a>). spice-server chose H.264 because the client here
+  was Ryll, and the Ryll this rig ran (50a9cc0) asked for H.264 before
+  MJPEG; qemu 10.0.13 cannot select a codec, so the client's
+  preference decides it, and the proxy relayed that preference
+  correctly. #477, the proxy advertising Ryll's own capabilities to
+  spice-server instead of the real client's, was a genuine bug, but it
+  is not what chose the codec here: see
+  <a href="/components/kerbside/performance/spice-server-patches/">spice-server patches</a>, "Which codec the
+  streams used". Key-box latency is unaffected, because the key
   box is always a <code>DRAW_COPY</code> bitmap. But the video itself was not
   rendered, and spice-server's stream rate control ran on Ryll's
   stream reports for streams it never decoded, so the stream

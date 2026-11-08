@@ -17184,8 +17184,13 @@ against the relay:</p>
   because its colour depends on how many presses arrived.</li>
 <li><strong>The venv.</strong> <code>quality.py</code> needs numpy and Pillow, which nothing else
   in Kerbside does, so <code>quality.sh</code> keeps them in a venv of their own at
-  <code>QUALITY_VENV</code> (default <code>${TMPDIR:-/tmp}/kerbside-shaped-link-venv</code>),
-  made on first use and safe to delete. <code>quality.sh test</code> runs
+  <code>QUALITY_VENV</code> (default
+  <code>${XDG_CACHE_HOME:-$HOME/.cache}/kerbside/shaped-link-venv</code>),
+  made on first use and safe to delete. Because the script executes that
+  venv's python, it refuses one whose directory or interpreter this user
+  does not own, and creates a new one mode 700 and only under a parent
+  directory no other local user can write -- so a <code>QUALITY_VENV</code> set by
+  hand needs to be a path you own. <code>quality.sh test</code> runs
   <code>test_quality.py</code>.</li>
 </ul>
 <p>The rig can also put a SPICE server other than qemu's own in front of

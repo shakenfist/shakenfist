@@ -16228,9 +16228,12 @@ guest and link profiles, and
   price of a full redraw per switch.</strong> The configuration the
   measurements found best on most slow links, relaying with
   <code>streaming-video=all</code>, cannot take part: GLZ and streams both have to
-  go, and spice-server 0.15.2 crashes when a display channel connects
-  while streams exist, which every switch does. Choosing the mode once,
-  at connect, avoids all of this.</li>
+  go, and spice-server crashes when a display channel that states a
+  codec preference connects while streams exist, which every switch does
+  (the transcoder's backend dial always sends a preference). Every
+  released version and master are affected; see <a href="/components/kerbside/performance/spice-server-patches/">spice-server
+  patches</a>. Choosing the mode once, at connect,
+  avoids all of this.</li>
 </ul>
 <h2 id="how-a-switch-works">How a switch works<a class="headerlink" href="#how-a-switch-works" title="Permanent link">&para;</a></h2>
 <p>The hidden flag <code>--transcode-switch-after-secs N</code>, in builds with the
@@ -16485,7 +16488,7 @@ similar is not known.</p>
   serves as bitmap draws on the primary surface. A QXL guest, an
   off-screen surface or a second display was not tried.</li>
 <li>Switching with <code>streaming-video</code> on was not tried, because of the
-  spice-server 0.15.2 crash above.</li>
+  spice-server connect crash above.</li>
 </ul>
 <h2 id="procedure">Procedure<a class="headerlink" href="#procedure" title="Permanent link">&para;</a></h2>
 <p>The topology is the shaped-link rig's (<code>tools/shaped-link/run-matrix.sh</code>,

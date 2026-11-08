@@ -16261,8 +16261,9 @@ link profiles, so the tables line up with that page's. Measured on
   22 to 30 ms slower where andris streamed, and like it, it was seconds
   behind at 80 ms / 10 Mbit heavy (4400 ms p50, one repeat of two).</li>
 <li><strong>No server crashed.</strong> No qemu or andris exited in any of the 108
-  matrix repeats or the 10 reference repeats, and spice-server 0.15.2's
-  crash on connecting while streams exist did not recur. The 13 repeats
+  matrix repeats or the 10 reference repeats, and the spice-server crash
+  on stating a codec preference at connect while streams exist (0.15.2
+  here, but every released version) did not recur. The 13 repeats
   lost were all first key presses that took over 15 s. See
   <a href="#caveats">Caveats</a>.</li>
 </ul>
@@ -17801,8 +17802,15 @@ p50, 29 ms behind the virtio-gpu helper.</p>
   moved, and spice-server's rate control had reports from 16 of its 21
   streams. The key box is never streamed, so its latency is unaffected.
   The earlier pages on this rig, with the same Ryll and the same proxy,
-  report spice-server's streams as H.264 that Ryll did not decode. Why
-  spice-server chose MJPEG here was not established.</li>
+  report spice-server's streams as H.264 that Ryll did not decode. Those
+  pages were wrong and have been corrected; only the re-baseline, which
+  ran an older Ryll, really saw H.264. MJPEG here is the client's own
+  choice: qemu 10.0.13 cannot select a codec, so spice-server starts
+  from its <code>spice:mjpeg</code>-first default and reorders only on the client's
+  preference, and the Ryll these runs used asks for MJPEG first. The
+  proxy relayed that preference correctly. See
+  <a href="/components/kerbside/performance/spice-server-patches/">spice-server patches</a>, "Which codec the
+  streams used".</li>
 <li><strong>The guest flushes its whole plane.</strong> The guest's kernel (Linux 6.12,
   with the stock <code>drm_kms_helper</code>) carries the bug that ignores damage
   clips, so every flush from this guest covers all 1280x800 pixels,
@@ -17909,22 +17917,27 @@ p50, 29 ms behind the virtio-gpu helper.</p>
 <td></td>
 </tr>
 <tr>
-<td>- <strong>No crashes.</strong> No qemu or andris exited during a case. spice-server</td>
+<td>- <strong>No crashes.</strong> No qemu or andris exited during a case. The</td>
 <td></td>
 <td></td>
 </tr>
 <tr>
-<td>0.15.2's crash on connecting while streams exist did not recur in any</td>
+<td>spice-server crash on stating a codec preference at connect while</td>
 <td></td>
 <td></td>
 </tr>
 <tr>
-<td><code>all</code> repeat, with the activity delayed 8 s, or 12 s on the second</td>
+<td>streams exist (0.15.2 here, but every released version) did not recur</td>
 <td></td>
 <td></td>
 </tr>
 <tr>
-<td>150 ms / 2 Mbit run.</td>
+<td>in any <code>all</code> repeat, with the activity delayed 8 s, or 12 s on the</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>second 150 ms / 2 Mbit run.</td>
 <td></td>
 <td></td>
 </tr>

@@ -16581,8 +16581,8 @@ first phase.</p>
 <tr>
 <td>6. Push audit of phases 1-5 (kerbside, kerbside-patches and ryll #406)</td>
 <td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/">PLAN-spice-performance-phase-06-push-audit.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>2a34fe7ea9 (#668)</td>
 </tr>
 <tr>
 <td>7. QUIC client leg: experiments</td>
@@ -17164,7 +17164,16 @@ cells.
   andris #56 carries its own audit, which phase 6 cites. The
   phase plan
   (<a href="/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/">PLAN-spice-performance-phase-06-push-audit.md</a>)
-  has the full survey.</p>
+  has the full survey.
+- <em>Outcome:</em> the audit merged as 2a34fe7ea9 (#668) on 2026-10-31.
+  Nothing critical or medium anywhere; one high, an out-of-bounds read
+  in the carried qemu v2 series, which is in no image
+  (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-patches/issues/2032" title="GitHub Issue: shakenfist/kerbside-patches #2032">kerbside-patches#2032</a>). Its decision 7 follow-ups closed the phase
+  out on 2026-11-05: all 14 kerbside items fixed bar the
+  capability-masking half of item 6, which is declined with its
+  reasoning in the phase plan's <em>Follow-up outcome</em>, and the six
+  kerbside-patches items in that repository's own pull request. The
+  plan stays <code>In progress</code> for phase 2 and phases 7 to 9.</p>
 <p><strong>Phases 7 and 8</strong> (added 2026-09-27) put the ryll-to-Kerbside
 client leg on QUIC, so that one UDP connection carries every
 SPICE channel of a session. They are deliberately loosely

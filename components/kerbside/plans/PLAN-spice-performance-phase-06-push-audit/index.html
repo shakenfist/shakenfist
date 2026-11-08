@@ -16985,6 +16985,114 @@ progress</code> until phase 2 is done.</p>
   design: the client leg never carries GLZ, and the first transcoded
   frame clears streams. The mutant removing that guard was killed.</li>
 </ul>
+<h3 id="follow-up-outcome-2026-11-05">Follow-up outcome (2026-11-05)<a class="headerlink" href="#follow-up-outcome-2026-11-05" title="Permanent link">&para;</a></h3>
+<p>Decision 7's kerbside follow-up. It records #668's merge commit,
+2a34fe7ea9, in the master plan's Execution table and sets phase 6 to
+<code>Complete</code>. The plan itself stays <code>In progress</code>: phase 2's dri-devel
+submission is still outstanding, as decision 6 anticipated, and phases 7
+to 9 have not started.</p>
+<p>Every kerbside item above is fixed as written, except item 6, which is
+fixed in part and declined in part:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Fixed. The bullet now says the earlier pages were wrong, that only the re-baseline saw H.264, and that MJPEG was the client's own choice, citing <code>spice-server-patches.md</code>.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Fixed. The caveat now attributes H.264 to Ryll 50a9cc0's codec order, and says #477 was a real bug but not what chose the codec.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Fixed in five places across the spike and measurement pages: the crash is no longer 0.15.2's alone, and no longer triggered by any connect. The "every switch" claim is kept, with the reason (the transcoder's backend dial always sends a preference). The <em>Weighing them</em> paragraph no longer says the crash still needs reproducing, which #654 had already overtaken. <strong>Round 2 of review widened this</strong>: the first pass fixed the two pages the audit named and left the same sentence verbatim in <code>transcoding-switching.md</code> (twice), and the version-only framing in <code>tools/shaped-link/run-matrix.sh</code> and <code>guest/keydraw.c</code>, where it is operational guidance for whoever sets <code>ACTIVITY_DELAY</code> on whatever spice-server they have. All four are fixed. The two <code>dbus-helper-measurements.md</code> mentions keep 0.15.2, because that rig really ran it, but no longer describe the trigger as any connect. The plan sketches that discuss the crash historically are left as dated records.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Fixed. The bold lead now reads "A side finding, since refuted", so the correction is not only further down. <strong>Round 3 of review found the bullet still asserting the withdrawn reasoning</strong> in the present tense before the correction withdraws it, so a reader who stopped mid-bullet took it away as fact. The withdrawn steps are now past tense, and the lead, the body and the correction agree.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Fixed. "stream frames" to "display messages", matching the page's own line 198.</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Fixed as documentation and a test; the masking change is declined.</strong> See below. <strong>Round 3 of review found the argument one-directional and the seam unbound.</strong> The documented case was an unoffered capability admitting a server message; the inverse -- spice-server sending an opcode gated behind a capability Kerbside never offered, which fail-closed would terminate on -- was the load-bearing fact and went unstated. It is safe only because the L1 table derives from ryll's complete per-channel tables rather than from <code>reply_channel_caps</code>, and the module now says so, with the pointer that the fix for an unmodelled opcode is the table and not the verdict (<code>AGENTS.md</code>, "Never widen a firewall verdict to make traffic pass"). Separately, <code>backend_channel_caps</code> is an identity function, so its test bound nothing in <code>backend.rs</code>: inlining the clone back into either arm would compile, behave identically and leave the test green. A second test reads <code>backend.rs</code> with <code>include_str!</code> and asserts both arms call the seam and neither clones directly.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Fixed. <code>QUALITY_VENV</code> defaults under <code>${XDG_CACHE_HOME:-$HOME/.cache}</code>, and a venv or interpreter this user does not own is refused rather than executed. <code>docs/testing.md</code> follows. <strong>Round 2 of review found the manual case only half covered</strong>: the ownership loop tests with <code>-e</code>, so it had nothing to say about a venv that does not exist yet, and the script would still create one in a directory another user can write and then execute it. Creation now requires a parent directory this user owns and that no <em>other</em> local user can write, and makes the venv itself mode 700. Group-writable is deliberately allowed: with a umask of 002 and a user-private group, the Debian default, <code>~/.cache</code> is 775, so refusing that -- which is what the review suggested -- would have rejected the default path (measured on this host before taking it). A parent whose group is genuinely shared is the one case left to the operator, since a group's members cannot be enumerated portably; the header comment and the check now say that rather than claiming the case is covered. The same round found the new default aborts with "HOME: unbound variable" under <code>set -u</code> where the old <code>/tmp</code> one worked, so an explicit guard names the tool and the variables to set. <strong>Round 3 of review found the location guard in the wrong place and too shallow</strong>: it ran only inside the creation branch, so an existing venv of ours sitting under a world-writable directory was executed unchecked, and it looked at the immediate parent only, so an attacker-owned directory further up could still swap the subtree. The ownership and writability checks now run on every invocation, before anything is created, starting at the deepest ancestor that exists; writability is checked all the way to <code>/</code>, while ownership is required of that one directory only, because <code>/home</code> and <code>/</code> are root-owned everywhere. The <code>find -perm</code> probe also read a failed probe as a pass, so the mode is read with <code>stat</code> and its exit status checked.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Fixed. Both settings cap at 2^31-1 in <code>config.py</code>, and a <code>sockopt_bytes</code> parser caps the matching clap flags, with <code>MAX_SOCKOPT_BYTES</code> naming the reason. The flag test moved to the new bound and now also rejects a negative value. <strong>Round 2 of review found the generalisation incomplete at both ends</strong>: <code>docs/configuration.md</code> still told operators the limit was 4294967295, which is also the kernel's own <code>net.ipv4.tcp_notsent_lowat</code> "unlimited" sentinel and so a value a deployment could have copied, and <code>--transcode-notsent-lowat-bytes</code> still took anything up to <code>u32::MAX</code> into the same <code>setsockopt</code>. The reference rows carry the new bound and say the old values are now refused; the transcoder's flag shares <code>sockopt_bytes</code>, keeping its own floor of 1, and a test pins it. <strong>Round 3 of review found two further defects.</strong> The stated reason was wrong, and was wrong in six places: a value above <code>i32::MAX</code> is not simply "reinterpreted as negative" -- <code>TCP_NOTSENT_LOWAT</code> stores it into an unsigned field, where 4294967295 is the sysctl's own "unlimited" default, and <code>SO_RCVBUF</code> clamps through an unsigned comparison. The bound is still right and the migration advice still behaviourally equivalent, but the rationale would have misled anyone re-deriving it; all six sites now say the meaning is per-option and that one bound is imposed instead. And both <code>-1</code> assertions were vacuous: clap refuses a hyphen-led value for a long option before either parser sees the string, so they would have passed even if the parsers started accepting negatives. <code>sockopt_bytes</code> and <code>lowat_bytes</code> now have direct unit tests, with the flag-level assertions kept as the end-to-end check.</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Fixed. <code>saturating_sub</code>, with a comment that saturation rules out an i64 underflow and deliberately does <em>not</em> clamp at zero, because a negative count is the documented behaviour. Two tests added: over-ACK drives the count negative, and a zero window credits nothing. The clamp-at-zero mutant the audit found surviving is now killed by the first of them (verified). <strong>Round 2 of review found the second test's rationale unsupported</strong>: it opened by asserting that a window of zero is what spice-server sends to disable acknowledgement, which nothing in the cited sources says, in a module that cites <code>server/red-channel-client.cpp</code> for every other claim about server behaviour. Reworded to the conditional the test actually proves -- a boundary case of <code>threshold()</code> -- and it now also records that the tracker would report such a channel as permanently stalled.</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Fixed. Both settings are tested for negative rejection, not just <code>PROXY_BACKEND_RCVBUF_BYTES</code>.</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Fixed. The comment no longer claims the crate has no timeout. At the pinned rev the crate bounds the dial and each handshake stage at 15 s <em>separately</em>, so a staged stall reaches about a minute; Kerbside's 30 s whole-attempt budget is what binds, and the comment now says so.</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Fixed. <code>tools/build-proxy-wheel.sh</code> refuses a non-empty cargo <code>default</code> feature list and any maturin <code>features</code> key, with the reason that neither shows in the wheel's name. <strong>Round 2 of review showed the line matches were both loose and brittle</strong>: <code>grep -qx 'default = []'</code> matched that line anywhere in the manifest, missed a reformatted <code>default=[]</code>, and refused a correct manifest that omits <code>default</code> entirely, which cargo reads as empty. Both checks now parse the tables with <code>tomllib</code>. <strong>Round 3 of review found the enumeration itself incomplete</strong>, which is what defeated the check rather than how it matched: maturin also accepts <code>all-features</code> and <code>cargo-extra-args</code>, either of which compiles <code>transcode</code> into the wheel while passing both assertions. maturin's schema cannot be enumerated from this host, so <code>[tool.maturin]</code> is now deny-by-default -- only <code>bindings</code> is allowed, and any other key, feature-selecting or not, has to edit the allowlist. Verified against five shapes.</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Fixed. <code>relay::TERMINATED_BY_CONTROL_PLANE</code> is the one definition; the transcoder formats it. <strong>Round 2 of review showed the test did not do what its docstring promised</strong>: it compared the constant with a literal copy of itself, so editing both together left the three CI tools broken and only the lanes would say so. It now reads each tool's source with <code>include_str!</code>, inside <code>#[cfg(test)]</code> so that only <code>cargo test</code> needs <code>tools/</code> in the build context, and asserts the prefix appears in each.</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Fixed. The description is rejoined.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Item 6: why the forwarded caps are not masked.</strong> The item asked to
+document that the reply mask is not a security boundary, to test what the
+allowlist does with a server message only an unoffered capability enables,
+and <em>if that message is relayed</em>, to mask the forwarded caps to the reply
+set plus the codec bits. The first two are done: <code>caps.rs</code> now has a
+"The reply mask is not a security boundary" section, and
+<code>unoffered_client_cap_still_admits_its_server_message</code> pins the case.</p>
+<p>The test's answer is that the message <strong>is</strong> relayed:
+<code>DISPLAY_SIZED_STREAM</code> is absent from <code>DISPLAY_CAPS</code>, and
+<code>classify(Display, ServerToClient, STREAM_DATA_SIZED)</code> is <code>Allowed</code>. The
+masking change is still declined, on two grounds found while checking it:</p>
+<ul>
+<li><strong>It would regress every client.</strong> A SPICE capability is effective only
+  where both ends advertise it, which is why #477 forwards the client's
+  set. ryll's own <code>DEFAULT_DISPLAY</code> asks for <code>COMPOSITE</code>, <code>A8_SURFACE</code>,
+  <code>LZ4_COMPRESSION</code> and <code>SIZED_STREAM</code>, none of which this reply table
+  offers. ryll's own comment on that constant records what losing two of
+  them costs: without <code>COMPOSITE</code> the guest QXL driver "falls back to a
+  software path that produces far fewer display updates", and
+  <code>LZ4_COMPRESSION</code> is what lets the server pick LZ4 over Zlib for static
+  regions. Masking would take both away from every session.</li>
+<li><strong>It would buy no enforcement.</strong> The L1 allowlist classifies by opcode
+  and never consults the negotiated capability set, and it is fail-closed:
+  an unmodeled opcode is <code>Disallowed</code>, which the firewall observes or
+  terminates on. A capability cannot talk a message past it. Message
+  bodies are unchecked, but that is L2 (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/682" title="GitHub Issue: shakenfist/kerbside #682">kerbside#682</a>), and the reply mask
+  does not bear on it either way.</li>
+</ul>
+<p>So the defect was the claim, not the behaviour, and it is fixed where the
+claim was made: the <code>caps.rs</code> module docs and the forwarding site in
+<code>backend.rs</code>. This reverses the item's conditional instruction, which was
+written before the cost of masking was measured, so it is the part of this
+follow-up most worth arguing with.</p>
+<p>The kerbside-patches follow-up carries that repository's six items.</p>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, back brief the operator on
 your understanding of the plan and how the work you intend to do
