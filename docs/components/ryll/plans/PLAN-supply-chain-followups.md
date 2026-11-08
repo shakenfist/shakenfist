@@ -142,6 +142,47 @@ below. When an ignore is resolved, delete both the
 - **Remove ignore when:** `zbus` 5.x (and with it these
   three crates) no longer appears in `cargo tree`.
 
+### 6. `pin-utils` 0.1.1 unmaintained (RUSTSEC-2026-0441)
+
+- **Ignore rationale:** the upstream repository was archived
+  on 1 October 2026 after the 0.1.1 release and there is no
+  successor crate, so no version bump can clear this one
+  (`cargo deny` says so itself: "No safe upgrade is
+  available!"). It reaches us by two transitive paths:
+  `shakenfist-spice-renderer`'s `rtp` 0.17 dev-dependency ->
+  `webrtc-util` 0.17.2 -> `nix` 0.26.4, and
+  `ironrdp-connector` -> `sspi` -> `async-dnssd`. Both
+  scanners read the whole lockfile rather than a feature
+  resolution, so feature-gating a path would not help even
+  where we could.
+- **Attack surface:** none of substance. `pin-utils` is three
+  pinning macros with no parsing, I/O or arithmetic; this is
+  an unmaintained-status advisory, not a vulnerability. Its
+  only widely used macro, `pin_mut!`, has a std replacement
+  in `core::pin::pin!` (stable since Rust 1.68), so the
+  crates that still carry it have a cheap way out when they
+  get to it. Neither path reaches a shipped artefact either:
+  the first is a dev-dependency used only by
+  `tests/webrtc_h264_smoke.rs`, and the second arrives
+  through `shakenfist-spice-rdp` behind the default-off `rdp`
+  feature, which release builds do not enable. That makes
+  this a weaker-risk acceptance than items 2 and 3, which are
+  in the shipped TLS path; the ignore exists only because
+  both scanners read the lockfile rather than a feature
+  resolution.
+- **Action plan:**
+  1. Move the renderer's `webrtc_h264_smoke` dev-dependency
+     from `rtp` 0.17 onto `rtc::rtp`, which the webrtc 0.20
+     port already pulls into the lockfile. That retires the
+     first path along with a dead upstream line, and is
+     already recorded in PLAN-webrtc-0.20-upgrade.md's
+     Future work.
+  2. Track ironrdp / sspi for a release that drops
+     `async-dnssd`. Re-check on each ironrdp bump; renovate
+     opens those for us.
+- **Remove ignore when:** `pin-utils` no longer appears in
+  `cargo tree`.
+
 ## Also tracked: duplicate-version warnings
 
 `cargo deny check` currently reports ~45 duplicate-version
@@ -214,3 +255,11 @@ This plan is complete when:
 - Consider a recurring monthly cron that opens an issue if
   new advisories appear (`cargo audit` in CI produces the
   signal; we need a mechanism to route it).
+- Fail CI on a set difference between the advisory IDs in
+  `deny.toml` and those in `.cargo/audit.toml`. Forgetting
+  `.cargo/audit.toml` already turns the `cargo audit` job
+  red, but the reverse is silent, so a stale entry in either
+  file survives until someone notices by hand -- which is how
+  the September 2026 sweep above found its four. A periodic
+  run with an empty ignore list would surface the same thing
+  from the other side, as IDs reported `advisory-not-detected`.
