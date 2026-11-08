@@ -399,7 +399,7 @@ landed reads `—`. Phases that land in client-python record
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 0. Decisions and the live-memory baseline | [PLAN-placeable-capacity-phase-00-decisions.md](PLAN-placeable-capacity-phase-00-decisions.md) | Complete | `ab19cf67e7` (#4822) |
-| 1. Extract the shared set-placement core | [PLAN-placeable-capacity-phase-01-placement-core.md](PLAN-placeable-capacity-phase-01-placement-core.md) | In progress | — |
+| 1. Extract the shared set-placement core | [PLAN-placeable-capacity-phase-01-placement-core.md](PLAN-placeable-capacity-phase-01-placement-core.md) | Complete | `d20a7d7516` (#4835) |
 | 2. The placement dry run (`C`) | PLAN-placeable-capacity-phase-02-dry-run.md (to be written) | Not started | — |
 | 3. Shape holds: schema and the node guard (`A`) | PLAN-placeable-capacity-phase-03-holds-schema.md (to be written) | Not started | — |
 | 4. Shape holds: consumption, release and displacement | PLAN-placeable-capacity-phase-04-holds-lifecycle.md (to be written) | Not started | — |
