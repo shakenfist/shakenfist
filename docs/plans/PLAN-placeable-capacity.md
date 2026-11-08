@@ -400,7 +400,7 @@ landed reads `—`. Phases that land in client-python record
 |-------|------|--------|--------|
 | 0. Decisions and the live-memory baseline | [PLAN-placeable-capacity-phase-00-decisions.md](PLAN-placeable-capacity-phase-00-decisions.md) | Complete | `ab19cf67e7` (#4822) |
 | 1. Extract the shared set-placement core | [PLAN-placeable-capacity-phase-01-placement-core.md](PLAN-placeable-capacity-phase-01-placement-core.md) | Complete | `d20a7d7516` (#4835) |
-| 2. The placement dry run (`C`) | PLAN-placeable-capacity-phase-02-dry-run.md (to be written) | Not started | — |
+| 2. The placement dry run (`C`) | [PLAN-placeable-capacity-phase-02-dry-run.md](PLAN-placeable-capacity-phase-02-dry-run.md) | In progress | — |
 | 3. Shape holds: schema and the node guard (`A`) | PLAN-placeable-capacity-phase-03-holds-schema.md (to be written) | Not started | — |
 | 4. Shape holds: consumption, release and displacement | PLAN-placeable-capacity-phase-04-holds-lifecycle.md (to be written) | Not started | — |
 | 5. The refusal contract | PLAN-placeable-capacity-phase-05-refusal-contract.md (to be written) | Not started | — |
@@ -434,15 +434,17 @@ before either admission change.
   denomination and the tentative charge. Both `C` and `A` build
   on it. See the phase plan's `F1`.
 - **Phase 2** builds `C` on that core: a stateless, advisory query
-  behind its own capability string, surfaced in the API, in a
-  client method, and in `GET /admin/resources`. No writes, so it
-  cannot strand capacity, deadlock admission or desynchronise the
-  reconciler. private-ci scores it in shadow against what jobs'
-  creates met minutes later; those counts are read before phase 3.
-  Phase 0's `D13` makes that reading load-bearing rather than merely
-  useful: it is where `Q1`'s live-memory test is re-applied, so a
-  live share anywhere near the baseline's reopens `Q1` before phase
-  3 is written.
+  behind its own capability string, surfaced in the API and in a
+  client method, but not in `GET /admin/resources` -- see the
+  section below. No writes, so it cannot strand capacity, deadlock
+  admission or desynchronise the reconciler. private-ci scores it
+  in shadow against what jobs' creates met minutes later, in a
+  harness it has already shipped; those counts are read before
+  phase 3. Phase 0's `D13` makes that reading load-bearing rather
+  than merely useful: it is where `Q1`'s live-memory test is
+  re-applied, so a live share anywhere near the baseline's reopens
+  `Q1` before phase 3 is written. The reading is private-ci's and
+  gates phase 3, not phase 2.
 - **Phase 3** gives the core the right to book: the per-node held
   column, the node guard term (`G6`), claim-limit validation
   against the sum of holds, and the reconciler and release paths.
@@ -512,13 +514,24 @@ forking the placement logic.
 Build the stateless query on the core: given a multiset of shapes,
 answer whether they fit now and on which nodes, with no state
 written. Advertise it with a capability string (`API_CAPABILITIES`
-in `shakenfist/external_api/app.py`), surface it in a client method,
-and show the per-node answer in `GET /admin/resources`. It is racy
-and advisory by construction. private-ci will call it in shadow
-before creating a runner's namespace and score the answer against
-what the job's creates actually met minutes later — which measures
-how often room present at claim time is gone at create time, and on
-which check. Read those counts before writing phase 3.
+in `shakenfist/external_api/app.py`) and surface it in a client
+method. Not in `GET /admin/resources`: that was this section's
+original instruction and it cannot be followed literally, because a
+per-node verdict is a verdict about a shape and a GET with no body
+has none to be about. The phase plan's `D6` records the decision
+and what was rejected with it. It is racy and advisory by
+construction.
+
+private-ci scores it in shadow against what a job's creates
+actually met minutes later -- which measures how often room
+present at claim time is gone at create time, and on which check.
+That harness is not phase 2's to build: placeable-claims phase 3
+shipped it already, scoring a client-side model of the same
+per-node checks rebuilt from `GET /admin/resources`, so what phase
+2 does is let that model become a call. The switch, the soak and
+the reading of the counts belong to private-ci and gate phase 3
+rather than phase 2 (the phase plan's `F1` and `D9`). Read those
+counts before writing phase 3.
 
 Phase 1's core returns a whole ordered candidate list per shape but
 charged only the head of each, and phase 2 is the first caller which
@@ -764,14 +777,17 @@ stale (see the Prompt).
   The root cause is a request value reaching a handler untyped,
   which is
   [PLAN-api-input-validation.md](PLAN-api-input-validation.md)'s
-  subject. Two notes for that plan. `validation.py`'s justification
-  for accepting the string -- that pydantic's lax mode converts it
-  -- is true of the database row and not of the object the scheduler
-  and the admission path read. And the one-line fix is to type the
-  value where the request becomes an instance
-  (`shakenfist/external_api/instance.py:1121`), not at either
-  reader: both of the casts a reader could add leave the next reader
-  to find the next one.
+  subject -- but that plan is `Complete` and never covered this
+  site, so phase 2's survey filed the bug as
+  shakenfist/shakenfist#4842 rather than leave it deferred to a
+  closed plan. Two notes recorded there. `validation.py`'s
+  justification for accepting the string -- that pydantic's lax
+  mode converts it -- is true of the database row and not of the
+  object the scheduler and the admission path read. And the
+  one-line fix is to type the value where the request becomes an
+  instance (`shakenfist/external_api/instance.py:1121`), not at
+  either reader: both of the casts a reader could add leave the
+  next reader to find the next one.
 
 None yet. Directly related open issues: shakenfist/shakenfist#1364
 (lame-duck and evacuate), shakenfist/shakenfist#4474 (the functional
