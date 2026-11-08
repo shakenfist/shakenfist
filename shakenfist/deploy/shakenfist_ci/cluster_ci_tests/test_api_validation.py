@@ -958,3 +958,86 @@ class TestStringSpelledBooleanBootsBIOS(base.BaseNamespacedTestCase):
         # the string 'false' stored verbatim, and a truthiness-blind
         # assertion is exactly the mistake under test.
         self.assertIs(False, fetched['uefi'])
+
+
+class TestStringSpelledIntegersCreate(base.BaseNamespacedTestCase):
+    """Issue 4842, at the real API.
+
+    `cpus` and `memory` are published as `unsignedinteger`, and the
+    published vocabulary includes a JSON string: marshmallow's Integer
+    reads "2" as 2, and validation deliberately declines to refuse it
+    rather than be narrower than its handler. The layer only *checks*,
+    though, so the handler was handed the string and stored it on the
+    in-memory instance as handed -- and the capacity guard then
+    computed `'2' * SCHEDULER_DEMAND_PER_VCPU`, a float multiplication
+    by a string, and answered 500. Late, too: by then the scheduler had
+    walked every filter stage and published its whole audit event
+    sequence for a placement which did not happen.
+
+    The handler now reads both through validation.declared_integer(),
+    at the point the request becomes an instance. The unit half
+    (test_instance_create_validation.py's
+    InstanceCreateIntegerSpellingTestCase) asserts on the exact values
+    handed to Instance.new(); this half is what proves the create
+    completes against a cluster with real hypervisors, which is the
+    only place the admission arithmetic that faulted actually runs --
+    the unit fixture has no hypervisor, so its creates are refused at
+    scheduling, one stage before the defect.
+
+    The create is issued with `_request_url` rather than through the
+    client, and so deliberately without `self.create_instance()`'s
+    transient-capacity wait. Two reasons, and the first is the
+    important one: the request body *is* the subject here, and a client
+    which typed these values on the way out -- now or after a later
+    refactor -- would leave every assertion below passing while testing
+    nothing. The second is that the wrapper's capacity instrument does
+    arithmetic on the dimensions it is handed, so a string would fault
+    inside the instrument rather than in the code under test. The shape
+    asked for is the smallest the API accepts (1 vCPU, 128 MB, one
+    empty 1 GB disk, no network, no base image), so a capacity refusal
+    is unlikely, and an honest failure is the right outcome if one
+    happens.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'apivalidint'
+        super().__init__(*args, **kwargs)
+
+    def test_string_cpus_and_memory_create_an_instance(self):
+        inst = self.test_client._request_url(
+            'POST', '/instances',
+            data={
+                'name': 'string-integers',
+                'cpus': '1',
+                'memory': '128',
+                'disk': [{'size': 1, 'type': 'disk'}],
+                'namespace': self.namespace,
+            }).json()
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
+
+        # The create response is built from the in-memory object the
+        # scheduling decision and the capacity claim ran against, so it
+        # is the one view of these two values which the typed column
+        # cannot rescue. Before this fix no caller saw it at all: the
+        # request faulted at admission a few lines before the response
+        # was built.
+        self.assertIsInstance(inst['cpus'], int)
+        self.assertEqual(1, inst['cpus'])
+        self.assertIsInstance(inst['memory'], int)
+        self.assertEqual(128, inst['memory'])
+
+        self._await_instance_create(inst['uuid'])
+
+        fetched = self.test_client.get_instance(inst['uuid'])
+        self.addDetail(
+            'fetched',
+            content.text_content(json.dumps(fetched, indent=4, sort_keys=True)))
+        # The stored value, which the column types for us: this pair is
+        # here to show both views agree, not as the test of the fix.
+        # The assertions above are that.
+        self.assertIsInstance(fetched['cpus'], int)
+        self.assertEqual(1, fetched['cpus'])
+        self.assertIsInstance(fetched['memory'], int)
+        self.assertEqual(128, fetched['memory'])

@@ -440,3 +440,193 @@ class InstanceCreateBooleanSpellingRollbackTestCase(
     """
 
     mode = 'warn'
+
+
+class InstanceCreateIntegerSpellingTestCase(AuthenticatedStackTestCase):
+    """The declared integers, read the way the schema publishes them.
+
+    `cpus` and `memory` are published as `unsignedinteger`, and the
+    published vocabulary includes a JSON *string*: marshmallow's
+    Integer reads "2" as 2, and validation deliberately does not refuse
+    it, on the grounds that a validator narrower than its handler is a
+    breaking change wearing the clothes of a correctness fix. The layer
+    is check-only though, so the handler was handed the string and
+    passed it to Instance.new() untouched, and Instance.__init__ stores
+    static values as handed.
+
+    The typed column hid how far that reached. A *later* load of the
+    instance gives integers back, so the string survived exactly as
+    long as the in-memory object the create's own decisions run
+    against -- which was long enough for `admit_instance_placement()`
+    to compute `'2' * config.SCHEDULER_DEMAND_PER_VCPU` and raise
+    TypeError, answering 500 after the scheduler had walked every
+    filter stage and published its audit events for a placement which
+    then did not happen (issue 4842).
+
+    So these tests assert on the value handed to Instance.new(), which
+    is where the request becomes an instance and the one place a cast
+    fixes every reader at once; the cluster CI half
+    (test_api_validation.TestStringSpelledIntegersCreate) pins the
+    create itself against a deployed cluster. The reading is the
+    handler's own, so it holds in every API_VALIDATION_MODE -- the
+    rollback subclass at the bottom re-runs all of it at 'warn'.
+    """
+
+    mode = 'enforce'
+
+    def _post_spying_on_new(self, body):
+        """POST /instances, capturing what reaches Instance.new().
+
+        Identical in shape and reasoning to
+        InstanceCreateBooleanSpellingTestCase._post_spying_on_new: the
+        spy raises, so no test here asserts on the response of a
+        request which was expected to reach it.
+        """
+        with mock.patch.object(instance_api, 'SCHEDULER', None), \
+                mock.patch.object(
+                    api_base.util_exceptions, 'record_exception',
+                    return_value={'exception-record': 'test'}), \
+                mock.patch.object(
+                    instance_api.instance.Instance, 'new',
+                    side_effect=AssertionError(
+                        'halted at instance creation by the test spy')) as new:
+            response = self.client.post(
+                '/instances', data=json.dumps(body),
+                content_type='application/json',
+                headers={'Authorization': self.token})
+        return response, new
+
+    def test_a_string_cpus_count_becomes_an_integer(self):
+        """Issue 4842's case.
+
+        assertIsInstance as well as the value, because the pre-fix
+        failure mode is a value which compares equal to nothing it is
+        multiplied by: `assertEqual(2, '2')` fails, but a test written
+        as `assertTrue(new.call_args.kwargs['cpus'])` would have passed
+        throughout.
+        """
+        body = dict(VALID_REMAINDER)
+        body['name'] = 'stringcpus'
+        body['cpus'] = '2'
+        _, new = self._post_spying_on_new(body)
+
+        new.assert_called_once()
+        self.assertIsInstance(new.call_args.kwargs['cpus'], int)
+        self.assertEqual(2, new.call_args.kwargs['cpus'])
+
+    def test_a_string_memory_size_becomes_an_integer(self):
+        """The same defect in the other dimension. It is the same two
+        lines of fix, and it is asserted separately because a fix which
+        typed only the one named in the issue would pass the test
+        above."""
+        body = dict(VALID_REMAINDER)
+        body['name'] = 'stringmemory'
+        body['memory'] = '1024'
+        _, new = self._post_spying_on_new(body)
+
+        new.assert_called_once()
+        self.assertIsInstance(new.call_args.kwargs['memory'], int)
+        self.assertEqual(1024, new.call_args.kwargs['memory'])
+
+    def test_json_integers_are_unchanged(self):
+        """The dominant callers send real JSON numbers -- the shipped
+        CLI and the ansible collection both do -- and their values must
+        come through untouched."""
+        body = dict(VALID_REMAINDER)
+        body['name'] = 'jsonintegers'
+        body['cpus'] = 4
+        body['memory'] = 8192
+        _, new = self._post_spying_on_new(body)
+
+        new.assert_called_once()
+        self.assertEqual(4, new.call_args.kwargs['cpus'])
+        self.assertEqual(8192, new.call_args.kwargs['memory'])
+
+    def test_an_integral_float_is_the_integer_it_names(self):
+        """JSON has one numeric type, so 8.0 and 8 are the same number.
+
+        _ExactInteger accepts an integral float for exactly that
+        reason and refuses 2.9, which is what keeps this reading from
+        being able to truncate a caller's request: the only floats
+        which reach here are the ones int() converts faithfully.
+        """
+        body = dict(VALID_REMAINDER)
+        body['name'] = 'integralfloat'
+        body['cpus'] = 8.0
+        _, new = self._post_spying_on_new(body)
+
+        new.assert_called_once()
+        self.assertIsInstance(new.call_args.kwargs['cpus'], int)
+        self.assertEqual(8, new.call_args.kwargs['cpus'])
+
+    def test_a_fractional_cpus_count_is_refused(self):
+        """The near miss which was already right, pinned as a floor.
+
+        The schema refuses 2.9 at enforce, and the handler's reading
+        refuses it in the rollback modes, so this is a 400 either way
+        -- the message differs and the subclass below overrides this
+        test to say which. Nothing here may start truncating it.
+        """
+        body = dict(VALID_REMAINDER)
+        body['name'] = 'fractionalcpus'
+        body['cpus'] = 2.9
+        response, new = self._post_spying_on_new(body)
+
+        self.assertEqual(400, response.status_code, response.get_json())
+        self.assertEqual(
+            {'error': 'cpus: Not a valid integer.', 'status': 400},
+            response.get_json())
+        new.assert_not_called()
+
+
+class InstanceCreateIntegerSpellingRollbackTestCase(
+        InstanceCreateIntegerSpellingTestCase):
+    """The same properties at 'warn'.
+
+    declared_integer() is a handler read rather than a validation-layer
+    refusal, so the rollback must change nothing about the typing --
+    these spellings pass the compiled integer field at enforce anyway,
+    which is why the handler has to do its own reading. What the
+    rollback does change is who refuses a value int() cannot read at
+    all, which the two overridden tests below measure: with the layer
+    standing aside, the handler's own guard is the thing between a
+    caller's mistake and a recorded 500.
+    """
+
+    mode = 'warn'
+
+    def test_a_fractional_cpus_count_is_refused(self):
+        """Overridden: in 'warn' the layer stands aside and the
+        handler's reading is what answers, with its own message."""
+        body = dict(VALID_REMAINDER)
+        body['name'] = 'fractionalcpus'
+        body['cpus'] = 2.9
+        response, new = self._post_spying_on_new(body)
+
+        self.assertEqual(400, response.status_code, response.get_json())
+        self.assertEqual(
+            {'error': 'cpus must be an integer', 'status': 400},
+            response.get_json())
+        new.assert_not_called()
+
+    def test_an_unreadable_memory_size_is_a_bad_request(self):
+        """The arm only the rollback can reach, for the parameter the
+        test above does not cover.
+
+        'banana' is refused by the validation layer at enforce, so this
+        is the mode in which it reaches the handler -- and a caller
+        mistake must not be a 500 there either. Asserted on `memory`
+        rather than on `cpus` so that each of the two guards is reached
+        by one test: a fix which wrote one guard and reused its
+        variable for both would pass the cpus tests and fail here.
+        """
+        body = dict(VALID_REMAINDER)
+        body['name'] = 'unreadablememory'
+        body['memory'] = 'banana'
+        response, new = self._post_spying_on_new(body)
+
+        self.assertEqual(400, response.status_code, response.get_json())
+        self.assertEqual(
+            {'error': 'memory must be an integer', 'status': 400},
+            response.get_json())
+        new.assert_not_called()

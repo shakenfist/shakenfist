@@ -154,6 +154,10 @@ metrics. The headlines:
   and NAT away from every caller who did not mention them. All of them are
   enumerated in
   [docs/developer_guide/writing_an_endpoint.md](docs/developer_guide/writing_an_endpoint.md).
+  A declared `integer` is the same story with
+  `validation.declared_integer()`: a JSON string is a valid integer to
+  the schema, so a handler which does arithmetic on one, or hands it to
+  an object which keeps it, reads it first.
 
 - **Events and logs are different channels.** An event is a durable,
   queryable record on an object; a log line is not. See
