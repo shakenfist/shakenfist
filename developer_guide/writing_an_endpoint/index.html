@@ -16307,6 +16307,21 @@ on a destructive route refuses a string spelling rather than acting on
 it. <code>declared_boolean()</code> is the right answer for a new declaration; the
 other three are existing shapes, each with its reason recorded where a
 change would break it.</p>
+<p><strong>A declared <code>integer</code> your handler does arithmetic on, or stores,
+needs <code>validation.declared_integer()</code> for the same reason.</strong> A query
+parameter is always a string on the wire and a body integer may be a
+JSON string, and both are valid integers to the published schema —
+<code>{"cpus": "2"}</code> is accepted deliberately, because refusing it would
+make the validator narrower than its handler. So the string is what
+your handler gets. Where it is passed straight through to something
+typed, that is harmless: the per-object events <code>limit</code> had to be read
+because it is compared against an <code>int</code>, and <code>cpus</code> and <code>memory</code> on
+<code>POST /instances</code> because the created object carries them in memory
+until it is next loaded, and the capacity guard multiplies vCPUs by a
+float. There is no derived sweep over the 27 declared integers the way
+there is over the booleans, so a new one is on its author: read it, or
+be able to say why nothing downstream of the handler cares what type
+it is.</p>
 <h2 id="handler-guards-and-where-a-new-one-goes">Handler guards, and where a new one goes<a class="headerlink" href="#handler-guards-and-where-a-new-one-goes" title="Permanent link">&para;</a></h2>
 <p>Not every check can be a declaration. A rule spanning two parameters
 (secure boot requires UEFI), an "at least one of" the schema language
