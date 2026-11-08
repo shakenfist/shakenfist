@@ -39,16 +39,10 @@ sf_claim = ansible_module_loader.load_collection_module(
     })
 
 
-class ModuleExited(Exception):
-    def __init__(self, result):
-        super().__init__('module exited')
-        self.result = result
-
-
-class ModuleFailed(Exception):
-    def __init__(self, result):
-        super().__init__('module failed')
-        self.result = result
+# One definition of the two terminal outcomes, shared with the other
+# collection module test files -- see ansible_module_loader.ModuleOutcome.
+ModuleExited = ansible_module_loader.ModuleExited
+ModuleFailed = ansible_module_loader.ModuleFailed
 
 
 class FakeModule:

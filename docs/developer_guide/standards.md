@@ -264,6 +264,20 @@ external dependencies are replaced with `mock.patch`
 Tests live in `shakenfist/tests/` as `test_<subject>.py`, with
 subdirectories for `external_api`, `operations` and `schema`.
 
+The ansible collection's modules are loaded from source by
+`shakenfist/tests/ansible_module_loader.py`, which also owns the two
+exceptions a stubbed `exit_json()` and `fail_json()` raise:
+`ModuleExited` and `ModuleFailed`. Raise those rather than defining a
+local pair, and in particular do not raise a `SystemExit` subclass to
+mirror what the real `AnsibleModule` does. A `SystemExit` is not an
+`Exception`, so a module which took the other outcome than the one a
+test named escaped both `assertRaises()` and testtools and killed the
+stestr worker, dropping that worker's remaining tests from the totals
+and reporting a mismatch as a crash rather than as one failed
+assertion. Ordinary exceptions are only safe there while no collection
+module makes a terminal call inside a `try` which catches `Exception`,
+which `shakenfist/tests/test_ansible_module_loader.py` enforces.
+
 ## Pre-commit Hooks
 
 The repository uses pre-commit hooks to validate code before commits:

@@ -604,12 +604,13 @@ class SfInstanceAdoptableStateTestCase(base.ShakenFistTestCase):
                               if line.startswith('Instance dirty: state')])
 
 
-class _Succeeded(SystemExit):
-    """The module called exit_json()."""
-
-
-class _Failed(SystemExit):
-    """The module called fail_json()."""
+# The outcome exceptions the stubbed exit_json()/fail_json() raise. They
+# live in the shared loader, which documents why they are ordinary
+# exceptions rather than the SystemExit the real AnsibleModule raises:
+# issue 4815, where a mismatched outcome escaped assertRaises() and the
+# test runner with it.
+_Succeeded = ansible_module_loader.ModuleExited
+_Failed = ansible_module_loader.ModuleFailed
 
 
 class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
@@ -655,11 +656,11 @@ class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
         module.check_mode = False
         # The real AnsibleModule.exit_json terminates the module; a bare
         # MagicMock would let execution fall through into the deletion
-        # path below it. Distinct exception types rather than a shared
-        # SystemExit, because assertRaises(SystemExit) cannot tell a
-        # success from an early bail-out, and a test whose body is two
-        # negative assertions would then pass without running any of the
-        # code it names.
+        # path below it. Distinct exception types rather than one shared
+        # outcome, because assertRaises() against a single type cannot
+        # tell a success from an early bail-out, and a test whose body is
+        # two negative assertions would then pass without running any of
+        # the code it names.
         module.exit_json.side_effect = _Succeeded
         module.fail_json.side_effect = _Failed
 

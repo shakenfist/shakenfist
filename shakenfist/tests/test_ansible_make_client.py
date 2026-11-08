@@ -7,8 +7,11 @@ from shakenfist.tests import ansible_module_loader
 from shakenfist.tests import base
 
 
-class _Failed(SystemExit):
-    ...
+# The outcome exceptions the stub modules below raise. The shared loader
+# documents why they are ordinary exceptions rather than the SystemExit
+# the real AnsibleModule raises -- issue 4815.
+_Failed = ansible_module_loader.ModuleFailed
+_Exited = ansible_module_loader.ModuleExited
 
 
 class FakeModule(object):
@@ -37,10 +40,6 @@ class ForgivingModule(FakeModule):
 
     def fail_json(self, **kwargs):
         self.failure = kwargs
-
-
-class _Exited(SystemExit):
-    ...
 
 
 class CheckModeModule(FakeModule):
