@@ -23,24 +23,33 @@
   collections:
     - shakenfist.shakenfist
 
+  vars:
+    # The disk base every create in this scenario boots from.
+    # ansiblemoduletests.sh overrides this with an artifact imported from the
+    # /srv/ci cache disk when that disk is present, so that CI does not fetch
+    # ~407 MiB over the internet for bytes it already has (issue 4461). A hand
+    # run without the cache disk gets the well known image name instead, and
+    # with it the internet fetch.
+    debian_11_base: "debian:11"
+
   tasks:
     - name: Ensure the instance doesn't exist at the start
       sf_instance:
         name: "ansibleci-007"
         state: "absent"
 
-    # debian:11 is cached by the time this scenario runs (scenario 004 pays
-    # the cold fetch), but the blob may still have to reach this hypervisor
-    # inside the await, so the budget is generous. The await is expected to
-    # fail: it is how this task knows the instance errored rather than
-    # leaving the next task racing the failure.
+    # debian_11_base is already in the cluster by the time this scenario runs
+    # (scenario 004 pays for whatever fetch it needs), but the blob may still
+    # have to reach this hypervisor inside the await, so the budget is
+    # generous. The await is expected to fail: it is how this task knows the
+    # instance errored rather than leaving the next task racing the failure.
     - name: Create an instance which cannot possibly be created
       sf_instance:
         name: "ansibleci-007"
         cpu: 1
         ram: 1024
         disks:
-          - 1@debian:11
+          - "1@{{ debian_11_base }}"
         state: present
         await: true
         await_timeout: 1200
@@ -65,7 +74,7 @@
         cpu: 1
         ram: 1024
         disks:
-          - 1@debian:11
+          - "1@{{ debian_11_base }}"
         state: present
       register: ci_dead
       check_mode: true
@@ -89,7 +98,7 @@
         cpu: 1
         ram: 1024
         disks:
-          - 10@debian:11
+          - "10@{{ debian_11_base }}"
         state: present
         await: true
         await_timeout: 1200

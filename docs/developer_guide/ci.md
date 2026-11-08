@@ -1108,6 +1108,25 @@ caches.
   `localhost,127.0.0.1,10.0.0.0/8` to prevent local service traffic from
   being routed through the proxy.
 
+### Guest images come from the cache disk
+
+Guest images are not cached by the proxy -- they are too big to be worth
+it, and a nested cluster fetching one pays for it inside whatever await
+budget the test gave the create. The `/srv/ci` disk attached to the CI
+clusters carries a copy of each image the `shakenfist/actions`
+dependencies build caches, so a suite which boots a guest should import
+the cached copy and boot from the artifact rather than naming the image.
+
+A disk base which is a well known image name (`debian:11`) is always an
+internet fetch: the server expands it against `IMAGE_DOWNLOAD_URL` and
+downloads it, whatever is on the cache disk. `sf-client artifact upload
+<name> /srv/ci/<image> --shared --no-checksum` turns a cached file into
+an artifact, and `sf://upload/system/<name>` is the base which boots it.
+The upload has to be shared for a test running in its own namespace to
+see it. `shakenfist/deploy/ansiblemoduletests.sh` does this for
+`debian:11` and overrides the scenarios' `debian_11_base` with the
+result, falling back to the image name when the cache disk is absent.
+
 ## Fork pull requests and the runner pool
 
 Workflow runs from a fork wait for a maintainer's approval:

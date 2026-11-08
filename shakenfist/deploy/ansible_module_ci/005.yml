@@ -1,8 +1,8 @@
 # Tests: sf_instance metadata, instance affinity
 #
 # Also the regression coverage for issue 3669: these instances are created as
-# system, so the server resolves debian:11 to the blob behind the artifact
-# scenario 004 fetched and records a blob_uuid in the stored disk_spec. The
+# system, so the server resolves debian_11_base to the blob behind the
+# artifact scenario 004 resolved and records a blob_uuid in the disk_spec. The
 # re-presentation below must still be judged idempotent despite that extra
 # server populated key.
 
@@ -11,6 +11,15 @@
   collections:
     - shakenfist.shakenfist
 
+  vars:
+    # The disk base every create in this scenario boots from.
+    # ansiblemoduletests.sh overrides this with an artifact imported from the
+    # /srv/ci cache disk when that disk is present, so that CI does not fetch
+    # ~407 MiB over the internet for bytes it already has (issue 4461). A hand
+    # run without the cache disk gets the well known image name instead, and
+    # with it the internet fetch.
+    debian_11_base: "debian:11"
+
   tasks:
     - name: Create a test instance with metadata
       sf_instance:
@@ -18,7 +27,7 @@
         cpu: 2
         ram: 2048
         disks:
-          - 10@debian:11
+          - "10@{{ debian_11_base }}"
         metadata:
           affinity:
             ci-worker: -10
@@ -43,7 +52,7 @@
         cpu: 2
         ram: 2048
         disks:
-          - 10@debian:11
+          - "10@{{ debian_11_base }}"
         metadata:
           affinity:
             ci-worker: -10
@@ -73,7 +82,7 @@
         cpu: 2
         ram: 2048
         disks:
-          - 10@debian:11
+          - "10@{{ debian_11_base }}"
         metadata:
           affinity:
             ci-worker: -10

@@ -5,6 +5,15 @@
   collections:
     - shakenfist.shakenfist
 
+  vars:
+    # The disk base every create in this scenario boots from.
+    # ansiblemoduletests.sh overrides this with an artifact imported from the
+    # /srv/ci cache disk when that disk is present, so that CI does not fetch
+    # ~407 MiB over the internet for bytes it already has (issue 4461). A hand
+    # run without the cache disk gets the well known image name instead, and
+    # with it the internet fetch.
+    debian_11_base: "debian:11"
+
   tasks:
     - name: Create a unique namespace name
       shell: pwgen 10 -n 1
@@ -88,21 +97,22 @@
     # matching the server -- was perpetually dirty and the instance was
     # replaced on every run.
     #
-    # NOTE(mikal): we await this instance so that the debian:11 image is a
-    # fully resolved artifact in this (non-system) namespace by the time we
-    # return. Scenario 005 then creates an instance as system, which resolves
-    # debian:11 to the blob behind this artifact and stores a blob_uuid in the
-    # instance's disk_spec. Without the await, whether 005 sees a resolved
-    # blob_uuid is a race against this image fetch, and 005's idempotency
-    # assertion is the regression coverage for issue 3669 (the module used to
-    # treat that server populated key as a specification change and recreate
-    # the instance).
+    # NOTE(mikal): we await this instance so that debian_11_base is a fully
+    # resolved artifact in this (non-system) namespace by the time we return.
+    # Scenario 005 then creates an instance as system, which resolves the same
+    # base to a blob and stores a blob_uuid in the instance's disk_spec.
+    # Without the await, whether 005 sees a resolved blob_uuid is a race
+    # against this image fetch, and 005's idempotency assertion is the
+    # regression coverage for issue 3669 (the module used to treat that server
+    # populated key as a specification change and recreate the instance).
     #
-    # This is the first scenario in the suite to touch debian:11, so this
-    # create pays a cold ~407 MiB internet fetch inside its await budget. On
-    # a slow uplink that fetch alone has been observed to take 578 seconds
-    # (issue 4000), which leaves the default 600 second await_timeout with no
-    # headroom, so give this create a larger budget.
+    # This is the first scenario in the suite to touch debian:11. When
+    # ansiblemoduletests.sh has imported it from the /srv/ci cache disk that
+    # costs an intra-cluster blob transfer; when it has not, this create pays
+    # a cold ~407 MiB internet fetch inside its await budget, which has been
+    # observed to take 578 seconds on its own (issue 4000) against a 600
+    # second default. Either way the budget here is generous, because the
+    # bytes still have to reach the hypervisor the scheduler picked.
     #
     # NOTE(mikal): ssh_key and user_data are set to explicit empty strings
     # because the idempotency assertion below is also the regression coverage
@@ -124,7 +134,7 @@
         cpu: 2
         ram: 2048
         disks:
-          - 10@debian:11
+          - "10@{{ debian_11_base }}"
         diskspecs:
           - size=20,type=cdrom
         networks:
@@ -182,7 +192,7 @@
         cpu: 2
         ram: 2048
         disks:
-          - 10@debian:11
+          - "10@{{ debian_11_base }}"
         diskspecs:
           - size=20,type=cdrom
         networks:
@@ -224,7 +234,7 @@
         cpu: 2
         ram: 2048
         disks:
-          - 10@debian:11
+          - "10@{{ debian_11_base }}"
         diskspecs:
           - size=30,type=cdrom
         networks:
@@ -271,7 +281,7 @@
         cpu: 1
         ram: 1024
         disks:
-          - 10@debian:11
+          - "10@{{ debian_11_base }}"
         state: present
         await_placement: true
       register: ci_instance_placed
