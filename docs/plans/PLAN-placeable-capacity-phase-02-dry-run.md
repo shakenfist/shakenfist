@@ -321,12 +321,36 @@ comments warn about twice. An operator wanting a per-node answer
 asks `POST /placement` with the shape they care about. The master
 plan's sentence is corrected rather than silently not done.
 
-**`D7`. Phase 1's core is not changed.** Not its signature, not
-its return type, not its stage names, not its events. `F4` settles
-the question phase 1 left open in favour of the existing type. If
-this phase finds it needs a change there, that is a finding to
-report before making it, because phases 3 and 4 are built on the
-same core and a change here is paid for by both.
+**`D7`. Phase 1's core is not changed, with one amendment made
+during execution.** Not its signature, not its return type, not its
+stage names, not its events. `F4` settles the question phase 1 left
+open in favour of the existing type.
+
+**Amended once, deliberately.** Step 2a reported that the refusal a
+set raises names the stage but not *which* shape was being walked,
+which a caller asking about several shapes cannot act on. It
+obtained the index without touching the core, by binary searching
+prefixes of the walk order -- sound, because prefix refusal is
+monotone, and documented as such. That was the wrong shape for
+three reasons, so `D7` was amended to authorise one change to
+`shakenfist/scheduler.py` and `shakenfist/exceptions.py`: the
+master plan's `G7` already requires a hold refusal to name "the
+shape and stage", so phases 3 to 5 need the index on the exception
+regardless and would otherwise rebuild or remove the search; a
+refusal is the common case for a query rather than the exceptional
+one, so up to six extra walks of the whole pipeline land on the
+path the endpoint exercises most; and recovering the order from
+`_shapes_largest_first`, a private module helper, coupled the API
+layer to an internal that is free to change. The index now rides on
+`SchedulerException` beside `stage`, attached by the set loop
+because that is the only scope which knows it, and re-raised bare
+so the class, message, stage and traceback are exactly what the
+stage raised. Every phase 1 test passes unmodified.
+
+The clause the amendment replaces still stands for anything else: a
+further change to the core is a finding to report before making it,
+because phases 3 and 4 are built on it and a change there is paid
+for by both.
 
 **`D8`. client-python gets a method and a capability probe, not
 verbs.** One `apiclient` method taking the shape list and
@@ -366,8 +390,15 @@ Steps 2a, 2c and 2e run in sequence in the shakenfist worktree:
 each runs `tox` and `pre-commit` in that tree, and each depends on
 2a's code. Step 2b may run beside 2c or 2e only if the management
 session is not already running a check in that tree; the simplest
-order is sequential. Step 2d is in a different repository and a
-different worktree, so it can run in parallel with any of them.
+order is sequential.
+
+Step 2d is in a different repository and a different worktree, so
+nothing it does collides with a check running here -- but it still
+runs *after* 2a rather than beside it, because its own brief tells
+it to read 2a's request and response shapes, and 2a decides two
+things the client method has to match. An earlier draft of this
+paragraph said 2d could run in parallel with any step; the brief
+was right and the paragraph was wrong.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
@@ -436,17 +467,27 @@ way around.
 2. One capability token was added, and it is advertised:
    `shakenfist/tests/external_api/test_root.py` asserts it, and
    `declared_tokens(API_CAPABILITIES)` contains it.
-3. No stage name was minted. `git diff develop..HEAD --
-   shakenfist/scheduler.py` is empty, and `grep -c
-   '_log_and_raise_on_error('` on `shakenfist/scheduler.py` is
-   still 10 -- one definition and nine call sites.
+3. No stage name was minted, and the core changed only as
+   `D7`'s amendment authorises. `git diff develop..HEAD --
+   shakenfist/scheduler.py` touches nothing but the set loop's
+   attachment of the refused shape's index and the docstring which
+   describes it; `grep -c '_log_and_raise_on_error('` on
+   `shakenfist/scheduler.py` is still 10 -- one definition and nine
+   call sites -- and no stage string, event name or payload
+   changed. Every pre-existing test in
+   `shakenfist/tests/test_scheduler.py` passes unmodified.
 4. A set that does not fit is a 200. A test asserts the status
    code is 200, that `fits` is false, and that `stage` is one of
    the names `_log_and_raise_on_error()` reports; and a test
    asserts a 507 is *not* returned.
-5. A dry run publishes no events. A test patches
-   `add_event_multi` and asserts it was called zero times for a
-   complete successful query, and zero times for a refused one.
+5. A dry run publishes no events. Asserting this by patching
+   `add_event_multi` and expecting zero calls, as this item first
+   said, is not achievable and never was: the core calls it around
+   fourteen times per shape, and it is `eventlog.add_event_multi`
+   which returns early when the target list is empty. So the
+   assertion is one step further out -- nothing reached
+   `eventlog_spool.enqueue` for either a successful or a refused
+   query, and every call the walk made carried no targets.
 6. The disk sum has one implementation. `grep -rn "disk_spec"
    shakenfist/external_api/` shows the new handler calling
    `mariadb.disk_spec_virtual_gb()` and no arithmetic of its own.
@@ -506,3 +547,64 @@ Four things need Michael's answer before step 2a runs.
 One thing explicitly does not need an answer: whether to fix issue
 #4842 here. It is filed, it is a create-path type error, and this
 phase's scope says no.
+
+## Execution notes
+
+**2026-11-08 (AEDT). Back brief answered before step 2a ran.** All
+four points went to Michael in one question and all four came back
+as the plan recommended: `D1`'s per-node detail is admin-only, with
+a non-admin caller answered at set level; `D4`'s refusal is a 200
+carrying `fits: false`; `D10`'s bound is a published constant of 64
+rather than a configuration setting; and this session may push and
+open both pull requests without asking again.
+
+**Step order departed from the step plan's preamble.** Step 2d runs
+after 2a rather than beside it. The preamble has been corrected
+where it said otherwise -- 2d's own brief depends on 2a's request
+and response shapes, and on the two judgement calls 2a makes.
+
+**`D7` was amended during step 2a**, to authorise one change to the
+placement core. The decision records the reasoning and what was
+built and then removed; the short version is that the refused
+shape's index belongs on the exception, because the master plan's
+`G7` needs it for hold refusals too and recovering it afterwards
+costs extra walks of the pipeline on the path which has just
+failed.
+
+**Two of this phase's own claims were wrong, and are corrected at
+source rather than worked around.** Definition-of-done item 5 asked
+for an assertion that cannot hold, and now asks for the one that
+can. And a review note from the management session asserted that
+the endpoint's declared 503 was never produced; step 2a disproved
+it by probing the running endpoint --
+`handle_database_unavailable` is in `Resource.method_decorators`,
+so an unreachable database answers 503 for every handler, which is
+how the other endpoints' declared 503s are produced as well. The
+real defect was the declaration's wording, which promised a 503 for
+an unreadable *capacity* read; phase 1 deliberately degrades that
+read and answers anyway, so the declaration now says so and both
+halves are tested.
+
+**One thing step 2a offered to defer was taken instead.** It
+reported that the query accepted affinity documents the create path
+refuses, because the published schema types `affinity` as an
+unconstrained object, and asked whether to act. Taken: a query
+which answers "that would fit" about a document a create answers
+400 to is the divergence this phase exists to prevent, and a
+mistyped constraint read as no constraint at all is worse than a
+refusal. The create path's validation was extracted into one shared
+implementation rather than copied, with its error strings unchanged.
+
+**One extra from step 2a was kept deliberately.**
+`caller_has_admin_rights()` in `shakenfist/external_api/base.py`
+splits the admin predicate out of the `caller_is_admin` decorator,
+so the endpoint's disclosure boundary and the decorator which
+enforces it read one definition. It is what
+`docs/developer_guide/coding_rules.md`'s "Never restate a
+visibility predicate" asks for, and the decorator still decides on
+its own whether to answer 401 or 403.
+
+**A brief given to a step contained a false premise, which the step
+caught.** Step 2a was told flake8 here enforces 79 columns. It
+enforces 120 (`tools/flake8wrap.sh`). Nothing was mis-wrapped as a
+result, but the correction belongs in the record.
