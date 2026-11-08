@@ -310,6 +310,17 @@ recorded and nothing changes -- a dict built and dropped is not a
 defect, and the guard would be a conditional on a correctness-
 critical path bought with nothing.
 
+**Amended by the measurement, which rejected this decision's own
+remedy.** Step 2e found that the cost is not dict assembly at all:
+`Instance.tags` is an uncached metadata read, so the payload drives
+database round trips, and the two preferred-tag loops read it once per
+tag the caller named rather than once per neighbour. The guard
+prescribed above removes 6,000 redundant reads of an eight-shape query
+on a twenty-node cluster; reading the tags into a local once per
+neighbour removes 8,000, costs no conditional, and leaves the guard
+with nothing to save. The local is what was implemented. The Results
+section carries the counts and the arithmetic.
+
 **`D6`. `/admin/resources` is left alone.** The master plan's
 instruction to "show the per-node answer" there cannot be followed
 literally: a per-node verdict is a verdict about a shape, and that
@@ -547,6 +558,119 @@ Four things need Michael's answer before step 2a runs.
 One thing explicitly does not need an answer: whether to fix issue
 #4842 here. It is filed, it is a create-path type error, and this
 phase's scope says no.
+
+## Results
+
+### Step 2c: do the placement tests bite?
+
+Ten mutations, each applied to the live file from a pristine copy held
+outside the worktree and restored in a `finally`, never with `git
+checkout`; the tree was compared byte for byte afterwards. Seven were
+caught as written. Three were not, and each survivor was a real gap
+rather than an equivalent mutant:
+
+| Mutation | Caught | Pinned by |
+|---|---|---|
+| Drop the `count` expansion | yes | two verdict tests |
+| Local sum instead of the ledger's disk helper | **no** | now a null-size test |
+| `fits: true` whenever the core did not raise | yes | seven tests |
+| Per-node detail to a non-admin | yes | the tenant disclosure test |
+| Drop the shape bound | yes | the expanded-total test |
+| Name event targets, so a query publishes | yes | two publishing tests |
+| Render the answer in walk order | **no** | now a request-order test |
+| Remove the shape index attachment | yes | seven tests |
+| Set the shape index unconditionally | **no** | now a pre-set-index test |
+| Query affinity validation made a no-op | yes | the query-and-create test |
+
+The disk survivor is the instructive one. Substituting
+`int(d.get('size', 0))` for the ledger's own helper passed every test,
+because every size the tests used was a plain integer -- and at the
+shipped validation mode the integer field refuses a fractional or
+string size before the handler sees it, so the rounding the helper
+documents is unreachable from this endpoint. What *is* reachable is a
+present-but-null size, which the schema documents as meaning "the size
+of the base image": the helper skips it, and a local sum evaluates
+`int(None)` and turns a documented request into a server error. That
+is the test which now pins the delegation, and it runs at the default
+rather than on an operator's rollback.
+
+### Step 2e: what does a discarded event payload cost?
+
+The first measurement said about 1.5 ms of CPU per eight-shape query,
+some 23% of the walk, attributed by timing a stripped copy of the
+methods swapped in through `__code__` so the tree was never edited.
+Read on its own that number says the construction is too cheap to be
+worth guarding.
+
+It was the wrong number. `BaseObject.metadata` is an uncached
+property: every access is a `get_object_metadata()` call, and the only
+`attribute_memo()` in the scheduler covers the requesting instance's
+own attributes rather than the placed neighbours whose tags the
+affinity payload reads. In the measurement fixture that read is a
+mock costing nothing, so what was timed was dict assembly with the
+expensive part stubbed out.
+
+Counting the reads instead settled it, and counts are deterministic
+where timings are not. For an eight-shape query against twenty nodes
+holding fifty instances each, repeated three times with identical
+results each time:
+
+| Variant | `get_object_metadata` calls |
+|---|---|
+| As written | 20,000 |
+| Payload construction stripped out | 14,000 |
+| Tags read once per neighbour | 12,000 |
+
+The distinct rows read are identical in all three, so every one of
+those differences is a repeat read of a row already fetched.
+
+The defect was worse than "four reads per neighbour", which is what it
+looks like from the source. The two preferred-tag loops read
+`Instance.tags` once **per tag the caller named**, so the cost of
+scoring a neighbour grew with the size of the affinity specification
+while the information gained stayed the same. A seven-tag preference
+paid seven reads of one row where one would do.
+
+`D5` is therefore amended, and the amendment is a rejection of its own
+remedy on evidence. Guarding payload construction -- which `D5` and
+the master plan both prescribed -- is the middle row: it removes 6,000
+of the redundant reads and buys a conditional on the placement path to
+do it. Reading the tags into a local once per neighbour removes 8,000,
+costs no branch, and subsumes the guard entirely: measured on the
+fixed tree, stripping the payload now saves *nothing at all*, because
+the payload no longer issues a read. The hoist is sound for the reason
+the set walk already relies on -- a decision is a snapshot, a set
+places nothing, so no neighbour's tags can change while the walk is in
+progress, which is the same reasoning behind the memo that reads each
+node's placed instances once for the whole set.
+
+Two tests pin it, by read count rather than by timing, so a
+reintroduced repeat fails rather than merely slowing down: one asserts
+the exact count for a known fixture with the arithmetic in its
+docstring, and one asserts that the count does not move when the
+affinity specification names seven tags instead of one -- the per-tag
+growth being the part a single-tag test would have missed.
+
+### A larger saving, left alone deliberately
+
+Two further reductions were found and not taken, both because they
+reach past this phase's scope rather than because they are wrong.
+
+The skip predicate tests `i.tags` before it tests the namespace, and
+`Instance.namespace` is a plain attribute while `i.tags` is a database
+read. So every query reads the metadata of every placed instance in
+every *other* namespace and then discards it -- on a cluster with many
+namespaces that is most of the reads it makes. Swapping the two tests
+would cost nothing and save all of them, but it changes which reason
+an audit event reports for an instance that is both tagless and
+foreign, and this phase changes no event payload.
+
+Beyond that, a per-decision metadata memo on the set walk would
+collapse repeated reads of one instance across shapes and stages, and
+would save considerably more than reading the tags into a local does.
+That is a change to how the set walk caches, which is the placement
+core's own design, and it wants its own tests and its own thought
+rather than a corner of this one.
 
 ## Execution notes
 
