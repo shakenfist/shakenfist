@@ -1,4 +1,5 @@
 from typing import Any
+from typing import Optional
 
 
 class HTTPError(Exception):
@@ -123,11 +124,28 @@ class SchedulerException(Exception):
     Nothing may re-derive it by parsing str(exception): that would make
     the message prose load-bearing, which the structured field exists
     to prevent.
+
+    ``shape`` names *which* member of a requested set of shapes the
+    refusal was walking, as its index in the list the caller handed
+    over. A set is placed all or nothing, so a caller told only the
+    stage knows that something did not fit but not what, and a request
+    carrying several shapes cannot act on that. It is None where the
+    refusal was not walking a set member at all, which is every
+    refusal raised outside the set placement walk.
+
+    The index rides on the exception rather than being worked out
+    afterwards by asking the pipeline smaller questions, because every
+    caller which reports a refusal needs it -- a booking which cannot
+    be made has to name the shape as well as the stage -- and because
+    re-deriving it means walking the pipeline again on the path which
+    has just failed.
     """
 
-    def __init__(self, *args: Any, stage: str = '') -> None:
+    def __init__(self, *args: Any, stage: str = '',
+                 shape: Optional[int] = None) -> None:
         super().__init__(*args)
         self.stage: str = stage
+        self.shape: Optional[int] = shape
 
 
 class CandidateNodeNotFoundException(SchedulerException):

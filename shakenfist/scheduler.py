@@ -1235,10 +1235,14 @@ class Scheduler:
         All or nothing. A shape which runs out of candidates at any
         stage raises exactly what that stage raises for a single
         request, with the same exception class and the same stage, and
-        the assignment built so far is discarded. A caller is given a
-        placement for every shape it asked for, or none at all. There is
-        nothing to roll back when that happens, because the charges were
-        never anywhere but the snapshot. The audit events are not
+        the assignment built so far is discarded. The exception also
+        carries the refused shape's index in ``shapes``, because a
+        stage on its own tells a caller that something did not fit but
+        not what, which a caller asking about several shapes cannot
+        act on. A caller is given a placement for every shape it asked
+        for, or none at all. There is nothing to roll back when that
+        happens, because the charges were never anywhere but the
+        snapshot. The audit events are not
         unwound, though: a set refused on its fourth shape has already
         published a full stage sequence for the three before it, which
         are durable records of placements that did not happen. A
@@ -1320,9 +1324,27 @@ class Scheduler:
         assignment = {}
         for index in _shapes_largest_first(shapes):
             shape = shapes[index]
-            assignment[index] = self._find_candidates_for_shape(
-                shape, candidates, related_objects, log_ctx, snapshot,
-                metrics_refreshed, placements)
+            try:
+                assignment[index] = self._find_candidates_for_shape(
+                    shape, candidates, related_objects, log_ctx, snapshot,
+                    metrics_refreshed, placements)
+            except exceptions.SchedulerException as e:
+                # Which shape was being walked is attached here rather
+                # than at each of the stages which raise, because this
+                # loop is the only scope that knows the index: a stage
+                # is handed a shape and has no idea where in the
+                # caller's list it came from. Set only when it is not
+                # already set, so a future refusal raised closer to
+                # the shape than this stays authoritative.
+                #
+                # A bare re-raise, so the class, the message, the stage
+                # and the traceback are all exactly what the stage
+                # raised. Nothing else about the refusal changes, and a
+                # caller which does not read the index cannot tell the
+                # difference.
+                if e.shape is None:
+                    e.shape = index
+                raise
             # The head of the list is where the caller will put this
             # shape, so that is what the shapes after it are told to
             # expect. Charged even for the last shape in a set, so that

@@ -3155,6 +3155,69 @@ class MultisetPlacementTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_idle_memory',
             str(exc))
+        # The fourth shape of four is the one that ran out, and the
+        # refusal says so: a caller told only the stage knows that
+        # something did not fit and not what.
+        self.assertEqual(3, exc.shape)
+
+    def test_a_refusal_names_the_shape_in_the_callers_own_order(self):
+        # The set is walked largest first, so the shape which runs out
+        # here is the second one the caller listed -- the only one too
+        # large for any node -- and it is neither the first shape nor
+        # the last. An index counting the shapes already placed, or
+        # counting in the walk's own order, would be wrong in both
+        # directions, and a caller cannot map either back onto the list
+        # it sent.
+        self.mock_mariadb.set_node_metrics_same(
+            self._baseline(memory_available=8192))
+        s = scheduler.Scheduler()
+
+        exc = self.assertRaises(
+            exceptions.LowResourceException, s.find_candidates_for_shapes,
+            [self._shape(memory_mb=1024), self._shape(memory_mb=65536),
+             self._shape(memory_mb=1024)])
+
+        self.assertEqual('sufficient_idle_memory', exc.stage)
+        self.assertEqual(1, exc.shape)
+
+    def test_a_hard_affinity_refusal_names_its_shape_too(self):
+        # The other exception class the walk raises carries the index
+        # on the same field, so a caller reads one place whatever
+        # refused. The second shape is the one with the constraint.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        s = scheduler.Scheduler()
+
+        exc = self.assertRaises(
+            exceptions.AffinityConstraintUnsatisfiable,
+            s.find_candidates_for_shapes,
+            [self._shape(),
+             self._shape(affinity={'require_with_tag': ['database']})])
+
+        self.assertEqual('affinity_constraints', exc.stage)
+        self.assertEqual(1, exc.shape)
+
+    def test_a_single_shape_refusal_names_shape_zero(self):
+        # The one-shape caller is a set of one, so the field is present
+        # and is 0 rather than absent. A caller which reads it does not
+        # have to special case the single request path.
+        self.mock_mariadb.set_node_metrics_same(
+            self._baseline(memory_available=1024))
+        s = scheduler.Scheduler()
+
+        exc = self.assertRaises(
+            exceptions.LowResourceException, s.find_candidates_for_shapes,
+            [self._shape(memory_mb=65536)])
+
+        self.assertEqual(0, exc.shape)
+
+    def test_a_refusal_outside_the_walk_names_no_shape(self):
+        # The field defaults to None, so a refusal raised by something
+        # which was not walking a set member -- the capacity guard, for
+        # one -- does not claim to name a shape. A default of 0 would
+        # have every such refusal pointing at the first one.
+        self.assertIsNone(exceptions.LowResourceException('nope').shape)
+        self.assertIsNone(
+            exceptions.LowResourceException('nope', stage='whatever').shape)
 
     def test_a_disk_charge_is_debited_in_bytes(self):
         # disk_free_instances is published in bytes and a shape's disk is
