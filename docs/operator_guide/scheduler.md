@@ -90,6 +90,61 @@ was affine to silently placed it anywhere with headroom, and the
 anti-affinity case could leave an instance on the one node it was
 asked to avoid.
 
+## Asking whether a set of instances would fit
+
+`POST /placement` asks the placement pipeline above whether a set of
+instances *would* be placed, before anything is created. The request is
+a list of shapes -- `cpus`, `memory` in megabytes, optionally `disk` in
+gigabytes (or a `disk_spec` list in the form an instance create takes),
+an optional `affinity` document and an optional `count`. Each shape is
+walked through the real stages in order, and is charged to the node it
+would land on before the next shape is considered, so a set is never
+told that two of its members fit in one node's worth of room. Any
+authenticated caller may ask, and the question is evaluated in the
+caller's own namespace, so affinity stages count only that namespace's
+instances. A client learns the endpoint exists from the
+`placement-query` capability.
+
+* **It writes nothing and publishes nothing.** No instance, no capacity
+  counter and no claim is created or changed, and no audit events are
+  published, so a speculative query leaves no trail against anybody's
+  instance.
+* **The answer is advisory and racy by construction.** Nothing is
+  reserved. Room found by a query can be gone by the next request, and a
+  create is still admitted or refused by the guarded capacity claim
+  described below. Treat `fits: true` as data about the cluster a moment
+  ago, not as a promise.
+* **A set which does not fit is a 200, not a 507.** The question was
+  answered successfully; the answer is `fits: false`. The response names
+  the pipeline `stage` which emptied the candidate list (for example
+  `sufficient_idle_memory` or `capacity_guard`, in the same vocabulary
+  the placement events use) and the index, `shape`, of the shape being
+  walked, counted after `count` has been expanded. A 507 remains what a
+  create gets. A 503 means the database could not be reached and the
+  question could not be answered; retry.
+* **Per-node detail requires admin.** A cluster administrator also
+  receives, for a set that fits, a `shapes` array in the order asked,
+  giving each shape's chosen `node` and its `candidates` (the chosen
+  node first, followed by fallbacks). Every other caller receives only
+  the set-level verdict, including the refusing stage, because node
+  identity is cluster topology that no other endpoint gives to a
+  non-administrator.
+* **The set is bounded.** A query may ask about at most 64 shapes,
+  counted after each shape's `count` is expanded. More is a 400 naming
+  the bound. A short request body can otherwise buy a long walk.
+
+### Why `GET /admin/resources` does not answer this
+
+The first instinct when asking "is there room?" is to read
+`/admin/resources`. It cannot answer the question: whether a node has
+room is a verdict about a *shape*, and that endpoint takes no shape. It
+reports per-node figures, not whether a particular request would be
+accepted by the filters, affinity stages and the capacity guard. Deriving
+an answer from those figures by hand is a second, independent
+implementation of the pipeline which will drift from the real one. To
+get a per-node answer, ask `POST /placement` with the shape you care
+about, as an administrator.
+
 ## System reservations
 
 Some of a machine's capacity is never offered to instances. Each

@@ -1,6 +1,6 @@
 # Documentation state:
 #   - OpenAPI complete: yes
-#   - Covered in user or operator docs: no
+#   - Covered in user or operator docs: yes
 #   - API reference docs exist: no
 #        - and link to OpenAPI docs: no
 #        - and include examples: no
