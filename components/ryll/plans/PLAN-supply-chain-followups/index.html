@@ -13056,6 +13056,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#6-pin-utils-011-unmaintained-rustsec-2026-0441" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. pin-utils 0.1.1 unmaintained (RUSTSEC-2026-0441)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -16111,6 +16122,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#6-pin-utils-011-unmaintained-rustsec-2026-0441" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. pin-utils 0.1.1 unmaintained (RUSTSEC-2026-0441)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -16323,6 +16345,47 @@ below. When an ignore is resolved, delete both the
 <li><strong>Remove ignore when:</strong> <code>zbus</code> 5.x (and with it these
   three crates) no longer appears in <code>cargo tree</code>.</li>
 </ul>
+<h3 id="6-pin-utils-011-unmaintained-rustsec-2026-0441">6. <code>pin-utils</code> 0.1.1 unmaintained (RUSTSEC-2026-0441)<a class="headerlink" href="#6-pin-utils-011-unmaintained-rustsec-2026-0441" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Ignore rationale:</strong> the upstream repository was archived
+  on 1 October 2026 after the 0.1.1 release and there is no
+  successor crate, so no version bump can clear this one
+  (<code>cargo deny</code> says so itself: "No safe upgrade is
+  available!"). It reaches us by two transitive paths:
+  <code>shakenfist-spice-renderer</code>'s <code>rtp</code> 0.17 dev-dependency -&gt;
+  <code>webrtc-util</code> 0.17.2 -&gt; <code>nix</code> 0.26.4, and
+  <code>ironrdp-connector</code> -&gt; <code>sspi</code> -&gt; <code>async-dnssd</code>. Both
+  scanners read the whole lockfile rather than a feature
+  resolution, so feature-gating a path would not help even
+  where we could.</li>
+<li><strong>Attack surface:</strong> none of substance. <code>pin-utils</code> is three
+  pinning macros with no parsing, I/O or arithmetic; this is
+  an unmaintained-status advisory, not a vulnerability. Its
+  only widely used macro, <code>pin_mut!</code>, has a std replacement
+  in <code>core::pin::pin!</code> (stable since Rust 1.68), so the
+  crates that still carry it have a cheap way out when they
+  get to it. Neither path reaches a shipped artefact either:
+  the first is a dev-dependency used only by
+  <code>tests/webrtc_h264_smoke.rs</code>, and the second arrives
+  through <code>shakenfist-spice-rdp</code> behind the default-off <code>rdp</code>
+  feature, which release builds do not enable. That makes
+  this a weaker-risk acceptance than items 2 and 3, which are
+  in the shipped TLS path; the ignore exists only because
+  both scanners read the lockfile rather than a feature
+  resolution.</li>
+<li><strong>Action plan:</strong></li>
+<li>Move the renderer's <code>webrtc_h264_smoke</code> dev-dependency
+     from <code>rtp</code> 0.17 onto <code>rtc::rtp</code>, which the webrtc 0.20
+     port already pulls into the lockfile. That retires the
+     first path along with a dead upstream line, and is
+     already recorded in PLAN-webrtc-0.20-upgrade.md's
+     Future work.</li>
+<li>Track ironrdp / sspi for a release that drops
+     <code>async-dnssd</code>. Re-check on each ironrdp bump; renovate
+     opens those for us.</li>
+<li><strong>Remove ignore when:</strong> <code>pin-utils</code> no longer appears in
+  <code>cargo tree</code>.</li>
+</ul>
 <h2 id="also-tracked-duplicate-version-warnings">Also tracked: duplicate-version warnings<a class="headerlink" href="#also-tracked-duplicate-version-warnings" title="Permanent link">&para;</a></h2>
 <p><code>cargo deny check</code> currently reports ~45 duplicate-version
 warnings (set to <code>warn</code>, not <code>deny</code>). Most are in the
@@ -16385,6 +16448,14 @@ practice it is the most exposed parser surface we ship.</p>
 <li>Consider a recurring monthly cron that opens an issue if
   new advisories appear (<code>cargo audit</code> in CI produces the
   signal; we need a mechanism to route it).</li>
+<li>Fail CI on a set difference between the advisory IDs in
+  <code>deny.toml</code> and those in <code>.cargo/audit.toml</code>. Forgetting
+  <code>.cargo/audit.toml</code> already turns the <code>cargo audit</code> job
+  red, but the reverse is silent, so a stale entry in either
+  file survives until someone notices by hand -- which is how
+  the September 2026 sweep above found its four. A periodic
+  run with an empty ignore list would surface the same thing
+  from the other side, as IDs reported <code>advisory-not-detected</code>.</li>
 </ul>
 
 
