@@ -39,6 +39,53 @@ MODULE_UTILS_PACKAGE = \
 SF_CONNECTION_NAME = MODULE_UTILS_PACKAGE + '.sf_connection'
 
 
+class ModuleOutcome(Exception):
+    """A collection module reached a terminal exit_json()/fail_json().
+
+    The real AnsibleModule's exit_json() and fail_json() end the process,
+    and the code after each call site in the modules is written on that
+    basis, so a stub which merely recorded the call would let a test run
+    code which cannot run in production. The stubs therefore raise, and
+    these are what they raise.
+
+    They are ordinary exceptions and deliberately NOT SystemExit
+    subclasses, which is what the real pair raise. Issue 4815: as
+    SystemExit subclasses they were not Exceptions, so when a module took
+    the other outcome than the one a test named, assertRaises() did not
+    catch it, testtools did not catch it either, and it propagated out of
+    the test runner -- killing the stestr worker. The worker's remaining
+    tests then silently dropped out of the totals, and the mismatch was
+    reported as a crashed worker rather than as the one failing
+    assertion. The fidelity that buys nothing is not worth that, and the
+    collection has no handler which would swallow one of these: the only
+    `except Exception` in plugins/ wraps a client call, not a terminal
+    call.
+
+    result carries the kwargs the module passed, for the stubs which
+    record them on the exception rather than on themselves. A stub
+    installed as a mock side_effect is raised with no arguments, so it
+    must stay optional.
+    """
+
+    message = 'module reached a terminal outcome'
+
+    def __init__(self, result=None):
+        super().__init__(self.message)
+        self.result = result
+
+
+class ModuleExited(ModuleOutcome):
+    """The module called exit_json()."""
+
+    message = 'module exited'
+
+
+class ModuleFailed(ModuleOutcome):
+    """The module called fail_json()."""
+
+    message = 'module failed'
+
+
 def _stub_modules(apiclient_attrs):
     """The stub module tree the collection code imports.
 
@@ -78,7 +125,12 @@ def _stub_modules(apiclient_attrs):
                      'InsufficientResourcesException',
                      'ResourceStateConflictException'):
         setattr(apiclient, specific, type(specific, (_APIException, ), {}))
-    apiclient.UnconfiguredException = Exception
+    # A class of its own rather than Exception itself: as an alias,
+    # `except apiclient.UnconfiguredException` in make_client() caught
+    # everything the client constructor could raise, including a stub's
+    # own ModuleOutcome, which is not what it catches in production.
+    apiclient.UnconfiguredException = type(
+        'UnconfiguredException', (Exception, ), {})
     apiclient.ASYNC_BLOCK = 'block'
     apiclient.ASYNC_CONTINUE = 'continue'
     apiclient.Client = mock.MagicMock()
