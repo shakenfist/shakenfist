@@ -536,6 +536,13 @@ jobs:
   # smaller one; what a weekly run gives up is noticing a base image or a
   # Kerbside regression on the merge which caused it rather than within a
   # week of it.
+  #
+  # Ansible modules and Node lifecycle moved to the weekly run for the same
+  # trade. Over thirty days they failed alone three times and once, and
+  # neither failure was caused by the change under test, so what each merge
+  # was paying for was two more nested clusters rather than a bug it would
+  # have caught. Both are lanes of functional-lanes.yml now, so the same
+  # exactly-one-tier check covers them.
   functional_lanes:
     name: "Functional lanes"
     if: >-
@@ -546,228 +553,6 @@ jobs:
     with:
       lanes: >-
         ["debian-13-slim-primary", "guests"]
-
-  # Native-module lifecycle CI: deploys via the reusable smoke-cluster workflow
-  # (slim-primary) and runs ansiblemoduletests.sh against the installed
-  # shakenfist.shakenfist collection. Gated by can_merge.
-  ansible_modules_collection:
-    name: "Ansible modules (collection)"
-    if: >-
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
-      && needs.check_paths.outputs.code_changed != 'false'
-    needs: [check_paths]
-    uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
-    with:
-      component: shakenfist
-      component_ref: ${{ github.sha }}
-      # Not gated, although this job is now measured. shakenfist/actions#120
-      # widened the probe steps to admit ansible-modules, so the collect step
-      # runs here and banks a series. The band it would be gated against was
-      # fitted to the shapes the warn window read, and this suite was not one
-      # of them -- so the reusable workflow resolves CI_HEADROOM_GATE to false
-      # for any test_kind but functional whatever a caller passes, and passing
-      # false here is that policy stated where review sees it. See the smoke
-      # tier job above.
-      headroom_gate: false
-      tier: full
-      topology: slim-primary
-      base_image: 'sf://label/ci-images/debian-13'
-      base_image_user: debian
-      test_kind: ansible-modules
-      concurrency_key: ansible-modules
-
-  # Node lifecycle CI: deploys via the collection, then runs
-  # nodelifecycletests.sh, which disturbs the cluster (powers nodes off), hence
-  # the under-cloud node restart, ServerAlive ssh and node-lifecycle log tag in
-  # the teardown. Does not use the reusable workflow (its teardown assumes nodes
-  # stay up); only the deploy is shared. Gated by can_merge.
-  node_lifecycle_collection:
-    name: "Node lifecycle (collection)"
-    if: >-
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
-      && needs.check_paths.outputs.code_changed != 'false'
-    needs: [check_paths]
-    # Carries a size element for the same reason smoke-cluster.yml does:
-    # without one the conductor falls back to xs (1 vCPU / 2048 MB), and
-    # this job drives a full ansible deploy from the runner. Measured
-    # demand is ~2.5-2.7 GB against 1927 MB usable and no swap. See
-    # shakenfist/shakenfist#3696.
-    #
-    # The size is s-cluster rather than s: the same footprint as s (the
-    # runner is still an orchestrator), but a pending pool of its own
-    # for jobs that build a multi-node cluster, so this job does not set
-    # the capacity claim of every lint runner on s. This builds the
-    # five-node slim-primary topology, which smoke-cluster.yml also
-    # routes to s-cluster. See shakenfist/private-ci
-    # docs/capacity-claims.md, "Cloud-building jobs".
-    runs-on: [self-hosted, vm, debian-13, s-cluster]
-    # The deploy and test steps below are capped at 90 and 60 minutes;
-    # this is the backstop for the setup and teardown around them, and
-    # is still far short of GitHub's six hour default.
-    timeout-minutes: 180
-    # Keyed as automated_delinter's is, for the reasons given there.
-    concurrency:
-      group: >-
-        ${{ github.workflow }}-nodelifecycle-collection-${{
-        github.event_name == 'merge_group' && github.run_attempt == '1'
-        && format('merge_group-{0}', github.event.merge_group.base_ref)
-        || github.ref }}
-      cancel-in-progress: true
-
-    steps:
-      - name: Setup test environment
-        uses: shakenfist/actions/setup-test-environment@main
-
-      # The deploy is the build-smoke-cluster composite action (shared with
-      # the reusable smoke-cluster workflow); only this job's teardown is
-      # bespoke, because the lifecycle test powers nodes off.
-      - name: Build the smoke cluster
-        timeout-minutes: 90
-        uses: shakenfist/actions/build-smoke-cluster@main
-        with:
-          topology: slim-primary
-
-      # The lifecycle test kills nodes, so upload the cached image to a
-      # random hypervisor rather than the primary the action selected --
-      # matching the getsf-era behaviour of exercising non-primary uploads.
-      - name: Choose a random upload target
-        run: |
-          nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
-          random_index=$(( RANDOM % 5 ))
-          echo "UPLOAD_TARGET=${nodes[$random_index]}" >> $GITHUB_ENV
-
-      - name: Import cached images to the random target
-        run: |
-          set -e
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-
-          setup="export PATH=$PATH:/srv/shakenfist/venv/bin;"
-          setup="${setup} . /etc/sf/sfrc;"
-          setup="${setup} export SHAKENFIST_API_URL=http://localhost:13000;"
-          setup="${setup} /srv/shakenfist/venv/bin/sf-client artifact upload"
-
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              debian@${UPLOAD_TARGET} \
-              "${setup} debian /srv/ci/debian:13 --shared --no-checksum"
-
-
-      - name: Run node lifecycle tests
-        timeout-minutes: 60
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          scp -rp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${GITHUB_WORKSPACE}/shakenfist \
-              debian@$primary:shakenfist
-          # The lifecycle test terminates its victim node via the
-          # under-cloud API (in-guest kills are not durable -- see the
-          # under-cloud kill comment in nodelifecycletests.sh), so it
-          # needs this runner's under-cloud credentials and the node
-          # name -> under-cloud instance uuid map from ci-environment.sh.
-          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${HOME}/.shakenfist \
-              debian@$primary:undercloud-creds.json
-          scp -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${GITHUB_WORKSPACE}/ci-environment.sh \
-              debian@$primary:ci-environment.sh
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              debian@$primary "chmod u=r,go= undercloud-creds.json"
-          # ServerAliveInterval/ServerAliveCountMax: if the remote host
-          # goes down (e.g. a lifecycle test bug takes out the script's
-          # own host), the TCP connection can sit half-open until the
-          # default TCP keepalive eventually times out -- hours later,
-          # well past the GitHub step budget. With these options ssh
-          # notices a dead connection in roughly 30 s and the step fails
-          # fast instead.
-          ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              -o ServerAliveInterval=10 -o ServerAliveCountMax=3 \
-              debian@$primary "cd shakenfist/shakenfist/deploy; . /etc/sf/sfrc; bash nodelifecycletests.sh"
-
-      - name: Check logs
-        id: check_logs
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} "sudo bash tools/ci_log_checks_loki.sh develop node-lifecycle"
-
-      - name: Dump systemd state and journals
-        if: always() && steps.check_logs.outcome == 'failure'
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cd ${GITHUB_WORKSPACE}/actions
-          tools/run_remote ${primary} 'echo "=== systemctl --failed (primary) ==="; sudo systemctl --failed --no-pager; echo "=== journalctl sf-* (primary, last 200 warn+) ==="; sudo journalctl -u "sf-*.service" -p warning -n 200 --no-pager' || true
-
-      - name: Restart Shaken Fist nodes so we can collect logs
-        if: always()
-        # Log collection is best effort: the functional tests above are
-        # the merge gate. Nodes failing to return from the post-test
-        # reboot has burned three merge queue attempts where the tests
-        # themselves passed. The script still dumps instance state and
-        # guest consoles so the boot wedge stays diagnosable.
-        continue-on-error: true
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          bash ${GITHUB_WORKSPACE}/shakenfist/tools/ci-restart-cluster-nodes.sh debian
-
-      - name: Per-node system-level checks
-        if: always()
-        run: |
-          . ${GITHUB_WORKSPACE}/ci-environment.sh
-          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
-          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
-          chown -R debian.debian /home/debian/.ssh
-          ansible-playbook -i /srv/github/ci-inventory.yaml \
-              --extra-vars "base_image_user=debian node_checks_job_name=node-lifecycle ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/actions/ansible/ci-node-checks.yml
-
-      - name: Gather logs
-        if: always()
-        # Best effort for the same reason as the restart step above --
-        # this job deliberately breaks nodes, and a node that never
-        # returns makes log gathering fail through no fault of the code
-        # under test.
-        continue-on-error: true
-        run: |
-          # We need the ssh key in the place ansible expects it to be, which isn't
-          # true on the CI worker node.
-          cp /srv/github/id_ci /home/debian/.ssh/id_rsa
-          cp /srv/github/id_ci.pub /home/debian/.ssh/id_rsa.pub
-          chown -R debian.debian /home/debian/.ssh
-
-          ansible-playbook -i /srv/github/ci-inventory.yaml \
-              --extra-vars "base_image_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/actions/ansible/ci-gather-logs-loki.yml
-
-      - name: Capture py-spy thread dumps
-        if: always()
-        continue-on-error: true
-        run: |
-          ansible-playbook -i /srv/github/ci-inventory.yaml \
-              --extra-vars "ansible_ssh_common_args='-o StrictHostKeyChecking=no'" \
-              ${GITHUB_WORKSPACE}/shakenfist/tools/ci_capture_pyspy.yml || true
-
-      - name: Bundle artifacts
-        if: always()
-        run: |
-          cd /srv/github
-          sudo chown -R debian:debian /srv/github
-          sudo find . -ls
-          echo
-          mkdir -p /srv/github/artifacts /srv/github/bundle
-          zip -rq artifacts/bundle.zip bundle/* || true
-
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: bundle-functional-node-lifecycle-collection
-          retention-days: 90
-          if-no-files-found: error
-          path: /srv/github/artifacts/bundle.zip
 
   # MariaDB ENUM columns freeze their permitted values at CREATE TABLE
   # time, so a Python enum gaining a member silently breaks existing
@@ -790,7 +575,7 @@ jobs:
     # (1 vCPU / 2048 MB, no swap) when the labels name none. This job
     # apt-installs a real MariaDB server and then runs the live test
     # modules against it, which is the same shape that ran out of
-    # memory on xs in node_lifecycle_collection above.
+    # memory on xs in the node lifecycle lane (functional-lanes.yml).
     #
     # The distro label also picks the MariaDB version: the install
     # script takes whatever the distro archive ships, which on Debian 13
@@ -899,8 +684,6 @@ jobs:
     name: "Can merge"
     needs:
       - functional_lanes
-      - ansible_modules_collection
-      - node_lifecycle_collection
       - schema_enum_widening
       - check_paths
       - credential_scan

@@ -54,7 +54,8 @@ jobs:
     uses: ./.github/workflows/functional-lanes.yml
     with:
       lanes: >-
-        ["ubuntu-2404-slim-primary", "debian-13-slim-tier", "debian-13-localhost"]
+        ["ubuntu-2404-slim-primary", "debian-13-slim-tier", "debian-13-localhost",
+         "ansible-modules", "node-lifecycle"]
 
   report_failures:
     name: "Report failures"

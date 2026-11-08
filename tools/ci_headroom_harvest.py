@@ -207,12 +207,13 @@ BUNDLE_TOPOLOGIES = {
 # composite-action seam:
 #
 # * 'Node lifecycle' never reaches the reusable smoke-cluster workflow at
-#   all. It calls the build-smoke-cluster composite action directly
-#   (functional-tests.yml:587), and the probe steps live in the workflow
-#   rather than in the action, so they are not in its job. Fixing this means
-#   moving or duplicating the probe steps into the composite action, which
-#   changes how *every* caller deploys -- shakenfist's five call sites,
-#   client-python's, kerbside's and the canary's -- through an action
+#   all. It calls the build-smoke-cluster composite action directly (it is
+#   the one lane of functional-lanes.yml which runs its own steps), and the
+#   probe steps live in the workflow rather than in the action, so they are
+#   not in its job. Fixing this means moving or duplicating the probe steps
+#   into the composite action, which changes how *every* caller deploys --
+#   shakenfist's five call sites, client-python's, kerbside's and the
+#   canary's -- through an action
 #   consumed at @main with no pin. Instrumenting it is therefore deferred,
 #   and tracked as #4367 rather than done here; kerbside's
 #   'sf-e2e-functional.yml' reaches the same seam but uploads no cluster
