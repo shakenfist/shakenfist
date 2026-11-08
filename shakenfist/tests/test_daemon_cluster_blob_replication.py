@@ -37,6 +37,14 @@ NODES = {
 NODE_UUIDS = {name: node_uuid for node_uuid, name in NODES.items()}
 
 
+def _fake_node(name):
+    """A roster entry, named the way blob locations are named."""
+    n = mock.MagicMock()
+    n.fqdn = name
+    n.uuid = NODE_UUIDS.get(name)
+    return n
+
+
 def _fake_node_from_db(identifier, suppress_failure_audit=False):
     name = NODES.get(identifier)
     if not name:
@@ -79,7 +87,8 @@ class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
 
     def _run_pass(self, mock_mariadb, mock_ipam, mock_network, mock_artifact,
                   mock_instance, mock_blob, mock_low_disk, mock_nodes,
-                  the_blob, low_disk_nodes, instance_nodes=None):
+                  the_blob, low_disk_nodes, instance_nodes=None,
+                  active_nodes=None):
         # The orphan artifact sweep lists namespaces once per pass and
         # treats an empty list as an unreadable one, skipping the rest
         # of the cleanup. A bare MagicMock iterates empty, so this has
@@ -103,7 +112,13 @@ class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
 
         mock_instance.Instance.from_db.side_effect = fake_instance_from_db
         mock_low_disk.return_value = low_disk_nodes
-        mock_nodes.return_value = []
+        # The blob section asks which nodes could hold another copy, so
+        # the roster has to be the cluster the rest of the test describes.
+        # The default is the three node cluster NODES names, which is what
+        # every test here assumed before the roster was read at all.
+        if active_nodes is None:
+            active_nodes = sorted(NODES.values())
+        mock_nodes.return_value = [_fake_node(name) for name in active_nodes]
 
         mock_mariadb.get_active_blob_uuids.return_value = [BLOB_UUID_1]
         mock_mariadb.get_expired_blob_uuids.return_value = []
@@ -256,3 +271,120 @@ class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
             low_disk_nodes=['sf-2'])
         b.request_replication.assert_called_once_with(allow_excess=1)
         b.drop_node_location.assert_not_called()
+
+    @_pass_mocks
+    def test_single_node_cluster_does_not_request_impossible_replication(
+            self, mock_mariadb, mock_ipam, mock_network,
+            mock_remove_uploads, mock_artifact, mock_instance, mock_blob,
+            mock_low_disk, mock_nodes):
+        # One node, one copy, and a replication factor of two. The blob is
+        # short of the factor and always will be: the only node which could
+        # hold a copy already has one. request_replication() would reach
+        # that conclusion too, but only after listing the roster twice,
+        # taking the blob's locations lock and reading the location's node
+        # back, and the cluster daemon asked it per blob per pass -- 0.48
+        # calls/s on the one-node CI lane, which is what its database load
+        # budget failed on (issue 4741).
+        b = self._make_blob(['sf-1'], [])
+        self._run_pass(
+            mock_mariadb, mock_ipam, mock_network, mock_artifact,
+            mock_instance, mock_blob, mock_low_disk, mock_nodes, b,
+            low_disk_nodes=[], active_nodes=['sf-1'])
+        b.request_replication.assert_not_called()
+        self.assertNotEqual(dbo.STATE_ERROR, b.state)
+
+    @_pass_mocks
+    def test_single_node_cluster_does_not_request_a_rebalance_copy(
+            self, mock_mariadb, mock_ipam, mock_network,
+            mock_remove_uploads, mock_artifact, mock_instance, mock_blob,
+            mock_low_disk, mock_nodes):
+        # The rebalancer's version of the same thing. Exactly the factor of
+        # copies with one of them on a node low on disk normally asks for a
+        # temporary extra copy "elsewhere" so a later pass can prune the
+        # copy on the full node -- but on a two node cluster which already
+        # holds both copies there is no elsewhere, so asking is pure cost.
+        b = self._make_blob(['sf-1', 'sf-2'], [])
+        self._run_pass(
+            mock_mariadb, mock_ipam, mock_network, mock_artifact,
+            mock_instance, mock_blob, mock_low_disk, mock_nodes, b,
+            low_disk_nodes=['sf-2'], active_nodes=['sf-1', 'sf-2'])
+        b.request_replication.assert_not_called()
+        b.drop_node_location.assert_not_called()
+
+    @_pass_mocks
+    def test_transfer_in_flight_is_a_target_already_taken(
+            self, mock_mariadb, mock_ipam, mock_network,
+            mock_remove_uploads, mock_artifact, mock_instance, mock_blob,
+            mock_low_disk, mock_nodes):
+        # Two nodes, one completed copy, and a healthy transfer in flight to
+        # the other. The blob is under replicated now and will not be once
+        # the transfer lands, so there is nothing to ask for: the only other
+        # node is already receiving a copy.
+        b = self._make_blob(['sf-1'], ['sf-2'])
+        self._run_pass(
+            mock_mariadb, mock_ipam, mock_network, mock_artifact,
+            mock_instance, mock_blob, mock_low_disk, mock_nodes, b,
+            low_disk_nodes=[], active_nodes=['sf-1', 'sf-2'])
+        b.request_replication.assert_not_called()
+
+    @_pass_mocks
+    def test_lost_blob_on_a_single_node_is_still_errored(
+            self, mock_mariadb, mock_ipam, mock_network,
+            mock_remove_uploads, mock_artifact, mock_instance, mock_blob,
+            mock_low_disk, mock_nodes):
+        # Data loss outranks "nowhere to replicate to". A created blob with
+        # no copies anywhere is lost whatever size the cluster is, so the
+        # errored path must still run on one node -- the guard added for the
+        # case above sits immediately after it and must not swallow it.
+        b = self._make_blob([], [])
+        self._run_pass(
+            mock_mariadb, mock_ipam, mock_network, mock_artifact,
+            mock_instance, mock_blob, mock_low_disk, mock_nodes, b,
+            low_disk_nodes=[], active_nodes=['sf-1'])
+        self.assertEqual(dbo.STATE_ERROR, b.state)
+        b.request_replication.assert_not_called()
+
+    @_pass_mocks
+    def test_a_node_without_a_copy_is_still_replicated_to(
+            self, mock_mariadb, mock_ipam, mock_network,
+            mock_remove_uploads, mock_artifact, mock_instance, mock_blob,
+            mock_low_disk, mock_nodes):
+        # The other side of the guard: a cluster which does have somewhere
+        # to put a copy must still be asked. Two nodes, one copy, no
+        # transfer in flight.
+        b = self._make_blob(['sf-1'], [])
+        self._run_pass(
+            mock_mariadb, mock_ipam, mock_network, mock_artifact,
+            mock_instance, mock_blob, mock_low_disk, mock_nodes, b,
+            low_disk_nodes=[], active_nodes=['sf-1', 'sf-2'])
+        b.request_replication.assert_called_once_with(allow_excess=0)
+
+
+class ReplicationTargetAvailableTestCase(base.ShakenFistTestCase):
+    """The guard itself, away from the maintenance pass around it."""
+
+    def test_an_empty_cluster_has_nowhere_to_replicate_to(self):
+        self.assertFalse(
+            cluster_main.replication_target_available(['sf-1'], []))
+
+    def test_a_node_without_a_copy_is_a_target(self):
+        self.assertTrue(
+            cluster_main.replication_target_available(
+                ['sf-1'], ['sf-1', 'sf-2']))
+
+    def test_every_node_holding_a_copy_leaves_no_target(self):
+        self.assertFalse(
+            cluster_main.replication_target_available(
+                ['sf-1', 'sf-2'], ['sf-1', 'sf-2']))
+
+    def test_a_location_on_a_node_no_longer_in_the_roster_is_ignored(self):
+        # A copy on a node which has left the cluster is not a reason to
+        # stop replicating to a node which is still in it.
+        self.assertTrue(
+            cluster_main.replication_target_available(
+                ['sf-9'], ['sf-1', 'sf-2']))
+
+    def test_order_and_duplicates_do_not_matter(self):
+        self.assertFalse(
+            cluster_main.replication_target_available(
+                ['sf-2', 'sf-1', 'sf-1'], ['sf-1', 'sf-2']))

@@ -196,6 +196,20 @@ extra copies are only removed from nodes which are running low on disk. A copy
 on a node where an instance uses the blob as its disk's backing file is never
 removed, because that instance could not start again without it.
 
+The target is also not a promise. A cluster with fewer nodes than the
+replication factor -- a single machine deployment being the obvious case --
+cannot meet it, and that is not an error: the blobs are intact, there is
+simply nowhere to put a second copy. Shaken Fist notices this and stops
+asking. On each maintenance pass the cluster daemon skips any blob whose
+copies already cover every node which could hold one, so a small cluster
+does no repeated work over a target it can never reach. A blob which has
+lost every copy is a different matter, and is still recorded as errored.
+
+Nothing needs configuring for this. Setting `BLOB_REPLICATION_FACTOR` to
+the node count on a permanently small cluster is still reasonable if you
+would rather the target describe what you have, but leaving it at the
+default costs nothing beyond the copies you do not get.
+
 ## Artifact uploads and downloads
 
 Artifacts may also be uploaded and downloaded. This means you can extract a
