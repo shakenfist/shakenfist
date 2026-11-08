@@ -92,7 +92,7 @@ notifications with read/unread state, severity icons, and
 mark-as-read affordances — fed by a small unified store.
 A bell icon with a filled dot when there are unread items
 sits in the status bar (or hamburger area, after
-[PLAN-hamburger-menu.md](/components/ryll/plans/PLAN-hamburger-menu/)).
+[`PLAN-hamburger-menu.md`](https://github.com/shakenfist/ryll/blob/459c2427f55ccad8cf2881b44c3d7cbde22f363d/docs/plans/PLAN-hamburger-menu.md)).
 
 This plan deliberately **does not** include channel
 disconnect / reconnect events as a notification source,
@@ -142,7 +142,7 @@ do not initially distinguish it in the UI — see Open
 question 4.
 
 When the hamburger plan
-([PLAN-hamburger-menu.md](/components/ryll/plans/PLAN-hamburger-menu/)) lands
+([`PLAN-hamburger-menu.md`](https://github.com/shakenfist/ryll/blob/459c2427f55ccad8cf2881b44c3d7cbde22f363d/docs/plans/PLAN-hamburger-menu.md)) lands
 first, the bell sits next to the hamburger icon at the
 right of the status bar; the existing *Gaps* badge is
 replaced by the bell (gaps become notifications, so the
@@ -191,7 +191,7 @@ badge is redundant); the bug-report transient at
    30 seconds is folded into the existing entry's count
    field, like `[3×]`.
 
-6. **Bell placement**. After PLAN-hamburger-menu lands,
+6. **Bell placement**. After [`PLAN-hamburger-menu.md`](https://github.com/shakenfist/ryll/blob/459c2427f55ccad8cf2881b44c3d7cbde22f363d/docs/plans/PLAN-hamburger-menu.md) lands,
    the right-edge cluster is `[hamburger] [Gaps]`. The
    Gaps badge gets replaced by the bell here — same
    slot, same colour-coded unread-dot style. Recommend.
@@ -298,7 +298,7 @@ Phase 3 lands as one PR with Phase 4 closely behind.
 effort, sonnet)**. Add a bell icon (`🔔` or custom)
 to the status-bar right-edge cluster (or to the
 hamburger menu's leftmost slot, depending on whether
-PLAN-hamburger-menu has landed by then — re-read the
+[`PLAN-hamburger-menu.md`](https://github.com/shakenfist/ryll/blob/459c2427f55ccad8cf2881b44c3d7cbde22f363d/docs/plans/PLAN-hamburger-menu.md) has landed by then — re-read the
 status of that plan when Phase 4 begins). The bell
 shows a small filled dot — coloured by the
 highest-severity unread item — when `unread_count > 0`,

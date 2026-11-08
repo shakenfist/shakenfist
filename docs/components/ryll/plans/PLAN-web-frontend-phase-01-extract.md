@@ -5,8 +5,9 @@
 Before responding to questions or making changes, explore the
 ryll codebase thoroughly. Read the master plan at
 `docs/plans/PLAN-web-frontend.md` and the prior crate-extraction
-phases (`docs/plans/PLAN-crate-extraction-phase-04-protocol.md`
-and `-phase-05-usbredir.md`) for precedent. Key files for this
+phases ([`PLAN-crate-extraction-phase-04-protocol.md`](https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-04-protocol.md)
+and [`PLAN-crate-extraction-phase-05-usbredir.md`](https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-05-usbredir.md))
+for precedent. Key files for this
 phase:
 
 - `Cargo.toml` (workspace) and `ryll/Cargo.toml`
@@ -67,7 +68,7 @@ Out:
 
 - Reserving the crate name on crates.io. That is a separate
   pre-step the operator handles before publishing (analogous to
-  `PLAN-crate-extraction-phase-02-reserve-names.md`). For
+  [`PLAN-crate-extraction-phase-02-reserve-names.md`](https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-02-reserve-names.md)). For
   development the dual-spec dep with a `path` works without
   publication.
 - Any feature gating (`--gui` / `--web` cargo features). Master
@@ -312,7 +313,7 @@ impl, and the GUI event loop stay in `ryll`.
   on crates.io before publishing the first release that
   contains it; treat the reservation as a separate one-line
   task outside this phase, following the precedent of
-  `PLAN-crate-extraction-phase-02-reserve-names.md`.
+  [`PLAN-crate-extraction-phase-02-reserve-names.md`](https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-02-reserve-names.md).
 
 ## Steps
 

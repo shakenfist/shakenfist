@@ -252,7 +252,7 @@ changes (phase 9 batches the doc sweep).
 3. **Phase 4 vs deferring to the GLZ investigation.**
    The user's residual "static" is a GLZ bug (see the
    2026-04-21 status note on
-   [PLAN-deferred-debt-phase-01-display.md](/components/ryll/plans/PLAN-deferred-debt-phase-01-display/)),
+   [`PLAN-deferred-debt-phase-01-display.md`](https://github.com/shakenfist/ryll/blob/7487d2f4cd6767a63bd630d08e2c177dee4d04d0/docs/plans/PLAN-deferred-debt-phase-01-display.md)),
    not a missing draw op. Landing phase 4 will not
    affect the static but *will* fix kernel-console
    scroll if the user's workload exercises it. Plan

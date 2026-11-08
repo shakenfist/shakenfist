@@ -433,9 +433,9 @@ Mechanical across two files: the struct and its `impl`
 in `messages.rs`, and the `use` line in
 [ryll/src/channels/display.rs:21](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L21).
 The documentation-level plans
-([PLAN-crate-extraction-phase-04-protocol.md](/components/ryll/plans/PLAN-crate-extraction-phase-04-protocol/),
-[PLAN-deferred-debt-phase-06-tests.md](/components/ryll/plans/PLAN-deferred-debt-phase-06-tests/),
-[PLAN-deferred-debt.md](/components/ryll/plans/PLAN-deferred-debt/),
+([`PLAN-crate-extraction-phase-04-protocol.md`](https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-04-protocol.md),
+[`PLAN-deferred-debt-phase-06-tests.md`](https://github.com/shakenfist/ryll/blob/1e6dbc2a91e97a7479ce4a075c01cddf2a06fab0/docs/plans/PLAN-deferred-debt-phase-06-tests.md),
+[`PLAN-deferred-debt.md`](https://github.com/shakenfist/ryll/blob/b29d4ecfdbf1740595b92988162ac84fa1b16755/docs/plans/PLAN-deferred-debt.md),
 [PLAN-display-iteration-followups.md](/components/ryll/plans/PLAN-display-iteration-followups/))
 may reference the old name — update them if the reference
 is a code citation; leave them alone if it's historical

@@ -1099,3 +1099,17 @@ themselves do not state:
   why it is safe. ryll runs the upstream gitleaks binary
   directly rather than `gitleaks-action`, which requires a paid
   licence for organisation repositories.
+- **Holding a dependency back** goes in `renovate.json`, as a
+  `packageRules` entry whose `description` states the reason and
+  the condition that would release the hold. Two shapes are in
+  use. An `allowedVersions` ceiling stops the upgrade being
+  offered at all, and suits a hold with a known upper bound
+  (`sha1`, `rand`). `dependencyDashboardApproval` instead lets
+  renovate find the upgrade but leaves it on the dependency
+  dashboard until someone ticks it, and suits a group that
+  cannot be split and is only occasionally landable — the
+  `ironrdp` group, where every crate has to move in step with
+  `ironrdp-server` and an opened PR would otherwise sit red
+  until upstream releases a matching one. The cost is that a
+  dashboard-approval hold is silent: no pull request appears, so
+  the pending upgrade is only visible on the dashboard issue.

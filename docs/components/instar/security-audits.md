@@ -88,8 +88,8 @@ sandbox with no access to host memory.
 #### VHDX BAT calculation integer overflow
 
 **Severity:** Medium
-**Location:** `src/crates/vhdx/src/lib.rs`, lines 754-755 and
-`calculate_bat_layout()` at line 1092
+**Location:** `src/crates/vhdx/src/lib.rs`, in `VhdxState::init()`
+and `calculate_bat_layout()`
 **Issue:** `total_bat_entries` and `chunk_ratio` were cast from u64
 to u32 via `as u32` without overflow checking. A crafted VHDX image
 with `virtual_disk_size` near u64::MAX and small `block_size` would
@@ -133,6 +133,11 @@ reviewed. Key findings:
 All `as u32`, `as u16`, and `as u8` casts on values wider than the
 target type were catalogued and classified.
 
+Each location names the enclosing function rather than a line number.
+These are dated records of what the code looked like on the audit date,
+so a line number in one rots on the next edit and then points at
+unrelated code, while the function it was in is still findable.
+
 #### Format crates (library code)
 
 | Location | Cast | Classification | Notes |
@@ -157,12 +162,12 @@ target type were catalogued and classified.
 
 | Location | Cast | Classification | Notes |
 |----------|------|----------------|-------|
-| convert: `reftable_clusters as u32` (ln 1624) | u64→u32 | Bounded | Reftable fits in scratch (~12.5MB), ≤ ~200 |
-| convert: `l1_size` (line 1682) | u64→u32 | Bounded | L1 fits in scratch; checked at line 1693 before use |
-| convert: `entries_per_l2` (line 1680) | u64→u32 | Bounded | cluster_size/8; cluster_bits ≤ 21 so max = 262144 |
-| convert: `num_gd_entries` (line 2495) | u64→u32 | Bounded | GD must fit in scratch memory; checked at line 2510 |
-| convert: GTE sector offset (lines 2695, 2987) | u64→u32 | Spec | VMDK GTE is 32-bit sector offset per specification |
-| convert: GDE sector offset (line 2726) | u64→u32 | Spec | VMDK GDE is 32-bit sector offset per specification |
+| convert: `reftable_clusters` in `write_qcow2_header()` | u64→u32 | Bounded | Reftable fits in scratch (~12.5MB), ≤ ~200 |
+| convert: `l1_size` in `init_qcow2_output_layout()` | u64→u32 | Bounded | L1 fits in scratch; checked against `ALLOC_HEAP_BASE` before use |
+| convert: `entries_per_l2` in `init_qcow2_output_layout()` | u64→u32 | Bounded | cluster_size/8; cluster_bits ≤ 21 so max = 262144 |
+| convert: `num_gd_entries` in `init_vmdk_output_layout()` | u64→u32 | Bounded | GD must fit in scratch memory; checked against `ALLOC_HEAP_BASE` |
+| convert: GTE sector offset in `convert_to_vmdk()` and `convert_to_vmdk_compressed()` | u64→u32 | Spec | VMDK GTE is 32-bit sector offset per specification |
+| convert: GDE sector offset in `convert_to_vmdk()` | u64→u32 | Spec | VMDK GDE is 32-bit sector offset per specification |
 | convert: progress percentage | u64→u32 | Bounded | Result of `(n * 100 / total)`, always ≤ 100 |
 | info/check: format header fields | various | Bounded | Values validated by format crate parsers |
 

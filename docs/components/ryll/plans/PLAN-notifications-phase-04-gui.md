@@ -91,7 +91,7 @@ in.
 
 ### Hamburger plan status
 
-[PLAN-hamburger-menu.md](/components/ryll/plans/PLAN-hamburger-menu/) is
+[`PLAN-hamburger-menu.md`](https://github.com/shakenfist/ryll/blob/459c2427f55ccad8cf2881b44c3d7cbde22f363d/docs/plans/PLAN-hamburger-menu.md) is
 *Complete*. The hamburger is in place at `app.rs:1722`,
 which means the master plan's conditional "if hamburger
 hasn't landed yet" branch in §"Phase 4" doesn't apply — we
