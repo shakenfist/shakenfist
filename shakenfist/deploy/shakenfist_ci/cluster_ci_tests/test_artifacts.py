@@ -514,6 +514,119 @@ class TestLabelWriteTargets(base.BaseNamespacedTestCase):
         self.system_client.delete_namespace(two)
 
 
+class TestInstanceLabelNamespace(base.BaseNamespacedTestCase):
+    """Which namespace's label a `label:` on instance create means.
+
+    POST /instances takes a namespace which need not be the caller's
+    own, and a diskspec's `base` accepts a `label:<name>` shorthand.
+    Until v0.8 the two disagreed: the URL was built from the caller's
+    namespace and then resolved scoped to the target's, so system
+    creating an instance in a tenant namespace looked for
+    `sf://label/system/<name>` inside the tenant and found nothing,
+    answering 404 for a label the tenant owned (issue 4830).
+
+    The shorthand means a label in the namespace the instance is being
+    created in. Both halves of that are asserted here, and the first is
+    asserted on the blob that was resolved rather than on the status
+    code: with a label of the same name in each namespace, a create
+    which answered 200 against the wrong one would satisfy every
+    status assertion and boot the administrator's image.
+
+    The instance is never booted. Its base is a sixteen-byte blob
+    standing in for an image, which is enough to answer which artifact
+    the handler reached and not enough to be a disk, so it is deleted
+    as soon as its disk spec has been read.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'labelinstns'
+        super().__init__(*args, **kwargs)
+
+    def _blob(self):
+        """A blob to hang a label off, via a URL nothing else uses."""
+        img = self.system_client.cache_artifact(
+            'https://sfcbr.shakenfist.com/cgi-bin/uuid.cgi?uniq=%06d'
+            % random.randint(-999999, 999999))
+        results = self._await_artifacts_ready([img['uuid']])
+        self.assertEqual('created', results[0].get('state'))
+        return results[0]['blob_uuid']
+
+    def _safe_delete_artifact(self, artifact_uuid):
+        try:
+            self.system_client.delete_artifact(artifact_uuid)
+        except apiclient.ResourceNotFoundException:
+            pass
+
+    def _safe_delete_instance(self, instance_uuid):
+        try:
+            self.system_client.delete_instance(instance_uuid)
+        except apiclient.ResourceNotFoundException:
+            pass
+
+    def test_label_shorthand_means_the_target_namespace(self):
+        # The label names are prefixed with this test's own namespace
+        # because one of them lives in `system`, which is shared with
+        # every other test in the run.
+        name = '%s-thing' % self.namespace
+        ours = self._blob()
+        theirs = self._blob()
+
+        # The same bare name in each namespace, pointing at different
+        # blobs. A bare name on the write path means one of your own,
+        # so these two calls are all it takes to build the collision.
+        lbl = self.test_client.update_label(name, ours)
+        self.addDetail('label', content.text_content(json.dumps(
+            lbl, indent=4, sort_keys=True)))
+        self.assertEqual(self.namespace, lbl['namespace'])
+
+        decoy = self.system_client.update_label(name, theirs)
+        self.addCleanup(self._safe_delete_artifact, decoy['uuid'])
+        self.assertEqual('system', decoy['namespace'])
+
+        # 128MB because this instance is never booted and the
+        # scheduler's ledger is the scarce thing in CI.
+        inst = self.create_instance(
+            'labelinstns', 1, 128, None,
+            [
+                {
+                    'size': 8,
+                    'base': 'label:%s' % name,
+                    'type': 'disk'
+                }
+            ], None, None, client=self.system_client,
+            namespace=self.namespace)
+        self.addCleanup(self._safe_delete_instance, inst['uuid'])
+        self.addDetail('instance', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
+
+        self.assertEqual(self.namespace, inst['namespace'])
+        self.assertEqual(ours, inst['disk_spec'][0].get('blob_uuid'))
+        self.system_client.delete_instance(inst['uuid'])
+
+        # And the other half of the decision: a label only the caller
+        # has is not what the shorthand means, so this is a 404 even
+        # though `system` owns a label by that name and can see it
+        # perfectly well from its own namespace.
+        sysonly = '%s-sysonly' % self.namespace
+        only = self.system_client.update_label(sysonly, theirs)
+        self.addCleanup(self._safe_delete_artifact, only['uuid'])
+
+        self.assertRaises(
+            apiclient.ResourceNotFoundException,
+            # raw-create: asserts the 404 a label the target namespace
+            # does not have gets, which no amount of waiting for
+            # capacity turns into a success.
+            self.system_client.create_instance,
+            'labelinstns-sysonly', 1, 128, None,
+            [
+                {
+                    'size': 8,
+                    'base': 'label:%s' % sysonly,
+                    'type': 'disk'
+                }
+            ], None, None, namespace=self.namespace)
+
+
 class TestTypoedLabel(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'sharedimages'

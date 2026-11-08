@@ -106,6 +106,12 @@ A `diskspec` consists of the following fields as a JSON dictionary:
   source URL, which is not a base -- use `sf://snapshot/<uuid>` instead. These
   used to be accepted and scheduled, and failed only once the instance reached a
   hypervisor, leaving it in `error`.
+  The `label:<name>` shorthand means a label in the namespace the instance is
+  being created in, which is the `namespace` of this request rather than the
+  caller's own namespace when the two differ. To use some other namespace's
+  label, name it in full as `sf://label/<namespace>/<name>`; that form resolves
+  by visibility, so the label has to be shared with, or its namespace has to
+  trust, the namespace the instance is created in.
 * bus (enum): the hardware bus the disk device should be attached to on the instance.
   In general you shouldn't care about this and can omit this value. However, in
   some cases, such as unmodified Microsoft Windows images it is required. The options
