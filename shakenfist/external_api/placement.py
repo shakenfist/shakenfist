@@ -252,14 +252,16 @@ class PlacementEndpoint(api_base.Resource):
           'each shape\'s count has been expanded.'
           % api_base.MAX_PLACEMENT_SHAPES, True)],
         [(200, 'Whether the set fits, in <code>fits</code>. A cluster '
-               'administrator is also told which node each shape would be '
-               'placed on and which nodes were behind it, in '
-               '<code>shapes</code>, in the order the shapes were asked '
-               'about. A set which does not fit carries no '
-               '<code>shapes</code> at all -- placement is all or nothing '
-               '-- and instead names the pipeline stage which emptied the '
-               'candidate list in <code>stage</code> and the index of the '
-               'shape it was walking in <code>shape</code>.',
+               'administrator is also told, in <code>shapes</code> and in '
+               'the order the shapes were asked about, which node each '
+               'shape would be placed on in <code>node</code>, and that '
+               'node followed by its fallbacks in '
+               '<code>candidates</code> -- the chosen node is the head of '
+               'that list, not absent from it. A set which does not fit '
+               'carries no <code>shapes</code> at all -- placement is all '
+               'or nothing -- and instead names the pipeline stage which '
+               'emptied the candidate list in <code>stage</code> and the '
+               'index of the shape it was walking in <code>shape</code>.',
           placement_post_example),
          (400, 'The request does not describe a set of shapes: a shape '
                'without a vCPU or memory figure, a shape giving both disk '
@@ -298,9 +300,19 @@ class PlacementEndpoint(api_base.Resource):
         # separate them because 507 and 409 mean different things to
         # something which was building an instance; a query is not.
         except exceptions.LowResourceException as e:
-            # A stage which failed to arrive is answered as 'unknown'
-            # rather than raised, for the reason the create path's 507
-            # gives: an answer with a vague stage beats no answer.
+            # The stage is published exactly as the refusal carried it,
+            # with nothing substituted for an empty one. A consumer
+            # scoring a prediction against a real refusal compares the
+            # two labels, so a label invented here would be one that
+            # cannot appear on either side of that comparison -- worse
+            # than an empty string, which is at least visibly absent.
+            # Every refusal the pipeline raises carries a stage, and a
+            # test over the raise sites is what keeps that true rather
+            # than a fallback here.
+            #
+            # Both fields are read directly: SchedulerException declares
+            # them, so they are always present on anything this clause
+            # can catch.
             #
             # The shape index is whatever the walk attached to the
             # refusal, and is an index into the expanded request order:
@@ -309,8 +321,8 @@ class PlacementEndpoint(api_base.Resource):
             # a successful answer carries.
             return {
                 'fits': False,
-                'stage': getattr(e, 'stage', '') or 'unknown',
-                'shape': getattr(e, 'shape', None),
+                'stage': e.stage,
+                'shape': e.shape,
             }
 
         answer = {'fits': True}

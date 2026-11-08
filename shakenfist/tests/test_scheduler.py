@@ -1,3 +1,4 @@
+import ast
 import importlib.util
 import os
 import random
@@ -2944,7 +2945,10 @@ class SchedulerStageAttributeTestCase(SchedulerTestCase):
     def test_the_stage_defaults_to_empty(self):
         # An exception raised without a stage still has the attribute,
         # so a handler reads a field rather than probing for one. The
-        # API turns an empty stage into 'unknown'.
+        # create path turns an empty stage into 'unknown' on its 507;
+        # the placement query publishes it as it arrives, and
+        # test_every_low_resource_raise_site_names_a_stage below is
+        # what makes that safe.
         self.assertEqual('', exceptions.SchedulerException('boom').stage)
         self.assertEqual('', exceptions.LowResourceException('boom').stage)
         self.assertEqual(
@@ -2980,6 +2984,83 @@ class SchedulerStageAttributeTestCase(SchedulerTestCase):
             self.assertEqual(stage, exc.stage)
             self.assertEqual(
                 f'No nodes remaining at scheduling stage {stage}', str(exc))
+
+    def test_every_low_resource_raise_site_names_a_stage(self):
+        """No LowResourceException may be raised without a stage.
+
+        The placement query publishes the stage exactly as the refusal
+        carried it, with nothing substituted for an empty one, because
+        a label the API invented is a label that cannot appear on
+        either side of the comparison a consumer makes between a
+        prediction and a real refusal. That makes "every raiser passes
+        one" a property of the code rather than a habit, so it is
+        derived from the source here: a new raise site which forgets
+        the stage fails this test instead of reaching a caller as an
+        empty string.
+
+        Two sites exist today. The filter stages all raise through
+        _log_and_raise_on_error(), whose stage is its caller's and
+        which test_every_scheduler_stage_is_classified() reads off the
+        call sites; the redirect's capacity guard raises its own with
+        CAPACITY_GUARD_STAGE. Neither passes a literal here, so what is
+        asserted is that a stage is passed at all and that it is not
+        the empty one.
+        """
+        root = os.path.dirname(os.path.abspath(scheduler.__file__))
+        wanted = {'LowResourceException', 'AffinityConstraintUnsatisfiable'}
+
+        found = []
+        for path, _, names in os.walk(root):
+            if os.path.sep + 'tests' in path:
+                continue
+            for name in sorted(names):
+                if not name.endswith('.py'):
+                    continue
+                full = os.path.join(path, name)
+                tree = ast.parse(open(full).read(), filename=full)
+                for node in ast.walk(tree):
+                    if not isinstance(node, ast.Raise):
+                        continue
+                    call = node.exc
+                    if not isinstance(call, ast.Call):
+                        continue
+                    func = call.func
+                    # Raised bare, qualified with the module, or -- as
+                    # the single stage helper does -- through a class
+                    # handed in by the caller.
+                    if isinstance(func, ast.Attribute):
+                        raised = func.attr
+                    elif isinstance(func, ast.Name):
+                        raised = func.id
+                    else:
+                        continue
+                    if raised not in wanted and raised != 'exception_class':
+                        continue
+
+                    where = '%s:%d' % (
+                        os.path.relpath(full, root), node.lineno)
+                    found.append(where)
+
+                    stage = [kw for kw in call.keywords if kw.arg == 'stage']
+                    self.assertEqual(
+                        1, len(stage),
+                        '%s raises a low resource refusal without a stage. '
+                        'The placement query publishes the stage as it '
+                        'arrives, so an absent one reaches a caller as an '
+                        'empty label rather than as a filter name' % where)
+                    value = stage[0].value
+                    if isinstance(value, ast.Constant):
+                        self.assertTrue(
+                            value.value,
+                            '%s passes an empty stage' % where)
+
+        # The vacuity floor: a walk which silently stopped matching
+        # would otherwise pass by examining nothing.
+        self.assertEqual(
+            ['operations/node_inst_netdesc_op.py:287', 'scheduler.py:1187'],
+            sorted(found),
+            'the set of low resource raise sites moved; read each one and '
+            'check it still names a stage before updating this list')
 
     def test_the_affinity_subclass_is_given_its_stage_too(self):
         # The affinity stage raises a different class, passed in by the
@@ -3218,6 +3299,38 @@ class MultisetPlacementTestCase(SchedulerTestCase):
         self.assertIsNone(exceptions.LowResourceException('nope').shape)
         self.assertIsNone(
             exceptions.LowResourceException('nope', stage='whatever').shape)
+
+    def test_a_refusal_which_already_names_a_shape_is_left_alone(self):
+        # The set loop attaches the index only when the refusal does not
+        # already carry one, so a refusal raised one day closer to the
+        # shape it was walking stays authoritative. Nothing raises an
+        # already-attributed refusal today, which is exactly why the
+        # guard needs a test: a documented property with nothing
+        # exercising it is one that quietly stops being true.
+        #
+        # The index handed over is deliberately not a valid index into
+        # this set, so the loop agreeing with it cannot be mistaken for
+        # the loop leaving it alone.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        s = scheduler.Scheduler()
+
+        def already_attributed(*args, **kwargs):
+            raise exceptions.LowResourceException(
+                'No nodes remaining at scheduling stage sufficient_idle_cpu',
+                stage='sufficient_idle_cpu', shape=7)
+
+        with mock.patch.object(s, '_find_candidates_for_shape',
+                               side_effect=already_attributed):
+            exc = self.assertRaises(
+                exceptions.LowResourceException,
+                s.find_candidates_for_shapes,
+                [self._shape(), self._shape()])
+
+        self.assertEqual(
+            7, exc.shape,
+            'the set loop overwrote a shape index the refusal already '
+            'carried')
+        self.assertEqual('sufficient_idle_cpu', exc.stage)
 
     def test_a_disk_charge_is_debited_in_bytes(self):
         # disk_free_instances is published in bytes and a shape's disk is

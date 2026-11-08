@@ -248,6 +248,43 @@ class PlacementVerdictTestCase(PlacementTestCase):
         self.assertTrue(body['fits'])
         self.assertEqual(3, len(body['shapes']))
 
+    def test_the_shapes_array_is_in_the_order_the_caller_asked(self):
+        # The set is walked largest shape first, so a successful answer
+        # has to be put back into the caller's order before it is
+        # rendered: an entry a caller cannot line up with the shape it
+        # sent tells them nothing, and silently reversed would be worse
+        # than missing.
+        #
+        # Each node's ledger has room for exactly one of these shapes
+        # and for no larger one, which is what makes the node each
+        # shape lands on predictable rather than a draw from a load
+        # bucket: the largest shape fits only the roomiest node, which
+        # its charge then fills, and so on down. The shapes are listed
+        # smallest first, so the walk order is the exact reverse of the
+        # request order and a render in walk order is unmistakable.
+        self._baseline()
+        hypervisors = self._hypervisors()
+        for node, limit in zip(hypervisors, (2048, 4096, 8192)):
+            self.mock_mariadb.set_node_capacity(
+                node, limit_cpus=64, limit_memory_mb=limit)
+
+        body = self._answer([self._shape(memory=1024),
+                             self._shape(memory=4096),
+                             self._shape(memory=8192)])
+
+        self.assertTrue(body['fits'])
+        self.assertEqual(
+            hypervisors, [entry['node'] for entry in body['shapes']],
+            'the shapes array is not in the order the caller asked about '
+            'them: %r' % (body['shapes'],))
+        # Each shape had exactly one node left to it, so the candidate
+        # list is that node alone. Asserted as well as the head, because
+        # it is what says the per-entry lists were not shuffled between
+        # entries either.
+        self.assertEqual(
+            [[node] for node in hypervisors],
+            [entry['candidates'] for entry in body['shapes']])
+
 
 class PlacementDiskTestCase(PlacementTestCase):
     """The two ways to say how much disk a shape asks for.
@@ -289,6 +326,90 @@ class PlacementDiskTestCase(PlacementTestCase):
             self._shape(disk_spec=[{'size': 100}, {'base': 'cirros'}])])
 
         self.assertTrue(body['fits'])
+
+    def test_a_null_size_contributes_nothing(self):
+        """A present-but-null size, at the shipped validation mode.
+
+        Sending null is documented and supported: a size is optional,
+        the schema accepts a null at every depth, and the key's own
+        description says to send one for a disk the size of its base
+        image. So this body reaches the handler with validation
+        enforced, rather than only on the operator's rollback as the
+        fractional and numeric-string rows below do.
+
+        The helper skips it, because a JSON null casts to SQL NULL and
+        SUM() ignores it -- the same answer it gives for a disk with no
+        size key at all. That is why the two are tested apart: they are
+        one fact to the ledger and two to anything which reads the key
+        with a default, and a sum written here instead would evaluate
+        int(None) and turn a documented request into a server error.
+        """
+        fits = self._answer(
+            [self._shape(disk_spec=[{'size': 100}, {'size': None}])])
+        self.assertTrue(
+            fits['fits'],
+            'a null size was not read as no disk at all: %r' % (fits,))
+
+        # The anti-vacuity half: the null contributed zero, rather than
+        # the whole spec having been ignored.
+        refused = self._answer(
+            [self._shape(disk_spec=[{'size': 101}, {'size': None}])])
+        self.assertFalse(refused['fits'])
+        self.assertEqual('sufficient_free_disk', refused['stage'])
+
+    def test_a_fractional_size_rounds_the_way_the_ledger_rounds(self):
+        """The sum is the ledger's sum, not an arithmetic of its own.
+
+        mariadb.disk_spec_virtual_gb() follows MariaDB's
+        JSON-number-to-BIGINT cast and rounds half away from zero, so
+        10.5 is eleven gigabytes and not ten. That is the whole value
+        of calling it: a handler which summed the sizes itself would
+        truncate, and a query which truncates answers that a set fits
+        in room the create it predicts would be refused for.
+
+        Run at warn because the published schema types a disk size as
+        an integer and refuses a fractional one before the handler is
+        reached. The sum is still what this measures: it is what
+        answers on the operator's rollback, and it is the arithmetic
+        the ledger performs on the same list whatever this endpoint
+        does with it.
+        """
+        self.set_validation_mode('warn')
+        self._baseline(disk_free_instances=10 * GiB)
+
+        # Eleven gigabytes against ten free. Truncating to ten would
+        # answer that it fits.
+        rounded_up = self._answer([self._shape(disk_spec=[{'size': 10.5}])])
+        self.assertFalse(
+            rounded_up['fits'],
+            'a disk of 10.5 GB was read as fitting in 10 GB, so the sum '
+            'truncated rather than rounding as the ledger does')
+        self.assertEqual('sufficient_free_disk', rounded_up['stage'])
+
+        # And the other side of the rounding, so the row above is not
+        # passing because every fractional size is refused.
+        rounded_down = self._answer([self._shape(disk_spec=[{'size': 10.4}])])
+        self.assertTrue(rounded_down['fits'])
+
+    def test_a_numeric_string_size_is_summed_as_a_number(self):
+        # The same helper reads a numeric string as the number it
+        # spells and rounds it the same way, so "8.7" is nine. A sum
+        # written here instead would either truncate it or raise on it,
+        # and raising on a value the ledger accepts turns a caller's
+        # question into a server error.
+        self.set_validation_mode('warn')
+        self._baseline(disk_free_instances=10 * GiB)
+
+        refused = self._answer(
+            [self._shape(disk_spec=[{'size': '8.7'}, {'size': 2}])])
+        self.assertFalse(
+            refused['fits'],
+            'a disk spec summing to 11 GB was read as fitting in 10 GB: %r'
+            % (refused,))
+        self.assertEqual('sufficient_free_disk', refused['stage'])
+
+        accepted = self._answer([self._shape(disk_spec=[{'size': '8'}])])
+        self.assertTrue(accepted['fits'])
 
     def test_both_disk_forms_at_once_is_refused(self):
         resp = self._query([self._shape(disk=10, disk_spec=[{'size': 10}])])
