@@ -16704,13 +16704,13 @@ landed reads <code>—</code>. Phases that land in client-python record
 <tr>
 <td>0. Decisions and the live-memory baseline</td>
 <td><a href="../PLAN-placeable-capacity-phase-00-decisions/">PLAN-placeable-capacity-phase-00-decisions.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>ab19cf67e7</code> (#4822)</td>
 </tr>
 <tr>
 <td>1. Extract the shared set-placement core</td>
-<td>PLAN-placeable-capacity-phase-01-placement-core.md (to be written)</td>
-<td>Not started</td>
+<td><a href="../PLAN-placeable-capacity-phase-01-placement-core/">PLAN-placeable-capacity-phase-01-placement-core.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -16768,10 +16768,15 @@ before either admission change.</p>
   committed nodes (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3937" title="GitHub Issue: shakenfist/shakenfist #3937">shakenfist#3937</a>, correctly), which is what turns
   aggregate headroom into per-node fragments. Phases 3 and 4 own
   that constraint.</li>
-<li><strong>Phase 1</strong> extracts the duplicated placement walk (<code>POST
-  /instances</code> and preflight) into one all-or-nothing multiset walk
-  through the scheduler's filters, with no behaviour change. Both
-  <code>C</code> and <code>A</code> build on it.</li>
+<li><strong>Phase 1</strong> generalises the single-instance placement
+  pipeline into one all-or-nothing multiset walk through the
+  scheduler's filters, with no behaviour change. It no longer
+  de-duplicates anything: the walk this plan was written to
+  extract was shared by scheduler-reservations phase 5 as
+  <code>Instance.place_on_candidates()</code> on 2026-11-05, the day after
+  this plan was written, so what is left is the shape
+  denomination and the tentative charge. Both <code>C</code> and <code>A</code> build
+  on it. See the phase plan's <code>F1</code>.</li>
 <li><strong>Phase 2</strong> builds <code>C</code> on that core: a stateless, advisory query
   behind its own capability string, surfaced in the API, in a
   client method, and in <code>GET /admin/resources</code>. No writes, so it
@@ -16824,14 +16829,22 @@ ends with the design decisions the later phases cite, and with a
 clear statement of whether the live-memory question comes before
 <code>A</code>.</p>
 <h3 id="phase-1-extract-the-shared-set-placement-core">Phase 1: extract the shared set-placement core<a class="headerlink" href="#phase-1-extract-the-shared-set-placement-core" title="Permanent link">&para;</a></h3>
-<p><code>POST /instances</code> and preflight run two placement walks that "must
-change together". Extract them into one function that walks a
-multiset of shapes through the scheduler's own filters, all or
-nothing, each shape's tentative charge visible to the next, with no
-behaviour change and the existing single-instance callers routed
-through it. This is the core both <code>C</code> and <code>A</code> reuse, and doing it
-first keeps the dry run and the holds from forking the placement
-logic.</p>
+<p>This section originally read that <code>POST /instances</code> and preflight
+run two placement walks that "must change together", and said to
+extract them. <strong>They no longer do.</strong> scheduler-reservations phase 5
+shared the walk as <code>Instance.place_on_candidates()</code> in
+<code>036f255758</code> on 2026-11-05, one day after this plan was written,
+and left each caller only its own candidate construction and
+after-handling, which is the right split. The phase plan's <code>F1</code>
+records the correction and this paragraph was rewritten from it.</p>
+<p>What remains is the part that was always the point. The placement
+pipeline evaluates one <code>Instance</code>: build one function that walks a
+multiset of requested <em>shapes</em> through the scheduler's own filters,
+all or nothing, each shape's tentative charge visible to the next,
+with no behaviour change and the existing single-instance callers
+routed through it at one shape. This is the core both <code>C</code> and <code>A</code>
+reuse, and doing it first keeps the dry run and the holds from
+forking the placement logic.</p>
 <h3 id="phase-2-the-placement-dry-run-c">Phase 2: the placement dry run (<code>C</code>)<a class="headerlink" href="#phase-2-the-placement-dry-run-c" title="Permanent link">&para;</a></h3>
 <p>Build the stateless query on the core: given a multiset of shapes,
 answer whether they fit now and on which nodes, with no state
@@ -16843,6 +16856,29 @@ before creating a runner's namespace and score the answer against
 what the job's creates actually met minutes later — which measures
 how often room present at claim time is gone at create time, and on
 which check. Read those counts before writing phase 3.</p>
+<p>Phase 1's core returns a whole ordered candidate list per shape but
+charged only the head of each, and phase 2 is the first caller which
+could have more than one shape to place. A caller which walks past a
+head — which <code>Instance.place_on_candidates()</code> does today when
+admission refuses it — leaves the set's arithmetic behind, because
+every later shape was ranked as though the skipped shape were on the
+node it skipped. Phase 1 states that rule in the entry point's
+docstring rather than enforcing it in the return type, on the grounds
+that the type to return is the one phase 2's real consumer wants.
+Decide it there: either phase 2 takes only heads, or the core returns
+the chosen node distinctly from its fallbacks.</p>
+<p>Two costs to measure there rather than guess at here. The core calls
+<code>add_event_multi()</code> around fourteen times per shape and builds each
+<code>extra=</code> payload — <code>affinity_detail</code>, <code>load_detail</code>, <code>by_affinity</code>,
+the per-candidate weights — before the call, whether or not the
+caller gave it any event targets. A dry run gives none, so all of
+that is assembled and discarded, per shape and per candidate. It is
+dict construction with no I/O, so there is nothing to win until a dry
+run is measured as hot; if it is, guard the construction once at the
+top of <code>_find_candidates_for_shape()</code> rather than at fourteen call
+sites. And a refused set leaves the audit events of the shapes it had
+already assigned, which phase 3's hold evaluation has to decide what
+to do about.</p>
 <h3 id="phase-3-shape-holds-schema-and-the-node-guard-a">Phase 3: shape holds — schema and the node guard (<code>A</code>)<a class="headerlink" href="#phase-3-shape-holds-schema-and-the-node-guard-a" title="Permanent link">&para;</a></h3>
 <p>Add a claim's ability to carry shapes and book them onto nodes. The
 schema decision (<code>Q4</code>) is the per-node held column beside <code>used_*</code>:
@@ -17014,8 +17050,49 @@ stale (see the Prompt).</p>
   <code>D10</code> found 10 post-change refusals in standing <code>ucs-lab-*</code>
   namespaces and no record of who creates them; worth knowing before
   the design is called "every caller".</li>
+<li><strong>Affinity across a set's own members.</strong> Phase 1's <code>D6</code> charges
+  capacity across a multiset but leaves the hard affinity filter
+  and the scorer blind to the set's tentatively placed members,
+  because both read placed <code>Instance</code> rows and a shape has none.
+  No known caller needs it; the eight-instance <code>kerbside-patches</code>
+  topology is the candidate if one does, and phase 2's shadow
+  scoring is the instrument that would show it.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>A <code>POST /instances</code> with a JSON string vCPU or memory count
+  returned 500, and still does.</strong> Phase 1 closed the scheduler's
+  half of it and not the create. The API deliberately accepts
+  <code>{"cpus": "2"}</code> -- <code>shakenfist/external_api/validation.py</code>
+  declines to refuse it on the grounds that the handler copes -- and
+  the create path passes it to <code>Instance.new()</code> untouched, where
+  <code>Instance.__init__</code> stores static values as handed. The typed
+  column means a later read gives an integer back, so the string
+  survives exactly as long as the in-memory object a create's
+  scheduling decision runs against, and <code>inst.cpus &gt; max_cpu</code> raised
+  <code>TypeError</code> in the <code>cpu_max_per_instance</code> filter. Phase 1's shape
+  factory types those figures, because it has to in order to sort a
+  set largest first, so the walk now completes. <strong>Admission then
+  raises on the same string</strong>: <code>Instance._capacity_claim</code> returns
+  <code>self.cpus</code> as handed and <code>mariadb.admit_instance_placement()</code>
+  computes <code>cpus * config.SCHEDULER_DEMAND_PER_VCPU</code>, a float, so
+  <code>'2' * 0.6</code> raises <code>TypeError</code> and the create still 500s -- now
+  after the whole scheduling walk has run and published its audit
+  events. Phase 1 deliberately did not cast there as well: a second
+  cast in a third module would make the hole look closed while
+  <code>Instance.cpus</code> stayed a string for every other reader of it.
+  The root cause is a request value reaching a handler untyped,
+  which is
+  <a href="../PLAN-api-input-validation/">PLAN-api-input-validation.md</a>'s
+  subject. Two notes for that plan. <code>validation.py</code>'s justification
+  for accepting the string -- that pydantic's lax mode converts it
+  -- is true of the database row and not of the object the scheduler
+  and the admission path read. And the one-line fix is to type the
+  value where the request becomes an instance
+  (<code>shakenfist/external_api/instance.py:1121</code>), not at either
+  reader: both of the casts a reader could add leave the next reader
+  to find the next one.</li>
+</ul>
 <p>None yet. Directly related open issues: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/1364" title="GitHub Issue: shakenfist/shakenfist #1364">shakenfist#1364</a>
 (lame-duck and evacuate), <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4474" title="GitHub Issue: shakenfist/shakenfist #4474">shakenfist#4474</a> (the functional
 suite's wrapper waits on the exception class, ignoring <code>transient</code>).</p>
