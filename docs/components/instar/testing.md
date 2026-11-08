@@ -1687,6 +1687,92 @@ existing oracle. This folds in and retires the standalone
 Known quirks (see [quirks.md](/components/instar/quirks/)) are excluded from comparison:
 disk size fields and format-specific metadata.
 
+### What the create and convert arms draw
+
+The `create` picker draws, beyond the qcow2 and raw shapes: VHDX
+`subformat` (unset, `dynamic` or `fixed`) and both `block_state_zero`
+values; VMDK `monolithicFlat`; and `preallocation=falloc` and `full` on
+VMDK and VHDX. For `monolithicFlat` the two tools name the flat extent
+after their own output file, so the info normaliser rewrites the
+side-specific name before comparing. The fuzzer imports that normaliser
+from `tests/helpers/info_json.py` rather than keeping a copy, so the
+integration suite and the fuzzer cannot drift apart.
+
+`convert` can also target VHDX. qemu-img cannot be the oracle for the
+file layout, because instar's fixed convert deliberately writes qemu's
+*create* layout, not its *convert* layout (see [quirks.md](/components/instar/quirks/)),
+so a live convert-against-convert comparison would report that
+documented difference on every iteration. Instead the output's content
+is compared with qemu-img as for every other target, and its structure
+is compared with the committed qemu-img pins (see
+[qemu-img create pins](#qemu-img-create-pins)). The two differ in
+divergence type: `convert_content_divergence` is the content, and
+`convert_vhdx_structure_divergence` (or `convert_vhdx_parse_failure`)
+is the structure, so triage can tell which differed from the type
+alone. Dynamic comparisons skip the fields that depend on the data
+written. A geometry with no pin is not structurally compared.
+
+Which pin referees an output is decided by the virtual size and block
+size that were *asked for*, not by the ones the output claims: a wrong
+`virtual_disk_size` or `block_size` is then reported as a difference,
+rather than moving the image off the pinned geometry and silencing the
+comparison that would have caught it. The block size is read back out
+of the image only for the draw that leaves the option unset, which is
+the one case where what was asked for is whatever the tool's own
+default picked.
+
+#### What the differential fuzzer does not cover
+
+An exclusion that is not written down reads as coverage, so these are
+stated. They are three different kinds of gap.
+
+* **vpc is not a create target.** qemu-img rounds a VHD's virtual size
+  up to CHS geometry and instar writes the exact byte count, so every
+  vpc create would report that documented difference. vpc's
+  preallocation no-op is covered by `test_vpc_noop_preallocation` and
+  `test_vpc_fixed_noop_preallocation` instead. This is *not* "the fuzzer
+  never touches vpc": `op_dd` does draw vpc, and dd compares flattened
+  content, where virtual size never enters.
+* **Fixed VHDX sizes are whole multiples of the block size**, so there
+  is never a partial last payload block. Two independent defects force
+  this: instar's #879 (`convert -O vhdx --subformat fixed` fails on a
+  partial last block that holds data, and only for some source formats:
+  it fails from qcow2 while the same geometry passes from raw), and a
+  qemu-img bug, where it creates such an image with
+  `block_state_zero=off` and then cannot open the file it wrote.
+* **#883 is skipped, visibly.** `convert -O vhdx` ends a dynamic file
+  inside its own declared metadata region when no payload block is
+  allocated. qemu-img `info` accepts such a file and `instar check` reports no
+  errors, so the structural comparison is the only thing that notices. It would fire on
+  most dynamic iterations and bury every other finding, so exactly that
+  shape (a declared region overrunning the file and an all-zero BAT) is
+  skipped. Each skip is counted, logged once with the issue number and
+  printed in the run's summary (`known_defect_skips` in the summary
+  JSON), so a skip is distinguishable from a pass. Dynamic structural
+  coverage is correspondingly thin until #883 is fixed: in one
+  200-iteration run, 113 of 184 dynamic draws were skipped and 14 were
+  structurally compared. Fixed draws are fully compared.
+
+Those proportions are reported rather than measured by hand.
+`structural_outcomes` in `summary-<seed>.json` counts every VHDX
+structural comparison by what became of it, keyed `<operation>:<outcome>`:
+`compared`, `no_pin_for_geometry`, `no_virtual_size` (the `qemu-img
+info` probe could not answer), `parse_failure`, and
+`skipped_issue_883`. Only `compared` is coverage. The counts are
+logged once at the end of a run as well, because an iteration that
+parsed its output and then found no pinned case to judge it against
+returns no divergence, which otherwise reads exactly like a clean
+comparison -- so a pin set that stopped matching, or a probe that
+stopped answering, could zero this arm with the summary still saying
+nothing was wrong.
+
+A short mixed-operation run can easily compare nothing at all: 60
+iterations at seed 2024 draw 7 vhdx convert targets, of which 4 are
+skipped for #883 and 3 have no pin. To exercise this arm, run it
+against `--ops convert` with a few hundred iterations -- 150 at seed 7
+gives `compared x34`, `no_pin_for_geometry x44`,
+`skipped_issue_883 x56`.
+
 ### libyal cross-validation
 
 When libyal tools are installed in the environment (`libvmdk-utils`,
@@ -1717,6 +1803,9 @@ python3 scripts/differential-fuzz.py \
     --seed 42 \
     --log-dir ./fuzz-logs
 ```
+
+Add `--ops create,convert` (comma-separated op names) to restrict a run to
+particular operations.
 
 ### CI integration
 
@@ -1810,7 +1899,7 @@ differential fuzzing cannot reach.
 
 ### Fuzz targets
 
-43 targets across the parser and planner crates, organized in
+44 targets across the parser and planner crates, organized in
 `src/fuzz/`:
 
 | Target | Crate | Type |
@@ -1841,6 +1930,7 @@ differential fuzzing cannot reach.
 | `fuzz_measure_calc` | measure | Buffer-based |
 | `fuzz_measure_scan` | all parsers | CallTable |
 | `fuzz_create_emitters` | create | Buffer-based |
+| `fuzz_vhdx_fixed_bat` | vhdx | Buffer-based |
 | `fuzz_resize_planners` | resize | Buffer-based |
 | `fuzz_rebase_planners` | rebase | Buffer-based |
 | `fuzz_commit_planners` | commit | Buffer-based |
@@ -2076,9 +2166,9 @@ Rather than splitting the budget evenly, the run plan is computed by
 math, CHS rounding, and the planner/emitter crates) take a short fixed
 slice (300s — they reach steady coverage in well under a minute), and
 the deep parser/format targets split the remainder. With the current
-43 targets (17 fast, 26 deep) and the full 450 minutes, that gives the
+44 targets (18 fast, 26 deep) and the full 450 minutes, that gives the
 26 deep targets ~14 min each versus ~10 min under an even split
-(27000 / 43). A plan never sums to more than its budget: a budget too
+(27000 / 44). A plan never sums to more than its budget: a budget too
 small for every target's fast slice is shared equally instead, with a
 warning. `tools/ci/test-fuzz-tier.sh` asserts both, in `ci-tooling`.
 
@@ -2111,6 +2201,34 @@ if the self-hosted runner pool has spare physical cores during the
 nightly window, since each libFuzzer target pins a core — confirm core
 availability before adding jobs.
 
+#### The VHDX fixed-BAT targets
+
+`fuzz_create_emitters` draws both VHDX subformats and both
+`block_state_zero` values, and asserts invariants over the fixed BAT it
+fills (numbered 6 to 10 in the source): the entry count matches the
+layout; a payload entry is in the state asked for and its offset lies
+inside the payload region; offsets strictly increase; the offset an
+entry encodes is a whole number of MiB, asserted on the entry's bits;
+and a sector-bitmap slot is zero.
+
+`fuzz_vhdx_fixed_bat` drives `vhdx::fill_fixed_bat` directly, at
+arbitrary layouts, index ranges and buffer sizes, which the emitter
+target reaches only through a bounded window. It is also the target
+that holds each offset to the exact place qemu's forward map
+(`vhdx_create_bat` and `vhdx_block_translate`, `block/vhdx.c`) gives
+that block, inverted from the BAT index independently of the filler's
+own arithmetic — a stronger oracle than the emitter target's region
+membership, and the one that catches a map right about its shape and
+wrong about which block an index belongs to.
+
+Run either by hand with the Makefile, which uses the devcontainer:
+
+```bash
+make fuzz-build FUZZ_TARGET=fuzz_vhdx_fixed_bat
+make fuzz-run FUZZ_TARGET=fuzz_vhdx_fixed_bat FUZZ_DURATION=120
+make fuzz-coverage FUZZ_TARGET=fuzz_vhdx_fixed_bat
+```
+
 #### Keeping the registration lists honest
 
 Adding a target means editing several places by hand, and the
@@ -2124,6 +2242,11 @@ checked as a subset rather than for equality, since an unlisted target
 legitimately defaults to the deep tier. The guard needs no docker, no
 cargo and no testdata, and `tools/ci/test-check-fuzz-targets.sh` proves
 it still fails when one list loses an entry.
+
+Two prose counts of the same set are not checked by anything and have
+to be updated by hand with the table above: "N fuzz targets cover all
+parser crates" in [development.md](/components/instar/development/) and "has grown to
+**N targets**" in [security-audits.md](/components/instar/security-audits/).
 
 #### Crash reporting
 
