@@ -551,6 +551,22 @@ it. `declared_boolean()` is the right answer for a new declaration; the
 other three are existing shapes, each with its reason recorded where a
 change would break it.
 
+**A declared `integer` your handler does arithmetic on, or stores,
+needs `validation.declared_integer()` for the same reason.** A query
+parameter is always a string on the wire and a body integer may be a
+JSON string, and both are valid integers to the published schema —
+`{"cpus": "2"}` is accepted deliberately, because refusing it would
+make the validator narrower than its handler. So the string is what
+your handler gets. Where it is passed straight through to something
+typed, that is harmless: the per-object events `limit` had to be read
+because it is compared against an `int`, and `cpus` and `memory` on
+`POST /instances` because the created object carries them in memory
+until it is next loaded, and the capacity guard multiplies vCPUs by a
+float. There is no derived sweep over the 27 declared integers the way
+there is over the booleans, so a new one is on its author: read it, or
+be able to say why nothing downstream of the handler cares what type
+it is.
+
 ## Handler guards, and where a new one goes
 
 Not every check can be a declaration. A rule spanning two parameters

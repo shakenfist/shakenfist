@@ -12,6 +12,7 @@ import uuid
 from functools import partial
 
 import flask
+import marshmallow
 import symbolicmode
 import validators
 from flasgger import swag_from
@@ -1170,6 +1171,45 @@ class InstancesEndpoint(api_base.Resource):
         for sc in side_channels:
             if sc not in VALID_SIDE_CHANNELS:
                 return sf_api.error(400, f'{sc} is not a known side channel type')
+
+        # cpus and memory are read here, where the request becomes an
+        # instance, for the same reason uefi and secure_boot are read
+        # above: validation is check-only, so the handler is handed the
+        # raw body. The integer field the schema compiles accepts a JSON
+        # string -- {"cpus": "2"} is a valid integer to the published
+        # specification, and deliberately so, because refusing it would
+        # make the validator narrower than its handler -- and
+        # Instance.__init__ stores static values as handed. The typed
+        # column means a *later* load of the instance returns integers,
+        # so the string survives exactly as long as the in-memory object
+        # the create's own scheduling decision and capacity claim run
+        # against. That was long enough to be a 500:
+        # admit_instance_placement() computes cpus *
+        # config.SCHEDULER_DEMAND_PER_VCPU, a float, so '2' * 0.6 raised
+        # TypeError -- after the whole placement walk had run and
+        # published its audit events for a placement which then did not
+        # happen (issue 4842).
+        #
+        # Here rather than at either reader. A cast in
+        # Instance._capacity_claim() or in the scheduler's shape factory
+        # -- which already has one, which is why the walk completes --
+        # closes one reader and leaves the next one to be found. The
+        # others on this request are the audit events the placement
+        # publishes and the create's own response, both of which read
+        # the same in-memory object.
+        try:
+            cpus = validation.declared_integer(cpus)
+        except marshmallow.ValidationError:
+            # Only reachable with API_VALIDATION_MODE at warn or off,
+            # where the layer stands aside; at enforce a value int()
+            # cannot read is already a 400 from the schema.
+            return sf_api.error(400, 'cpus must be an integer',
+                                suppress_traceback=True)
+        try:
+            memory = validation.declared_integer(memory)
+        except marshmallow.ValidationError:
+            return sf_api.error(400, 'memory must be an integer',
+                                suppress_traceback=True)
 
         # Create instance object
         inst = instance.Instance.new(
