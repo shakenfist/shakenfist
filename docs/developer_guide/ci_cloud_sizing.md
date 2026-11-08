@@ -333,21 +333,26 @@ an unbounded harvest downloads the whole ninety day retention window;
 bundles are cached by artifact id under `~/.cache/shakenfist-ci-headroom`
 by default, outside any checkout, and an already-cached bundle is never
 re-fetched. Two things about it are deliberate and worth knowing before
-changing it. A merge run builds four cluster bundles, three are
-classified for harvest, and all three carry the probe. (Before
-2026-10-25 it built six, of which five were classified: the Ubuntu
-24.04 cluster and Debian 13 tier lanes then moved to the weekly
-`scheduled-tests.yml`, whose runs the harvest does not read. Their
-table entries stay, for the windows that still hold their bundles.) `Ansible modules`
-was classified ahead of the `shakenfist/actions` change that instruments
-it ([#4377](https://github.com/shakenfist/shakenfist/issues/4377)); that
-change merged on 2026-10-01, and the bundle has recorded a real series
-since. Harvests over the window before it read `series_present: false`
-for that bundle, which is an expected absence rather than a probe
-failure. The sixth, `Node
-lifecycle`, is skipped *by name* with the reason recorded in the source,
-so it never appears as missing data; and a
-bundle whose artifact name the tool has no entry for raises
+changing it. A merge run builds two cluster bundles, both classified for
+harvest, and both carry the probe. (Before 2026-10-25 it built six, of
+which five were classified: the Ubuntu 24.04 cluster and Debian 13 tier
+lanes then moved to the weekly `scheduled-tests.yml`, whose runs the
+harvest does not read. The Ansible modules and Node lifecycle lanes
+followed them there, leaving a merge run with two. Their table entries
+stay, for the windows that still hold their bundles.) The consequence for
+Ansible modules is that its `bundle-shakenfist-full-ansible-modules` series
+stops growing: it was classified ahead of the `shakenfist/actions` change
+that instruments it ([#4377](https://github.com/shakenfist/shakenfist/issues/4377)),
+that change merged on 2026-10-01, and it recorded a real series from then
+until the lane left the queue, but no later run will add to it. Nothing
+breaks, since that lane was never gated on the band. Anyone who later wants
+to arm the gate on its shape has the data up to its last merge run and no
+more, and would need to harvest the weekly runs, which this tool does not
+read. Harvests over the window before the series began read
+`series_present: false` for that bundle, which is an expected absence
+rather than a probe failure. Node lifecycle was always skipped *by name*
+with the reason recorded in the source, so it never appears as missing
+data; and a bundle whose artifact name the tool has no entry for raises
 `UnknownBundleError` rather than being guessed at or skipped, so adding
 a lane to the merge queue stops the harvest until someone says what the
 new lane is. A bundle with no series is written out with a reason
@@ -624,11 +629,12 @@ Each passes `headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}`, so
 the variable being unset leaves the gate on. The other call sites of
 `smoke-cluster.yml` pass `headroom_gate: false`: the smoke tier job (pull
 requests only, a single node, never harvested because the harvest reads
-`merge_group` runs), the Ansible modules job (measured since
+`merge_group` runs), the Ansible modules lane (measured from
 [#4377](https://github.com/shakenfist/shakenfist/issues/4377), but never
-fitted to the band, and the reusable workflow resolves the gate to false
-for any `test_kind` but `functional` whatever the caller passes), and the
-Debian 13 single machine lane (whose shape has never been harvested). Every call site has to
+fitted to the band, and the reusable workflow resolves the gate to
+false for any `test_kind` but `functional` whatever the caller passes;
+its series ended when it left the merge queue), and the Debian 13 single
+machine lane (whose shape has never been harvested). Every call site has to
 pass one of those two values explicitly. The reusable workflow leaves
 the gate off when nothing is passed (shakenfist/actions#102; before it,
 the default gated), but that default lives in another repository at
@@ -750,7 +756,8 @@ the wrong floor. The Ansible modules lane is why the distinction
 exists: it carries the probe but is not armed, and its job probes for
 about three and a half minutes, so its series holds 9 to 15 samples and
 the gate always withholds on it. That is the gate declining to judge a
-short job, not the instrument failing.
+short job, not the instrument failing. The series is closed: the lane
+runs weekly now, and the harvest reads only merge runs.
 
 **It fails loudly because it is scheduled**, and that is the whole
 design rather than an oversight to tidy up. It sits in no pull
