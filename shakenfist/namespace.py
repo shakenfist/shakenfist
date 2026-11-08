@@ -457,6 +457,80 @@ def revoke_inbound_trust(namespace, reason):
     return revoked
 
 
+def revoke_trusts_naming_missing_namespaces(reason):
+    """Remove trust entries which name a namespace that does not exist.
+
+    revoke_inbound_trust() is event driven: it fires when a namespace is
+    deleted, and only from the two delete paths which call it. That
+    leaves three ways a trust can end up naming a namespace which is
+    not there -- it was granted before that revocation existed, it was
+    granted for a name which never existed at all (the REST grant
+    handler now refuses that, but entries predating the check remain),
+    or a future delete path forgets to revoke. This is the standing
+    reconciliation behind all three, and it needs to know nothing about
+    how an entry came to be wrong.
+
+    "Does not exist" means no namespace static row carries the name,
+    which is exactly the condition under which the REST create handler
+    will let somebody else take it. A namespace which exists but is
+    deleted keeps its inbound trusts: its name is not available for
+    reuse yet, and Namespace.hard_delete() revokes them at the moment
+    it becomes available.
+
+    Only active namespaces are swept, for the reason
+    revoke_inbound_trust() gives.
+
+    Returns a dict of trusting namespace name to the names revoked
+    from it.
+    """
+    existing = set(mariadb.get_all_namespace_names() or [])
+    if not existing:
+        # A cluster we are running inside has at least the system
+        # namespace, so an empty answer is a failed read rather than an
+        # empty cluster. Revoking every trust in the cluster is not an
+        # acceptable response to a failed read.
+        LOG.warning('No namespaces found, skipping stale trust sweep')
+        return {}
+
+    revoked = {}
+    for ns in Namespaces([], prefilter='active'):
+        for trusted in ns.trust:
+            if trusted in existing:
+                continue
+
+            if trusted == 'system':
+                # remove_trust() refuses to remove the system trust
+                # whatever it is asked, because a namespace the cluster
+                # admin cannot see is worse than a stale trust. Asking
+                # anyway would report a revocation which did not
+                # happen, so this is not an existence question.
+                continue
+
+            # Confirm with a second read before acting. The listing is
+            # taken once per pass, and _persist_pydantic_upgrade()
+            # deletes and recreates a namespace's static row to change
+            # its version, so a listing taken inside that window is
+            # missing a live namespace. One read per candidate costs
+            # nothing because candidates are rare, and revoking a live
+            # trust is not a cheap mistake.
+            if Namespace.from_db(trusted, suppress_failure_audit=True):
+                continue
+
+            ns.remove_trust(trusted)
+            ns.add_event(
+                EVENT_TYPE_AUDIT, 'trust revoked, trusted namespace is gone',
+                extra={'untrusted-namespace': trusted, 'reason': reason})
+            revoked.setdefault(ns.uuid, []).append(trusted)
+
+    if revoked:
+        LOG.with_fields({
+            'revoked': revoked,
+            'reason': reason
+        }).info('Revoked trusts naming namespaces which do not exist')
+
+    return revoked
+
+
 class Namespaces(dbo_iter):
     base_object = Namespace
 
