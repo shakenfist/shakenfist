@@ -5,6 +5,7 @@ import random
 import time
 from unittest import mock
 
+from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import scheduler
@@ -3240,6 +3241,81 @@ class MultisetPlacementTestCase(SchedulerTestCase):
         # refusal says so: a caller told only the stage knows that
         # something did not fit and not what.
         self.assertEqual(3, exc.shape)
+
+    def _metadata_reads(self, affinity, neighbours=3, shapes=2):
+        """Count the metadata reads one multiset decision performs.
+
+        Instance.tags is a metadata read and nothing caches it, so each
+        access is a database round trip. Counting them is the only way
+        to assert this: a timing assertion on a read this small would
+        flake and would not say what regressed.
+        """
+        for j in range(neighbours):
+            self.mock_mariadb.create_instance(
+                'neighbour-%d' % j, place_on_node='node2',
+                metadata={'tags': ['web']})
+
+        requested = [self._shape(affinity=affinity) for _ in range(shapes)]
+
+        real = baseobject.mariadb.get_object_metadata
+        reads = []
+
+        def counting(*args, **kwargs):
+            reads.append(args)
+            return real(*args, **kwargs)
+
+        with mock.patch.object(
+                baseobject.mariadb, 'get_object_metadata', counting):
+            scheduler.Scheduler().find_candidates_for_shapes(requested)
+
+        return reads
+
+    def test_a_neighbours_tags_are_read_once_per_scoring_visit(self):
+        """The scorer reads each neighbour's tags once, not once per tag.
+
+        Only node2 carries neighbours, so it is the only node whose
+        instances are ever read: the empty nodes score zero and are
+        dropped from the preferred bucket. Each of the two shapes is
+        scored against it once, and each of its three neighbours is
+        read twice per visit -- once by the neighbour-skip predicate,
+        which owns that read and is deliberately left alone, and once
+        by the scorer, which hands the same value to both preferred-tag
+        loops and to the audit payload. 2 shapes x 3 neighbours x 2
+        reads = 12.
+
+        The exact number is asserted rather than a ceiling, because a
+        ceiling loose enough to be comfortable is loose enough to
+        absorb a repeat read somebody reintroduces.
+        """
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        reads = self._metadata_reads({
+            'prefer_with_tag': ['web', 'db'],
+            'prefer_without_tag': ['batch']})
+
+        self.assertEqual(12, len(reads))
+        # Three rows, read four times each across the decision. The
+        # rows are what makes the count above a statement about repeat
+        # reads rather than about how much there was to read.
+        self.assertEqual(3, len(set(reads)))
+
+    def test_scoring_a_neighbour_costs_the_same_whatever_tags_are_asked(self):
+        """The read count does not grow with the specification.
+
+        Each preferred-tag loop used to read the neighbour's tags once
+        per tag it was given, so asking about more tags cost more round
+        trips for no more information. This is the assertion that
+        catches that specifically: the same cluster, scored against a
+        specification naming seven tags instead of three, must perform
+        exactly the same reads.
+        """
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        reads = self._metadata_reads({
+            'prefer_with_tag': ['web', 'db', 'cache', 'batch', 'spare'],
+            'prefer_without_tag': ['batch', 'other']})
+
+        self.assertEqual(12, len(reads))
 
     def test_a_refusal_names_the_shape_in_the_callers_own_order(self):
         # The set is walked largest first, so the shape which runs out

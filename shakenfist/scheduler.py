@@ -1613,6 +1613,23 @@ class Scheduler:
                     considered.append(skipped)
                     continue
 
+                # This neighbour's tags, read once. Instance.tags is a
+                # metadata read and nothing caches it, so each access
+                # is a database round trip -- and the loops below read
+                # it once *per tag the caller named*, not once each, so
+                # the cost of scoring a neighbour grew with the size of
+                # the affinity specification for no additional
+                # information. Both loops and the audit payload below
+                # now read this local.
+                #
+                # Safe because a decision is a snapshot. This call
+                # places nothing, so no neighbour's tags can change
+                # under it, and the placed instances these were read
+                # from are memoised for the whole decision for the same
+                # reason: a node considered by several shapes should be
+                # read once, not once per shape.
+                neighbour_tags = i.tags
+
                 # Count proportional, not set membership: a node
                 # carrying five instances of a group really is more
                 # "with the group" than one carrying a single
@@ -1628,17 +1645,17 @@ class Scheduler:
                 contribution = 0
                 for tag in binary_spec[
                         instance.Instance.AFFINITY_PREFER_WITH]:
-                    if tag in i.tags:
+                    if tag in neighbour_tags:
                         matched[tag] = matched.get(tag, 0) + 1
                         contribution += 1
                 for tag in binary_spec[
                         instance.Instance.AFFINITY_PREFER_WITHOUT]:
-                    if tag in i.tags:
+                    if tag in neighbour_tags:
                         matched[tag] = matched.get(tag, 0) - 1
                         contribution -= 1
                 considered.append({
                     'instance_uuid': instance_uuid,
-                    'tags': list(i.tags),
+                    'tags': list(neighbour_tags),
                     'matched': matched,
                     'contribution': contribution,
                 })
