@@ -50,6 +50,16 @@ names, and that list is the only thing which decides when a lane runs:
 | `debian-13-slim-tier` (Debian 13 tier, with Kerbside) | Weekly | `slim-tier` | `cluster-ci.conf` |
 | `debian-13-localhost` (Debian 13 single machine) | Weekly | `localhost` | `cluster-ci.conf` |
 
+`smoke-cluster.yml`'s `tier` input does not appear in that table because
+it does not select anything: it names the bundle artifact and forms part of
+the concurrency group, and nothing else reads it. A lane's suite is its
+`stestr_config` alone. `debian-13-localhost` passes `tier: smoke` and runs
+the whole of `cluster-ci.conf`, the same 163 tests as the multi-node lanes,
+which is why its `test_timeout_minutes` is the largest of any lane rather
+than the smallest -- one node at concurrency 3 needs about 48 minutes for
+the suite the three-node lane finishes in 34 at concurrency 5. Making that
+lane a real smoke subset would be a change to what it runs.
+
 `functional-tests.yml`'s `functional_lanes` job selects the merge lanes,
 and `can_merge` needs it. `scheduled-tests.yml`'s `weekly_lanes` job
 selects the rest. Every merge lane deploys a nested cluster onto the sfcbr
