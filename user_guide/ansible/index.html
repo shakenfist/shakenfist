@@ -16930,7 +16930,7 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 </tr>
 <tr>
 <td>state<br/><em>string</em></td>
-<td>The state of the resource. Valid states are <code>present</code> or <code>absent</code>, defaults to <code>present</code>.</td>
+<td>The state of the resource. Valid states are <code>present</code> or <code>absent</code>, defaults to <code>present</code>. Instances are immutable, so <code>present</code> means an instance which can run the requested specification: one whose specification differs is deleted and recreated, and so is one which exists in a state it will never leave on its own. Only an instance in <code>initial</code>, <code>preflight</code>, <code>creating</code> or <code>created</code> is adopted unchanged. A record in an error state (where the server parks a refused create, and where it stays until somebody deletes it), in <code>delete-wait</code>, or already <code>deleted</code> holds the name but is not an instance the specification is satisfied by, so it is replaced however well its fields match: the module waits for it to settle in <code>error</code>, deletes it, waits for that delete to finish, and then creates.</td>
 </tr>
 <tr>
 <td>uuid<br/><em>string</em></td>
