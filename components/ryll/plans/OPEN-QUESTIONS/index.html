@@ -1541,6 +1541,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/bypass-actor-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Bypass actor identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -12499,34 +12527,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-initial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Initial porting plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../PLAN-capture/" class="md-nav__link">
         
   
@@ -12723,34 +12723,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-crate-extraction/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Crate extraction
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../PLAN-remaining-issues/" class="md-nav__link">
         
   
@@ -12843,34 +12815,6 @@
     
   
     PR 23 follow-up
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-deferred-debt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deferred debt
   
 
     
@@ -13143,34 +13087,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-hamburger-menu/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hamburger menu
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../PLAN-notifications/" class="md-nav__link">
         
   
@@ -13179,34 +13095,6 @@
     
   
     Notifications system
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-pr31-followup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PR 31 follow-up
   
 
     
@@ -13700,6 +13588,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#q6-what-corrupts-glz-cross-frame-images-during-guest-boot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q6 — What corrupts GLZ cross-frame images during guest boot?
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13740,34 +13639,6 @@
     
   
     Self-hosted runner migration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-pip-distribution/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip-installable ryll
   
 
     
@@ -16078,6 +15949,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#q6-what-corrupts-glz-cross-frame-images-during-guest-boot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q6 — What corrupts GLZ cross-frame images during guest boot?
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -16260,6 +16142,59 @@ this is a robustness gap rather than a dogfooding blocker, and
 the webrtc-0.20 port (phases 02–04) rewrites the adjacent code
 paths — diagnosis before the port would likely be throwaway
 work.</p>
+<h3 id="q6-what-corrupts-glz-cross-frame-images-during-guest-boot">Q6 — What corrupts GLZ cross-frame images during guest boot?<a class="headerlink" href="#q6-what-corrupts-glz-cross-frame-images-during-guest-boot" title="Permanent link">&para;</a></h3>
+<p><strong>Linked plan:</strong> none live. The investigation was
+<a href="https://github.com/shakenfist/ryll/blob/7487d2f4cd6767a63bd630d08e2c177dee4d04d0/docs/plans/PLAN-deferred-debt-phase-01-display.md">phase 1 of the deferred-debt plan</a>,
+retired once its three fixes landed; that pinned copy is the
+evidence trail, and the eviction rule it produced is design
+decision 8.</p>
+<p><strong>Symptom:</strong> during the early BIOS/GRUB/kernel-boot window a
+coloured-noise band appears across the top of the primary
+surface. A <code>tools/pcap-inspect.py draw-copy</code> over the captured
+window showed 9237 DRAW_COPY into surface 0 and nothing else —
+no DRAW_FILL, no COPY_BITS — of which 5286 were ZLIB_GLZ_RGB
+and 3904 GLZ_RGB, so ~99% of the window is GLZ-family images.
+Still listed as a known issue in
+<a href="/components/ryll/troubleshooting/">troubleshooting.md</a>.</p>
+<p><strong>Already eliminated:</strong> the three dictionary-management bugs
+this was first written around have all landed — <code>win_head_dist</code>
+eviction, the <code>IMAGE_FLAGS_CACHE_ME</code> test before caching, and
+the INVALIDATE_LIST and INVAL_ALL_PIXMAPS handlers that clear
+the dictionary — and the band still reproduces. The decoder
+itself was ruled out separately: control-byte parsing,
+pixel_flag and image_flag decoding and the pixel copy loops
+were compared against kerbside's Python <code>glz.py</code> and found
+faithful. A hunt that restarts from either is repeating work.</p>
+<p><strong>Surviving hypotheses,</strong> in the order the retired plan ranked
+them:</p>
+<ul>
+<li><strong>Stride or dimension confusion</strong> between decode and blit —
+  the band has horizontal-scanline structure consistent with
+  pixels written at width W and read at width W'. Check
+  width×height×4 against the scratch-buffer allocation and the
+  blit stride.</li>
+<li><strong>A dictionary entry mutated after insertion.</strong> Eviction
+  bounds the dictionary but says nothing about content: if a
+  cached image's backing <code>Vec</code> is reused or overwritten, a
+  reference returns garbled pixels. Check that insertion stores
+  a fresh owned <code>Vec</code> and that values are never mutated after.</li>
+<li><strong>ZLIB_GLZ_RGB specifically</strong> — the majority flavour here. A
+  short zlib output-buffer estimate would truncate before the
+  GLZ footer, rendering the head of the frame and garbage after
+  it.</li>
+<li><strong>Top-down versus bottom-up row order,</strong> which would show
+  uninitialised bytes as the garbage rows.</li>
+<li><strong>Cross-channel dictionary visibility.</strong> The dictionary is
+  behind a mutex and callers clone rather than borrow across
+  release points, so this is the least likely, but it was never
+  verified.</li>
+</ul>
+<p><strong>What would close it:</strong> <code>tools/pcap-inspect.py timeline
+--since-last N</code> against a bug report's pcap ring buffer to
+isolate the DRAW_COPYs that produced the corruption, then a
+unit test feeding those image blobs to the GLZ decoder in
+isolation and comparing against a reference decode of the same
+input.</p>
 <h2 id="when-to-add-a-new-entry">When to add a new entry<a class="headerlink" href="#when-to-add-a-new-entry" title="Permanent link">&para;</a></h2>
 <p>Add a Q-entry here when <strong>all</strong> of the following hold:</p>
 <ol>
@@ -16276,6 +16211,13 @@ work.</p>
 that phase. If it doesn't, file a new standalone plan stub and
 link to it from the entry. Entries without a linked plan are a
 smell — the plan is where the history lives.</p>
+<p>One exception: where the investigation came from a plan that has
+since been retired, there is no live plan to link, so the entry
+carries the evidence inline and links the retired plan's pinned
+copy as the trail. Such an entry is longer than the others on
+purpose, and it cannot be closed by the linked plan reaching a
+conclusion — closing it means folding its content into the
+<code>docs/</code> page that owns the topic. Q6 is the current example.</p>
 
 
 

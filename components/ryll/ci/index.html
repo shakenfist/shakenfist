@@ -1541,6 +1541,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/bypass-actor-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Bypass actor identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -12804,34 +12832,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-initial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Initial porting plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-capture/" class="md-nav__link">
         
   
@@ -13028,34 +13028,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-crate-extraction/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Crate extraction
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-remaining-issues/" class="md-nav__link">
         
   
@@ -13148,34 +13120,6 @@
     
   
     PR 23 follow-up
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-deferred-debt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deferred debt
   
 
     
@@ -13448,34 +13392,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-hamburger-menu/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hamburger menu
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-notifications/" class="md-nav__link">
         
   
@@ -13484,34 +13400,6 @@
     
   
     Notifications system
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-pr31-followup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PR 31 follow-up
   
 
     
@@ -13904,34 +13792,6 @@
     
   
     Self-hosted runner migration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-pip-distribution/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip-installable ryll
   
 
     
@@ -17545,6 +17405,20 @@ themselves do not state:</p>
   why it is safe. ryll runs the upstream gitleaks binary
   directly rather than <code>gitleaks-action</code>, which requires a paid
   licence for organisation repositories.</li>
+<li><strong>Holding a dependency back</strong> goes in <code>renovate.json</code>, as a
+  <code>packageRules</code> entry whose <code>description</code> states the reason and
+  the condition that would release the hold. Two shapes are in
+  use. An <code>allowedVersions</code> ceiling stops the upgrade being
+  offered at all, and suits a hold with a known upper bound
+  (<code>sha1</code>, <code>rand</code>). <code>dependencyDashboardApproval</code> instead lets
+  renovate find the upgrade but leaves it on the dependency
+  dashboard until someone ticks it, and suits a group that
+  cannot be split and is only occasionally landable — the
+  <code>ironrdp</code> group, where every crate has to move in step with
+  <code>ironrdp-server</code> and an opened PR would otherwise sit red
+  until upstream releases a matching one. The cost is that a
+  dashboard-approval hold is silent: no pull request appears, so
+  the pending upgrade is only visible on the dashboard issue.</li>
 </ul>
 
 

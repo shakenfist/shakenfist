@@ -1541,6 +1541,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/bypass-actor-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Bypass actor identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -12621,34 +12649,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-initial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Initial porting plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-capture/" class="md-nav__link">
         
   
@@ -12845,34 +12845,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-crate-extraction/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Crate extraction
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-remaining-issues/" class="md-nav__link">
         
   
@@ -12965,34 +12937,6 @@
     
   
     PR 23 follow-up
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-deferred-debt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deferred debt
   
 
     
@@ -13265,34 +13209,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-hamburger-menu/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hamburger menu
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-notifications/" class="md-nav__link">
         
   
@@ -13301,34 +13217,6 @@
     
   
     Notifications system
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-pr31-followup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PR 31 follow-up
   
 
     
@@ -13721,34 +13609,6 @@
     
   
     Self-hosted runner migration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-pip-distribution/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip-installable ryll
   
 
     
@@ -16156,8 +16016,8 @@ succeeds on a host without them. ALSA is linked directly, so without
 <a href="/components/ryll/releasing/#the-pypi-wheels-platform-tag">the PyPI wheel's platform tag</a>.
 <code>remote-viewer</code> is the fallback whenever ryll can't be installed or run
 on a given platform.</p>
-<p>See <a href="/components/ryll/plans/PLAN-pip-distribution/">plans/PLAN-pip-distribution.md</a>
-for the full design rationale.</p>
+<p>See <a href="/components/ryll/design-decisions/">Key design decisions</a> for why the wheel
+embeds the binary rather than fetching it on first run.</p>
 <h2 id="kasm-workspaces">Kasm Workspaces<a class="headerlink" href="#kasm-workspaces" title="Permanent link">&para;</a></h2>
 <p><code>make kasm-image</code> builds a <a href="https://kasm.com/">Kasm Workspaces</a> image
 that runs the ryll GUI as a single-application workspace. See the

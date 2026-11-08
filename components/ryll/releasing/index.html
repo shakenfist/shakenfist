@@ -1541,6 +1541,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/bypass-actor-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Bypass actor identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -12275,6 +12303,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#reserving-a-new-crate-name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reserving a new crate name
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#host-tools" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12788,34 +12827,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-initial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Initial porting plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-capture/" class="md-nav__link">
         
   
@@ -13012,34 +13023,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-crate-extraction/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Crate extraction
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-remaining-issues/" class="md-nav__link">
         
   
@@ -13132,34 +13115,6 @@
     
   
     PR 23 follow-up
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-deferred-debt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deferred debt
   
 
     
@@ -13432,34 +13387,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-hamburger-menu/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hamburger menu
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-notifications/" class="md-nav__link">
         
   
@@ -13468,34 +13395,6 @@
     
   
     Notifications system
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-pr31-followup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PR 31 follow-up
   
 
     
@@ -13888,34 +13787,6 @@
     
   
     Self-hosted runner migration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-pip-distribution/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip-installable ryll
   
 
     
@@ -16194,6 +16065,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#reserving-a-new-crate-name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reserving a new crate name
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#host-tools" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16500,7 +16382,35 @@ Settings → Rules → Rulesets (or the older Settings → Tags):</p>
   still succeed.</li>
 </ul>
 <p>No secret is needed for the <code>ryll</code> PyPI wheel: it publishes via
-OIDC Trusted Publishers instead (see below).</p>
+OIDC Trusted Publishers instead (see below). crates.io still needs
+the long-lived token above; moving it to crates.io's own trusted
+publishing is
+<a href="https://github.com/shakenfist/ryll/issues/699">issue 699</a>.</p>
+<p>Scope <code>CARGO_REGISTRY_TOKEN</code> as narrowly as the job it serves allows,
+and give it an expiry. A release publishes new versions of crates that
+already exist, so it does need <code>publish-update</code> -- but scope the token
+to the <code>shakenfist-spice-*</code> and <code>ryll</code> crate patterns rather than to
+the whole account, because a leaked account-wide token can publish
+updates to any crate the owner holds, transfer ownership and yank
+published versions. A one-shot publish of a <em>new</em> name needs only
+<code>publish-new</code>: the first three <code>0.0.0</code> name reservations
+(<code>shakenfist-spice-compression</code>, <code>-protocol</code> and <code>-usbredir</code>) were
+made with a <code>publish-new</code>-only token scoped to just those names and
+expiring in a day, so a leak could not have touched anything else.
+Both the release workflow and <code>make publish-crates</code> hand the token
+over in the environment (<code>-e CARGO_REGISTRY_TOKEN</code>), which cargo
+reads without a prior <code>cargo login</code>, so it is never written to
+<code>~/.cargo/credentials.toml</code> inside the container.</p>
+<p>The expiry is not free, so check it before starting a release rather
+than relying on the release to tell you. An expired token cannot
+leak publishing rights, but it is only read at publish time:
+<code>publish-crates</code> runs behind <code>sign-tag</code>, which is gated on the
+<code>release</code> environment's manual approval, so the failure surfaces
+after the tag is signed and the binaries are public.
+<code>tools/publish-crates.sh</code> runs <code>cargo publish</code> per crate under <code>set
+-e</code> with no already-published guard, so a token that expires mid-run
+leaves the earlier crates published and the rest to be done by hand
+-- a re-run would fail on the ones that already landed.</p>
 <h3 id="pypi-trusted-publishers-and-the-release-environment">PyPI Trusted Publishers and the <code>release</code> environment<a class="headerlink" href="#pypi-trusted-publishers-and-the-release-environment" title="Permanent link">&para;</a></h3>
 <p>The <code>ryll</code> wheel publishes to PyPI using an OIDC Trusted
 Publisher — no API tokens are stored in the repo. This is
@@ -16539,6 +16449,22 @@ approval</strong>.</p>
 fails with a "publisher not found" error; the
 <code>.deb</code>/<code>.rpm</code>/tarball/zip artifacts, GitHub Release, and
 crates.io publishes are unaffected.</p>
+<h3 id="reserving-a-new-crate-name">Reserving a new crate name<a class="headerlink" href="#reserving-a-new-crate-name" title="Permanent link">&para;</a></h3>
+<p>crates.io has a flat, immutable, first-come namespace, and a name
+cannot be reclaimed except through a slow and uncertain complaint to
+the Rust Foundation. The risk is asymmetric -- reserving costs almost
+nothing, while losing a name to a typosquatter or a junk crate is a
+setback to be worked around -- so a new crate's name is published as a
+minimal <code>0.0.0</code> placeholder as soon as its workspace member exists,
+before the work that will fill it. The real release then supersedes the
+placeholder, which the resolver already prefers. Scope the token for
+that publish to <code>publish-new</code> only, as above.</p>
+<p>While the member sits at <code>0.0.0</code>, depend on it by <code>path</code> alone and
+leave the <code>version =</code> half of the dual spec off until it reaches its
+first real version. Cargo will not satisfy <code>^0.1</code> from <code>0.0.0</code> -- it
+fails the resolve with "candidate versions found which didn't match:
+0.0.0" -- so adding the qualifier early as forward preparation breaks
+the build rather than being the no-op it looks like.</p>
 <h3 id="host-tools">Host tools<a class="headerlink" href="#host-tools" title="Permanent link">&para;</a></h3>
 <p>Both scripts orchestrate from the operator's host. The
 workspace test compile in stage 1 is delegated to <code>make test</code>,
@@ -16849,8 +16775,12 @@ reproduce one. What it cannot catch is anything about crates.io
 itself: the token, the network, or a version that already exists.</p>
 <p>Common causes:</p>
 <ul>
-<li><code>CARGO_REGISTRY_TOKEN</code> missing, expired, or scoped too
-  narrowly. Regenerate with <code>publish-new</code> + <code>publish-update</code>.</li>
+<li><code>CARGO_REGISTRY_TOKEN</code> missing, expired, or lacking a scope this
+  publish needs. A release needs <code>publish-update</code> as well as
+  <code>publish-new</code>; regenerate with both, keeping the crate-pattern
+  scoping and expiry described under
+  <a href="#repository-secrets">Repository secrets</a> rather than widening it to
+  the whole account.</li>
 <li>A dependency inside ryll that still uses a <code>path = ...</code> only
   reference without a <code>version = ...</code> qualifier. <code>cargo publish</code>
   rejects this. The dual-spec qualifiers are wired up and

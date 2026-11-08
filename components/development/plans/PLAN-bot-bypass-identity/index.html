@@ -1543,6 +1543,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../audits/bypass-actor-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Bypass actor identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -12679,34 +12707,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../ryll/plans/PLAN-initial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Initial porting plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../ryll/plans/PLAN-capture/" class="md-nav__link">
         
   
@@ -12903,34 +12903,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Crate extraction
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
         
   
@@ -13023,34 +12995,6 @@
     
   
     PR 23 follow-up
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deferred debt
   
 
     
@@ -13323,34 +13267,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hamburger menu
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../ryll/plans/PLAN-notifications/" class="md-nav__link">
         
   
@@ -13359,34 +13275,6 @@
     
   
     Notifications system
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PR 31 follow-up
   
 
     
@@ -13779,34 +13667,6 @@
     
   
     Self-hosted runner migration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../ryll/plans/PLAN-pip-distribution/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip-installable ryll
   
 
     
@@ -16735,12 +16595,12 @@ the App as its bypass actor rather than a team of one.</p>
 </tr>
 <tr>
 <td>2. <code>prune-reviews</code> mints an App token</td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>9f080cd (#354), b3ff906 (#356), 55f554e (#357), 9d1301b (#368)</td>
 </tr>
 <tr>
 <td>3. Move the bypass and enforce it</td>
-<td>Not started</td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -18357,9 +18217,128 @@ show him 2b's record: the three readings from andris are the
 evidence that the App path works, and the six pull requests that
 follow are opened on that evidence alone.</p>
 <h3 id="phase-3-move-the-bypass-and-enforce-it">Phase 3: move the bypass and enforce it<a class="headerlink" href="#phase-3-move-the-bypass-and-enforce-it" title="Permanent link">&para;</a></h3>
-<p>Planning effort: high. Steps 3a and 3b change who can push to seven
-default branches, and a mistake either locks out review marks or
-leaves the old path open without anything saying so.</p>
+<p>Planning effort: high, as the master plan set it. Review effort:
+high: steps 3a and 3b change who can push to seven default branches,
+and a mistake either locks out review marks or leaves the old path
+open without anything saying so. Planned on 2026-11-04 against
+<code>9d1301b</code>, on the branch <code>bot-bypass-identity-phase-03-enforce</code>. This
+section replaces the three-row sketch the master plan carried for
+phase 3; the step briefs below are unchanged in substance.</p>
+<h4 id="scope_2">Scope<a class="headerlink" href="#scope_2" title="Permanent link">&para;</a></h4>
+<p>In: removing <code>shakenfist-bot</code> from <code>sf-can-skip-merge-queue</code> and
+proving both halves of the enforcement (3a); the edits to
+<code>PLAN-workflow-ref-trust.md</code> that point its open question 1 at this
+plan's App and strike #211 from it (3b); the <code>bypass-actor-identity</code>
+criterion, its spec, its audit page and its tests (3c); closing</p>
+<h1 id="211">211.<a class="headerlink" href="#211" title="Permanent link">&para;</a></h1>
+<p>Out: anything about <code>sfconductor</code>'s own bypass beyond what open
+question 3 settled (the team rule waits on it, decision 3); widening
+<code>AUDIT_READ_TOKEN</code> so the audit can read <code>bypass_actors</code> (#352,
+decision 2); narrowing the <code>shakenfist-k3s-ci-arc</code> App's
+<code>administration: write</code> on hunkydory (33fl's k3s CI plan, its phase
+5); the push audit (phase 4).</p>
+<h4 id="what-the-survey-found_2">What the survey found<a class="headerlink" href="#what-the-survey-found_2" title="Permanent link">&para;</a></h4>
+<p>Read on 2026-11-04 (Australian Eastern Daylight Time) against the
+tree at <code>9d1301b</code> and the GitHub API. Every factual premise the
+master plan's phase 3 sketch rests on still holds, so nothing in the
+sketch was corrected at source. Seven things are worth knowing
+before the step briefs are read.</p>
+<ol>
+<li><strong>The bypass is exactly two actors on all four rulesets.</strong> andris
+   (ruleset 24700229), hunkydory (23805020), kerbside (20252051) and
+   ryll (18708684) each bypass <code>Integration:5538020</code> (the
+   <code>shakenfist-review-marks</code> App) and <code>Team:11722172</code>
+   (<code>sf-can-skip-merge-queue</code>), both <code>always</code>, and nothing else. So
+   3a takes the bot out of the team and the App keeps the only
+   automation bypass; 3c's team rule would flag <code>Team:11722172</code> on
+   all seven (decision 3).</li>
+<li><strong><code>shakenfist-bot</code> is already demoted.</strong> It is an organisation
+   <em>member</em>, not an owner (only <code>mikalstill</code> owns the org), and
+   carries <code>write</code>, not admin, on hunkydory, development and andris
+   (spot-checked; 3a re-records all eleven). Open question 5 is
+   settled as its default, so 3a's role check confirms nothing
+   restored the bot rather than changing anything.</li>
+<li><strong>The bot is still in the bypass team.</strong> Membership of
+   <code>sf-can-skip-merge-queue</code> is <code>mikalstill</code>, <code>shakenfist-bot</code>,
+   <code>sfconductor</code>. Removing the bot leaves the two accounts open
+   question 3 is about, and the team itself stays a bypass actor.</li>
+<li><strong>Phase 2's App path is live on all four key-holders.</strong> andris,
+   hunkydory, kerbside and ryll each push <code>prune-reviews</code> as
+   <code>shakenfist-review-marks[bot]</code> (phase 2 record), so phase 2's
+   "Order matters" precondition -- phase 3 must not start until those
+   four have merged and pushed as the App -- is met.</li>
+<li><strong>3c's targets all exist and the check does not.</strong>
+   <code>scripts/audit/checks/github_config.py</code> carries
+   <code>DeleteBranchOnMerge</code>; <code>scripts/audit/registry.py</code> has <code>CHECKS</code>;
+   <code>scripts/tests/test_metadata.py</code> has <code>FROZEN_METADATA</code> and
+   <code>FROZEN_ISSUE_TITLES</code>; <code>scripts/tests/test_github_config.py</code> has
+   <code>CheckTestCase</code>; <code>docs/audits/README.md</code> and
+   <code>docs/audits/merge-queue-config.md</code> exist. Nothing named
+   <code>bypass-actor-identity</code> is in <code>scripts/</code> or <code>docs/audits/</code> yet,
+   so 3c adds, never edits.</li>
+<li><strong>#352 and #211 are both open.</strong> #352 (a read-only App identity
+   for the audit) being open is what keeps 3c on the fallback shape:
+   <code>AUDIT_READ_TOKEN</code> cannot read <code>bypass_actors</code>, so the actor-type
+   rules live in the spec's reviewer-confirmed half, not in code
+   (decision 2). #211, reopened in step 1a, is still open and 3c
+   closes it.</li>
+<li><strong>No live ruleset names the admin <code>RepositoryRole</code>.</strong> The four
+   rulesets bypass only the App and the team, so 3c's instruction to
+   "confirm its <code>actor_id</code> against a real ruleset GET" cannot be met
+   from the fleet. The implementer sources the id another way -- a
+   scratch ruleset GET, or GitHub's documented repository-role ids --
+   and says which in the commit and the test (decision 4).</li>
+</ol>
+<p><strong>One hazard, not a false premise.</strong> 3b edits
+<code>PLAN-workflow-ref-trust.md</code>, and an active worktree
+(<code>development-wt-wrt-p3</code>, branch
+<code>workflow-ref-trust-phase-03-third-party-pinning</code>) is rewriting that
+same file by +315/-32 lines. The four passages 3b edits exist today
+-- open question 1's default (~line 225), the #211 residual (~241),
+step 2a's <code>actions</code> brief (~518) and step 2b's "documented set"
+(~504) -- but that branch may move or reword them. 3b re-verifies its
+targets at implementation time and lands after that branch has
+merged or is confirmed not to touch them (risk 5, decision 5).</p>
+<h4 id="decisions_2">Decisions<a class="headerlink" href="#decisions_2" title="Permanent link">&para;</a></h4>
+<ol>
+<li><strong>3a is one operator action, not a sub-agent.</strong> Removing a team
+   member needs <code>admin:org</code>, which no sub-agent carries (as in phase
+   1 and the 3a brief). The management session does it with the
+   operator and records the result; only the probe half (the
+   throwaway rejection workflow) could be a sub-agent, and it is
+   cheaper run inline with the operator watching the ruleset.</li>
+<li><strong>3c lands on the fallback shape.</strong> #352 is open (survey item 6),
+   so <code>AUDIT_READ_TOKEN</code> cannot see <code>bypass_actors</code>. The criterion
+   measures only the <code>review-marks</code> environment and its branch
+   policy in code; the actor-type rules and the repository-level key
+   check are the spec's reviewer-confirmed half, as
+   <code>PLAN-workflow-ref-trust.md</code> step 2b does it. Phase 1 and Mikal
+   (phase 2 decision 8) already settled that #352 does not hold this
+   work; it is restated because it shapes every test 3c writes.</li>
+<li><strong>3c lands without the team rule.</strong> Open question 3 (sfconductor)
+   is unresolved and <code>Team:11722172</code> is still a bypass actor on all
+   seven, so a team rule would file seven issues this plan cannot
+   close. The criterion reports team bypass actors in the spec's
+   reviewer-confirmed half without failing on them, and the commit
+   message states that and how many repositories it newly fails (the
+   prediction: none, if phases 1 and 2 did their job). The team rule
+   is a later follow-up, when open question 3 has an outcome, not
+   part of this phase.</li>
+<li><strong>The admin role's <code>actor_id</code> is sourced off the fleet.</strong> No live
+   ruleset bypasses the admin role (survey item 7), so the
+   implementer confirms the id from a scratch ruleset GET or
+   GitHub's documented role ids, not from a fleet ruleset, and
+   records which in the commit and the test.</li>
+<li><strong>3b runs last and lands after the workflow-ref-trust phase-3
+   branch settles.</strong> That branch rewrites the file 3b edits (survey
+   hazard). 3b is the cheapest step and the one whose targets most
+   need to be stable, so it runs after 3a and 3c, re-reads its four
+   target passages against the then-current file, and is held while
+   the other branch is still open and touching them. If that branch
+   has already repointed open question 1 at the App, 3b confirms it
+   and only strikes #211.</li>
+</ol>
+<h4 id="steps_2">Steps<a class="headerlink" href="#steps_2" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
 <tr>
@@ -18394,13 +18373,442 @@ leaves the old path open without anything saying so.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Definition of done.</strong> <code>shakenfist-bot</code> is not a member of
-<code>sf-can-skip-merge-queue</code>, and its role is what open question 5
-settled; a push to a protected default branch with either bot PAT is
-rejected; <code>bypass-actor-identity</code> runs in the
-weekly audit and its results match what step 3a recorded; #211, reopened in
-step 1a, is closed from the pull request that lands 3c, with a link to this
-plan.</p>
+<h4 id="record_2">Record<a class="headerlink" href="#record_2" title="Permanent link">&para;</a></h4>
+<p>Filled in as the steps run; every cell cites the run, pull request,
+command or ruleset GET it came from and the date, and a cell that
+could not be read says so. Dates are Australian Eastern Daylight
+Time (UTC+11). To capture:</p>
+<ul>
+<li>3a: the eleven
+  <code>repos/shakenfist/&lt;r&gt;/collaborators/shakenfist-bot/permission</code>
+  reads (write, not admin); <code>sf-can-skip-merge-queue</code> membership
+  after the removal; both rejection probes on hunkydory's <code>develop</code>
+  (the <code>DEPENDENCIES_TOKEN</code> push and the <code>RENOVATE_TOKEN</code> push, each
+  refused by hunkydory's ruleset) with their rule-suite ids and the
+  deletion of the probe workflow and branch; and each of
+  andris/hunkydory/kerbside/ryll's <code>bypass_actors</code> after the removal
+  (the App, plus the team for the human accounts).</li>
+<li>3c: how many repositories the criterion newly fails on its first
+  weekly run, against the prediction of none; the source of the
+  admin-role <code>actor_id</code> (decision 4); the audit run that reports the
+  new criterion.</li>
+<li>3b: the workflow-ref-trust pull request or commit this rides
+  behind, and which of its four target passages the phase-3 branch
+  had already changed.</li>
+</ul>
+<p><strong>3a ran on 2026-11-08 between 13:20 and 14:15 AEDT.</strong></p>
+<p><em>Pre-flight, before the removal.</em> The rule-suite history of all seven
+pull-request rulesets over the previous month, which is 1a item 7
+re-run on the day the bypass was taken away: in each of the four
+repositories the App pushes in, <code>shakenfist-bot</code>'s last bypass
+predates the App's first, and the three repositories without the App
+show no bot bypass at all. Nothing live still depended on the bot's
+bypass.</p>
+<table>
+<thead>
+<tr>
+<th>Repository</th>
+<th>Ruleset</th>
+<th>Bypasses</th>
+<th>By the bot</th>
+<th>Last bot bypass</th>
+<th>First App bypass</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>shakenfist</td>
+<td>2681531</td>
+<td>66</td>
+<td>0</td>
+<td>none</td>
+<td>none (no App)</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>20252051</td>
+<td>48</td>
+<td>37</td>
+<td>2026-11-03 19:39</td>
+<td>2026-11-04 06:07</td>
+</tr>
+<tr>
+<td>ryll</td>
+<td>18708684</td>
+<td>74</td>
+<td>61</td>
+<td>2026-11-01 08:55</td>
+<td>2026-11-02 06:21</td>
+</tr>
+<tr>
+<td>instar</td>
+<td>20783686</td>
+<td>4</td>
+<td>0</td>
+<td>none</td>
+<td>none (no App)</td>
+</tr>
+<tr>
+<td>hunkydory</td>
+<td>23805020</td>
+<td>42</td>
+<td>28</td>
+<td>2026-11-03 10:47</td>
+<td>2026-11-04 06:46</td>
+</tr>
+<tr>
+<td>client-python-k3s</td>
+<td>20595671</td>
+<td>5</td>
+<td>0</td>
+<td>none</td>
+<td>none (no App)</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>24700229</td>
+<td>12</td>
+<td>2</td>
+<td>2026-10-30 07:14</td>
+<td>2026-11-01 11:39</td>
+</tr>
+</tbody>
+</table>
+<p>The three repositories with no App are bypassed through the team by
+<code>sfconductor</code> (shakenfist, all 66; client-python-k3s, 3 of 5) and
+<code>mikalstill</code> (instar, all 4), which is what the team's remaining
+membership is for.</p>
+<p><em>The removal.</em> <code>gh api -X DELETE
+orgs/shakenfist/teams/sf-can-skip-merge-queue/memberships/shakenfist-bot</code>.
+That endpoint now answers 404 for the bot, and the team's members are
+<code>mikalstill</code> and <code>sfconductor</code>.</p>
+<p><em>Nothing else moved.</em> The same set of readings, taken before and after
+the removal, differ in exactly one line: the bot's team membership.
+<code>orgs/shakenfist/memberships/shakenfist-bot</code> is <code>member</code>, and
+<code>repos/shakenfist/&lt;r&gt;/collaborators/shakenfist-bot/permission</code> is
+<code>write</code>, not <code>admin</code>, in all eleven of shakenfist, kerbside, ryll,
+instar, hunkydory, client-python-k3s, actions, development, sfui,
+kerbside-client and andris. Each of the seven rulesets' <code>bypass_actors</code>
+is unchanged by the removal: <code>Team:11722172</code> on all seven, with
+<code>Integration:5538020</code> (the App) beside it on andris, hunkydory,
+kerbside and ryll. Taking an account out of the team changes who the
+team's bypass admits, not the ruleset.</p>
+<p><em>The rejection probes.</em> Run 42438929941 in hunkydory, from a throwaway
+<code>bypass-probe.yml</code> on the branch <code>bbi-phase3-bypass-probe</code>: one job on
+<code>[self-hosted, vm, debian-13, s]</code>, queued 13:31 and run at 13:58 AEDT
+(a 27-minute wait for a vm runner, the pool's queue rather than its
+boot, as in phase 2's record; then 5 seconds of work). Each step read
+its secret, failed the run if it resolved empty, recorded which account
+the credential authenticates as, and pushed an empty commit on the tip
+of <code>develop</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Secret</th>
+<th>Authenticates as</th>
+<th>Result</th>
+<th>Rule suite</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DEPENDENCIES_TOKEN</code></td>
+<td><code>shakenfist-bot</code></td>
+<td>rejected, <code>GH013</code></td>
+<td>4975726839</td>
+</tr>
+<tr>
+<td><code>RENOVATE_TOKEN</code></td>
+<td><code>shakenfist-bot</code></td>
+<td>rejected, <code>GH013</code></td>
+<td>4975727110</td>
+</tr>
+</tbody>
+</table>
+<p>Both rejections read "Changes must be made through a pull request",
+"6 of 6 required status checks are expected" and "Changes must be made
+through the merge queue". The probe tells a ruleset rejection from an
+authentication failure and would have failed the run on the latter, so
+these are the ruleset refusing the bot rather than a token that no
+longer works. <code>develop</code> is still at <code>22cd841</code>, the commit the probe
+cloned, so neither push changed a thing. The probe run, the skipped
+<code>prune-reviews</code> run the branch push also started, and the branch itself
+are deleted: <code>gh run list --branch bbi-phase3-bypass-probe</code> and
+<code>git ls-remote refs/heads/bbi-phase3-bypass-probe</code> are both empty.</p>
+<p><em>The App still lands.</em> The four key-holders' <code>prune-reviews</code> runs
+after the removal, dispatched rather than waited for: a dispatch runs
+on the default branch, so the job's guard passes and the run is a real
+one, and waiting for each repository's own cron would have spread the
+proof across a day.</p>
+<table>
+<thead>
+<tr>
+<th>Repository</th>
+<th>Run</th>
+<th>Mint step</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>andris</td>
+<td>42439145838</td>
+<td>ran</td>
+<td>nothing to do</td>
+</tr>
+<tr>
+<td>hunkydory</td>
+<td>42439148648</td>
+<td>ran</td>
+<td>nothing to do</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>42439151631</td>
+<td>ran</td>
+<td>pushed <code>17a31eb..69b378d</code> as <code>shakenfist-review-marks[bot]</code> (350161744), rule suite 4975585417</td>
+</tr>
+<tr>
+<td>ryll</td>
+<td>42439154250</td>
+<td>ran</td>
+<td>nothing to do</td>
+</tr>
+</tbody>
+</table>
+<p><code>Mint the push token</code> ran in all four, so each read the key from its
+<code>review-marks</code> environment and minted a token. kerbside had marks to
+prune and its push landed on a <code>develop</code> that refuses a pull request's
+own token, at 13:37 AEDT, after the bot's bypass was gone: that single
+push is the proof that the removal took the bot's bypass and not the
+App's. The other three had nothing to push, which is the weaker but
+still correct outcome the step allows.</p>
+<p><strong>3c, measured locally rather than from a weekly run.</strong> The criterion
+has not merged, so there is no scheduled run to cite yet.
+<code>python3 scripts/audit-check.py --repo-path . --repo-name development</code>
+on this branch reports <code>bypass-actor-identity</code> as a pass ("The
+"review-marks" environment admits only the default branch
+"main""), with the rest of the suite unchanged: 68 criteria, 38
+pass, 29 not applicable, 0 error and the one pre-existing
+<code>review-coverage</code> failure (#247, 227 of 236 files reviewed at HEAD).
+So the prediction holds locally -- nothing newly fails -- and the
+fleet-wide count is still to be read off the first scheduled run after
+this merges. The admin role's <code>actor_id</code> is <code>5</code>, from GitHub's
+documented predefined repository base-role ids (read 1, triage 2, write
+3, maintain 4, admin 5), not from a live ruleset: no ruleset in the
+organisation bypasses the admin role, so there was none to read
+(decision 4).</p>
+<h4 id="execution-notes_2">Execution notes<a class="headerlink" href="#execution-notes_2" title="Permanent link">&para;</a></h4>
+<ul>
+<li>2026-11-04 AEDT: back brief answered. Mikal chose to implement 3c
+  this session and to prepare 3a for him to run (it needs <code>admin:org</code>
+  and the bot PATs, which no sub-agent holds), holding 3b until the
+  workflow-ref-trust phase-3 branch lands (decision 5). He confirmed
+  3c ships without the team rule while open question 3 is open
+  (decision 3). Steps therefore ran out of the table's order: 3c
+  first, 3a and 3b to follow.</li>
+<li>2026-11-04 AEDT: 3c built by one opus sub-agent at high effort. It
+  ran in the phase worktree rather than a separate one -- the plan's
+  "worktree" isolation guards against contention between steps, and
+  3c was the only code step this session, so there was none; the
+  agent also had to read this phase section, which lives only on the
+  phase branch. It left its work uncommitted and the management
+  session reviewed the diff, reproduced the tests (157 pass) and the
+  live verdict (<code>bypass-actor-identity</code> -&gt; pass on development:
+  "admits only the default branch main"), and committed. Two edits
+  beyond the deliverable list were kept because a network check must
+  appear in both derived sets or their tests fail:
+  <code>audit_snapshot.NETWORK_CHECKS</code>, and the contract test's expected
+  tool-failure set for an empty directory. One interpretive choice
+  the brief left open: a repository with a pull-request ruleset but
+  no <code>review-marks</code> environment is a pass (failing closed, open
+  question 4), not a fail. not_applicable is returned from <code>run()</code>
+  via <code>skip()</code>, as the other API checks do, not from <code>applies()</code>,
+  since the decision needs API data.</li>
+<li>2026-11-04 AEDT: 3a materials prepared for Mikal (a throwaway
+  hunkydory probe workflow and the operator readings); the team
+  removal and the two authenticated pushes are his to run. 3b held:
+  the workflow-ref-trust phase-3 branch still rewrites the file 3b
+  edits.</li>
+<li>2026-11-08 AEDT: 3a ran, in this session rather than Mikal's own.
+  He was back briefed on decisions 1, 3 and 5 and chose to have the
+  session run both halves with its own <code>gh</code> (which carries
+  <code>admin:org</code>) rather than run them himself, so decision 1's "the
+  management session does it with the operator" became the session
+  doing it on his explicit yes. The 2026-11-04 materials were gone
+  with that session's scratchpad, so the probe workflow was rebuilt.
+  Before the removal, 1a item 7 was re-run as a pre-flight across all
+  seven rulesets (record): nothing live still depended on the bot's
+  bypass. Afterwards the before and after readings differed in exactly
+  one line.</li>
+<li>2026-11-08 AEDT: two things the probe needed that the 3a brief did
+  not say. First, <code>prune-reviews</code> in hunkydory triggers on
+  <code>push: branches: ['**']</code>, so pushing the probe branch started a run
+  of it; its job guard (<code>github.ref == default branch</code>) skipped it, and
+  no other hunkydory workflow fires on an arbitrary branch push, which
+  was checked before the branch was pushed. Second, the probe
+  distinguishes a ruleset rejection from an authentication failure: a
+  revoked or expired PAT is refused too, and would have read as a
+  rejection and proved nothing. Both probe steps therefore grep the
+  push output and fail the run on an authentication failure or an
+  unrecognised reason.</li>
+<li>2026-11-08 AEDT: 3b still held. The workflow-ref-trust phase-3
+  branch is unpushed and unmerged (<code>origin/main</code> does not carry its
+  two commits), so decision 5's condition has not been met and the
+  four passages 3b edits may still move. Phase 3 therefore lands
+  without 3b and stays <code>In progress</code>; 3b is the whole of what is left.</li>
+<li>2026-11-08 AEDT: #377's first automated review, on the current head:
+  1 fix, 3 document, 4 consider, 2 none. Seven taken. The fix (two
+  untested branches of <code>policy_problems</code>) was swept rather than
+  patched: every branch of the criterion now has a test, and a
+  mutation script covering all of them was run once, from the session
+  scratchpad rather than the tree: there is no precedent here for
+  committing a per-criterion mutation script, and the run is
+  reproducible without the file because the mutants are simply each
+  guard in <code>run</code>, <code>read_environment</code>, <code>confirm_absence</code> and
+  <code>policy_problems</code> inverted in turn. Three of the four <code>consider</code> items
+  were defects in code this phase added and were taken too. The one
+  that mattered: a 404 on the environment read meant "absent"
+  unconditionally, and GitHub answers 404 both for an environment that
+  does not exist and for one the token may not read, so a future
+  permission lapse would have reported the whole fleet compliant at
+  once -- the exact failure this criterion exists to prevent. The check
+  now resolves the 404 against <code>GET /repos/{org}/{repo}/environments</code>
+  and errors if the listing names the environment or cannot be read.
+  Declined: extracting the ~30 lines shared with
+  <code>ReleaseEnvironmentProtection</code> into common helpers, because the two
+  callers deliberately disagree about what a 404 means and the
+  extraction would edit a criterion that passes fleet-wide today. The
+  duplication did bite once, in the mutation script, where two patterns
+  matched both copies; the script now mutates inside the class body.</li>
+<li>2026-11-08 AEDT: #377's second review: 2 fix, 2 document, 4 consider,
+  4 none. Six taken, two declined, one needed nothing. Both fix items
+  were fair hits on the previous round's own work: the non-404 branch of
+  <code>read_environment</code> had no test, which is the branch whose regression
+  would re-open the fleet-wide blind spot that round closed, and the
+  specification still described the old call order after the calls were
+  reordered. The round also caught a false claim in the note above --
+  it said the mutation script lived with the round when it lived in a
+  session scratchpad -- which is now reworded to say what was mutated,
+  so the run is reproducible without the file. Declined twice:
+  measuring environment drift from the checkout's <code>prune-reviews.yml</code>
+  (a behaviour change, not a correction, as in round 1), and turning
+  <code>policy_problems</code> into a single-value return (a signature change that
+  would stop it mirroring <code>environment_problems</code>, for no behavioural
+  gain). Eighteen tests, sixteen mutants, all killed. Stopping here:
+  no fix item is open, and both rounds' items have been about the code
+  the previous round added, which is where this reviewer stops being
+  informative.</li>
+<li>2026-11-08 AEDT: two additions beyond 3c, made by the management
+  session when it reviewed 3c for landing. The audit page's
+  reviewer-confirmed half gained a paragraph recording the team bypass
+  as a known exception: the table says a <code>Team</code> actor fails, and
+  without that paragraph a reviewer reads seven fresh findings rather
+  than one known state whose end condition is written down. And two
+  branches of the check had no test -- a repository with a
+  pull-request ruleset but no environment (the pass the 2026-11-04
+  note calls an interpretive choice), and an environment whose
+  <code>deployment_branch_policy</code> is null -- so they gained one each. Both
+  were mutation-checked: inverting each branch fails exactly its own
+  test.</li>
+</ul>
+<h4 id="risks-and-mitigations_2">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations_2" title="Permanent link">&para;</a></h4>
+<ol>
+<li><strong>Removing the bot from the team restores a grant it needed.</strong>
+   Open question 5 demoted the bot to write-only, and survey item 2
+   confirms it stayed there; its credentials push branches and open
+   pull requests, which <code>write</code> and the org's <code>write</code> base
+   permission already allow. 3a re-records all eleven permissions to
+   prove no grant was restored. If one was, stop and report.</li>
+<li><strong>The bypass is removed but the App's is not proven.</strong> 3a's
+   second half reads the next <code>prune-reviews</code> run in all four
+   key-holders: each must land or find nothing to do, pushing as the
+   App. A run that now fails means the removal took the App's bypass
+   too, not just the bot's -- stop and restore from the rule-suite
+   history.</li>
+<li><strong>The rejection probe pushes to a real branch.</strong> It pushes an
+   empty commit on the tip of hunkydory's <code>develop</code> from a throwaway
+   workflow on its own branch, deleted afterwards, and each probe
+   step fails the run if its secret resolves empty, so an unset
+   secret can never read as a rejection. An accepted push means the
+   bypass is still there: stop, open a revert at once, do not go on.</li>
+<li><strong>3c's first weekly run files issues this plan cannot close.</strong>
+   Only if the team rule lands -- decision 3 keeps it out -- or if a
+   repository's environment has drifted. The commit states the
+   prediction (none newly fail); a run that files more is a real
+   finding about an environment, triaged then, not suppressed.</li>
+<li><strong>3b conflicts with the workflow-ref-trust phase-3 branch.</strong> Both
+   edit <code>PLAN-workflow-ref-trust.md</code> (survey hazard). Decision 5
+   sequences 3b last and re-verifies its targets; the check is that
+   the four target passages still read as the brief expects before
+   3b edits them, and the mitigation is to land after that branch.</li>
+</ol>
+<h4 id="definition-of-done_2">Definition of done<a class="headerlink" href="#definition-of-done_2" title="Permanent link">&para;</a></h4>
+<p>Every item is checked by the management session from the API, the
+tree and the record, not from a sub-agent's summary.</p>
+<ul>
+<li><code>gh api
+  orgs/shakenfist/teams/sf-can-skip-merge-queue/memberships/shakenfist-bot</code>
+  returns 404 (not a member), and
+  <code>repos/shakenfist/&lt;r&gt;/collaborators/shakenfist-bot/permission</code> is
+  <code>write</code> for all eleven repositories.</li>
+<li>A push to a protected default branch authenticated with
+  <code>DEPENDENCIES_TOKEN</code>, and again with <code>RENOVATE_TOKEN</code>, is rejected
+  by the ruleset; the rejection is in the rule-suite history, and
+  the probe workflow and branch are gone.</li>
+<li>The next <code>prune-reviews</code> run in andris, hunkydory, kerbside and
+  ryll lands or finds nothing to do, pushing as
+  <code>shakenfist-review-marks[bot]</code>, and each ruleset's <code>bypass_actors</code>
+  is the App plus the team.</li>
+<li><code>grep -rn 'bypass-actor-identity' scripts/ docs/audits/</code> shows the
+  criterion registered in <code>CHECKS</code>, its page in <code>docs/audits/</code>, its
+  row in <code>docs/audits/README.md</code>, and its lines in <code>FROZEN_METADATA</code>
+  and <code>FROZEN_ISSUE_TITLES</code>.</li>
+<li><code>python3 -m unittest discover -s scripts/tests -t scripts</code> passes,
+  including every case the fallback shape can test: the compliant
+  policy; the fails for no policy, two policies, a tag-only policy, a
+  wildcard name, the wrong branch name, <code>protected_branches</code> true and a
+  null <code>deployment_branch_policy</code>; the errors for a policy with no name
+  or no type, an unreadable policy list, a cut policy page, a
+  non-404 failure reading the environment, an unreadable environment
+  listing, a cut environment listing page and a 404 on an environment
+  the listing names; the pull-request-ruleset-without-environment pass;
+  and the <code>not_applicable</code> case. Each is mutation-checked: inverting its
+  branch in <code>BypassActorIdentity</code> fails a test.</li>
+<li>The actor-type rules the 3c brief enumerates (team, non-admin role,
+  <code>OrganizationAdmin</code>, <code>DeployKey</code>, unknown <code>actor_type</code>, a ruleset
+  with no <code>bypass_actors</code>, an unknown App) and the
+  repository-level-<code>REVIEW_MARKS_APP_KEY</code> rule are rows of the audit
+  page's reviewer-confirmed table rather than tests, because decision
+  2's fallback shape keeps them out of code. They become code, with
+  tests, when #352 gives the audit a read identity that can see
+  <code>bypass_actors</code> and a repository's secret names.</li>
+<li>The first scheduled weekly audit after 3c lands reports
+  <code>bypass-actor-identity</code> with the verdicts step 3a recorded, and
+  the count of newly-failing repositories matches the commit's
+  prediction.</li>
+<li>
+<h1 id="211-is-closed-from-the-pull-request-that-lands-3c-with-a-link-to">211 is closed from the pull request that lands 3c, with a link to<a class="headerlink" href="#211-is-closed-from-the-pull-request-that-lands-3c-with-a-link-to" title="Permanent link">&para;</a></h1>
+  this plan.</li>
+<li>In <code>PLAN-workflow-ref-trust.md</code>, open question 1's default names
+  this plan's App rather than a team of one, and #211 appears
+  nowhere in its Future work or related-issues list.</li>
+<li><code>pre-commit run --all-files</code> passes, and <code>python3
+  scripts/audit-check.py --repo-path . --repo-name development</code>
+  reports the same verdicts as on <code>9d1301b</code> for the existing checks,
+  plus the new <code>bypass-actor-identity</code> row.</li>
+</ul>
+<h4 id="back-brief_2">Back brief<a class="headerlink" href="#back-brief_2" title="Permanent link">&para;</a></h4>
+<p>Before 3a, back brief Mikal on decision 1 (3a is his operator
+action, with the probe run inline), decision 3 (3c lands without the
+team rule and open question 3 stays open), and decision 5 (3b
+sequenced behind the workflow-ref-trust phase-3 branch). 3a is cheap
+to propose and expensive to undo: removing the team membership and
+proving the rejection is the gate, so show him each ruleset's
+<code>bypass_actors</code> before and after. 3c is the large step, and its
+shape -- the fallback, no team rule -- is fixed by #352 and open
+question 3, so the back brief confirms those have not changed rather
+than reopening them.</p>
 <h3 id="phase-4-push-audit">Phase 4: push audit<a class="headerlink" href="#phase-4-push-audit" title="Permanent link">&para;</a></h3>
 <p>Planning effort: medium. The runbook and the ranges are fixed; the
 work is running it.</p>
@@ -18729,7 +19137,7 @@ where one exists, for directly related issues that we should
 either resolve as part of this master plan or at least be aware of
 while planning it.</p>
 <p>...</p>
-<h3 id="back-brief_2">Back brief<a class="headerlink" href="#back-brief_2" title="Permanent link">&para;</a></h3>
+<h3 id="back-brief_3">Back brief<a class="headerlink" href="#back-brief_3" title="Permanent link">&para;</a></h3>
 <p>Before executing any step of this plan, please back brief the
 operator as to your understanding of the plan and how the work you
 intend to do aligns with that plan.</p>

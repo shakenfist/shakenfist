@@ -137,6 +137,10 @@
          <lastmod>2026-11-08</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/audits/bypass-actor-identity/</loc>
+         <lastmod>2026-11-08</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/audits/ci-review-automation/</loc>
          <lastmod>2026-11-08</lastmod>
     </url>
@@ -2389,34 +2393,6 @@
          <lastmod>2026-11-08</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-01-workspace/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-02-reserve-names/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-03-compression/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-04-protocol/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-05-usbredir/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-06-client/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-release/</loc>
          <lastmod>2026-11-08</lastmod>
     </url>
@@ -2438,34 +2414,6 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-decoder-hardening/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt-phase-01-display/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt-phase-02-audio/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt-phase-03-session/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt-phase-04-robustness/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt-phase-05-cleanup/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt-phase-06-tests/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt/</loc>
          <lastmod>2026-11-08</lastmod>
     </url>
     <url>
@@ -2541,14 +2489,6 @@
          <lastmod>2026-11-08</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-hamburger-menu-phase-01-migrate/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-hamburger-menu/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile/</loc>
          <lastmod>2026-11-08</lastmod>
     </url>
@@ -2574,10 +2514,6 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-idle-cpu-and-latency/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-initial/</loc>
          <lastmod>2026-11-08</lastmod>
     </url>
     <url>
@@ -2689,31 +2625,11 @@
          <lastmod>2026-11-08</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-pip-distribution/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-pr20-followup/</loc>
          <lastmod>2026-11-08</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-pr23-followup/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-pr31-followup-phase-01-tests/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-pr31-followup-phase-02-docs/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-pr31-followup-phase-03-polish/</loc>
-         <lastmod>2026-11-08</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-pr31-followup/</loc>
          <lastmod>2026-11-08</lastmod>
     </url>
     <url>

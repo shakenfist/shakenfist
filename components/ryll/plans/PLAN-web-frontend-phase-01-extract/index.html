@@ -1535,6 +1535,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/bypass-actor-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Bypass actor identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -12489,34 +12517,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-initial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Initial porting plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../PLAN-capture/" class="md-nav__link">
         
   
@@ -12713,34 +12713,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-crate-extraction/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Crate extraction
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../PLAN-remaining-issues/" class="md-nav__link">
         
   
@@ -12833,34 +12805,6 @@
     
   
     PR 23 follow-up
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-deferred-debt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deferred debt
   
 
     
@@ -13133,34 +13077,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-hamburger-menu/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hamburger menu
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../PLAN-notifications/" class="md-nav__link">
         
   
@@ -13169,34 +13085,6 @@
     
   
     Notifications system
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-pr31-followup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PR 31 follow-up
   
 
     
@@ -13589,34 +13477,6 @@
     
   
     Self-hosted runner migration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-pip-distribution/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip-installable ryll
   
 
     
@@ -16129,8 +15989,9 @@
 <p>Before responding to questions or making changes, explore the
 ryll codebase thoroughly. Read the master plan at
 <code>docs/plans/PLAN-web-frontend.md</code> and the prior crate-extraction
-phases (<code>docs/plans/PLAN-crate-extraction-phase-04-protocol.md</code>
-and <code>-phase-05-usbredir.md</code>) for precedent. Key files for this
+phases (<a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-04-protocol.md"><code>PLAN-crate-extraction-phase-04-protocol.md</code></a>
+and <a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-05-usbredir.md"><code>PLAN-crate-extraction-phase-05-usbredir.md</code></a>)
+for precedent. Key files for this
 phase:</p>
 <ul>
 <li><code>Cargo.toml</code> (workspace) and <code>ryll/Cargo.toml</code></li>
@@ -16186,7 +16047,7 @@ yet. This is pure refactor.</p>
 <ul>
 <li>Reserving the crate name on crates.io. That is a separate
   pre-step the operator handles before publishing (analogous to
-  <code>PLAN-crate-extraction-phase-02-reserve-names.md</code>). For
+  <a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-02-reserve-names.md"><code>PLAN-crate-extraction-phase-02-reserve-names.md</code></a>). For
   development the dual-spec dep with a <code>path</code> works without
   publication.</li>
 <li>Any feature gating (<code>--gui</code> / <code>--web</code> cargo features). Master
@@ -16460,7 +16321,7 @@ impl, and the GUI event loop stay in <code>ryll</code>.</p>
   on crates.io before publishing the first release that
   contains it; treat the reservation as a separate one-line
   task outside this phase, following the precedent of
-  <code>PLAN-crate-extraction-phase-02-reserve-names.md</code>.</li>
+  <a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-02-reserve-names.md"><code>PLAN-crate-extraction-phase-02-reserve-names.md</code></a>.</li>
 </ul>
 <h2 id="steps">Steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
 <table>

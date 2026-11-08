@@ -1541,6 +1541,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/bypass-actor-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Bypass actor identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -12507,34 +12535,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-initial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Initial porting plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-capture/" class="md-nav__link">
         
   
@@ -12731,34 +12731,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-crate-extraction/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Crate extraction
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-remaining-issues/" class="md-nav__link">
         
   
@@ -12851,34 +12823,6 @@
     
   
     PR 23 follow-up
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-deferred-debt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deferred debt
   
 
     
@@ -13151,34 +13095,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-hamburger-menu/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hamburger menu
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-notifications/" class="md-nav__link">
         
   
@@ -13187,34 +13103,6 @@
     
   
     Notifications system
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-pr31-followup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PR 31 follow-up
   
 
     
@@ -13607,34 +13495,6 @@
     
   
     Self-hosted runner migration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plans/PLAN-pip-distribution/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip-installable ryll
   
 
     
@@ -15969,7 +15829,18 @@ produced.</p>
    based on the <code>win_head_dist</code> field from each GLZ header, rather than using
    a fixed cache size. This matches the server's reference window and prevents
    both premature eviction (corrupting cross-frame references) and unbounded
-   memory growth.</p>
+   memory growth. Cross-frame corruption is <em>not</em> explained by either the
+   dictionary's lifetime or the decoder, and a hunt for it should not restart
+   with them. All three dictionary-lifetime fixes landed -- this eviction, the
+   <code>IMAGE_FLAGS_CACHE_ME</code> test before caching, and the INVALIDATE_LIST and
+   INVAL_ALL_PIXMAPS handlers that clear the dictionary -- and the
+   coloured-noise band still reproduces across the top of the primary surface
+   during the BIOS/GRUB/kernel-boot window. The decoder was ruled out
+   separately: the control-byte parsing, pixel_flag and image_flag decoding
+   and the pixel copy loops were compared against kerbside's Python <code>glz.py</code>
+   and found faithful. The cause is still open; the surviving hypotheses and
+   the pcap entry point for chasing them are in
+   <a href="/components/ryll/plans/OPEN-QUESTIONS/">OPEN-QUESTIONS.md</a>.</p>
 </li>
 <li>
 <p><strong>Pcap TCP segmentation</strong> - Large SPICE messages are split into multiple
@@ -16203,9 +16074,69 @@ no snapshot exists.</p>
     repeats and run their own timer. ryll's held-key set, not the
     toolkit's <code>repeat</code> flag, decides what counts as a repeat, and on
     macOS a repeat while Cmd is down is withheld like any other Cmd
-    chord. Earlier plans record dropping repeats as a fix (the PR 31
-    follow-up and the WebRTC soak's input findings); this entry
-    reverses them.</p>
+    chord. Earlier plans record dropping repeats as a fix (the WebRTC
+    soak's input findings, and the retired PR #31 follow-up, whose text
+    the plans index links); this entry reverses them.</p>
+</li>
+<li>
+<p><strong>The PyPI wheel embeds the binary rather than fetching it</strong> - <code>pip
+    install ryll</code> installs a per-arch <code>manylinux_2_28</code> wheel with the
+    compiled GUI binary already inside it (maturin <code>bindings = "bin"</code>,
+    from <code>ryll/pyproject.toml</code>), so the install works offline and fetches
+    nothing from GitHub the first time <code>ryll</code> runs. Two alternatives were
+    rejected, and the first of them was fully built and working before it
+    was dropped: a pure-Python <code>py3-none-any</code> wheel whose console script
+    downloads and SHA256-verifies the release binary on first run, which
+    puts a runtime GitHub dependency plus launcher, download and verify
+    code on every user's machine; and compiling at install time from a
+    maturin sdist, which needs a Rust toolchain and every GUI/audio
+    <code>-dev</code> library present while <code>pip install</code> runs, so it fails in a
+    container or on a fresh desktop. The cost the embedded wheel carries
+    instead -- a manylinux build lane and larger per-arch wheels -- falls
+    on CI rather than on users. kerbside-proxy builds its wheel with
+    maturin's <code>--zig</code>, which does not work here, because zig's sysroot
+    has no GUI/audio dev libraries; <code>tools/build-ryll-wheel.sh</code> runs the
+    build natively inside the <code>manylinux_2_28</code> container instead. See
+    <a href="/components/ryll/releasing/#the-pypi-wheels-platform-tag">Releasing</a> for what the
+    wheel's platform tag does and does not promise.</p>
+</li>
+<li>
+<p><strong>The status bar is glanceable state; feature actions live in the
+    menu</strong> - The bottom panel shows only what an operator reads
+    continuously -- volume, latency, bandwidth and their sparklines, the
+    FPS readout, the Cadence indicator, the USB device description --
+    while anything an operator <em>invokes</em> sits behind the <code>☰</code> menu at the
+    right edge (<code>ryll/src/app/mod.rs</code>). The row had grown a button per
+    feature as USB, WebDAV, screenshots, bug reports and the traffic
+    viewer landed, which mixed commands into the state and crowded out
+    the state, so a new feature gets a menu entry rather than another
+    button. The glyph is the unicode <code>☰</code> rather than an image, matching
+    the <code>🔇</code>/<code>🔊</code> buttons beside it and keeping the GUI free of an asset
+    pipeline. Side-panel entries and persistent settings are checkboxes,
+    so the menu shows whether their panel is open; one-shot actions are
+    buttons, and those with a host shortcut advertise it (see
+    <code>HostShortcut</code>). Protocol gaps are neither: a gap is a notification,
+    so <code>register_gap_notification_observer</code> pushes it into the
+    notification store and it is read from the bell and its side panel
+    rather than from a status-bar badge or a menu entry.</p>
+</li>
+<li>
+<p><strong>The crates are workspace members, not separate repositories</strong> -
+    All seven crates live in this repository. A type change in
+    <code>shakenfist-spice-protocol</code> and every call site it touches is then
+    one commit and one CI run rather than a multi-repository version
+    dance, one <code>Cargo.lock</code> keeps every member on the same dependency
+    versions, and one CI and pre-commit configuration covers them all.
+    They are versioned together (<code>version.workspace = true</code>, and
+    <a href="/components/ryll/releasing/">Releasing</a> bumps them as a set), so the independent
+    versioning separate repositories would buy goes unused. The layout
+    does not block publication: <code>tools/publish-crates.sh</code> runs <code>cargo
+    publish</code> per crate in dependency order, and <code>ryll/Cargo.toml</code> uses
+    the dual-spec <code>{ path = "...", version = "..." }</code> idiom so Cargo
+    takes the path for local builds and the version for the published
+    artefact. The choice is reversible rather than permanent: if a
+    crate ever needs its own repository, <code>git filter-repo</code> can lift it
+    out with its history.</p>
 </li>
 </ol>
 

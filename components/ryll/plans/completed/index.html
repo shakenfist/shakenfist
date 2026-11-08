@@ -1535,6 +1535,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/bypass-actor-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Bypass actor identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -12489,34 +12517,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-initial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Initial porting plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../PLAN-capture/" class="md-nav__link">
         
   
@@ -12713,34 +12713,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-crate-extraction/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Crate extraction
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../PLAN-remaining-issues/" class="md-nav__link">
         
   
@@ -12833,34 +12805,6 @@
     
   
     PR 23 follow-up
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-deferred-debt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deferred debt
   
 
     
@@ -13133,34 +13077,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-hamburger-menu/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hamburger menu
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../PLAN-notifications/" class="md-nav__link">
         
   
@@ -13169,34 +13085,6 @@
     
   
     Notifications system
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-pr31-followup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PR 31 follow-up
   
 
     
@@ -13589,34 +13477,6 @@
     
   
     Self-hosted runner migration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-pip-distribution/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip-installable ryll
   
 
     
@@ -15874,8 +15734,22 @@ of code looks the way it does.</p>
 are code-landed but still have operator smoke tests, parked
 investigations, or open follow-ups stay in <code>docs/plans/</code> until
 their work is genuinely done.</p>
+<p>Retirement is the other ending, and it deletes. A plan is
+retired once its reasoning has been moved into the <code>docs/</code>
+page that owns the topic, where it will be maintained; the
+file is then deleted and its row in
+<a href="/components/ryll/plans/index/">index.md</a> becomes a pinned
+<code>blob/&lt;sha&gt;/</code> permalink. The two endings differ in whether
+the design history has a maintained home yet: a plan lands
+here when the plan itself is still the cleanest record of
+why the code looks as it does, and is retired when that is
+no longer true. The process, including which plans are
+eligible, is
+<a href="https://github.com/shakenfist/development/blob/main/docs/plan-retirement.md">docs/plan-retirement.md</a>
+in shakenfist/development.</p>
 <p>Convention added during PR #102 review (item 9 — keeps the
-active <code>docs/plans/</code> directory focused on work in flight).</p>
+active <code>docs/plans/</code> directory focused on work in flight).
+The retirement paragraph was added during the #700 review.</p>
 
 
 

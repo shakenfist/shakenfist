@@ -1541,6 +1541,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/bypass-actor-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Bypass actor identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -13065,34 +13093,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-initial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Initial porting plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../ryll/plans/PLAN-capture/" class="md-nav__link">
         
   
@@ -13289,34 +13289,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Crate extraction
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
         
   
@@ -13409,34 +13381,6 @@
     
   
     PR 23 follow-up
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deferred debt
   
 
     
@@ -13709,34 +13653,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hamburger menu
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../ryll/plans/PLAN-notifications/" class="md-nav__link">
         
   
@@ -13745,34 +13661,6 @@
     
   
     Notifications system
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PR 31 follow-up
   
 
     
@@ -14165,34 +14053,6 @@
     
   
     Self-hosted runner migration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pip-distribution/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip-installable ryll
   
 
     
@@ -17221,8 +17081,8 @@ sandbox with no access to host memory.</p>
 <h3 id="bugs-found-and-fixed">Bugs Found and Fixed<a class="headerlink" href="#bugs-found-and-fixed" title="Permanent link">&para;</a></h3>
 <h4 id="vhdx-bat-calculation-integer-overflow">VHDX BAT calculation integer overflow<a class="headerlink" href="#vhdx-bat-calculation-integer-overflow" title="Permanent link">&para;</a></h4>
 <p><strong>Severity:</strong> Medium
-<strong>Location:</strong> <code>src/crates/vhdx/src/lib.rs</code>, lines 754-755 and
-<code>calculate_bat_layout()</code> at line 1092
+<strong>Location:</strong> <code>src/crates/vhdx/src/lib.rs</code>, in <code>VhdxState::init()</code>
+and <code>calculate_bat_layout()</code>
 <strong>Issue:</strong> <code>total_bat_entries</code> and <code>chunk_ratio</code> were cast from u64
 to u32 via <code>as u32</code> without overflow checking. A crafted VHDX image
 with <code>virtual_disk_size</code> near u64::MAX and small <code>block_size</code> would
@@ -17257,6 +17117,10 @@ reviewed. Key findings:</p>
 <h3 id="truncating-cast-audit">Truncating Cast Audit<a class="headerlink" href="#truncating-cast-audit" title="Permanent link">&para;</a></h3>
 <p>All <code>as u32</code>, <code>as u16</code>, and <code>as u8</code> casts on values wider than the
 target type were catalogued and classified.</p>
+<p>Each location names the enclosing function rather than a line number.
+These are dated records of what the code looked like on the audit date,
+so a line number in one rots on the next edit and then points at
+unrelated code, while the function it was in is still findable.</p>
 <h4 id="format-crates-library-code">Format crates (library code)<a class="headerlink" href="#format-crates-library-code" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
@@ -17355,37 +17219,37 @@ target type were catalogued and classified.</p>
 </thead>
 <tbody>
 <tr>
-<td>convert: <code>reftable_clusters as u32</code> (ln 1624)</td>
+<td>convert: <code>reftable_clusters</code> in <code>write_qcow2_header()</code></td>
 <td>u64→u32</td>
 <td>Bounded</td>
 <td>Reftable fits in scratch (~12.5MB), ≤ ~200</td>
 </tr>
 <tr>
-<td>convert: <code>l1_size</code> (line 1682)</td>
+<td>convert: <code>l1_size</code> in <code>init_qcow2_output_layout()</code></td>
 <td>u64→u32</td>
 <td>Bounded</td>
-<td>L1 fits in scratch; checked at line 1693 before use</td>
+<td>L1 fits in scratch; checked against <code>ALLOC_HEAP_BASE</code> before use</td>
 </tr>
 <tr>
-<td>convert: <code>entries_per_l2</code> (line 1680)</td>
+<td>convert: <code>entries_per_l2</code> in <code>init_qcow2_output_layout()</code></td>
 <td>u64→u32</td>
 <td>Bounded</td>
 <td>cluster_size/8; cluster_bits ≤ 21 so max = 262144</td>
 </tr>
 <tr>
-<td>convert: <code>num_gd_entries</code> (line 2495)</td>
+<td>convert: <code>num_gd_entries</code> in <code>init_vmdk_output_layout()</code></td>
 <td>u64→u32</td>
 <td>Bounded</td>
-<td>GD must fit in scratch memory; checked at line 2510</td>
+<td>GD must fit in scratch memory; checked against <code>ALLOC_HEAP_BASE</code></td>
 </tr>
 <tr>
-<td>convert: GTE sector offset (lines 2695, 2987)</td>
+<td>convert: GTE sector offset in <code>convert_to_vmdk()</code> and <code>convert_to_vmdk_compressed()</code></td>
 <td>u64→u32</td>
 <td>Spec</td>
 <td>VMDK GTE is 32-bit sector offset per specification</td>
 </tr>
 <tr>
-<td>convert: GDE sector offset (line 2726)</td>
+<td>convert: GDE sector offset in <code>convert_to_vmdk()</code></td>
 <td>u64→u32</td>
 <td>Spec</td>
 <td>VMDK GDE is 32-bit sector offset per specification</td>

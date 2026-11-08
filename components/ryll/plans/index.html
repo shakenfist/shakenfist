@@ -16,7 +16,7 @@
         <link rel="prev" href="../web-mode-internals/">
       
       
-        <link rel="next" href="PLAN-initial/">
+        <link rel="next" href="PLAN-capture/">
       
       
         
@@ -1521,6 +1521,34 @@
     
   
     Audit: audit scope against the organisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/audits/bypass-actor-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Bypass actor identity
   
 
     
@@ -12579,34 +12607,6 @@
   
   
     <li class="md-nav__item">
-      <a href="PLAN-initial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Initial porting plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="PLAN-capture/" class="md-nav__link">
         
   
@@ -12803,34 +12803,6 @@
   
   
     <li class="md-nav__item">
-      <a href="PLAN-crate-extraction/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Crate extraction
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="PLAN-remaining-issues/" class="md-nav__link">
         
   
@@ -12923,34 +12895,6 @@
     
   
     PR 23 follow-up
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="PLAN-deferred-debt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deferred debt
   
 
     
@@ -13223,34 +13167,6 @@
   
   
     <li class="md-nav__item">
-      <a href="PLAN-hamburger-menu/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hamburger menu
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="PLAN-notifications/" class="md-nav__link">
         
   
@@ -13259,34 +13175,6 @@
     
   
     Notifications system
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="PLAN-pr31-followup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PR 31 follow-up
   
 
     
@@ -13679,34 +13567,6 @@
     
   
     Self-hosted runner migration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="PLAN-pip-distribution/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip-installable ryll
   
 
     
@@ -16033,6 +15893,12 @@ that plan needs.</p>
 </table>
 <p>Where a plan is <code>In progress</code> for a reason the phase table does not make
 obvious, that reason belongs in the plan itself rather than in this table.</p>
+<p>A plan linked by a pinned <code>blob/&lt;sha&gt;/</code> URL has been retired, and its row
+is marked <code>(retired)</code>. Its reasoning now lives in the <code>docs/</code> page that
+owns the topic; the pinned copy is frozen history rather than a maintained
+document, so it may contain claims a later phase overturned. See
+<a href="/components/ryll/plans/completed/README/">completed/README.md</a> for how retiring a plan differs
+from archiving a completed phase plan.</p>
 <h2 id="master-plans">Master plans<a class="headerlink" href="#master-plans" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -16047,7 +15913,7 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <tbody>
 <tr>
 <td>2026-04-01</td>
-<td><a href="/components/ryll/plans/PLAN-initial/">Initial porting plan</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/d06d765e3e463a55d351968ca76afefcd363afdf/docs/plans/PLAN-initial.md">Initial porting plan</a> (retired)</td>
 <td>Port the ryll SPICE client from Python to Rust with egui</td>
 <td>Complete</td>
 <td>(design document)</td>
@@ -16103,10 +15969,10 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 </tr>
 <tr>
 <td>2026-04-08</td>
-<td><a href="/components/ryll/plans/PLAN-crate-extraction/">Crate extraction</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/8634fe4e378c7b2b33aca59b3ae907f8a97d2798/docs/plans/PLAN-crate-extraction.md">Crate extraction</a> (retired)</td>
 <td>Extract compression, protocol, and usbredir crates for reuse</td>
 <td>Complete</td>
-<td><a href="/components/ryll/plans/PLAN-crate-extraction-phase-01-workspace/">1. Workspace</a>, <a href="/components/ryll/plans/PLAN-crate-extraction-phase-02-reserve-names/">2. Reserve names</a>, <a href="/components/ryll/plans/PLAN-crate-extraction-phase-03-compression/">3. Compression</a>, <a href="/components/ryll/plans/PLAN-crate-extraction-phase-04-protocol/">4. Protocol</a>, <a href="/components/ryll/plans/PLAN-crate-extraction-phase-05-usbredir/">5. Usbredir</a>, <a href="/components/ryll/plans/PLAN-crate-extraction-phase-06-client/">6. Client</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-01-workspace.md">1. Workspace</a>, <a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-02-reserve-names.md">2. Reserve names</a>, <a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-03-compression.md">3. Compression</a>, <a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-04-protocol.md">4. Protocol</a>, <a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-05-usbredir.md">5. Usbredir</a>, <a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-crate-extraction-phase-06-client.md">6. Client</a></td>
 </tr>
 <tr>
 <td>2026-04-19</td>
@@ -16152,10 +16018,10 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 </tr>
 <tr>
 <td>2026-04-25</td>
-<td><a href="/components/ryll/plans/PLAN-hamburger-menu/">Hamburger menu</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/459c2427f55ccad8cf2881b44c3d7cbde22f363d/docs/plans/PLAN-hamburger-menu.md">Hamburger menu</a> (retired)</td>
 <td>Replace the status-bar action-button row with a single hamburger menu so the row returns to glanceable state</td>
 <td>Complete</td>
-<td><a href="/components/ryll/plans/PLAN-hamburger-menu-phase-01-migrate/">1. Migrate</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/459c2427f55ccad8cf2881b44c3d7cbde22f363d/docs/plans/PLAN-hamburger-menu-phase-01-migrate.md">1. Migrate</a></td>
 </tr>
 <tr>
 <td>2026-04-25</td>
@@ -16166,10 +16032,10 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 </tr>
 <tr>
 <td>2026-04-27</td>
-<td><a href="/components/ryll/plans/PLAN-pr31-followup/">PR #31 follow-up</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/8411d699a87ac8a623a58b501f424f166fd0726b/docs/plans/PLAN-pr31-followup.md">PR #31 follow-up</a> (retired)</td>
 <td>Tests, docs, and polish items deferred when landing PR 31 (UI improvements, reconnect, protocol fixes)</td>
 <td>Complete</td>
-<td><a href="/components/ryll/plans/PLAN-pr31-followup-phase-01-tests/">1. Tests</a>, <a href="/components/ryll/plans/PLAN-pr31-followup-phase-02-docs/">2. Docs</a>, <a href="/components/ryll/plans/PLAN-pr31-followup-phase-03-polish/">3. Polish</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-pr31-followup-phase-01-tests.md">1. Tests</a>, <a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-pr31-followup-phase-02-docs.md">2. Docs</a>, <a href="https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-pr31-followup-phase-03-polish.md">3. Polish</a></td>
 </tr>
 <tr>
 <td>2026-04-28</td>
@@ -16236,7 +16102,7 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 </tr>
 <tr>
 <td>2026-07-19</td>
-<td><a href="/components/ryll/plans/PLAN-pip-distribution/">Pip-installable ryll</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/26424384bb7510279cccd1df21edab6052d3fbe6/docs/plans/PLAN-pip-distribution.md">Pip-installable ryll</a> (retired)</td>
 <td>Ship <code>ryll</code> on PyPI so <code>pip install ryll</code> (typically via the client's <code>[vdi]</code> extra) puts a working <code>ryll</code> on PATH, the way <code>pip install kerbside</code> ships <code>kerbside-proxy</code>. Phase 3 of the cross-repo Shaken Fist VDI console tokens plan. A per-arch <code>manylinux_2_28</code> maturin (<code>bindings = "bin"</code>) wheel that embeds the compiled GUI binary — no runtime download — built natively for x86_64 and aarch64 and published to PyPI via OIDC Trusted Publishers</td>
 <td>Complete</td>
 <td>maturin bin wheel, build/sign/publish jobs in release.yml, and docs (phases inline in this master)</td>
@@ -16375,10 +16241,10 @@ a single execution sequence.</p>
 <tbody>
 <tr>
 <td>2026-04-16</td>
-<td><a href="/components/ryll/plans/PLAN-deferred-debt/">Deferred debt</a></td>
+<td><a href="https://github.com/shakenfist/ryll/blob/b29d4ecfdbf1740595b92988162ac84fa1b16755/docs/plans/PLAN-deferred-debt.md">Deferred debt</a> (retired)</td>
 <td>Pay down correctness bugs, robustness gaps, code quality, tests, and docs across all completed plans</td>
 <td>Complete</td>
-<td><a href="/components/ryll/plans/PLAN-deferred-debt-phase-01-display/">1. Display</a>, <a href="/components/ryll/plans/PLAN-deferred-debt-phase-02-audio/">2. Audio</a>, <a href="/components/ryll/plans/PLAN-deferred-debt-phase-03-session/">3. Session</a>, <a href="/components/ryll/plans/PLAN-deferred-debt-phase-04-robustness/">4. Robustness</a>, <a href="/components/ryll/plans/PLAN-deferred-debt-phase-05-cleanup/">5. Cleanup</a>, <a href="/components/ryll/plans/PLAN-deferred-debt-phase-06-tests/">6. Tests</a>, 7. Docs (inline)</td>
+<td><a href="https://github.com/shakenfist/ryll/blob/7487d2f4cd6767a63bd630d08e2c177dee4d04d0/docs/plans/PLAN-deferred-debt-phase-01-display.md">1. Display</a>, <a href="https://github.com/shakenfist/ryll/blob/3b3cab8e34e7b7577d502a9b98eb29b9919f96ea/docs/plans/PLAN-deferred-debt-phase-02-audio.md">2. Audio</a>, <a href="https://github.com/shakenfist/ryll/blob/052f495471355a8ed8e7cda364dd43b0c878702f/docs/plans/PLAN-deferred-debt-phase-03-session.md">3. Session</a>, <a href="https://github.com/shakenfist/ryll/blob/5d567f300c8529f5e32ad27cd344dd7c9e9eebf5/docs/plans/PLAN-deferred-debt-phase-04-robustness.md">4. Robustness</a>, <a href="https://github.com/shakenfist/ryll/blob/abee1b37abeac3a780e9a1fb4005f2959a86aef9/docs/plans/PLAN-deferred-debt-phase-05-cleanup.md">5. Cleanup</a>, <a href="https://github.com/shakenfist/ryll/blob/1e6dbc2a91e97a7479ce4a075c01cddf2a06fab0/docs/plans/PLAN-deferred-debt-phase-06-tests.md">6. Tests</a>, 7. Docs (inline)</td>
 </tr>
 <tr>
 <td>2026-05-07</td>

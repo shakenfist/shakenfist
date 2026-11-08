@@ -1541,6 +1541,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/bypass-actor-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Bypass actor identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -12810,34 +12838,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-initial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Initial porting plan
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../ryll/plans/PLAN-capture/" class="md-nav__link">
         
   
@@ -13034,34 +13034,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Crate extraction
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
         
   
@@ -13154,34 +13126,6 @@
     
   
     PR 23 follow-up
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deferred debt
   
 
     
@@ -13454,34 +13398,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hamburger menu
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../ryll/plans/PLAN-notifications/" class="md-nav__link">
         
   
@@ -13490,34 +13406,6 @@
     
   
     Notifications system
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PR 31 follow-up
   
 
     
@@ -13910,34 +13798,6 @@
     
   
     Self-hosted runner migration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pip-distribution/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pip-installable ryll
   
 
     
@@ -16853,6 +16713,18 @@ doesn't evenly divide the sector size.</p>
    written, via <code>write_chain_config_header()</code></li>
 <li>All writes use <code>guest_mem.write_obj()</code> for type-safe memory access</li>
 </ol>
+<p>A chain holding more than <code>MAX_CHAIN_DEVICES</code> (16) devices is refused
+here, naming the depth and the limit, rather than written as its first
+16 slots. No command reaches that refusal: <code>check</code>, <code>convert</code>, <code>bench</code>
+and <code>commit</code> each count the devices of the chain they are about to
+write and refuse an over-budget one themselves, with a message naming
+the operation. It is a backstop against a caller whose own count
+drifts from the chain it passes, which the budget makes easy to get
+wrong -- it is in devices and not images, so
+<code>security.max_chain_depth</code> (16 by default) counts images while each
+external data file takes a slot of its own. A guard taking its number
+from the depth limit would undershoot, and the chain would be
+truncated here with only a debug line to say so.</p>
 <p><code>compare</code> and <code>rebase</code> attach two unrelated chains, so they call
 <code>write_chain_device_entries()</code> once per chain and then
 <code>write_chain_config_header()</code> with one segment per chain. Both take
