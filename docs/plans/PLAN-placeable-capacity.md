@@ -445,7 +445,13 @@ before either admission change.
   re-applied, so a live share anywhere near the baseline's reopens
   `Q1` before phase 3 is written. The reading is private-ci's and
   gates phase 3, not phase 2.
-- **Phase 3** gives the core the right to book: the per-node held
+- **Phase 3** is gated, and the gate is recorded rather than
+  remembered: it may not be planned until private-ci has switched its
+  shadow fit check from a local model to a call to the dry run,
+  soaked it and read the agreement counts, which is where `D13`'s
+  live-memory question is re-tested. The entry is `plan-blockers`
+  `b4` against this plan. Phase 3 then gives the core the right to
+  book: the per-node held
   column, the node guard term (`G6`), claim-limit validation
   against the sum of holds, and the reconciler and release paths.
   Phase 0's `D15` constrains it: a hold row books one shape onto one

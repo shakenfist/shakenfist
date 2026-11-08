@@ -478,15 +478,19 @@ way around.
 2. One capability token was added, and it is advertised:
    `shakenfist/tests/external_api/test_root.py` asserts it, and
    `declared_tokens(API_CAPABILITIES)` contains it.
-3. No stage name was minted, and the core changed only as
-   `D7`'s amendment authorises. `git diff develop..HEAD --
-   shakenfist/scheduler.py` touches nothing but the set loop's
-   attachment of the refused shape's index and the docstring which
-   describes it; `grep -c '_log_and_raise_on_error('` on
-   `shakenfist/scheduler.py` is still 10 -- one definition and nine
-   call sites -- and no stage string, event name or payload
-   changed. Every pre-existing test in
-   `shakenfist/tests/test_scheduler.py` passes unmodified.
+3. No stage name was minted, and the core changed only as the
+   amendments to `D7` and `D5` authorise: the set loop's attachment
+   of the refused shape's index with the docstring describing it,
+   and the local which reads a neighbour's tags once per scoring
+   visit. `grep -c '_log_and_raise_on_error('` on
+   `shakenfist/scheduler.py` is 10 -- one definition and nine call
+   sites -- and `git diff` over that file shows no line touching a
+   stage string, an event name or an event payload's contents.
+   Every pre-existing test in `shakenfist/tests/test_scheduler.py`
+   passes with no assertion, expected value, fixture or name
+   changed; one comment in `test_the_stage_defaults_to_empty` was
+   corrected, because the query stopped substituting a label for an
+   empty stage and the comment said otherwise.
 4. A set that does not fit is a 200. A test asserts the status
    code is 200, that `fits` is false, and that `stage` is one of
    the names `_log_and_raise_on_error()` reports; and a test
@@ -526,7 +530,8 @@ way around.
     capability.
 14. `D9`'s handover exists as a `plan-blockers` entry naming what
     private-ci must switch, soak and read, and phase 3's section
-    of the master plan points at it.
+    of the master plan points at it. Recorded as blocker `b4`
+    against this plan, which gates phase 3 alone.
 
 ## Back brief
 
