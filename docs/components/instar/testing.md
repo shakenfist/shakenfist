@@ -45,6 +45,46 @@ nineteen tests only assert that instar refuses an image and leaves it
 byte-identical, so the class takes `_require_qemu_img()` and the one
 zstd test that needs a `qemu-io` write asks for it itself.
 
+**A capability probe has to be able to succeed.** The same invisible
+skip arrives by a second route: a probe that fails on every host,
+whatever it supports. `TestZstdBackingChain`'s probe asked qemu-img to
+create a qcow2 image on `/dev/null`, which fails on every build
+because the result cannot be read back as qcow2, so both its tests
+skipped from the day they were written in February 2026 until #813 was
+fixed — in CI and locally, with nothing to distinguish that from two
+passes. Probe by building the real thing in a temporary directory, and
+assert the result carries what the probe claims: a build that accepted
+`compression_type=zstd` and recorded zlib would otherwise look
+supported, and the comparison that followed would prove nothing about
+ZSTD.
+
+What the probe cannot promise is read where it is needed rather than
+assumed: `qemu-img map --output=json` only reports a `compressed` key
+from 8.2.0 onwards (measured against instar-testdata's per-version
+builds; it is absent at 6.0.0 through 8.1.0), while the
+`compression_type=zstd` the probe tests has existed since 5.1. So a
+map carrying no such key anywhere means the host cannot report
+compression, and declares itself the same way a missing tool does; a
+map that carries the key and reports nothing compressed is the fixture
+having built the wrong thing, and stays an assertion.
+
+An honest probe still skips, and a skip still reads as a pass, so the
+probe is also made mandatory where the environment can promise the
+tools: `INSTAR_REQUIRE_ZSTD` turns every reason
+`TestZstdBackingChain` would skip -- no `qemu-img`, no `qemu-io`, or a
+`qemu-img` that does not really produce ZSTD -- into a failure, and
+the `integration-core` job sets it because the devcontainer supplies
+all three. All three container targets pass the variable into the
+container, not only that one, and `check-test-partition.py` asserts
+that whichever pull-request job claims `TestZstdBackingChain` is a job
+that sets it: a variable that reaches the tests only because of which
+selection their module happens to fall in is a requirement waiting to
+go quiet, and moving the class would unset it with nothing red. A
+base-image bump that dropped ZSTD support would otherwise return both
+tests to skipping on every run, which is the state #813 found them in. This is the same bargain `INSTAR_REQUIRE_LIBVHDI`
+strikes for the libvhdi oracle, and `INSTAR_REQUIRE_LIBYAL` for the
+fuzzer's.
+
 **A `_run_tool` timeout is a hang guard, not a performance
 assertion.** The budget (`QEMU_TOOL_TIMEOUT`, 300s) exists so a wedged
 `qemu-img` cannot block a stestr worker forever; it is not a claim
@@ -975,6 +1015,16 @@ class-level convert split has a subtler gap: a `test_convert` class
 containing `Vhd` but not matching `TestConvert.*Vhd` would be excluded
 by the qcow2 job and missed by the vhd job.
 
+The run-integrity guard that those jobs share,
+`tools/ci/check-stestr-run.sh`, expects one run per file and refuses a
+file holding two totals blocks: every number it reads is the last one
+in the file, so a second run would hide whatever the first did. It
+also matches the subunit packet-size failure in two shapes -- the
+traceback line, and the bare message as a whole line -- because
+anchoring on the traceback alone is what stops a test that merely
+prints the phrase from making a complete run unreportable, and the
+copy this replaced matched the phrase anywhere.
+
 The **`ci-tooling` CI job** guards against both. It runs
 `tools/ci/check-test-partition.sh`, which enumerates the suite with
 `stestr list`, reads the *actual* job selectors from the Makefile and
@@ -1709,6 +1759,33 @@ filings failed does not claim them. Both rules exist because one
 single kernel fault (#787); under these rules it would have filed five,
 and its log would have said why it stopped.
 `tools/ci/test_differential_fuzz_issues.py` holds both, in `ci-tooling`.
+
+### The libyal oracles are mandatory in CI
+
+qemu-img is not the fuzzer's only reference. The libyal parsers --
+`vmdkinfo`, `vhdiinfo` and `qcowinfo`, from `libvmdk-utils`,
+`libvhdi-utils` and `libqcow-utils` -- are the only *independent* one
+for VMDK, VHD and VHDX: qemu-img shares a family of assumptions with
+instar, and for a differencing child it has no opinion at all.
+
+Each is optional by default, because a developer host need not have the
+packages: a missing tool is warned about, and that format's comparison
+is dropped. The trap is that the run then exits 0 and reports the same
+"N iterations, 0 divergences" as a run that had every oracle, so
+dropping a package from the devcontainer image -- a Dockerfile edit, a
+base-image bump that renames one, a Debian package split -- would halve
+the oracle coverage of every later nightly with nothing turning red.
+
+So `INSTAR_REQUIRE_LIBYAL` makes the tools mandatory: a missing one
+exits 2 naming the tool, its package and the formats that lost their
+cross-check, instead of warning. The nightly workflow sets it, since it
+rebuilds the image that installs all three. This is the same bargain
+`INSTAR_REQUIRE_LIBVHDI` strikes for the integration suite. Every run
+also logs which oracles it used, reports them on its `PASSED` line and
+records them as `libyal_tools` in `summary-<seed>.json`, so a degraded
+run is distinguishable from a clean one after the fact.
+`tools/ci/test_differential_fuzz_oracles.py` holds this, in
+`ci-tooling`.
 
 ### Reproducing a divergence
 
@@ -2776,12 +2853,14 @@ None of them needs docker, a venv, testdata or a build.
 not one of the three above: it fails, naming the line, if anything in
 the tree says instar cannot read or compose a differencing image — a
 claim that was true when earlier phases wrote it and became false once
-five operations learned to compose one. It is not wired into
-`pre-commit` or CI; a contributor gets it only by running it, the same
-as this harness.
+five operations learned to compose one. It runs in the `ci-tooling`
+job, with its `--self-test` beside it; until #663 it ran nowhere, and
+the only evidence the convention held was a one-off `exit 0` recorded
+in a plan file.
 
 It reads whole paragraphs — runs of non-blank lines, flattened —
-across `src/**/*.rs`, `tests/**/*.py` and top-level `docs/*.md`, so
+across `src/**/*.rs`, `tests/**/*.py`, `docs/**/*.md`,
+`tools/**/*.py` and `scripts/**/*.py`, so
 Rust comments and block comments, Python docstrings, assertion
 messages and Markdown prose all fall out of one pass. That breadth is
 not incidental. A line-granular grep missed a claim in
@@ -2795,6 +2874,25 @@ Two trees are excluded on purpose: `docs/plans/` records what was true
 when each phase was planned and prescribes the sweeps that made it
 false, and `CHANGELOG.md` entries were true for the release they
 describe. Editing either to satisfy the script would falsify a record.
+
+Build trees are excluded for a duller reason: `src/target/` and
+`tests/.venv/` are inside two of the globs, and pathlib matches dotted
+directories, so a developer who had built the tree scanned 1,199 files
+where CI's fresh checkout scans 277. Those 922 extra files are
+generated and vendored code, where a claim would be reported against a
+path nobody can edit — and the two counts disagreeing makes the figure
+the script prints useless as evidence.
+
+Which trees those are is git's answer and not a list here: the scan
+asks `git check-ignore` about everything its globs matched and drops
+what git ignores. The first version of the exclusion was a hardcoded
+prefix tuple and had already drifted — `.gitignore` is `**/target/`
+and `src/fuzz` carries its own, so `src/fuzz/target/`, where the
+cargo-fuzz crate builds outside the main workspace, was ignored by git
+and scanned here. A tree git cannot be asked about, such as an
+exported source drop, falls back to the prefixes, and the self-test
+reports that check as skipped rather than failing on it.
+
 The pattern is anchored on what a claim says instar cannot act *on*
 rather than on the verb, because that is what decides whether the
 claim is false. An unscoped claim naming a differencing image or a
@@ -2808,14 +2906,38 @@ form out, because a page containing it verbatim is indistinguishable,
 to anyone skimming, from a page making the claim — and the checker
 reads this page too.
 
-`--self-test` pins ten checks: nine claim forms it must flag or clear,
-each one that actually appeared in this repository, and one that the
-scan reads files at all from a working directory other than the
-repository root. That last one exists because the script globbed
-relative to the current directory and reported a clean tree, exit 0,
-having read nothing, whenever it was run from anywhere else. It now
-resolves the repository from its own path and refuses to report a
-clean tree on a scan that matched almost no files.
+`--self-test` pins sixteen checks: nine claim forms it must flag or
+clear, each one that actually appeared in this repository, and seven
+about the scan itself. That it reads files at all from a working
+directory other than the repository root exists because the script
+globbed relative to the current directory and reported a clean tree,
+exit 0, having read nothing, whenever it was run from anywhere else;
+it now resolves the repository from its own path and refuses to report
+a clean tree on a scan that matched almost no files.
+
+The other six are about what the widened scan reads, which the claim
+forms cannot see: that every glob matches at least one file, that a
+docs page below `docs/` itself is read, that nothing under
+`docs/plans/` is, that nothing named in `EXCLUDED` is, that the
+ignore filter drops the build trees git ignores and only those, and
+that the prefix fallback drops the same two. The per-glob floor is the
+load-bearing one.
+
+The fallback is checked because git answers in every checkout, so the
+branch that runs when it cannot be asked is the one nobody reaches --
+and it is the half that has already rotted once. One expectation over
+both halves means a prefix tuple that stops covering a build tree git
+ignores fails here, rather than in an exported source drop where
+nobody is running the self-test.
+The aggregate floor was sized for three globs, and with five any
+single glob could stop matching -- the precise failure a floor exists
+to catch -- while the other four held the total in the hundreds. The
+real scan refuses for the same reason: a glob that matches nothing it
+may read means whatever that glob covers is not being checked, which
+is reported rather than passed. The nested-docs check is there because
+the glob *was* `docs/*.md`, non-recursive, which hid 36 pages
+including every commentary page while the docstring presented the
+`docs/plans/` exclusion as the deliberate one.
 
 `--self-test` exists because the classifier is the one part of the
 harness nothing else checks — everything else is checked *by* it — and

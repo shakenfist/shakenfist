@@ -91,7 +91,37 @@ Two secrets must be configured in the ryll repo settings:
   still succeed.
 
 No secret is needed for the `ryll` PyPI wheel: it publishes via
-OIDC Trusted Publishers instead (see below).
+OIDC Trusted Publishers instead (see below). crates.io still needs
+the long-lived token above; moving it to crates.io's own trusted
+publishing is
+[issue 699](https://github.com/shakenfist/ryll/issues/699).
+
+Scope `CARGO_REGISTRY_TOKEN` as narrowly as the job it serves allows,
+and give it an expiry. A release publishes new versions of crates that
+already exist, so it does need `publish-update` -- but scope the token
+to the `shakenfist-spice-*` and `ryll` crate patterns rather than to
+the whole account, because a leaked account-wide token can publish
+updates to any crate the owner holds, transfer ownership and yank
+published versions. A one-shot publish of a *new* name needs only
+`publish-new`: the first three `0.0.0` name reservations
+(`shakenfist-spice-compression`, `-protocol` and `-usbredir`) were
+made with a `publish-new`-only token scoped to just those names and
+expiring in a day, so a leak could not have touched anything else.
+Both the release workflow and `make publish-crates` hand the token
+over in the environment (`-e CARGO_REGISTRY_TOKEN`), which cargo
+reads without a prior `cargo login`, so it is never written to
+`~/.cargo/credentials.toml` inside the container.
+
+The expiry is not free, so check it before starting a release rather
+than relying on the release to tell you. An expired token cannot
+leak publishing rights, but it is only read at publish time:
+`publish-crates` runs behind `sign-tag`, which is gated on the
+`release` environment's manual approval, so the failure surfaces
+after the tag is signed and the binaries are public.
+`tools/publish-crates.sh` runs `cargo publish` per crate under `set
+-e` with no already-published guard, so a token that expires mid-run
+leaves the earlier crates published and the rest to be done by hand
+-- a re-run would fail on the ones that already landed.
 
 ### PyPI Trusted Publishers and the `release` environment
 
@@ -133,6 +163,25 @@ Without the trusted-publisher registration, `publish-ryll-pypi`
 fails with a "publisher not found" error; the
 `.deb`/`.rpm`/tarball/zip artifacts, GitHub Release, and
 crates.io publishes are unaffected.
+
+### Reserving a new crate name
+
+crates.io has a flat, immutable, first-come namespace, and a name
+cannot be reclaimed except through a slow and uncertain complaint to
+the Rust Foundation. The risk is asymmetric -- reserving costs almost
+nothing, while losing a name to a typosquatter or a junk crate is a
+setback to be worked around -- so a new crate's name is published as a
+minimal `0.0.0` placeholder as soon as its workspace member exists,
+before the work that will fill it. The real release then supersedes the
+placeholder, which the resolver already prefers. Scope the token for
+that publish to `publish-new` only, as above.
+
+While the member sits at `0.0.0`, depend on it by `path` alone and
+leave the `version =` half of the dual spec off until it reaches its
+first real version. Cargo will not satisfy `^0.1` from `0.0.0` -- it
+fails the resolve with "candidate versions found which didn't match:
+0.0.0" -- so adding the qualifier early as forward preparation breaks
+the build rather than being the no-op it looks like.
 
 ### Host tools
 
@@ -437,8 +486,12 @@ itself: the token, the network, or a version that already exists.
 
 Common causes:
 
-- `CARGO_REGISTRY_TOKEN` missing, expired, or scoped too
-  narrowly. Regenerate with `publish-new` + `publish-update`.
+- `CARGO_REGISTRY_TOKEN` missing, expired, or lacking a scope this
+  publish needs. A release needs `publish-update` as well as
+  `publish-new`; regenerate with both, keeping the crate-pattern
+  scoping and expiry described under
+  [Repository secrets](#repository-secrets) rather than widening it to
+  the whole account.
 - A dependency inside ryll that still uses a `path = ...` only
   reference without a `version = ...` qualifier. `cargo publish`
   rejects this. The dual-spec qualifiers are wired up and

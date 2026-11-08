@@ -167,6 +167,64 @@ the webrtc-0.20 port (phases 02–04) rewrites the adjacent code
 paths — diagnosis before the port would likely be throwaway
 work.
 
+### Q6 — What corrupts GLZ cross-frame images during guest boot?
+
+**Linked plan:** none live. The investigation was
+[phase 1 of the deferred-debt plan](https://github.com/shakenfist/ryll/blob/7487d2f4cd6767a63bd630d08e2c177dee4d04d0/docs/plans/PLAN-deferred-debt-phase-01-display.md),
+retired once its three fixes landed; that pinned copy is the
+evidence trail, and the eviction rule it produced is design
+decision 8.
+
+**Symptom:** during the early BIOS/GRUB/kernel-boot window a
+coloured-noise band appears across the top of the primary
+surface. A `tools/pcap-inspect.py draw-copy` over the captured
+window showed 9237 DRAW_COPY into surface 0 and nothing else —
+no DRAW_FILL, no COPY_BITS — of which 5286 were ZLIB_GLZ_RGB
+and 3904 GLZ_RGB, so ~99% of the window is GLZ-family images.
+Still listed as a known issue in
+[troubleshooting.md](/components/ryll/troubleshooting/).
+
+**Already eliminated:** the three dictionary-management bugs
+this was first written around have all landed — `win_head_dist`
+eviction, the `IMAGE_FLAGS_CACHE_ME` test before caching, and
+the INVALIDATE_LIST and INVAL_ALL_PIXMAPS handlers that clear
+the dictionary — and the band still reproduces. The decoder
+itself was ruled out separately: control-byte parsing,
+pixel_flag and image_flag decoding and the pixel copy loops
+were compared against kerbside's Python `glz.py` and found
+faithful. A hunt that restarts from either is repeating work.
+
+**Surviving hypotheses,** in the order the retired plan ranked
+them:
+
+- **Stride or dimension confusion** between decode and blit —
+  the band has horizontal-scanline structure consistent with
+  pixels written at width W and read at width W'. Check
+  width×height×4 against the scratch-buffer allocation and the
+  blit stride.
+- **A dictionary entry mutated after insertion.** Eviction
+  bounds the dictionary but says nothing about content: if a
+  cached image's backing `Vec` is reused or overwritten, a
+  reference returns garbled pixels. Check that insertion stores
+  a fresh owned `Vec` and that values are never mutated after.
+- **ZLIB_GLZ_RGB specifically** — the majority flavour here. A
+  short zlib output-buffer estimate would truncate before the
+  GLZ footer, rendering the head of the frame and garbage after
+  it.
+- **Top-down versus bottom-up row order,** which would show
+  uninitialised bytes as the garbage rows.
+- **Cross-channel dictionary visibility.** The dictionary is
+  behind a mutex and callers clone rather than borrow across
+  release points, so this is the least likely, but it was never
+  verified.
+
+**What would close it:** `tools/pcap-inspect.py timeline
+--since-last N` against a bug report's pcap ring buffer to
+isolate the DRAW_COPYs that produced the corruption, then a
+unit test feeding those image blobs to the GLZ decoder in
+isolation and comparing against a reference decode of the same
+input.
+
 ## When to add a new entry
 
 Add a Q-entry here when **all** of the following hold:
@@ -184,3 +242,11 @@ If the symptom maps cleanly to existing phase work, link to
 that phase. If it doesn't, file a new standalone plan stub and
 link to it from the entry. Entries without a linked plan are a
 smell — the plan is where the history lives.
+
+One exception: where the investigation came from a plan that has
+since been retired, there is no live plan to link, so the entry
+carries the evidence inline and links the retired plan's pinned
+copy as the trail. Such an entry is longer than the others on
+purpose, and it cannot be closed by the linked plan reaching a
+conclusion — closing it means folding its content into the
+`docs/` page that owns the topic. Q6 is the current example.

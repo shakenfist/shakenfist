@@ -46,7 +46,7 @@ Ryll today shows a small amount of connection state in the
 status bar (volume, latency, FPS, bandwidth, USB device
 description) and exposes feature actions through a hamburger
 menu at the right edge of the status bar
-([PLAN-hamburger-menu.md](/components/ryll/plans/PLAN-hamburger-menu/), now
+([`PLAN-hamburger-menu.md`](https://github.com/shakenfist/ryll/blob/459c2427f55ccad8cf2881b44c3d7cbde22f363d/docs/plans/PLAN-hamburger-menu.md), now
 landed). What it does **not** show anywhere visible is the
 connection's structural metadata: which SPICE host and port
 we're talking to, whether TLS is in use, the negotiated

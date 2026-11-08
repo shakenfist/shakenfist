@@ -108,6 +108,7 @@ nav:
                 - "Audit: Agent instruction file naming": components/development/audits/llm-doc-naming.md
                 - "Audit: AGENTS.md / ARCHITECTURE.md structure": components/development/audits/llm-doc-structure.md
                 - "Audit: audit scope against the organisation": components/development/audits/scope-coverage.md
+                - "Audit: Bypass actor identity": components/development/audits/bypass-actor-identity.md
                 - "Audit: CI review automation and developer automation": components/development/audits/ci-review-automation.md
                 - "Audit: Console script logging setup": components/development/audits/console-logging.md
                 - "Audit: Credential handling and leak detection": components/development/audits/secret-handling.md
@@ -478,7 +479,6 @@ nav:
             - "Web mode internals": components/ryll/web-mode-internals.md
             - Plans:
                 - "Plans index": components/ryll/plans/index.md
-                - "Initial porting plan": components/ryll/plans/PLAN-initial.md
                 - "Capture mode": components/ryll/plans/PLAN-capture.md
                 - "Packaging": components/ryll/plans/PLAN-packaging.md
                 - "USB redirection": components/ryll/plans/PLAN-usb-redir.md
@@ -486,12 +486,10 @@ nav:
                 - "Bug reports": components/ryll/plans/PLAN-bug-reports.md
                 - "USB UI": components/ryll/plans/PLAN-usb-ui.md
                 - "WebDAV": components/ryll/plans/PLAN-webdav.md
-                - "Crate extraction": components/ryll/plans/PLAN-crate-extraction.md
                 - "Remaining issues": components/ryll/plans/PLAN-remaining-issues.md
                 - "Display follow-ups": components/ryll/plans/PLAN-display-iteration-followups.md
                 - "PR 20 follow-up": components/ryll/plans/PLAN-pr20-followup.md
                 - "PR 23 follow-up": components/ryll/plans/PLAN-pr23-followup.md
-                - "Deferred debt": components/ryll/plans/PLAN-deferred-debt.md
                 - "Supply-chain scanning": components/ryll/plans/PLAN-supply-chain-scanning.md
                 - "Supply-chain follow-ups": components/ryll/plans/PLAN-supply-chain-followups.md
                 - "Screenshot and latency HUD": components/ryll/plans/PLAN-screenshot-and-latency-hud.md
@@ -501,9 +499,7 @@ nav:
                 - "Bug-report trigger snapshot": components/ryll/plans/PLAN-bugreport-trigger-snapshot.md
                 - "Macbook bug-report fixes": components/ryll/plans/PLAN-macbook-bugreport-fixes.md
                 - "Paste-as-keystrokes fallback": components/ryll/plans/PLAN-paste-as-keystrokes.md
-                - "Hamburger menu": components/ryll/plans/PLAN-hamburger-menu.md
                 - "Notifications system": components/ryll/plans/PLAN-notifications.md
-                - "PR 31 follow-up": components/ryll/plans/PLAN-pr31-followup.md
                 - "Connection properties": components/ryll/plans/PLAN-connection-properties.md
                 - "Display window sizing": components/ryll/plans/PLAN-display-window-sizing.md
                 - "Web frontend": components/ryll/plans/PLAN-web-frontend.md
@@ -518,7 +514,6 @@ nav:
                 - "Streaming test automation": components/ryll/plans/PLAN-streaming-test-automation.md
                 - "Open questions watch-list": components/ryll/plans/OPEN-QUESTIONS.md
                 - "Self-hosted runner migration": components/ryll/plans/PLAN-self-hosted-runners.md
-                - "Pip-installable ryll": components/ryll/plans/PLAN-pip-distribution.md
                 - "webrtc-rs 0.20 upgrade": components/ryll/plans/PLAN-webrtc-0.20-upgrade.md
                 - "Two-stage CI": components/ryll/plans/PLAN-two-stage-ci.md
                 - "Main-channel event drops": components/ryll/plans/PLAN-main-event-drops.md
