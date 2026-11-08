@@ -55,6 +55,75 @@ class TestNamespace(base.BaseNamespacedTestCase):
                 apiclient.RequestMalformedException,
                 self.system_client.create_namespace, name)
 
+    def _await_instance_state(self, instance_uuid, state, timeout=300):
+        start_time = time.time()
+        while True:
+            i = self.system_client.get_instance(instance_uuid)
+            if i['state'] == state:
+                return i
+            if time.time() - start_time > timeout:
+                break
+            time.sleep(5)
+
+        self.addDetail(
+            'instance', content.text_content(json.dumps(i, indent=4,
+                                                        sort_keys=True)))
+        self.fail('Instance %s did not reach state %s within %d seconds, it '
+                  'is in state %s' % (instance_uuid, state, timeout,
+                                      i['state']))
+
+    def test_namespace_delete_refuses_an_errored_instance(self):
+        """Issue 4847: an errored instance blocks its namespace's delete.
+
+        An instance in error was counted as already gone, so the
+        namespace was deleted over the top of a live row which then had
+        no namespace, no owner and nothing which would ever sweep it.
+
+        The instance here reaches error through an image which cannot be
+        fetched rather than through a delete which failed, because that
+        is the path reachable from the API and the refusal reads the
+        state rather than how it got there.
+        """
+        other = '%s-errored-%s' % (self.namespace, self._uniquifier())
+        other_client = self._make_namespace(other, self._uniquifier())
+        self.addCleanup(self._remove_namespace, other)
+
+        inst = self.create_instance(
+            'errored', 1, 1024, [],
+            [
+                {
+                    'size': 8,
+                    'base': 'https://nosuch.shakenfist.com/foo',
+                    'type': 'disk'
+                }
+            ], None, None, client=other_client)
+        self.addDetail('inst', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
+        # An unfetchable image is deferred and retried before the fetch
+        # is declared dead (15, 30 and 60 seconds), and the instance
+        # then passes through creating-error on its way to error, so
+        # this wait is longer than the deleted one below.
+        self._await_instance_state(inst['uuid'], 'error', timeout=600)
+
+        e = self.assertRaises(
+            apiclient.RequestMalformedException,
+            self.system_client.delete_namespace, other)
+        self.assertIn('you cannot delete a namespace with instances',
+                      str(e.text))
+        self.assertIn(other,
+                      base.namespace_names(self.system_client.get_namespaces()))
+
+        # Clearing the instance is what makes the namespace deletable,
+        # and a deleted instance does not block: it has released
+        # everything it held and is hard deleted by state rather than
+        # through its namespace.
+        other_client.delete_instance(inst['uuid'])
+        self._await_instance_state(inst['uuid'], 'deleted')
+
+        self.system_client.delete_namespace(other)
+        self.assertNotIn(
+            other, base.namespace_names(self.system_client.get_namespaces()))
+
     def test_namespace_clean(self):
         """Check that instances and networks are cleaned from namespace
 

@@ -321,6 +321,17 @@ stateDiagram-v2
   deleted --> [*]
 ```
 
+A namespace may only be deleted once it holds no instances, and only an
+instance in state `deleted` counts as gone — an instance in `error` is a live
+row which merely failed at something. That matters more than it looks: an
+instance is reachable only through its namespace, so a namespace deleted over
+the top of one leaves a row with no namespace, no owner, and no sweep which
+would ever find it. An errored instance has to be deleted (which is permitted
+from `error`, and may be retried) before its namespace can be. As a backstop,
+`Namespace.hard_delete()` enqueues the delete of any instance which reaches it
+anyway, alongside the keys, mapping rules, trusts and capacity claims it
+sweeps.
+
 ## Networks
 
 * `initial`: first state for a network. A UUID has been allocated, database entry

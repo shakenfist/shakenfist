@@ -15,6 +15,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
+from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -365,8 +366,6 @@ class AuthWithLingeringInstance(base.ShakenFistTestCase):
         self.mock_mariadb.setup()
 
         self.mock_mariadb.create_namespace('foo', 'key1', 'banana')
-        self.mock_mariadb.create_instance(
-            name='fooinst', namespace='foo')
 
         # The client must be created after all the mocks, or the mocks are not
         # correctly applied.
@@ -378,9 +377,14 @@ class AuthWithLingeringInstance(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
 
-    def test_delete_namespace_with_instances(self):
-        resp = self.client.delete('/auth/namespaces/foo',
+    def _delete_namespace_foo(self):
+        return self.client.delete('/auth/namespaces/foo',
                                   headers={'Authorization': self.auth_token})
+
+    def test_delete_namespace_with_instances(self):
+        self.mock_mariadb.create_instance(name='fooinst', namespace='foo')
+
+        resp = self._delete_namespace_foo()
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
             {
@@ -388,6 +392,49 @@ class AuthWithLingeringInstance(base.ShakenFistTestCase):
                 'status': 400
             },
             resp.get_json())
+
+    def test_delete_namespace_with_errored_instance(self):
+        # Issue 4847: an errored instance used to be counted as already
+        # gone, so the namespace was deleted over the top of a live row
+        # which then had no namespace, no owner and no sweeper.
+        self.mock_mariadb.create_instance(
+            name='fooinst', namespace='foo', set_state=dbo.STATE_ERROR)
+
+        resp = self._delete_namespace_foo()
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'you cannot delete a namespace with instances',
+                'status': 400
+            },
+            resp.get_json())
+        self.assertEqual(dbo.STATE_CREATED,
+                         Namespace.from_db('foo').state.value)
+
+    def test_delete_namespace_with_delete_wait_error_instance(self):
+        # The state an instance whose delete failed passes through on
+        # its way to error. This refusal is the floor the errored case
+        # above used to expire out of: it blocked, the caller retried,
+        # and by then the instance had reached error and the retry
+        # succeeded.
+        self.mock_mariadb.create_instance(
+            name='fooinst', namespace='foo',
+            set_state=Instance.STATE_DELETE_WAIT_ERROR)
+
+        resp = self._delete_namespace_foo()
+        self.assertEqual(400, resp.status_code)
+
+    def test_delete_namespace_with_deleted_instance(self):
+        # A deleted instance has released everything it held and the
+        # deleted object sweep hard deletes its row without needing the
+        # namespace, so it does not block.
+        self.mock_mariadb.create_instance(
+            name='fooinst', namespace='foo', set_state=dbo.STATE_DELETED)
+
+        resp = self._delete_namespace_foo()
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(dbo.STATE_DELETED,
+                         Namespace.from_db('foo').state.value)
 
 
 class AuthWithLingeringNetwork(base.ShakenFistTestCase):

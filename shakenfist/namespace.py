@@ -342,6 +342,39 @@ class Namespace(dbo):
                 self._save_attributes(fields=['trust'])
 
     def hard_delete(self):
+        # An instance is not cascade deleted by its namespace the way a
+        # key or a rule is -- deleting one is real work on a hypervisor,
+        # which is why the REST delete handler refuses a namespace still
+        # holding one rather than deleting it on the caller's behalf.
+        # But an instance is reachable only through its namespace, so an
+        # instance which gets this far has no owner and nothing which
+        # will ever sweep it: no namespace, and no state the deleted
+        # object sweep looks at (issue 4847). This is the backstop for
+        # whatever arrives here anyway -- a create which raced the
+        # namespace delete, or an instance left behind by a release
+        # which counted an errored instance as already gone.
+        #
+        # The delete is enqueued rather than the row being hard deleted
+        # here, because the disks, interfaces and placement are the
+        # point: hard deleting the row would release the capacity but
+        # leave whatever is on the hypervisor with nothing left to
+        # explain it. A deleted instance is left alone, because the
+        # deleted object sweep already owns it and does not need this
+        # namespace to find it.
+        #
+        # Imported here rather than at the top of the file:
+        # shakenfist.instance reaches shakenfist.namespace through
+        # shakenfist.artifact, so a module level import is a cycle.
+        from shakenfist import instance as instance_module
+        for i in instance_module.instances_in_namespace(self.uuid):
+            if i.state.value == dbo.STATE_DELETED:
+                continue
+            i.add_event(
+                EVENT_TYPE_AUDIT,
+                'deletion request from namespace hard delete, instance '
+                'outlived its namespace', log_as_error=True)
+            i.enqueue_delete()
+
         # Keys are owned by the namespace and are meaningless without
         # it, so they go too. This used to happen for free, because the
         # keys lived in the namespace attributes row.
