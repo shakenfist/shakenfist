@@ -909,6 +909,12 @@ message ReleaseAddressRequest {
   string ipam_uuid = 1;
   string address = 2;
   IPAMReservationData halo_reservation = 3;  // The deletion-halo data to set
+  // If set to something other than RESERVATION_TYPE_UNSPECIFIED, the release
+  // only proceeds when the address is currently reserved as this type,
+  // checked in the UPDATE's WHERE clause so the type check and the release
+  // are one atomic statement (issue #4261). An older sf-database built
+  // before this field ignores it and releases unconditionally.
+  ReservationType expected_type = 4;
 }
 
 message GetReservationRequest {

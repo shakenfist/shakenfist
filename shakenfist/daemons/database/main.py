@@ -1063,8 +1063,15 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 reserved_at=request.halo_reservation.reserved_at,
                 comment=request.halo_reservation.comment or None
             )
+            # A zero expected_type is RESERVATION_TYPE_UNSPECIFIED, which
+            # from_proto_id maps to None: no type guard, the pre-field
+            # behaviour. A non-zero value threads into the UPDATE's WHERE
+            # clause so the release is refused unless the address is still
+            # reserved as that type (issue #4261).
+            expected_type = ReservationType.from_proto_id(request.expected_type)
             success = mariadb._direct_release_address(
-                UUID(request.ipam_uuid), request.address, halo_reservation)
+                UUID(request.ipam_uuid), request.address, halo_reservation,
+                expected_type=expected_type)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database ReleaseAddress failed', e)

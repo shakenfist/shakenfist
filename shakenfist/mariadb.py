@@ -4864,14 +4864,27 @@ def _grpc_reserve_address(reservation: IPAMReservation,
         return False
 
 
-def _grpc_release_address(ipam_uuid: str, address: str,
-                          halo_reservation: IPAMReservation) -> bool:
-    """Release an IP address via the database microservice."""
+def _grpc_release_address(
+        ipam_uuid: str, address: str,
+        halo_reservation: IPAMReservation,
+        expected_type: Optional[ReservationType] = None) -> bool:
+    """Release an IP address via the database microservice.
+
+    expected_type is sent as RESERVATION_TYPE_UNSPECIFIED (0) when None, which
+    an sf-database that understands the field reads as "no type guard". An
+    older sf-database built before the field ignores it and releases
+    unconditionally -- the pre-field behaviour -- so a mixed-version window
+    degrades to an unguarded release rather than refusing the RPC (issue
+    #4261).
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.ReleaseAddressRequest(
             ipam_uuid=ipam_uuid,
             address=address,
+            expected_type=cast(
+                shakenfist_enums_pb2.ReservationType.ValueType,
+                expected_type.proto_id if expected_type else 0),
             halo_reservation=database_pb2.IPAMReservationData(
                 ipam_uuid=str(halo_reservation.ipam_uuid),
                 address=str(halo_reservation.address),
@@ -7329,32 +7342,47 @@ def _direct_reserve_address(reservation: IPAMReservation,
         return False
 
 
-def _direct_release_address(ipam_uuid: UUID, address: str,
-                            halo_reservation: IPAMReservation) -> bool:
+def _direct_release_address(
+        ipam_uuid: UUID, address: str,
+        halo_reservation: IPAMReservation,
+        expected_type: Optional[ReservationType] = None) -> bool:
     """Release an IP address by updating it to deletion-halo state.
 
     Uses a transactional update to atomically change the reservation to
     deletion-halo state. This preserves the row for the halo period.
 
+    When expected_type is given, it is added to the UPDATE's WHERE clause,
+    so the type check and the release are one statement and a release
+    cannot be run against a row whose type changed since it was read
+    (issue #4261). Zero rows then match when the type no longer holds, and
+    the function returns False, exactly as it does for an address that is
+    not reserved. This is the same guarded-UPDATE shape
+    _direct_reserve_address uses for evict_halo.
+
     Args:
         ipam_uuid: The IPAM UUID.
         address: The IP address to release (as string).
         halo_reservation: The new reservation data with deletion-halo type.
+        expected_type: If set, only release a reservation of this type.
 
     Returns:
-        True if the update succeeded, False if the reservation didn't exist
-        or the update failed.
+        True if the update succeeded, False if the reservation didn't exist,
+        was not of expected_type, or the update failed.
     """
     engine = _get_engine()
     table = _get_ipam_reservations_table()
 
+    conditions = [
+        table.c.ipam_uuid == ipam_uuid,
+        table.c.address == address
+    ]
+    if expected_type is not None:
+        conditions.append(table.c.reservation_type == expected_type)
+
     try:
         with engine.connect() as conn:
             stmt = sa.update(table).where(
-                sa.and_(
-                    table.c.ipam_uuid == ipam_uuid,
-                    table.c.address == address
-                )
+                sa.and_(*conditions)
             ).values(
                 reservation_type=halo_reservation.reservation_type,
                 user_type=halo_reservation.user_type,
@@ -7576,20 +7604,25 @@ def reserve_address(reservation: IPAMReservation,
 
 
 def release_address(ipam_uuid: UUID, address: str,
-                    halo_reservation: IPAMReservation) -> bool:
+                    halo_reservation: IPAMReservation,
+                    expected_type: Optional[ReservationType] = None) -> bool:
     """Release an IP address by updating it to deletion-halo state.
 
     Args:
         ipam_uuid: The IPAM UUID.
         address: The IP address to release (as string).
         halo_reservation: The new reservation data with deletion-halo type.
+        expected_type: If set, only release a reservation of this type,
+            checked atomically with the release (issue #4261).
 
     Returns:
         True if successful, False otherwise.
     """
     if _use_database_service():
-        return _grpc_release_address(str(ipam_uuid), address, halo_reservation)
-    return _direct_release_address(ipam_uuid, address, halo_reservation)
+        return _grpc_release_address(str(ipam_uuid), address, halo_reservation,
+                                     expected_type=expected_type)
+    return _direct_release_address(ipam_uuid, address, halo_reservation,
+                                   expected_type=expected_type)
 
 
 def get_reservation(ipam_uuid: UUID, address: str) -> Optional[IPAMReservation]:
