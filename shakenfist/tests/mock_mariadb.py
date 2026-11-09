@@ -3266,8 +3266,8 @@ class MockMariaDB():
                     dimension, row['limit_' + dimension],
                     row['used_' + dimension], requested))
             if enforce_demand and row['demand_limit'] is not None:
-                # Check-then-charge, as the real clause does since phase
-                # 4a: the incoming placement's demand_add is reported but
+                # Check-then-charge, as the real clause does: the
+                # incoming placement's demand_add is reported but
                 # not compared, so an under-target node admits whatever
                 # size asks and the charge lands for the next decision.
                 # Charging it here would refuse placements the real guard

@@ -396,8 +396,8 @@ def parse_since(value):
     Accepts a bare date or a full ISO 8601 timestamp. GitHub returns
     created_at as UTC with a trailing Z, so a naive value is read as UTC
     rather than as local time; a harvest whose window boundary moved with
-    the operator's timezone would not be reproducible from the README step
-    2d is required to write.
+    the operator's timezone would not be reproducible from the command the
+    dataset's README quotes.
     """
     text = value.strip()
     if text.endswith('Z'):

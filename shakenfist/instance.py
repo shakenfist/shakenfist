@@ -1311,9 +1311,10 @@ class Instance(dbowo):
         the operator asked for when this fires. CLAIM_ENFORCEMENT_HARD is
         False for one release precisely so exceedances are *observed*
         before they are refused, so this is a warning -- loud enough to
-        find, and to calibrate a claim against, but not a failure. Phase
-        5 turns the same condition into a refusal, which will be an error
-        because then the create does not happen.
+        find, and to calibrate a claim against, but not a failure. Once
+        that constant is flipped the same condition refuses the create
+        instead, and will be an error because then the create does not
+        happen.
 
         This instance's own event above is left exactly as it was (G2).
         In addition, the same facts are recorded against the

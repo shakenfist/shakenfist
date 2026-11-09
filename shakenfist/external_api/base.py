@@ -135,8 +135,10 @@ TRANSIENT_RETRY_AFTER_SECONDS = 15
 # 4568): shakenfist/instance.py cannot import the API layer, and a
 # second copy of the classification is how the API and the instance come
 # to disagree about one refusal. Anybody splitting a stage out of either
-# set -- the claim stage, once mariadb.CLAIM_ENFORCEMENT_HARD is flipped
-# by PLAN-scheduler-reservations phase 5 -- edits constants.py, not here.
+# set -- the claim stage, once mariadb.CLAIM_ENFORCEMENT_HARD lets a
+# namespace claim refuse a placement, because a refusal against a quota
+# the namespace declared is not one a wait clears -- edits constants.py,
+# not here.
 CAPACITY_GUARD_STAGE = constants.CAPACITY_GUARD_STAGE
 TRANSIENT_CAPACITY_STAGES = constants.TRANSIENT_CAPACITY_STAGES
 PERMANENT_CAPACITY_STAGES = constants.PERMANENT_CAPACITY_STAGES
