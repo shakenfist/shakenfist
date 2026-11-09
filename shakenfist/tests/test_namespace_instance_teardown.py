@@ -8,6 +8,7 @@
 # Namespace.hard_delete() is the backstop for whatever arrives anyway.
 from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace
@@ -21,7 +22,7 @@ class HardDeleteSweepsInstancesTestCase(base.ShakenFistTestCase):
 
         self.mock_mariadb = MockMariaDB(self, node_count=1)
         self.mock_mariadb.setup()
-        for name in ['doomed', 'bystander']:
+        for name in ['system', 'doomed', 'bystander']:
             self.mock_mariadb.create_namespace(name, 'key1', 'secret')
 
     def _hard_delete_doomed(self):
@@ -77,3 +78,34 @@ class HardDeleteSweepsInstancesTestCase(base.ShakenFistTestCase):
         self.assertIn(
             'deletion request from namespace hard delete, instance '
             'outlived its namespace', messages)
+
+    def test_system_does_not_sweep_the_cluster(self):
+        # The object iterator reads a namespace of 'system' as "every
+        # namespace", so without the guard this would enqueue a delete
+        # for both of these.
+        self.mock_mariadb.create_instance(
+            name='theirs', namespace='bystander', set_state=dbo.STATE_ERROR)
+        self.mock_mariadb.create_instance(
+            name='ours', namespace='system', set_state=dbo.STATE_CREATED)
+
+        with mock.patch.object(Instance, 'enqueue_delete',
+                               autospec=True) as ed:
+            Namespace.from_db('system').hard_delete()
+        self.assertEqual([], ed.call_args_list)
+
+    def test_a_failed_enqueue_does_not_defer_trust_revocation(self):
+        # enqueue_delete() raises when it cannot read the instance's
+        # outstanding operations. That aborts the pass, which is fine --
+        # the namespace rows survive for the sweep's next one -- but the
+        # trust revocation must already have happened.
+        Namespace.from_db('bystander').add_trust('doomed')
+        self.mock_mariadb.create_instance(
+            name='orphan', namespace='doomed', set_state=dbo.STATE_ERROR)
+
+        with mock.patch.object(
+                Instance, 'enqueue_delete', autospec=True,
+                side_effect=exceptions.DatabaseUnavailable('no')) as ed:
+            self.assertRaises(exceptions.DatabaseUnavailable,
+                              Namespace.from_db('doomed').hard_delete)
+        ed.assert_called_once()
+        self.assertNotIn('doomed', Namespace.from_db('bystander').trust)

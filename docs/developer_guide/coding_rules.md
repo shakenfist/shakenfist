@@ -249,6 +249,28 @@ than inferring one, and write the test that returns the empty-error reply and
 asserts the refusal. The invariant is not that today's code produces a message;
 it is that no reply can be mistaken for a permissive one.
 
+## A state an object can leave is not a terminal state
+
+A guard which asks "is this object gone?" must answer yes only for a state the
+object cannot leave. The namespace delete handler used to count an instance in
+`error` as already gone, alongside `deleted`. But `error` is where an instance
+whose delete failed ends up, and that instance still holds its disks, its
+interfaces and its placement. Its row is reachable only through its namespace,
+so deleting the namespace over the top of it left a row with no owner and
+nothing which would ever sweep it (issue 4847).
+
+Worse, the refusal expired into permission. A failing delete walks
+`delete-wait` -> `delete-wait-error` -> `error`, and only the middle state
+blocked, so a caller who retried the namespace delete a moment later got
+through over exactly the instance the first refusal had protected.
+
+When a guard lists the states it lets through, check each one against the
+state machine: can an object leave this state, and does it still hold anything
+while it is in it? `deleted` is the only state which answers no to both.
+Test the guard against every state on the failing path, not just the one the
+guard was written for: each of those is a moment a caller can retry. See the comment in
+`AuthNamespaceEndpoint.delete()` in `shakenfist/external_api/auth.py`.
+
 ## `or []` is a decision about what a failed read means
 
 `mariadb.get_objects_by_state()` returns `None` when the read failed and `[]`

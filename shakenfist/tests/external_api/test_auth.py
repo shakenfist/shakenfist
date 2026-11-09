@@ -411,6 +411,17 @@ class AuthWithLingeringInstance(base.ShakenFistTestCase):
         self.assertEqual(dbo.STATE_CREATED,
                          Namespace.from_db('foo').state.value)
 
+    def test_delete_namespace_with_delete_wait_instance(self):
+        # The first state on a failing delete's path to error: the
+        # delete is still in flight, so the instance still holds
+        # everything it held.
+        self.mock_mariadb.create_instance(
+            name='fooinst', namespace='foo',
+            set_state=Instance.STATE_DELETE_WAIT)
+
+        resp = self._delete_namespace_foo()
+        self.assertEqual(400, resp.status_code)
+
     def test_delete_namespace_with_delete_wait_error_instance(self):
         # The state an instance whose delete failed passes through on
         # its way to error. This refusal is the floor the errored case

@@ -413,6 +413,12 @@ class AuthNamespaceEndpoint(api_base.Resource):
         if len(instances) > 0:
             return sf_api.error(400, 'you cannot delete a namespace with instances')
 
+        # Networks still count error and delete_wait as gone, through
+        # is_dead(), which is the defect fixed above for instances. That
+        # is known and tracked as issue 4863 rather than fixed here:
+        # is_dead() is shared, and its other callers rely on it meaning
+        # "do not act on this network", so the fix is a predicate of
+        # this handler's own rather than narrowing that one.
         networks = []
         for n in network.networks_in_namespace(namespace):
             if not n.is_dead():

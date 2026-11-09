@@ -56,11 +56,30 @@ class TestNamespace(base.BaseNamespacedTestCase):
                 self.system_client.create_namespace, name)
 
     def _await_instance_state(self, instance_uuid, state, timeout=300):
+        # Unlike base._await_instance_deleted(), error is not success
+        # here: telling error from deleted is the point of the test.
         start_time = time.time()
         while True:
-            i = self.system_client.get_instance(instance_uuid)
+            try:
+                i = self.system_client.get_instance(instance_uuid)
+            except apiclient.ResourceNotFoundException:
+                i = None
+            if not i:
+                # Hard deleted between polls. That is as gone as
+                # deleted, and a failure for any other target.
+                if state == 'deleted':
+                    return None
+                self.fail('Instance %s vanished while awaiting state %s'
+                          % (instance_uuid, state))
             if i['state'] == state:
                 return i
+            # Deleted is the one state nothing leaves, so reaching it
+            # while awaiting another cannot come right by waiting. Error
+            # is not treated the same way, because an errored instance
+            # which has just been asked to delete still reads error
+            # until the delete is picked up.
+            if i['state'] == 'deleted':
+                break
             if time.time() - start_time > timeout:
                 break
             time.sleep(5)
@@ -71,6 +90,12 @@ class TestNamespace(base.BaseNamespacedTestCase):
         self.fail('Instance %s did not reach state %s within %d seconds, it '
                   'is in state %s' % (instance_uuid, state, timeout,
                                       i['state']))
+
+    def _delete_instance_if_present(self, client, instance_uuid):
+        try:
+            client.delete_instance(instance_uuid)
+        except apiclient.ResourceNotFoundException:
+            pass
 
     def test_namespace_delete_refuses_an_errored_instance(self):
         """Issue 4847: an errored instance blocks its namespace's delete.
@@ -101,6 +126,15 @@ class TestNamespace(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None, client=other_client)
+        # Registered after the namespace cleanup so that it runs first:
+        # BaseNamespacedTestCase only tears down instances in
+        # self.namespace, and with this one left behind the namespace
+        # removal would be refused -- which is this test's subject --
+        # and the instance and namespace would both leak. On the
+        # passing path the test has already deleted it, and deleting a
+        # deleted instance is harmless.
+        self.addCleanup(self._delete_instance_if_present, other_client,
+                        inst['uuid'])
         self.addDetail('inst', content.text_content(json.dumps(
             inst, indent=4, sort_keys=True)))
         # An unfetchable image is deferred and retried before the fetch
