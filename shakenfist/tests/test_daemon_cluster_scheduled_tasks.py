@@ -3199,3 +3199,69 @@ class ReconcileSchedulerCapacityTaskTestCase(base.ShakenFistTestCase):
         # never elected or has just restarted.
         st.clear_scheduler_capacity_metrics()
         st.clear_scheduler_capacity_metrics()
+
+
+class SweepQueueLogLabelTestCase(base.ShakenFistTestCase):
+    """Each sweep's log lines must name the queue they report on.
+
+    per_instance_checks_and_usage() read its depth from
+    INSTANCE_CHECKS_QUEUE but called it the per-blob queue, so a log
+    search for the per-blob refill returned the per-instance queue's
+    depth half the time, with nothing in the message to say which was
+    which (#4864).
+    """
+
+    def setUp(self):
+        super().setUp()
+        for work_queue in (st.BLOB_CHECKS_QUEUE, st.INSTANCE_CHECKS_QUEUE):
+            while not work_queue.empty():
+                work_queue.get(block=False)
+
+    def test_queues_carry_distinct_names(self):
+        self.assertEqual('per-blob', st.BLOB_CHECKS_QUEUE.name)
+        self.assertEqual('per-instance', st.INSTANCE_CHECKS_QUEUE.name)
+        self.assertNotEqual(
+            st.BLOB_CHECKS_QUEUE.name, st.INSTANCE_CHECKS_QUEUE.name)
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.LOG')
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks._process_per_blob_queue',
+        return_value=3)
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks._fill_per_blob_queue')
+    def test_per_blob_checks_says_per_blob(
+            self, mock_fill, mock_process, mock_log):
+        def _fill():
+            # Only the depth the refill reports matters here, and the
+            # processing pass is mocked out, so the entry is a sentinel.
+            st.BLOB_CHECKS_QUEUE.put(object())
+        mock_fill.side_effect = _fill
+
+        st.per_blob_checks()
+
+        messages = [c[0][0] for c in mock_log.info.call_args_list]
+        self.assertIn('Refreshed per-blob queue with 1 items', messages)
+        self.assertIn('Processed 3 items from per-blob queue', messages)
+        for message in messages:
+            self.assertNotIn('per-instance', message)
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.LOG')
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.'
+        '_process_per_instance_queue',
+        return_value=2)
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks._fill_per_instance_queue')
+    def test_per_instance_checks_says_per_instance(
+            self, mock_fill, mock_process, mock_log):
+        def _fill():
+            st.INSTANCE_CHECKS_QUEUE.put(object())
+        mock_fill.side_effect = _fill
+
+        st.per_instance_checks_and_usage()
+
+        messages = [c[0][0] for c in mock_log.info.call_args_list]
+        self.assertIn('Refreshed per-instance queue with 1 items', messages)
+        self.assertIn('Processed 2 items from per-instance queue', messages)
+        for message in messages:
+            self.assertNotIn('per-blob', message)
