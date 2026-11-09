@@ -2515,6 +2515,30 @@ class InstanceAgentOperationViewTestCase(base.ShakenFistTestCase):
         self.assertEqual([str(op2.uuid)], self._queued_uuids())
         self.assertIn(str(op1.uuid), self.inst.agent_operations['all'])
 
+    def test_view_skips_a_finished_head_not_yet_retired(self):
+        # Retirement is lazy: a finished operation stays on the dispatch
+        # queue until agent_operation_next() next runs, which on an idle
+        # instance may not be for a while. The view promises only work
+        # which has not finished, so it must not wait for that. The smoke
+        # test found this as the "cloud-init status --wait" operation
+        # which _await_instance_ready() ran, still on the queue after it
+        # had completed.
+        finished = []
+        for terminal_state in (AgentOperation.STATE_COMPLETE,
+                               AgentOperation.STATE_ERROR,
+                               AgentOperation.STATE_EXPIRED):
+            op = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+            if terminal_state == AgentOperation.STATE_COMPLETE:
+                op.state = AgentOperation.STATE_EXECUTING
+            op.state = terminal_state
+            finished.append(str(op.uuid))
+        pending = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        # Nothing has retired them: they are all still on the queue.
+        self.assertEqual(
+            finished + [str(pending.uuid)], self.inst.agent_operations_queued())
+        self.assertEqual([str(pending.uuid)], self._queued_uuids())
+
 
 class AgentOperationDeadlineTestCase(base.ShakenFistTestCase):
     """The deadline and progress bookkeeping an operation carries.
