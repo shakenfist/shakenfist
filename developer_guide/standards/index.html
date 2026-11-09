@@ -15972,6 +15972,19 @@ external dependencies are replaced with <code>mock.patch</code>
 (<code>shakenfist/tests/mock_mariadb.py</code> provides the common database fakes).
 Tests live in <code>shakenfist/tests/</code> as <code>test_&lt;subject&gt;.py</code>, with
 subdirectories for <code>external_api</code>, <code>operations</code> and <code>schema</code>.</p>
+<p>The ansible collection's modules are loaded from source by
+<code>shakenfist/tests/ansible_module_loader.py</code>, which also owns the two
+exceptions a stubbed <code>exit_json()</code> and <code>fail_json()</code> raise:
+<code>ModuleExited</code> and <code>ModuleFailed</code>. Raise those rather than defining a
+local pair, and in particular do not raise a <code>SystemExit</code> subclass to
+mirror what the real <code>AnsibleModule</code> does. A <code>SystemExit</code> is not an
+<code>Exception</code>, so a module which took the other outcome than the one a
+test named escaped both <code>assertRaises()</code> and testtools and killed the
+stestr worker, dropping that worker's remaining tests from the totals
+and reporting a mismatch as a crash rather than as one failed
+assertion. Ordinary exceptions are only safe there while no collection
+module makes a terminal call inside a <code>try</code> which catches <code>Exception</code>,
+which <code>shakenfist/tests/test_ansible_module_loader.py</code> enforces.</p>
 <h2 id="pre-commit-hooks">Pre-commit Hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h2>
 <p>The repository uses pre-commit hooks to validate code before commits:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>pre-commit<span class="w">           </span><span class="c1"># Install pre-commit</span>
