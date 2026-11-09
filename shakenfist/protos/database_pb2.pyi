@@ -84,12 +84,15 @@ class DequeueRequest(_message.Message):
     free-slot count so they fill the pool in one round trip.
     """
     worker_id: _builtins.str
-    """The node name of the worker claiming these items, recorded in
-    work_queue.claimed_by. Without it the server recorded its own
-    node name, so nothing could tell one node's abandoned claim on a
-    shared any-* queue from another node's live one (issue 4652). A
-    client from before this field existed sends nothing, and the
-    server falls back to its own node name as it always did.
+    """The identity of the worker claiming these items, recorded in
+    work_queue.claimed_by: its node uuid, or its node name if it does
+    not know its uuid. Without it the server recorded its own node
+    name, so nothing could tell one node's abandoned claim on a shared
+    any-* queue from another node's live one (issue 4652). A client
+    from before this field existed sends nothing, and the server falls
+    back to its own node name as it always did. A name never matches
+    the uuid a node asks RestartQueueClaimsBy to clear, so such a
+    claim is left to the reaper.
     """
     @_builtins.property
     def queue_names(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
@@ -231,15 +234,38 @@ class RestartQueueRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     QUEUE_NAME_FIELD_NUMBER: _builtins.int
+    queue_name: _builtins.str
+    def __init__(
+        self,
+        *,
+        queue_name: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["queue_name", b"queue_name"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___RestartQueueRequest: _TypeAlias = RestartQueueRequest  # noqa: Y015
+
+@_typing.final
+class RestartQueueClaimsByRequest(_message.Message):
+    """Clear only the claims one worker holds on a queue. The shared any-*
+    queues are drained by every node, so sf-queues' startup reset there
+    must leave a live peer's claims alone (issue 4652). This is a
+    separate RPC rather than a filter field on RestartQueueRequest
+    because an sf-database from before the filter would ignore the field
+    and clear every claim on the queue -- the defect itself -- where an
+    unknown RPC answers UNIMPLEMENTED and the caller can fail closed.
+    An empty claimed_by is refused rather than read as "every claim".
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    QUEUE_NAME_FIELD_NUMBER: _builtins.int
     CLAIMED_BY_FIELD_NUMBER: _builtins.int
     queue_name: _builtins.str
     claimed_by: _builtins.str
-    """When set, only claims whose claimed_by matches are cleared. The
-    shared any-* queues are drained by every node, so sf-queues'
-    startup reset asks for its own claims by name rather than
-    clearing a live peer's (issue 4652). Empty clears every claim on
-    the queue, which is what a single-consumer queue wants.
-    """
     def __init__(
         self,
         *,
@@ -252,7 +278,7 @@ class RestartQueueRequest(_message.Message):
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
-Global___RestartQueueRequest: _TypeAlias = RestartQueueRequest  # noqa: Y015
+Global___RestartQueueClaimsByRequest: _TypeAlias = RestartQueueClaimsByRequest  # noqa: Y015
 
 @_typing.final
 class ListStuckWorkQueueRowsRequest(_message.Message):

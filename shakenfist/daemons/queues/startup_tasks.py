@@ -392,13 +392,15 @@ def recover_interrupted_operations(node_uuid):
     killing it.
 
     A claim this node left on one of the shared any-* queues is recovered on
-    the same basis, but only once claimed_by says it is ours. Every node's
-    sf-queues drains those queues, so a claim there which names another node
-    may be an item that node is running right now. claimed_by is only
-    trustworthy because the dequeue RPC now carries the caller's node name;
-    before that the database daemon recorded its own (#4652). A claim written
-    by an older sf-queues therefore names the database node and is left to
-    the reaper, which is what happened to every such claim before this.
+    the same basis, but only when claimed_by is this node's uuid. Every
+    node's sf-queues drains those queues, so a claim there which names
+    another node may be an item that node is running right now. claimed_by
+    is only trustworthy because the dequeue RPC now carries the caller's
+    identity; before that the database daemon recorded its own node name for
+    every claim made over gRPC (#4652). Matching on the uuid rather than the
+    name is what keeps such a claim, which may be any node's, from looking
+    like the database node's own: it is left to the reaper, which is what
+    happened to every shared-queue claim before this.
 
     This is best effort, item by item: an item which cannot be recovered --
     its operation type no longer exists, say, or the database fails part way
@@ -412,17 +414,14 @@ def recover_interrupted_operations(node_uuid):
                      get_node_background_node_queues(node_uuid))
     shared_queues = set(get_general_user_facing_node_queues() +
                         get_general_background_node_queues())
-    # Fail closed on an unset node name rather than matching every claim
-    # whose claimed_by is empty: a shared queue is only ours by name.
-    node_name = config.NODE_NAME or None
     for row in mariadb.list_stuck_work_queue_rows(0, strict=True):
         queue_name = row['queue_name']
         # A claim on one of our own queues is ours whatever claimed_by
         # says -- nothing else drains them. On a shared queue only
         # claimed_by can tell us apart from a live peer.
         if not (queue_name in own_queues or
-                (queue_name in shared_queues and node_name and
-                 row['claimed_by'] == node_name)):
+                (queue_name in shared_queues and
+                 row['claimed_by'] == node_uuid)):
             continue
         try:
             _recover_interrupted_operation(row)
@@ -522,31 +521,27 @@ def startup_tasks():
     # every claim on one is ours and the reset is unfiltered.
     #
     # The shared any-* queues are drained by every node's sf-queues, so
-    # the reset there names us: clearing a peer's claim hands work which
-    # is still running to a second worker (#4652). It can name us
-    # because the dequeue RPC now carries the caller's node name --
-    # before that, claimed_by was the database daemon's node for every
-    # claim made over gRPC. A claim an older sf-queues left on a shared
-    # queue is therefore still the cluster daemon reaper's to clear,
-    # once it is CLUSTER_OP_STUCK_THRESHOLD old.
-    resets = []
+    # the reset there clears only claims made under this node's uuid:
+    # clearing a peer's claim hands work which is still running to a
+    # second worker (#4652). It can, because the dequeue RPC now carries
+    # the caller's identity -- before that, claimed_by was the database
+    # daemon's node name for every claim made over gRPC. A claim an older
+    # sf-queues left on a shared queue, or one an older sf-database
+    # recorded, carries a name, so it is still the cluster daemon
+    # reaper's to clear once it is CLUSTER_OP_STUCK_THRESHOLD old. So is
+    # every claim on a shared queue while sf-database is too old to
+    # clear one worker's claims: restart_work_queue_claims_by() does
+    # nothing then, rather than clearing them all.
+    own_queues = []
+    shared_queues = []
     if not config.NODE_UUID:
         LOG.warning('NODE_UUID is not set, cannot recover interrupted '
                     'operations or reset this node\'s queue claims')
     else:
-        resets = [(q, '') for q in
-                  get_node_user_facing_node_queues(config.NODE_UUID) +
-                  get_node_background_node_queues(config.NODE_UUID)]
-        if config.NODE_NAME:
-            resets += [(q, config.NODE_NAME) for q in
-                       get_general_user_facing_node_queues() +
-                       get_general_background_node_queues()]
-        else:
-            # An unnamed node cannot say which shared-queue claims are
-            # its own, and an unfiltered reset there is the defect this
-            # guard exists to prevent. Leave them to the reaper.
-            LOG.warning('NODE_NAME is not set, not resetting this node\'s '
-                        'claims on the shared queues')
+        own_queues = (get_node_user_facing_node_queues(config.NODE_UUID) +
+                      get_node_background_node_queues(config.NODE_UUID))
+        shared_queues = (get_general_user_facing_node_queues() +
+                         get_general_background_node_queues())
         try:
             recover_interrupted_operations(config.NODE_UUID)
         except Exception as e:
@@ -556,9 +551,13 @@ def startup_tasks():
             util_exceptions.ignore_exception(
                 'recovering interrupted operations; leaving this node\'s '
                 'claims to the reaper', e)
-            resets = []
-    for queue, claimed_by in resets:
-        mariadb.restart_work_queue(queue, claimed_by=claimed_by)
+            own_queues = []
+            shared_queues = []
+    for queue in own_queues:
+        mariadb.restart_work_queue(queue)
+    for queue in shared_queues:
+        mariadb.restart_work_queue_claims_by(queue, config.NODE_UUID)
+    for queue in own_queues + shared_queues:
         processing, queued, deferred = mariadb.get_work_queue_length(queue)
         LOG.with_fields({
             'processing': processing,

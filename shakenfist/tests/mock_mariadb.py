@@ -1165,6 +1165,13 @@ class MockMariaDB():
         self.test_obj.addCleanup(
             self.mariadb_restart_work_queue.stop)
 
+        self.mariadb_restart_work_queue_claims_by = mock.patch(
+            'shakenfist.mariadb.restart_work_queue_claims_by',
+            side_effect=self._mariadb_restart_work_queue_claims_by)
+        self.mariadb_restart_work_queue_claims_by.start()
+        self.test_obj.addCleanup(
+            self.mariadb_restart_work_queue_claims_by.stop)
+
         self.mariadb_list_stuck_work_queue_rows = mock.patch(
             'shakenfist.mariadb.list_stuck_work_queue_rows',
             side_effect=self._mariadb_list_stuck_work_queue_rows)
@@ -3928,7 +3935,7 @@ class MockMariaDB():
             row['claimed_at'] = now
             # The real dequeue records the claiming node, on both the
             # direct and the gRPC path (issue 4652).
-            row['claimed_by'] = config.NODE_NAME
+            row['claimed_by'] = config.NODE_UUID or config.NODE_NAME
             row['attempts'] = row.get('attempts', 0) + 1
             result.append(
                 (row['queue_name'], str(row['id']),
@@ -3978,12 +3985,22 @@ class MockMariaDB():
             f'deferred={deferred}')
         return processing, queued, deferred
 
-    def _mariadb_restart_work_queue(self, queue_name, claimed_by=''):
-        """Mock implementation of mariadb.restart_work_queue().
+    def _mariadb_restart_work_queue(self, queue_name):
+        """Mock implementation of mariadb.restart_work_queue()."""
+        self._restart_work_queue(queue_name, '')
 
-        A non-empty ``claimed_by`` clears only that worker's claims,
-        as the real SQL does (issue 4652).
+    def _mariadb_restart_work_queue_claims_by(self, queue_name, claimed_by):
+        """Mock implementation of mariadb.restart_work_queue_claims_by().
+
+        Clears only that worker's claims, as the real SQL does (issue
+        4652), and refuses an empty worker as the real one does.
         """
+        if not claimed_by:
+            raise ValueError('claimed_by is required')
+        self._restart_work_queue(queue_name, claimed_by)
+        return True
+
+    def _restart_work_queue(self, queue_name, claimed_by):
         cleared = 0
         for r in self.work_queue_store:
             if (r['queue_name'] == queue_name

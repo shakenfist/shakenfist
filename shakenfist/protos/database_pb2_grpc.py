@@ -59,6 +59,11 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.RestartQueueRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
                 _registered_method=True)
+        self.RestartQueueClaimsBy = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/RestartQueueClaimsBy',
+                request_serializer=database__pb2.RestartQueueClaimsByRequest.SerializeToString,
+                response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
         self.ListStuckWorkQueueRows = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/ListStuckWorkQueueRows',
                 request_serializer=database__pb2.ListStuckWorkQueueRowsRequest.SerializeToString,
@@ -1245,6 +1250,12 @@ class DatabaseServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def RestartQueue(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RestartQueueClaimsBy(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2819,6 +2830,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.RestartQueueRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
+            'RestartQueueClaimsBy': grpc.unary_unary_rpc_method_handler(
+                    servicer.RestartQueueClaimsBy,
+                    request_deserializer=database__pb2.RestartQueueClaimsByRequest.FromString,
+                    response_serializer=database__pb2.StatusReply.SerializeToString,
+            ),
             'ListStuckWorkQueueRows': grpc.unary_unary_rpc_method_handler(
                     servicer.ListStuckWorkQueueRows,
                     request_deserializer=database__pb2.ListStuckWorkQueueRowsRequest.FromString,
@@ -4109,6 +4125,33 @@ class DatabaseService:
             target,
             '/shakenfist.protos.DatabaseService/RestartQueue',
             database__pb2.RestartQueueRequest.SerializeToString,
+            database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RestartQueueClaimsBy(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/RestartQueueClaimsBy',
+            database__pb2.RestartQueueClaimsByRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
             options,
             channel_credentials,

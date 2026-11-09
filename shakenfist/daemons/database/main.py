@@ -110,7 +110,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         (index 0 = top priority); the MariaDB query honours it via
         ``FIELD()``. Items are returned in the same order.
 
-        ``claimed_by`` records the caller's node, not ours: a claim on
+        ``claimed_by`` records the caller's identity, not ours: a claim on
         a shared ``any-*`` queue has to name the node whose worker is
         running the item, or nothing can tell a stopped node's claim
         from a live peer's (issue 4652). A client older than this
@@ -178,19 +178,38 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.RestartQueueRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.StatusReply:
-        """Clear claims on a queue so workers re-pick up the jobs.
-
-        A non-empty ``claimed_by`` clears only that worker's claims,
-        which is how a reset of a shared ``any-*`` queue leaves a live
-        peer's claims alone (issue 4652).
-        """
+        """Clear claims on a queue so workers re-pick up the jobs."""
         try:
             self.monitor.counters['restart_queue'].inc()
+            mariadb._direct_work_queue_restart(request.queue_name)
+            return database_pb2.StatusReply(success=True, error='')
+        except Exception as e:
+            util_exceptions.ignore_exception('database RestartQueue failed', e)
+            return database_pb2.StatusReply(success=False, error=str(e))
+
+    def RestartQueueClaimsBy(
+        self,
+        request: database_pb2.RestartQueueClaimsByRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.StatusReply:
+        """Clear one worker's claims on a queue.
+
+        This is how a reset of a shared ``any-*`` queue leaves a live
+        peer's claims alone (issue 4652). An empty ``claimed_by`` is
+        refused: read as "every claim" it would be exactly the reset
+        this RPC exists to avoid.
+        """
+        try:
+            self.monitor.counters['restart_queue_claims_by'].inc()
+            if not request.claimed_by:
+                return database_pb2.StatusReply(
+                    success=False, error='claimed_by is required')
             mariadb._direct_work_queue_restart(
                 request.queue_name, request.claimed_by)
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
-            util_exceptions.ignore_exception('database RestartQueue failed', e)
+            util_exceptions.ignore_exception(
+                'database RestartQueueClaimsBy failed', e)
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def ListStuckWorkQueueRows(
@@ -6593,7 +6612,8 @@ class Monitor(daemon.WorkerPoolDaemon):
         # Create counters for all operations
         operations = [
             'enqueue', 'dequeue', 'resolve', 'get_queue_length',
-            'restart_queue', 'list_stuck_work_queue_rows',
+            'restart_queue', 'restart_queue_claims_by',
+            'list_stuck_work_queue_rows',
             'clear_work_queue_claim', 'delete_work_queue_row',
             'list_orphaned_cluster_operations',
             'claim_coalescible_siblings_v2',

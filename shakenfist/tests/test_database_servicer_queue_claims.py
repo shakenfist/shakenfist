@@ -70,24 +70,38 @@ class RestartQueueScopeTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._direct_work_queue_restart',
                 return_value=0)
-    def test_a_named_worker_is_passed_through(self, mock_restart):
-        request = database_pb2.RestartQueueRequest(
+    def test_one_workers_claims_are_cleared(self, mock_restart):
+        request = database_pb2.RestartQueueClaimsByRequest(
             queue_name='any-clusteroperation-background',
-            claimed_by='sf-3')
+            claimed_by='6a3c5a8e-0c8a-4a8f-9d77-6f1f4f0f8d11')
 
-        reply = self.servicer.RestartQueue(request, mock.MagicMock())
+        reply = self.servicer.RestartQueueClaimsBy(request, mock.MagicMock())
 
         self.assertTrue(reply.success)
         mock_restart.assert_called_once_with(
-            'any-clusteroperation-background', 'sf-3')
+            'any-clusteroperation-background',
+            '6a3c5a8e-0c8a-4a8f-9d77-6f1f4f0f8d11')
 
     @mock.patch('shakenfist.mariadb._direct_work_queue_restart',
                 return_value=0)
-    def test_no_worker_still_clears_the_whole_queue(self, mock_restart):
+    def test_an_empty_worker_is_refused_not_read_as_everyone(
+            self, mock_restart):
+        # Clearing every claim on a shared queue is the defect itself.
+        request = database_pb2.RestartQueueClaimsByRequest(
+            queue_name='any-clusteroperation-background')
+
+        reply = self.servicer.RestartQueueClaimsBy(request, mock.MagicMock())
+
+        self.assertFalse(reply.success)
+        mock_restart.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_work_queue_restart',
+                return_value=0)
+    def test_restart_queue_still_clears_the_whole_queue(self, mock_restart):
         # The negative control: a queue only one node drains is reset
         # unfiltered, exactly as it always was.
         request = database_pb2.RestartQueueRequest(queue_name='q')
 
         self.servicer.RestartQueue(request, mock.MagicMock())
 
-        mock_restart.assert_called_once_with('q', '')
+        mock_restart.assert_called_once_with('q')

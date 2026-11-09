@@ -597,16 +597,32 @@ It then does the same for the rows this node claimed on the shared
 `any-*` queues, and clears those claims too. A claim on an `any-*`
 queue may be another node's worker running that item right now, so
 both the recovery and the reset there are narrowed to rows whose
-`claimed_by` is this node's name -- and `claimed_by` can be trusted
-because the `Dequeue` RPC carries the caller's node name in
-`worker_id`, which the server records. Before that it recorded its own
-node name, so every claim made over gRPC looked like the database
-node's, and these claims had to be left to the reaper
-(issue 4652). A claim an sf-queues from before that change left on a
-shared queue still names the database node, so it is still the
-reaper's. The reset of this node's own queues is deliberately not
-narrowed: nothing else drains them, so every claim on one is this
-node's regardless of what `claimed_by` says.
+`claimed_by` is this node's **uuid**. That can be trusted because the
+`Dequeue` RPC carries the caller's identity in `worker_id` (its node
+uuid, or its name if it has not resolved one), which the server
+records. Before issue 4652 the server recorded its own node name, so
+every claim made over gRPC looked like the database node's.
+
+The match is on the uuid rather than the name because of what is
+still written under a name. An sf-database still records its own name
+for a client from before `worker_id`, and every claim made over gRPC
+before the upgrade carries it too. Matched by name, the database
+node's own sf-queues would take all of those claims for its own,
+including live claims of its peers. No name ever equals a uuid, so
+such claims are left to the reaper, as every shared-queue claim was
+before.
+
+The narrowed reset is its own RPC, `RestartQueueClaimsBy`, not a
+filter field on `RestartQueue`. An sf-database from before it would
+ignore an unknown field and clear every claim on the queue, which is
+the defect itself. An unknown RPC answers `UNIMPLEMENTED` instead, and
+the client then clears nothing and leaves the claims to the reaper.
+That makes a rolling upgrade safe in either order. The server also
+refuses an empty `claimed_by` rather than treating it as "everyone".
+
+The reset of this node's own queues is deliberately not narrowed:
+nothing else drains them, so every claim on one is this node's,
+whatever `claimed_by` says.
 Recovery is best effort, one item at a time. An item it cannot recover,
 for example because its operation type no longer exists, is logged and
 left for the reaper. If the claims cannot be listed at all, startup

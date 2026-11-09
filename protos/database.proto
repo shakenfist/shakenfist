@@ -11,6 +11,7 @@ service DatabaseService {
   rpc Resolve (ResolveRequest) returns (StatusReply) {}
   rpc GetQueueLength (QueueLengthRequest) returns (QueueLengthReply) {}
   rpc RestartQueue (RestartQueueRequest) returns (StatusReply) {}
+  rpc RestartQueueClaimsBy (RestartQueueClaimsByRequest) returns (StatusReply) {}
   rpc ListStuckWorkQueueRows (ListStuckWorkQueueRowsRequest) returns (ListStuckWorkQueueRowsReply) {}
   rpc ClearWorkQueueClaim (ClearWorkQueueClaimRequest) returns (StatusReply) {}
   rpc DeleteWorkQueueRow (DeleteWorkQueueRowRequest) returns (StatusReply) {}
@@ -470,12 +471,15 @@ message DequeueRequest {
   // want one-at-a-time behaviour pass 1; pool workers pass their
   // free-slot count so they fill the pool in one round trip.
   int32 limit = 2;
-  // The node name of the worker claiming these items, recorded in
-  // work_queue.claimed_by. Without it the server recorded its own
-  // node name, so nothing could tell one node's abandoned claim on a
-  // shared any-* queue from another node's live one (issue 4652). A
-  // client from before this field existed sends nothing, and the
-  // server falls back to its own node name as it always did.
+  // The identity of the worker claiming these items, recorded in
+  // work_queue.claimed_by: its node uuid, or its node name if it does
+  // not know its uuid. Without it the server recorded its own node
+  // name, so nothing could tell one node's abandoned claim on a shared
+  // any-* queue from another node's live one (issue 4652). A client
+  // from before this field existed sends nothing, and the server falls
+  // back to its own node name as it always did. A name never matches
+  // the uuid a node asks RestartQueueClaimsBy to clear, so such a
+  // claim is left to the reaper.
   string worker_id = 3;
 }
 
@@ -506,11 +510,18 @@ message QueueLengthReply {
 
 message RestartQueueRequest {
   string queue_name = 1;
-  // When set, only claims whose claimed_by matches are cleared. The
-  // shared any-* queues are drained by every node, so sf-queues'
-  // startup reset asks for its own claims by name rather than
-  // clearing a live peer's (issue 4652). Empty clears every claim on
-  // the queue, which is what a single-consumer queue wants.
+}
+
+// Clear only the claims one worker holds on a queue. The shared any-*
+// queues are drained by every node, so sf-queues' startup reset there
+// must leave a live peer's claims alone (issue 4652). This is a
+// separate RPC rather than a filter field on RestartQueueRequest
+// because an sf-database from before the filter would ignore the field
+// and clear every claim on the queue -- the defect itself -- where an
+// unknown RPC answers UNIMPLEMENTED and the caller can fail closed.
+// An empty claimed_by is refused rather than read as "every claim".
+message RestartQueueClaimsByRequest {
+  string queue_name = 1;
   string claimed_by = 2;
 }
 
