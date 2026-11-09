@@ -731,7 +731,7 @@ python3 tools/ci_headroom_health.py /tmp/headroom.jsonl
 | Check | Fails when |
 |---|---|
 | window age | the newest harvested run is more than 14 days old, so the listing served a stale window |
-| records harvested | fewer than 18 records -- three instrumented jobs in each of six of the ten merge runs -- so bundles stopped arriving at all |
+| records harvested | fewer than 12 records -- the two instrumented merge lanes in each of six of the ten merge runs -- so bundles stopped arriving at all |
 | series present rate | under 90% of records carry a summarised series, or any record claims a series and has no summary |
 | usable samples per record | a record holds fewer samples than the band gate's floor, or than 5 on a lane the gate is not armed on |
 | failed samples | any sample failed, which no record in the committed datasets does |

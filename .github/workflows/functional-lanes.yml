@@ -222,8 +222,12 @@ jobs:
     # this is the backstop for the setup and teardown around them, and
     # is still far short of GitHub's six hour default.
     timeout-minutes: 180
-    # Keyed as the queue jobs of functional-tests.yml are, for the
-    # reasons given on automated_delinter there.
+    # The same key smoke-cluster.yml gives every other lane, so this lane
+    # behaves as they do wherever it runs. The merge_group arm cannot fire
+    # while the lane is weekly; it is kept so that moving the lane back into
+    # the merge queue needs no edit here (see automated_delinter in
+    # functional-tests.yml for why the queue wants it). The seam test reads
+    # the lane name from this group, so it must stay in it.
     concurrency:
       group: >-
         ${{ github.workflow }}-node-lifecycle-collection-${{
@@ -334,11 +338,13 @@ jobs:
 
       - name: Restart Shaken Fist nodes so we can collect logs
         if: always()
-        # Log collection is best effort: the functional tests above are
-        # the merge gate. Nodes failing to return from the post-test
-        # reboot has burned three merge queue attempts where the tests
-        # themselves passed. The script still dumps instance state and
-        # guest consoles so the boot wedge stays diagnosable.
+        # Log collection is best effort: this lane deliberately breaks
+        # nodes, and a node which does not return from the post-test
+        # reboot is not a failure of the code under test. That was
+        # established while the lane gated merges, when a boot wedge
+        # burned three merge queue attempts whose tests had passed. The
+        # script still dumps instance state and guest consoles so the
+        # boot wedge stays diagnosable.
         continue-on-error: true
         run: |
           . ${GITHUB_WORKSPACE}/ci-environment.sh

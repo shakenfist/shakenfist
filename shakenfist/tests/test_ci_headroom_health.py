@@ -36,7 +36,10 @@ import os
 import shutil
 import tempfile
 
+import yaml
+
 from shakenfist.tests import base
+from shakenfist.tests import test_functional_lanes_workflow_seams as lane_seams
 from shakenfist.tests import test_headroom_gate_workflow_seams as gate_seams
 
 
@@ -45,6 +48,10 @@ TOOLS = os.path.join(
     'tools')
 HEALTH_PATH = os.path.join(TOOLS, 'ci_headroom_health.py')
 REPORT_PATH = os.path.join(TOOLS, 'ci_headroom_report.py')
+HARVEST_PATH = os.path.join(TOOLS, 'ci_headroom_harvest.py')
+WORKFLOWS = os.path.join(os.path.dirname(TOOLS), '.github', 'workflows')
+SIZING_DOC = os.path.join(os.path.dirname(TOOLS), 'docs', 'developer_guide', 'ci_cloud_sizing.md')
+SMOKE_CLUSTER = 'shakenfist/actions/.github/workflows/smoke-cluster.yml@'
 
 
 def _load(name, path):
@@ -56,6 +63,7 @@ def _load(name, path):
 
 health = _load('ci_headroom_health_under_test', HEALTH_PATH)
 report = _load('ci_headroom_report_for_health', REPORT_PATH)
+harvest = _load('ci_headroom_harvest_for_health', HARVEST_PATH)
 
 PROBE_INTERVAL = 15.0
 
@@ -275,6 +283,66 @@ class LaneTestCase(HealthTestCase):
         self.assertEqual(1, status, out)
         self.assertIn('FAIL gate withheld', out)
         self.assertIn('32 on ungated lanes', out)
+
+
+def _workflow(name):
+    with open(os.path.join(WORKFLOWS, name)) as handle:
+        return yaml.safe_load(handle)
+
+
+def _lane_bundles(testcase, job_id, job):
+    """Every bundle artifact name a lane's job uploads.
+
+    A lane which calls smoke-cluster.yml gets the name that workflow builds,
+    bundle-<component>-<tier>-<concurrency_key>; a lane which runs its own
+    steps names its bundle in its own upload step.
+    """
+    if (job.get('uses') or '').startswith(SMOKE_CLUSTER):
+        inputs = job.get('with') or {}
+        return ['bundle-%s-%s-%s' % (inputs['component'], inputs['tier'], inputs['concurrency_key'])]
+    bundles = [step['with']['name'] for step in job.get('steps') or []
+               if (step.get('uses') or '').startswith('actions/upload-artifact@')
+               and str((step.get('with') or {}).get('name', '')).startswith(harvest.BUNDLE_PREFIX)]
+    testcase.assertTrue(bundles, 'Lane job %s uploads no bundle this test can find.' % job_id)
+    return bundles
+
+
+class RecordFloorTestCase(HealthTestCase):
+    def test_the_instrumented_merge_lanes_are_the_ones_the_queue_runs(self):
+        # MIN_RECORDS is a count of records per merge run, so it is wrong the
+        # moment a lane enters or leaves the merge queue -- and the first
+        # symptom would otherwise be a red scheduled run of the check this
+        # floor belongs to. Derive the lanes which bank a record on every
+        # code-changing merge from the workflows and the harvest's own table.
+        workflow_name, job_id = lane_seams.MERGE_CALLER
+        merge_lanes = json.loads(_workflow(workflow_name)['jobs'][job_id]['with']['lanes'])
+        lanes_jobs = _workflow(lane_seams.LANES_WORKFLOW)['jobs']
+        by_lane = {}
+        for lane_job_id, job in lanes_jobs.items():
+            match = lane_seams.LANE_GATE.match(job.get('if', ''))
+            if match:
+                by_lane[match.group(1)] = lane_job_id
+
+        instrumented = []
+        for lane in merge_lanes:
+            lane_job_id = by_lane[lane]
+            for bundle in _lane_bundles(self, lane_job_id, lanes_jobs[lane_job_id]):
+                if bundle in harvest.UNINSTRUMENTED_BUNDLES:
+                    continue
+                self.assertIn(
+                    bundle, harvest.BUNDLE_TOPOLOGIES,
+                    'Merge lane %s uploads %s, which the harvest cannot classify.' % (lane, bundle))
+                instrumented.append(lane)
+        self.assertEqual(
+            sorted(instrumented), sorted(health.INSTRUMENTED_MERGE_LANES),
+            'The merge queue runs a different set of instrumented lanes than '
+            'INSTRUMENTED_MERGE_LANES names, so MIN_RECORDS is scaled to the '
+            'wrong number of records per merge run.')
+
+    def test_the_sizing_guide_states_the_floor_in_force(self):
+        with open(SIZING_DOC) as handle:
+            text = handle.read()
+        self.assertIn('fewer than %d records' % health.MIN_RECORDS, text)
 
 
 class SeriesPresenceTestCase(HealthTestCase):

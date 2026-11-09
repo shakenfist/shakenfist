@@ -98,13 +98,15 @@ class FunctionalLanesWorkflowSeamsTestCase(base.ShakenFistTestCase):
                     '%s job %s is gated on %r but its concurrency_key is %r.'
                     % (LANES_WORKFLOW, job_id, lane, key))
             else:
+                # Delimited, so a lane named 'node' is not satisfied by a
+                # group keyed on 'node-lifecycle'.
                 group = (job.get('concurrency') or {}).get('group') or ''
-                self.assertIn(
-                    lane, group,
-                    '%s job %s is gated on %r, but that name is not in its '
-                    'concurrency group %r. A lane which runs its own steps '
-                    'passes no concurrency_key, so its concurrency group is '
-                    'where its name has to appear.'
+                self.assertRegex(
+                    group, r'-%s-' % re.escape(lane),
+                    '%s job %s is gated on %r, but that name is not a '
+                    'hyphen-delimited segment of its concurrency group %r. A '
+                    'lane which runs its own steps passes no concurrency_key, '
+                    'so its concurrency group is where its name has to appear.'
                     % (LANES_WORKFLOW, job_id, lane, group))
 
     def test_the_callers_are_the_ones_expected(self):

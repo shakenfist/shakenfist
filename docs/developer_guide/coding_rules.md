@@ -370,8 +370,12 @@ run on `merge_group`. A green PR therefore says nothing about whether those
 tests pass, or whether they can even reach their first assertion. Some lanes
 do not run in the merge queue at all, only weekly: the Ubuntu base image, the
 `slim-tier` topology with Kerbside, and a single machine (see
-[Merge lanes and weekly lanes](ci.md#merge-lanes-and-weekly-lanes)). To run
-those against a branch, dispatch `scheduled-tests.yml` on it.
+[Merge lanes and weekly lanes](ci.md#merge-lanes-and-weekly-lanes)). The
+Ansible modules and Node lifecycle suites (`ansiblemoduletests.sh` and
+`nodelifecycletests.sh`, shell scripts rather than `cluster_ci_tests/`
+lanes) also run only weekly, so neither a pull request nor a retest in the
+merge queue exercises them. To run any of those against a branch, dispatch
+`scheduled-tests.yml` on it.
 
 `cluster_ci_tests/test_federation.py` sat through four commits registering a
 trusted issuer with an `http://` `jwks_uri` while the API had refused

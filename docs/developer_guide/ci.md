@@ -75,6 +75,15 @@ teardown powers nodes off and the reusable workflow's does not. It has no
 `concurrency_key` to pass, so its own `concurrency.group` carries the lane
 name, and the seam test reads it from there.
 
+A weekly run now deploys all five weekly lanes at once: twenty-two nested
+instances (six each for the three `slim-primary` lanes, three for
+`slim-tier`, one for `localhost`; see `ci-topology-*.yml` in
+`shakenfist/actions`). That is two fewer than every code-changing merge
+deployed before these two lanes left the queue -- four six-instance
+`slim-primary` clusters, at whatever hour the merge happened -- so the
+weekly peak is smaller than one the under-cloud already carried routinely,
+and it now lands in the quietest window of the week.
+
 A weekly lane blocks nothing, so its failures have to reach a person some
 other way. When `weekly_lanes` fails, `report_failures` runs
 `tools/ci_report_scheduled_failures.py`, which files one issue per failed
@@ -591,8 +600,10 @@ Every job that can run in the queue and holds a scarce runner carries a
 `concurrency:` block whose key is merge-group aware — the merge lanes
 `functional_lanes` selects, through the shared `smoke-cluster.yml`, and
 `schema_enum_widening` and `automated_delinter` in this repository. The
-weekly lanes need none of this, since a weekly run has no merge group to be
-superseded by.
+weekly lanes carry the same key -- through `smoke-cluster.yml`, or for Node
+lifecycle in its own job -- but need none of it, since a weekly run has no
+merge group to be superseded by; the key's merge group arm is kept so that a
+lane can move back into the queue without an edit.
 `sanity_checks` holds only a static runner, but is keyed the same way so that
 a superseded queue run does not finish its lint and unit tests either.
 
