@@ -16992,13 +16992,13 @@ rather than merge requests.</p>
 <tr>
 <td>10. Cross-version matrix and derived-profile validation</td>
 <td><a href="/components/instar/plans/PLAN-bat-population-phase-10-matrix/">PLAN-bat-population-phase-10-matrix.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>e0b0fe13</code> (#881)</td>
 </tr>
 <tr>
 <td>11. Coverage and differential fuzzing</td>
-<td>PLAN-bat-population-phase-11-fuzz.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-bat-population-phase-11-fuzz/">PLAN-bat-population-phase-11-fuzz.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -17238,9 +17238,25 @@ and the filler's invariants (every payload entry in range, every
 sector-bitmap slot zero, offsets strictly increasing and 1 MiB
 aligned, nothing past the region), adds a target for the filler at
 arbitrary index ranges, and teaches the differential fuzzer's create
-and convert pickers the fixed subformat, <code>block_state_zero</code>, the
-non-qcow2 preallocation modes and monolithicFlat, comparing through
-the structural comparator for VHDX.</p>
+picker the fixed subformat, <code>block_state_zero</code>, the non-qcow2
+preallocation modes and monolithicFlat.</p>
+<p>Phase 11's survey corrected four things this paragraph used to
+assume. The differential fuzzer hand-mirrors
+<code>tests/helpers/info_json.py</code> and the mirror never gained phase 10's
+sibling-file rule, so a monolithicFlat pick would report the two
+sides' differing <code>-flat</code> extent paths as a divergence on every
+iteration; the mirror is replaced by an import before any picker
+changes. The fuzzer excludes the <code>vhd</code> create target entirely for a
+CHS virtual-size rounding divergence that is still live, so the
+non-qcow2 preallocation coverage reaches vmdk and vhdx only, and
+vpc's no-op stays covered by the host tests and phase 10's
+baselines. There is no convert <em>picker</em> to teach: <code>op_convert</code>
+chooses only raw and qcow2, and for non-raw targets it flattens both
+outputs to raw and compares bytes -- an oracle blind to every layout
+property the fixed subformat exists to get right -- so phase 11 adds
+a structural comparison arm rather than a picker entry. And the
+comment in <code>fuzz_create_emitters</code> saying fixed output reaches no
+caller has been false since phases 7 and 8.</p>
 <p><strong>Phase 12</strong> carries the cross-cutting documentation. Per-phase pages
 change in their own phases (see the constraints below); phase 12 is
 for <code>docs/format-coverage.md</code>'s output-side rows and notes,
@@ -17819,6 +17835,70 @@ canonical copy lives in shakenfist/development at
 encountered, and anything else we should one day do but have
 chosen to defer to here, so that we do not forget them.</p>
 <ul>
+<li>The differential fuzzer's fixed VHDX convert arm is reachable only
+  when the source's virtual size exactly equals a pinned fixed
+  geometry's, which after the filters is 16M or 64M, and then at
+  probability 0.5 -- so roughly 8% of vhdx convert iterations exercise
+  the subject of this plan. Biasing the convert source size toward the
+  pinned geometries would fix it, but it shifts the fuzzer's draw
+  sequence, so it wants measuring rather than tacking onto a review
+  round. The <code>structural_outcomes</code> counts in the run summary now make
+  the balance visible without re-measuring it by hand.</li>
+<li>Nothing re-checks that every option the differential fuzzer's create
+  picker draws is still reachable. The plan makes "an option that is
+  never drawn is not coverage" a reportable failure, and phase 11d
+  measured hit counts for each new shape at a fixed seed by hand, but a
+  later edit that made <code>monolithicFlat</code>, <code>block_state_zero=off</code> or a
+  fixed VHDX geometry unreachable -- a mis-ordered <code>rng.choice</code>, a size
+  list that excludes every pinned geometry -- would pass CI silently. A
+  seeded test that draws a few thousand times and asserts each
+  documented shape appears at least once would close it. Raised in
+  review on the phase 11 pull request and deferred as its own task
+  rather than grown into that review.</li>
+<li><code>op_dd</code> in <code>scripts/differential-fuzz.py</code> compares a VHDX target the
+  same layout-blind way <code>op_convert</code> used to -- its docstring says
+  "Mirrors <code>op_convert</code>" -- so the structural comparison phase 11 added
+  for convert is a call away but not yet wired in. <code>compare_vhdx_structure</code>
+  takes the expected virtual size, which <code>dd</code> would have to probe rather
+  than being told. Phase 11 deliberately left <code>op_dd</code> alone as outside
+  its row.</li>
+<li>Dynamic VHDX convert has a pin for only two of the six source sizes
+  the differential fuzzer draws, so most dynamic iterations parse the
+  output and then have no reference to compare it against. Found while
+  measuring phase 11's structural coverage: of 184 dynamic draws in a
+  200-iteration run, 57 parsed cleanly with no pin for their geometry.
+  Adding the missing dynamic pins would widen that coverage
+  independently of #883.</li>
+<li>qemu-img writes a fixed VHDX it cannot then read, at a geometry
+  whose last payload block is partial and with <code>block_state_zero=off</code>.
+  Measured on qemu-img 10.0.13: creating a 4608.5M image with 1 MiB
+  blocks succeeds, and <code>qemu-img info</code> on it then fails with "VHDX BAT
+  entry 4609 end offset ... points after end of file ... Image has
+  probably been truncated". This is the other tool's defect, not
+  instar's #879, and the two should not be conflated when either is
+  worked on; it is why phase 11's create picker holds fixed sizes to
+  whole multiples of the block size. Worth reporting upstream, and
+  worth a quirks entry once someone decides which of the two tools is
+  right about such a geometry.</li>
+<li><code>src/fuzz</code> is excluded from the cargo workspace
+  (<code>src/Cargo.toml</code>, <code>exclude = ["fuzz"]</code>), so neither <code>make lint</code> nor
+  CI's rustfmt and clippy has ever checked a fuzz target. Found while
+  adding phase 11's VHDX invariants. Bringing the fuzz crate under the
+  workspace lints, or giving it its own lint step, would want a pass
+  over the existing 43 targets' formatting first.</li>
+<li>A <code>vpc</code> create target for the differential fuzzer. It is excluded
+  today (<code>scripts/differential-fuzz.py</code>'s <code>_create_option_picker</code>)
+  because qemu-img rounds a VHD's virtual size up to CHS geometry and
+  instar writes the exact byte count, so every iteration would
+  diverge on <code>virtual-size</code> for a reason unrelated to whatever else
+  it is testing. Closing it means either resolving that divergence or
+  masking the field, and masking it blinds the comparison to the
+  field most worth checking in a VHD writer. Phase 11 left it out,
+  which is why the differential fuzzer covers the non-qcow2
+  preallocation no-op for vmdk and vhdx but not vpc; the five
+  <code>KNOWN_WRITER_DIVERGENCES</code> vhd entries in <code>tests/test_create.py</code>
+  and the two <code>test_vpc_*_noop_preallocation</code> tests are the current
+  coverage.</li>
 <li>VMDK <code>twoGbMaxExtentSparse</code> and <code>twoGbMaxExtentFlat</code> output, the
   remaining leaf of the same goal. The streaming filler this plan
   builds is the shape a grain-table writer would want; the multiple
