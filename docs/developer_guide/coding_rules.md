@@ -268,8 +268,8 @@ When a guard lists the states it lets through, check each one against the
 state machine: can an object leave this state, and does it still hold anything
 while it is in it? `deleted` is the only state which answers no to both.
 Test the guard against every state on the failing path, not just the one the
-guard was written for: each of those is a moment a caller can retry. See the comment in
-`AuthNamespaceEndpoint.delete()` in `shakenfist/external_api/auth.py`.
+guard was written for: each of those is a moment a caller can retry. See the
+comment in `AuthNamespaceEndpoint.delete()` in `shakenfist/external_api/auth.py`.
 
 ## `or []` is a decision about what a failed read means
 

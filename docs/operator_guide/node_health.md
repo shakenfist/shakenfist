@@ -125,6 +125,14 @@ instances that were errored when the node failed stay in `<state>-error`
 — snapshot or delete them as you see fit; they are not automatically
 revived.
 
+An errored instance still counts against its namespace: a namespace cannot
+be deleted while it holds an instance in any state but `deleted`, so delete
+the errored instances first. That delete is carried out by the instance's own
+node, so it needs the node back in service. If the node is gone for good,
+deleting the node does not currently clean up its errored instances either
+(issue 4868), and such an instance blocks its namespace's delete until that
+is fixed.
+
 ## Configuration
 
 | Setting | Default | Purpose |

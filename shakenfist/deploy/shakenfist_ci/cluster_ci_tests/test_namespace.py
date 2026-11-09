@@ -91,9 +91,13 @@ class TestNamespace(base.BaseNamespacedTestCase):
                   'is in state %s' % (instance_uuid, state, timeout,
                                       i['state']))
 
-    def _delete_instance_if_present(self, client, instance_uuid):
+    def _delete_instance_if_present(self, instance_uuid):
+        # Through system rather than the instance's own namespace: on
+        # the passing path that namespace has been deleted by the time
+        # this runs, and a deleted namespace's credential is refused
+        # with a 401 however harmless the request.
         try:
-            client.delete_instance(instance_uuid)
+            self.system_client.delete_instance(instance_uuid)
         except apiclient.ResourceNotFoundException:
             pass
 
@@ -131,10 +135,9 @@ class TestNamespace(base.BaseNamespacedTestCase):
         # self.namespace, and with this one left behind the namespace
         # removal would be refused -- which is this test's subject --
         # and the instance and namespace would both leak. On the
-        # passing path the test has already deleted it, and deleting a
-        # deleted instance is harmless.
-        self.addCleanup(self._delete_instance_if_present, other_client,
-                        inst['uuid'])
+        # passing path the test has already deleted both the instance
+        # and its namespace, so the cleanup must not need either.
+        self.addCleanup(self._delete_instance_if_present, inst['uuid'])
         self.addDetail('inst', content.text_content(json.dumps(
             inst, indent=4, sort_keys=True)))
         # An unfetchable image is deferred and retried before the fetch

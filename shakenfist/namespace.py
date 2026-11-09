@@ -392,6 +392,12 @@ class Namespace(dbo):
         # namespace delete, or an instance left behind by a release
         # which counted an errored instance as already gone.
         #
+        # Instances only. A network is reachable only through its
+        # namespace too, and the REST handler still lets an errored or
+        # delete-waiting one through, so a network can arrive here in
+        # the same way and is not swept. That gap is issue 4863's, and
+        # its fix belongs with the handler's network check.
+        #
         # The delete is enqueued rather than the row being hard deleted
         # here, because the disks, interfaces and placement are the
         # point: hard deleting the row would release the capacity but
@@ -410,7 +416,10 @@ class Namespace(dbo):
         # re-enqueueing a doomed delete on every pass. The refusal in
         # the REST handler is the real guard; this only catches what
         # got past it, and the audit event below says so on the
-        # instance where an operator will find it.
+        # instance where an operator will find it. The event is worded
+        # as an attempt and written first: enqueue_delete() can return
+        # without enqueueing (and events that itself) or raise, and in
+        # either case the event should still be true.
         #
         # It runs after the key, rule, trust and claim removals rather
         # than first, because enqueue_delete() raises
@@ -437,8 +446,8 @@ class Namespace(dbo):
                     continue
                 i.add_event(
                     EVENT_TYPE_AUDIT,
-                    'deletion request from namespace hard delete, instance '
-                    'outlived its namespace', log_as_error=True)
+                    'attempting deletion from namespace hard delete, '
+                    'instance outlived its namespace', log_as_error=True)
                 i.enqueue_delete()
 
         mariadb.delete_namespace_attributes(self.uuid)

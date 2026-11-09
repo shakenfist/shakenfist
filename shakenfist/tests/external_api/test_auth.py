@@ -421,6 +421,8 @@ class AuthWithLingeringInstance(base.ShakenFistTestCase):
 
         resp = self._delete_namespace_foo()
         self.assertEqual(400, resp.status_code)
+        self.assertEqual(dbo.STATE_CREATED,
+                         Namespace.from_db('foo').state.value)
 
     def test_delete_namespace_with_delete_wait_error_instance(self):
         # The state an instance whose delete failed passes through on
@@ -434,6 +436,8 @@ class AuthWithLingeringInstance(base.ShakenFistTestCase):
 
         resp = self._delete_namespace_foo()
         self.assertEqual(400, resp.status_code)
+        self.assertEqual(dbo.STATE_CREATED,
+                         Namespace.from_db('foo').state.value)
 
     def test_delete_namespace_with_deleted_instance(self):
         # A deleted instance has released everything it held and the

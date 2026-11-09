@@ -40,6 +40,9 @@ class HardDeleteSweepsInstancesTestCase(base.ShakenFistTestCase):
             name='orphan', namespace='doomed', set_state=dbo.STATE_ERROR)
 
         self.assertEqual([str(inst.uuid)], self._hard_delete_doomed())
+        # The sweep is one attempt alongside the namespace's own rows,
+        # not a reason to hold them back.
+        self.assertIsNone(Namespace.from_db('doomed'))
 
     def test_live_instance_is_deleted(self):
         # A create which raced the namespace delete.
@@ -76,8 +79,8 @@ class HardDeleteSweepsInstancesTestCase(base.ShakenFistTestCase):
 
         messages = [c.args[1] for c in ae.call_args_list]
         self.assertIn(
-            'deletion request from namespace hard delete, instance '
-            'outlived its namespace', messages)
+            'attempting deletion from namespace hard delete, '
+            'instance outlived its namespace', messages)
 
     def test_system_does_not_sweep_the_cluster(self):
         # The object iterator reads a namespace of 'system' as "every

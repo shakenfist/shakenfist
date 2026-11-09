@@ -330,7 +330,9 @@ would ever find it. An errored instance has to be deleted (which is permitted
 from `error`, and may be retried) before its namespace can be. As a backstop,
 `Namespace.hard_delete()` enqueues the delete of any instance which reaches it
 anyway, alongside the keys, mapping rules, trusts and capacity claims it
-sweeps.
+sweeps. Networks are not yet held to the same rule: the delete handler still
+counts an errored or delete-waiting network as gone, and the backstop does
+not sweep networks (issue 4863).
 
 ## Networks
 
