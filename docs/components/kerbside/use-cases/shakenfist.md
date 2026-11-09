@@ -258,6 +258,22 @@ Fist API, to ask for a console, and Kerbside, at the address
 `KERBSIDE_URL` names, both to exchange the token and to run the
 SPICE session. Nothing needs a route to a hypervisor.
 
+### Clocks
+
+The token carries `exp`, and Shaken Fist stamps `iat` on the
+host that minted it, so Kerbside's clock and the minting host's
+must agree. Kerbside allows them to disagree by up to 30
+seconds in either direction before it refuses a token:
+earlier than that and the token has genuinely expired, later
+and `/sf-console.vv` answers `401 token is not valid yet`. Both
+hosts running NTP is enough; a host whose clock has never been
+set is not.
+
+A token that fails this way names the clock in the rejection.
+Before Kerbside tolerated any skew at all, the same failure was
+reported as `401 invalid token signature`, which pointed at the
+cached signing keys instead.
+
 ### Kerbside side
 
 Add a Shaken Fist source to `sources.yaml`:

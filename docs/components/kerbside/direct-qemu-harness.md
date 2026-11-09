@@ -154,12 +154,22 @@ grep 'backend link capabilities' /tmp/kerbside-rust-proxy-verify/rust-proxy.log
 
 Each line carries `sent_channel_caps` (the client's, forwarded) and
 `backend_channel_caps` (qemu's reply). On the display channel ryll
-sends `[7039]`; any other value there is the client's own set. A
-`backend lacks capabilities Kerbside offered the client` warning means
-qemu's spice-server was built without a capability the proxy offers by
-default, such as Opus. A backend that lacks MINI_HEADER, AUTH_SELECTION or
-AUTH_SPICE is not a warning: the backend connect fails and is audited
-as a hypervisor connection failure.
+sends `[7039]`; any other value there is the client's own set.
+
+Where qemu's reply lacks a capability the proxy offered the client,
+the proxy says so, at one of two levels. A capability a backend of
+that channel type may legitimately not have — Opus on either sound
+channel, LZ4 on usbredir, port or webdav, `PREF_COMPRESSION` on a
+streaming-agent display channel — is a DEBUG line saying "which a
+backend of this channel type may legitimately not have". These are
+build options, so they are normal; they were a warning until they
+were measured firing on every channel of every session. Anything else
+is a WARN saying "every implementation of this channel type sets",
+which means a backend that is not the spice-server the offer assumed.
+
+A backend that lacks MINI_HEADER, AUTH_SELECTION or AUTH_SPICE is
+neither: the backend connect fails and is audited as a hypervisor
+connection failure.
 
 `assert-firewall` (with the default `FIREWALL_EXPECT=clean`) waits for
 a real session — `kerbside_proxy_authorized_total >= 1` and

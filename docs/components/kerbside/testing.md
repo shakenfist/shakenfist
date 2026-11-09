@@ -97,7 +97,7 @@ change.
 | `functional-tests.yml` (`ovirt_matrix`, `openstack_matrix`) | nightly (04:30 UTC), workflow_dispatch | nightly |
 | `proxmox-functional.yml` | nightly (05:30 UTC), workflow_dispatch, and pull_request path-filtered to the Proxmox path; see "The Proxmox end-to-end lane" below (advisory, never in the merge queue) | nightly |
 | `direct-qemu-functional.yml` | pull_request, merge_group, nightly | smoke |
-| `sf-e2e-functional.yml` | pull_request, merge_group, nightly | smoke |
+| `sf-e2e-functional.yml` | pull_request, merge_group, nightly (02:30 UTC), workflow_dispatch | smoke |
 | `rust.yml` | push and pull_request, path-filtered to `rust/**` and the proto | neither (advisory) |
 | `demo-compose.yml` | push and pull_request, path-filtered to `demo/**`, `tools/demo/**`, the migrations, the proto, `pyproject.toml` and `docs/installation.md` | neither (advisory) |
 | `mermaid-lint.yml` | pull_request, path-filtered to `**.md` excluding `REVIEWS.md`; workflow_dispatch | neither (advisory) |
@@ -800,10 +800,21 @@ expiry, wrong audience, unknown kid, and cross-namespace mint.
 
 Driver scripts live in `tools/sf-e2e/` (see
 `tools/sf-e2e/README.md`). It is a smoke-tier PR gate, and also runs
-nightly and on dispatch. Every run uploads an artifact bundle with the
-Kerbside unit journals and the ryll, SF daemon and libvirt logs,
-redacted before upload; the README's Security section lists what is
-collected.
+nightly and on dispatch. Two things run it against develop: the 02:30
+cron, and the Shaken Fist conductor's periodic tier, which dispatches
+it on develop -- sf-e2e is the only lane here the conductor
+dispatches, which is why the other lanes' failure-issue jobs are
+cron-only. A failing run against develop files or updates the
+"Nightly sf-e2e lane failing" tracking issue, because nothing else
+runs the lane against develop itself and a red entry in the Actions
+tab alerts nobody. A dispatch on any other ref is the interactive
+debugging case: it says nothing about develop's coverage and files
+nothing, and nor does a pull request, whose red is already visible
+there.
+
+Every run uploads an artifact bundle with the Kerbside unit journals
+and the ryll, SF daemon and libvirt logs, redacted before upload; the
+README's Security section lists what is collected.
 
 The exchange needs a real cluster because it cannot be faked in the
 cloud-free direct-qemu lane. Only a `type: shakenfist` source's keys
