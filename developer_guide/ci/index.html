@@ -16311,6 +16311,15 @@ names, and that list is the only thing which decides when a lane runs:</p>
 </tr>
 </tbody>
 </table>
+<p><code>smoke-cluster.yml</code>'s <code>tier</code> input does not appear in that table because
+it does not select anything: it names the bundle artifact and forms part of
+the concurrency group, and nothing else reads it. A lane's suite is its
+<code>stestr_config</code> alone. <code>debian-13-localhost</code> passes <code>tier: smoke</code> and runs
+the whole of <code>cluster-ci.conf</code>, the same 163 tests as the multi-node lanes,
+which is why its <code>test_timeout_minutes</code> is the largest of any lane rather
+than the smallest -- one node at concurrency 3 needs about 48 minutes for
+the suite the three-node lane finishes in 34 at concurrency 5. Making that
+lane a real smoke subset would be a change to what it runs.</p>
 <p><code>functional-tests.yml</code>'s <code>functional_lanes</code> job selects the merge lanes,
 and <code>can_merge</code> needs it. <code>scheduled-tests.yml</code>'s <code>weekly_lanes</code> job
 selects the rest. Every merge lane deploys a nested cluster onto the sfcbr
