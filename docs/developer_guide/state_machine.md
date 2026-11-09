@@ -345,7 +345,17 @@ not sweep networks (issue 4863).
 * `error`: the network has encountered an error and cannot be used.
 
 A network is regarded as "dead" when it is in state `deleted`, `delete-wait` or
-`error`.
+`error`. "Dead" means "do not act on this network", not "this network is gone":
+a network in `error` still holds its vxlan, its network namespace, its dnsmasq,
+its NAT rules and its IPAM reservations, and one in `delete-wait` is still
+waiting for its interfaces to drain. A guard which asks "is this network gone?"
+therefore has to ask for `deleted` specifically rather than calling `is_dead()`
+— which is why a namespace may only be deleted once every network it holds is
+`deleted`, and why `DELETE /networks/<ref>` accepts a network in `error`
+(`error` → `deleted` is a permitted transition, and the teardown checks for
+each thing before removing it, so it is safe to run against a partly built
+network). As a backstop, `Namespace.hard_delete()` enqueues the delete of any
+network which reaches it anyway.
 
 The following transitions are possible (note that hyphens have been replaced with
 underscores in some state names due to limitations in the diagram renderer):

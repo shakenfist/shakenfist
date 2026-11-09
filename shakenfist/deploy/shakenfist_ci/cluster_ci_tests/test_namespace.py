@@ -91,13 +91,16 @@ class TestNamespace(base.BaseNamespacedTestCase):
                   'is in state %s' % (instance_uuid, state, timeout,
                                       i['state']))
 
-    def _delete_instance_if_present(self, instance_uuid):
+    def _delete_instance_if_present(self, instance_uuid, client=None):
         # Through system rather than the instance's own namespace: on
         # the passing path that namespace has been deleted by the time
         # this runs, and a deleted namespace's credential is refused
-        # with a 401 however harmless the request.
+        # with a 401 however harmless the request. A caller which needs
+        # a client that does not wait on operations passes its own.
+        if client is None:
+            client = self.system_client
         try:
-            self.system_client.delete_instance(instance_uuid)
+            client.delete_instance(instance_uuid)
         except apiclient.ResourceNotFoundException:
             pass
 
@@ -160,6 +163,122 @@ class TestNamespace(base.BaseNamespacedTestCase):
         # through its namespace.
         other_client.delete_instance(inst['uuid'])
         self._await_instance_state(inst['uuid'], 'deleted')
+
+        self.system_client.delete_namespace(other)
+        self.assertNotIn(
+            other, base.namespace_names(self.system_client.get_namespaces()))
+
+    def _await_network_state(self, network_uuid, state, timeout=300):
+        start_time = time.time()
+        while True:
+            n = self.system_client.get_network(network_uuid)
+            if n['state'] == state:
+                return n
+            # Deleted is the one state nothing leaves, so reaching it
+            # while awaiting another cannot come right by waiting.
+            if n['state'] == 'deleted' and state != 'deleted':
+                break
+            if time.time() - start_time > timeout:
+                break
+            time.sleep(5)
+
+        self.addDetail(
+            'network', content.text_content(json.dumps(n, indent=4,
+                                                       sort_keys=True)))
+        self.fail('Network %s did not reach state %s within %d seconds, it '
+                  'is in state %s' % (network_uuid, state, timeout,
+                                      n['state']))
+
+    def _delete_network_if_present(self, client, network_uuid):
+        try:
+            client.delete_network(network_uuid)
+        except (apiclient.ResourceNotFoundException,
+                apiclient.ResourceStateConflictException):
+            pass
+
+    def test_namespace_delete_refuses_a_draining_network(self):
+        """Issue 4863: a network mid-delete blocks its namespace's delete.
+
+        A network in delete-wait or error was counted as already gone,
+        because the handler asked Network.is_dead(). Neither state is in
+        FINAL_OBJECT_STATES, so nothing would ever reap the network, and
+        the namespace delete left it with no namespace and no owner --
+        still holding its vxlan, its dnsmasq, its NAT rules and its IPAM.
+
+        delete-wait is the state this test can reach from the API: a
+        network deleted while an interface is still attached parks there
+        while the delete op waits for the interface to drain. The error
+        state is only reachable by exhausting the floating network, so it
+        is covered by unit tests rather than here.
+        """
+        # Kept short for the same VARCHAR(36) reason as the errored
+        # instance test above.
+        other = 'ci-draining-%s' % self._uniquifier()
+        other_client = self._make_namespace(other, self._uniquifier())
+        self.addCleanup(self._remove_namespace, other)
+
+        # The network delete below deliberately leaves a cluster
+        # operation in flight, so every delete here is issued through an
+        # admin client which does not wait on an object's operations.
+        # Admin rather than the namespace's own client because the
+        # cleanups registered below run after the namespace has been
+        # deleted on the passing path, and a key in a deleted namespace
+        # no longer authenticates.
+        nb_client = apiclient.Client(async_strategy=apiclient.ASYNC_CONTINUE)
+
+        net = other_client.allocate_network(
+            '192.168.243.0/24', True, True, 'draining-net')
+        self.addCleanup(self._delete_network_if_present, nb_client,
+                        net['uuid'])
+        self.addDetail('net_draining', content.text_content(json.dumps(
+            net, indent=4, sort_keys=True)))
+        self._await_networks_ready([net['uuid']])
+
+        inst = self.create_instance(
+            'draining', 1, 1024,
+            [
+                {
+                    'network_uuid': net['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': base.CLUSTER_CI_IMAGE,
+                    'type': 'disk'
+                }
+            ], None, None, client=other_client)
+        # Registered after the network and namespace cleanups so that it
+        # runs before them: the network cannot finish draining while the
+        # instance holds an interface on it, and the namespace cannot be
+        # removed while either is live.
+        self.addCleanup(self._delete_instance_if_present, inst['uuid'],
+                        client=nb_client)
+        self.addDetail('inst', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
+        # Ready rather than merely created, because the refusal is about
+        # a network whose interface has not drained -- and an instance
+        # which is still being created may not have attached one yet.
+        self._await_instance_ready(inst['uuid'])
+
+        nb_client.delete_network(net['uuid'])
+        self._await_network_state(net['uuid'], 'delete-wait', timeout=120)
+
+        e = self.assertRaises(
+            apiclient.RequestMalformedException,
+            self.system_client.delete_namespace, other)
+        self.assertIn('you cannot delete a namespace with networks',
+                      str(e.text))
+        self.assertIn(other,
+                      base.namespace_names(self.system_client.get_namespaces()))
+
+        # Draining the interface is what lets the delete finish, and a
+        # deleted network does not block: it has released everything it
+        # held and is hard deleted by state rather than through its
+        # namespace.
+        nb_client.delete_instance(inst['uuid'])
+        self._await_instance_deleted(inst['uuid'])
+        self._await_network_state(net['uuid'], 'deleted', timeout=600)
 
         self.system_client.delete_namespace(other)
         self.assertNotIn(

@@ -413,15 +413,34 @@ class AuthNamespaceEndpoint(api_base.Resource):
         if len(instances) > 0:
             return sf_api.error(400, 'you cannot delete a namespace with instances')
 
-        # Networks still count error and delete_wait as gone, through
-        # is_dead(), which is the defect fixed above for instances. That
-        # is known and tracked as issue 4863 rather than fixed here:
-        # is_dead() is shared, and its other callers rely on it meaning
-        # "do not act on this network", so the fix is a predicate of
-        # this handler's own rather than narrowing that one.
+        # Only a deleted network counts as gone, and this handler asks
+        # that question itself rather than through Network.is_dead(),
+        # which is true for delete_wait and error as well. is_dead()
+        # means "do not act on this network" to its other callers and is
+        # right for them, but it is the wrong question here: a network in
+        # error still holds its vxlan, its dnsmasq, its NAT rules and its
+        # IPAM reservations, and a network in delete_wait is one whose
+        # delete has not finished yet. Neither state is in
+        # FINAL_OBJECT_STATES, so the deleted object sweep will never
+        # reap either, and a network's only owner is its namespace -- so
+        # a namespace deleted over the top of one left a network with no
+        # namespace, no owner and nothing which would ever remove it
+        # (issue 4863).
+        #
+        # Counting error as gone also made this refusal expire into
+        # permission, exactly as it did for instances: a delete which
+        # fails walks delete_wait -> error, and the delete_wait refusal
+        # was already gone, so a caller who retried a moment later
+        # succeeded over the top of the network the first refusal had
+        # protected.
+        #
+        # Unlike the instances above, this test is doing real work rather
+        # than being defensive: Networks overrides the iterator's state
+        # prefilter to "no filter at all" when none is given, so a
+        # deleted network is yielded here and has to be skipped.
         networks = []
         for n in network.networks_in_namespace(namespace):
-            if not n.is_dead():
+            if n.state.value != dbo.STATE_DELETED:
                 LOG.with_fields({'network': n.uuid,
                                  'state': n.state.value}).info('Blocks namespace delete')
                 networks.append(n.uuid)

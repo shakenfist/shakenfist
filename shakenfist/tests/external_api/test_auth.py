@@ -469,10 +469,6 @@ class AuthWithLingeringNetwork(base.ShakenFistTestCase):
 
         self.mock_mariadb.create_namespace('foo', 'key1', 'banana')
 
-        self.network_id = str(uuid4())
-        self.mock_mariadb.create_network(
-            name='foonet', uuid=self.network_id, namespace='foo')
-
         # The client must be created after all the mocks, or the mocks are not
         # correctly applied.
         self.client = external_api.app.test_client()
@@ -483,9 +479,21 @@ class AuthWithLingeringNetwork(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
 
+    def _create_network(self, state):
+        self.network_id = str(uuid4())
+        self.mock_mariadb.create_network(
+            name='foonet', uuid=self.network_id, namespace='foo',
+            set_state=state)
+
+    def _delete_namespace_foo(self):
+        return self.client.delete(
+            '/auth/namespaces/foo',
+            headers={'Authorization': self.auth_token})
+
     def test_delete_namespace_with_networks(self):
-        resp = self.client.delete('/auth/namespaces/foo',
-                                  headers={'Authorization': self.auth_token})
+        self._create_network(dbo.STATE_CREATED)
+
+        resp = self._delete_namespace_foo()
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
             {
@@ -493,6 +501,46 @@ class AuthWithLingeringNetwork(base.ShakenFistTestCase):
                 'status': 400
             },
             resp.get_json())
+        self.assertEqual(dbo.STATE_CREATED,
+                         Namespace.from_db('foo').state.value)
+
+    def test_delete_namespace_with_errored_network(self):
+        # Issue 4863: error was counted as gone, through is_dead(). An
+        # errored network is a live row which merely failed at something,
+        # and it still holds its vxlan, its dnsmasq, its NAT rules and
+        # its IPAM reservations.
+        self._create_network(dbo.STATE_ERROR)
+
+        resp = self._delete_namespace_foo()
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(dbo.STATE_CREATED,
+                         Namespace.from_db('foo').state.value)
+
+    def test_delete_namespace_with_delete_wait_network(self):
+        # The other state is_dead() answers true for, and the state a
+        # network's delete sits in while it waits for interfaces to
+        # drain. Counting it as gone made the refusal expire into
+        # permission: a delete which fails walks delete_wait -> error,
+        # and neither blocked.
+        self._create_network(dbo.STATE_DELETE_WAIT)
+
+        resp = self._delete_namespace_foo()
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(dbo.STATE_CREATED,
+                         Namespace.from_db('foo').state.value)
+
+    def test_delete_namespace_with_deleted_network(self):
+        # Deleted is the one state which does not block: the network has
+        # released everything it held, and the deleted object sweep hard
+        # deletes its row by state without needing its namespace. The
+        # network iterator yields deleted networks, so this is not
+        # vacuous -- it is what the handler's skip is for.
+        self._create_network(dbo.STATE_DELETED)
+
+        resp = self._delete_namespace_foo()
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(dbo.STATE_DELETED,
+                         Namespace.from_db('foo').state.value)
 
 
 class AuthKeysTestCase(base.ShakenFistTestCase):
