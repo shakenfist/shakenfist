@@ -276,21 +276,39 @@ def _webargs_error(error, req, schema, *, error_status_code, error_headers):
         400, parameters[0] if parameters else 'invalid request parameter'))
 
 
+def caller_has_admin_rights():
+    """May this request's token administer the cluster?
+
+    The one definition of that question. caller_is_admin below guards a
+    whole method with it, and an endpoint which answers every caller
+    but *says more* to an administrator reads it here rather than
+    restating the two tests (coding_rules.md, "Never restate a
+    visibility predicate") -- a second copy is how a disclosure
+    boundary and the decorator which enforces it come to disagree.
+
+    Being in the system namespace is necessary but not sufficient.
+    Without the scope test a key scoped to, say, blob.read but minted
+    into system would reach every administrative endpoint -- a scoped
+    credential escalating to cluster administration. Legacy unscoped
+    keys carry the wildcard and are unaffected, so existing admin
+    automation keeps working.
+    """
+    if request_namespace() != 'system':
+        return False
+    return api_scopes.satisfies(get_jwt().get('scopes'), api_scopes.ADMIN)
+
+
 def caller_is_admin(func):
     # Ensure only users in the 'system' namespace can call this method
     def wrapper(*args, **kwargs):
-        if request_namespace() != 'system':
-            return sf_api.error(401, 'unauthorized')
+        if not caller_has_admin_rights():
+            # Which of the predicate's two tests failed decides what to
+            # answer, so it is asked again here. The predicate decides
+            # *whether* to refuse; this decides only how to say so.
+            if request_namespace() != 'system':
+                return sf_api.error(401, 'unauthorized')
 
-        # Being in the system namespace is necessary but no longer
-        # sufficient. Without this a key scoped to, say, blob.read but
-        # minted into system would reach every administrative endpoint
-        # -- a scoped credential escalating to cluster administration.
-        # Legacy unscoped keys carry the wildcard and are unaffected,
-        # so existing admin automation keeps working.
-        held = get_jwt().get('scopes')
-        if not api_scopes.satisfies(held, api_scopes.ADMIN):
-            LOG.with_fields({'held': held}).info(
+            LOG.with_fields({'held': get_jwt().get('scopes')}).info(
                 'Administrative request denied: token lacks the admin scope')
             return sf_api.error(
                 403, 'token is not scoped for administrative operations')
@@ -311,6 +329,89 @@ def caller_scopes():
     if held is None or api_scopes.WILDCARD in held:
         return None
     return list(held)
+
+
+def validate_affinity_document(value):
+    """Check an affinity document, or answer 400 saying what is wrong.
+
+    Returns the error response, or None when the document is
+    acceptable. The one implementation: the instance create and
+    metadata paths validate the affinity they are about to store with
+    it, and the placement query validates the affinity it is about to
+    ask a question about with it. A second copy is how a query comes to
+    answer "that would fit" for a document a create answers 400 to,
+    which is worse than either answer on its own -- and a mistyped
+    constraint silently dropped is worse again, because the scheduler
+    reads a stored document leniently and would place the shape with no
+    constraint at all.
+
+    An empty document is accepted here. It means "no affinity", which
+    is a legitimate thing for a request to say; the metadata paths
+    refuse an empty *value* for any key before they reach this, which
+    is a different rule and stays theirs.
+    """
+    if not isinstance(value, dict):
+        return sf_api.error(
+            400, 'value for "affinity" key should be a valid JSON dictionary')
+
+    # The binary model is a second value shape under the same key,
+    # not a second key, so the two are told apart here by type. A
+    # dict whose keys are the four reserved names is the binary
+    # form; anything else is read as the weighted form and has to
+    # coerce to integers below. A spec mixing the two is refused
+    # rather than guessed at, because either guess silently
+    # discards half of what the caller asked for.
+    binary_keys = set(Instance.AFFINITY_BINARY_KEYS)
+    present = set(value.keys())
+    if present & binary_keys:
+        unknown = present - binary_keys
+        if unknown:
+            return sf_api.error(
+                400,
+                'affinity keys %s are not valid alongside the binary '
+                'affinity constraints; the weighted and binary forms '
+                'cannot be mixed' % sorted(unknown))
+
+        for constraint, tags in value.items():
+            if not isinstance(tags, list):
+                return sf_api.error(
+                    400,
+                    'value for affinity constraint "%s" should be a JSON '
+                    'list of tags' % constraint)
+            for tag in tags:
+                # isinstance(True, str) is false, so booleans are
+                # already excluded here, unlike in the weighted form.
+                if not isinstance(tag, str) or not tag:
+                    return sf_api.error(
+                        400,
+                        'affinity constraint "%s" should contain only '
+                        'non-empty tag names' % constraint)
+        return None
+
+    for key_type, dv in value.items():
+        # isinstance(True, int) is true in Python, so int(True) is 1 and a
+        # JSON true would be accepted as a weight of one. Nobody writing
+        # true means "weight 1", and the binary affinity model gives it a
+        # meaning nobody asked for, so refuse it explicitly.
+        if isinstance(dv, bool):
+            return sf_api.error(
+                400,
+                'affinity dictionary values should be integers, not booleans')
+
+        # int() raises TypeError -- not ValueError -- for a list, a dict or
+        # None, and OverflowError for infinity. json.loads() accepts the
+        # bare Infinity and NaN literals by default, so flask hands them
+        # straight through and a bare ValueError handler returns a 500 to
+        # the caller. NaN is already covered: int(float('nan')) is a
+        # ValueError.
+        try:
+            int(dv)
+        except (TypeError, ValueError, OverflowError):
+            return sf_api.error(
+                400, 'affinity dictionary values should be integers',
+                suppress_traceback=True)
+
+    return None
 
 
 def resolve_lookup_namespace(body_namespace, kind):
@@ -800,6 +901,114 @@ VIDEOSPEC_SCHEMA: dict[str, Any] = {
 }
 
 
+# How many shapes one placement query may ask about, after a shape's
+# `count` has been expanded into that many identical shapes.
+#
+# A published constant rather than an operator setting, and that is the
+# decision rather than the number: a caller has to know the bound to
+# respect it, so it is declared as the `maximum` on `count` below and
+# named in the refusal, and nothing yet justifies a cluster asking for
+# a different one. The number itself is a long way above every real
+# request -- the largest set any first party caller assembles is eight
+# -- and a long way below a walk worth worrying about, which is the
+# only property it needs: a query is a cheap request which buys a walk
+# costing O(shapes x candidates), so something has to stop a four line
+# body asking for ten thousand of them.
+MAX_PLACEMENT_SHAPES = 64
+
+
+# What one requested shape looks like on the wire: the figures
+# placement reads about a thing which does not exist yet.
+#
+# The keys are POST /instances' own words -- `cpus`, `memory` in
+# megabytes, a disk -- because a shape has to mean one thing across the
+# API, the CLI and the Ansible collection, and the claim verbs will
+# publish the same vocabulary. What is deliberately *not* here is
+# anything a create takes which placement never reads: no name, no
+# networks, no user data, no video. The filter, affinity and ranking
+# stages are denominated in vCPUs, memory, disk and affinity, and a
+# query which accepted more would be describing a create rather than
+# asking a question about capacity.
+#
+# additionalProperties: False for the reason a diskspec publishes it.
+# A shape is a new vocabulary with no deployed callers sending keys it
+# has not heard of, so refusing an unknown key costs nothing today and
+# buys the human who typed `memory_mb` an error rather than a silently
+# sized-at-nothing shape.
+SHAPESPEC_SCHEMA: dict[str, Any] = {
+    'type': 'object',
+    'additionalProperties': False,
+    # cpus and memory only. A shape with no disk at all is a legitimate
+    # question -- "would these fit if they brought no disk" -- and
+    # placement charges a disk of zero without complaint, so requiring
+    # one would refuse a request the pipeline answers. count defaults
+    # to one and affinity to none.
+    'required': ['cpus', 'memory'],
+    'properties': {
+        'cpus': {
+            'type': 'integer',
+            # The floor POST /instances publishes for the same figure,
+            # and for the same reason: a negative request deflates the
+            # capacity counters it is measured against.
+            'minimum': 0,
+            'description': 'The number of vCPUs this shape asks for.'
+        },
+        'memory': {
+            'type': 'integer',
+            'minimum': 0,
+            'description': (
+                'The memory this shape asks for, in megabytes. The same '
+                'unit POST /instances takes it in.')
+        },
+        'disk': {
+            'type': 'integer',
+            'minimum': 0,
+            'description': (
+                'The disk this shape asks for, in gigabytes, already '
+                'summed. Mutually exclusive with disk_spec. Omit both for '
+                'a shape which asks for no disk.')
+        },
+        'disk_spec': {
+            'type': 'array',
+            'items': DISKSPEC_SCHEMA,
+            'description': (
+                'The disks this shape asks for, in the form POST '
+                '/instances takes them, summed by the server. Mutually '
+                'exclusive with disk, and offered so that a caller '
+                'holding an instance create body can ask about it '
+                'without summing the disks itself.')
+        },
+        'count': {
+            'type': 'integer',
+            # One, not zero: a shape asked for zero times is not a
+            # shape, and silently dropping it would answer a question
+            # about a smaller set than the caller described.
+            'minimum': 1,
+            'maximum': MAX_PLACEMENT_SHAPES,
+            'description': (
+                'How many of this shape to ask about. Each is placed in '
+                'its own right and sees the ones before it already '
+                'sitting on their nodes, so a count of three asks for '
+                'room for three. The bound here is also the bound on the '
+                'whole request: the counts of every shape sent together '
+                'may not sum above it.')
+        },
+        # A bare object, like POST /instances' metadata and for a
+        # related reason: the affinity document's keys are the four
+        # binary constraint names or an arbitrary tag name in the
+        # deprecated weighted form, and the two shapes are told apart
+        # by the handler rather than by a properties block.
+        'affinity': {
+            'type': 'object',
+            'description': (
+                'An affinity document for this shape, in the same '
+                'prefer_with_tag / require_without_tag form an '
+                'instance\'s affinity metadata takes.')
+        },
+    },
+}
+
+
 # Type MUST be one of "string", "number", "integer", "boolean", "array" or "file".
 ARGTYPES: dict[str, dict[str, Any]] = {
     # The metadata family's "the API stores this and never interprets
@@ -826,6 +1035,10 @@ ARGTYPES: dict[str, dict[str, Any]] = {
     # takes one at all.
     'arrayofdiskspec': {'type': 'array', 'items': DISKSPEC_SCHEMA},
     'arrayofnetworkspec': {'type': 'array', 'items': NETWORKSPEC_SCHEMA},
+    # A shape has no single form for the reason a diskspec has none:
+    # the only endpoint which takes one takes a list of them, because
+    # the question worth asking is whether a whole set fits at once.
+    'arrayofshapespec': {'type': 'array', 'items': SHAPESPEC_SCHEMA},
     'arrayofstring': {'type': 'array', 'items': {'type': 'string'}},
     # byte is Swagger 2.0's standard format token for base64
     # encoded content.
@@ -875,6 +1088,12 @@ ARGTYPES: dict[str, dict[str, Any]] = {
     'networkspec': NETWORKSPEC_SCHEMA,
     'node': {'type': 'string', 'format': 'the name of a node'},
     'number': {'type': 'number', 'format': 'a floating point number'},
+    # Named here as well as inside 'arrayofshapespec' above, exactly as
+    # a diskspec is: the single form is the vocabulary's statement of
+    # what the shape is, and the array form nests this very object
+    # rather than a copy of it, so the two cannot drift. No endpoint
+    # declares it on its own.
+    'shapespec': SHAPESPEC_SCHEMA,
     'string': {'type': 'string', 'format': 'string'},
     # Negative values here are at best meaningless and at worst
     # silently destructive: a negative artifact max_versions

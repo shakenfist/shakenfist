@@ -291,6 +291,50 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         # because the database layer raises on anything else.
         ('/admin/claims', 'get', 'coverage_state',
          {'type': 'string', 'pattern': api_admin.COVERAGE_STATE_PATTERN}),
+        # A list of shapes to ask placement about. cpus and memory are
+        # the only required keys because PlacementEndpoint.post()
+        # refuses a shape without either and defaults everything else:
+        # a shape with no disk asks for no disk, a shape with no count
+        # asks for one, and a shape with no affinity constrains
+        # nothing. disk's and memory's floors are 0 rather than 1 for
+        # the reason the create endpoint's are -- nothing refuses a
+        # shape of nothing and a negative one is what corrupts the
+        # arithmetic it is measured against. count floors at 1 because
+        # a shape asked for zero times is not a shape, and its maximum
+        # is the published bound on the whole request, enforced by the
+        # handler on the sum of every count rather than on this one
+        # value. disk_spec nests the same diskspec constant POST
+        # /instances publishes, so a caller can ask about a create body
+        # it already holds and the two cannot describe different disks.
+        ('/placement', 'post', 'shapes',
+         {'type': 'array',
+          'items': {
+              'type': 'object',
+              'additionalProperties': False,
+              'required': ['cpus', 'memory'],
+              'properties': {
+                  'cpus': {'type': 'integer', 'minimum': 0},
+                  'memory': {'type': 'integer', 'minimum': 0},
+                  'disk': {'type': 'integer', 'minimum': 0},
+                  'disk_spec': {
+                      'type': 'array',
+                      'items': {
+                          'type': 'object',
+                          'additionalProperties': False,
+                          'properties': {
+                              'size': {'type': 'integer',
+                                       'format': 'int64', 'minimum': 0},
+                              'base': {'type': 'string'},
+                              'bus': {'type': 'string',
+                                      'enum': ['sata', 'scsi', 'usb',
+                                               'virtio', 'nvme']},
+                              'type': {'type': 'string',
+                                       'enum': ['disk', 'cdrom']},
+                          }}},
+                  'count': {'type': 'integer', 'minimum': 1,
+                            'maximum': api_base.MAX_PLACEMENT_SHAPES},
+                  'affinity': {'type': 'object'},
+              }}}),
         ('/auth/namespaces/{namespace}/rules', 'post', 'scopes',
          {'type': 'array', 'items': {'type': 'string'}}),
         ('/auth/namespaces/{namespace}/rules', 'post', 'bound_claims',

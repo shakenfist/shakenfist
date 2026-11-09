@@ -67,6 +67,7 @@ from shakenfist.config import config
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import declarations
 from shakenfist.external_api import instance as instance_api
+from shakenfist.external_api import placement as placement_api
 from shakenfist.instance import Instance
 from shakenfist.mapping_rule import MappingRule
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -437,6 +438,17 @@ RECIPES = {
         'body': {'key': 'sweepkey', 'value': 'sweepvalue'},
         'control': 200,
     },
+    ('PlacementEndpoint', 'post'): {
+        # A 200 carrying a verdict of "no", which is this endpoint's
+        # whole point: the fixture seeds no node metrics, so the
+        # placement walk finds no hypervisor and the query answers that
+        # the set does not fit. A question which was answered is a
+        # successful request whatever the answer, so the control is a
+        # 200 rather than the 507 a create would get.
+        'url': '/placement',
+        'body': {'shapes': [{'cpus': 1, 'memory': 1024}]},
+        'control': 200,
+    },
     ('UploadDataEndpoint', 'post'): {
         'url': '/upload/{upload}',
         'raw_body': b'some bytes',
@@ -624,6 +636,10 @@ SWEEP = {
         (400, False, 'guarded'),
     ('NodeMetadatasEndpoint', 'post', 'value'):
         (400, False, 'guarded'),
+    # A query with no shapes in it is not a question, so it is refused
+    # in the handler rather than answered "yes, nothing fits anywhere".
+    ('PlacementEndpoint', 'post', 'shapes'):
+        (400, False, 'guarded'),
     ('UploadDataEndpoint', 'post', 'body'):
         (200, False, 'accepted'),
 }
@@ -660,9 +676,12 @@ class SweepFixtureTestCase(AuthenticatedStackTestCase):
         # containment wanted here. Copied from
         # test_instance_create_validation.py, where the same escape
         # produced a 507 in unrelated tests.
-        scheduler_patch = mock.patch.object(instance_api, 'SCHEDULER', None)
-        scheduler_patch.start()
-        self.addCleanup(scheduler_patch.stop)
+        # PlacementEndpoint.post caches one the same way and for the
+        # same reason, so it needs the same containment.
+        for module in (instance_api, placement_api):
+            scheduler_patch = mock.patch.object(module, 'SCHEDULER', None)
+            scheduler_patch.start()
+            self.addCleanup(scheduler_patch.stop)
 
         # The upload route writes into STORAGE_PATH, which defaults to
         # /srv/shakenfist. A test must not depend on that existing, and
@@ -912,7 +931,7 @@ class RequiredSweepTestCase(SweepFixtureTestCase):
     keeps the same observability), it just does not act on one, so a
     request reaches its handler exactly as it did before enforcement
     and the table below still describes real handler behaviour. That
-    also makes every one of the 76 rows, not merely the ``guarded`` and
+    also makes every one of the 77 rows, not merely the ``guarded`` and
     ``faults`` ones, evidence that ``warn`` reproduces the
     pre-enforcement answers.
 
@@ -938,7 +957,7 @@ class RequiredSweepTestCase(SweepFixtureTestCase):
             set(), set(RECIPES) - declared,
             'a recipe names a handler which declares nothing required')
 
-    def test_the_census_still_finds_seventy_six(self):
+    def test_the_census_still_finds_seventy_seven(self):
         """Finding F1's premise, re-asked here.
 
         D32 and D35 both rest on the shape of this census rather than
@@ -950,10 +969,15 @@ class RequiredSweepTestCase(SweepFixtureTestCase):
         relaxed. The census script in the plan's appendix knows nothing
         about the latter, so it reports one fewer per relaxed
         declaration from step 2 onwards.
+
+        The census was 76 until the placement query arrived, whose
+        shape list is the one declaration added since -- an endpoint
+        which takes a required body parameter joins this table, and the
+        number moving is how that obligation is noticed.
         """
         rows = required_declarations()
-        self.assertEqual(76, len(rows))
-        self.assertEqual(75, len([r for r in rows if r[4]]))
+        self.assertEqual(77, len(rows))
+        self.assertEqual(76, len([r for r in rows if r[4]]))
         self.assertEqual(0, len([r for r in rows if not r[4] and r[5]]))
         self.assertEqual(1, len([r for r in rows if not r[5]]))
         self.assertEqual(

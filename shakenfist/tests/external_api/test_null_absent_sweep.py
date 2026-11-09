@@ -60,6 +60,7 @@ import json
 from collections import namedtuple
 from unittest import mock
 
+from shakenfist import scheduler
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
 from shakenfist.instance import Instance
@@ -70,6 +71,7 @@ from shakenfist.tests.external_api.test_required_sweep import (
 
 CREATE = 'create'
 HOTPLUG = 'hotplug'
+PLACEMENT = 'placement'
 
 #: Substituted for the sweep network's uuid when a request is sent.
 NETWORK = '{network}'
@@ -91,6 +93,7 @@ ROUTES = [
     ('networkspec', CREATE, 'network', True),
     ('networkspec', HOTPLUG, 'network', False),
     ('videospec', CREATE, 'video', False),
+    ('shapespec', PLACEMENT, 'shapes', True),
 ]
 
 #: A complete, valid example of each spec. The base request for a key
@@ -101,6 +104,13 @@ EXEMPLARS = {
     'diskspec': {'size': 8, 'base': 'http://example.com/null-sweep.qcow2'},
     'networkspec': {'network_uuid': NETWORK},
     'videospec': {'model': 'vga', 'memory': 16384},
+    # The summed disk form rather than disk_spec, because the two are
+    # alternatives and a shape carrying both is refused. That makes the
+    # disk_spec row's probe a refusal rather than a placement, which
+    # the differential is indifferent to: it needs the probe to be
+    # visibly different from the omission, not to be accepted.
+    'shapespec': {'cpus': 1, 'memory': 1024, 'disk': 8, 'count': 1,
+                  'affinity': {}},
 }
 
 #: The anti-vacuity probe: a real value of the key which the
@@ -128,6 +138,21 @@ PROBES = {
     ('videospec', 'model'): 'qxl',
     ('videospec', 'memory'): 32768,
     ('videospec', 'vdi'): 'vnc',
+    # Every shape probe is seen in the shapes the handler hands the
+    # placement core, which is what makes the omission of a figure
+    # distinguishable from a figure of zero. count's probe is seen as
+    # the *number* of shapes handed over, which is the expansion
+    # itself.
+    ('shapespec', 'cpus'): 2,
+    ('shapespec', 'memory'): 2048,
+    ('shapespec', 'disk'): 12,
+    ('shapespec', 'disk_spec'): [{'size': 12}],
+    ('shapespec', 'count'): 2,
+    # Keyed by route because the value is itself a mapping, and a bare
+    # mapping here is read as a per-route table. There is only one
+    # route which carries a shape.
+    ('shapespec', 'affinity'): {
+        PLACEMENT: {'require_with_tag': ['sweeptag']}},
 }
 
 #: Everything one request did, canonicalised. ``instances`` is what
@@ -136,10 +161,19 @@ PROBES = {
 #: received it; ``floats`` is how many interfaces the handler decided
 #: to float (assign_floating_ip is stubbed to succeed, because whether
 #: the fixture carries a floating network is not the property under
-#: test).
+#: test). ``shapes`` is the set of requested shapes as the placement
+#: core received it -- the first call only, because a refused query
+#: asks the core further questions of its own to attribute the
+#: refusal, and the first call is the one the request described.
+#:
+#: A create reaches placement too, so its ``shapes`` is recorded as
+#: well. That is deliberate: it is one more thing a diskspec row's
+#: null is measured against, and a disk sum which started reading a
+#: null size as something other than zero would show up there.
 Observable = namedtuple(
     'Observable',
-    ['status', 'recorded', 'error', 'instances', 'interfaces', 'floats'])
+    ['status', 'recorded', 'error', 'instances', 'interfaces', 'floats',
+     'shapes'])
 
 
 def _leaves(value, out):
@@ -207,6 +241,11 @@ class _NullAbsentMixin:
                     'memory': 1024, 'disk': [{'size': 8}]}
             body.update(overlay)
             url = '/instances'
+        elif route == PLACEMENT:
+            # The whole body is the overlay: a placement query takes
+            # nothing but the shapes it is asking about.
+            body = dict(overlay)
+            url = '/placement'
         else:
             body = dict(overlay)
             url = '/instances/%s/interfaces' % self.instance.uuid
@@ -217,8 +256,16 @@ class _NullAbsentMixin:
         instances = []
         interfaces = []
         floats = []
+        shapes = []
         real_instance_new = Instance.new
         real_interface_new = NetworkInterface.new
+        real_find_candidates = scheduler.Scheduler.find_candidates_for_shapes
+
+        def recording_find_candidates(scheduler_self, requested, *args,
+                                      **kwargs):
+            shapes.append([dict(shape._asdict()) for shape in requested])
+            return real_find_candidates(
+                scheduler_self, requested, *args, **kwargs)
 
         def recording_instance_new(*args, **kwargs):
             # Snapshotted at call time: the handler and Instance.new
@@ -248,7 +295,10 @@ class _NullAbsentMixin:
                     side_effect=recording_interface_new), \
                 mock.patch.object(
                     api_util, 'assign_floating_ip',
-                    side_effect=recording_float):
+                    side_effect=recording_float), \
+                mock.patch.object(
+                    scheduler.Scheduler, 'find_candidates_for_shapes',
+                    recording_find_candidates):
             response = self.client.post(
                 url, headers={'Authorization': self.token},
                 content_type='application/json', data=json.dumps(body))
@@ -261,7 +311,8 @@ class _NullAbsentMixin:
             error,
             _canonical(instances, sent),
             _canonical(interfaces, sent),
-            len(floats))
+            len(floats),
+            _canonical(shapes[:1], sent))
 
     def test_the_controls_still_work(self):
         """A rotted fixture must fail here, not read as a verdict."""
@@ -282,6 +333,16 @@ class _NullAbsentMixin:
             1, len(hotplug.interfaces),
             'the hotplug control created no interface, so an accepted '
             'row here proves nothing')
+
+        placement = self._observe(
+            PLACEMENT, {'shapes': [{'cpus': 1, 'memory': 1024}]}, 0)
+        self.assertEqual(
+            (200, False), (placement.status, placement.recorded),
+            'the minimal placement query was not answered: %r' % (placement,))
+        self.assertEqual(
+            1, len(placement.shapes[0]),
+            'the placement control handed the core no shapes, so every '
+            'shapespec row would be measuring nothing: %r' % (placement,))
 
     def test_every_structured_schema_is_swept(self):
         """The derived obligation: a new spec cannot arrive unswept.

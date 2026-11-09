@@ -43,6 +43,7 @@ from shakenfist.external_api import interface as api_interface
 from shakenfist.external_api import label as api_label
 from shakenfist.external_api import network as api_network
 from shakenfist.external_api import node as api_node
+from shakenfist.external_api import placement as api_placement
 from shakenfist.external_api import snapshot as api_snapshot
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import upload as api_upload
@@ -512,7 +513,18 @@ API_CAPABILITIES = {
         # instance-get only -- instance-execute deliberately refuses
         # it. Without the token a new client cannot tell these
         # parameters exist and must not send them.
-        'agentoperation-deadlines'],
+        'agentoperation-deadlines',
+        # placement-query tells a client it can ask POST /placement
+        # whether a set of instance shapes would fit the cluster now,
+        # and therefore that it need not rebuild the scheduler's
+        # per-node checks from the cluster resource summary to guess.
+        # In this family rather than with the administrative capacity
+        # reads because any authenticated caller may ask: what admin
+        # buys is the per-node half of the answer, not the question. A
+        # client which does not see the token must not send the
+        # request, because it has no other way to tell a cluster which
+        # predates the endpoint from one which refused it.
+        'placement-query'],
     'networks': [
         'list-addresses', 'route-addresses', 'get-network-namespace',
         'provide-dns', 'extra-dns-entries', 'network-clusteroperations',
@@ -766,6 +778,12 @@ api.add_resource(api_node.NodeEventsEndpoint, '/nodes/<node>/events')
 api.add_resource(api_node.NodeProcessMetricsEndpoint, '/nodes/<node>/processmetrics')
 api.add_resource(api_node.NodeMetadatasEndpoint, '/nodes/<node>/metadata')
 api.add_resource(api_node.NodeMetadataEndpoint, '/nodes/<node>/metadata/<key>')
+
+# A question about the cluster rather than about an instance which
+# exists, so it is not under /instances/<instance_ref>, where the ref
+# converter would shadow it. A POST because the question is a multiset
+# and a GET has no body to carry one.
+api.add_resource(api_placement.PlacementEndpoint, '/placement')
 
 api.add_resource(api_upload.UploadCreateEndpoint, '/upload')
 api.add_resource(api_upload.UploadDataEndpoint, '/upload/<upload_uuid>')

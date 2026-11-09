@@ -1944,64 +1944,14 @@ def _validate_instance_metadata(key, value):
     # Reserved key "affinity" should be validated to avoid unexpected
     # failures during instance creation.
     elif key == instance.Instance.METADATA_KEY_AFFINITY:
-        if not isinstance(value, dict):
-            return sf_api.error(
-                400, 'value for "affinity" key should be a valid JSON dictionary')
-
-        # The binary model is a second value shape under the same key,
-        # not a second key, so the two are told apart here by type. A
-        # dict whose keys are the four reserved names is the binary
-        # form; anything else is read as the weighted form and has to
-        # coerce to integers below. A spec mixing the two is refused
-        # rather than guessed at, because either guess silently
-        # discards half of what the caller asked for.
-        binary_keys = set(instance.Instance.AFFINITY_BINARY_KEYS)
-        present = set(value.keys())
-        if present & binary_keys:
-            unknown = present - binary_keys
-            if unknown:
-                return sf_api.error(
-                    400,
-                    'affinity keys %s are not valid alongside the binary '
-                    'affinity constraints; the weighted and binary forms '
-                    'cannot be mixed' % sorted(unknown))
-
-            for constraint, tags in value.items():
-                if not isinstance(tags, list):
-                    return sf_api.error(
-                        400,
-                        'value for affinity constraint "%s" should be a JSON '
-                        'list of tags' % constraint)
-                for tag in tags:
-                    # isinstance(True, str) is false, so booleans are
-                    # already excluded here, unlike in the weighted form.
-                    if not isinstance(tag, str) or not tag:
-                        return sf_api.error(
-                            400,
-                            'affinity constraint "%s" should contain only '
-                            'non-empty tag names' % constraint)
-            return
-
-        for key_type, dv in value.items():
-            # isinstance(True, int) is true in Python, so int(True) is 1 and a
-            # JSON true would be accepted as a weight of one. Nobody writing
-            # true means "weight 1", and the binary affinity model gives it a
-            # meaning nobody asked for, so refuse it explicitly.
-            if isinstance(dv, bool):
-                return sf_api.error(
-                    400, 'affinity dictionary values should be integers, not booleans')
-
-            # int() raises TypeError -- not ValueError -- for a list, a dict or
-            # None, and OverflowError for infinity. json.loads() accepts the
-            # bare Infinity and NaN literals by default, so flask hands them
-            # straight through and a bare ValueError handler returns a 500 to
-            # the caller. NaN is already covered: int(float('nan')) is a
-            # ValueError.
-            try:
-                int(dv)
-            except (TypeError, ValueError, OverflowError):
-                return sf_api.error(400, 'affinity dictionary values should be integers',
-                                    suppress_traceback=True)
+        # The rules an affinity document has to satisfy live in
+        # api_base, because the placement query checks the same
+        # document before it answers a question about it. Two
+        # readings of what an affinity document may say is how a
+        # query comes to answer "that would fit" about a document
+        # this path answers 400 to -- or worse, about a mistyped
+        # constraint read as no constraint at all.
+        return api_base.validate_affinity_document(value)
 
 
 class InstanceMetadataEndpoint(api_base.Resource):

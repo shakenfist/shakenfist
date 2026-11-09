@@ -184,7 +184,14 @@ class RealEndpointDerivationTestCase(base.ShakenFistTestCase):
     EXPECTED_FAMILIES = {
         'admin', 'agentoperation', 'artifact', 'auth', 'blob',
         'clusteroperation', 'instance', 'interface', 'issuer', 'label',
-        'network', 'node', 'rule', 'upload',
+        # placement is a family with no object behind it: a placement
+        # query reads the cluster's capacity and creates nothing, so
+        # granting placement.read is granting the question and nothing
+        # else. It is deliberately not part of the instance family,
+        # because a mapping rule which grants a tenant the right to ask
+        # whether instances would fit is not granting them the right to
+        # create one.
+        'network', 'node', 'placement', 'rule', 'upload',
         # Public endpoints. Their family is never consulted because
         # @public short-circuits before enforcement, but they are
         # listed so the assertion below is exhaustive.

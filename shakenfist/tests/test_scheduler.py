@@ -1,9 +1,11 @@
+import ast
 import importlib.util
 import os
 import random
 import time
 from unittest import mock
 
+from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import scheduler
@@ -2944,7 +2946,10 @@ class SchedulerStageAttributeTestCase(SchedulerTestCase):
     def test_the_stage_defaults_to_empty(self):
         # An exception raised without a stage still has the attribute,
         # so a handler reads a field rather than probing for one. The
-        # API turns an empty stage into 'unknown'.
+        # create path turns an empty stage into 'unknown' on its 507;
+        # the placement query publishes it as it arrives, and
+        # test_every_low_resource_raise_site_names_a_stage below is
+        # what makes that safe.
         self.assertEqual('', exceptions.SchedulerException('boom').stage)
         self.assertEqual('', exceptions.LowResourceException('boom').stage)
         self.assertEqual(
@@ -2980,6 +2985,83 @@ class SchedulerStageAttributeTestCase(SchedulerTestCase):
             self.assertEqual(stage, exc.stage)
             self.assertEqual(
                 f'No nodes remaining at scheduling stage {stage}', str(exc))
+
+    def test_every_low_resource_raise_site_names_a_stage(self):
+        """No LowResourceException may be raised without a stage.
+
+        The placement query publishes the stage exactly as the refusal
+        carried it, with nothing substituted for an empty one, because
+        a label the API invented is a label that cannot appear on
+        either side of the comparison a consumer makes between a
+        prediction and a real refusal. That makes "every raiser passes
+        one" a property of the code rather than a habit, so it is
+        derived from the source here: a new raise site which forgets
+        the stage fails this test instead of reaching a caller as an
+        empty string.
+
+        Two sites exist today. The filter stages all raise through
+        _log_and_raise_on_error(), whose stage is its caller's and
+        which test_every_scheduler_stage_is_classified() reads off the
+        call sites; the redirect's capacity guard raises its own with
+        CAPACITY_GUARD_STAGE. Neither passes a literal here, so what is
+        asserted is that a stage is passed at all and that it is not
+        the empty one.
+        """
+        root = os.path.dirname(os.path.abspath(scheduler.__file__))
+        wanted = {'LowResourceException', 'AffinityConstraintUnsatisfiable'}
+
+        found = []
+        for path, _, names in os.walk(root):
+            if os.path.sep + 'tests' in path:
+                continue
+            for name in sorted(names):
+                if not name.endswith('.py'):
+                    continue
+                full = os.path.join(path, name)
+                tree = ast.parse(open(full).read(), filename=full)
+                for node in ast.walk(tree):
+                    if not isinstance(node, ast.Raise):
+                        continue
+                    call = node.exc
+                    if not isinstance(call, ast.Call):
+                        continue
+                    func = call.func
+                    # Raised bare, qualified with the module, or -- as
+                    # the single stage helper does -- through a class
+                    # handed in by the caller.
+                    if isinstance(func, ast.Attribute):
+                        raised = func.attr
+                    elif isinstance(func, ast.Name):
+                        raised = func.id
+                    else:
+                        continue
+                    if raised not in wanted and raised != 'exception_class':
+                        continue
+
+                    where = '%s:%d' % (
+                        os.path.relpath(full, root), node.lineno)
+                    found.append(where)
+
+                    stage = [kw for kw in call.keywords if kw.arg == 'stage']
+                    self.assertEqual(
+                        1, len(stage),
+                        '%s raises a low resource refusal without a stage. '
+                        'The placement query publishes the stage as it '
+                        'arrives, so an absent one reaches a caller as an '
+                        'empty label rather than as a filter name' % where)
+                    value = stage[0].value
+                    if isinstance(value, ast.Constant):
+                        self.assertTrue(
+                            value.value,
+                            '%s passes an empty stage' % where)
+
+        # The vacuity floor: a walk which silently stopped matching
+        # would otherwise pass by examining nothing.
+        self.assertEqual(
+            ['operations/node_inst_netdesc_op.py:287', 'scheduler.py:1187'],
+            sorted(found),
+            'the set of low resource raise sites moved; read each one and '
+            'check it still names a stage before updating this list')
 
     def test_the_affinity_subclass_is_given_its_stage_too(self):
         # The affinity stage raises a different class, passed in by the
@@ -3155,6 +3237,176 @@ class MultisetPlacementTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_idle_memory',
             str(exc))
+        # The fourth shape of four is the one that ran out, and the
+        # refusal says so: a caller told only the stage knows that
+        # something did not fit and not what.
+        self.assertEqual(3, exc.shape)
+
+    def _metadata_reads(self, affinity, neighbours=3, shapes=2):
+        """Count the metadata reads one multiset decision performs.
+
+        Instance.tags is a metadata read and nothing caches it, so each
+        access is a database round trip. Counting them is the only way
+        to assert this: a timing assertion on a read this small would
+        flake and would not say what regressed.
+        """
+        for j in range(neighbours):
+            self.mock_mariadb.create_instance(
+                'neighbour-%d' % j, place_on_node='node2',
+                metadata={'tags': ['web']})
+
+        requested = [self._shape(affinity=affinity) for _ in range(shapes)]
+
+        real = baseobject.mariadb.get_object_metadata
+        reads = []
+
+        def counting(*args, **kwargs):
+            reads.append(args)
+            return real(*args, **kwargs)
+
+        with mock.patch.object(
+                baseobject.mariadb, 'get_object_metadata', counting):
+            scheduler.Scheduler().find_candidates_for_shapes(requested)
+
+        return reads
+
+    def test_a_neighbours_tags_are_read_once_per_scoring_visit(self):
+        """The scorer reads each neighbour's tags once, not once per tag.
+
+        Only node2 carries neighbours, so it is the only node whose
+        instances are ever read: the empty nodes score zero and are
+        dropped from the preferred bucket. Each of the two shapes is
+        scored against it once, and each of its three neighbours is
+        read twice per visit -- once by the neighbour-skip predicate,
+        which owns that read and is deliberately left alone, and once
+        by the scorer, which hands the same value to both preferred-tag
+        loops and to the audit payload. 2 shapes x 3 neighbours x 2
+        reads = 12.
+
+        The exact number is asserted rather than a ceiling, because a
+        ceiling loose enough to be comfortable is loose enough to
+        absorb a repeat read somebody reintroduces.
+        """
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        reads = self._metadata_reads({
+            'prefer_with_tag': ['web', 'db'],
+            'prefer_without_tag': ['batch']})
+
+        self.assertEqual(12, len(reads))
+        # Three rows, read four times each across the decision. The
+        # rows are what makes the count above a statement about repeat
+        # reads rather than about how much there was to read.
+        self.assertEqual(3, len(set(reads)))
+
+    def test_scoring_a_neighbour_costs_the_same_whatever_tags_are_asked(self):
+        """The read count does not grow with the specification.
+
+        Each preferred-tag loop used to read the neighbour's tags once
+        per tag it was given, so asking about more tags cost more round
+        trips for no more information. This is the assertion that
+        catches that specifically: the same cluster, scored against a
+        specification naming seven tags instead of three, must perform
+        exactly the same reads.
+        """
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        reads = self._metadata_reads({
+            'prefer_with_tag': ['web', 'db', 'cache', 'batch', 'spare'],
+            'prefer_without_tag': ['batch', 'other']})
+
+        self.assertEqual(12, len(reads))
+
+    def test_a_refusal_names_the_shape_in_the_callers_own_order(self):
+        # The set is walked largest first, so the shape which runs out
+        # here is the second one the caller listed -- the only one too
+        # large for any node -- and it is neither the first shape nor
+        # the last. An index counting the shapes already placed, or
+        # counting in the walk's own order, would be wrong in both
+        # directions, and a caller cannot map either back onto the list
+        # it sent.
+        self.mock_mariadb.set_node_metrics_same(
+            self._baseline(memory_available=8192))
+        s = scheduler.Scheduler()
+
+        exc = self.assertRaises(
+            exceptions.LowResourceException, s.find_candidates_for_shapes,
+            [self._shape(memory_mb=1024), self._shape(memory_mb=65536),
+             self._shape(memory_mb=1024)])
+
+        self.assertEqual('sufficient_idle_memory', exc.stage)
+        self.assertEqual(1, exc.shape)
+
+    def test_a_hard_affinity_refusal_names_its_shape_too(self):
+        # The other exception class the walk raises carries the index
+        # on the same field, so a caller reads one place whatever
+        # refused. The second shape is the one with the constraint.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        s = scheduler.Scheduler()
+
+        exc = self.assertRaises(
+            exceptions.AffinityConstraintUnsatisfiable,
+            s.find_candidates_for_shapes,
+            [self._shape(),
+             self._shape(affinity={'require_with_tag': ['database']})])
+
+        self.assertEqual('affinity_constraints', exc.stage)
+        self.assertEqual(1, exc.shape)
+
+    def test_a_single_shape_refusal_names_shape_zero(self):
+        # The one-shape caller is a set of one, so the field is present
+        # and is 0 rather than absent. A caller which reads it does not
+        # have to special case the single request path.
+        self.mock_mariadb.set_node_metrics_same(
+            self._baseline(memory_available=1024))
+        s = scheduler.Scheduler()
+
+        exc = self.assertRaises(
+            exceptions.LowResourceException, s.find_candidates_for_shapes,
+            [self._shape(memory_mb=65536)])
+
+        self.assertEqual(0, exc.shape)
+
+    def test_a_refusal_outside_the_walk_names_no_shape(self):
+        # The field defaults to None, so a refusal raised by something
+        # which was not walking a set member -- the capacity guard, for
+        # one -- does not claim to name a shape. A default of 0 would
+        # have every such refusal pointing at the first one.
+        self.assertIsNone(exceptions.LowResourceException('nope').shape)
+        self.assertIsNone(
+            exceptions.LowResourceException('nope', stage='whatever').shape)
+
+    def test_a_refusal_which_already_names_a_shape_is_left_alone(self):
+        # The set loop attaches the index only when the refusal does not
+        # already carry one, so a refusal raised one day closer to the
+        # shape it was walking stays authoritative. Nothing raises an
+        # already-attributed refusal today, which is exactly why the
+        # guard needs a test: a documented property with nothing
+        # exercising it is one that quietly stops being true.
+        #
+        # The index handed over is deliberately not a valid index into
+        # this set, so the loop agreeing with it cannot be mistaken for
+        # the loop leaving it alone.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        s = scheduler.Scheduler()
+
+        def already_attributed(*args, **kwargs):
+            raise exceptions.LowResourceException(
+                'No nodes remaining at scheduling stage sufficient_idle_cpu',
+                stage='sufficient_idle_cpu', shape=7)
+
+        with mock.patch.object(s, '_find_candidates_for_shape',
+                               side_effect=already_attributed):
+            exc = self.assertRaises(
+                exceptions.LowResourceException,
+                s.find_candidates_for_shapes,
+                [self._shape(), self._shape()])
+
+        self.assertEqual(
+            7, exc.shape,
+            'the set loop overwrote a shape index the refusal already '
+            'carried')
+        self.assertEqual('sufficient_idle_cpu', exc.stage)
 
     def test_a_disk_charge_is_debited_in_bytes(self):
         # disk_free_instances is published in bytes and a shape's disk is
