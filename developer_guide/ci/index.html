@@ -16118,6 +16118,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="CI Caching">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#guest-images-come-from-the-cache-disk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guest images come from the cache disk
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -17301,6 +17318,22 @@ caches.
 - <strong>Proxy bypass</strong>: <code>no_proxy</code>/<code>NO_PROXY</code> set to
   <code>localhost,127.0.0.1,10.0.0.0/8</code> to prevent local service traffic from
   being routed through the proxy.</p>
+<h3 id="guest-images-come-from-the-cache-disk">Guest images come from the cache disk<a class="headerlink" href="#guest-images-come-from-the-cache-disk" title="Permanent link">&para;</a></h3>
+<p>Guest images are not cached by the proxy -- they are too big to be worth
+it, and a nested cluster fetching one pays for it inside whatever await
+budget the test gave the create. The <code>/srv/ci</code> disk attached to the CI
+clusters carries a copy of each image the <code>shakenfist/actions</code>
+dependencies build caches, so a suite which boots a guest should import
+the cached copy and boot from the artifact rather than naming the image.</p>
+<p>A disk base which is a well known image name (<code>debian:11</code>) is always an
+internet fetch: the server expands it against <code>IMAGE_DOWNLOAD_URL</code> and
+downloads it, whatever is on the cache disk. <code>sf-client artifact upload
+&lt;name&gt; /srv/ci/&lt;image&gt; --shared --no-checksum</code> turns a cached file into
+an artifact, and <code>sf://upload/system/&lt;name&gt;</code> is the base which boots it.
+The upload has to be shared for a test running in its own namespace to
+see it. <code>shakenfist/deploy/ansiblemoduletests.sh</code> does this for
+<code>debian:11</code> and overrides the scenarios' <code>debian_11_base</code> with the
+result, falling back to the image name when the cache disk is absent.</p>
 <h2 id="fork-pull-requests-and-the-runner-pool">Fork pull requests and the runner pool<a class="headerlink" href="#fork-pull-requests-and-the-runner-pool" title="Permanent link">&para;</a></h2>
 <p>Workflow runs from a fork wait for a maintainer's approval:
 <code>fork-pr-contributor-approval</code> on this repository is
