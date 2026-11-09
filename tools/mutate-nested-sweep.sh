@@ -86,8 +86,8 @@ BACKUP=$(mktemp -d /tmp/mutate-nested-sweep-XXXXXX)
 # basename key silently collides: the second snapshot overwrites the
 # first, and restore() then copies one file's contents over the other,
 # destroying uncommitted work in a file it was supposed to be
-# protecting. That happened once, in the third round of review on phase
-# 8, the moment the test base joined the list.
+# protecting. That happened once, in a review round of this script, the
+# moment the test base joined the list.
 snapshot_key() {
     echo "${BACKUP}/${1//\//_}"
 }
@@ -389,8 +389,8 @@ check "videospec null guard" "video.model.null"
 
 # ---------------------------------------------------------------------
 # 11b. The videospec `memory` guard, which is the other half of the
-#      same review item and a separate line of code. Added by the phase
-#      8 audit, which found the script was behind the code: the review
+#      same review item and a separate line of code. Added by a push
+#      audit, which found the script was behind the code: the review
 #      round added three guards and only one of them was mutated here.
 # ---------------------------------------------------------------------
 run "the videospec memory guard tests presence again (review item 1)"

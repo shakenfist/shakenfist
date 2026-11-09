@@ -2016,8 +2016,8 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
             # Not unsignedinteger: -1 is a supported sentinel meaning
             # "the whole log", which get_console_data() special-cases
             # and the functional suite relies on. Publishing minimum 0
-            # would describe the API as narrower than it is, and phase
-            # 4 would compile that into rejecting a value which works.
+            # would describe the API as narrower than it is, and the
+            # validation layer would reject a value which works.
             ('length', 'body', 'integer',
              'The amount of data to fetch, defaults to 10240 bytes. Use -1 '
              'to fetch the entire console log.', False)

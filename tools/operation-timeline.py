@@ -104,10 +104,10 @@ Loki rules, which are load bearing
 Loki caps a query at 5000 lines. Asking for more fails the request outright.
 Asking for exactly 5000 succeeds and *silently* returns only the most recent
 5000 lines, which is the dangerous case: a truncated window looks exactly
-like a complete one, and that already caused one wrong measurement in phase
-9. So this tool pages ``query_range`` in half-hour chunks, treats a chunk
-which comes back holding exactly the limit as truncated, subdivides it and
-retries, and reports what it had to do. A chunk still at the ceiling at the
+like a complete one, and that has already produced one wrong measurement of
+queue latency. So this tool pages ``query_range`` in half-hour chunks, treats
+a chunk which comes back holding exactly the limit as truncated, subdivides it
+and retries, and reports what it had to do. A chunk still at the ceiling at the
 minimum chunk size is reported as a hard truncation, loudly, at the top of
 the output where it cannot be missed.
 

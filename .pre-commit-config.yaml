@@ -161,16 +161,18 @@ repos:
         pass_filenames: false
 
       - id: check-plan-phase-references
-        name: Check documentation cites no plan phase numbers
+        name: Check nothing cites plan phases, decisions or steps
         description: >-
-          Documentation describes the current state of the software, not the
-          history of how it was built, so it must not cite implementation
-          plan phase numbers (the plan-phase-references consistency audit).
-          Describe the current behaviour instead, or link the master plan in
-          docs/plans/.
+          Documentation and code describe the current state of the software,
+          not the history of how it was built, so neither may cite an
+          implementation plan's phase, decision or step numbers (the
+          plan-phase-references and plan-history-in-source consistency
+          audits). Write the reason the code is this way instead, or link
+          the master plan in docs/plans/. A pointer to a PLAN-*.md file is
+          left alone; the numbered citation beside it is not.
         entry: python3 tools/check-plan-phase-references.py
         language: system
-        files: ^(docs/.*\.md|AGENTS\.md|ARCHITECTURE\.md|README\.md)$
+        files: ^(?!docs/(.*/)?plans/).*$
         pass_filenames: false
 
       - id: check-signal-handlers

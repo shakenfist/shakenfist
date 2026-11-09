@@ -147,3 +147,155 @@ class PlanPhaseReferenceRegressionTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             [], problems,
             'Plan phase references in documentation:\n' + '\n'.join(problems))
+
+
+class PlanHistoryInSourceFixtureTestCase(base.ShakenFistTestCase):
+    """The source side of the same rule (the plan-history-in-source audit).
+
+    A comment saying a guard was added in a numbered phase, or that a
+    limit is what it is per a numbered decision, records how the code
+    came to be and not why it is the way it is -- and the reader of the
+    code has not read the plan, which is often finished or archived.
+    """
+
+    def _write(self, tmp, name, content):
+        path = os.path.join(tmp, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write(content)
+        return path
+
+    def _problems(self, name, content):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write(tmp, name, content)
+            return checker.source_problems(root_dir=tmp)
+
+    def test_clean_source_passes(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# The guard sits where the exception is raised.\n'))
+
+    def test_a_phase_citation_is_reported_with_its_line(self):
+        problems = self._problems(
+            'shakenfist/thing.py',
+            '# A comment.\n# The branch landed in phase 3.\n')
+        self.assertEqual(1, len(problems))
+        self.assertIn('thing.py:2', problems[0])
+        self.assertIn("'phase 3'", problems[0])
+
+    def test_the_three_extra_source_shapes_are_reported(self):
+        for citation in ('the phase-4 leaks pass', 'per decision 6.4',
+                         'pending step 5f'):
+            self.assertEqual(
+                1, len(self._problems('shakenfist/thing.py',
+                                      f'# {citation}\n')),
+                citation)
+
+    def test_a_bare_numbered_step_is_not_a_citation(self):
+        # "step 1: open the file" is ordinary procedural prose, so only
+        # the lettered form is read as a plan's.
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py', '# step 1: open the file\n'))
+
+    def test_an_unnumbered_phase_is_not_a_citation(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py', '# A two-phase commit, in phases.\n'))
+
+    def test_a_quoted_shape_is_ignored(self):
+        # A comment may say what shape it is talking about, in single or
+        # double backticks.
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# The nav entry reads `phase 3`, and so does ``phase 4a``.\n'))
+
+    def test_a_shape_beside_a_quoted_one_is_still_reported(self):
+        self.assertEqual(1, len(self._problems(
+            'shakenfist/thing.py',
+            '# `sf-ctl` grew this in phase 2 of the plan.\n')))
+
+    def test_a_url_is_an_address_not_prose(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# See https://example.com/PLAN-thing/phase-4/notes\n'))
+
+    def test_a_plan_filename_is_left_to_the_other_check(self):
+        # A phase-per-file plan carries the number in its name, and an
+        # unbuilt behaviour may legitimately name the plan which will
+        # build it. Whether the file resolves is a different audit's.
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# See docs/plans/PLAN-thing-phase-04-guard.md.\n'))
+
+    def test_the_line_marker_suppresses_a_line(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            "# A three-phase 415V supply.  # audit-ok: phase-reference\n"))
+
+    def test_the_file_marker_suppresses_the_whole_file(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# audit-ok: phase-reference-file -- fixtures.\n'
+            '# Landed in phase 3, and in decision 2.\n'))
+
+    def test_mkdocs_is_skipped(self):
+        # A plan with a page per phase puts a nav entry per phase in it.
+        self.assertEqual([], self._problems(
+            'mkdocs.yml', '    - "Phase 3: the guard": plans/p3.md\n'))
+
+    def test_markdown_and_plans_directories_are_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write(tmp, 'docs/guide.md', 'Phase 3 landed the guard.\n')
+            self._write(tmp, 'docs/plans/helper.py',
+                        '# Phase 3 landed the guard.\n')
+            self._write(tmp, 'docs/components/other/plans/h.py',
+                        '# Phase 4 landed the rest.\n')
+            self.assertEqual([], checker.source_problems(root_dir=tmp))
+
+    def test_a_citation_split_by_a_line_wrap_is_reported(self):
+        # The fleet audit reads one line at a time and cannot see these.
+        # Seven were in this repository while it reported one reference.
+        problems = self._problems(
+            'shakenfist/thing.py',
+            '        """A docstring.\n'
+            '\n'
+            '        This is a warning rather than an error. Phase\n'
+            '        5 turns it into a refusal.\n'
+            '        """\n')
+        self.assertEqual(1, len(problems))
+        self.assertIn('thing.py:3', problems[0])
+        self.assertIn("'Phase 5'", problems[0])
+
+    def test_a_wrapped_bare_step_is_still_not_a_citation(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# This is the table the sweep publishes, and steps\n'
+            '# 2 and 3 act on it.\n'))
+
+    def test_a_wrapped_lettered_step_is_reported(self):
+        self.assertEqual(1, len(self._problems(
+            'shakenfist/thing.py',
+            '# Not reproducible from the README step\n'
+            '# 2d is required to write.\n')))
+
+    def test_a_wrapped_lettered_phase_is_reported(self):
+        # The phase shape carries no trailing word boundary, so a
+        # sub-phase matches wrapped as well as whole.
+        self.assertEqual(1, len(self._problems(
+            'shakenfist/thing.py',
+            '# Check-then-charge, as the real clause does since phase\n'
+            '# 4a: the charge lands for the next decision.\n')))
+
+    def test_a_binary_file_is_not_read_as_prose(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'thing.bin')
+            with open(path, 'wb') as f:
+                f.write(b'phase 3\x00phase 4')
+            self.assertEqual([], checker.source_problems(root_dir=tmp))
+
+
+class PlanHistoryInSourceRegressionTestCase(base.ShakenFistTestCase):
+    def test_the_shipped_source_is_clean(self):
+        problems = checker.source_problems()
+        self.assertEqual(
+            [], problems,
+            'Plan history references in source:\n' + '\n'.join(problems))
