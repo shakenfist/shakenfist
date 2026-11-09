@@ -295,6 +295,33 @@ class DiskSpecReferenceTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, mariadb.disk_spec_virtual_gb({'size': 10}))
         self.assertEqual(0, mariadb.disk_spec_virtual_gb(None))
 
+    def test_strict_changes_no_readable_sum(self):
+        # strict is about what an unreadable value costs, not about how
+        # large a readable spec is, so every sum above is unchanged by
+        # it. A sizeless disk and a null size are readable: they claim
+        # the size of their base image, which is not a malformed spec.
+        for spec, expected in (
+                ([{'size': 10}, {'size': 20}], 30),
+                ([{'size': 10}, {'base': 'cd'}, {'size': None}], 10),
+                ([{'size': 10.5}], 11),
+                ([{'size': '8.7'}], 9),
+                ([{'size': True}], 1)):
+            self.assertEqual(
+                expected, mariadb.disk_spec_virtual_gb(spec, strict=True),
+                f'{spec!r} summed differently in strict mode')
+
+    def test_strict_refuses_what_the_default_counts_as_zero(self):
+        # The scheduler sums a request which has not been admitted yet,
+        # where a size nothing can read is not a claim of zero
+        # gigabytes. The three places the default warns raise instead.
+        for spec in ([{'size': 'banana'}],
+                     [{'size': {'gb': 8}}],
+                     [{'size': 10}, 'garbage'],
+                     {'size': 10},
+                     None):
+            self.assertRaises(
+                ValueError, mariadb.disk_spec_virtual_gb, spec, strict=True)
+
 
 class ClaimUsageStatementTestCase(base.ShakenFistTestCase):
     """_RECONCILE_CLAIM_USAGE_SQL's shape.

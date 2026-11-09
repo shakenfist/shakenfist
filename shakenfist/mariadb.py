@@ -26766,13 +26766,30 @@ def _decayed_demand_contribution(
     return cpus * demand_per_vcpu * (1.0 - age / demand_decay_seconds)
 
 
-def disk_spec_virtual_gb(disk_spec: Any) -> int:
+def _malformed_disk_spec(strict: bool, message: str) -> None:
+    """What a disk_spec element the sum cannot read costs the caller.
+
+    The reconciler and the ledger sum specs which are already stored,
+    where a value the SQL counts as zero must not stop the recompute, so
+    they warn. A caller summing a request which has not been admitted
+    yet fails closed instead: a size nothing can read is not a claim of
+    zero gigabytes, and the create which carries it has to fail where
+    the value is read rather than minutes later on a hypervisor.
+    """
+    if strict:
+        raise ValueError(message)
+    LOG.warning(message)
+
+
+def disk_spec_virtual_gb(disk_spec: Any, strict: bool = False) -> int:
     """Sum the virtual sizes (in GB) of a disk_spec JSON list.
 
     Public because it is the one implementation of "how big is this
-    instance's disk claim": instance.py's capacity claim and the queues
-    daemon's startup repair must not reimplement the sum, or acquire
-    and release drift from the counters the reconciler recomputes.
+    instance's disk claim": instance.py's capacity claim, the queues
+    daemon's startup repair and the scheduler's requested shape must not
+    reimplement the sum, or acquire and release drift from the counters
+    the reconciler recomputes, and the filters evaluate a request of a
+    different size to the one the ledger then charges.
 
     This is the executable specification of the JSON_TABLE aggregation in
     _RECONCILE_USAGE_SQL: elements without a numeric ``size`` (missing,
@@ -26790,15 +26807,23 @@ def disk_spec_virtual_gb(disk_spec: Any) -> int:
     int() would truncate, and either divergence is exactly the silent
     wrong number this oracle exists to expose. Booleans cast to 0/1 as
     they do in SQL. No current write path produces fractional sizes, so
-    this is soundness of the oracle rather than a live behaviour.
+    the rounding is soundness of the oracle rather than a live
+    behaviour -- but it is the live behaviour of every caller, which is
+    why they share it rather than each summing for themselves.
+
+    ``strict`` raises a ValueError where the default warns, and changes
+    no sum: see _malformed_disk_spec() for which caller wants which, and
+    why that is not the same question as how large a readable spec is.
     """
     if not isinstance(disk_spec, list):
-        LOG.warning(f'Malformed disk_spec (not a list): {disk_spec!r}')
+        _malformed_disk_spec(
+            strict, f'Malformed disk_spec (not a list): {disk_spec!r}')
         return 0
     total = 0
     for disk in disk_spec:
         if not isinstance(disk, dict):
-            LOG.warning(f'Malformed disk_spec element: {disk!r}')
+            _malformed_disk_spec(
+                strict, f'Malformed disk_spec element: {disk!r}')
             continue
         size = disk.get('size')
         if size is None:
@@ -26811,7 +26836,8 @@ def disk_spec_virtual_gb(disk_spec: Any) -> int:
             total += int(decimal.Decimal(str(size)).quantize(
                 decimal.Decimal('1'), rounding=decimal.ROUND_HALF_UP))
         except (decimal.InvalidOperation, TypeError, ValueError):
-            LOG.warning(f'Malformed disk_spec size: {size!r}')
+            _malformed_disk_spec(
+                strict, f'Malformed disk_spec size: {size!r}')
     return total
 
 

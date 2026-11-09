@@ -93,17 +93,33 @@ class PlacementShape(NamedTuple):
 
         The only place a shape is read out of an Instance, and therefore
         the only place which has to know how an instance expresses its
-        request. It is also the one copy of the disk sum: the audit
-        event recording the inputs to a decision and the disk filter
-        which acts on them each summed disk_spec separately, which is
+        request. It is also the only place placement sums a disk_spec:
+        the audit event recording the inputs to a decision and the disk
+        filter which acts on them each summed it separately, which was
         two chances to disagree about how large a request is.
 
         placed_on is the same field instance.placement_filter() compares
         a node against, so the reschedule self-charge exemption cannot
         drift from the placement it is exempting.
 
-        cpus and memory are cast, as the disk sizes already are. The
-        create API deliberately accepts a numeric string for an integer
+        The disk sum is mariadb.disk_spec_virtual_gb(), which is the one
+        implementation of "how many gigabytes does this disk claim".
+        Instance._capacity_claim charges the ledger with that helper, so
+        delegating to it is what makes the filters evaluate the same
+        request the ledger then charges: summing here instead with
+        int() truncated, so a disk_spec of [{"size": 10.5}] was filtered
+        as 10 GB and charged as 11. The helper also absorbs the
+        sizeless-disk case this factory used to carry a TODO about -- a
+        missing or null size is the size of the base image, and
+        contributes nothing to the claim.
+
+        It is called strictly, because this is a request rather than a
+        stored row: a size the sum cannot read raises here, as it did
+        when this factory read it with int(), instead of being counted
+        as a claim of zero gigabytes and admitted.
+
+        cpus and memory are cast, as the disk sizes are by that helper.
+        The create API deliberately accepts a numeric string for an integer
         body field -- a validator which refused "2" would be narrower
         than the handler behind it -- so an instance can carry its vCPU
         count as a string, and this is the one place which reads a
@@ -121,23 +137,18 @@ class PlacementShape(NamedTuple):
         Typing the request where it enters the API is what closes
         that, and this type is the wrong place for it.
 
-        int() truncates, and nothing non-integral reaches it. A JSON
-        number with a fractional part is refused by the integer field
-        in shakenfist/external_api/validation.py, and an integral
-        float is the same JSON number as the integer, so int(8.0) is
-        exact. The cheap filter and the admission guard therefore
-        cannot disagree about the size of a request by a truncated
-        vCPU.
+        int() truncates, and nothing non-integral reaches the two casts
+        which remain. A JSON number with a fractional part is refused by
+        the integer field in shakenfist/external_api/validation.py, and
+        an integral float is the same JSON number as the integer, so
+        int(8.0) is exact. The cheap filter and the admission guard
+        therefore cannot disagree about the size of a request by a
+        truncated vCPU.
         """
-        disk_gb = 0
-        for disk in inst.disk_spec:
-            # TODO(mikal): this ignores "sizeless disks", that is ones that
-            # are exactly the size of their base image, for example CD ROMs.
-            if 'size' in disk and disk['size'] is not None:
-                disk_gb += int(disk['size'])
-
         return cls(
-            cpus=int(inst.cpus), memory_mb=int(inst.memory), disk_gb=disk_gb,
+            cpus=int(inst.cpus), memory_mb=int(inst.memory),
+            disk_gb=mariadb.disk_spec_virtual_gb(
+                inst.disk_spec, strict=True),
             affinity=inst.affinity, namespace=inst.namespace,
             instance_uuid=inst.uuid,
             placed_on=inst.placement.get('node'),
