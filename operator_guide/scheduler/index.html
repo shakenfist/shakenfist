@@ -14042,6 +14042,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user_guide/placement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Placement queries
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user_guide/consoles/" class="md-nav__link">
         
   
@@ -15648,6 +15676,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#asking-whether-a-set-of-instances-would-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asking whether a set of instances would fit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Asking whether a set of instances would fit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-get-adminresources-does-not-answer-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why GET /admin/resources does not answer this
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#system-reservations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16018,6 +16074,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#asking-whether-a-set-of-instances-would-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asking whether a set of instances would fit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Asking whether a set of instances would fit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-get-adminresources-does-not-answer-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why GET /admin/resources does not answer this
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#system-reservations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16358,6 +16442,58 @@ scored for affinity in the first place. If load shedding eliminates
 was affine to silently placed it anywhere with headroom, and the
 anti-affinity case could leave an instance on the one node it was
 asked to avoid.</p>
+<h2 id="asking-whether-a-set-of-instances-would-fit">Asking whether a set of instances would fit<a class="headerlink" href="#asking-whether-a-set-of-instances-would-fit" title="Permanent link">&para;</a></h2>
+<p><code>POST /placement</code> asks the placement pipeline above whether a set of
+instances <em>would</em> be placed, before anything is created. The request is
+a list of shapes -- <code>cpus</code>, <code>memory</code> in megabytes, optionally <code>disk</code> in
+gigabytes (or a <code>disk_spec</code> list in the form an instance create takes),
+an optional <code>affinity</code> document and an optional <code>count</code>. Each shape is
+walked through the real stages in order, and is charged to the node it
+would land on before the next shape is considered, so a set is never
+told that two of its members fit in one node's worth of room. Any
+authenticated caller may ask, and the question is evaluated in the
+caller's own namespace, so affinity stages count only that namespace's
+instances. A client learns the endpoint exists from the
+<code>placement-query</code> capability.</p>
+<ul>
+<li><strong>It writes nothing and publishes nothing.</strong> No instance, no capacity
+  counter and no claim is created or changed, and no audit events are
+  published, so a speculative query leaves no trail against anybody's
+  instance.</li>
+<li><strong>The answer is advisory and racy by construction.</strong> Nothing is
+  reserved. Room found by a query can be gone by the next request, and a
+  create is still admitted or refused by the guarded capacity claim
+  described below. Treat <code>fits: true</code> as data about the cluster a moment
+  ago, not as a promise.</li>
+<li><strong>A set which does not fit is a 200, not a 507.</strong> The question was
+  answered successfully; the answer is <code>fits: false</code>. The response names
+  the pipeline <code>stage</code> which emptied the candidate list (for example
+  <code>sufficient_idle_memory</code> or <code>capacity_guard</code>, in the same vocabulary
+  the placement events use) and the index, <code>shape</code>, of the shape being
+  walked, counted after <code>count</code> has been expanded. A 507 remains what a
+  create gets. A 503 means the database could not be reached and the
+  question could not be answered; retry.</li>
+<li><strong>Per-node detail requires admin.</strong> A cluster administrator also
+  receives, for a set that fits, a <code>shapes</code> array in the order asked,
+  giving each shape's chosen <code>node</code> and its <code>candidates</code> (the chosen
+  node first, followed by fallbacks). Every other caller receives only
+  the set-level verdict, including the refusing stage, because node
+  identity is cluster topology that no other endpoint gives to a
+  non-administrator.</li>
+<li><strong>The set is bounded.</strong> A query may ask about at most 64 shapes,
+  counted after each shape's <code>count</code> is expanded. More is a 400 naming
+  the bound. A short request body can otherwise buy a long walk.</li>
+</ul>
+<h3 id="why-get-adminresources-does-not-answer-this">Why <code>GET /admin/resources</code> does not answer this<a class="headerlink" href="#why-get-adminresources-does-not-answer-this" title="Permanent link">&para;</a></h3>
+<p>The first instinct when asking "is there room?" is to read
+<code>/admin/resources</code>. It cannot answer the question: whether a node has
+room is a verdict about a <em>shape</em>, and that endpoint takes no shape. It
+reports per-node figures, not whether a particular request would be
+accepted by the filters, affinity stages and the capacity guard. Deriving
+an answer from those figures by hand is a second, independent
+implementation of the pipeline which will drift from the real one. To
+get a per-node answer, ask <code>POST /placement</code> with the shape you care
+about, as an administrator.</p>
 <h2 id="system-reservations">System reservations<a class="headerlink" href="#system-reservations" title="Permanent link">&para;</a></h2>
 <p>Some of a machine's capacity is never offered to instances. Each
 node carries three <strong>per-node</strong> reservation values -- RAM, CPU and
