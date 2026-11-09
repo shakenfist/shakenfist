@@ -39,9 +39,9 @@ answer = client.check_placement([
 ])
 ```
 
-`check_placement()` is available in client-python from v0.8.5. It takes a list
-of shape mappings and returns the parsed answer. A set that does not fit is
-a successful call which returns `fits: False`; it does not raise.
+`check_placement()` needs client-python v0.8.5 or newer. It takes a list of
+shape mappings and returns the parsed answer. A set that does not fit is a
+successful call which returns `fits: False`; it does not raise.
 
 It does raise `IncapableException` when the cluster does not advertise the
 capability, rather than sending a request that an older server would answer
@@ -59,10 +59,18 @@ If it would not, the answer is a normal successful response which says why:
 
 `stage` names the scheduler check which ruled out every remaining hypervisor,
 and `shape` is the index of the instance being placed at the time, counting
-each shape `count` times. A hard affinity constraint which cannot be satisfied
+each shape `count` times. It is null if the refusal did not come from placing
+one of your shapes. A hard affinity constraint which cannot be satisfied
 names a different stage to one that merely ran out of capacity, so you can tell
 "the cluster is full" from "nothing satisfies the constraint you asked for".
 Placement is all or nothing: a set that does not fit has no partial answer.
+
+The stages a query can name are the scheduler's filter and affinity checks.
+It will never answer `capacity_guard`: that is the ledger check a create
+makes when it actually claims the capacity, and only a create can meet it. So
+a create can still be refused at `capacity_guard` moments after a query said
+the set would fit — the room was there when you asked and somebody else took
+it, which is what "advisory" means below.
 
 Cluster administrators additionally receive a `shapes` list, in the order
 asked, naming the hypervisor each shape would land on and its fallbacks.

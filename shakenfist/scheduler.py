@@ -498,6 +498,24 @@ def _affinity_neighbour_skip(shape, instance_uuid, i):
     The namespace skip is the trust boundary: crossing it would let a
     caller learn what another tenant is running by watching where
     their own instances refuse to land.
+
+    The order of the last two tests is the cheap one rather than the
+    historical one. ``namespace`` is a field of the instance's own row
+    and is already in hand; ``tags`` is a metadata read which nothing
+    caches, so each access is a database round trip. Testing tags
+    first read, and then discarded, the metadata of every instance in
+    every other namespace on every candidate node -- work whose result
+    could not change the answer, because a foreign instance is skipped
+    whatever its tags say.
+
+    One consequence is accepted rather than avoided. An instance which
+    is both tagless *and* foreign is now reported as skipped for
+    ``different namespace`` where it used to be reported as ``no
+    tags``. Both are true of it and neither is more true; nothing
+    reads the reason, which is audit prose rather than an input to any
+    decision. The namespace reason is arguably the better answer for
+    such an instance anyway, since it is the test which would go on
+    skipping it if somebody tagged it tomorrow.
     """
     if not i:
         return {
@@ -509,16 +527,16 @@ def _affinity_neighbour_skip(shape, instance_uuid, i):
             'instance_uuid': instance_uuid,
             'skipped': 'self',
         }
-    if not i.tags:
-        return {
-            'instance_uuid': instance_uuid,
-            'skipped': 'no tags',
-        }
     if i.namespace != shape.namespace:
         return {
             'instance_uuid': instance_uuid,
             'skipped': 'different namespace',
             'namespace': i.namespace,
+        }
+    if not i.tags:
+        return {
+            'instance_uuid': instance_uuid,
+            'skipped': 'no tags',
         }
     return None
 

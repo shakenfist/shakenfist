@@ -58,7 +58,16 @@ Out:
   expression. Phase 6, per `D11`'s "left to phase 6".
 - Any change to what a filter decides, what a stage is called, or
   what any event contains (`G5`). This phase adds a reader of the
-  placement pipeline, not a change to it.
+  placement pipeline, not a change to it. **One exception was made
+  deliberately after the review round**, and it is the only one: the
+  affinity skip predicate now tests the namespace before it reads an
+  instance's tags, which changes the `skipped` reason reported for an
+  instance that is both tagless and foreign from `no tags` to
+  `different namespace`. Both are true of such an instance and nothing
+  reads the reason -- it is audit prose rather than an input to a
+  decision. The saving is every metadata read the query used to spend
+  on instances in other namespaces, which on a cluster with many
+  namespaces is most of the reads it makes.
 - Issue #4842, the string `cpus` 500 at admission. Filed during
   this phase's survey (`F9`) and deliberately not fixed here: it
   is a create-path type error, and a phase that adds a query has
@@ -527,7 +536,9 @@ way around.
 13. The client-python method merges, is recorded in the master
     plan's Execution table in the `client-python <sha> (#pr)`
     form, and refuses to call a server that does not advertise the
-    capability.
+    capability. Merged as client-python `4ff8a7d` (#448), recorded
+    in the Execution table beside this phase's own merge, and the
+    capability gate is tested by asserting no request is sent.
 14. `D9`'s handover exists as a `plan-blockers` entry naming what
     private-ci must switch, soak and read, and phase 3's section
     of the master plan points at it. Recorded as blocker `b4`
@@ -737,3 +748,46 @@ its own whether to answer 401 or 403.
 caught.** Step 2a was told flake8 here enforces 79 columns. It
 enforces 120 (`tools/flake8wrap.sh`). Nothing was mis-wrapped as a
 result, but the correction belongs in the record.
+
+### Review round on the pull request
+
+One automated round, 3 document and 8 consider items, no `fix`. Nine
+were actioned and one declined. Three are worth recording beyond the
+commit message.
+
+**The query advertised a stage it can never return.** The module
+docstring, the operator guide and the user guide all listed
+`capacity_guard` among the stages an answer may carry. It is raised
+only at admission, and the query never reaches admission. That is
+worse than ordinary drift here, because the endpoint exists so a
+deployed consumer can score predictions against real refusals label
+for label, and `capacity_guard` is precisely the refusal a dry run
+cannot predict. The lists are corrected and each page now says
+admission-only stages reach a create's 507 and never a query.
+
+**The disk delegation agrees with the ledger, not with the filter.**
+`_shape_disk_gb()` sums with the ledger's helper so that a query and a
+create cannot disagree about how large a request is. That holds against
+the create's capacity claim and not against the create's *filter*
+input, which `PlacementShape.from_instance()` sums by truncation. For a
+fractional size the query predicts a gigabyte more than the filters
+would charge. The claim is corrected rather than the sum: making the
+core delegate would change what a filter decides, which this phase
+does not do. The divergence itself is filed as
+shakenfist/shakenfist#4853.
+
+**The read amplification was rated higher by the reviewer than by
+this phase.** The `Results` section above identified the skip
+predicate's ordering as a free saving and left it alone as an event
+payload change. The review rated the same thing a high-severity
+finding, on the grounds that the endpoint is tenant-reachable, that 64
+shapes is roughly eight times the measured twelve thousand reads, and
+that the database load budget was fitted before this endpoint existed.
+That reading is the better one: the inefficiency predates the phase but
+the exposure does not. Michael chose the swap, and the scope exception
+above records it.
+
+Declined: a shared accessor so that this module and the instance API
+stop holding separate `Scheduler` globals with separate metrics
+caches. It follows the established pattern, it is correct as written,
+and it costs one extra metrics read per worker per cache window.

@@ -226,7 +226,15 @@ The families in use are:
 
 `admin`, `agentoperation`, `artifact`, `auth`, `blob`,
 `clusteroperation`, `instance`, `interface`, `issuer`, `label`,
-`network`, `node`, `rule`, `upload`
+`network`, `node`, `placement`, `rule`, `upload`
+
+`placement` is the one family with no object behind it. `POST
+/placement` asks whether a set of instance shapes would fit the
+cluster now and creates nothing, so it derives `placement.read`
+despite being a POST. It is deliberately not part of the `instance`
+family: the right to ask whether instances would fit is not the right
+to create one, and a rule granting the question should not have to
+grant the create as well.
 
 So `GET /blobs` needs `blob.read`, and `DELETE /instances/{ref}` needs
 `instance.delete`. The unauthenticated endpoints (`/`, `/livez`,
