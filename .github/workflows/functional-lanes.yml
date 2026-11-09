@@ -133,13 +133,24 @@ jobs:
       concurrency_key: debian-13-slim-tier
       deploy_profile: shakenfist/tools/ci-deploy-profiles/kerbside-slim-tier.yml.j2
 
-  # The cluster suite's smoke tier on one node, deliberately, to find
-  # whatever in it breaks when every role shares a machine. sizing.
-  # is_single_machine() and cluster_ci_tests/test_nodes.py carve this
-  # deployment out of the structural minimum, which no single node can meet.
-  # Smoke, not full, and smoke-cluster.yml's default 45 minute budget, as
-  # the scheduled matrix this lane came from ran it. Not gated on the
+  # The cluster suite on one node, deliberately, to find whatever in it
+  # breaks when every role shares a machine. sizing.is_single_machine()
+  # and cluster_ci_tests/test_nodes.py carve this deployment out of the
+  # structural minimum, which no single node can meet. Not gated on the
   # headroom band: no warn window has measured the localhost shape.
+  #
+  # tier is passed as smoke but selects nothing: smoke-cluster.yml uses it
+  # for the artifact name and the concurrency group only, so this lane runs
+  # the same cluster-ci.conf suite as the multi-node lanes above -- 163
+  # tests -- on one node at concurrency 3. It inherited the default 45
+  # minute budget from the scheduled matrix it came from, and that budget
+  # was never achievable: measured on 2026-11-06 it finished 156 of the 163
+  # in 44m50s with 2.52 of its 3 workers busy, leaving about 6.7 minutes of
+  # test time to go, so the suite wants roughly 48 minutes before any
+  # overhead. 75 gives it about the same headroom over measured runtime
+  # that debian-13-slim-tier has (34 minutes used of 60). If this lane is
+  # ever to be a real smoke subset, that is a change to what it runs rather
+  # than to the clock (shakenfist/shakenfist#4741).
   debian_13_single_machine:
     name: "Debian 13 single machine (collection)"
     if: contains(fromJSON(inputs.lanes), 'debian-13-localhost')
@@ -155,5 +166,5 @@ jobs:
       base_image_user: debian
       stestr_config: cluster-ci.conf
       test_concurrency: 3
-      test_timeout_minutes: 45
+      test_timeout_minutes: 75
       concurrency_key: debian-13-localhost

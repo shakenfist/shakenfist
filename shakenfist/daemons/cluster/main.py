@@ -84,6 +84,34 @@ ELECTION_POLL_MINIMUM_SECONDS = 2.5
 ELECTION_POLL_MAXIMUM_SECONDS = 7.5
 
 
+def replication_target_available(locations, candidate_fqdns):
+    """Whether any node could hold another copy of a blob.
+
+    ``locations`` is where the blob already is, counting healthy transfers
+    in flight, and ``candidate_fqdns`` is every node which could hold a
+    copy -- both named the way blob locations are named, by FQDN.
+
+    This is the cheap half of the give-up test
+    Blob.request_replication() makes for itself. That one is exact, and
+    it is also expensive: it lists the node roster twice, takes the
+    blob's locations lock and reads each location's node back before
+    concluding it has run out of nodes to replicate to. Asking it per
+    blob per maintenance pass is therefore pure database load whenever
+    the answer cannot change, and on a single node deployment the answer
+    never changes: with the default replication factor of two, every
+    in-use blob is permanently one copy short and there is nowhere for
+    the second copy to go. That spun at 0.48 calls/s on the one-node CI
+    lane, growing with the blob count, and was the cluster daemon's
+    largest source of fixed-rate database traffic (issue 4741).
+
+    Deliberately conservative: it only reports "nowhere to go" when
+    every candidate already holds a copy. A candidate which is active
+    but errored, or which has no disk left, still looks like a target
+    here, so request_replication() keeps the final say over those.
+    """
+    return bool(set(candidate_fqdns) - set(locations))
+
+
 class MaintenancePassAbandoned(Exception):
     """The daemon is stopping, so the rest of this maintenance pass is skipped.
 
@@ -392,6 +420,19 @@ class Monitor(daemon.Daemon):
             active_blob_uuids = []
             blobs_readable = False
 
+        # Every node which could hold a copy of a blob, named as blob
+        # locations name them. Read once for the pass rather than per
+        # blob: replication_target_available() below is asked about every
+        # blob, and the call it guards reads this same roster twice on
+        # each invocation. Read after the list above, and only when there
+        # is something to decide about, so a degraded pass -- which does
+        # no replication at all -- does not pay for a node listing it
+        # cannot use.
+        replication_candidates = []
+        if active_blob_uuids:
+            replication_candidates = [
+                n.fqdn for n in Nodes([], prefilter='active')]
+
         for blob_uuid in active_blob_uuids:
             self._maintenance_checkpoint()
 
@@ -489,6 +530,29 @@ class Monitor(daemon.Daemon):
                         'blob has no remaining locations and no possible '
                         'replication source, marking as errored')
                     b.state = dbo.STATE_ERROR
+                elif not replication_target_available(
+                        locations, replication_candidates):
+                    # The blob is short of the replication factor, but
+                    # every node which could hold another copy already
+                    # has one, so the factor cannot be met on a cluster
+                    # this size and asking again next pass will not
+                    # change that. See replication_target_available().
+                    #
+                    # Debug rather than a warning because this is the
+                    # routine state of a cluster smaller than the
+                    # replication factor, not a fault. It does not quiet
+                    # the case worth hearing about -- a blob whose only
+                    # copies sit on nodes which have left -- because that
+                    # blob still has somewhere to replicate to, so it
+                    # does not reach here and still gets
+                    # request_replication()'s "No available replicas,
+                    # giving up".
+                    LOG.with_fields({
+                        'blob': b,
+                        'locations': locations,
+                        'candidates': replication_candidates
+                    }).debug('Blob under replicated, but every node which '
+                             'could hold a copy already has one')
                 else:
                     # The tuple is blob UUID, and how much to over
                     # replicate by.
@@ -496,16 +560,21 @@ class Monitor(daemon.Daemon):
 
             else:
                 # We have exactly the right number of copies, but what if
-                # the blob is on a really full node?
-                for n in low_disk_nodes:
-                    if n in blob_locations:
-                        # We have at least one space constrained node with
-                        # this blob. Request an extra temporary copy of the
-                        # blob elsewhere so we can hopefully clean up one of
-                        # these next pass. The tuple is blob UUID, and how
-                        # much to over replicate by.
-                        underreplicated.append((b.uuid, 1))
-                        break
+                # the blob is on a really full node? Only worth asking when
+                # there is a node to put the temporary copy on: "elsewhere"
+                # below has to be somewhere. See
+                # replication_target_available().
+                if replication_target_available(
+                        locations, replication_candidates):
+                    for n in low_disk_nodes:
+                        if n in blob_locations:
+                            # We have at least one space constrained node
+                            # with this blob. Request an extra temporary
+                            # copy of the blob elsewhere so we can hopefully
+                            # clean up one of these next pass. The tuple is
+                            # blob UUID, and how much to over replicate by.
+                            underreplicated.append((b.uuid, 1))
+                            break
 
         # Record blobs in use
         for blob_uuid in in_use_blobs:
