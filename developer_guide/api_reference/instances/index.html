@@ -16934,6 +16934,13 @@ completed one.</p>
 </details>
 <h3 id="fetching-information-about-an-instances-agent-operations">Fetching information about an Instance's Agent Operations<a class="headerlink" href="#fetching-information-about-an-instances-agent-operations" title="Permanent link">&para;</a></h3>
 <p>Additionally, you can list the agent operations for a given instance.</p>
+<p>An instance's own view carries a summary of the same thing in its
+<code>agent_operations_queue</code> field: the full view of each agent operation the
+instance has not finished yet, in the order they will run, so that a client
+which has just fetched an instance does not need a second request to find out
+what is queued behind what. Operations which have finished are not included --
+use the call below with <code>all=True</code> for those. A server which populates the
+field advertises the <code>include-queued-agent-operations</code> capability.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
