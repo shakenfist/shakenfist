@@ -14454,34 +14454,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/placement/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Placement queries
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../user_guide/consoles/" class="md-nav__link">
         
   
@@ -16658,7 +16630,7 @@ change.</p>
 </tr>
 <tr>
 <td><code>sf-e2e-functional.yml</code></td>
-<td>pull_request, merge_group, nightly</td>
+<td>pull_request, merge_group, nightly (02:30 UTC), workflow_dispatch</td>
 <td>smoke</td>
 </tr>
 <tr>
@@ -17335,10 +17307,20 @@ instance — followed by an adversarial matrix covering replay,
 expiry, wrong audience, unknown kid, and cross-namespace mint.</p>
 <p>Driver scripts live in <code>tools/sf-e2e/</code> (see
 <code>tools/sf-e2e/README.md</code>). It is a smoke-tier PR gate, and also runs
-nightly and on dispatch. Every run uploads an artifact bundle with the
-Kerbside unit journals and the ryll, SF daemon and libvirt logs,
-redacted before upload; the README's Security section lists what is
-collected.</p>
+nightly and on dispatch. Two things run it against develop: the 02:30
+cron, and the Shaken Fist conductor's periodic tier, which dispatches
+it on develop -- sf-e2e is the only lane here the conductor
+dispatches, which is why the other lanes' failure-issue jobs are
+cron-only. A failing run against develop files or updates the
+"Nightly sf-e2e lane failing" tracking issue, because nothing else
+runs the lane against develop itself and a red entry in the Actions
+tab alerts nobody. A dispatch on any other ref is the interactive
+debugging case: it says nothing about develop's coverage and files
+nothing, and nor does a pull request, whose red is already visible
+there.</p>
+<p>Every run uploads an artifact bundle with the Kerbside unit journals
+and the ryll, SF daemon and libvirt logs, redacted before upload; the
+README's Security section lists what is collected.</p>
 <p>The exchange needs a real cluster because it cannot be faked in the
 cloud-free direct-qemu lane. Only a <code>type: shakenfist</code> source's keys
 can verify a token, and the exchange then requires the console to

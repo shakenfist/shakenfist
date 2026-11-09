@@ -10603,6 +10603,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#clocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#kerbside-side" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14211,34 +14222,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../user_guide/placement/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Placement queries
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../../user_guide/consoles/" class="md-nav__link">
         
   
@@ -15967,6 +15950,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#clocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#kerbside-side" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16291,6 +16285,19 @@ healthy and connections that fail.</p>
 Fist API, to ask for a console, and Kerbside, at the address
 <code>KERBSIDE_URL</code> names, both to exchange the token and to run the
 SPICE session. Nothing needs a route to a hypervisor.</p>
+<h3 id="clocks">Clocks<a class="headerlink" href="#clocks" title="Permanent link">&para;</a></h3>
+<p>The token carries <code>exp</code>, and Shaken Fist stamps <code>iat</code> on the
+host that minted it, so Kerbside's clock and the minting host's
+must agree. Kerbside allows them to disagree by up to 30
+seconds in either direction before it refuses a token:
+earlier than that and the token has genuinely expired, later
+and <code>/sf-console.vv</code> answers <code>401 token is not valid yet</code>. Both
+hosts running NTP is enough; a host whose clock has never been
+set is not.</p>
+<p>A token that fails this way names the clock in the rejection.
+Before Kerbside tolerated any skew at all, the same failure was
+reported as <code>401 invalid token signature</code>, which pointed at the
+cached signing keys instead.</p>
 <h3 id="kerbside-side">Kerbside side<a class="headerlink" href="#kerbside-side" title="Permanent link">&para;</a></h3>
 <p>Add a Shaken Fist source to <code>sources.yaml</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shakenfist</span>

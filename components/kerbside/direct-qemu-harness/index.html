@@ -14220,34 +14220,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/placement/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Placement queries
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../user_guide/consoles/" class="md-nav__link">
         
   
@@ -16201,12 +16173,20 @@ needs a Python with <code>grpc</code>, such as the tox environment's:</p>
 </code></pre></div>
 <p>Each line carries <code>sent_channel_caps</code> (the client's, forwarded) and
 <code>backend_channel_caps</code> (qemu's reply). On the display channel ryll
-sends <code>[7039]</code>; any other value there is the client's own set. A
-<code>backend lacks capabilities Kerbside offered the client</code> warning means
-qemu's spice-server was built without a capability the proxy offers by
-default, such as Opus. A backend that lacks MINI_HEADER, AUTH_SELECTION or
-AUTH_SPICE is not a warning: the backend connect fails and is audited
-as a hypervisor connection failure.</p>
+sends <code>[7039]</code>; any other value there is the client's own set.</p>
+<p>Where qemu's reply lacks a capability the proxy offered the client,
+the proxy says so, at one of two levels. A capability a backend of
+that channel type may legitimately not have — Opus on either sound
+channel, LZ4 on usbredir, port or webdav, <code>PREF_COMPRESSION</code> on a
+streaming-agent display channel — is a DEBUG line saying "which a
+backend of this channel type may legitimately not have". These are
+build options, so they are normal; they were a warning until they
+were measured firing on every channel of every session. Anything else
+is a WARN saying "every implementation of this channel type sets",
+which means a backend that is not the spice-server the offer assumed.</p>
+<p>A backend that lacks MINI_HEADER, AUTH_SELECTION or AUTH_SPICE is
+neither: the backend connect fails and is audited as a hypervisor
+connection failure.</p>
 <p><code>assert-firewall</code> (with the default <code>FIREWALL_EXPECT=clean</code>) waits for
 a real session — <code>kerbside_proxy_authorized_total &gt;= 1</code> and
 <code>kerbside_proxy_bytes_relayed_total &gt; 0</code> in both directions — then
