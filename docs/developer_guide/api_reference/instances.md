@@ -984,6 +984,14 @@ is meaningful.
 
 Additionally, you can list the agent operations for a given instance.
 
+An instance's own view carries a summary of the same thing in its
+`agent_operations_queue` field: the full view of each agent operation the
+instance has not finished yet, in the order they will run, so that a client
+which has just fetched an instance does not need a second request to find out
+what is queued behind what. Operations which have finished are not included --
+use the call below with `all=True` for those. A server which populates the
+field advertises the `include-queued-agent-operations` capability.
+
 ???+ tip "REST API calls"
 
     * [GET /instances/{instance_ref}/agentoperations](https://openapi.shakenfist.com/#/instances/get_instances__instance_ref__agentoperations): List all agent operations for an instance.

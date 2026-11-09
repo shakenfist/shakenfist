@@ -215,13 +215,14 @@ class InstanceAgentOperationsEndpoint(api_base.Resource):
         all = validation.declared_boolean(all)
 
         out = []
-        ops = instance_from_db.agent_operations
-
-        key = 'queue'
         if all:
-            key = 'all'
+            agentop_uuids = instance_from_db.agent_operations.get('all', [])
+        else:
+            # Via the accessor, so this and the instance's own view cannot
+            # disagree about which key the queue lives under (issue #4826).
+            agentop_uuids = instance_from_db.agent_operations_queued()
 
-        for agentop_uuid in ops.get(key, []):
+        for agentop_uuid in agentop_uuids:
             aop = AgentOperation.from_db(agentop_uuid)
             if aop:
                 out.append(aop.external_view())
