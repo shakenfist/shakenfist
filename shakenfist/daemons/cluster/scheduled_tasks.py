@@ -41,8 +41,27 @@ from shakenfist.util import general as util_general
 
 
 LOG, _ = logs.setup(__name__)
-BLOB_CHECKS_QUEUE = queue.Queue()
-INSTANCE_CHECKS_QUEUE = queue.Queue()
+
+
+class NamedQueue(queue.Queue):
+    """A sweep work queue which carries the name we log it under.
+
+    The refill and processing log lines are the only thing in the log
+    stream which says which sweep a queue depth belongs to, and a label
+    written out by hand at each emitter drifts from the queue it reports
+    on: the per-instance refill spent its entire life announcing itself
+    as the per-blob queue, so a search for one returned both (#4864).
+    Taking the label from the queue makes the two impossible to
+    confuse, and gives a new sweep nowhere to get it wrong.
+    """
+
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+
+
+BLOB_CHECKS_QUEUE = NamedQueue('per-blob')
+INSTANCE_CHECKS_QUEUE = NamedQueue('per-instance')
 
 # The deleted-object sweep's work, held per object type. A single queue
 # filled type by type let one large backlog take every pass's whole budget,
@@ -447,14 +466,16 @@ def per_blob_checks():
     if BLOB_CHECKS_QUEUE.empty():
         _fill_per_blob_queue()
         LOG.info(
-            f'Refreshed per-blob queue with {BLOB_CHECKS_QUEUE.qsize()} items')
+            f'Refreshed {BLOB_CHECKS_QUEUE.name} queue with '
+            f'{BLOB_CHECKS_QUEUE.qsize()} items')
 
     queue_fill_cost = time.time() - start_time
     if queue_fill_cost > 10:
         return
 
     processed = _process_per_blob_queue(execution_limit=(10 - queue_fill_cost))
-    LOG.info(f'Processed {processed} items from per-blob queue')
+    LOG.info(
+        f'Processed {processed} items from {BLOB_CHECKS_QUEUE.name} queue')
 
 
 def _fill_per_blob_queue():
@@ -564,8 +585,8 @@ def per_instance_checks_and_usage():
     if INSTANCE_CHECKS_QUEUE.empty():
         _fill_per_instance_queue()
         LOG.info(
-            f'Refreshed per-blob queue with {INSTANCE_CHECKS_QUEUE.qsize()} '
-            'items')
+            f'Refreshed {INSTANCE_CHECKS_QUEUE.name} queue with '
+            f'{INSTANCE_CHECKS_QUEUE.qsize()} items')
 
     queue_fill_cost = time.time() - start_time
     if queue_fill_cost > 10:
@@ -573,7 +594,8 @@ def per_instance_checks_and_usage():
 
     processed = _process_per_instance_queue(
         execution_limit=(10 - queue_fill_cost))
-    LOG.info(f'Processed {processed} items from per-instance queue')
+    LOG.info(
+        f'Processed {processed} items from {INSTANCE_CHECKS_QUEUE.name} queue')
 
 
 def _fill_per_instance_queue():
