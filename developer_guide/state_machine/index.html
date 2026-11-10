@@ -16328,6 +16328,18 @@ still a <code>created</code> object. See
   [*] --&gt; created
   created --&gt; deleted
   deleted --&gt; [*]</code></pre>
+<p>A namespace may only be deleted once it holds no instances, and only an
+instance in state <code>deleted</code> counts as gone — an instance in <code>error</code> is a live
+row which merely failed at something. That matters more than it looks: an
+instance is reachable only through its namespace, so a namespace deleted over
+the top of one leaves a row with no namespace, no owner, and no sweep which
+would ever find it. An errored instance has to be deleted (which is permitted
+from <code>error</code>, and may be retried) before its namespace can be. As a backstop,
+<code>Namespace.hard_delete()</code> enqueues the delete of any instance which reaches it
+anyway, alongside the keys, mapping rules, trusts and capacity claims it
+sweeps. Networks are not yet held to the same rule: the delete handler still
+counts an errored or delete-waiting network as gone, and the backstop does
+not sweep networks (issue 4863).</p>
 <h2 id="networks">Networks<a class="headerlink" href="#networks" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>initial</code>: first state for a network. A UUID has been allocated, database entry

@@ -15798,6 +15798,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-state-an-object-can-leave-is-not-a-terminal-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A state an object can leave is not a terminal state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#or-is-a-decision-about-what-a-failed-read-means" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16144,6 +16155,24 @@ list, a <code>False</code> that means "go ahead" -- carry an explicit success fi
 than inferring one, and write the test that returns the empty-error reply and
 asserts the refusal. The invariant is not that today's code produces a message;
 it is that no reply can be mistaken for a permissive one.</p>
+<h2 id="a-state-an-object-can-leave-is-not-a-terminal-state">A state an object can leave is not a terminal state<a class="headerlink" href="#a-state-an-object-can-leave-is-not-a-terminal-state" title="Permanent link">&para;</a></h2>
+<p>A guard which asks "is this object gone?" must answer yes only for a state the
+object cannot leave. The namespace delete handler used to count an instance in
+<code>error</code> as already gone, alongside <code>deleted</code>. But <code>error</code> is where an instance
+whose delete failed ends up, and that instance still holds its disks, its
+interfaces and its placement. Its row is reachable only through its namespace,
+so deleting the namespace over the top of it left a row with no owner and
+nothing which would ever sweep it (issue 4847).</p>
+<p>Worse, the refusal expired into permission. A failing delete walks
+<code>delete-wait</code> -&gt; <code>delete-wait-error</code> -&gt; <code>error</code>, and only the middle state
+blocked, so a caller who retried the namespace delete a moment later got
+through over exactly the instance the first refusal had protected.</p>
+<p>When a guard lists the states it lets through, check each one against the
+state machine: can an object leave this state, and does it still hold anything
+while it is in it? <code>deleted</code> is the only state which answers no to both.
+Test the guard against every state on the failing path, not just the one the
+guard was written for: each of those is a moment a caller can retry. See the
+comment in <code>AuthNamespaceEndpoint.delete()</code> in <code>shakenfist/external_api/auth.py</code>.</p>
 <h2 id="or-is-a-decision-about-what-a-failed-read-means"><code>or []</code> is a decision about what a failed read means<a class="headerlink" href="#or-is-a-decision-about-what-a-failed-read-means" title="Permanent link">&para;</a></h2>
 <p><code>mariadb.get_objects_by_state()</code> returns <code>None</code> when the read failed and <code>[]</code>
 when nothing matched, and says so in its docstring. Every <code>or []</code> at a call

@@ -17625,6 +17625,14 @@ details.</p>
 </ul>
 <h2 id="minor-changes">Minor changes<a class="headerlink" href="#minor-changes" title="Permanent link">&para;</a></h2>
 <ul>
+<li><code>DELETE /auth/namespaces/{namespace}</code> now refuses a namespace holding an
+  instance in <code>error</code>, as it already refused one in any other live state. An
+  errored instance was counted as already gone, so the namespace was deleted
+  over a row which then had no owner and which nothing would ever clean up.
+  Delete the errored instances first: an instance blocks until it reaches
+  <code>deleted</code>. <code>Namespace.hard_delete()</code> also enqueues the delete of any instance
+  which reaches it anyway. An errored instance whose node has been deleted
+  cannot currently be deleted, and so blocks its namespace (issue 4868).</li>
 <li><code>cluster_config</code> row names are case-insensitive identifiers, stored in upper
   case. <code>sf-ctl set-config kerbside_url ...</code> now writes a <code>KERBSIDE_URL</code> row,
   and <code>unset-config</code> deletes by the same spelling. The daemons always read
