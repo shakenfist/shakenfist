@@ -17930,7 +17930,7 @@ constraints. These get dedicated tables optimized for their access patterns:</p>
 </tr>
 <tr>
 <td><code>work_queue</code></td>
-<td>Per-job queue row with <code>queue_name</code>, <code>scheduled_at</code>, <code>claimed_at</code>, <code>claimed_by</code>, <code>attempts</code> and <code>payload</code>. Dequeue uses <code>SELECT ... FOR UPDATE SKIP LOCKED</code></td>
+<td>Per-job queue row with <code>queue_name</code>, <code>scheduled_at</code>, <code>claimed_at</code>, <code>claimed_by</code>, <code>attempts</code> and <code>payload</code>. Dequeue uses <code>SELECT ... FOR UPDATE SKIP LOCKED</code>, and records the claiming node (its uuid, or its name if it has not resolved one -- never the database node's, except for a client from before issue 4652) in <code>claimed_by</code></td>
 </tr>
 <tr>
 <td><code>cluster_operation_targets</code></td>

@@ -16514,17 +16514,47 @@ run by the process it replaces. It moves the operation back to
 makes -- so the row re-runs it from the first task once the claims are
 cleared, or, if the row has been claimed <code>CLUSTER_OP_MAX_ATTEMPTS</code>
 times, deletes the row and errors the operation as the reaper would.
-Rows on the shared <code>any-*</code> queues are left to the reaper, because
-nothing records which node claimed them: over gRPC, <code>claimed_by</code> is
-the database daemon's node name, not the caller's. For the same reason
-startup clears the claims on its own queues only. A claim on an
-<code>any-*</code> queue may be another node's worker running that item right
-now, and clearing it would hand the item to a second worker.
-Recovery is best effort, one item at a time. An item it cannot recover,
+It then does the same for the rows this node claimed on the shared
+<code>any-*</code> queues, and clears those claims too. A claim on an <code>any-*</code>
+queue may be another node's worker running that item right now, so
+both the recovery and the reset there are narrowed to rows whose
+<code>claimed_by</code> is this node's <strong>uuid</strong>. That can be trusted because the
+<code>Dequeue</code> RPC carries the caller's identity in <code>worker_id</code> (its node
+uuid, or its name if it has not resolved one), which the server
+records. Before issue 4652 the server recorded its own node name, so
+every claim made over gRPC looked like the database node's.</p>
+<p>The match is on the uuid rather than the name because of what is
+still written under a name. An sf-database still records its own name
+for a client from before <code>worker_id</code>, and every claim made over gRPC
+before the upgrade carries it too. Matched by name, the database
+node's own sf-queues would take all of those claims for its own,
+including live claims of its peers. No name ever equals a uuid, so
+such claims are left to the reaper, as every shared-queue claim was
+before.</p>
+<p>The narrowed reset is its own RPC, <code>RestartQueueClaimsBy</code>, not a
+filter field on <code>RestartQueue</code>. An sf-database from before it would
+ignore an unknown field and clear every claim on the queue, which is
+the defect itself. An unknown RPC answers <code>UNIMPLEMENTED</code> instead, and
+the client then clears nothing and leaves the claims to the reaper.
+That makes a rolling upgrade safe in either order. The server also
+refuses an empty <code>claimed_by</code> rather than treating it as "everyone".</p>
+<p>The reset of this node's own queues is deliberately not narrowed:
+nothing else drains them while the node is live, so every claim on one
+is this node's, whatever <code>claimed_by</code> says. (The cluster daemon drains
+a node's own queues once the node is deleted, so a deleted node which
+came back under the same uuid could reset a claim that drain holds.)</p>
+<p>Recovery is best effort, one item at a time. An item it cannot recover,
 for example because its operation type no longer exists, is logged and
 left for the reaper. If the claims cannot be listed at all, startup
 clears none of them, because clearing a claim nobody has checked
 strands its operation just as before.</p>
+<p>Each reset is best effort too. One which fails, or which an
+sf-database too old for <code>RestartQueueClaimsBy</code> cannot narrow, leaves
+that queue's claims to the reaper and is logged; it does not stop the
+rest of startup. An operation recovery has already moved back to
+<code>queued</code> on a shared queue then waits behind its claim until the
+reaper clears it, which is still better than before: the next worker
+would have found it executing, skipped it and stranded it.</p>
 <p>The cluster daemon also runs two other reaping sweeps from
 <code>daemons/cluster/scheduled_tasks.py</code>. <code>per_deleted_object_checks()</code>
 (every minute, within <code>DELETED_OBJECT_SWEEP_SECONDS</code>) hard deletes
