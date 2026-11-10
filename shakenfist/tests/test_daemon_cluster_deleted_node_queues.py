@@ -100,7 +100,7 @@ class DeletedNodeQueueDrainTestCase(base.ShakenFistTestCase):
 
         self.instance = mock.MagicMock()
         self.instance.instance_blob_usage.return_value = {}
-        self.instance.healthy_instances_on_node.return_value = []
+        self.instance.undeleted_instances_on_node.return_value = []
 
         self.ipam = mock.MagicMock()
         self.ipam.IPAMs.return_value = []
