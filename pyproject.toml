@@ -248,7 +248,7 @@ test = [
     "flake8==7.5.0",            # mit
     "tox==4.67.6",              # mit
     "mkdocs==1.6.1",            # bsd
-    "mkdocs-material==9.8.0",   # mit
+    "mkdocs-material==9.8.1",   # mit
     "mypy==2.4.1",             # mit
     "mypy-protobuf==5.1.0",     # apache2
     "grpc-stubs==1.53.0.6",     # mit
