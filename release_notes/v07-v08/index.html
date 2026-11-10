@@ -17631,8 +17631,14 @@ details.</p>
   over a row which then had no owner and which nothing would ever clean up.
   Delete the errored instances first: an instance blocks until it reaches
   <code>deleted</code>. <code>Namespace.hard_delete()</code> also enqueues the delete of any instance
-  which reaches it anyway. An errored instance whose node has been deleted
-  cannot currently be deleted, and so blocks its namespace (issue 4868).</li>
+  which reaches it anyway.</li>
+<li>Deleting a node now deletes every instance placed on it, not only the healthy
+  ones. An instance in an error state, or in <code>delete-wait</code> or
+  <code>delete-wait-error</code>, was left behind with its placement, interfaces and row,
+  and nothing would ever clean it up: its own delete is enqueued for the node
+  which no longer exists. Combined with the namespace delete refusal above,
+  such an instance made its namespace undeletable with no operator recovery
+  path short of editing the database.</li>
 <li><code>cluster_config</code> row names are case-insensitive identifiers, stored in upper
   case. <code>sf-ctl set-config kerbside_url ...</code> now writes a <code>KERBSIDE_URL</code> row,
   and <code>unset-config</code> deletes by the same spelling. The daemons always read

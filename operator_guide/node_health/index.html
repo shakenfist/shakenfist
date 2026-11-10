@@ -16049,9 +16049,11 @@ revived.</p>
 be deleted while it holds an instance in any state but <code>deleted</code>, so delete
 the errored instances first. That delete is carried out by the instance's own
 node, so it needs the node back in service. If the node is gone for good,
-deleting the node does not currently clean up its errored instances either
-(issue 4868), and such an instance blocks its namespace's delete until that
-is fixed.</p>
+delete the node instead — <code>sf-client node delete &lt;node&gt;</code> — and sf-cluster
+deletes every instance placed on it, whatever state it is in, releasing their
+placements and interfaces and freeing their namespace to be deleted. Nothing
+is recoverable from those instances afterwards, so snapshot anything you want
+to keep while the node is still only errored.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
