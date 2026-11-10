@@ -21,6 +21,8 @@ from shakenfist.exceptions import InvalidStateException
 from shakenfist.network.interface import interfaces_for_instance
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import get_general_background_node_queues
+from shakenfist.operations.baseoperation import get_general_user_facing_node_queues
 from shakenfist.operations.baseoperation import get_node_background_node_queues
 from shakenfist.operations.baseoperation import get_node_user_facing_node_queues
 from shakenfist.util import concurrency as util_concurrency
@@ -389,10 +391,16 @@ def recover_interrupted_operations(node_uuid):
     as the reaper would, so an operation which kills sf-queues cannot keep
     killing it.
 
-    The shared any-* queues are left alone: nothing reliably records which
-    node claimed an item there (over gRPC, claimed_by names the database
-    daemon's node, not the worker's), so an executing operation behind one
-    may be running on another node right now.
+    A claim this node left on one of the shared any-* queues is recovered on
+    the same basis, but only when claimed_by is this node's uuid. Every
+    node's sf-queues drains those queues, so a claim there which names
+    another node may be an item that node is running right now. claimed_by
+    is only trustworthy because the dequeue RPC now carries the caller's
+    identity; before that the database daemon recorded its own node name for
+    every claim made over gRPC (#4652). Matching on the uuid rather than the
+    name is what keeps such a claim, which may be any node's, from looking
+    like the database node's own: it is left to the reaper, which is what
+    happened to every shared-queue claim before this.
 
     This is best effort, item by item: an item which cannot be recovered --
     its operation type no longer exists, say, or the database fails part way
@@ -404,8 +412,17 @@ def recover_interrupted_operations(node_uuid):
     """
     own_queues = set(get_node_user_facing_node_queues(node_uuid) +
                      get_node_background_node_queues(node_uuid))
+    shared_queues = set(get_general_user_facing_node_queues() +
+                        get_general_background_node_queues())
     for row in mariadb.list_stuck_work_queue_rows(0, strict=True):
-        if row['queue_name'] not in own_queues:
+        queue_name = row['queue_name']
+        # A claim on one of our own queues is ours whatever claimed_by
+        # says -- nothing else drains them while this node is live (the
+        # cluster daemon drains them only once the node is deleted). On a
+        # shared queue only claimed_by can tell us apart from a live peer.
+        if not (queue_name in own_queues or
+                (queue_name in shared_queues and
+                 row['claimed_by'] == node_uuid)):
             continue
         try:
             _recover_interrupted_operation(row)
@@ -495,21 +512,40 @@ def startup_tasks():
     # Check in early and often
     locks.clear_stale_locks()
 
-    # Reset this node's own queues. They are named by its uuid, not its
-    # name: looked up by name, they matched no queue, so a claim left by a
-    # stopped sf-queues was never cleared. Recovering interrupted operations
-    # reads those claims, so it goes first. The shared any-* queues are not
-    # reset: other nodes' workers hold live claims there, and clearing one
-    # hands work which is still running to a second worker. A claim a
-    # stopped sf-queues left on one is cleared by the cluster daemon's
-    # reaper once it is CLUSTER_OP_STUCK_THRESHOLD old.
+    # Reset the claims this node's previous sf-queues left behind.
+    # Recovering interrupted operations reads those claims, so it goes
+    # first.
+    #
+    # This node's own queues are named by its uuid, not its name: looked
+    # up by name, they matched no queue, so a claim left by a stopped
+    # sf-queues was never cleared (#4543). Nothing else drains them while
+    # this node is live, so every claim on one is ours and the reset is
+    # unfiltered. The one exception is the cluster daemon draining a
+    # deleted node's queues, which only matters if a deleted node comes
+    # back under the same uuid.
+    #
+    # The shared any-* queues are drained by every node's sf-queues, so
+    # the reset there clears only claims made under this node's uuid:
+    # clearing a peer's claim hands work which is still running to a
+    # second worker (#4652). It can, because the dequeue RPC now carries
+    # the caller's identity -- before that, claimed_by was the database
+    # daemon's node name for every claim made over gRPC. A claim an older
+    # sf-queues left on a shared queue, or one an older sf-database
+    # recorded, carries a name, so it is still the cluster daemon
+    # reaper's to clear once it is CLUSTER_OP_STUCK_THRESHOLD old. So is
+    # every claim on a shared queue while sf-database is too old to
+    # clear one worker's claims: restart_work_queue_claims_by() does
+    # nothing then, rather than clearing them all.
+    own_queues = []
+    shared_queues = []
     if not config.NODE_UUID:
         LOG.warning('NODE_UUID is not set, cannot recover interrupted '
-                    'operations or reset this node\'s own queues')
-        own_queues = []
+                    'operations or reset this node\'s queue claims')
     else:
         own_queues = (get_node_user_facing_node_queues(config.NODE_UUID) +
                       get_node_background_node_queues(config.NODE_UUID))
+        shared_queues = (get_general_user_facing_node_queues() +
+                         get_general_background_node_queues())
         try:
             recover_interrupted_operations(config.NODE_UUID)
         except Exception as e:
@@ -520,15 +556,47 @@ def startup_tasks():
                 'recovering interrupted operations; leaving this node\'s '
                 'claims to the reaper', e)
             own_queues = []
-    for queue in own_queues:
-        mariadb.restart_work_queue(queue)
-        processing, queued, deferred = mariadb.get_work_queue_length(queue)
-        LOG.with_fields({
-            'processing': processing,
-            'queued': queued,
-            'deferred': deferred,
-            'queue': queue
-        }).debug('Queue length')
+            shared_queues = []
+
+    # The resets are best effort, like the recovery before them. A queue
+    # whose reset fails -- the database is unavailable, or too old to
+    # narrow the reset -- keeps its claims until the reaper clears them,
+    # and must not stop the blob datastore upgrade and instance restore
+    # below. An operation recovery moved back to queued on a shared queue
+    # then waits behind its claim for the reaper too. That is still better
+    # than before recovery reached the shared queues: the next worker
+    # would have found the operation executing, skipped it and stranded it.
+    unreset = []
+    for queue in own_queues + shared_queues:
+        try:
+            if queue in shared_queues:
+                cleared = mariadb.restart_work_queue_claims_by(
+                    queue, config.NODE_UUID)
+            else:
+                mariadb.restart_work_queue(queue)
+                cleared = True
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'resetting this node\'s claims on {queue}', e)
+            cleared = False
+        if not cleared:
+            unreset.append(queue)
+
+        try:
+            processing, queued, deferred = mariadb.get_work_queue_length(queue)
+            LOG.with_fields({
+                'processing': processing,
+                'queued': queued,
+                'deferred': deferred,
+                'queue': queue
+            }).debug('Queue length')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'reading the length of {queue}', e)
+    if unreset:
+        LOG.with_fields({'queues': unreset}).warning(
+            'Could not reset this node\'s claims on these queues, leaving '
+            'them to the reaper')
 
     # Ensure the blob data store is the most recent version
     upgrade_blob_datastore()

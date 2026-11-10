@@ -22993,20 +22993,24 @@ def _grpc_work_queue_enqueue(
 
 def _grpc_work_queue_dequeue_batch(
         queue_names: list[str],
+        worker_id: str,
         limit: int) -> list[tuple[str, str, dict[str, Any]]]:
     """Claim up to ``limit`` available jobs via the database microservice.
 
-    The database daemon uses its own NODE_NAME as worker_id; the gRPC
-    contract does not carry a caller-supplied worker_id. Returns a
-    list of ``(queue_name, job_name, payload)`` tuples in the
-    server-supplied priority order (top-priority first).
+    ``worker_id`` is this node's name, and the server records it in
+    ``claimed_by``. It used to record its own NODE_NAME instead, which
+    made every claim on a shared ``any-*`` queue look like the database
+    node's, so nothing could tell a dead worker's claim from a live
+    peer's (issue 4652). Returns a list of ``(queue_name, job_name,
+    payload)`` tuples in the server-supplied priority order
+    (top-priority first).
     """
     if not queue_names or limit <= 0:
         return []
     try:
         stub = _get_database_stub()
         request = database_pb2.DequeueRequest(
-            queue_names=queue_names, limit=limit)
+            queue_names=queue_names, limit=limit, worker_id=worker_id)
         reply = _grpc_call(stub.Dequeue, request)
         return [
             (item.queue_name, item.job_name, json.loads(item.work_item))
@@ -23066,6 +23070,38 @@ def _grpc_work_queue_restart(queue_name: str) -> None:
     except grpc.RpcError as e:
         LOG.warning(
             f'gRPC RestartQueue failed for {queue_name}: {e}')
+
+
+def _grpc_work_queue_restart_claims_by(
+        queue_name: str, claimed_by: str) -> bool:
+    """Clear one worker's claims on a queue via the database microservice.
+
+    An sf-database from before RestartQueueClaimsBy answers UNIMPLEMENTED.
+    There is deliberately no fallback to RestartQueue: that clears every
+    claim on the queue, which on a shared ``any-*`` queue is the defect
+    this exists to avoid (issue 4652). The claims are left to the reaper
+    instead, as they were before. Returns whether the claims were cleared.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.RestartQueueClaimsByRequest(
+            queue_name=queue_name, claimed_by=claimed_by)
+        reply = _grpc_call(stub.RestartQueueClaimsBy, request)
+        if not reply.success:
+            LOG.error(
+                f'gRPC RestartQueueClaimsBy failed for {queue_name}: '
+                f'{reply.error}')
+        return bool(reply.success)
+    except grpc.RpcError as e:
+        if e.code() == grpc.StatusCode.UNIMPLEMENTED:
+            LOG.warning(
+                f'gRPC RestartQueueClaimsBy is not implemented by this '
+                f'database service, leaving the claims {claimed_by} holds '
+                f'on {queue_name} to the reaper')
+            return False
+        LOG.warning(
+            f'gRPC RestartQueueClaimsBy failed for {queue_name}: {e}')
+        return False
 
 
 def _grpc_work_queue_list_stuck(
@@ -23853,12 +23889,19 @@ def _direct_work_queue_length(
         return 0, 0, 0
 
 
-def _direct_work_queue_restart(queue_name: str) -> int:
-    """Clear all claims on a queue so workers re-pick up the jobs.
+def _direct_work_queue_restart(
+        queue_name: str, claimed_by: str = '') -> int:
+    """Clear claims on a queue so workers re-pick up the jobs.
 
     Used by the queues daemon at startup to recover in-flight work
     after a crash. Does NOT reset attempts -- the stale-claim reaper
     still needs to notice persistently-failing jobs eventually.
+
+    With ``claimed_by`` empty every claim on the queue is cleared,
+    which is correct for a queue only one node drains. The shared
+    ``any-*`` queues are drained by every node, so a reset there must
+    name the worker whose claims it is clearing, or it hands a live
+    peer's running work to a second worker (issue 4652).
 
     Returns the number of rows whose claim was cleared.
     """
@@ -23873,6 +23916,8 @@ def _direct_work_queue_restart(queue_name: str) -> int:
                 .where(table.c.claimed_at.is_not(None))
                 .values(claimed_at=None, claimed_by=None)
             )
+            if claimed_by:
+                stmt = stmt.where(table.c.claimed_by == claimed_by)
             result = conn.execute(stmt)
             conn.commit()
             return int(result.rowcount or 0)
@@ -25472,6 +25517,22 @@ def enqueue_work_item(
     _direct_work_queue_enqueue(queue_name, work_item, delay)
 
 
+def work_queue_worker_id() -> str:
+    """The identity this process records in work_queue.claimed_by.
+
+    This is the node uuid where the process knows it, because a name is
+    what everything before issue 4652 recorded: an sf-database answering
+    an older client, or any claim made before the upgrade, names the
+    database node whichever node actually claimed the item. A node
+    clearing its own claims on a shared ``any-*`` queue therefore asks
+    for its uuid, which none of those can match, rather than its name,
+    which on the database node itself would match every one of them --
+    including a live peer's. A process which has not resolved its uuid
+    falls back to its name, which equally never matches.
+    """
+    return config.NODE_UUID or config.NODE_NAME
+
+
 def dequeue_work_items(
         queue_names: list[str],
         limit: int = 10,
@@ -25480,10 +25541,10 @@ def dequeue_work_items(
 
     Returns a list of ``(queue_name, job_name, payload)`` tuples,
     possibly empty. Items are returned in caller-supplied priority
-    order: the first queue_name in the list is highest priority. The
-    direct path uses ``config.NODE_NAME`` as worker_id; the gRPC
-    path relies on the database daemon's NODE_NAME (the proto does
-    not carry a caller-supplied worker_id).
+    order: the first queue_name in the list is highest priority. Both
+    paths record ``work_queue_worker_id()`` in ``claimed_by``, so a
+    claim names the node whose worker holds it rather than whichever
+    node answered the RPC (issue 4652).
 
     This single query replaces the previous per-queue dequeue loop;
     a sf-net or sf-queues worker that used to issue 10 sequential
@@ -25494,9 +25555,10 @@ def dequeue_work_items(
     (``list_stuck_work_queue_rows``).
     """
     if _use_database_service():
-        return _grpc_work_queue_dequeue_batch(queue_names, limit)
+        return _grpc_work_queue_dequeue_batch(
+            queue_names, work_queue_worker_id(), limit)
     return _direct_work_queue_dequeue_batch(
-        queue_names, config.NODE_NAME, limit)
+        queue_names, work_queue_worker_id(), limit)
 
 
 def resolve_work_item(queue_name: str, job_name: str) -> None:
@@ -25516,15 +25578,34 @@ def get_work_queue_length(
 
 
 def restart_work_queue(queue_name: str) -> None:
-    """Clear claims on a queue so workers re-pick up the jobs.
+    """Clear every claim on a queue so workers re-pick up the jobs.
 
     Called at queue daemon startup to recover in-flight work after
-    a crash.
+    a crash, on the queues only that node drains. A queue more than one
+    node drains wants restart_work_queue_claims_by() instead.
     """
     if _use_database_service():
         _grpc_work_queue_restart(queue_name)
         return
     _direct_work_queue_restart(queue_name)
+
+
+def restart_work_queue_claims_by(queue_name: str, claimed_by: str) -> bool:
+    """Clear only the claims ``claimed_by`` holds on a queue.
+
+    For a queue more than one node drains, such as the shared ``any-*``
+    queues, where clearing a live peer's claim hands work which is still
+    running to a second worker (issue 4652). An empty ``claimed_by``
+    raises ValueError rather than clearing every claim. Returns whether
+    the claims were cleared; an sf-database too old to filter by worker
+    leaves them alone and this returns False.
+    """
+    if not claimed_by:
+        raise ValueError('claimed_by is required')
+    if _use_database_service():
+        return _grpc_work_queue_restart_claims_by(queue_name, claimed_by)
+    _direct_work_queue_restart(queue_name, claimed_by)
+    return True
 
 
 def list_stuck_work_queue_rows(

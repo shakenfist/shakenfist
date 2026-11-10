@@ -1165,6 +1165,13 @@ class MockMariaDB():
         self.test_obj.addCleanup(
             self.mariadb_restart_work_queue.stop)
 
+        self.mariadb_restart_work_queue_claims_by = mock.patch(
+            'shakenfist.mariadb.restart_work_queue_claims_by',
+            side_effect=self._mariadb_restart_work_queue_claims_by)
+        self.mariadb_restart_work_queue_claims_by.start()
+        self.test_obj.addCleanup(
+            self.mariadb_restart_work_queue_claims_by.stop)
+
         self.mariadb_list_stuck_work_queue_rows = mock.patch(
             'shakenfist.mariadb.list_stuck_work_queue_rows',
             side_effect=self._mariadb_list_stuck_work_queue_rows)
@@ -3926,7 +3933,9 @@ class MockMariaDB():
         result = []
         for row in claimed:
             row['claimed_at'] = now
-            row['claimed_by'] = 'mock'
+            # The real dequeue records the claiming node, on both the
+            # direct and the gRPC path (issue 4652).
+            row['claimed_by'] = config.NODE_UUID or config.NODE_NAME
             row['attempts'] = row.get('attempts', 0) + 1
             result.append(
                 (row['queue_name'], str(row['id']),
@@ -3978,16 +3987,31 @@ class MockMariaDB():
 
     def _mariadb_restart_work_queue(self, queue_name):
         """Mock implementation of mariadb.restart_work_queue()."""
+        self._restart_work_queue(queue_name, '')
+
+    def _mariadb_restart_work_queue_claims_by(self, queue_name, claimed_by):
+        """Mock implementation of mariadb.restart_work_queue_claims_by().
+
+        Clears only that worker's claims, as the real SQL does (issue
+        4652), and refuses an empty worker as the real one does.
+        """
+        if not claimed_by:
+            raise ValueError('claimed_by is required')
+        self._restart_work_queue(queue_name, claimed_by)
+        return True
+
+    def _restart_work_queue(self, queue_name, claimed_by):
         cleared = 0
         for r in self.work_queue_store:
             if (r['queue_name'] == queue_name
-                    and r['claimed_at'] is not None):
+                    and r['claimed_at'] is not None
+                    and (not claimed_by or r['claimed_by'] == claimed_by)):
                 r['claimed_at'] = None
                 r['claimed_by'] = None
                 cleared += 1
         self._trace(
-            f'MockMariaDB.restart_work_queue({queue_name}): '
-            f'cleared {cleared}')
+            f'MockMariaDB.restart_work_queue({queue_name}, '
+            f'claimed_by={claimed_by!r}): cleared {cleared}')
 
     def _mariadb_list_stuck_work_queue_rows(self, threshold_seconds, strict=False):
         """Mock implementation of mariadb.list_stuck_work_queue_rows().

@@ -698,7 +698,7 @@ constraints. These get dedicated tables optimized for their access patterns:
 |-------|---------|
 | `ipam_reservations` | IP address allocations with uniqueness constraints |
 | `cluster_operations` | Full cluster operation metadata with indexed `node_uuid`, `instance_uuid`, `network_uuid` and `priority` columns extracted from JSON for dispatch-time filtering |
-| `work_queue` | Per-job queue row with `queue_name`, `scheduled_at`, `claimed_at`, `claimed_by`, `attempts` and `payload`. Dequeue uses `SELECT ... FOR UPDATE SKIP LOCKED` |
+| `work_queue` | Per-job queue row with `queue_name`, `scheduled_at`, `claimed_at`, `claimed_by`, `attempts` and `payload`. Dequeue uses `SELECT ... FOR UPDATE SKIP LOCKED`, and records the claiming node (its uuid, or its name if it has not resolved one -- never the database node's, except for a client from before issue 4652) in `claimed_by` |
 | `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering, plus an `observational` flag per row (schema v3). Holds in-flight operations and finished ones until the [deleted-object sweep](#the-deleted-object-sweep) removes them, not a full history |
 | `cluster_operation_errors` | One row per failed cluster operation, keyed by `op_uuid`. Stores the structured `ErrorReport` (code, message, details, origin_class, traceback) JSON. Cleaned up alongside the `cluster_operations` row by `BaseClusterOperation.hard_delete()` when the cluster cleaner reaps a terminal-state op |
 | `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload, plus typed nullable columns projecting the capacity-relevant fields and the node's hypervisor role |

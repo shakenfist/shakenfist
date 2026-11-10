@@ -37,6 +37,7 @@ class DatabaseServiceStub:
     Resolve: _grpc.UnaryUnaryMultiCallable[_database_pb2.ResolveRequest, _database_pb2.StatusReply]
     GetQueueLength: _grpc.UnaryUnaryMultiCallable[_database_pb2.QueueLengthRequest, _database_pb2.QueueLengthReply]
     RestartQueue: _grpc.UnaryUnaryMultiCallable[_database_pb2.RestartQueueRequest, _database_pb2.StatusReply]
+    RestartQueueClaimsBy: _grpc.UnaryUnaryMultiCallable[_database_pb2.RestartQueueClaimsByRequest, _database_pb2.StatusReply]
     ListStuckWorkQueueRows: _grpc.UnaryUnaryMultiCallable[_database_pb2.ListStuckWorkQueueRowsRequest, _database_pb2.ListStuckWorkQueueRowsReply]
     ClearWorkQueueClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClearWorkQueueClaimRequest, _database_pb2.StatusReply]
     DeleteWorkQueueRow: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteWorkQueueRowRequest, _database_pb2.StatusReply]
@@ -470,6 +471,7 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     Resolve: _aio.UnaryUnaryMultiCallable[_database_pb2.ResolveRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     GetQueueLength: _aio.UnaryUnaryMultiCallable[_database_pb2.QueueLengthRequest, _database_pb2.QueueLengthReply]  # type: ignore[assignment]
     RestartQueue: _aio.UnaryUnaryMultiCallable[_database_pb2.RestartQueueRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    RestartQueueClaimsBy: _aio.UnaryUnaryMultiCallable[_database_pb2.RestartQueueClaimsByRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     ListStuckWorkQueueRows: _aio.UnaryUnaryMultiCallable[_database_pb2.ListStuckWorkQueueRowsRequest, _database_pb2.ListStuckWorkQueueRowsReply]  # type: ignore[assignment]
     ClearWorkQueueClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.ClearWorkQueueClaimRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     DeleteWorkQueueRow: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteWorkQueueRowRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
@@ -928,6 +930,13 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     def RestartQueue(
         self,
         request: _database_pb2.RestartQueueRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def RestartQueueClaimsBy(
+        self,
+        request: _database_pb2.RestartQueueClaimsByRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
