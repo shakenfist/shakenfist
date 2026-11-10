@@ -63,6 +63,23 @@ Memory is measured in MiB in Shaken Fist. All references to memory size are stor
   a file made of the shapes, such as a test suite for a plan-reference
   checker, carries `# audit-ok: phase-reference-file` once near the top,
   with a sentence saying why
+- Two more citation shapes are reported in Python without failing the
+  commit: a decision cited by its shorthand (`D13`) and a pointer to a
+  `PLAN-*.md` file. The same hook finds them, with a `tokenize` walk
+  over comments and string literals and an `ast` walk over `def` and
+  `class` names, so that `D13` is read as a citation in prose and as
+  somebody's variable in code. Several hundred are in the tree, which is
+  why they are advisory: fix the ones in the files you touch, and run
+  `python3 tools/check-plan-phase-references.py --advisory` to see all of
+  them. Two survive the rule and carry
+  `# audit-ok: plan-reference` on the line, or
+  `# audit-ok: plan-reference-file` once near the top of a file -- a
+  pointer to work that is not built yet, where an issue link is better
+  if one exists, and a string persisted as data, where rewording it
+  splits a committed dataset on one condition. Those are the tokens the
+  fleet's
+  [plan references in source](../components/development/audits/plan-source-references.md)
+  audit accepts, so one marker answers both
 
 This page is the style guide; `AGENTS.md` summarises it and links here.
 

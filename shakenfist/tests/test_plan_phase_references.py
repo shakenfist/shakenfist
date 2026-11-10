@@ -13,7 +13,9 @@ gap at commit time, these tests keep it honest, and the final test is
 the regression guard for the documentation itself.
 """
 
+import contextlib
 import importlib.util
+import io
 import os
 import tempfile
 
@@ -299,3 +301,142 @@ class PlanHistoryInSourceRegressionTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             [], problems,
             'Plan history references in source:\n' + '\n'.join(problems))
+
+
+class PlanCitationAdvisoryFixtureTestCase(base.ShakenFistTestCase):
+    """The advisory Python pass.
+
+    A decision cited by its shorthand (`D13`) and a pointer to a plan
+    file are plan history as much as `decision 13` is, but several
+    hundred are already in the tree, so they are reported without
+    failing the commit and fixed in the files a change touches.
+    """
+
+    def _write(self, tmp, name, content):
+        path = os.path.join(tmp, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write(content)
+        return path
+
+    def _problems(self, name, content):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write(tmp, name, content)
+            return checker.advisory_problems(root_dir=tmp)
+
+    def test_clean_source_passes(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# The guard sits where the exception is raised.\n'))
+
+    def test_a_decision_shorthand_in_a_comment_is_reported(self):
+        problems = self._problems(
+            'shakenfist/thing.py',
+            '# A comment.\n# The ceiling is advisory (D16).\n')
+        self.assertEqual(1, len(problems))
+        self.assertIn('thing.py:2', problems[0])
+        self.assertIn("'D16'", problems[0])
+
+    def test_a_decision_shorthand_in_a_docstring_is_reported_at_its_line(self):
+        # A docstring is one token spanning many lines, so the citation
+        # has to be reported where it is written.
+        problems = self._problems(
+            'shakenfist/thing.py',
+            'def guard():\n'
+            '    """One line.\n'
+            '\n'
+            '    The clause the node guard applies, per D13.\n'
+            '    """\n')
+        self.assertEqual(1, len(problems))
+        self.assertIn('thing.py:4', problems[0])
+
+    def test_a_citation_in_an_fstring_is_reported(self):
+        # Python 3.12 stopped emitting an f-string as one STRING token.
+        problems = self._problems(
+            'shakenfist/thing.py',
+            "def thing(node):\n"
+            "    return f'{node} refused per D13'\n")
+        self.assertEqual(1, len(problems))
+        self.assertIn('thing.py:2', problems[0])
+
+    def test_a_plan_filename_is_reported(self):
+        problems = self._problems(
+            'shakenfist/thing.py',
+            '# Deferred; see docs/plans/PLAN-thing-phase-04-guard.md.\n')
+        self.assertEqual(1, len(problems))
+        self.assertIn("'PLAN-thing-phase-04-guard.md'", problems[0])
+
+    def test_a_citation_in_code_rather_than_prose_is_not_reported(self):
+        # This is what reading prose rather than lines buys: in code a
+        # `D13` is a name somebody chose, and the shape is unusable
+        # without the distinction.
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py', 'D13 = 4\nvalue = D13 + 1\n'))
+
+    def test_a_definition_name_carrying_a_citation_is_reported(self):
+        for name in ('test_cluster_guard_is_d14_shape',
+                     'test_phase_5_refuses', 'test_step_5f_waits',
+                     '_decision_3_limit'):
+            problems = self._problems(
+                'shakenfist/thing.py',
+                f'class {name}:\n    pass\n')
+            self.assertEqual(1, len(problems), name)
+            self.assertIn(repr(name), problems[0])
+
+    def test_an_ordinary_definition_name_is_not_reported(self):
+        # The last two are the pattern's deliberate limit: it anchors on
+        # underscores, so a run-together CamelCase citation is missed.
+        # Every one in the tree is a snake_case test name.
+        for name in ('test_ipv6_address_parses', 'test_d_is_not_a_decision',
+                     'Instance', 'PhaseD3Guard', 'D14Guard'):
+            self.assertEqual([], self._problems(
+                'shakenfist/thing.py', f'class {name}:\n    pass\n'), name)
+
+    def test_the_line_marker_suppresses_a_line(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# Deferred; see PLAN-thing.md.  # audit-ok: plan-reference\n'))
+
+    def test_the_phase_reference_line_marker_also_suppresses_a_line(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# Model D13 of the pump.  # audit-ok: phase-reference\n'))
+
+    def test_the_file_marker_suppresses_the_whole_file(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# audit-ok: plan-reference-file -- fixtures.\n'
+            '# See PLAN-thing.md, per D13.\n'))
+
+    def test_only_python_is_read(self):
+        # The blocking pass reads every tracked file; this one needs a
+        # tokeniser and an abstract syntax tree.
+        self.assertEqual([], self._problems(
+            'deploy/thing.yaml', '# Deferred; see PLAN-thing.md, per D13.\n'))
+
+    def test_a_plans_directory_is_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write(tmp, 'docs/plans/helper.py',
+                        '# See PLAN-thing.md, per D13.\n')
+            self.assertEqual([], checker.advisory_problems(root_dir=tmp))
+
+    def test_unparseable_python_is_skipped_rather_than_crashing(self):
+        # A file mid-conflict or written for another interpreter must not
+        # take the hook down with it.
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py', 'def (((:\n'))
+
+
+class PlanCitationAdvisoryRegressionTestCase(base.ShakenFistTestCase):
+    def test_the_advisory_backlog_does_not_fail_the_checker(self):
+        # The point of the advisory pass: the tree carries hundreds of
+        # these citations, and the checker still exits zero so that they
+        # are worked off file by file rather than in one sweep. The
+        # blocking passes stay blocking, which the two regression tests
+        # above cover.
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            status = checker.main(argv=[])
+        self.assertEqual(0, status)
+        self.assertIn('advisory plan citation', printed.getvalue())
+        self.assertIn('do not fail the commit', printed.getvalue())
