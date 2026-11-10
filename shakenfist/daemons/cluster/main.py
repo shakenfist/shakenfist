@@ -663,18 +663,7 @@ class Monitor(daemon.Daemon):
                     n.add_event(EVENT_TYPE_AUDIT,
                                 'node returned from being missing')
             elif n.state.value == Node.STATE_DELETED:
-                # Find instances on deleted nodes
-                for i in instance.healthy_instances_on_node(n):
-                    n.add_event(
-                        EVENT_TYPE_AUDIT, 'deleting instance as hosting node as been deleted',
-                        extra={'instance_uuid': i.uuid})
-                    i.add_event(
-                        EVENT_TYPE_AUDIT, 'deleting instance as hosting node as been deleted')
-                    i.delete(global_only=True)
-
-                    # Cleanup the instance's interfaces
-                    for ni in interface.interfaces_for_instance(i):
-                        ni.delete()
+                self._delete_instances_on_deleted_node(n)
 
                 # Cleanup any blob locations (use Node.blobs property)
                 self._drop_blob_locations(
@@ -737,6 +726,51 @@ class Monitor(daemon.Daemon):
 
         # And we're done
         LOG.info('Cluster maintenance loop complete')
+
+    def _delete_instances_on_deleted_node(self, n):
+        """Delete every instance which has not left a deleted node.
+
+        Every instance on the node which is not already deleted, not
+        just the healthy ones. An instance whose node failed is often
+        exactly the one in an error state -- the resource health
+        cascade below puts it there -- or one stuck in delete-wait
+        because the delete it was asked to do was enqueued for a node
+        which has since gone. Sweeping only HEALTHY_STATES left those
+        behind with their placement, interfaces and row intact, and
+        nothing else would ever move them to deleted: their own delete
+        is enqueued for the node which no longer exists, and the
+        cleaner's delete-wait escalation runs on that same node. Since
+        issue 4847 an instance in any state but deleted also blocks its
+        namespace's delete, so such an instance made its namespace
+        undeletable with no operator recovery path (issue 4868).
+        """
+        for i in instance.undeleted_instances_on_node(n):
+            self.pet_watchdog()
+            n.add_event(
+                EVENT_TYPE_AUDIT, 'deleting instance as hosting node as been deleted',
+                extra={'instance_uuid': i.uuid})
+            i.add_event(
+                EVENT_TYPE_AUDIT, 'deleting instance as hosting node as been deleted')
+
+            # _delete_globally() moves an instance in a *-error
+            # transition state to error rather than deleted, because a
+            # caller is normally expected to acknowledge the error
+            # before the instance goes away. There is nobody to
+            # acknowledge it to here: the node is gone, so the instance
+            # can never run again, and a second delete is the only thing
+            # which would take it from error to deleted -- one it could
+            # not perform itself, for the same reason this sweep exists.
+            # So delete twice, in this pass. The node row is hard
+            # deleted on the deleted object sweep's own schedule, after
+            # which this branch never runs again, so an instance left in
+            # error here is one left in error for good.
+            i.delete(global_only=True)
+            if i.state.value != dbo.STATE_DELETED:
+                i.delete(global_only=True)
+
+            # Cleanup the instance's interfaces
+            for ni in interface.interfaces_for_instance(i):
+                ni.delete()
 
     def _cascade_errored_node(self, n):
         # React to a node that sf-resources' health evaluator marked

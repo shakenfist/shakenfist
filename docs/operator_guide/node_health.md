@@ -129,9 +129,11 @@ An errored instance still counts against its namespace: a namespace cannot
 be deleted while it holds an instance in any state but `deleted`, so delete
 the errored instances first. That delete is carried out by the instance's own
 node, so it needs the node back in service. If the node is gone for good,
-deleting the node does not currently clean up its errored instances either
-(issue 4868), and such an instance blocks its namespace's delete until that
-is fixed.
+delete the node instead — `sf-client node delete <node>` — and sf-cluster
+deletes every instance placed on it, whatever state it is in, releasing their
+placements and interfaces and freeing their namespace to be deleted. Nothing
+is recoverable from those instances afterwards, so snapshot anything you want
+to keep while the node is still only errored.
 
 ## Configuration
 

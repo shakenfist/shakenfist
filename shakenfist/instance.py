@@ -309,6 +309,18 @@ class Instance(dbowo):
         dbo.STATE_ERROR, STATE_INITIAL_ERROR, STATE_PREFLIGHT_ERROR,
         STATE_CREATING_ERROR, STATE_CREATED_ERROR, STATE_DELETE_WAIT_ERROR
     }
+    # Every state in which an instance is still a live row holding
+    # something -- a placement, interfaces, disks -- which some caller
+    # must eventually take away from it. That is ACTIVE_STATES plus
+    # delete-wait-error, which ACTIVE_STATES omits even though such an
+    # instance is precisely the one whose teardown did not complete; the
+    # same gap gave shakenfist/daemons/network/maintain.py its
+    # VXLAN_PROTECTING_INSTANCE_STATES. Resolved by the 'undeleted'
+    # prefilter below, and used by the deleted-node sweep in sf-cluster,
+    # where any state left out is an instance which can never be
+    # deleted (issue 4868). A test asserts this is every state except
+    # deleted and hard-deleted, so a new state joins it by default.
+    UNDELETED_STATES = ACTIVE_STATES | {STATE_DELETE_WAIT_ERROR}
 
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
@@ -3469,6 +3481,12 @@ class Instances(dbo_iter):
         # prefilter is set, do not filter on state (return every
         # instance and let predicate filters scope). The base class
         # default of ACTIVE_STATES is kept for other inheritors.
+        #
+        # 'undeleted' is instance-only as well, because only instances
+        # have a state which is neither active nor finished with
+        # (delete-wait-error).
+        if self.prefilter == 'undeleted':
+            return set(Instance.UNDELETED_STATES)
         if self.prefilter is None:
             return set()
         return super()._resolve_prefilter_to_states()
@@ -3503,6 +3521,19 @@ def healthy_instances_on_node(n):
     return Instances(
         [partial(placement_filter, str(n.uuid))],
         prefilter='healthy')
+
+
+def undeleted_instances_on_node(n):
+    """Every instance on node n which has not reached deleted.
+
+    The deleted-node cleanup needs this rather than
+    healthy_instances_on_node(): an instance whose node failed is often
+    in an error state or stuck in delete-wait, and once the node is gone
+    nothing else will ever move it on (issue 4868).
+    """
+    return Instances(
+        [partial(placement_filter, str(n.uuid))],
+        prefilter='undeleted')
 
 
 def instances_in_namespace(namespace):
