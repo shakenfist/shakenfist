@@ -1,4 +1,5 @@
 import json
+from xml.etree import ElementTree
 
 from testtools import content
 
@@ -68,10 +69,16 @@ class TestUEFI(base.BaseNamespacedTestCase):
         # And the reason it booted, so a regression here says which half
         # broke: the controller is in the domain XML, not merely implied by a
         # guest which came up.
+        # Parse rather than match the template's text: the newest event is
+        # usually libvirt's own rewrite of the domain, which gives the
+        # controller an index and a PCI address and so never contains the
+        # line libvirt.tmpl wrote.
         xml = self._await_domain_xml(inst['uuid'])
-        self.assertIn(
-            "<controller type='scsi' model='virtio-scsi'/>", xml,
-            'the domain XML this hypervisor generated declares no virtio-scsi '
+        controllers = ElementTree.fromstring(xml).findall(
+            "./devices/controller[@type='scsi'][@model='virtio-scsi']")
+        self.assertNotEqual(
+            0, len(controllers),
+            'the domain XML this hypervisor recorded declares no virtio-scsi '
             'controller, so libvirt chose its LSI Logic default (issue 4579). '
             'The most likely cause is a hypervisor running an older copy of '
             'libvirt.tmpl.')
