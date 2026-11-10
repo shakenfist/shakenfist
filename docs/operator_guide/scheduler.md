@@ -105,10 +105,12 @@ caller's own namespace, so affinity stages count only that namespace's
 instances. A client learns the endpoint exists from the
 `placement-query` capability.
 
-* **It writes nothing and publishes nothing.** No instance, no capacity
-  counter and no claim is created or changed, and no audit events are
-  published, so a speculative query leaves no trail against anybody's
-  instance.
+* **It writes nothing and publishes nothing of its own.** No instance,
+  no capacity counter and no claim is created or changed, and the
+  placement walk publishes no audit events, so a speculative query
+  leaves no trail against anybody's instance. The only event a query
+  causes is the `token used to authenticate request` audit event that
+  every authenticated request records on the caller's own namespace.
 * **The answer is advisory and racy by construction.** Nothing is
   reserved. Room found by a query can be gone by the next request, and a
   create is still admitted or refused by the guarded capacity claim
@@ -117,11 +119,21 @@ instances. A client learns the endpoint exists from the
 * **A set which does not fit is a 200, not a 507.** The question was
   answered successfully; the answer is `fits: false`. The response names
   the pipeline `stage` which emptied the candidate list (for example
-  `sufficient_idle_memory` or `capacity_guard`, in the same vocabulary
-  the placement events use) and the index, `shape`, of the shape being
-  walked, counted after `count` has been expanded. A 507 remains what a
-  create gets. A 503 means the database could not be reached and the
-  question could not be answered; retry.
+  `sufficient_idle_memory`, in the same vocabulary the placement events
+  use) and the index, `shape`, of the shape being walked, counted after
+  `count` has been expanded. `shape` is null where the refusal did not
+  come from walking a member of the set. A 507 remains what a create
+  gets. A 503 means the database could not be reached and the question
+  could not be answered; retry.
+* **Admission-only stages are never a query's answer.** `capacity_guard`
+  is the one of these. It is raised by the guarded capacity claim a
+  create makes against the ledger, not by any filter in the walk, so it
+  can reach a create's 507 and can never be a query's `stage`. A query
+  answering `fits: true` followed by a create refused at
+  `capacity_guard` is the ledger having moved in between, not the query
+  and the create disagreeing about the pipeline. Anything scoring
+  predictions against real refusals should expect that label on the
+  refusal side only.
 * **Per-node detail requires admin.** A cluster administrator also
   receives, for a set that fits, a `shapes` array in the order asked,
   giving each shape's chosen `node` and its `candidates` (the chosen
@@ -129,6 +141,25 @@ instances. A client learns the endpoint exists from the
   the set-level verdict, including the refusing stage, because node
   identity is cluster topology that no other endpoint gives to a
   non-administrator.
+
+  That boundary accepts a residual disclosure rather than closing it.
+  The set-level verdict and the refusing stage are enough to bisect the
+  largest single node's free memory, vCPUs or disk in a handful of
+  requests: ask for a shape, halve or double it according to the answer,
+  and read the stage to learn which dimension ran out. A tenant could
+  already learn the same by attempting creates, but each attempt cost a
+  507 and left an audit event on an instance, whereas a query is cheap
+  and — by the first property above — writes nothing against any
+  instance. It is not invisible: like every authenticated request, each
+  query records a `token used to authenticate request` audit event on
+  the caller's own namespace, naming the key, the method, the path and
+  the remote address. That event does not carry the shapes asked about,
+  so a namespace's events show how often it queried but not what it
+  learned. Writing nothing against instances is listed here as a
+  benefit, and for the consumers this endpoint was built for it is one;
+  it is also what makes the content of this probing unrecoverable after
+  the fact. Treat per-node figures as administrative, and cluster-wide
+  extremes as information any authenticated caller can obtain.
 * **The set is bounded.** A query may ask about at most 64 shapes,
   counted after each shape's `count` is expanded. More is a 400 naming
   the bound. A short request body can otherwise buy a long walk.

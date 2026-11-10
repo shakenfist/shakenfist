@@ -18,10 +18,12 @@ Three properties make it a query rather than a create:
 * It writes nothing. No instance row, no capacity counter, no claim.
   The charges it reasons about live in a snapshot built for the call
   and discarded with it.
-* It publishes no events. The placement walk addresses its audit
-  events to the objects its caller names, and this caller names none,
-  so a speculative evaluation leaves no trail against anybody's
-  instance.
+* It publishes no events of its own. The placement walk addresses its
+  audit events to the objects its caller names, and this caller names
+  none, so a speculative evaluation leaves no trail against anybody's
+  instance. The one event a query does cause is the token-use audit
+  event every authenticated request records on the caller's own
+  namespace, which names the path but not the shapes asked about.
 * Its answer is advisory and racy by construction. The room it found
   can be gone before the caller's next request, and nothing here
   reserves any of it. That is why a set which does not fit is a 200
@@ -34,11 +36,19 @@ The answer names the pipeline stage which refused rather than a bare
 boolean, in the stage vocabulary the scheduler already reports --
 ``cpu_max_per_instance``, ``sufficient_idle_cpu``,
 ``sufficient_idle_memory``, ``sufficient_free_disk``,
-``sufficient_idle_disk``, ``capacity_guard`` and the rest. Nothing
-here mints a stage name: a prediction and a real refusal are compared
-label for label by code which is already deployed, and a stage this
-endpoint invented would be a silent incompatibility rather than a
-compile error.
+``sufficient_idle_disk`` and the rest. Nothing here mints a stage
+name: a prediction and a real refusal are compared label for label by
+code which is already deployed, and a stage this endpoint invented
+would be a silent incompatibility rather than a compile error.
+
+What a query cannot name is the admission-only stages, of which
+``capacity_guard`` is the one. It is raised by the guarded capacity
+claim a create makes against the ledger, not by any filter in the
+walk, so it reaches a create's 507 and can never be the answer to a
+question. A consumer comparing the two label for label should expect
+it on the refusal side alone: a query answering ``fits: true``
+followed by a create refused at ``capacity_guard`` is the ledger
+having moved in between, not the two disagreeing about the pipeline.
 """
 
 from flasgger import swag_from
@@ -74,6 +84,21 @@ placement_post_example = """{
 }"""
 
 
+# The other answer, and for a query the more common one. OpenAPI 2.0
+# allows a response one example per mime type, and both answers share
+# the 200, so this one is rendered into the response description
+# rather than published beside the example above. A reader of the
+# apidocs sees both either way, which is the point; a caller which
+# only ever saw the fits-true body would be guessing at the shape of
+# the answer it has to handle most often.
+placement_post_refusal_example = (
+    '<pre>{\n'
+    '    "fits": false,\n'
+    '    "stage": "sufficient_idle_memory",\n'
+    '    "shape": 1\n'
+    '}</pre>')
+
+
 def _integer(name, value):
     """One of a shape's integer figures, or an error response.
 
@@ -100,9 +125,23 @@ def _shape_disk_gb(label, shape):
 
     The list form is summed by mariadb.disk_spec_virtual_gb(), which is
     the one implementation of "how big is this disk claim" and is what
-    the create path's own capacity claim calls. A second sum here is
-    exactly how a dry run and a create come to disagree about how large
-    a request is.
+    the create path's own capacity claim calls. A second sum written
+    here is exactly how a query and a create come to disagree about how
+    large a request is.
+
+    That agreement is with the create's *ledger claim*, and is not
+    total. The create's own filter input is summed separately by
+    PlacementShape.from_instance(), which truncates each size with
+    int() where this helper rounds half away from zero, as the ledger's
+    SQL cast does. The two therefore agree on every integral size,
+    which is every size the shipped validation mode accepts: the
+    published schema types a disk size as an integer and refuses a
+    fractional one before this handler is reached. They diverge by a
+    gigabyte per fractional disk only where an operator has relaxed
+    validation, in which case a `size` of 10.5 is charged to the
+    query's filters as 11 and to a create's filters as 10. Making the
+    two sums one is a change to what a filter decides rather than to
+    what this endpoint reports, so it is not made here.
     """
     disk = shape.get('disk')
     disk_spec = shape.get('disk_spec')
@@ -261,7 +300,15 @@ class PlacementEndpoint(api_base.Resource):
                'carries no <code>shapes</code> at all -- placement is all '
                'or nothing -- and instead names the pipeline stage which '
                'emptied the candidate list in <code>stage</code> and the '
-               'index of the shape it was walking in <code>shape</code>.',
+               'index of the shape it was walking in <code>shape</code>, '
+               'counted after each shape\'s count has been expanded. '
+               '<code>shape</code> is null where the refusal did not come '
+               'from walking a member of the set. The stages are the '
+               'scheduler\'s filter and affinity checks; the '
+               '<code>capacity_guard</code> stage belongs to the ledger '
+               'claim a create makes and is never a query\'s answer. A '
+               'refusal looks like this:<br/>'
+               + placement_post_refusal_example,
           placement_post_example),
          (400, 'The request does not describe a set of shapes: a shape '
                'without a vCPU or memory figure, a shape giving both disk '

@@ -1,4 +1,5 @@
 import ast
+import collections
 import importlib.util
 import os
 import random
@@ -3010,7 +3011,7 @@ class SchedulerStageAttributeTestCase(SchedulerTestCase):
         root = os.path.dirname(os.path.abspath(scheduler.__file__))
         wanted = {'LowResourceException', 'AffinityConstraintUnsatisfiable'}
 
-        found = []
+        found = collections.Counter()
         for path, _, names in os.walk(root):
             if os.path.sep + 'tests' in path:
                 continue
@@ -3040,7 +3041,7 @@ class SchedulerStageAttributeTestCase(SchedulerTestCase):
 
                     where = '%s:%d' % (
                         os.path.relpath(full, root), node.lineno)
-                    found.append(where)
+                    found[os.path.relpath(full, root)] += 1
 
                     stage = [kw for kw in call.keywords if kw.arg == 'stage']
                     self.assertEqual(
@@ -3057,11 +3058,18 @@ class SchedulerStageAttributeTestCase(SchedulerTestCase):
 
         # The vacuity floor: a walk which silently stopped matching
         # would otherwise pass by examining nothing.
+        #
+        # Which files raise, and how many times each -- not which
+        # lines. A line number moves whenever somebody edits a comment
+        # above it, and a check which cries wolf for that teaches the
+        # next reader to update the expected value without reading the
+        # raise site, which is the one thing this test is asking them
+        # to do. Adding or removing a raiser still fails here.
         self.assertEqual(
-            ['operations/node_inst_netdesc_op.py:287', 'scheduler.py:1198'],
-            sorted(found),
-            'the set of low resource raise sites moved; read each one and '
-            'check it still names a stage before updating this list')
+            {'operations/node_inst_netdesc_op.py': 1, 'scheduler.py': 1},
+            dict(found),
+            'the set of low resource raise sites changed; read each one '
+            'and check it still names a stage before updating this')
 
     def test_the_affinity_subclass_is_given_its_stage_too(self):
         # The affinity stage raises a different class, passed in by the
@@ -3351,18 +3359,27 @@ class MultisetPlacementTestCase(SchedulerTestCase):
         # something did not fit and not what.
         self.assertEqual(3, exc.shape)
 
-    def _metadata_reads(self, affinity, neighbours=3, shapes=2):
+    def _metadata_reads(self, affinity, neighbours=3, shapes=2, foreign=0):
         """Count the metadata reads one multiset decision performs.
 
         Instance.tags is a metadata read and nothing caches it, so each
         access is a database round trip. Counting them is the only way
         to assert this: a timing assertion on a read this small would
         flake and would not say what regressed.
+
+        ``foreign`` places that many tagged instances belonging to
+        another namespace on the same node. They are nobody's
+        neighbours, so anything a decision reads about them is
+        something it cannot use.
         """
         for j in range(neighbours):
             self.mock_mariadb.create_instance(
                 'neighbour-%d' % j, place_on_node='node2',
                 metadata={'tags': ['web']})
+        for j in range(foreign):
+            self.mock_mariadb.create_instance(
+                'stranger-%d' % j, place_on_node='node2',
+                namespace='somebody-else', metadata={'tags': ['web']})
 
         requested = [self._shape(affinity=affinity) for _ in range(shapes)]
 
@@ -3425,6 +3442,53 @@ class MultisetPlacementTestCase(SchedulerTestCase):
             'prefer_without_tag': ['batch', 'other']})
 
         self.assertEqual(12, len(reads))
+
+    def test_another_namespaces_instances_are_never_read(self):
+        """A foreign instance costs nothing to skip.
+
+        The neighbour-skip predicate tests the namespace before it
+        reads the tags, because the namespace is a field of the row it
+        already holds and the tags are a database round trip. A
+        foreign instance is skipped whatever its tags say, so reading
+        them is work whose result cannot change the answer -- and on a
+        shared cluster most of the instances on any node belong to
+        somebody else, which makes it most of the work.
+
+        Four strangers on the same node as the three real neighbours,
+        and the count is the three neighbours' alone: 2 shapes x 3
+        neighbours x 2 reads = 12, the same number the test above
+        measures without them. The strangers are *tagged*, so a
+        predicate which read tags first would read all four of them
+        once per visit and come to 20.
+        """
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        reads = self._metadata_reads(
+            {'prefer_with_tag': ['web']}, foreign=4)
+
+        self.assertEqual(12, len(reads))
+        # And the rows read are the neighbours', not the strangers'.
+        self.assertEqual(3, len(set(reads)))
+
+    def test_the_hard_filter_never_reads_another_namespaces_instances(self):
+        """The hard affinity filter skips strangers without reading them.
+
+        The filter calls the same neighbour-skip predicate as the scorer
+        and then reads the tags of every instance it did not skip, so it
+        saves the same reads. It is reached by a different branch, and a
+        predicate restated or reordered inside only one caller would not
+        be caught by the scorer's test above. The strangers are tagged
+        with the required tag, so a filter that read them would also
+        find what it was looking for in them; only the three
+        neighbours' rows may be read.
+        """
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        reads = self._metadata_reads(
+            {'require_with_tag': ['web']}, foreign=4)
+
+        self.assertNotEqual([], reads)
+        self.assertEqual(3, len(set(reads)))
 
     def test_a_refusal_names_the_shape_in_the_callers_own_order(self):
         # The set is walked largest first, so the shape which runs out

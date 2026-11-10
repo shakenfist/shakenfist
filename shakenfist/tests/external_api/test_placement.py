@@ -237,6 +237,15 @@ class PlacementVerdictTestCase(PlacementTestCase):
         self.assertFalse(three['fits'])
         self.assertEqual('sufficient_idle_memory', three['stage'])
 
+        # The refusal index counts the expanded order, which for a
+        # single shape asked for three times means the third copy is
+        # shape 2 -- not shape 0, which is where an index counting the
+        # caller's array entries would point, and which would tell a
+        # caller the first copy was the problem when two of them fitted.
+        # This is the one place the published "counted after count has
+        # been expanded" contract is observable.
+        self.assertEqual(2, three['shape'])
+
     def test_a_count_expands_into_separate_shapes(self):
         # The expansion is visible in the answer as well as in the
         # arithmetic: a count of three is three entries, each placed in
@@ -363,16 +372,24 @@ class PlacementDiskTestCase(PlacementTestCase):
         mariadb.disk_spec_virtual_gb() follows MariaDB's
         JSON-number-to-BIGINT cast and rounds half away from zero, so
         10.5 is eleven gigabytes and not ten. That is the whole value
-        of calling it: a handler which summed the sizes itself would
-        truncate, and a query which truncates answers that a set fits
-        in room the create it predicts would be refused for.
+        of calling it rather than summing the sizes here.
 
-        Run at warn because the published schema types a disk size as
-        an integer and refuses a fractional one before the handler is
-        reached. The sum is still what this measures: it is what
-        answers on the operator's rollback, and it is the arithmetic
-        the ledger performs on the same list whatever this endpoint
-        does with it.
+        What the delegation buys is agreement with the *ledger claim* a
+        create makes, and the agreement is not total. A create's own
+        filter input is summed separately by
+        PlacementShape.from_instance(), which truncates with int(): on
+        this very list it charges the filters 10 where the query
+        charges them 11. The two agree on every integral size, which is
+        every size the shipped validation mode accepts -- the schema
+        types a disk size as an integer and refuses a fractional one
+        before any handler sees it -- and diverge by a gigabyte per
+        fractional disk only under relaxed validation, which is the
+        mode this test runs at in order to reach the sum at all.
+
+        So this is not a test that the query predicts the create
+        exactly for fractional sizes; it does not. It is a test that
+        the sum here is the shared implementation's and not a fourth
+        reading of how big a disk list is.
         """
         self.set_validation_mode('warn')
         self._baseline(disk_free_instances=10 * GiB)
@@ -498,6 +515,40 @@ class PlacementRequestTestCase(PlacementTestCase):
         resp = self._query([{'cpus': True, 'memory': 1024}])
 
         self.assertEqual(400, resp.status_code)
+
+    def test_a_count_of_zero_is_refused(self):
+        # A shape asked for zero times is not a shape. Accepting it and
+        # expanding to nothing would answer a question about a smaller
+        # set than the caller described -- and for a body of one such
+        # shape, about no set at all.
+        self.set_validation_mode('warn')
+        resp = self._query([self._shape(count=0)])
+
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('count', resp.get_json()['error'])
+
+    def test_a_disk_spec_which_is_not_a_list_is_refused(self):
+        # The sum is over a list of disks. Without the handler's own
+        # check, a mapping or a bare number would reach
+        # mariadb.disk_spec_virtual_gb(), which answers zero with a
+        # warning for anything that is not a list -- a silent
+        # "this shape wants no disk" where the caller plainly asked for
+        # some.
+        self.set_validation_mode('warn')
+        for value in ({'size': 10}, 10, 'ten'):
+            resp = self._query([self._shape(disk_spec=value)])
+            self.assertEqual(400, resp.status_code, value)
+            self.assertIn('disk_spec', resp.get_json()['error'], value)
+
+    def test_a_shape_which_is_not_an_object_is_refused(self):
+        # A list of shapes whose members are not shapes. Each of these
+        # would otherwise reach .get() on something that has no .get(),
+        # which is a 500 for a caller's mistake.
+        self.set_validation_mode('warn')
+        for value in ('shape', 7, ['cpus', 1], None):
+            resp = self._query([value])
+            self.assertEqual(400, resp.status_code, value)
+            self.assertIn('shape 0', resp.get_json()['error'], value)
 
 
 class PlacementAffinityTestCase(PlacementTestCase):
