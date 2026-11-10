@@ -16571,7 +16571,14 @@ automatic and a newly added endpoint is governed the moment it exists.
 The families in use are:</p>
 <p><code>admin</code>, <code>agentoperation</code>, <code>artifact</code>, <code>auth</code>, <code>blob</code>,
 <code>clusteroperation</code>, <code>instance</code>, <code>interface</code>, <code>issuer</code>, <code>label</code>,
-<code>network</code>, <code>node</code>, <code>rule</code>, <code>upload</code></p>
+<code>network</code>, <code>node</code>, <code>placement</code>, <code>rule</code>, <code>upload</code></p>
+<p><code>placement</code> is the one family with no object behind it. <code>POST
+/placement</code> asks whether a set of instance shapes would fit the
+cluster now and creates nothing, so it derives <code>placement.read</code>
+despite being a POST. It is deliberately not part of the <code>instance</code>
+family: the right to ask whether instances would fit is not the right
+to create one, and a rule granting the question should not have to
+grant the create as well.</p>
 <p>So <code>GET /blobs</code> needs <code>blob.read</code>, and <code>DELETE /instances/{ref}</code> needs
 <code>instance.delete</code>. The unauthenticated endpoints (<code>/</code>, <code>/livez</code>,
 <code>/readyz</code>) derive families of their own, but <code>@public</code>

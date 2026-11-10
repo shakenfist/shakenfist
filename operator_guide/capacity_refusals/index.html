@@ -16206,7 +16206,9 @@ rather than settled.</p>
 <li>
 <p><strong><code>capacity_guard</code></strong> -- the capacity admission guard refused every candidate.
   This stage name is used when the admission check itself, rather than a
-  pre-filter, refused the placement.</p>
+  pre-filter, refused the placement. Admission happens only on a create, so
+  this stage appears in a create's 507 and never in a placement query's
+  answer; see <a href="../scheduler/">the placement query</a>.</p>
 </li>
 <li>
 <p><strong><code>unknown</code></strong> -- the refusal reached the API carrying no stage. This is a

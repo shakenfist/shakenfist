@@ -15830,9 +15830,9 @@ three, not for one.</p>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="p">{</span><span class="s1">'cpus'</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">'memory'</span><span class="p">:</span> <span class="mi">4096</span><span class="p">},</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">])</span>
 </code></pre></div>
-<p><code>check_placement()</code> is available in client-python from v0.8.5. It takes a list
-of shape mappings and returns the parsed answer. A set that does not fit is
-a successful call which returns <code>fits: False</code>; it does not raise.</p>
+<p><code>check_placement()</code> needs client-python v0.8.5 or newer. It takes a list of
+shape mappings and returns the parsed answer. A set that does not fit is a
+successful call which returns <code>fits: False</code>; it does not raise.</p>
 <p>It does raise <code>IncapableException</code> when the cluster does not advertise the
 capability, rather than sending a request that an older server would answer
 with a 404. No request is sent in that case.</p>
@@ -15843,10 +15843,17 @@ with a 404. No request is sent in that case.</p>
 </code></pre></div>
 <p><code>stage</code> names the scheduler check which ruled out every remaining hypervisor,
 and <code>shape</code> is the index of the instance being placed at the time, counting
-each shape <code>count</code> times. A hard affinity constraint which cannot be satisfied
+each shape <code>count</code> times. It is null if the refusal did not come from placing
+one of your shapes. A hard affinity constraint which cannot be satisfied
 names a different stage to one that merely ran out of capacity, so you can tell
 "the cluster is full" from "nothing satisfies the constraint you asked for".
 Placement is all or nothing: a set that does not fit has no partial answer.</p>
+<p>The stages a query can name are the scheduler's filter and affinity checks.
+It will never answer <code>capacity_guard</code>: that is the ledger check a create
+makes when it actually claims the capacity, and only a create can meet it. So
+a create can still be refused at <code>capacity_guard</code> moments after a query said
+the set would fit — the room was there when you asked and somebody else took
+it, which is what "advisory" means below.</p>
 <p>Cluster administrators additionally receive a <code>shapes</code> list, in the order
 asked, naming the hypervisor each shape would land on and its fallbacks.
 Other users are not told which hypervisors exist, only the verdict.</p>

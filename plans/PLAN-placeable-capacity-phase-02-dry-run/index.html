@@ -15881,7 +15881,18 @@ reason.</p>
   expression. Phase 6, per <code>D11</code>'s "left to phase 6".</li>
 <li>Any change to what a filter decides, what a stage is called, or
   what any event contains (<code>G5</code>). This phase adds a reader of the
-  placement pipeline, not a change to it.</li>
+  placement pipeline, not a change to it. <strong>One exception was made
+  deliberately after the review round</strong>, and it is the only one: the
+  affinity skip predicate now tests the namespace before it reads an
+  instance's tags, which changes the <code>skipped</code> reason reported for an
+  instance that is both tagless and foreign from <code>no tags</code> to
+  <code>different namespace</code>. Both are true of such an instance and nothing
+  reads the reason -- it is audit prose rather than an input to a
+  decision. The saving is every metadata read an affinity-bearing
+  query or create used to spend on instances in other namespaces,
+  which on a cluster with many namespaces is most of the reads such a
+  request makes. A request with no affinity never reached the
+  predicate, so it saves nothing.</li>
 <li>Issue #4842, the string <code>cpus</code> 500 at admission. Filed during
   this phase's survey (<code>F9</code>) and deliberately not fixed here: it
   is a create-path type error, and a phase that adds a query has
@@ -16352,7 +16363,9 @@ way around.</p>
 <li>The client-python method merges, is recorded in the master
     plan's Execution table in the <code>client-python &lt;sha&gt; (#pr)</code>
     form, and refuses to call a server that does not advertise the
-    capability.</li>
+    capability. Merged as client-python <code>4ff8a7d</code> (#448), recorded
+    in the Execution table beside this phase's own merge, and the
+    capability gate is tested by asserting no request is sent.</li>
 <li><code>D9</code>'s handover exists as a <code>plan-blockers</code> entry naming what
     private-ci must switch, soak and read, and phase 3's section
     of the master plan points at it. Recorded as blocker <code>b4</code>
@@ -16600,6 +16613,43 @@ its own whether to answer 401 or 403.</p>
 caught.</strong> Step 2a was told flake8 here enforces 79 columns. It
 enforces 120 (<code>tools/flake8wrap.sh</code>). Nothing was mis-wrapped as a
 result, but the correction belongs in the record.</p>
+<h3 id="review-round-on-the-pull-request">Review round on the pull request<a class="headerlink" href="#review-round-on-the-pull-request" title="Permanent link">&para;</a></h3>
+<p>One automated round, 3 document and 8 consider items, no <code>fix</code>. Nine
+were actioned and one declined. Three are worth recording beyond the
+commit message.</p>
+<p><strong>The query advertised a stage it can never return.</strong> The module
+docstring, the operator guide and the user guide all listed
+<code>capacity_guard</code> among the stages an answer may carry. It is raised
+only at admission, and the query never reaches admission. That is
+worse than ordinary drift here, because the endpoint exists so a
+deployed consumer can score predictions against real refusals label
+for label, and <code>capacity_guard</code> is precisely the refusal a dry run
+cannot predict. The lists are corrected and each page now says
+admission-only stages reach a create's 507 and never a query.</p>
+<p><strong>The disk delegation agrees with the ledger, not with the filter.</strong>
+<code>_shape_disk_gb()</code> sums with the ledger's helper so that a query and a
+create cannot disagree about how large a request is. That holds against
+the create's capacity claim and not against the create's <em>filter</em>
+input, which <code>PlacementShape.from_instance()</code> sums by truncation. For a
+fractional size the query predicts a gigabyte more than the filters
+would charge. The claim is corrected rather than the sum: making the
+core delegate would change what a filter decides, which this phase
+does not do. The divergence itself is filed as
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4853" title="GitHub Issue: shakenfist/shakenfist #4853">shakenfist#4853</a>.</p>
+<p><strong>The read amplification was rated higher by the reviewer than by
+this phase.</strong> The <code>Results</code> section above identified the skip
+predicate's ordering as a free saving and left it alone as an event
+payload change. The review rated the same thing a high-severity
+finding, on the grounds that the endpoint is tenant-reachable, that 64
+shapes is roughly eight times the measured twelve thousand reads, and
+that the database load budget was fitted before this endpoint existed.
+That reading is the better one: the inefficiency predates the phase but
+the exposure does not. Michael chose the swap, and the scope exception
+above records it.</p>
+<p>Declined: a shared accessor so that this module and the instance API
+stop holding separate <code>Scheduler</code> globals with separate metrics
+caches. It follows the established pattern, it is correct as written,
+and it costs one extra metrics read per worker per cache window.</p>
 
 
 
