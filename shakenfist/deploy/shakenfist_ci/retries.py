@@ -56,6 +56,13 @@ def requested_disk_gb(disk_spec):
     one and ignores the sizeless ones (a CD ROM is exactly the size of its
     base image), so this does the same. A caller which passes no disk spec at
     all asks for nothing.
+
+    The server sums with mariadb.disk_spec_virtual_gb(), which rounds a
+    fractional size half away from zero where the int() below truncates.
+    This module imports nothing from the server by design, so the two
+    agree by the suite only ever creating integral sizes rather than by
+    construction. A fractional size here would make this estimate one
+    gigabyte light, and the wait it feeds optimistic.
     """
     requested = 0
     for disk in disk_spec or []:

@@ -3058,7 +3058,7 @@ class SchedulerStageAttributeTestCase(SchedulerTestCase):
         # The vacuity floor: a walk which silently stopped matching
         # would otherwise pass by examining nothing.
         self.assertEqual(
-            ['operations/node_inst_netdesc_op.py:287', 'scheduler.py:1187'],
+            ['operations/node_inst_netdesc_op.py:287', 'scheduler.py:1198'],
             sorted(found),
             'the set of low resource raise sites moved; read each one and '
             'check it still names a stage before updating this list')
@@ -3077,6 +3077,115 @@ class SchedulerStageAttributeTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage affinity_constraints: '
             'requires tag nonexistent', str(exc))
+
+
+class PlacementShapeDiskSumTestCase(SchedulerTestCase):
+    """The shape's disk sum is the ledger's disk sum.
+
+    PlacementShape.from_instance() feeds the capacity filters and
+    Instance._capacity_claim feeds the counters those filters are meant
+    to predict, so the two must answer "how many gigabytes does this
+    disk claim" identically for every disk_spec, not merely for the
+    integral sizes the API currently lets through. The factory used to
+    sum with int(), which truncates, so a fractional size was filtered
+    low and charged high.
+    """
+
+    def _claimed_gb(self, inst):
+        """What the capacity ledger will charge for this instance."""
+        return inst._capacity_claim[2]
+
+    def test_a_fractional_disk_size_rounds_as_the_ledger_does(self):
+        # 10.5 is the interesting case: half away from zero gives 11,
+        # truncation gives 10 and banker's rounding gives 10, so this
+        # one value separates all three implementations.
+        inst = self.mock_mariadb.create_instance(
+            'fractional-inst', disk_spec=[{'base': 'cirros', 'size': 10.5}])
+
+        shape = scheduler.PlacementShape.from_instance(inst)
+
+        self.assertEqual(11, shape.disk_gb)
+        self.assertEqual(self._claimed_gb(inst), shape.disk_gb)
+
+    def test_a_fractional_disk_size_below_the_half_rounds_down(self):
+        inst = self.mock_mariadb.create_instance(
+            'fractional-inst', disk_spec=[{'base': 'cirros', 'size': 10.4}])
+
+        shape = scheduler.PlacementShape.from_instance(inst)
+
+        self.assertEqual(10, shape.disk_gb)
+        self.assertEqual(self._claimed_gb(inst), shape.disk_gb)
+
+    def test_a_fractional_numeric_string_rounds_too(self):
+        # The create API accepts a numeric string for an integer body
+        # field, so a size can arrive as text and still be fractional.
+        inst = self.mock_mariadb.create_instance(
+            'stringy-disk-inst', disk_spec=[{'base': 'cirros', 'size': '8.7'}])
+
+        shape = scheduler.PlacementShape.from_instance(inst)
+
+        self.assertEqual(9, shape.disk_gb)
+        self.assertEqual(self._claimed_gb(inst), shape.disk_gb)
+
+    def test_a_sizeless_disk_contributes_nothing(self):
+        # A disk which is exactly the size of its base image -- a CD ROM,
+        # say -- carries no size at all, and a null size is the same
+        # claim. Neither is an error, and neither adds to the sum.
+        inst = self.mock_mariadb.create_instance(
+            'cdrom-inst', disk_spec=[
+                {'base': 'cirros', 'size': 10},
+                {'base': 'cirros-cdrom', 'type': 'cdrom'},
+                {'base': 'other', 'size': None}])
+
+        shape = scheduler.PlacementShape.from_instance(inst)
+
+        self.assertEqual(10, shape.disk_gb)
+        self.assertEqual(self._claimed_gb(inst), shape.disk_gb)
+
+    def test_an_integral_size_is_unchanged(self):
+        # The sizes every current write path produces are integers, so
+        # the common case has to be exactly what it was before.
+        inst = self.mock_mariadb.create_instance('fake-inst')
+
+        shape = scheduler.PlacementShape.from_instance(inst)
+
+        self.assertEqual(21, shape.disk_gb)
+        self.assertEqual(self._claimed_gb(inst), shape.disk_gb)
+
+    def test_an_unreadable_disk_size_still_fails_the_decision(self):
+        # The ledger counts a size it cannot read as zero, because it
+        # recomputes from rows which already exist and must not stop.
+        # A request is different: this factory read the size with int()
+        # and raised, which is the only thing stopping a create with a
+        # garbage size from being admitted free and then erroring on a
+        # hypervisor minutes later. The delegation keeps that by asking
+        # the helper strictly, so API_VALIDATION_MODE=warn answers
+        # exactly what it answered before.
+        inst = self.mock_mariadb.create_instance(
+            'garbage-inst', disk_spec=[{'base': 'cirros', 'size': 'banana'}])
+
+        self.assertRaises(
+            ValueError, scheduler.PlacementShape.from_instance, inst)
+
+    def test_the_free_disk_filter_sees_the_rounded_request(self):
+        # The point of the agreement: a request the ledger will charge 11
+        # GB for is refused by a node with 10 GB free, where the
+        # truncated sum admitted it as a 10 GB request and then charged
+        # 11 against the node it was placed on.
+        self.mock_mariadb.set_node_metrics_same({
+            'disk_free_instances': 10 * GiB,
+            'disk_reservation_gb': 0,
+        })
+        inst = self.mock_mariadb.create_instance(
+            'fractional-inst', disk_spec=[{'base': 'cirros', 'size': 10.5}])
+
+        s = scheduler.Scheduler()
+        ok, reason = s._has_sufficient_disk(
+            s.log, scheduler.PlacementShape.from_instance(inst),
+            self._node_uuid('node2'), self._snapshot(s))
+
+        self.assertFalse(ok)
+        self.assertEqual(11, reason['requested_disk_gb'])
 
 
 class MultisetPlacementTestCase(SchedulerTestCase):
