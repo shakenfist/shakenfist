@@ -380,6 +380,76 @@ class Namespace(dbo):
         for claim in namespace_claim.claims_in_namespace(self.uuid):
             claim.hard_delete()
 
+        # An instance is not cascade deleted by its namespace the way a
+        # key or a rule is -- deleting one is real work on a hypervisor,
+        # which is why the REST delete handler refuses a namespace still
+        # holding one rather than deleting it on the caller's behalf.
+        # But an instance is reachable only through its namespace, so an
+        # instance which gets this far has no owner and nothing which
+        # will ever sweep it: no namespace, and no state the deleted
+        # object sweep looks at (issue 4847). This is the backstop for
+        # whatever arrives here anyway -- a create which raced the
+        # namespace delete, or an instance left behind by a release
+        # which counted an errored instance as already gone.
+        #
+        # Instances only. A network is reachable only through its
+        # namespace too, and the REST handler still lets an errored or
+        # delete-waiting one through, so a network can arrive here in
+        # the same way and is not swept. That gap is issue 4863's, and
+        # its fix belongs with the handler's network check.
+        #
+        # The delete is enqueued rather than the row being hard deleted
+        # here, because the disks, interfaces and placement are the
+        # point: hard deleting the row would release the capacity but
+        # leave whatever is on the hypervisor with nothing left to
+        # explain it. A deleted instance is left alone, because the
+        # deleted object sweep already owns it and does not need this
+        # namespace to find it.
+        #
+        # This is one attempt, not a retry loop. The namespace rows go
+        # below in the same pass, so if the enqueued delete later fails
+        # the instance lands in error with no namespace, and nothing
+        # will run this again for it. Holding the namespace back until
+        # its instances are gone was the alternative, and it is worse:
+        # an instance which can never be deleted (its hypervisor is gone
+        # for good) would wedge the namespace in the sweep for ever,
+        # re-enqueueing a doomed delete on every pass. The refusal in
+        # the REST handler is the real guard; this only catches what
+        # got past it, and the audit event below says so on the
+        # instance where an operator will find it. The event is worded
+        # as an attempt and written first: enqueue_delete() can return
+        # without enqueueing (and events that itself) or raise, and in
+        # either case the event should still be true.
+        #
+        # It runs after the key, rule, trust and claim removals rather
+        # than first, because enqueue_delete() raises
+        # DatabaseUnavailable when it cannot read the instance's
+        # outstanding operations. Raising here aborts the pass and
+        # leaves the namespace rows for the sweep's next one, which is
+        # the right outcome -- but it should not also defer the trust
+        # revocation, which is the step that matters for security.
+        #
+        # Never for the system namespace: the object iterator reads a
+        # namespace of 'system' as "every namespace" (see
+        # DatabaseBackedObjectIterator.get_iterator()), so this loop
+        # would enqueue a delete for every instance on the cluster. The
+        # REST handler refuses to delete system and nothing else
+        # reaches here for it, but the guard costs one line.
+        #
+        # Imported here rather than at the top of the file:
+        # shakenfist.instance reaches shakenfist.namespace through
+        # shakenfist.artifact, so a module level import is a cycle.
+        if self.uuid != 'system':
+            from shakenfist import instance as instance_module
+            for i in instance_module.instances_in_namespace(self.uuid):
+                if i.state.value == dbo.STATE_DELETED:
+                    continue
+                i.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'attempting deletion from namespace hard delete, '
+                    'instance outlived its namespace', log_as_error=True)
+                i.enqueue_delete()
+
         mariadb.delete_namespace_attributes(self.uuid)
         mariadb.delete_namespace(self.uuid)
         super().hard_delete()

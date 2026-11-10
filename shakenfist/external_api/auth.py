@@ -388,19 +388,37 @@ class AuthNamespaceEndpoint(api_base.Resource):
         if namespace == 'system':
             return sf_api.error(403, 'you cannot delete the system namespace')
 
-        # The namespace must be empty
+        # The namespace must be empty. Only a deleted instance counts as
+        # gone: it has released everything it held, and the deleted
+        # object sweep hard deletes its row on its own schedule whether
+        # its namespace still exists or not. Every other state, error
+        # included, is a live row, and an instance is reachable only
+        # through its namespace -- so a namespace deleted over the top
+        # of one leaves a row with no owner and nothing which will ever
+        # sweep it (issue 4847).
+        #
+        # Counting error as gone also made this refusal expire into
+        # permission. An instance whose delete fails goes delete-wait ->
+        # delete-wait-error -> error, and only the middle state blocked,
+        # so a caller who retried the namespace delete a moment later
+        # succeeded over the top of exactly the instance the first
+        # refusal had protected.
         instances = []
-        deleted_instances = []
         for i in instance.instances_in_namespace(namespace):
-            if i.state.value in [dbo.STATE_DELETED, dbo.STATE_ERROR]:
-                deleted_instances.append(i.uuid)
-            else:
-                LOG.with_fields({'instance': i.uuid,
-                                 'state': i.state.value}).info('Blocks namespace delete')
-                instances.append(i.uuid)
+            if i.state.value == dbo.STATE_DELETED:
+                continue
+            LOG.with_fields({'instance': i.uuid,
+                             'state': i.state.value}).info('Blocks namespace delete')
+            instances.append(i.uuid)
         if len(instances) > 0:
             return sf_api.error(400, 'you cannot delete a namespace with instances')
 
+        # Networks still count error and delete_wait as gone, through
+        # is_dead(), which is the defect fixed above for instances. That
+        # is known and tracked as issue 4863 rather than fixed here:
+        # is_dead() is shared, and its other callers rely on it meaning
+        # "do not act on this network", so the fix is a predicate of
+        # this handler's own rather than narrowing that one.
         networks = []
         for n in network.networks_in_namespace(namespace):
             if not n.is_dead():
