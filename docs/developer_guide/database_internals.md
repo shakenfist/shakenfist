@@ -621,13 +621,24 @@ That makes a rolling upgrade safe in either order. The server also
 refuses an empty `claimed_by` rather than treating it as "everyone".
 
 The reset of this node's own queues is deliberately not narrowed:
-nothing else drains them, so every claim on one is this node's,
-whatever `claimed_by` says.
+nothing else drains them while the node is live, so every claim on one
+is this node's, whatever `claimed_by` says. (The cluster daemon drains
+a node's own queues once the node is deleted, so a deleted node which
+came back under the same uuid could reset a claim that drain holds.)
+
 Recovery is best effort, one item at a time. An item it cannot recover,
 for example because its operation type no longer exists, is logged and
 left for the reaper. If the claims cannot be listed at all, startup
 clears none of them, because clearing a claim nobody has checked
 strands its operation just as before.
+
+Each reset is best effort too. One which fails, or which an
+sf-database too old for `RestartQueueClaimsBy` cannot narrow, leaves
+that queue's claims to the reaper and is logged; it does not stop the
+rest of startup. An operation recovery has already moved back to
+`queued` on a shared queue then waits behind its claim until the
+reaper clears it, which is still better than before: the next worker
+would have found it executing, skipped it and stranded it.
 
 The cluster daemon also runs two other reaping sweeps from
 `daemons/cluster/scheduled_tasks.py`. `per_deleted_object_checks()`

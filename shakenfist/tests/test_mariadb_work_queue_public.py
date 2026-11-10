@@ -213,6 +213,37 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
             stub.return_value.RestartQueueClaimsBy, call.call_args.args[0])
         mock_log.warning.assert_called_once()
 
+    @mock.patch('shakenfist.mariadb.LOG')
+    def test_restart_claims_by_other_rpc_failure_clears_nothing(
+            self, mock_log):
+        # Any other failure is no reason to fall back either.
+        with mock.patch('shakenfist.mariadb._get_database_stub') as stub, \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           side_effect=FakeRpcError(
+                               grpc.StatusCode.UNAVAILABLE)) as call:
+            self.assertFalse(mariadb._grpc_work_queue_restart_claims_by(
+                'any-clusteroperation-background', 'uuid-3'))
+
+        call.assert_called_once()
+        self.assertIs(
+            stub.return_value.RestartQueueClaimsBy, call.call_args.args[0])
+        mock_log.warning.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb.LOG')
+    def test_restart_claims_by_refused_by_the_server_clears_nothing(
+            self, mock_log):
+        reply = mock.Mock(success=False, error='claimed_by is required')
+        with mock.patch('shakenfist.mariadb._get_database_stub') as stub, \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply) as call:
+            self.assertFalse(mariadb._grpc_work_queue_restart_claims_by(
+                'any-clusteroperation-background', 'uuid-3'))
+
+        call.assert_called_once()
+        self.assertIs(
+            stub.return_value.RestartQueueClaimsBy, call.call_args.args[0])
+        mock_log.error.assert_called_once()
+
     @mock.patch('shakenfist.mariadb._grpc_work_queue_restart')
     @mock.patch('shakenfist.mariadb._direct_work_queue_restart')
     @mock.patch(

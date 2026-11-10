@@ -417,8 +417,9 @@ def recover_interrupted_operations(node_uuid):
     for row in mariadb.list_stuck_work_queue_rows(0, strict=True):
         queue_name = row['queue_name']
         # A claim on one of our own queues is ours whatever claimed_by
-        # says -- nothing else drains them. On a shared queue only
-        # claimed_by can tell us apart from a live peer.
+        # says -- nothing else drains them while this node is live (the
+        # cluster daemon drains them only once the node is deleted). On a
+        # shared queue only claimed_by can tell us apart from a live peer.
         if not (queue_name in own_queues or
                 (queue_name in shared_queues and
                  row['claimed_by'] == node_uuid)):
@@ -517,8 +518,11 @@ def startup_tasks():
     #
     # This node's own queues are named by its uuid, not its name: looked
     # up by name, they matched no queue, so a claim left by a stopped
-    # sf-queues was never cleared (#4543). Nothing else drains them, so
-    # every claim on one is ours and the reset is unfiltered.
+    # sf-queues was never cleared (#4543). Nothing else drains them while
+    # this node is live, so every claim on one is ours and the reset is
+    # unfiltered. The one exception is the cluster daemon draining a
+    # deleted node's queues, which only matters if a deleted node comes
+    # back under the same uuid.
     #
     # The shared any-* queues are drained by every node's sf-queues, so
     # the reset there clears only claims made under this node's uuid:
@@ -553,18 +557,46 @@ def startup_tasks():
                 'claims to the reaper', e)
             own_queues = []
             shared_queues = []
-    for queue in own_queues:
-        mariadb.restart_work_queue(queue)
-    for queue in shared_queues:
-        mariadb.restart_work_queue_claims_by(queue, config.NODE_UUID)
+
+    # The resets are best effort, like the recovery before them. A queue
+    # whose reset fails -- the database is unavailable, or too old to
+    # narrow the reset -- keeps its claims until the reaper clears them,
+    # and must not stop the blob datastore upgrade and instance restore
+    # below. An operation recovery moved back to queued on a shared queue
+    # then waits behind its claim for the reaper too. That is still better
+    # than before recovery reached the shared queues: the next worker
+    # would have found the operation executing, skipped it and stranded it.
+    unreset = []
     for queue in own_queues + shared_queues:
-        processing, queued, deferred = mariadb.get_work_queue_length(queue)
-        LOG.with_fields({
-            'processing': processing,
-            'queued': queued,
-            'deferred': deferred,
-            'queue': queue
-        }).debug('Queue length')
+        try:
+            if queue in shared_queues:
+                cleared = mariadb.restart_work_queue_claims_by(
+                    queue, config.NODE_UUID)
+            else:
+                mariadb.restart_work_queue(queue)
+                cleared = True
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'resetting this node\'s claims on {queue}', e)
+            cleared = False
+        if not cleared:
+            unreset.append(queue)
+
+        try:
+            processing, queued, deferred = mariadb.get_work_queue_length(queue)
+            LOG.with_fields({
+                'processing': processing,
+                'queued': queued,
+                'deferred': deferred,
+                'queue': queue
+            }).debug('Queue length')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'reading the length of {queue}', e)
+    if unreset:
+        LOG.with_fields({'queues': unreset}).warning(
+            'Could not reset this node\'s claims on these queues, leaving '
+            'them to the reaper')
 
     # Ensure the blob data store is the most recent version
     upgrade_blob_datastore()

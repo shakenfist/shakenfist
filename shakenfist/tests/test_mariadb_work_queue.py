@@ -403,8 +403,11 @@ class WorkQueueRestartTestCase(base.ShakenFistTestCase):
 
         mariadb._direct_work_queue_restart('my-queue')
 
+        # The SET clause names the bare column; only a WHERE on it is
+        # qualified with the table.
         compiled = mock_conn.execute.call_args[0][0].compile()
-        self.assertNotIn('claimed_by_1', compiled.params)
+        compiled_sql = str(compiled).replace('`', '')
+        self.assertNotIn('work_queue.claimed_by', compiled_sql)
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_restart_for_one_worker_only_clears_its_claims(
@@ -422,7 +425,7 @@ class WorkQueueRestartTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(result, 1)
         compiled = mock_conn.execute.call_args[0][0].compile()
-        self.assertEqual(compiled.params['claimed_by_1'], 'sf-3')
+        self.assertIn('sf-3', compiled.params.values())
         self.assertEqual(compiled.params['claimed_by'], None)
         compiled_sql = str(compiled).replace('`', '')
         self.assertIn('work_queue.claimed_by = ', compiled_sql)

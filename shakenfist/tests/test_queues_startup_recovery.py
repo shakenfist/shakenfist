@@ -157,8 +157,9 @@ class RecoverInterruptedOperationsTestCase(base.ShakenFistTestCase):
         self.assertEqual(BaseClusterOperation.STATE_EXECUTING, legacy.state.value)
 
     def test_our_own_queue_is_ours_whatever_claimed_by_says(self):
-        # Nothing else drains it, and the cluster daemon's drain of a deleted
-        # node's queues writes its own name into claimed_by there.
+        # Nothing else drains it while this node is live. Claims on it may
+        # still name another node: one an older sf-queues made over gRPC
+        # names the database node, as this row does.
         op = self.ops['op'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
         self.rows.append(row(OWN_QUEUE, 'op', claimed_by='sf-database-1'))
         startup_tasks.recover_interrupted_operations(NODE_UUID)
@@ -327,4 +328,58 @@ class StartupResetTestCase(base.ShakenFistTestCase):
         self.mariadb.restart_work_queue.assert_not_called()
         self.mariadb.restart_work_queue_claims_by.assert_not_called()
         startup_tasks.upgrade_blob_datastore.assert_called_once()
+        startup_tasks.restore_instances.assert_called_once()
+
+    def _unreset_warnings(self):
+        return [c for c in startup_tasks.LOG.with_fields.call_args_list
+                if 'queues' in c.args[0]]
+
+    def test_a_reset_which_fails_does_not_stop_startup(self):
+        # Every reset is attempted, the failures are named in one warning,
+        # and the blob datastore upgrade and instance restore still run.
+        self.mariadb.restart_work_queue.side_effect = \
+            exceptions.DatabaseUnavailable('gone')
+        self.mariadb.restart_work_queue_claims_by.side_effect = \
+            exceptions.DatabaseUnavailable('gone')
+        with mock.patch.object(startup_tasks.util_exceptions, 'ignore_exception'), \
+                mock.patch.object(startup_tasks, 'LOG'):
+            restore = startup_tasks.startup_tasks()
+            restore.join(10)
+            warnings = self._unreset_warnings()
+
+        self.assertEqual(10, len(self._resets()))
+        startup_tasks.upgrade_blob_datastore.assert_called_once()
+        startup_tasks.restore_instances.assert_called_once()
+        self.assertEqual(1, len(warnings))
+        self.assertEqual(10, len(warnings[0].args[0]['queues']))
+
+    def test_a_shared_reset_the_database_cannot_narrow_is_logged(self):
+        # An older sf-database leaves the shared claims alone; say so in
+        # sf-queues' own log, not just the database layer's.
+        self.mariadb.restart_work_queue_claims_by.return_value = False
+        with mock.patch.object(startup_tasks, 'LOG'):
+            startup_tasks.startup_tasks().join(10)
+            warnings = self._unreset_warnings()
+
+        self.assertEqual(1, len(warnings))
+        self.assertEqual(
+            sorted(get_general_user_facing_node_queues() +
+                   get_general_background_node_queues()),
+            sorted(warnings[0].args[0]['queues']))
+
+    def test_resets_which_succeed_are_not_logged_as_failures(self):
+        self.mariadb.restart_work_queue_claims_by.return_value = True
+        with mock.patch.object(startup_tasks, 'LOG'):
+            startup_tasks.startup_tasks().join(10)
+            self.assertEqual([], self._unreset_warnings())
+
+    def test_a_queue_length_which_cannot_be_read_does_not_stop_startup(self):
+        self.mariadb.get_work_queue_length.side_effect = \
+            exceptions.DatabaseUnavailable('gone')
+        self.mariadb.restart_work_queue_claims_by.return_value = True
+        with mock.patch.object(startup_tasks.util_exceptions, 'ignore_exception'), \
+                mock.patch.object(startup_tasks, 'LOG'):
+            startup_tasks.startup_tasks().join(10)
+            self.assertEqual([], self._unreset_warnings())
+
         startup_tasks.restore_instances.assert_called_once()
