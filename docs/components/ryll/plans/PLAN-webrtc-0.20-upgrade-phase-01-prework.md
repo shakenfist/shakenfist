@@ -360,7 +360,8 @@ must reproduce these conditions to compare against these numbers.
 > Both runs were therefore at `INFO`, where those counters are not
 > emitted, so the zeros mean "nothing logged" rather than "nothing
 > dropped". The RSS and CPU rows are unaffected — they were sampled
-> externally from `/proc`.
+> externally from `/proc`. (Fixed since: ryll honours `RUST_LOG` as of
+> #702. This correction records the tree as it stood in August 2026.)
 
 **Verdict: no regression.** The phase-01 tip is at-or-below the
 baseline on both memory and CPU, and the differences are within

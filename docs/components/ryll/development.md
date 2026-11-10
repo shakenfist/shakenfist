@@ -469,12 +469,14 @@ which ryll logs at `debug`; run ryll with `--verbose` and take them
 out of the session log.
 
 Note that `--verbose` turns on `debug` for the whole dependency tree,
-not just ryll — webrtc-rs is talkative at that level. That is enough
-log to affect the numbers on a long run, so take the counters from a
-short separate session rather than from the one being measured.
-`RUST_LOG` will not narrow it: ryll does not read it. Tracked as
-[#313](https://github.com/shakenfist/ryll/issues/313); when that
-lands, this paragraph goes away.
+not just ryll — webrtc-rs is talkative at that level, and that is
+enough log to affect the numbers on a long run. Narrow it with
+`RUST_LOG` instead, which ryll honours in place of `--verbose`'s
+level: `RUST_LOG=info,shakenfist_spice_webrtc=debug,ryll=debug` gives
+the drop counters and the reaper events without the rest of the tree,
+so the counters can come from the session being measured. A
+`RUST_LOG` that does not parse is reported at `warn!` and ignored,
+and the run falls back to `--verbose`'s level.
 
 If you are driving the uefi-latency-guest, note that any keypress
 advances a fixed eight-colour cycle and one step in eight is black,

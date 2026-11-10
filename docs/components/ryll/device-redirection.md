@@ -233,10 +233,14 @@ Per-character event sequence:
 At paste start, held modifier keys (Ctrl, Shift, Alt) are released
 and saved; at paste end they are restored. Translation errors
 (non-ASCII characters) emit `ChannelEvent::PasteFailed` and cause
-a non-zero exit in headless mode.
+a non-zero exit in headless mode. A paste that arrives while another
+is still typing is refused with a `PasteFailed` of kind `InProgress`
+before anything is typed; the GUI shows that one as a notification
+rather than the paste-error dialog, since nothing needs fixing.
 
 CLI flags: `--enable-paste-as-keystrokes` (master gate),
-`--paste-text TEXT` (headless trigger, implies enable),
+`--paste-text TEXT` (headless trigger, implies enable; refused without
+`--headless`),
 `--paste-char-delay-ms N` (default 16ms).
 
 GUI surface: When enabled, a "Paste" entry appears in the hamburger

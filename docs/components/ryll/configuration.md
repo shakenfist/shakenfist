@@ -21,7 +21,7 @@ ryll [OPTIONS]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--headless` | false | Run without GUI (for automated testing) |
+| `--headless` | false | Run without GUI (for automated testing). Mutually exclusive with `--web` and `--rdp`, which are refused together at parse time |
 | `--cadence` | false | Send automatic keystroke every 2 seconds |
 
 ### USB Device Redirection
@@ -64,7 +64,7 @@ window. The operator guide, including reverse-proxy and TLS setup, is
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--web` | false | Run as a SPICE → browser transcoder. Serves a browser shell that consumes the SPICE display via WebRTC, and prints a URL carrying a per-launch random token. Mutually exclusive with `--headless` and the GUI default |
+| `--web` | false | Run as a SPICE → browser transcoder. Serves a browser shell that consumes the SPICE display via WebRTC, and prints a URL carrying a per-launch random token. Mutually exclusive with `--headless` and the GUI default, and refused together with `--headless` at parse time |
 | `--web-host <ADDR>` | `127.0.0.1` | Bind address for the HTTP/HTTPS signalling listener only. Use `0.0.0.0` for LAN access. Has no effect on which addresses WebRTC media binds or advertises — that is `--web-media-addr` |
 | `--web-port <PORT>` | 0 (ephemeral) | TCP port for the signalling listener |
 | `--web-tls-cert <PATH>` | none | PEM-encoded TLS certificate chain. Serving over HTTPS requires `--web-tls-key` as well |
@@ -373,13 +373,58 @@ Ctrl+Shift+X, because ryll cannot tell them apart from those.
 
 ## Environment Variables
 
-Currently, ryll does not use environment variables for configuration. All
-settings are provided via command-line arguments or .vv files.
+`RUST_LOG` selects the logging filter, as described under
+[Logging](#logging).
+
+`RYLL_TOKIO_CONSOLE=1` starts the
+[tokio-console](https://github.com/tokio-rs/console) subscriber, in a
+build made with `--features tokio-console` and
+`RUSTFLAGS="--cfg tokio_unstable"` (`make build-tokio-console`); other
+builds ignore it. The console subscriber takes over as the global
+tracing subscriber, so ryll's own log lines go nowhere while it is
+active.
+
+Every other setting is provided via command-line arguments or .vv
+files.
 
 ## Logging
 
 Ryll uses the `tracing` crate for logging. By default, INFO-level messages
 are shown. Use `-v` or `--verbose` for DEBUG-level output.
+
+`RUST_LOG` overrides that level when it is set, using `tracing`'s
+own directive syntax, so a single crate can be turned up without
+turning up the whole dependency tree:
+
+```bash
+RUST_LOG=shakenfist_spice_webrtc=debug ryll --file test.vv
+```
+
+A value that names only targets, as that one does, leaves everything
+else at info: ryll reads it as `info,shakenfist_spice_webrtc=debug`.
+Taken literally, `tracing` would switch every other target off,
+ryll's own warnings included. To make the rest quieter, give a level
+of its own: `RUST_LOG=warn,shakenfist_spice_webrtc=debug`. The rest
+stays at info under `--verbose` too, since narrowing is what
+`RUST_LOG` is for.
+
+`--verbose` still decides whether `/tmp/ryll.log` is written, and
+that file is filtered by the same directive. A `RUST_LOG` that does
+not parse is reported at WARN level and ignored, leaving the level
+`--verbose` asked for.
+
+`RUST_LOG` is not a replacement for `--verbose`. Many per-channel
+protocol lines are gated on `--verbose` itself as well as on the log
+level, so `RUST_LOG=debug` alone still logs less than `--verbose`
+does; pass both when you want those lines narrowed to one crate.
+Because the same directive filters the file, a restrictive `RUST_LOG`
+also thins `/tmp/ryll.log` -- worth knowing before following a
+troubleshooting step that says to run with `-v` and read that file.
+
+Every session logs the directive it is using at startup (`logging at
+'info'`), so a log that is thinner than expected says why rather than
+leaving an inherited `RUST_LOG` to be guessed at. When `RUST_LOG`
+overrides `--verbose`, that line is a warning instead of a note.
 
 Log output goes to stderr, so you can redirect stdout for data output:
 
