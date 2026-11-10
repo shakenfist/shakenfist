@@ -494,6 +494,8 @@ and triage status, is in
   `DEBUG`.  The demotion quieted non-verbose stderr, which
   is where the CPU concern was.  The `EnvFilter` question
   is already tracked as #313; declined here as a duplicate.
+  (Fixed since: ryll honours `RUST_LOG` as of #702, which
+  closed #313.)
 
 **Already fixed before the audit ran.**
 

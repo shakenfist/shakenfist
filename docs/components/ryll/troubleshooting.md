@@ -887,6 +887,53 @@ probe reported a stall on healthy guests (issue #429).
 | `last_agent_reply_lag_us` | Microseconds between the most recent matched send and its REPLY, where replies arrive at all. |
 | `recent_agent_reply_lag_us` | Ring of the last 16 reply lags, in microseconds. |
 | `outstanding_agent_request_count` | `MONITORS_CONFIG` sends without a matched REPLY. Grows by one per send on QXL guests and is not a stall signal; saturates at 99. |
+| `resize_requests_sent_count` | Display sizes sent to the agent. Cumulative. |
+| `resize_unapplied_count` | How many of those the guest never applied. Cumulative. |
+| `outstanding_resize` | The size sent and not yet judged, with the session-relative seconds at which it was queued for the agent. `None` between requests. |
+
+### The guest ignores a resize
+
+Resizing the ryll window, or asking for a size over the control socket,
+sends the guest a `VD_AGENT_MONITORS_CONFIG` and nothing more: the
+request is fire-and-forget, and on a QXL guest the agent never replies
+to it at all. A guest that acts on it creates a new primary surface,
+which is the only evidence ryll gets.
+
+So ryll watches for that surface. If none arrives within 5 seconds of
+the request, a Warn notification says "The guest did not apply the
+requested display resolution -- check that spice-vdagent is running in
+the guest's desktop session", the log line beside it names the size,
+and `resize_unapplied_count` grows. The notification's text is the
+same for every size, so dragging a window edge on such a guest folds
+into one entry rather than one per size it passed through. The size
+the guest picks need not be the one asked for -- a driver pads the mode,
+a desktop rounds it -- so any new primary surface counts as the guest
+having acted, including one the same size as the old one. A request for
+the size the guest is already at is not judged at all: there is nothing
+for it to apply, and a control client polling `resize` with the size it
+just read would otherwise be told the guest had ignored it.
+
+The five seconds are the guest's. A request still waiting in ryll's own
+agent queue for tokens the agent is not returning has not reached the
+guest, so the deadline waits another interval rather than blaming
+spice-vdagent; that case has its own notification ("Guest agent is not
+accepting messages..."), and `queued_agent_message_count` and
+`agent_starved_since_ts_secs` in the same table are where it shows. A
+request the agent never collected is dropped unjudged when the agent
+disconnects.
+
+The usual causes, in the order worth checking inside the guest:
+
+- the per-user `spice-vdagent` is not running in the desktop session
+  (the system `spice-vdagentd` answering the capabilities exchange at
+  connect is not enough): `pgrep -a spice-vdagent`. That includes a
+  guest still booting or sitting at its login screen, where the first
+  resize ryll sends on connect can arrive before any desktop session
+  has an agent; if the warning appeared only then, resize again once
+  the desktop is up before looking further;
+- the desktop does not honour agent-driven resizes, which some Wayland
+  sessions do not;
+- the display driver has no such mode: `xrandr` in the guest.
 
 ## Auto-snapshot mode for intermittent issues
 

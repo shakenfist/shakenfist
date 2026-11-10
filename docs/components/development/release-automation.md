@@ -187,6 +187,46 @@ three repositories fills the workflow's build section.
 | [kerbside](https://github.com/shakenfist/kerbside) | `kerbside` | Live |
 | [agent-python](https://github.com/shakenfist/agent-python) | `shakenfist-agent` | Added |
 
+## Recovering a Failed Release
+
+A release can fail after it has already published something. The policy
+is **burn the version and tag the next one**: do not try to replace a
+version an index has already served. PyPI never lets a file be
+re-uploaded, so a "fixed" re-release of the same version is not possible
+even in principle.
+
+Re-running the workflow *is* safe, and is how you finish a release that
+failed partway. `publish-pypi` passes `skip-existing: true`, so a job
+that reaches a version PyPI already holds reports success and lets the
+jobs behind it run. Without it the release deadlocks, because
+`github-release` has `publish-pypi` in its needs list: once PyPI has the
+version, every later run fails in `publish-pypi` and everything
+downstream skips. That is what made
+[shakenfist/client-python-k3s#168](https://github.com/shakenfist/client-python-k3s/issues/168)
+unfixable by re-running — the plugin was on PyPI, its Ansible collection
+was never published, and the workflow could not be driven past the
+upload to reach the Galaxy job.
+
+So:
+
+| Situation | Do this |
+|---|---|
+| Failed before anything published | Re-run the failed jobs, or fix and tag the next version |
+| Published to PyPI, later job failed | Re-run. `skip-existing` carries the PyPI job and the rest proceeds |
+| Published everywhere, release is wrong | Burn the version, tag the next one. Never re-tag |
+| A job is stuck in `waiting` | It needs a reviewer on the `release` environment (Step 3). This is a human action, not a stuck runner |
+
+**If you add a publish step after `publish-pypi`,** keep `skip-existing`
+and make the new step's failure recoverable the same way. An adopter
+with two indexes has two ways to half-publish and only one of them is
+reachable by re-running. kerbside does this for its two sequential
+packages.
+
+That last row is worth knowing before debugging: a job awaiting
+deployment approval looks queued, and one v0.4.0 job sat in `waiting`
+for nine hours and forty minutes while it was mistaken for a runner
+shortage.
+
 ## Verifying a Release
 
 ### Tag Signature

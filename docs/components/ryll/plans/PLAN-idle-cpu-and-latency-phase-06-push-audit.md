@@ -516,8 +516,8 @@ code findings from being verified:
 
 Declined: B2, B3, B4, B8 (test-coverage gaps behind paths
 that already degrade to `RuntimeMetrics::unavailable`) and
-D7 (a duplicate of issue #313).  Reasons are in the master
-plan.
+D7 (a duplicate of issue #313, fixed since in #702).  Reasons
+are in the master plan.
 
 Two things worth carrying forward.  A1's `EventSink`
 refactor found a real defect — `AgentConnected` sent with

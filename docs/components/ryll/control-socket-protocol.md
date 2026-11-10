@@ -1,4 +1,4 @@
-# Control Socket Protocol — Version 1.6
+# Control Socket Protocol — Version 1.7
 
 This document specifies the wire protocol spoken between a Ryll session
 with no host window — `--headless` or `--web` — and any external driver
@@ -8,7 +8,7 @@ such as latency loadtests and Sextant scenario tests implement against
 this document. Read the whole document before writing a client or
 implementing a verb.
 
-Protocol version: **1.6**
+Protocol version: **1.7**
 
 Version history:
 
@@ -52,6 +52,15 @@ Version history:
   check that audio arrives and decodes.  It is absent when no playback
   channel has linked, including in every build without the `audio`
   feature.  Additive.
+- **1.7** — added `frames_dropped_empty_dest` to each stream in the
+  `stats` result, counting frames a server sent with a dest rect that
+  encloses no pixels, which used to be counted as painted.  Added the
+  `paste_not_enabled` error code, returned by `paste` in a session
+  started without `--enable-paste-as-keystrokes`.  The field and the
+  code are additive; the `paste` answer is a deliberate behaviour
+  change: in such a session v1.6 answered `ok` and then typed nothing
+  and sent no event, so a client that took that `ok` as success was
+  already wrong, and now hears so.
 
 ---
 
@@ -302,7 +311,7 @@ Parameters:
 ### Hello response — success
 
 ```json
-{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.6", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
+{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.7", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
 ```
 
 Result fields:
@@ -310,8 +319,8 @@ Result fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `server_name` | string | Always `"ryll"` in this implementation. |
-| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.6"`; older servers reported `"1.0"`, `"1.1"`, `"1.2"`, `"1.3"`, `"1.4"` or `"1.5"`. Clients should not compare for exact equality — see the compat note below. |
-| `supported_methods` | array of string | The complete set of verb names the server recognises. Clients should use this list rather than hard-coding expectations, especially when connecting to a newer server. |
+| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.7"`; older servers reported `"1.0"`, `"1.1"`, `"1.2"`, `"1.3"`, `"1.4"`, `"1.5"` or `"1.6"`. Clients should not compare for exact equality — see the compat note below. |
+| `supported_methods` | array of string | The complete set of verb names the server recognises. Clients should use this list rather than hard-coding expectations, especially when connecting to a newer server. It is the server's verb catalogue, not a promise about this session: a listed verb can still be refused because of how the session was started -- `paste` answers `paste_not_enabled` in a session without paste-as-keystrokes. |
 | `supported_events` | array of string | The complete set of event names the server can emit. |
 
 ### Hello response — version mismatch
@@ -327,7 +336,7 @@ error and then **closes the connection**:
 The server writes the error line and then closes the socket. The client
 will see EOF immediately after reading that line.
 
-**Minor version mismatches are accepted in both directions.** A v1.6
+**Minor version mismatches are accepted in both directions.** A v1.7
 client connecting to a v1.0 server, or vice versa, is fine: the server
 responds with whatever minor version *it* speaks (e.g. `"1.0"` or
 `"1.1"`), and both sides behave according to the features they each
@@ -400,7 +409,7 @@ Worked example:
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo", "protocol_version": "1.1"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.6", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.7", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
 ```
 
 ---
@@ -511,6 +520,12 @@ Note: 57419 decimal is 0xE04B, the scancode for the left arrow key.
 Paste a string of text into the guest by translating it into US-QWERTY
 key events and queuing them for delivery.
 
+The session must have been started with
+`--enable-paste-as-keystrokes` (or `--paste-text`, which implies it).
+Without it there is nothing to type with, and the request is refused
+with `paste_not_enabled` rather than accepted. `--web` and `--rdp`
+sessions never enable it, so `paste` is refused there too.
+
 This verb is **asynchronous**. The response is returned as soon as the
 paste task has been queued, not when it has finished typing all the
 characters. Completion (or failure) is communicated as a
@@ -545,7 +560,18 @@ Verb-specific error codes:
 
 | Code | When |
 |------|------|
-| `agent_not_connected` | The SPICE vdagent is not currently connected. The paste infrastructure depends on the agent for clipboard operations. Wait for an `agent_connected` event with `connected: true` before retrying. |
+| `paste_not_enabled` | From v1.7. Paste-as-keystrokes is not enabled for this session, so nothing can be typed: either `--enable-paste-as-keystrokes` was not passed, or the session is a `--web` or `--rdp` one, which never enable it. Not retryable: it is a property of how the session was launched. |
+
+`agent_not_connected` is **not** returned by this verb, although it
+appears in the error-code list: paste translates text to scancodes and
+sends them on the SPICE inputs channel, and never uses the vdagent, so
+it works with `agent_connected: false`.
+
+A paste that arrives while another is still typing is accepted here --
+only the inputs channel knows one is in flight -- and then fails with a
+`paste_failed` event whose `reason` says so. Every dropped paste gets
+one: a request that is answered `ok` always ends in either
+`paste_completed` or `paste_failed`.
 
 Worked example:
 
@@ -564,6 +590,12 @@ Or on failure (e.g. an unrepresentable character mid-string):
 
 ```
 ← {"event": "paste_failed", "data": {"request_id": 6, "reason": "character U+2022 is not representable in US-QWERTY"}}
+```
+
+Or because a paste was already typing when this one arrived:
+
+```
+← {"event": "paste_failed", "data": {"request_id": 7, "reason": "a paste is already in progress"}}
 ```
 
 ---
@@ -732,6 +764,14 @@ with `agent_not_connected`. A size equal to the last one sent is not
 sent again. Whether the guest applies the size is up to the guest;
 watch `status` (or `screenshot`) for the new surface dimensions.
 
+A guest that does not apply it says nothing either, so ryll judges the
+request itself: if no new primary surface appears within 5 seconds, it
+logs a warning and raises a notification naming the size, and the
+session's `resize_unapplied_count` grows (both are visible in a bug
+report, not over this socket). See *The guest ignores a resize* in the
+[troubleshooting guide](/components/ryll/troubleshooting/) for what to check in the
+guest.
+
 In `--web` mode the browser reports its viewport size on the same
 queue, so a later viewport change -- the browser window resized, or a
 viewer connecting -- replaces a size a control client asked for, and
@@ -821,6 +861,7 @@ Each stream object:
 | `frames_received` | u64 | Frames received, decodable or not. |
 | `frames_decoded_ok` | u64 | Frames decoded and painted. |
 | `frames_decode_failed` | u64 | Frames the decoder failed on. |
+| `frames_dropped_empty_dest` | u64 | From v1.7. Frames decoded but not painted, because the stream's dest rect encloses no pixels (`right <= left`, or `bottom <= top`). A server chooses that rect, so it can send one. |
 | `created_at_secs` | f64 | When the stream was created, in seconds since the session started. |
 | `destroyed_at_secs` | f64 or null | When the stream was destroyed, on the same clock; `null` while it is open. |
 
@@ -866,7 +907,7 @@ Worked example, polled while an H.264 stream plays:
 
 ```
 → {"id": 13, "method": "stats", "params": {}}
-← {"id": 13, "ok": true, "result": {"display": {"channel_id": 0, "bytes_in": 48211953, "messages_received": 5120, "marks_received": 1474, "streams_active": 1, "streams_created_total": 1, "streams_destroyed_total": 0, "stream_data_orphan_count": 0, "stream_reports_sent_total": 92, "decodes": {"h264": {"decodes_total": 460, "decode_failures_total": 0}}, "streams": [{"stream_id": 0, "surface_id": 0, "codec": "h264", "codec_type": 3, "width": 1280, "height": 720, "frames_received": 460, "frames_decoded_ok": 460, "frames_decode_failed": 0, "created_at_secs": 31.42, "destroyed_at_secs": null}], "streams_recently_destroyed": []}}}
+← {"id": 13, "ok": true, "result": {"display": {"channel_id": 0, "bytes_in": 48211953, "messages_received": 5120, "marks_received": 1474, "streams_active": 1, "streams_created_total": 1, "streams_destroyed_total": 0, "stream_data_orphan_count": 0, "stream_reports_sent_total": 92, "decodes": {"h264": {"decodes_total": 460, "decode_failures_total": 0}}, "streams": [{"stream_id": 0, "surface_id": 0, "codec": "h264", "codec_type": 3, "width": 1280, "height": 720, "frames_received": 460, "frames_decoded_ok": 460, "frames_decode_failed": 0, "frames_dropped_empty_dest": 0, "created_at_secs": 31.42, "destroyed_at_secs": null}], "streams_recently_destroyed": []}}}
 ```
 
 The same poll from a ryll with the `audio` feature, while Opus audio
@@ -1349,7 +1390,8 @@ The `code` field is a stable, machine-readable string. Do not parse
 `message` programmatically; it may change between minor versions.
 
 The following error codes are defined in v1.x (all were present in
-v1.0 except `queue_full`, added in v1.3):
+v1.0 except `queue_full`, added in v1.3, and `paste_not_enabled`,
+added in v1.7):
 
 | Code | Semantics |
 |------|-----------|
@@ -1359,10 +1401,11 @@ v1.0 except `queue_full`, added in v1.3):
 | `unknown_method` | The `method` field names a verb the server does not know. |
 | `bad_params` | The `params` object is missing a required field, has a field of the wrong type, or is not a JSON object at all. |
 | `bad_state` | The `state` field in a `send_key` request is not `"down"`, `"up"`, or `"press"`. |
-| `agent_not_connected` | A `paste` was requested but the SPICE vdagent is not currently connected. Not returned by `clipboard_set` or `resize`, which hold their request until the agent connects. |
+| `agent_not_connected` | Defined in v1.0 and returned by no verb in this implementation. `paste` does not use the vdagent, and `clipboard_set` and `resize` hold their request until the agent connects. |
 | `no_such_surface` | A `screenshot` was requested for a `surface_id` that does not exist in the current session. |
 | `unsupported_format` | A `screenshot` was requested with a `format` value other than `"png"` or `"rgba"`. |
 | `queue_full` | A queue into the session was full, so nothing was queued. Retryable after a short delay. Returned by `resize`. |
+| `paste_not_enabled` | A `paste` was requested in a session that does not have paste-as-keystrokes enabled — `--enable-paste-as-keystrokes` was not passed, or the mode (`--web`, `--rdp`) does not honour it — so there is nothing to type with. Not retryable. Returned by `paste`. |
 | `not_implemented` | The method is recognised but not yet implemented. Should not appear in a complete implementation; retained in the code so partial builds have a stable code to return during incremental rollout of a new verb. |
 | `internal_error` | An unexpected condition occurred server-side. The `message` field will contain details. Report these as bugs. |
 
@@ -1370,7 +1413,7 @@ Additional error codes may be added in future **minor** version bumps.
 Clients should treat any unrecognised `code` value as a generic error
 (print the `message` and fail the operation) rather than treating it as
 `internal_error`. This ensures forward compatibility when a client
-compiled against v1.0 connects to a v1.6 server that has added new
+compiled against v1.0 connects to a v1.7 server that has added new
 domain-specific codes.
 
 ---
@@ -1378,7 +1421,7 @@ domain-specific codes.
 ## Versioning
 
 The protocol version is a dotted `major.minor` string. The current
-version is **1.6**.
+version is **1.7**.
 
 Rules:
 
@@ -1410,6 +1453,14 @@ Forward-compatibility obligations:
   (they should never have arrived, but defensively discarding them is
   safer than panicking). Clients must also ignore unknown fields in
   response `result` objects; future minor versions may add fields.
+- **Clients** that deserialise a `result` into typed structs must also
+  tolerate fields a server older than themselves does not send, since a
+  minor mismatch is accepted in both directions. In this repository
+  that means every field added by a minor version is
+  `#[serde(default)]` in `control/protocol.rs` (the first is v1.7's
+  `frames_dropped_empty_dest`); fields present since the struct was
+  introduced need nothing, because no server that has the struct omits
+  them.
 - **Servers** must route unknown `method` values to the `unknown_method`
   error rather than panicking. Servers must also silently ignore unknown
   event names in `subscribe`/`unsubscribe` params.
@@ -1419,9 +1470,11 @@ Version 1.0 was the first published version. Version 1.1 added the
 socket to `--web` mode and corrected `send_key`'s extended-scancode
 encoding. Version 1.3 added the clipboard and `resize` verbs and the
 `clipboard_changed` event. Version 1.4 added the `stats` verb. Version
-1.5 added the `input_rtt` event. Version 1.6 (the current version)
-added the `stats` result's `playback` object; see the version history
-at the top of this document.
+1.5 added the `input_rtt` event. Version 1.6 added the `stats`
+result's `playback` object. Version 1.7 (the current version) added
+the `stats` result's `frames_dropped_empty_dest` stream counter and
+the `paste_not_enabled` error code; see the version history at the top
+of this document.
 
 ---
 
@@ -1434,7 +1487,7 @@ indicates the sender: `→` is client-to-server, `←` is server-to-client.
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo-client", "protocol_version": "1.0"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.6", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.7", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
 → {"id": 2, "method": "status", "params": {}}
 ← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
 → {"id": 3, "method": "subscribe", "params": {"events": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
@@ -1458,7 +1511,7 @@ Key observations from this transcript:
 
 - The `hello` handshake always comes first and its response lists the
   full verb and event catalogue. Note the minor-version interop at
-  work: the client requested `"1.0"` and the v1.6 server accepted it,
+  work: the client requested `"1.0"` and the v1.7 server accepted it,
   responding with the version *it* speaks and advertising verbs and
   events this v1.0 client simply never uses.
 - `status` gives a snapshot of the session state at that instant. The

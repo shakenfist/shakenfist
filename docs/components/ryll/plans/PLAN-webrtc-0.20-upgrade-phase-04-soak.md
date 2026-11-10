@@ -429,6 +429,8 @@ not have caught, because it only shows when you run the thing:
 `Level::INFO` and `Level::DEBUG` from the `--verbose` flag and builds
 a plain `LevelFilter`; there is no `EnvFilter` anywhere, and the only
 occurrence of `RUST_LOG` in ryll's history is inside a comment.
+(Fixed since: ryll honours `RUST_LOG` as of #702, which closed #313.
+The analysis below describes the tree as it stood in August 2026.)
 
 Phase 01's Baseline conditions record running with
 `RUST_LOG=info,shakenfist_spice_webrtc=debug,ryll=debug` "(the drop
@@ -820,7 +822,7 @@ them were places where this phase's own text was wrong:
 Two were deferred, both as the reviewer suggested:
 
 - **#313** — ryll ignores `RUST_LOG`, so `--verbose` is
-  all-or-nothing. This is the direct cause of the invalidated
+  all-or-nothing. (Fixed since, in #702.) This is the direct cause of the invalidated
   baseline rows recorded above. `EnvFilter` is a few lines, but it
   is a behaviour change to logging with its own testing, and the
   documented workaround is in both places an operator looks. The

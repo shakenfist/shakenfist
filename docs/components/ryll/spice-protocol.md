@@ -335,6 +335,11 @@ larger than the dest, such as an H.264 frame rounded up to whole macroblocks,
 is cropped to the dest's size, keeping its top-left corner. Ryll does not
 scale frames, and ignores the stream's clip and its `TOP_DOWN` flag.
 
+A dest rect that encloses no pixels (`right <= left`, or `bottom <= top`)
+is still decoded, because an H.264 decoder that misses a packet loses its
+reference state, but nothing is painted and the frame is counted in the
+stream's `frames_dropped_empty_dest` rather than its `frames_decoded_ok`.
+
 Currently supported codec types:
 - `1` (MJPEG): decoded by `MJpegVideoDecoder`, which wraps the
   platform-optimised JPEG backend and maintains a DHT cache for frames
