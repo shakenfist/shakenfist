@@ -28,21 +28,47 @@ reason and with three more shapes -- `phase-4`, `decision 3`,
 `step 5f` -- by source_problems(). A comment saying a branch was added
 in a numbered phase records how the code came to be rather than why it
 is the way it is, and the reader of the code has not read the plan.
-A pointer to a `PLAN-*.md` file is left alone: an unbuilt behaviour may
-legitimately name the plan which will build it, and whether the file
-still exists is a different check. So is a URL.
+A pointer to a `PLAN-*.md` file does not fail that pass, because an
+unbuilt behaviour may legitimately name the plan which will build it,
+and whether the file still exists is a different check. Nor does a URL.
 
 Unlike the fleet-wide audit, which reads one line at a time, the source
 check also matches a citation split by a wrap -- `Phase` at the end of
 one comment line and `5` at the start of the next. Seven of those were
 in this repository while the audit reported one reference, because
 nothing could see them.
+
+Python sources get a second, advisory pass in advisory_problems(), for
+two shapes that are plan history just as much as the four above: a
+decision cited by its shorthand (`D13`), and that plan filename. Several
+hundred of both are already in the tree, across scores of files, so
+reporting them as failures would block every commit which touched one.
+They are printed and the exit status stays zero, so that they are fixed
+in the files a change touches rather than in one unreviewable sweep.
+
+That pass reads the file's prose rather than its lines: a `tokenize`
+walk over comments and string literals, and an `ast` walk over `def`
+and `class` names, where the same citation appears as `test_d14_shape`
+with no space for the line patterns to match on. Reading only prose and
+names is what makes the `D<n>` shape usable at all -- in code it is
+somebody's variable.
+
+Two kinds of citation survive the rule and so carry a marker rather
+than a carve-out in the pattern: a pointer to work that is not built
+yet (prefer an issue link where one exists), and a string persisted as
+data, where rewording splits a committed dataset on one condition.
+`audit-ok: plan-reference` on the line, or
+`audit-ok: plan-reference-file` once near the top, exempts it -- the
+same tokens the fleet's plan-source-references audit accepts, so one
+marker answers both.
 """
 
+import ast
 import os
 import re
 import subprocess
 import sys
+import tokenize
 
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -94,6 +120,38 @@ SOURCE_SKIP_NAMES = ('mkdocs.yml', 'mkdocs.yaml')
 
 # 2 MB, as the audit does. Past that it is data, not prose.
 SOURCE_MAX_BYTES = 2 * 1024 * 1024
+
+# The advisory shapes, matched in Python prose and names only. A plan
+# filename is left alone by the blocking pass because an unbuilt
+# behaviour may legitimately name the plan which will build it; that is
+# a reading of intent no pattern makes, which is exactly what makes it
+# advisory here rather than exempt.
+ADVISORY_SHAPES_RE = re.compile(r'\bD\d+\b|\bPLAN-[\w.-]*\.md')
+
+# The same citations written as an identifier, where no space can fall
+# between the noun and the number: `test_phase_5_refuses`,
+# `_decision_3_limit`, `test_d14_unclaimed_shape`.
+ADVISORY_NAME_RE = re.compile(
+    r'(?:^|_)(?:phases?|decisions?)_\d+(?:_|$)'
+    r'|(?:^|_)steps?_\d+[a-z](?:_|$)'
+    r'|(?:^|_)d\d+(?:_|$)', re.IGNORECASE)
+
+# The markers the fleet's plan-source-references audit accepts for a
+# `PLAN-*.md` string which is not a live citation. Honoured here too, so
+# that a line needs one marker and not two.
+PLAN_MARKER = 'audit-ok: plan-reference'
+PLAN_FILE_MARKER = 'audit-ok: plan-reference-file'
+
+# FSTRING_MIDDLE only exists from Python 3.12, which stopped emitting an
+# f-string as one STRING token. A message built with an f-string is
+# prose like any other.
+PROSE_TOKEN_TYPES = tuple(
+    getattr(tokenize, name) for name in ('COMMENT', 'STRING', 'FSTRING_MIDDLE')
+    if hasattr(tokenize, name))
+
+# Enough to show the shape of the backlog without burying the blocking
+# findings under it. --advisory prints all of them.
+ADVISORY_SHOWN = 10
 
 
 def markdown_files(root_dir=None):
@@ -238,7 +296,100 @@ def source_problems(root_dir=None):
     return found
 
 
-def main():
+def python_sources(root_dir=None):
+    """The Python files the advisory pass reads."""
+    for path in source_files(root_dir=root_dir):
+        if path.endswith('.py'):
+            yield path
+
+
+def _prose_tokens(path):
+    """(line number, text) per line of each comment and string literal."""
+    found = []
+    try:
+        with tokenize.open(path) as handle:
+            tokens = list(tokenize.generate_tokens(handle.readline))
+    except (OSError, SyntaxError, UnicodeDecodeError, tokenize.TokenError):
+        return found
+    for token in tokens:
+        if token.type not in PROSE_TOKEN_TYPES:
+            continue
+        # A docstring is one token over many lines, and the citation is
+        # reported where it is written rather than where the quote opened.
+        for offset, line in enumerate(token.string.splitlines()):
+            found.append((token.start[0] + offset, line))
+    return found
+
+
+def _definition_names(path):
+    """(line number, name) for each def and class in one file."""
+    try:
+        with tokenize.open(path) as handle:
+            tree = ast.parse(handle.read())
+    except (OSError, SyntaxError, UnicodeDecodeError, ValueError):
+        return []
+    wanted = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+    return [(node.lineno, node.name)
+            for node in ast.walk(tree) if isinstance(node, wanted)]
+
+
+def advisory_references(path):
+    """(line number, matched text) for each advisory citation in one file."""
+    lines = _readable_lines(path)
+    if lines is None:
+        return []
+
+    # The file marker contains the line marker as a prefix, so the file
+    # test comes first and a line carrying only the line marker is not
+    # mistaken for it.
+    if any(SOURCE_FILE_MARKER in line or PLAN_FILE_MARKER in line
+           for line in lines):
+        return []
+
+    def marked(number):
+        line = lines[number - 1] if 0 < number <= len(lines) else ''
+        return SOURCE_MARKER in line or PLAN_MARKER in line
+
+    # A set, so that a line citing the same decision twice is one
+    # finding rather than a count of how often it says it.
+    found = set()
+    for number, text in _prose_tokens(path):
+        if marked(number):
+            continue
+        for match in ADVISORY_SHAPES_RE.finditer(text):
+            found.add((number, match.group(0)))
+    for number, name in _definition_names(path):
+        if not marked(number) and ADVISORY_NAME_RE.search(name):
+            found.add((number, name))
+    return sorted(found)
+
+
+def advisory_problems(root_dir=None):
+    found = []
+    for path in python_sources(root_dir=root_dir):
+        for number, text in advisory_references(path):
+            found.append(
+                f'{path}:{number}: advisory plan citation {text!r} -- '
+                'write the reason instead, or mark the line '
+                'audit-ok: plan-reference for unbuilt work or persisted data')
+    return found
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+
+    advisory = advisory_problems()
+    shown = advisory if '--advisory' in argv else advisory[:ADVISORY_SHOWN]
+    for problem in shown:
+        print(problem)
+    if len(advisory) > len(shown):
+        print(f'... and {len(advisory) - len(shown)} more; '
+              '--advisory lists them all.')
+    if advisory:
+        print(f'{len(advisory)} advisory plan citation(s) in Python prose '
+              'and names. These do not fail the commit: fix the ones in the '
+              'files you touch.\n')
+
     found = problems() + source_problems()
     for problem in found:
         print(problem)

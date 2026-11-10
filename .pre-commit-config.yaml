@@ -168,8 +168,10 @@ repos:
           implementation plan's phase, decision or step numbers (the
           plan-phase-references and plan-history-in-source consistency
           audits). Write the reason the code is this way instead, or link
-          the master plan in docs/plans/. A pointer to a PLAN-*.md file is
-          left alone; the numbered citation beside it is not.
+          the master plan in docs/plans/. Python comments, docstrings and
+          definition names get a second, advisory pass for a decision
+          shorthand (D13) and a PLAN-*.md pointer, which reports without
+          failing the commit while the backlog of those is worked off.
         entry: python3 tools/check-plan-phase-references.py
         language: system
         files: ^(?!docs/(.*/)?plans/).*$
