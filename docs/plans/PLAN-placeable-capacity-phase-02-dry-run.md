@@ -65,9 +65,11 @@ Out:
   instance that is both tagless and foreign from `no tags` to
   `different namespace`. Both are true of such an instance and nothing
   reads the reason -- it is audit prose rather than an input to a
-  decision. The saving is every metadata read the query used to spend
-  on instances in other namespaces, which on a cluster with many
-  namespaces is most of the reads it makes.
+  decision. The saving is every metadata read an affinity-bearing
+  query or create used to spend on instances in other namespaces,
+  which on a cluster with many namespaces is most of the reads such a
+  request makes. A request with no affinity never reached the
+  predicate, so it saves nothing.
 - Issue #4842, the string `cpus` 500 at admission. Filed during
   this phase's survey (`F9`) and deliberately not fixed here: it
   is a create-path type error, and a phase that adds a query has

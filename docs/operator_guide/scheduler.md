@@ -105,10 +105,12 @@ caller's own namespace, so affinity stages count only that namespace's
 instances. A client learns the endpoint exists from the
 `placement-query` capability.
 
-* **It writes nothing and publishes nothing.** No instance, no capacity
-  counter and no claim is created or changed, and no audit events are
-  published, so a speculative query leaves no trail against anybody's
-  instance.
+* **It writes nothing and publishes nothing of its own.** No instance,
+  no capacity counter and no claim is created or changed, and the
+  placement walk publishes no audit events, so a speculative query
+  leaves no trail against anybody's instance. The only event a query
+  causes is the `token used to authenticate request` audit event that
+  every authenticated request records on the caller's own namespace.
 * **The answer is advisory and racy by construction.** Nothing is
   reserved. Room found by a query can be gone by the next request, and a
   create is still admitted or refused by the guarded capacity claim
@@ -147,12 +149,17 @@ instances. A client learns the endpoint exists from the
   and read the stage to learn which dimension ran out. A tenant could
   already learn the same by attempting creates, but each attempt cost a
   507 and left an audit event on an instance, whereas a query is cheap
-  and — by the first property above — deliberately leaves no trail.
-  Writing nothing down is listed here as a benefit, and for the
-  consumers this endpoint was built for it is one; it is also what makes
-  this probing unobservable. Treat per-node figures as administrative,
-  and cluster-wide extremes as information any authenticated caller can
-  obtain.
+  and — by the first property above — writes nothing against any
+  instance. It is not invisible: like every authenticated request, each
+  query records a `token used to authenticate request` audit event on
+  the caller's own namespace, naming the key, the method, the path and
+  the remote address. That event does not carry the shapes asked about,
+  so a namespace's events show how often it queried but not what it
+  learned. Writing nothing against instances is listed here as a
+  benefit, and for the consumers this endpoint was built for it is one;
+  it is also what makes the content of this probing unrecoverable after
+  the fact. Treat per-node figures as administrative, and cluster-wide
+  extremes as information any authenticated caller can obtain.
 * **The set is bounded.** A query may ask about at most 64 shapes,
   counted after each shape's `count` is expanded. More is a 400 naming
   the bound. A short request body can otherwise buy a long walk.

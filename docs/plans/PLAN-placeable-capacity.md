@@ -400,7 +400,7 @@ landed reads `—`. Phases that land in client-python record
 |-------|------|--------|--------|
 | 0. Decisions and the live-memory baseline | [PLAN-placeable-capacity-phase-00-decisions.md](PLAN-placeable-capacity-phase-00-decisions.md) | Complete | `ab19cf67e7` (#4822) |
 | 1. Extract the shared set-placement core | [PLAN-placeable-capacity-phase-01-placement-core.md](PLAN-placeable-capacity-phase-01-placement-core.md) | Complete | `d20a7d7516` (#4835) |
-| 2. The placement dry run (`C`) | [PLAN-placeable-capacity-phase-02-dry-run.md](PLAN-placeable-capacity-phase-02-dry-run.md) | Complete | `e02a35e514` (#4850); client-python `4ff8a7d` (#448) |
+| 2. The placement dry run (`C`) | [PLAN-placeable-capacity-phase-02-dry-run.md](PLAN-placeable-capacity-phase-02-dry-run.md) | Complete | `e02a35e514` (#4850); review round #4860, merge commit recorded at phase 3's close-out; client-python `4ff8a7d` (#448) |
 | 3. Shape holds: schema and the node guard (`A`) | PLAN-placeable-capacity-phase-03-holds-schema.md (to be written) | Not started | — |
 | 4. Shape holds: consumption, release and displacement | PLAN-placeable-capacity-phase-04-holds-lifecycle.md (to be written) | Not started | — |
 | 5. The refusal contract | PLAN-placeable-capacity-phase-05-refusal-contract.md (to be written) | Not started | — |

@@ -511,11 +511,16 @@ def _affinity_neighbour_skip(shape, instance_uuid, i):
     One consequence is accepted rather than avoided. An instance which
     is both tagless *and* foreign is now reported as skipped for
     ``different namespace`` where it used to be reported as ``no
-    tags``. Both are true of it and neither is more true; nothing
-    reads the reason, which is audit prose rather than an input to any
-    decision. The namespace reason is arguably the better answer for
-    such an instance anyway, since it is the test which would go on
-    skipping it if somebody tagged it tomorrow.
+    tags``. Both are true of it and neither is more true; no decision
+    reads the reason. The record does change in one way that matters:
+    a ``different namespace`` skip also names the foreign namespace,
+    and on a create that record reaches the ``schedule have highest
+    affinity`` audit event on the caller's own instance. A tagged
+    foreign instance was already reported that way, so the only new
+    disclosure is another namespace's name for its tagless instances.
+    The namespace reason is arguably the better answer for such an
+    instance anyway, since it is the test which would go on skipping it
+    if somebody tagged it tomorrow.
     """
     if not i:
         return {

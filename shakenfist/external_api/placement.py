@@ -18,10 +18,12 @@ Three properties make it a query rather than a create:
 * It writes nothing. No instance row, no capacity counter, no claim.
   The charges it reasons about live in a snapshot built for the call
   and discarded with it.
-* It publishes no events. The placement walk addresses its audit
-  events to the objects its caller names, and this caller names none,
-  so a speculative evaluation leaves no trail against anybody's
-  instance.
+* It publishes no events of its own. The placement walk addresses its
+  audit events to the objects its caller names, and this caller names
+  none, so a speculative evaluation leaves no trail against anybody's
+  instance. The one event a query does cause is the token-use audit
+  event every authenticated request records on the caller's own
+  namespace, which names the path but not the shapes asked about.
 * Its answer is advisory and racy by construction. The room it found
   can be gone before the caller's next request, and nothing here
   reserves any of it. That is why a set which does not fit is a 200

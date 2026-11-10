@@ -3470,6 +3470,26 @@ class MultisetPlacementTestCase(SchedulerTestCase):
         # And the rows read are the neighbours', not the strangers'.
         self.assertEqual(3, len(set(reads)))
 
+    def test_the_hard_filter_never_reads_another_namespaces_instances(self):
+        """The hard affinity filter skips strangers without reading them.
+
+        The filter calls the same neighbour-skip predicate as the scorer
+        and then reads the tags of every instance it did not skip, so it
+        saves the same reads. It is reached by a different branch, and a
+        predicate restated or reordered inside only one caller would not
+        be caught by the scorer's test above. The strangers are tagged
+        with the required tag, so a filter that read them would also
+        find what it was looking for in them; only the three
+        neighbours' rows may be read.
+        """
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        reads = self._metadata_reads(
+            {'require_with_tag': ['web']}, foreign=4)
+
+        self.assertNotEqual([], reads)
+        self.assertEqual(3, len(set(reads)))
+
     def test_a_refusal_names_the_shape_in_the_callers_own_order(self):
         # The set is walked largest first, so the shape which runs out
         # here is the second one the caller listed -- the only one too

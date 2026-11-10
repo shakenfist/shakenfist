@@ -121,7 +121,9 @@ The `stage` field names where the refusal happened:
 
 - **`capacity_guard`** -- the capacity admission guard refused every candidate.
   This stage name is used when the admission check itself, rather than a
-  pre-filter, refused the placement.
+  pre-filter, refused the placement. Admission happens only on a create, so
+  this stage appears in a create's 507 and never in a placement query's
+  answer; see [the placement query](scheduler.md).
 
 - **`unknown`** -- the refusal reached the API carrying no stage. This is a
   defensive value that should never appear in normal operation; if you see it,

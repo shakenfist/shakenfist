@@ -528,9 +528,10 @@ class PlacementRequestTestCase(PlacementTestCase):
         self.assertIn('count', resp.get_json()['error'])
 
     def test_a_disk_spec_which_is_not_a_list_is_refused(self):
-        # The sum is over a list of disks. A mapping or a bare number
-        # reaches mariadb.disk_spec_virtual_gb(), which answers zero
-        # with a warning for anything that is not a list -- a silent
+        # The sum is over a list of disks. Without the handler's own
+        # check, a mapping or a bare number would reach
+        # mariadb.disk_spec_virtual_gb(), which answers zero with a
+        # warning for anything that is not a list -- a silent
         # "this shape wants no disk" where the caller plainly asked for
         # some.
         self.set_validation_mode('warn')
