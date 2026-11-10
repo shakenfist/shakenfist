@@ -15795,6 +15795,23 @@
   a file made of the shapes, such as a test suite for a plan-reference
   checker, carries <code># audit-ok: phase-reference-file</code> once near the top,
   with a sentence saying why</li>
+<li>Two more citation shapes are reported in Python without failing the
+  commit: a decision cited by its shorthand (<code>D13</code>) and a pointer to a
+  <code>PLAN-*.md</code> file. The same hook finds them, with a <code>tokenize</code> walk
+  over comments and string literals and an <code>ast</code> walk over <code>def</code> and
+  <code>class</code> names, so that <code>D13</code> is read as a citation in prose and as
+  somebody's variable in code. Several hundred are in the tree, which is
+  why they are advisory: fix the ones in the files you touch, and run
+  <code>python3 tools/check-plan-phase-references.py --advisory</code> to see all of
+  them. Two survive the rule and carry
+  <code># audit-ok: plan-reference</code> on the line, or
+  <code># audit-ok: plan-reference-file</code> once near the top of a file -- a
+  pointer to work that is not built yet, where an issue link is better
+  if one exists, and a string persisted as data, where rewording it
+  splits a committed dataset on one condition. Those are the tokens the
+  fleet's
+  <a href="../../components/development/audits/plan-source-references/">plan references in source</a>
+  audit accepts, so one marker answers both</li>
 </ul>
 <p>This page is the style guide; <code>AGENTS.md</code> summarises it and links here.</p>
 <h2 id="attribute-updates-use-field-masks">Attribute updates use field masks<a class="headerlink" href="#attribute-updates-use-field-masks" title="Permanent link">&para;</a></h2>
