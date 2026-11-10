@@ -11897,7 +11897,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.6
+    Control Socket Protocol — Version 1.7
   
 
     
@@ -16715,12 +16715,14 @@ used. And it does not read the pump drop counters or reaper events,
 which ryll logs at <code>debug</code>; run ryll with <code>--verbose</code> and take them
 out of the session log.</p>
 <p>Note that <code>--verbose</code> turns on <code>debug</code> for the whole dependency tree,
-not just ryll — webrtc-rs is talkative at that level. That is enough
-log to affect the numbers on a long run, so take the counters from a
-short separate session rather than from the one being measured.
-<code>RUST_LOG</code> will not narrow it: ryll does not read it. Tracked as
-<a href="https://github.com/shakenfist/ryll/issues/313">#313</a>; when that
-lands, this paragraph goes away.</p>
+not just ryll — webrtc-rs is talkative at that level, and that is
+enough log to affect the numbers on a long run. Narrow it with
+<code>RUST_LOG</code> instead, which ryll honours in place of <code>--verbose</code>'s
+level: <code>RUST_LOG=info,shakenfist_spice_webrtc=debug,ryll=debug</code> gives
+the drop counters and the reaper events without the rest of the tree,
+so the counters can come from the session being measured. A
+<code>RUST_LOG</code> that does not parse is reported at <code>warn!</code> and ignored,
+and the run falls back to <code>--verbose</code>'s level.</p>
 <p>If you are driving the uefi-latency-guest, note that any keypress
 advances a fixed eight-colour cycle and one step in eight is black,
 so the viewer legitimately goes black for one interval in eight. The

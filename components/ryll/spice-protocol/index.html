@@ -11897,7 +11897,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.6
+    Control Socket Protocol — Version 1.7
   
 
     
@@ -16821,6 +16821,10 @@ of codec — the per-codec logic lives in the impl, not the dispatch.</p>
 larger than the dest, such as an H.264 frame rounded up to whole macroblocks,
 is cropped to the dest's size, keeping its top-left corner. Ryll does not
 scale frames, and ignores the stream's clip and its <code>TOP_DOWN</code> flag.</p>
+<p>A dest rect that encloses no pixels (<code>right &lt;= left</code>, or <code>bottom &lt;= top</code>)
+is still decoded, because an H.264 decoder that misses a packet loses its
+reference state, but nothing is painted and the frame is counted in the
+stream's <code>frames_dropped_empty_dest</code> rather than its <code>frames_decoded_ok</code>.</p>
 <p>Currently supported codec types:
 - <code>1</code> (MJPEG): decoded by <code>MJpegVideoDecoder</code>, which wraps the
   platform-optimised JPEG backend and maintains a DHT cache for frames

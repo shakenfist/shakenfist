@@ -11889,7 +11889,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.6
+    Control Socket Protocol — Version 1.7
   
 
     
@@ -15912,117 +15912,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Baseline">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#conditions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Conditions
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#deviations-from-the-step-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Deviations from the step brief
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#effort" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Effort
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#acceptance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Acceptance
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Open questions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#found-during-execution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Found during execution
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Found during execution">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#wait_for_dead-has-a-lost-wakeup-race" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        wait_for_dead has a lost-wakeup race
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-notify-path-versus-the-fast-path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The notify path versus the fast path
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#sustained-surface-churn-wedges-the-web-stream-pre-existing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Sustained surface churn wedges the web stream (pre-existing)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
     </ul>
@@ -16501,7 +16390,8 @@ and builds a plain <code>LevelFilter</code> (<code>ryll/src/main.rs:161-169</cod
 Both runs were therefore at <code>INFO</code>, where those counters are not
 emitted, so the zeros mean "nothing logged" rather than "nothing
 dropped". The RSS and CPU rows are unaffected — they were sampled
-externally from <code>/proc</code>.</p>
+externally from <code>/proc</code>. (Fixed since: ryll honours <code>RUST_LOG</code> as of</p>
+<h1 id="702-this-correction-records-the-tree-as-it-stood-in-august-2026">702. This correction records the tree as it stood in August 2026.)<a class="headerlink" href="#702-this-correction-records-the-tree-as-it-stood-in-august-2026" title="Permanent link">&para;</a></h1>
 </blockquote>
 <p><strong>Verdict: no regression.</strong> The phase-01 tip is at-or-below the
 baseline on both memory and CPU, and the differences are within

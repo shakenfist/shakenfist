@@ -11889,7 +11889,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.6
+    Control Socket Protocol — Version 1.7
   
 
     
@@ -16719,8 +16719,8 @@ code findings from being verified:</p>
 </table>
 <p>Declined: B2, B3, B4, B8 (test-coverage gaps behind paths
 that already degrade to <code>RuntimeMetrics::unavailable</code>) and
-D7 (a duplicate of issue #313).  Reasons are in the master
-plan.</p>
+D7 (a duplicate of issue #313, fixed since in #702).  Reasons
+are in the master plan.</p>
 <p>Two things worth carrying forward.  A1's <code>EventSink</code>
 refactor found a real defect — <code>AgentConnected</code> sent with
 no paired repaint notify — that three independent judgment

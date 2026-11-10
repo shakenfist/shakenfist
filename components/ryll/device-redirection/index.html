@@ -11897,7 +11897,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.6
+    Control Socket Protocol — Version 1.7
   
 
     
@@ -16280,9 +16280,13 @@ reads and UI input events) remain responsive.</p>
 <p>At paste start, held modifier keys (Ctrl, Shift, Alt) are released
 and saved; at paste end they are restored. Translation errors
 (non-ASCII characters) emit <code>ChannelEvent::PasteFailed</code> and cause
-a non-zero exit in headless mode.</p>
+a non-zero exit in headless mode. A paste that arrives while another
+is still typing is refused with a <code>PasteFailed</code> of kind <code>InProgress</code>
+before anything is typed; the GUI shows that one as a notification
+rather than the paste-error dialog, since nothing needs fixing.</p>
 <p>CLI flags: <code>--enable-paste-as-keystrokes</code> (master gate),
-<code>--paste-text TEXT</code> (headless trigger, implies enable),
+<code>--paste-text TEXT</code> (headless trigger, implies enable; refused without
+<code>--headless</code>),
 <code>--paste-char-delay-ms N</code> (default 16ms).</p>
 <p>GUI surface: When enabled, a "Paste" entry appears in the hamburger
 menu with "Ctrl+Alt+V" shortcut text. The entry is disabled (greyed

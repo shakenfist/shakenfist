@@ -12298,7 +12298,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.6
+    Control Socket Protocol — Version 1.7
   
 
     
@@ -16538,7 +16538,7 @@
 <tr>
 <td><code>--headless</code></td>
 <td>false</td>
-<td>Run without GUI (for automated testing)</td>
+<td>Run without GUI (for automated testing). Mutually exclusive with <code>--web</code> and <code>--rdp</code>, which are refused together at parse time</td>
 </tr>
 <tr>
 <td><code>--cadence</code></td>
@@ -16663,7 +16663,7 @@ window. The operator guide, including reverse-proxy and TLS setup, is
 <tr>
 <td><code>--web</code></td>
 <td>false</td>
-<td>Run as a SPICE → browser transcoder. Serves a browser shell that consumes the SPICE display via WebRTC, and prints a URL carrying a per-launch random token. Mutually exclusive with <code>--headless</code> and the GUI default</td>
+<td>Run as a SPICE → browser transcoder. Serves a browser shell that consumes the SPICE display via WebRTC, and prints a URL carrying a per-launch random token. Mutually exclusive with <code>--headless</code> and the GUI default, and refused together with <code>--headless</code> at parse time</td>
 </tr>
 <tr>
 <td><code>--web-host &lt;ADDR&gt;</code></td>
@@ -17087,21 +17087,57 @@ Shift+Delete and Shift+Insert reach the guest as themselves, but
 Ctrl+Insert reaches it as Ctrl+C and Ctrl+Shift+Delete as
 Ctrl+Shift+X, because ryll cannot tell them apart from those.</p>
 <h2 id="environment-variables">Environment Variables<a class="headerlink" href="#environment-variables" title="Permanent link">&para;</a></h2>
-<p>Currently, ryll does not use environment variables for configuration. All
-settings are provided via command-line arguments or .vv files.</p>
+<p><code>RUST_LOG</code> selects the logging filter, as described under
+<a href="#logging">Logging</a>.</p>
+<p><code>RYLL_TOKIO_CONSOLE=1</code> starts the
+<a href="https://github.com/tokio-rs/console">tokio-console</a> subscriber, in a
+build made with <code>--features tokio-console</code> and
+<code>RUSTFLAGS="--cfg tokio_unstable"</code> (<code>make build-tokio-console</code>); other
+builds ignore it. The console subscriber takes over as the global
+tracing subscriber, so ryll's own log lines go nowhere while it is
+active.</p>
+<p>Every other setting is provided via command-line arguments or .vv
+files.</p>
 <h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h2>
 <p>Ryll uses the <code>tracing</code> crate for logging. By default, INFO-level messages
 are shown. Use <code>-v</code> or <code>--verbose</code> for DEBUG-level output.</p>
+<p><code>RUST_LOG</code> overrides that level when it is set, using <code>tracing</code>'s
+own directive syntax, so a single crate can be turned up without
+turning up the whole dependency tree:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nv">RUST_LOG</span><span class="o">=</span><span class="nv">shakenfist_spice_webrtc</span><span class="o">=</span>debug<span class="w"> </span>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv
+</code></pre></div>
+<p>A value that names only targets, as that one does, leaves everything
+else at info: ryll reads it as <code>info,shakenfist_spice_webrtc=debug</code>.
+Taken literally, <code>tracing</code> would switch every other target off,
+ryll's own warnings included. To make the rest quieter, give a level
+of its own: <code>RUST_LOG=warn,shakenfist_spice_webrtc=debug</code>. The rest
+stays at info under <code>--verbose</code> too, since narrowing is what
+<code>RUST_LOG</code> is for.</p>
+<p><code>--verbose</code> still decides whether <code>/tmp/ryll.log</code> is written, and
+that file is filtered by the same directive. A <code>RUST_LOG</code> that does
+not parse is reported at WARN level and ignored, leaving the level
+<code>--verbose</code> asked for.</p>
+<p><code>RUST_LOG</code> is not a replacement for <code>--verbose</code>. Many per-channel
+protocol lines are gated on <code>--verbose</code> itself as well as on the log
+level, so <code>RUST_LOG=debug</code> alone still logs less than <code>--verbose</code>
+does; pass both when you want those lines narrowed to one crate.
+Because the same directive filters the file, a restrictive <code>RUST_LOG</code>
+also thins <code>/tmp/ryll.log</code> -- worth knowing before following a
+troubleshooting step that says to run with <code>-v</code> and read that file.</p>
+<p>Every session logs the directive it is using at startup (<code>logging at
+'info'</code>), so a log that is thinner than expected says why rather than
+leaving an inherited <code>RUST_LOG</code> to be guessed at. When <code>RUST_LOG</code>
+overrides <code>--verbose</code>, that line is a warning instead of a note.</p>
 <p>Log output goes to stderr, so you can redirect stdout for data output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span><span class="m">2</span>&gt;debug.log
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span><span class="m">2</span>&gt;debug.log
 </code></pre></div>
 <h2 id="latency-file-format">Latency File Format<a class="headerlink" href="#latency-file-format" title="Permanent link">&para;</a></h2>
 <p>When <code>--latency-file</code> is specified, ryll writes latency measurements in CSV
 format:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>timestamp,latency_ms
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>1706540400.123,45.2
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>1706540402.125,43.8
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>1706540404.127,44.1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>timestamp,latency_ms
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>1706540400.123,45.2
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>1706540402.125,43.8
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>1706540404.127,44.1
 </code></pre></div>
 <ul>
 <li><strong>timestamp</strong>: Unix timestamp of the measurement</li>
@@ -17114,28 +17150,28 @@ known intervals.</p>
 remote VM. The guest OS sees a standard USB flash drive and can partition,
 format, mount, read, and write it.</p>
 <h3 id="creating-a-test-image">Creating a Test Image<a class="headerlink" href="#creating-a-test-image" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Create a 64MB empty image</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>dd<span class="w"> </span><span class="k">if</span><span class="o">=</span>/dev/zero<span class="w"> </span><span class="nv">of</span><span class="o">=</span>test.raw<span class="w"> </span><span class="nv">bs</span><span class="o">=</span>1M<span class="w"> </span><span class="nv">count</span><span class="o">=</span><span class="m">64</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># Optionally format it with a filesystem</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>mkfs.ext4<span class="w"> </span>test.raw
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Create a 64MB empty image</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>dd<span class="w"> </span><span class="k">if</span><span class="o">=</span>/dev/zero<span class="w"> </span><span class="nv">of</span><span class="o">=</span>test.raw<span class="w"> </span><span class="nv">bs</span><span class="o">=</span>1M<span class="w"> </span><span class="nv">count</span><span class="o">=</span><span class="m">64</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># Optionally format it with a filesystem</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>mkfs.ext4<span class="w"> </span>test.raw
 </code></pre></div>
 <h3 id="qemu-requirements">QEMU Requirements<a class="headerlink" href="#qemu-requirements" title="Permanent link">&para;</a></h3>
 <p>The SPICE server (QEMU) must have USB redirection enabled:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>-device qemu-xhci,id=xhci
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>-chardev spicevmc,id=usbredir1,name=usbredir
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>-device usb-redir,chardev=usbredir1,id=redir1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>-device qemu-xhci,id=xhci
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>-chardev spicevmc,id=usbredir1,name=usbredir
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>-device usb-redir,chardev=usbredir1,id=redir1
 </code></pre></div>
 <p>Use <code>make test-qemu-usb</code> to start a pre-configured QEMU instance.</p>
 <h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># GUI mode</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>ryll<span class="w"> </span>--direct<span class="w"> </span>localhost:5900<span class="w"> </span>--usb-disk<span class="w"> </span>test.raw
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># Headless mode</span>
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>ryll<span class="w"> </span>--direct<span class="w"> </span>localhost:5900<span class="w"> </span>--headless<span class="w"> </span>--usb-disk<span class="w"> </span>test.raw
-<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
-<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1"># Read-only (guest cannot write to the image)</span>
-<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>ryll<span class="w"> </span>--direct<span class="w"> </span>localhost:5900<span class="w"> </span>--usb-disk-ro<span class="w"> </span>test.raw
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># GUI mode</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>ryll<span class="w"> </span>--direct<span class="w"> </span>localhost:5900<span class="w"> </span>--usb-disk<span class="w"> </span>test.raw
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># Headless mode</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>ryll<span class="w"> </span>--direct<span class="w"> </span>localhost:5900<span class="w"> </span>--headless<span class="w"> </span>--usb-disk<span class="w"> </span>test.raw
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="c1"># Read-only (guest cannot write to the image)</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>ryll<span class="w"> </span>--direct<span class="w"> </span>localhost:5900<span class="w"> </span>--usb-disk-ro<span class="w"> </span>test.raw
 </code></pre></div>
 <h3 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h3>
 <ul>
@@ -17195,15 +17231,15 @@ host USB permissions.</p>
 </ul>
 <h3 id="qemu-configuration">QEMU Configuration<a class="headerlink" href="#qemu-configuration" title="Permanent link">&para;</a></h3>
 <p>The QEMU VM must have a spiceport chardev for folder sharing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>-device virtio-serial-pci,id=virtio-serial0
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>-chardev spiceport,name=org.spice-space.webdav.0,id=webdav0
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>-device virtserialport,chardev=webdav0,name=org.spice-space.webdav.0
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>-device virtio-serial-pci,id=virtio-serial0
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>-chardev spiceport,name=org.spice-space.webdav.0,id=webdav0
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>-device virtserialport,chardev=webdav0,name=org.spice-space.webdav.0
 </code></pre></div>
 <p>Or in libvirt domain XML:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">type=</span><span class="s">'spiceport'</span><span class="nt">&gt;</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="nt">&lt;source</span><span class="w"> </span><span class="na">channel=</span><span class="s">'org.spice-space.webdav.0'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="nt">&lt;target</span><span class="w"> </span><span class="na">type=</span><span class="s">'virtio'</span><span class="w"> </span><span class="na">name=</span><span class="s">'org.spice-space.webdav.0'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="nt">&lt;/channel&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">type=</span><span class="s">'spiceport'</span><span class="nt">&gt;</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">&lt;source</span><span class="w"> </span><span class="na">channel=</span><span class="s">'org.spice-space.webdav.0'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">&lt;target</span><span class="w"> </span><span class="na">type=</span><span class="s">'virtio'</span><span class="w"> </span><span class="na">name=</span><span class="s">'org.spice-space.webdav.0'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="nt">&lt;/channel&gt;</span>
 </code></pre></div>
 <p>Use <code>make test-qemu-webdav</code> to start a pre-configured QEMU instance.</p>
 <h3 id="guest-requirements">Guest Requirements<a class="headerlink" href="#guest-requirements" title="Permanent link">&para;</a></h3>

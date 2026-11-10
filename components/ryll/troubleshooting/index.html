@@ -11897,7 +11897,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.6
+    Control Socket Protocol — Version 1.7
   
 
     
@@ -12982,6 +12982,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Guest agent diagnostics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-guest-ignores-a-resize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The guest ignores a resize
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -16976,6 +16993,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Guest agent diagnostics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-guest-ignores-a-resize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The guest ignores a resize
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -17960,8 +17994,60 @@ probe reported a stall on healthy guests (issue #429).</p>
 <td><code>outstanding_agent_request_count</code></td>
 <td><code>MONITORS_CONFIG</code> sends without a matched REPLY. Grows by one per send on QXL guests and is not a stall signal; saturates at 99.</td>
 </tr>
+<tr>
+<td><code>resize_requests_sent_count</code></td>
+<td>Display sizes sent to the agent. Cumulative.</td>
+</tr>
+<tr>
+<td><code>resize_unapplied_count</code></td>
+<td>How many of those the guest never applied. Cumulative.</td>
+</tr>
+<tr>
+<td><code>outstanding_resize</code></td>
+<td>The size sent and not yet judged, with the session-relative seconds at which it was queued for the agent. <code>None</code> between requests.</td>
+</tr>
 </tbody>
 </table>
+<h3 id="the-guest-ignores-a-resize">The guest ignores a resize<a class="headerlink" href="#the-guest-ignores-a-resize" title="Permanent link">&para;</a></h3>
+<p>Resizing the ryll window, or asking for a size over the control socket,
+sends the guest a <code>VD_AGENT_MONITORS_CONFIG</code> and nothing more: the
+request is fire-and-forget, and on a QXL guest the agent never replies
+to it at all. A guest that acts on it creates a new primary surface,
+which is the only evidence ryll gets.</p>
+<p>So ryll watches for that surface. If none arrives within 5 seconds of
+the request, a Warn notification says "The guest did not apply the
+requested display resolution -- check that spice-vdagent is running in
+the guest's desktop session", the log line beside it names the size,
+and <code>resize_unapplied_count</code> grows. The notification's text is the
+same for every size, so dragging a window edge on such a guest folds
+into one entry rather than one per size it passed through. The size
+the guest picks need not be the one asked for -- a driver pads the mode,
+a desktop rounds it -- so any new primary surface counts as the guest
+having acted, including one the same size as the old one. A request for
+the size the guest is already at is not judged at all: there is nothing
+for it to apply, and a control client polling <code>resize</code> with the size it
+just read would otherwise be told the guest had ignored it.</p>
+<p>The five seconds are the guest's. A request still waiting in ryll's own
+agent queue for tokens the agent is not returning has not reached the
+guest, so the deadline waits another interval rather than blaming
+spice-vdagent; that case has its own notification ("Guest agent is not
+accepting messages..."), and <code>queued_agent_message_count</code> and
+<code>agent_starved_since_ts_secs</code> in the same table are where it shows. A
+request the agent never collected is dropped unjudged when the agent
+disconnects.</p>
+<p>The usual causes, in the order worth checking inside the guest:</p>
+<ul>
+<li>the per-user <code>spice-vdagent</code> is not running in the desktop session
+  (the system <code>spice-vdagentd</code> answering the capabilities exchange at
+  connect is not enough): <code>pgrep -a spice-vdagent</code>. That includes a
+  guest still booting or sitting at its login screen, where the first
+  resize ryll sends on connect can arrive before any desktop session
+  has an agent; if the warning appeared only then, resize again once
+  the desktop is up before looking further;</li>
+<li>the desktop does not honour agent-driven resizes, which some Wayland
+  sessions do not;</li>
+<li>the display driver has no such mode: <code>xrandr</code> in the guest.</li>
+</ul>
 <h2 id="auto-snapshot-mode-for-intermittent-issues">Auto-snapshot mode for intermittent issues<a class="headerlink" href="#auto-snapshot-mode-for-intermittent-issues" title="Permanent link">&para;</a></h2>
 <p>When you're hunting for an intermittent issue (audio that drops silent for 30
 seconds, streams that flap between encodings, latency that spikes mid-session),

@@ -11897,7 +11897,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.6
+    Control Socket Protocol — Version 1.7
   
 
     
@@ -16173,6 +16173,13 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available (the size the client connects with and every layout it sends are asked of the guest, rounded down to a multiple of 8; the control socket <code>resize</code> verb shares the queue)</td>
 </tr>
 <tr>
+<td>Unapplied-resize detection (guest never applies a <code>VDAgentMonitorsConfig</code>)</td>
+<td>available (a Warn notification in the store, so the bell shows it; <code>resize_unapplied_count</code> in a bug report)</td>
+<td>partial (the main channel logs it at WARN and the entry reaches the notification store <code>run_headless()</code> builds, which nothing prints — as for every other notification; see the Notifications rows)</td>
+<td>partial (logged at WARN only: nothing in <code>run_web</code>'s event drain handles <code>ChannelEvent::Notification</code>, and the control socket defines no notification event, so a browser session is told nothing)</td>
+<td>partial (logged at WARN only, as in web mode)</td>
+</tr>
+<tr>
 <td><strong>Cursor</strong></td>
 <td></td>
 <td></td>
@@ -16337,15 +16344,15 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>Paste-as-keystrokes (runtime trigger via Ctrl+Alt+V)</td>
 <td>available</td>
 <td>available (via the control socket <code>paste</code> verb; Ctrl+Alt+V itself is GUI-only)</td>
-<td>missing (out of MVP scope)</td>
-<td>missing (paste is off, so the inputs channel's <code>handle_input_event()</code> ignores the control socket <code>paste</code> verb)</td>
+<td>missing (out of MVP scope; the control socket's <code>paste</code> verb is refused with <code>paste_not_enabled</code>)</td>
+<td>missing (paste is off, so the control socket's <code>paste</code> verb is refused with <code>paste_not_enabled</code>)</td>
 </tr>
 <tr>
 <td>Paste-as-keystrokes (headless <code>--paste-text</code>)</td>
-<td>n/a — intrinsic (GUI reads clipboard; <code>--paste-text</code> is headless-only per README)</td>
+<td>n/a — intrinsic (GUI reads clipboard; <code>--paste-text</code> requires <code>--headless</code> and is refused at parse time without it)</td>
 <td>available</td>
-<td>missing (out of MVP scope)</td>
-<td>missing (<code>run_rdp</code> never reads <code>--paste-text</code>; paste is off)</td>
+<td>missing (out of MVP scope; refused at parse time, since <code>--paste-text</code> requires <code>--headless</code>)</td>
+<td>missing (refused at parse time, since <code>--paste-text</code> requires <code>--headless</code>)</td>
 </tr>
 <tr>
 <td>Paste-as-keystrokes (inter-character delay <code>--paste-char-delay-ms</code>)</td>
@@ -16363,8 +16370,8 @@ socket), supervises SPICE reconnects, and hands the session to the
 </tr>
 <tr>
 <td>Paste character validation / error dialog</td>
-<td>available</td>
-<td>partial (the renderer's <code>run_headless()</code> — <code>PasteFailed</code> logged and causes non-zero exit; control-socket clients get a <code>paste_failed</code> event; no interactive dialog)</td>
+<td>available (a paste refused because the previous one is still typing is a notification, not the dialog)</td>
+<td>partial (the renderer's <code>run_headless()</code> — a failed <code>--paste-text</code> paste is logged and causes a non-zero exit; a failed control-socket paste is logged and answered with a <code>paste_failed</code> event naming the request, and does not fail the run; no interactive dialog)</td>
 <td>missing (out of MVP scope)</td>
 <td>missing (paste is off)</td>
 </tr>

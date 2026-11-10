@@ -1543,6 +1543,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#recovering-a-failed-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovering a Failed Release
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#verifying-a-release" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12121,7 +12132,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.6
+    Control Socket Protocol — Version 1.7
   
 
     
@@ -16069,6 +16080,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#recovering-a-failed-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovering a Failed Release
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#verifying-a-release" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16367,6 +16389,59 @@ three repositories fills the workflow's build section.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="recovering-a-failed-release">Recovering a Failed Release<a class="headerlink" href="#recovering-a-failed-release" title="Permanent link">&para;</a></h2>
+<p>A release can fail after it has already published something. The policy
+is <strong>burn the version and tag the next one</strong>: do not try to replace a
+version an index has already served. PyPI never lets a file be
+re-uploaded, so a "fixed" re-release of the same version is not possible
+even in principle.</p>
+<p>Re-running the workflow <em>is</em> safe, and is how you finish a release that
+failed partway. <code>publish-pypi</code> passes <code>skip-existing: true</code>, so a job
+that reaches a version PyPI already holds reports success and lets the
+jobs behind it run. Without it the release deadlocks, because
+<code>github-release</code> has <code>publish-pypi</code> in its needs list: once PyPI has the
+version, every later run fails in <code>publish-pypi</code> and everything
+downstream skips. That is what made
+<a href="https://github.com/shakenfist/client-python-k3s/issues/168">shakenfist/client-python-k3s#168</a>
+unfixable by re-running — the plugin was on PyPI, its Ansible collection
+was never published, and the workflow could not be driven past the
+upload to reach the Galaxy job.</p>
+<p>So:</p>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Do this</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Failed before anything published</td>
+<td>Re-run the failed jobs, or fix and tag the next version</td>
+</tr>
+<tr>
+<td>Published to PyPI, later job failed</td>
+<td>Re-run. <code>skip-existing</code> carries the PyPI job and the rest proceeds</td>
+</tr>
+<tr>
+<td>Published everywhere, release is wrong</td>
+<td>Burn the version, tag the next one. Never re-tag</td>
+</tr>
+<tr>
+<td>A job is stuck in <code>waiting</code></td>
+<td>It needs a reviewer on the <code>release</code> environment (Step 3). This is a human action, not a stuck runner</td>
+</tr>
+</tbody>
+</table>
+<p><strong>If you add a publish step after <code>publish-pypi</code>,</strong> keep <code>skip-existing</code>
+and make the new step's failure recoverable the same way. An adopter
+with two indexes has two ways to half-publish and only one of them is
+reachable by re-running. kerbside does this for its two sequential
+packages.</p>
+<p>That last row is worth knowing before debugging: a job awaiting
+deployment approval looks queued, and one v0.4.0 job sat in <code>waiting</code>
+for nine hours and forty minutes while it was mistaken for a runner
+shortage.</p>
 <h2 id="verifying-a-release">Verifying a Release<a class="headerlink" href="#verifying-a-release" title="Permanent link">&para;</a></h2>
 <h3 id="tag-signature">Tag Signature<a class="headerlink" href="#tag-signature" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>gitsign<span class="w"> </span>verify<span class="w"> </span>--certificate-identity-regexp<span class="o">=</span><span class="s1">'.*'</span><span class="w"> </span><span class="se">\</span>

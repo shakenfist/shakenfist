@@ -11889,7 +11889,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.6
+    Control Socket Protocol — Version 1.7
   
 
     
@@ -16235,7 +16235,9 @@ not have caught, because it only shows when you run the thing:
 <strong>ryll does not read <code>RUST_LOG</code>.</strong> <code>main.rs:161-169</code> picks between
 <code>Level::INFO</code> and <code>Level::DEBUG</code> from the <code>--verbose</code> flag and builds
 a plain <code>LevelFilter</code>; there is no <code>EnvFilter</code> anywhere, and the only
-occurrence of <code>RUST_LOG</code> in ryll's history is inside a comment.</p>
+occurrence of <code>RUST_LOG</code> in ryll's history is inside a comment.
+(Fixed since: ryll honours <code>RUST_LOG</code> as of #702, which closed #313.
+The analysis below describes the tree as it stood in August 2026.)</p>
 <p>Phase 01's Baseline conditions record running with
 <code>RUST_LOG=info,shakenfist_spice_webrtc=debug,ryll=debug</code> "(the drop
 counters only log at debug)". That variable did nothing. The run was
@@ -16712,7 +16714,7 @@ them were places where this phase's own text was wrong:</p>
 <p>Two were deferred, both as the reviewer suggested:</p>
 <ul>
 <li><strong>#313</strong> — ryll ignores <code>RUST_LOG</code>, so <code>--verbose</code> is
-  all-or-nothing. This is the direct cause of the invalidated
+  all-or-nothing. (Fixed since, in #702.) This is the direct cause of the invalidated
   baseline rows recorded above. <code>EnvFilter</code> is a few lines, but it
   is a behaviour change to logging with its own testing, and the
   documented workaround is in both places an operator looks. The
