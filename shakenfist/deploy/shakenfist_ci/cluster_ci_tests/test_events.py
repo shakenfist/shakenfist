@@ -124,32 +124,7 @@ class TestEvents(base.BaseNamespacedTestCase):
             inst, indent=4, sort_keys=True)))
         self._await_instance_ready(inst['uuid'])
 
-        # Filter to mutate events rather than reading the default page of
-        # everything: a booting instance emits well over a hundred events
-        # and the domain XML is written early, so an unfiltered read can
-        # legitimately not contain it. Poll for the same eventual
-        # consistency reason as test_network_events.
-        xml_events = []
-        deadline = time.time() + 30
-        while time.time() < deadline:
-            xml_events = [
-                e for e in self.test_client.get_instance_events(
-                    inst['uuid'], event_type='mutate', limit=1000)
-                if str(e.get('message', '')) == 'libvirt domain XML']
-            if xml_events:
-                break
-            time.sleep(1)
-
-        self.addDetail('domain xml events', content.text_content(json.dumps(
-            xml_events, indent=4, sort_keys=True, default=str)))
-        self.assertNotEqual(
-            0, len(xml_events),
-            'instance create emitted no "libvirt domain XML" mutate event')
-
-        # Events come back newest first, and a power on retry can generate
-        # more than one, so [0] is the XML libvirt was most recently handed.
-        # "extra" can be present and null, hence the or rather than a default.
-        xml = (xml_events[0].get('extra') or {}).get('xml', '')
+        xml = self._await_domain_xml(inst['uuid'])
         self.assertIn(
             "freePageReporting='on'", xml,
             'the domain XML this hypervisor generated has no free page '

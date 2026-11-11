@@ -1425,6 +1425,50 @@ class BaseTestCase(testtools.TestCase):
             f'After time {after}, instance {instance_uuid} had no event '
             f'"{operation}:{message}"')
 
+    def _await_domain_xml(self, instance_uuid):
+        """The newest libvirt domain XML a hypervisor recorded for an instance.
+
+        Two mutate events carry the message "libvirt domain XML", and they
+        are the only view of the domain from outside the hypervisor -- and
+        therefore the only way a test can tell a stale copy of libvirt.tmpl
+        on a node from a correct template in this repository.
+        Instance._create_domain_xml() emits the XML it rendered from the
+        template, and Instance._record_domain_xml() emits libvirt's own
+        XMLDesc() once the domain exists. libvirt rewrites what it was handed
+        -- it adds indexes, PCI addresses and the devices it implies, and
+        collapses or expands elements -- so the second does not contain the
+        template's text verbatim. Once an instance is up the newest event is
+        normally the second, but a caller cannot rely on which it gets:
+        assert on the XML's structure (parse it), or on an attribute both
+        forms share, never on a line copied from libvirt.tmpl.
+
+        Filter to mutate events rather than reading the default page of
+        everything: a booting instance emits well over a hundred events and
+        the domain XML is written early, so an unfiltered read can
+        legitimately not contain it. Poll for eventual consistency.
+        """
+        xml_events = []
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            xml_events = [
+                e for e in self.test_client.get_instance_events(
+                    instance_uuid, event_type='mutate', limit=1000)
+                if str(e.get('message', '')) == 'libvirt domain XML']
+            if xml_events:
+                break
+            time.sleep(1)
+
+        self.addDetail('domain xml events', content.text_content(json.dumps(
+            xml_events, indent=4, sort_keys=True, default=str)))
+        self.assertNotEqual(
+            0, len(xml_events),
+            'instance create emitted no "libvirt domain XML" mutate event')
+
+        # Events come back newest first, and a power on retry can generate
+        # more of each, so [0] is the most recent view of the domain.
+        # "extra" can be present and null, hence the or rather than a default.
+        return (xml_events[0].get('extra') or {}).get('xml', '')
+
     def _await_object_operations_complete(
             self, object_type, object_uuid, poll_interval, label):
         # last_cluster_operation names only the newest operation, so a
