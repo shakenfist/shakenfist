@@ -43,6 +43,14 @@ alone, such as rewriting the row's link, do not.
 abandoned plan, the reasoning worth keeping is usually why it was
 abandoned.
 
+A plan listed in a table with no `Status` column records no status,
+so it is never eligible. The audit reports such plans and never
+fails for them, because the alternative is demanding a status that
+somebody invents to clear an issue, and an invented status in the
+one page people read to decide what wants attention is worse than
+none. A repository that keeps such a table should say in its index
+why, as `private-ci` does.
+
 ## What retiring involves
 
 1. **`docs/` describes what the plan built.** Usually it already
@@ -71,7 +79,10 @@ abandoned.
    Nothing catches the rest, which become silent 404s and stale
    names: absolute `blob/<branch>` links in `README.md`, and plan
    names in backticks in `AGENTS.md`, `ARCHITECTURE.md`, other plans
-   and `.claude/`.
+   and `.claude/`. A build input under `docs/plans/`, such as
+   `order.yml`, is the exception: it is keyed by file name, and the
+   file is going away, so its entry is deleted rather than pinned
+   to a permalink.
 5. **The master plan and its phase files are deleted.**
 6. **The index row stays.** It keeps its date, intent and status,
    and its link becomes a permalink to the plan's final text:
@@ -87,20 +98,28 @@ abandoned.
    ```
 
    That is the last commit on the default branch that changed the
-   file, so it holds the final text and, being on the default
-   branch, is never garbage collected. Never link `blob/main`: once
-   the file is deleted that is a 404. The index stays the complete
-   history of what the repository has planned, and `git` keeps the
-   text. A row whose link is an absolute URL registers no local
-   plan, so [`plan-index`](/components/development/audits/plan-index/) accepts a retired
-   row as it stands.
+   file, so it holds the final text and, being on the default branch,
+   is never garbage collected. Never link `blob/main`: once the file
+   is deleted that is a 404. The index stays the complete history of
+   what the repository has planned, and `git` keeps the text. The row
+   is marked `(retired)` after its link, in the `Plan` cell, and the
+   index says once, in a paragraph before its table, what a pinned
+   link means. That paragraph says the pinned copy is frozen history
+   rather than a maintained document, so it may state things a later
+   phase overturned. A row whose link is an absolute URL registers no
+   local plan, so [`plan-index`](/components/development/audits/plan-index/) accepts a
+   retired row as it stands.
 
 ## What it is not
 
 * **Retired is not a status.** A retired plan's row still reads
   `Complete`, `Superseded` or `Abandoned`. A status says whether a
   plan still wants attention, and a retired plan does not; that its
-  text now lives only in history is already shown by the link.
+  text now lives only in history is already shown by the link. The
+  `(retired)` marker does not contradict this: it sits in the `Plan`
+  cell, beside the link, and the `Status` cell is untouched. It
+  labels the link, saying that the text behind it is frozen, and
+  does not say anything about the plan's status.
 * **A plan whose reasoning cannot be placed is not retired.** If
   there is no sensible home in `docs/` for why the code is the shape
   it is, the plan is left where it is and reported, so that a person
@@ -119,6 +138,11 @@ abandoned.
 ryll's `docs/plans/completed/` was an earlier approach: finished
 phase files were moved there by hand and kept in the tree.
 Retirement replaces it; the files in it retire like any others.
+
+That is true of any local convention for finished plans: a
+`completed/` directory, a prose status, a per-repository rule. A
+retirement that contradicts one reconciles it. The retirement wins,
+and its commit says so.
 
 The `retire-plans` skill in the private `llm-setup` repository does
 this, one pull request per repository. Its `retire-plans` helper does

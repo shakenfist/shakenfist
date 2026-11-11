@@ -57,9 +57,9 @@ beyond the new EOF.
 |--------|------|----------------|----------------------------------|------------------------------------|
 | raw    | ✓    | ✓              | off, falloc, full                | host-only (truncate + post-pass)   |
 | qcow2  | ✓    | ✓ (`--shrink`) | off, falloc, full (metadata gap) | L1 + refcount-table grow           |
-| vmdk   | ✓    | reject         | off                              | monolithicSparse only              |
-| vpc    | ✓    | reject         | off                              | dynamic + fixed grow               |
-| vhdx   | ✓    | reject         | off                              | dynamic only; two-header dance     |
+| vmdk   | ✓    | reject         | off, falloc, full                | monolithicSparse only              |
+| vpc    | ✓    | reject         | off, falloc, full                | dynamic + fixed grow               |
+| vhdx   | ✓    | reject         | off, falloc, full                | dynamic only; two-header dance     |
 
 For raw and qcow2, the post-resize `qemu-img info --output=json`
 matches `qemu-img resize` byte-for-byte across every shipped
@@ -132,10 +132,10 @@ grow. Shrink and noop ignore the mode; pairing
 
 | Mode      | raw                                | qcow2                                 | vmdk / vpc / vhdx              |
 |-----------|------------------------------------|---------------------------------------|--------------------------------|
-| `off`     | sparse (default)                   | sparse (default)                      | sparse (only mode supported)   |
+| `off`     | sparse (default)                   | sparse (default)                      | sparse (default)               |
 | `metadata`| rejected (no metadata to populate) | rejected (planner gap; Future work)   | rejected (planner gap)         |
-| `falloc`  | `posix_fallocate` on the added region | `posix_fallocate` on the added region | rejected (planner gap)      |
-| `full`    | `fallocate(ZERO_RANGE)` with `pwrite` fallback | `fallocate(ZERO_RANGE)` with `pwrite` fallback | rejected (planner gap) |
+| `falloc`  | `posix_fallocate` on the added region | `posix_fallocate` on the added region | `posix_fallocate` on the added region |
+| `full`    | `fallocate(ZERO_RANGE)` with `pwrite` fallback | `fallocate(ZERO_RANGE)` with `pwrite` fallback | `fallocate(ZERO_RANGE)` with `pwrite` fallback |
 
 For `falloc` and `full`, instar preallocates only the **newly-added
 file region** (`[file_size_before, file_size_after)`), not the entire

@@ -96,23 +96,30 @@ Two projects are in scope for part of the audit only:
 
 - private-ci is audited for the `plan-phase-references`,
   `plan-source-references`, `plan-index`, `plan-template`,
-  `eol-producers` and `sfui-vendor` checks, and nothing else. It is
-  internal tooling and excluded from the conventions, but it vendors
-  sfui and a vendored copy drifts silently: nothing in the consumer
-  fails when the copy falls behind, or when someone edits it in place
-  and the next sync discards the edit. It also owns the runner-label
-  producer definitions `eol-producers` checks against the end-of-life
-  table, so that applies too. It plans like the rest of the fleet too,
-  so the four criteria that report a defect in a plan as written
-  apply. The three that do not are `plan-audit-phase`, because the
-  plans written there before it adopted the template track progress
-  as checkpoint sections rather than as a phase table and enabling it
-  would file an issue for a retrofit nobody has decided to do;
-  `push-audit`, which has no `PUSH-AUDIT.md` to read until that
-  changes; and `plan-history-in-source`, which comes in with
-  `push-audit`, since that runbook carries the rule it measures. It is
-  not expected to grow a `pyproject.toml`, a renovate config,
-  release workflows, or a `develop` branch.
+  `plan-retirement`, `eol-producers` and `sfui-vendor` checks, and
+  nothing else. It is internal tooling and excluded from the
+  conventions, but it vendors sfui and a vendored copy drifts
+  silently: nothing in the consumer fails when the copy falls behind,
+  or when someone edits it in place and the next sync discards the
+  edit. It also owns the runner-label producer definitions
+  `eol-producers` checks against the end-of-life table, so that
+  applies too. It plans like the rest of the fleet too, so the four
+  criteria that report a defect in a plan as written apply, and
+  `plan-retirement` with them: a plan index is maintained here like
+  anywhere else, and retirement maintains that page rather than
+  changing how a plan is written. Its table records no status, so
+  nothing in it is eligible and the criterion reports those plans on a
+  passing result instead -- which is the only place the fleet's
+  largest statusless table is visible at all. The three that do not
+  are `plan-audit-phase`, because the plans written there before it
+  adopted the template track progress as checkpoint sections rather
+  than as a phase table and enabling it would file an issue for a
+  retrofit nobody has decided to do; `push-audit`, which has no
+  `PUSH-AUDIT.md` to read until that changes; and
+  `plan-history-in-source`, which comes in with `push-audit`, since
+  that runbook carries the rule it measures. It is not expected to
+  grow a `pyproject.toml`, a renovate config, release workflows, or a
+  `develop` branch.
 
 - images is audited for the `eol-distro` check, and nothing else. It
   is built fresh every night and the fleet's CI boots on its output,
@@ -230,6 +237,7 @@ attached rather than quietly disappearing from the table.
 | [plan-audit-phase.md](/components/development/audits/plan-audit-phase/) | Master plans end with a phase that runs PUSH-AUDIT.md over the whole plan's work |
 | [push-audit.md](/components/development/audits/push-audit/) | PUSH-AUDIT.md naming, versioned shared blocks, and an AGENTS.md reference to it |
 | [plan-template.md](/components/development/audits/plan-template/) | PLAN-TEMPLATE.md shared blocks, including the sub-agent model roster and the push-audit phase |
+| [plan-retirement.md](/components/development/audits/plan-retirement/) | Plans whose index row went terminal more than 90 days ago have been retired |
 | [test-coverage.md](/components/development/audits/test-coverage/) | Unit and functional test coverage |
 | [secret-handling.md](/components/development/audits/secret-handling/) | Secret scanner in CI, credentials kept out of logs |
 | [review-coverage.md](/components/development/audits/review-coverage/) | Human review backlog stays under threshold in repos with review tracking |

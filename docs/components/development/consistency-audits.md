@@ -77,20 +77,27 @@ close the issues the fix resolved.
 
 The audit workflow has four jobs.
 
-**1. `audit`** -- a matrix job per repository. Each leg shallow-clones
-the target with `gh repo clone`, installs a pinned `skillsaw` into a
-virtualenv, asserts that skillsaw answers at that pinned version, then
-runs `scripts/audit-check.py` and uploads its result,
-`audit-result-<repo>.json`, as an artifact named `audit-<repo>`. The
-two later jobs download every artifact matching `audit-*`, so that
-prefix is what ties a leg's result to them.
+**1. `audit`** -- a matrix job per repository. Each leg clones the
+target with `gh repo clone -- --filter=blob:none`, installs a pinned
+`skillsaw` into a virtualenv, asserts that skillsaw answers at that
+pinned version, then runs `scripts/audit-check.py` and uploads its
+result, `audit-result-<repo>.json`, as an artifact named
+`audit-<repo>`. The two later jobs download every artifact matching
+`audit-*`, so that prefix is what ties a leg's result to them.
+
+The checkout is filtered of blobs rather than shallow because
+`plan-retirement` reads the history of `docs/plans/index.md` to date a
+plan's status change, and a shallow checkout carries no history to
+read. A filtered checkout holds every commit and fetches a blob when
+something reads one, which for every other criterion is no fetch at
+all: the checkout brings the blobs at HEAD with it.
 
 Most checks read files out of the clone, several of them by asking
-`git` inside it what the index holds. A few reach the network instead:
-they query the GitHub API through `gh`, or clone another repository to
-compare against. That set is `NETWORK_CHECKS` in
-`scripts/audit_snapshot.py`, which a test keeps in step with the code
-(see [Before and after a change to a
+`git` inside it what the index holds, and one by asking it what a file
+used to say. A few reach the network instead: they query the GitHub
+API through `gh`, or clone another repository to compare against. That
+set is `NETWORK_CHECKS` in `scripts/audit_snapshot.py`, which a test
+keeps in step with the code (see [Before and after a change to a
 check](#before-and-after-a-change-to-a-check)). Repository visibility
 is among what they query, live rather than hardcoded, because it
 changes.
@@ -473,7 +480,17 @@ so a step added to it reaches both.
    what lets a repository scoped by `only_checks` skip a criterion
    without paying for it -- several of them query the GitHub API, and
    on a private repository those calls fail for reasons that say
-   nothing about compliance.
+   nothing about compliance. The line is what the question costs:
+   applicability that is cheap to answer -- a file's presence, the
+   repository's identity, how it is scoped -- belongs in `applies()`,
+   while a `not_applicable` that only the measurement itself can
+   establish is reported from `run()`, which is why there are far more
+   `skip()` calls than `applies()` definitions. `BypassActorIdentity`
+   is the case where the two cost the same: answering whether it
+   applies needs the environment and branch-rules reads the verdict
+   needs, so an `applies()` would either make those calls twice or
+   cache them for a `run()` that may never ask. Where a criterion
+   decides in `run()` for a reason like that, say so in its docstring.
 
    Read the audited repository through the helpers rather than around
    them. `audit.files.tracked_paths(path, *pathspec)` is how to ask git
@@ -692,14 +709,14 @@ A test for a check subclasses `CheckTestCase` from
 `scripts/tests/base.py` rather than building its own fixture and
 assertion scaffolding. It provides `self.fixture`, a `FixtureRepo`
 over a throwaway checkout (`write()`, `write_all()`, `workflow()`,
-`workflows()`, `init_git()`, `commit()`); `self.fresh_fixture()`,
-which replaces it with an empty one; `self.check(**props)`,
-which runs `check_class` against the fixture with repository
-properties supplied directly rather than detected; `check_args=` on
-`self.check()` for the three checks whose constructors take an
-argument (`PushAudit`, `PlanTemplate` and `SfuiVendor` -- a set
-`ContractTest` pins against the registry, so a fourth cannot
-appear without this sentence failing); and the
+`workflows()`, `init_git()`, `commit()`, `commit_files()`);
+`self.fresh_fixture()`, which replaces it with an empty one;
+`self.check(**props)`, which runs `check_class` against the fixture
+with repository properties supplied directly rather than detected;
+`check_args=` on `self.check()` for the three checks whose
+constructors take an argument (`PushAudit`, `PlanTemplate` and
+`SfuiVendor` -- a set `ContractTest` pins against the registry, so a
+fourth cannot appear without this sentence failing); and the
 `assert_pass(result)` / `assert_fail(result, containing=)` /
 `assert_skip(result, containing=)` triple in place of a bare
 `assertEqual` against `result['status']`. A class that tests a pure
@@ -717,6 +734,16 @@ from an empty one would quietly pass. And a helper that runs the
 check more than once in a single test method must rebuild the
 fixture first, by calling `self.fresh_fixture()`, or the first
 call's files are still on disk for the second.
+
+A criterion that reads git history needs a fixture with one, and
+`commit_files({path: content}, message, when=)` is a revision of it:
+it writes the mapping and commits it, dated `when` if given, which
+sets the author and the committer date together. A check reading an
+age out of the history has to be handed commits that are not all a
+moment old, and `plan-retirement`'s cases are built around the
+ninety-day boundary, so they pass git the raw `<seconds> <offset>`
+form computed from the same clock the check reads rather than a
+formatted date.
 
 The tests cover the machinery, not what a check *decides* about a real
 repository. Test that half against local clones:
