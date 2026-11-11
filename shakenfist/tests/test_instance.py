@@ -11,6 +11,7 @@ from unittest import mock
 
 import pycdlib
 import testtools
+from pydantic import ValidationError
 from shakenfist import artifact
 from shakenfist import baseobject
 from shakenfist import constants
@@ -22,6 +23,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.daemons.sidechannel import main as sidechannel
 from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.schema.agentoperation_dependency import agent_dependency
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.schema.relationship_types import RelationshipType
@@ -2810,6 +2812,134 @@ class AgentOperationDeadlineTestCase(base.ShakenFistTestCase):
                 side_effect=mariadb.get_agent_operation_attributes) as m:
             self._view(op)
         self.assertEqual(1, m.call_count)
+
+
+class AgentOperationDependencyTestCase(base.ShakenFistTestCase):
+    """The dependency edges an operation carries.
+
+    Nothing evaluates an edge yet, so these tests are about storage,
+    retrieval and the external view, and about where the type checking
+    lives. The edge lists are validated on the schema model rather than
+    at the API layer, so a bad edge is refused when a row is read back
+    as well as when it is written, and that is what the two refusal
+    tests here demonstrate through an object layer which adds no
+    checking of its own.
+    """
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance('cirros', self.instance_uuid)
+
+    def _make_agentop(self, **kwargs):
+        return AgentOperation.new(
+            str(uuid.uuid4()), 'unittest', self.instance_uuid,
+            [{'command': 'execute', 'commandline': 'true'}], **kwargs)
+
+    def _edge(self, **kwargs):
+        # The stored shape of an edge is the serialised model, which is
+        # what the API layer will write once it normalises a caller's
+        # object. json mode because the value ends up in a JSON column.
+        return agent_dependency(**kwargs).model_dump(mode='json')
+
+    def _view(self, op):
+        # The reference grouping in external_view() reads the caller's
+        # namespace out of a JWT, so it needs a request context this
+        # test has no interest in standing up.
+        with mock.patch(
+                'shakenfist.operations.agentoperation.'
+                'references_to_grouped_dict', return_value={}):
+            return op.external_view()
+
+    def test_an_operation_with_no_edges_has_empty_lists(self):
+        # An operation created the way today's three API endpoints
+        # create one declares nothing, and that is an empty list rather
+        # than None at every layer. A client which saw null would have
+        # to decide whether it meant "none" or "this server does not
+        # know about edges".
+        op = self._make_agentop()
+        self.assertEqual([], op.depends_on)
+        self.assertEqual([], op.runs_after)
+
+        view = self._view(op)
+        self.assertEqual([], view['depends_on'])
+        self.assertEqual([], view['runs_after'])
+
+    def test_an_edge_round_trips_through_the_database(self):
+        dep_uuid = str(uuid.uuid4())
+        op = self._make_agentop(depends_on=[self._edge(op_uuid=dep_uuid)])
+
+        reread = AgentOperation.from_db(op.uuid)
+        self.assertEqual(
+            [{'op_type': 'agentoperation',
+              'op_uuid': dep_uuid,
+              'settle_seconds': None}],
+            reread.depends_on)
+        self.assertEqual([], reread.runs_after)
+        self.assertEqual(
+            reread.depends_on, self._view(reread)['depends_on'])
+
+    def test_a_runs_after_edge_round_trips_too(self):
+        # The two lists are stored and read independently, so a
+        # transposition between them would not show up in a test which
+        # only ever populated one.
+        dep_uuid = str(uuid.uuid4())
+        op = self._make_agentop(runs_after=[self._edge(op_uuid=dep_uuid)])
+
+        reread = AgentOperation.from_db(op.uuid)
+        self.assertEqual([], reread.depends_on)
+        self.assertEqual(
+            [{'op_type': 'agentoperation',
+              'op_uuid': dep_uuid,
+              'settle_seconds': None}],
+            reread.runs_after)
+        self.assertEqual([], self._view(reread)['depends_on'])
+        self.assertEqual(
+            reread.runs_after, self._view(reread)['runs_after'])
+
+    def test_a_settle_delay_survives_the_round_trip(self):
+        # settle_seconds is the only part of an edge which is neither a
+        # constant nor a UUID, so it is the part a lossy encode would
+        # drop without anything else noticing.
+        op = self._make_agentop(depends_on=[
+            self._edge(op_uuid=str(uuid.uuid4()), settle_seconds=30.0)])
+        reread = AgentOperation.from_db(op.uuid)
+        self.assertEqual(30.0, reread.depends_on[0]['settle_seconds'])
+
+    def test_an_edge_naming_another_object_type_is_refused(self):
+        # An agent operation's edge may only name an agent operation.
+        # The refusal comes from the schema model, which is why it
+        # happens here, on a path with no API layer anywhere in it.
+        with testtools.ExpectedException(ValidationError):
+            self._make_agentop(depends_on=[
+                {'op_type': ObjectType.INSTANCE.value,
+                 'op_uuid': str(uuid.uuid4())}])
+
+    def test_a_negative_settle_delay_is_refused(self):
+        # A negative settle would make an edge satisfied before the
+        # operation it names had finished.
+        with testtools.ExpectedException(ValidationError):
+            self._make_agentop(runs_after=[
+                {'op_uuid': str(uuid.uuid4()), 'settle_seconds': -1.0}])
 
 
 class InstanceAttributeFieldMaskTestCase(base.ShakenFistTestCase):
