@@ -423,6 +423,263 @@ management session under a `### ` heading named for the step.
 9. Phase 5 and the plan are `Complete` only if no blocking finding is
    open, and phase 5's `Merged` cell is empty either way (D37).
 
+## Findings
+
+### Wave 1
+
+Suite results, run from the worktree root, each under `timeout 2400`.
+
+* `timeout 2400 pre-commit run --all-files` exited 0.
+* `timeout 2400 tox` exited 0 (py3, flake8 and cover all OK; no
+  failing tests).
+* `timeout 2400 tools/mermaid-lint.sh` exited 0 (docker reachable;
+  status read directly from a file, not through a pipe).
+* `timeout 2400 bash -c 'tox -e genprotos && git diff --exit-code shakenfist/protos'`
+  exited 1. The diff is five files only, each a one-line change of
+  `GRPC_GENERATED_VERSION` from `'1.84.0'` to `'1.84.1'`:
+  `agent_pb2_grpc.py`, `common_pb2_grpc.py`, `nodelock_pb2_grpc.py`,
+  `privexec_pb2_grpc.py` and `shakenfist_enums_pb2_grpc.py`. The
+  regenerated `database_pb2*.py` and `database_pb2_grpc.py` files, the
+  only ones the ranges touch (`git diff --name-only` shows phases 2 and 3
+  change them; phases 1 and 4 touch nothing under `protos/`), matched
+  the committed copies exactly.
+
+  So the failure is not a stale generated file from any range, and the
+  management session traced its actual cause rather than leaving it at
+  tooling drift. `database_pb2_grpc.py` read `'1.84.0'` at both
+  `dd5723c3db` and `1090771e64`; `d0107d1eaa` ("Remove the
+  never-released V1 coalescing RPCs", 2026-10-29) regenerated the
+  `database_pb2*` family with grpcio-tools 1.84.1 and left the other
+  five families at 1.84.0. That commit is outside all four ranges and
+  belongs to another plan, so the split stamp is not a finding of this
+  audit; it is recorded here because it is the reason this check cannot
+  exit 0 on any machine running 1.84.1, and because the next audit in
+  any plan will hit the same wall until the five laggards are
+  regenerated. An issue for that is filed at the disposition.
+
+  The regenerated files were put back to their committed content
+  afterwards; `git status` and `git diff --cached` confirm the tree
+  carries nothing but this plan file.
+
+#### 6537966c00
+
+`git diff 6537966c00^1 6537966c00 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff 6537966c00^1 6537966c00 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff 6537966c00^1 6537966c00 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 6537966c00^1 6537966c00 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 6537966c00^1 6537966c00 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 6537966c00^1 6537966c00 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 6537966c00^1 6537966c00 --stat | tail -1`
+```
+ 11 files changed, 2054 insertions(+), 110 deletions(-)
+```
+
+`git diff 6537966c00^1 6537966c00 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+15
+```
+
+`git diff 6537966c00^1 6537966c00 --name-only -- 'docs/*' '*.md'`
+```
+docs/operator_guide/database.md
+docs/plans/PLAN-deleted-object-sweep-phase-01-measure.md
+docs/plans/PLAN-deleted-object-sweep.md
+docs/plans/index.md
+docs/plans/order.yml
+docs/release_notes/v07-v08.md
+```
+
+`git diff 6537966c00^1 6537966c00 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### dd5723c3db
+
+`git diff dd5723c3db^1 dd5723c3db -- '*.py' | grep -nE '^\+[^+].{120,}'`
+```
+976:+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0e\x64\x61tabase.proto\x12\x11s
+[line truncated here by the recorder: 91048 characters in all, one serialized protobuf descriptor in shakenfist/protos/database_pb2.py]
+```
+
+`git diff dd5723c3db^1 dd5723c3db -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff dd5723c3db^1 dd5723c3db -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff dd5723c3db^1 dd5723c3db -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff dd5723c3db^1 dd5723c3db -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff dd5723c3db^1 dd5723c3db -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff dd5723c3db^1 dd5723c3db --stat | tail -1`
+```
+ 22 files changed, 4002 insertions(+), 1090 deletions(-)
+```
+
+`git diff dd5723c3db^1 dd5723c3db -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+68
+```
+
+`git diff dd5723c3db^1 dd5723c3db --name-only -- 'docs/*' '*.md'`
+```
+docs/developer_guide/database_internals.md
+docs/operator_guide/database.md
+docs/plans/PLAN-deleted-object-sweep-phase-02-fair-drain.md
+docs/plans/PLAN-deleted-object-sweep.md
+docs/plans/PLAN-grpc-bounded-replies.md
+docs/plans/index.md
+docs/release_notes/v07-v08.md
+```
+
+`git diff dd5723c3db^1 dd5723c3db -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 1090771e64
+
+`git diff 1090771e64^1 1090771e64 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+```
+1328:+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0e\x64\x61tabase.proto\x12\x11
+[line truncated here by the recorder: 92220 characters in all, one serialized protobuf descriptor in shakenfist/protos/database_pb2.py]
+```
+
+`git diff 1090771e64^1 1090771e64 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff 1090771e64^1 1090771e64 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 1090771e64^1 1090771e64 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 1090771e64^1 1090771e64 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 1090771e64^1 1090771e64 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 1090771e64^1 1090771e64 --stat | tail -1`
+```
+ 43 files changed, 5088 insertions(+), 923 deletions(-)
+```
+
+`git diff 1090771e64^1 1090771e64 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+92
+```
+
+`git diff 1090771e64^1 1090771e64 --name-only -- 'docs/*' '*.md'`
+```
+docs/developer_guide/database_internals.md
+docs/developer_guide/subsystem_internals.md
+docs/operator_guide/database.md
+docs/plans/PLAN-deleted-object-sweep-phase-01-measure.md
+docs/plans/PLAN-deleted-object-sweep-phase-02-fair-drain.md
+docs/plans/PLAN-deleted-object-sweep-phase-03-batched-deletes.md
+docs/plans/PLAN-deleted-object-sweep.md
+docs/plans/index.md
+docs/release_notes/v07-v08.md
+```
+
+`git diff 1090771e64^1 1090771e64 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 1bd914aa02
+
+`git diff 1bd914aa02^1 1bd914aa02 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff 1bd914aa02^1 1bd914aa02 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff 1bd914aa02^1 1bd914aa02 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 1bd914aa02^1 1bd914aa02 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 1bd914aa02^1 1bd914aa02 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 1bd914aa02^1 1bd914aa02 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 1bd914aa02^1 1bd914aa02 --stat | tail -1`
+```
+ 5 files changed, 954 insertions(+), 4 deletions(-)
+```
+
+`git diff 1bd914aa02^1 1bd914aa02 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+0
+```
+
+`git diff 1bd914aa02^1 1bd914aa02 --name-only -- 'docs/*' '*.md'`
+```
+docs/operator_guide/database.md
+docs/plans/PLAN-deleted-object-sweep-phase-04-drain.md
+docs/plans/PLAN-deleted-object-sweep.md
+docs/plans/index.md
+docs/release_notes/v07-v08.md
+```
+
+`git diff 1bd914aa02^1 1bd914aa02 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+
+## Execution notes
+
+- **Back brief, 2026-11-11.** Michael kept all three points as planned:
+  D31 (the two 33fl pull requests are audited here under the five-item
+  floor, not as pull requests against 33fl), D35 at its full weight
+  (step 5h compares all 25 batchable types at opus and high effort,
+  rather than a five-type spot-check) and D37 (the plan may reach
+  `Complete` inside this phase's own pull request when nothing blocks).
+  He also gave this session permission to push and open the pull
+  request once the definition of done passes, so step 5j does not stop
+  to ask.
+- **5b, 2026-11-11.** Wave 1 and the mechanical sweep, recorded above.
+  Three of the four suite commands exited 0; the genprotos check exited
+  1 for a cause outside every range, traced in the Wave 1 record.
+  Thirty-three of the forty greps produced no output.
+  - *Departure from the brief, kept deliberately.* The management
+    session's brief told 5b to keep every line of every grep's output.
+    Two lines are serialized protobuf descriptors from
+    `shakenfist/protos/database_pb2.py`, 91,048 and 92,220 characters,
+    and keeping them whole would have added about 183KB of generated
+    bytes to this plan. They are truncated to their first 100
+    characters with a marker giving the full length and the file. The
+    plan's own definition of done counts commands rather than output
+    lines, so nothing in the plan is weakened; the brief's rule was the
+    management session's and it is the management session that relaxed
+    it.
+  - The four diffstats 5b recorded (11/+2,054-110, 22/+4,002-1,090,
+    43/+5,088-923 and 5/+954-4) match the figures the planning survey
+    measured independently, which is a cheap check that the ranges it
+    read are the ranges the plan names.
+  - Three verdicts were reproduced in the management session before
+    this was committed: the pushdown grep and the `print(` grep over
+    phase 3's range (both empty) and the over-120-character grep over
+    the same range (one hit, the generated descriptor, 92,220
+    characters). The one hit is in a generated file, which D30 exempts
+    from judgement review.
+
 ## Back brief
 
 Before starting, confirm with Michael:
