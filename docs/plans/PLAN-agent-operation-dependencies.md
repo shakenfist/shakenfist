@@ -408,7 +408,7 @@ before this repository can emit one (decision 3).
 
 | Phase | Plan | Status | Content | Merged |
 |-------|------|--------|---------|--------|
-| 0 | [PLAN-agent-operation-dependencies-phase-00-decisions.md](PLAN-agent-operation-dependencies-phase-00-decisions.md) | In progress | Resolve the open questions into the decisions section above, and re-cut this table. Its survey found five of this plan's factual claims wrong or incomplete; its measurement found that instance queues do get deep but that no log can say whether a deep one held two submitters; its consumer audit found one firm break outside this repository and one single-commit obligation inside it | — |
+| 0 | [PLAN-agent-operation-dependencies-phase-00-decisions.md](PLAN-agent-operation-dependencies-phase-00-decisions.md) | Complete | Resolve the open questions into the decisions section above, and re-cut this table. Its survey found five of this plan's factual claims wrong or incomplete; its measurement found that instance queues do get deep but that no log can say whether a deep one held two submitters; its consumer audit found one firm break outside this repository and one single-commit obligation inside it | `4c14523a7b` |
 | 1 | — | Not started | Schema, object and API: `depends_on` and `runs_after` on `AgentOperation` with an additive table migration, the agent edge model and `VALID_DEPENDENCY_OPERATIONS` (decision 5), per-edge settle seconds, `abort` in `state_targets` and `TERMINAL_STATES` in one commit (decision 3), the parameters on the three creating endpoints with their declarations and capability token, and submission-time validation (decision 6). Prerequisite: `client-python-k3s` has learned `abort` and released | — |
 | 2 | — | Not started | Dispatch evaluation (decisions 1, 2, 8, 9, 10): same-instance and cross-instance edges evaluated in the dispatcher between `agent_operation_next()` and `start_instance_executor()`, the cascade to `abort`, the settle delay, the dependency-wait budget and its configuration option, the failed dependency on the wire in `external_view()`, the `database_load_budget.yaml` amendment, and the terminal-dependency cache | — |
 | 3 | — | Not started | client-python: chain submission helpers, await-the-chain UX, failure reporting from the chain's first failure, and `abort` in `TERMINAL_AGENT_OPERATION_STATES`. Lands in the sibling repository, so its plan file lives there, following the `PLAN-agent-operation-deadlines` phase 6 precedent | — |
@@ -417,8 +417,10 @@ before this repository can emit one (decision 3).
 
 The `Merged` column records what put each phase on `develop`: the
 merge commit of its pull request, or an explicit `first..last` range
-where the phase landed directly. Nothing in this plan has landed, so
-every cell reads `—`.
+where the phase landed directly. Phase 0 landed as pull request
+[#4827](https://github.com/shakenfist/shakenfist/pull/4827), merge
+commit `4c14523a7b`; every other cell reads `—` because nothing
+else has landed yet.
 
 ## Future work
 
