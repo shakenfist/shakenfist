@@ -592,9 +592,21 @@ one. Run from the phase worktree unless stated.
       mutation is a failed Definition of done, not a note.
 * [ ] Nothing in the diff performs an OIDC token request, device
       authorization request, or PKCE exchange — that is phase 7,
-      in another repository:
-      `git diff develop... | grep -i 'grant_type\|code_verifier\|device_code'`
-      returns nothing outside `docs/plans/`.
+      in another repository. The grep this item first carried,
+      `git diff develop... | grep -i
+      'grant_type\|code_verifier\|device_code'`, is too blunt to
+      be the check: it matches a comment in the fetcher saying
+      why `grant_types_supported` is deliberately not stored, and
+      a test fixture whose discovery document carries
+      `grant_types_supported` in order to prove that unrecognised
+      members are ignored. Both are correct and neither is a
+      token request. Check it the way the claim is actually
+      falsifiable instead: nothing outbound is sent anywhere but
+      the discovery URL, so `grep -n 'session.post\|requests.post'
+      shakenfist/oidc_discovery.py` returns nothing, and every
+      use of `token_endpoint` or `device_authorization_endpoint`
+      outside the tests and the generated protobuf descriptor is
+      storage or serving rather than a call.
 * [ ] `git diff --stat develop... -- ':!docs/plans'` touches only
       `shakenfist/schema/trusted_issuer_attributes.py`,
       `shakenfist/mariadb.py`, `shakenfist/config.py`,
@@ -767,9 +779,201 @@ as they happen.
   whichever unrelated change next runs `genprotos`; committed on
   its own so the discovery diff stays discovery.
 
+* **2026-11-11 (AEDT), the gate before step 3d.** Michael was
+  given the exact field list and approved it unchanged. The
+  endpoint serves `name`, `issuer_url`, `client_id`,
+  `oidc_scopes` and whichever of the three endpoints are set,
+  and never `uuid`, `state`, `version`, `jwks_uri`, `audience`
+  or `discovered_at`. Two alternatives were offered and
+  declined: putting the endpoint behind a configuration flag
+  defaulting to off, and dropping `name` and `issuer_url` to
+  disclose less.
+
+* **2026-11-12 (AEDT), step 3e run inline, and step 3h run by
+  the management session.** 3e is a single grep that the plan
+  had already reduced to confirm-and-stop, so it was run inline
+  rather than delegated. 3h files issues, which is an
+  outward-facing action with no review step between a
+  sub-agent's draft and the public record, so the management
+  session wrote and filed them itself. Both are departures from
+  the plan's step table, which assigns each to a sub-agent.
+
+* **2026-11-12 (AEDT), one of 3h's two issues could not be
+  filed from this session.**
+  [#4890](https://github.com/shakenfist/shakenfist/issues/4890)
+  was filed. The second, on `Field(max_length=...)` never
+  reaching the generated DDL, was refused by this environment's
+  external-write policy on the second attempt at the same
+  operation. It was not retried around. Its body is written and
+  ready, the defect is recorded in the master plan's Future
+  work, and filing it is left to Michael.
+
+* **2026-11-12 (AEDT), a completed plan's table was left wrong
+  on purpose.** `jwks_uri` stopped being a required parameter on
+  both issuer routes, which makes three tables in
+  `PLAN-api-input-validation-phase-06-required.md` disagree with
+  the tree. That phase is `Complete` and merged as `81aa9a7d0`
+  (#4199), and its tables were true at that commit. Editing them
+  would falsify the record of what that phase measured rather
+  than correct a stale fact, in the same way this plan's own
+  `file:line` references are pinned to the commit they were
+  resolved at. The required-parameter census in
+  `shakenfist/tests/external_api/test_required_sweep.py` is the
+  live record and does move, from 77 rows to 75, with the two
+  departing rows commented where they were. Note for a later
+  reader: that completed plan's prose also contains the number
+  75, counting something different, and the collision is
+  coincidence.
+
+* **2026-11-12 (AEDT), two response codes declared rather than
+  filed.** See step 3f's results. A pre-existing defect is
+  normally filed, not fixed; this one was fixed because the same
+  pull request adds a reference page documenting the real
+  behaviour.
+
 ## Results
 
 Filled in as the steps complete.
+
+### Steps 3c and 3d — the endpoints
+
+3c landed as `Discover issuer endpoints when configuring one.`
+and 3d as `Serve login metadata for human sessions.`
+
+3c wired discovery into `POST` and `PUT /auth/issuers`,
+implemented D4's three cases through one helper, added
+`POST /auth/issuers/<name>/discover`, and added
+`issuer-discovery` to the advertised capabilities. 3d added the
+public `GET /auth/login` with the field list Michael approved at
+the gate, unchanged from what the gate proposed, plus
+`human-login-metadata`.
+
+Three things in these steps were not in the plan.
+
+**The discovery columns could not reach SQL.**
+`_trusted_issuer_attributes_column_values()` listed the original
+three columns only, so a full write dropped every discovered
+value and a masked write naming one of the new fields raised
+`ValueError` and surfaced as a 500. Step 3a shipped that and the
+management session committed it: the review of 3a checked the
+generated DDL and the gRPC round trip but not the hand-written
+mapper between model and SQL, which is the third layer of this
+repository's direct/gRPC/public pattern. Fixed in 3c, with the
+direct create now building its insert from the same map so the
+two cannot drift again.
+
+**An update must not clear a client registration it was not
+sent.** 3c's first implementation put `client_id` and
+`oidc_scopes` in the field mask unconditionally, which is what
+`audience` has always done, and offered the consequence to 3f as
+something to document. The management session rejected that: the
+operator guide's recipe for repointing an issuer sends the three
+identity fields, so an operator editing an audience would have
+silently switched off human login. Omitted or null now leaves
+them alone and an empty string clears. This is also what the
+proto field presence added in 3a exists to carry, so the
+alternative would have left that plumbing unused and the reason
+given for it wrong.
+
+**The scope default could not be a default.** D5 says
+`oidc_scopes` defaults to `openid`, and nothing implemented it;
+a login-capable issuer configured without scopes served `null`
+and every client would have hard coded the one scope OIDC makes
+mandatory. Implemented as a default per write path it collides
+with the update semantics above -- it would either write a scope
+list nobody asked for, or miss the issuer whose `client_id`
+arrives in a later request than its scopes. It is therefore one
+invariant over what a write leaves behind, which makes both
+paths agree and is idempotent; a test asserts that idempotence
+on the field mask rather than the value, so an unrelated update
+must not even name the column.
+
+Also in 3d: the login endpoint gets its own rate-limit counter
+key rather than sharing the exchange's, which the brief had
+asked for and which would have let a CI cluster behind NAT
+exhaust the budget and refuse human logins from that whole
+address, and the reverse. And the set of endpoints reachable
+with no credential at all is pinned by a test
+(`shakenfist/tests/external_api/test_auth_universal.py`), which
+this phase adds to, so the justification is recorded where the
+next reviewer of that set will read it.
+
+### Step 3e — nothing to template
+
+Confirmed and closed with no change, inline rather than by a
+sub-agent, because it is one grep. Eight `FEDERATION_*` settings
+exist in `shakenfist/config.py` and exactly one,
+`FEDERATION_JWKS_CA_BUNDLE`, is templated under
+`shakenfist/deploy/` (`collection/roles/node/templates/config:78`
+and `collection/roles/node/meta/argument_specs.yml:381`). The
+two new discovery settings are consistent with six of their
+seven siblings by running on their defaults.
+
+### Step 3f — the documentation
+
+Landed as `Document OIDC discovery and login metadata.`
+
+Four files changed as briefed. The operator guide's "Four
+fields, all mandatory" sentence is gone, replaced by three
+mandatory and three optional with the real length limits; the
+settings table gained both new settings; and the update
+semantics and the scope invariant are documented because
+neither is guessable.
+
+The management session cross-checked the documented defaults,
+the length limits and the timeout semantics against
+`shakenfist/config.py` and `shakenfist/oidc_discovery.py` rather
+than against the report. The timeout wording is worth keeping as
+written: it says the setting bounds each connect and each read
+rather than the whole transfer, which is what `requests` does
+with a scalar timeout and is the thing such a sentence usually
+gets wrong.
+
+One finding was fixed rather than filed. The issuer handlers
+have always returned 409 where another issuer holds an
+`issuer_url` and 422 where a field is over its limit, and
+`swag_from` declared neither, on `develop` as well as here.
+A pre-existing defect would normally be filed, but 3f's new
+reference page documents the real behaviour, so leaving it would
+have shipped generated API documentation contradicting the
+hand-written reference inside one pull request.
+
+One finding was documented rather than fixed: a refresh cannot
+update a `jwks_uri` that discovery supplied, because the stored
+value always wins and nothing records which of the two it came
+from. Recorded in the master plan's Future work.
+
+### Step 3g — the mutation check
+
+Eight mutants, eight killed, none survived and none timed out.
+Run with the `mutation-check` skill; the generator and logs are
+in the session scratchpad, and the files were restored from
+copies rather than with `git checkout`.
+
+| # | Mutation | Killed by |
+|---|----------|-----------|
+| 1a | `issuer` comparison becomes `startswith` | `test_a_trailing_slash_difference_is_refused_with_both_urls` |
+| 1b | `issuer` comparison normalises both sides with `rstrip('/')` | same |
+| 2 | the https requirement on the fetched `issuer_url` removed | `test_an_http_issuer_url_is_refused_without_a_fetch` |
+| 3a | `allow_redirects=False` becomes `True` | `test_a_redirect_is_refused_rather_than_followed`, and `test_the_request_is_built_the_way_the_jwks_fetch_is` |
+| 3b | the 3xx diagnosis branch removed | `test_a_redirect_is_refused_rather_than_followed` |
+| 4 | the public payload becomes `external_view()` | `test_a_login_capable_issuer_is_offered`, and `test_a_device_only_issuer_is_offered_without_the_absent_keys` |
+| 5 | `client_id`/`oidc_scopes` unconditional in the update mask | `test_an_update_of_the_identity_fields_keeps_the_client_id` |
+| 6 | the login rate-limit key loses its prefix | `test_the_counter_is_keyed_on_the_source_under_its_own_prefix`, and `test_exhausting_the_login_budget_does_not_refuse_an_exchange` |
+
+Mutations 4, 5 and 2 were additionally run by the management
+session itself, independently of the sub-agent, and gave the
+same result.
+
+Two of these are worth a reader's attention. 3b is the weaker
+half of the redirect guard: with the diagnosis branch gone the
+request is still unredirected and still refused, so what the
+test catches there is the quality of the message rather than the
+behaviour -- the security property is carried entirely by 3a.
+And mutation 6 is covered twice over, once on the key itself and
+once by its behavioural consequence, which is the right
+redundancy for a change whose whole point is that two budgets
+stay separate.
 
 ### Step 3b — the discovery fetcher
 

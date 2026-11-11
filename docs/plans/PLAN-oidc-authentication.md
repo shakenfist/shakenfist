@@ -1767,6 +1767,55 @@ When this plan is successfully implemented:
 
 ### Future work
 
+* **`issuer_url` is not required to be https**, although
+  `jwks_uri` is and says why
+  (`shakenfist/external_api/auth.py:919`). Filed as
+  [#4890](https://github.com/shakenfist/shakenfist/issues/4890)
+  by phase 3 rather than fixed there: it is a breaking change
+  to an administrative API for deployments that cannot be
+  inspected from here, so whether it wants a deprecation window
+  is a judgement about real deployments. Phase 3's discovery
+  fetcher refuses a plaintext URL of its own accord, so nothing
+  fetches one today.
+
+* **`Field(max_length=...)` never reaches the generated DDL.**
+  `PYTHON_TO_SQLALCHEMY` maps `str` to `sa.String(255)`
+  unconditionally (`shakenfist/schema/sqlalchemy.py:285`), so
+  `issuer_url`, `jwks_uri` and `audience` have each declared a
+  1024 character limit since they were written and are stored as
+  `VARCHAR(255)`. The same root cause as #4559, which was fixed
+  for one field without touching the mapping, so the class
+  remains. Phase 3 used the documented `SQLLongText()` escape
+  hatch for the three endpoint URLs it added, because those
+  genuinely can exceed 255, and left the three pre-existing
+  columns alone because changing them needs a data migration.
+  The issue body is written and ready to file; it was not filed
+  from the session that wrote it.
+
+* **A refresh cannot update a `jwks_uri` that discovery
+  supplied.** An operator-configured value always wins over a
+  discovered one, which is the right default -- silently
+  repointing where a cluster fetches signing keys is worse than
+  a stale endpoint -- but it is applied to the stored value
+  rather than to the operator's intent, and nothing records
+  which of the two a stored `jwks_uri` came from. So an issuer
+  configured by discovery alone can never have that field
+  refreshed, and an operator whose provider moves its key set
+  has to issue a PUT omitting `jwks_uri` to re-adopt the
+  published value. Phase 3 documented the workaround. The fix is
+  provenance on the column, so that a refresh replaces a
+  discovered value and preserves an operator's.
+
+* **The discovery read timeout bounds each read, not the
+  transfer.** `requests` applies a scalar timeout per connect
+  and per read, so a provider which drips bytes can hold an
+  administrator's request open far longer than
+  `FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS` suggests, up to
+  `FEDERATION_DISCOVERY_MAX_BYTES`. Low severity: the path is
+  administrator-only and the body is capped at 64KB, so the
+  worst case is one held worker and no unbounded read. A whole
+  transfer deadline would close it.
+
 * **Per-resource RBAC.** Roles like "read-only on
   namespace X" or "may create instances but not
   networks". The gap is narrower than it was when this
