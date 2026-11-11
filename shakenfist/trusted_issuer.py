@@ -408,7 +408,8 @@ class TrustedIssuer(dbo):
             EVENT_TYPE_MUTATE, 'updated trusted issuer configuration',
             extra=extra)
 
-    def record_discovery(self, jwks_uri: Optional[str],
+    def record_discovery(self, current: TrustedIssuerAttributesData,
+                         jwks_uri: Optional[str],
                          discovered: dict[str, Any]) -> None:
         """Write what a discovery run found, and nothing else.
 
@@ -425,18 +426,24 @@ class TrustedIssuer(dbo):
         -- an operator-supplied value is never overwritten by
         discovery, and only the caller knows what the operator
         supplied.
+
+        `current` is the configuration the caller already read, under
+        the lock it is writing beneath. It is here so that the two
+        fields this method must construct but must not write carry the
+        issuer's real values rather than blanks. They were blanks
+        first, which made the field mask load bearing in a way nothing
+        would have caught: widen it by one name and every refresh would
+        have written an empty issuer_url -- the single value compared
+        byte for byte against a token's iss claim -- and the issuer
+        would have stopped validating anything, silently. The mask is
+        still the thing that decides what is written; it is simply no
+        longer the only thing standing between a refresh and a wiped
+        row.
         """
         attrs = TrustedIssuerAttributesData(
             uuid=_as_uuid(self.uuid),
-            # The model requires these two and the mask below does not
-            # name them, so they are never written and the row keeps
-            # what it holds. They are placeholders rather than a read
-            # of the current values, because reading them would be two
-            # database round trips to populate fields this call cannot
-            # write. Anything added to the mask below has to be a real
-            # value here first.
-            issuer_url='',
-            audience='',
+            issuer_url=current.issuer_url,
+            audience=current.audience,
             jwks_uri=jwks_uri)
         for field in DISCOVERED_FIELDS:
             setattr(attrs, field, discovered.get(field))

@@ -28,7 +28,10 @@ from unittest import mock
 from shakenfist import exceptions
 from shakenfist import federation
 from shakenfist.external_api import app as external_api
+from shakenfist.external_api import auth as api_auth
 from shakenfist.tests import base
+from shakenfist.schema.trusted_issuer_attributes import (
+    TrustedIssuerAttributesData)
 from shakenfist.tests.mock_mariadb import MockMariaDB
 from shakenfist.trusted_issuer import TrustedIssuer
 
@@ -364,6 +367,130 @@ class IssuerDiscoveryTestCase(base.ShakenFistTestCase):
         self.assertIsNone(resp.get_json()['client_id'])
         self.assertIsNone(resp.get_json()['oidc_scopes'])
 
+    def test_a_refresh_writes_the_jwks_uri_it_read_under_the_lock(self):
+        # The interleaving the lock was added for, simulated by making
+        # the two configuration() reads disagree: the first, before the
+        # fetch, sees the old key set, and the second, taken under the
+        # lock, sees what a concurrent PUT committed while the provider
+        # was being asked. The refresh must write what it read under the
+        # lock. Writing what it read first would restore the previous
+        # provider's key set on top of the new issuer_url, which is a
+        # cluster verifying signatures against the wrong place.
+        self.assertEqual(200, self._create().status_code)
+        self.fetch.side_effect = None
+        self.fetch.return_value = document()
+
+        before = self._issuer()
+        old = TrustedIssuerAttributesData(
+            uuid=before['uuid'], issuer_url=AUTHENTIK,
+            jwks_uri=AUTHENTIK + 'old-keys/',
+            audience='https://sf.example.com')
+        committed = TrustedIssuerAttributesData(
+            uuid=before['uuid'], issuer_url=AUTHENTIK,
+            jwks_uri=AUTHENTIK + 'new-keys/',
+            audience='https://sf.example.com')
+
+        with mock.patch.object(
+                TrustedIssuer, 'configuration',
+                side_effect=[old, committed, committed, committed]):
+            with mock.patch(
+                    'shakenfist.mariadb.update_trusted_issuer_attributes'
+            ) as update:
+                self.assertEqual(200, self._discover().status_code)
+
+        [call] = update.call_args_list
+        self.assertEqual(AUTHENTIK + 'new-keys/', call.args[0].jwks_uri)
+
+    def test_the_refresh_fetches_outside_the_lock_and_writes_inside_it(self):
+        # Both halves of the placement matter and they pull opposite
+        # ways. The fetch must stay outside, because holding a cluster
+        # wide lock across a third party's network timeout blocks every
+        # other issuer write for as long as somebody else's provider
+        # takes to answer. The write must go inside, because the
+        # jwks_uri it writes was resolved from a read taken before the
+        # fetch, and a PUT committing a new issuer_url in between would
+        # otherwise be overwritten with the previous provider's key set
+        # -- the broken pairing the lock exists to prevent.
+        #
+        # Asserted as an ordering rather than by trying to interleave
+        # two requests, because the ordering is the property; a race
+        # test would prove it only for the interleaving it happened to
+        # produce.
+        self.assertEqual(200, self._create().status_code)
+
+        order = []
+
+        class RecordingLock:
+            def __enter__(inner):
+                order.append('lock')
+                return inner
+
+            def __exit__(inner, *args):
+                order.append('unlock')
+                return False
+
+        self.fetch.side_effect = lambda *a, **kw: (
+            order.append('fetch') or document())
+
+        with mock.patch.object(
+                api_auth, '_issuer_url_lock', return_value=RecordingLock()):
+            with mock.patch(
+                    'shakenfist.mariadb.update_trusted_issuer_attributes',
+                    side_effect=lambda *a, **kw: order.append('write')):
+                self.assertEqual(200, self._discover().status_code)
+
+        self.assertEqual(['fetch', 'lock', 'write', 'unlock'], order)
+
+    def test_the_refresh_mask_never_names_the_identity_fields(self):
+        # The assertion above sees the result; this one sees the write,
+        # which is what would change if somebody widened the mask. A
+        # refresh builds a whole TrustedIssuerAttributesData because the
+        # model requires issuer_url and audience, and only the mask
+        # keeps those two out of the UPDATE. Widen it by one name and
+        # every refresh on the cluster would rewrite a field the
+        # administrator did not ask it to touch.
+        self.assertEqual(200, self._create().status_code)
+        self.fetch.side_effect = None
+        self.fetch.return_value = document()
+
+        with mock.patch(
+                'shakenfist.mariadb.update_trusted_issuer_attributes',
+                side_effect=(
+                    self.mock_mariadb._mariadb_update_trusted_issuer_attributes
+                )) as update:
+            self.assertEqual(200, self._discover().status_code)
+
+        [call] = update.call_args_list
+        self.assertNotIn('issuer_url', call.kwargs['fields'])
+        self.assertNotIn('audience', call.kwargs['fields'])
+        self.assertIn('jwks_uri', call.kwargs['fields'])
+        # And what it did construct for the two it must not write is
+        # the issuer's real configuration, so a widened mask writes the
+        # truth rather than a blank.
+        self.assertEqual(AUTHENTIK, call.args[0].issuer_url)
+        self.assertEqual('https://sf.example.com', call.args[0].audience)
+
+    def test_clearing_a_client_id_alone_leaves_the_scopes(self):
+        # The scope default has no converse, which the operator guide
+        # now says explicitly. Clearing client_id without also clearing
+        # oidc_scopes leaves a scope list behind for a registration
+        # that no longer exists. Nothing is disclosed and no flow
+        # breaks, because client_id is the half that decides whether an
+        # issuer is login capable -- this test is here so that the state
+        # is a decision on the record rather than a surprise, and so
+        # that a later change to it has to change a test.
+        self.assertEqual(200, self._create(
+            client_id='sf-cli', oidc_scopes='openid profile').status_code)
+
+        resp = self._update(client_id='')
+        self.assertEqual(200, resp.status_code)
+        self.assertIsNone(resp.get_json()['client_id'])
+        self.assertEqual('openid profile', resp.get_json()['oidc_scopes'])
+
+        # The consequence that actually matters: no longer offered for
+        # human login, whatever the scope list still says.
+        self.assertEqual([], self.client.get('/auth/login').get_json())
+
     def test_a_discovery_run_never_touches_the_client_registration(self):
         # A document says nothing about a registration an operator
         # performed at the provider's console, so a refresh must not be
@@ -490,7 +617,12 @@ class IssuerDiscoveryTestCase(base.ShakenFistTestCase):
         # The operator's JWKS URI is not replaced by a discovered one,
         # because nothing stored says which of the two somebody typed.
         self.assertEqual(AUTHENTIK_JWKS, body['jwks_uri'])
-        # And the rest of the configuration is untouched.
+        # And the rest of the configuration is untouched. issuer_url
+        # matters most of the three: it is the value compared byte for
+        # byte against a token's iss claim, so an issuer which lost it
+        # would stop validating anything, and record_discovery() has to
+        # construct it in order to write the fields next to it.
+        self.assertEqual(AUTHENTIK, body['issuer_url'])
         self.assertEqual('https://sf.example.com', body['audience'])
 
     def test_the_refresh_endpoint_fills_in_a_missing_jwks_uri(self):
@@ -557,6 +689,32 @@ class IssuerDiscoveryTestCase(base.ShakenFistTestCase):
     def test_a_client_id_longer_than_its_column_is_refused(self):
         resp = self._create(client_id='x' * 256)
         self.assertEqual(422, resp.status_code)
+
+    def test_every_issuer_field_is_refused_at_its_real_column_width(self):
+        # These three declare max_length=1024 on the model and are
+        # stored in VARCHAR(255) columns, because a declared limit never
+        # reaches the generated DDL. The validator used to take the
+        # declared number, so a 300 character value was accepted here
+        # and then refused by MariaDB -- a 500 -- or silently truncated
+        # where strict mode is off. Nothing which ever worked is refused
+        # by checking the real width: a longer value could not have been
+        # stored in the first place.
+        for name in ('issuer_url', 'jwks_uri', 'audience'):
+            long_value = 'https://example.com/' + (
+                'x' * (256 - len('https://example.com/')))
+            self.assertEqual(256, len(long_value))
+            resp = self._create(**{name: long_value})
+            self.assertEqual(
+                422, resp.status_code, f'{name} was not refused at 256')
+            self.assertIn('255 characters', resp.get_json()['error'])
+
+    def test_an_issuer_field_at_its_column_width_is_accepted(self):
+        # The boundary from below, so the refusal above is not passing
+        # by refusing everything.
+        at_limit = 'https://example.com/' + (
+            'x' * (255 - len('https://example.com/')))
+        self.assertEqual(255, len(at_limit))
+        self.assertEqual(200, self._create(audience=at_limit).status_code)
 
     def test_the_jwks_cache_is_dropped_when_an_issuer_is_written(self):
         # Belt and braces -- the cache replaces a client whose uri has

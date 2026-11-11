@@ -34,6 +34,7 @@
 
 import json
 import ssl
+import time
 import urllib.parse
 from typing import Any
 from typing import Optional
@@ -44,6 +45,9 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import exceptions
 from shakenfist import federation
 from shakenfist.config import config
+from shakenfist.schema.sqlalchemy import stored_max_length
+from shakenfist.schema.trusted_issuer_attributes import \
+    TrustedIssuerAttributesData
 
 
 LOG, _ = logs.setup(__name__)
@@ -194,6 +198,42 @@ def _quoted(value: str) -> str:
             f'in total)')
 
 
+def _require_fits(value: str, what: str) -> None:
+    """Refuse a document value too long for the column which stores it.
+
+    Every value this module returns is written to trusted_issuer_
+    attributes, and until this phase each of those columns held something
+    an operator had typed and the API had already length checked. A
+    discovery document is the first third party input to reach them, and
+    it is bounded only by FEDERATION_DISCOVERY_MAX_BYTES, so a provider
+    publishing a 2000 character endpoint would otherwise reach the
+    database layer unchecked.
+
+    Refusing here rather than there is what makes the two write paths
+    agree. The create path builds TrustedIssuerAttributesData in its
+    constructor, where Pydantic would raise ValidationError and the
+    administrator would get a 500 instead of the documented 502; the
+    update path sets the same fields with setattr, which skips validation
+    entirely because the model is not configured with
+    validate_assignment. So one path failed obscurely, the other not at
+    all, and jwks_uri -- whose column is smaller than the model admits --
+    could be truncated on its way in. A truncated key set URL is a
+    signature check against the wrong place, which is the single thing
+    this module exists to prevent.
+
+    The limit comes from stored_max_length() rather than from the
+    model's declared max_length, because those two numbers are not the
+    same and only one of them is true of the column.
+    """
+    limit = stored_max_length(TrustedIssuerAttributesData, what)
+    if limit is None or len(value) <= limit:
+        return
+    raise exceptions.OIDCDiscoveryFailed(
+        f'{what} {_quoted(value)} is longer than the {limit} characters '
+        f'this cluster can store for it, so it would be refused or '
+        f'truncated on the way into the database')
+
+
 def _require_https(url: str, what: str) -> None:
     """Refuse a URL which is not https, naming which member it came from.
 
@@ -245,6 +285,14 @@ def fetch(issuer_url: str) -> dict[str, Any]:
     _require_https(issuer_url, 'issuer_url')
 
     url = discovery_url(issuer_url)
+
+    # One deadline over the whole exchange, started before the connect.
+    # The scalar passed to requests below is a per-operation timeout and
+    # is kept for what it is good at -- failing a dead host fast -- but
+    # it says nothing about how long the transfer as a whole may take.
+    timeout = config.FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS
+    deadline = time.monotonic() + timeout
+
     session = _discovery_session()
     try:
         try:
@@ -270,7 +318,7 @@ def fetch(issuer_url: str) -> dict[str, Any]:
                 # rather than after requests has already buffered
                 # whatever the far end decided to send.
                 stream=True,
-                timeout=config.FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS)
+                timeout=timeout)
 
             try:
                 # A non-2xx answer, with a redirect called out
@@ -311,6 +359,20 @@ def fetch(issuer_url: str) -> dict[str, Any]:
                             f'FEDERATION_DISCOVERY_MAX_BYTES ({cap}) bytes. '
                             f'A discovery document is a few kilobytes, so '
                             f'this is unlikely to be one')
+                    # requests' timeout bounds each connect and each
+                    # socket read, never the transfer, so a provider
+                    # returning one byte just inside the read timeout
+                    # never trips it: the ceiling without this check is
+                    # the byte cap times the timeout, which on the
+                    # defaults is days rather than seconds. The deadline
+                    # is monotonic because a clock step backwards during
+                    # a slow fetch would otherwise extend it.
+                    if time.monotonic() > deadline:
+                        raise exceptions.OIDCDiscoveryFailed(
+                            f'{url} took longer than '
+                            f'FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS '
+                            f'({timeout}s) to send {len(body)} bytes, so it '
+                            f'is being dripped rather than served')
             finally:
                 # Closing a streamed response is what returns the
                 # connection, and on the oversized path above it is also
@@ -386,6 +448,7 @@ def fetch(issuer_url: str) -> dict[str, Any]:
             f'{url} returned a document with no jwks_uri, so it says nothing '
             f'about where this issuer publishes its signing keys')
     _require_https(jwks_uri, 'jwks_uri')
+    _require_fits(jwks_uri, 'jwks_uri')
 
     discovered: dict[str, Any] = {
         'issuer': advertised,
@@ -404,6 +467,7 @@ def fetch(issuer_url: str) -> dict[str, Any]:
         # browser to over plaintext is worth refusing for the same reason
         # the fetch is: it is the credential-carrying half of the flow.
         _require_https(value, member)
+        _require_fits(value, member)
         discovered[member] = value
 
     LOG.with_fields({

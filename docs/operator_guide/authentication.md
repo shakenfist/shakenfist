@@ -170,8 +170,14 @@ has no client registration at its provider and never will, which is why
 `client_id` and `oidc_scopes` are optional. An issuer with a `client_id` and a
 discovered login endpoint is [login capable](#human-login-metadata).
 
-`issuer_url`, `jwks_uri` and `audience` may each be up to 1024
-characters; `client_id` and `oidc_scopes` up to 255.
+Every one of `issuer_url`, `jwks_uri`, `audience`, `client_id` and
+`oidc_scopes` may be up to 255 characters, which is what their columns
+hold. Discovered endpoints may be up to 1024. A longer value is
+refused with a **422** rather than stored, because a value between the
+limit and the column was previously accepted and then truncated by the
+database -- and a truncated `issuer_url` or `jwks_uri` means tokens
+checked against the wrong issuer, or signing keys fetched from the
+wrong place.
 
 The exact `issuer_url` comparison is deliberate. A loose comparison
 here is a way to accept tokens from somewhere else entirely, so if
@@ -272,9 +278,10 @@ curl -X POST https://sf.example.com/auth/issuers/corporate/discover \
   -H "Authorization: Bearer ${SF_ADMIN_TOKEN}"
 ```
 
-This fetches the document again and returns the issuer. It only
-changes what discovery owns: the three endpoints and `discovered_at`.
-It never touches your `audience`, `client_id` or `oidc_scopes`. Unlike
+This fetches the document again and returns the issuer. It changes
+the three endpoints and `discovered_at`, and fills in a `jwks_uri` the
+issuer does not have yet. It never touches your `audience`,
+`client_id` or `oidc_scopes`. Unlike
 a create or an update it always treats a failure as a failure, with a
 **502** or **503** as above, because a fetch is the only thing you
 asked for and a 200 for one that did not happen would be a lie.
@@ -314,6 +321,13 @@ same result. To manage the list yourself, send `oidc_scopes` as an
 empty string in the same request; the default is not applied over an
 explicit clear.
 
+The default has no converse: clearing a `client_id` on its own leaves
+the `oidc_scopes` behind. The issuer stops being login capable, because
+`client_id` is the half that decides that, so nothing is served for it
+and no flow breaks -- but the row keeps a scope list for a registration
+that no longer exists. Clear both in the same request if you want the
+row to read cleanly.
+
 ### Human login metadata
 
 `GET /auth/login` lists the identity providers this cluster offers for
@@ -341,6 +355,14 @@ exhausting its exchange budget does not stop people in the same office
 logging in, nor the reverse. The same caveat about reverse proxies
 applies as for the exchange. A limited caller gets a **429**, and if the
 database cannot be reached to count the request, a **503**.
+
+Setting `FEDERATION_RATE_LIMIT_PER_MINUTE` to `0` disables the limit on
+this endpoint too, not only on the exchange. That is worth knowing
+before you choose it: this endpoint reads one row per configured issuer
+on every request and caches nothing, so with the limit off an anonymous
+caller turns each request into a read per issuer with nothing counting
+them. The exchange, by contrast, bounds its body and does its cheap
+local checks before touching anything.
 
 ### Delegating to namespace owners
 
@@ -493,7 +515,7 @@ exchange answers 503 rather than assuming the request is fine.
 | `FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait on each connect and each read when fetching an issuer's discovery document. Separate from the JWKS timeout because discovery only runs when an administrator configures an issuer, where a slow provider costs that administrator one request, while the JWKS fetch can pin an API worker per anonymous exchange. This bounds each connect and read rather than the whole transfer; `FEDERATION_DISCOVERY_MAX_BYTES` bounds the transfer |
 | `FEDERATION_DISCOVERY_MAX_BYTES` | 65536 | Largest discovery document accepted, in bytes. The body is read up to this limit and refused beyond it, rather than trusting the provider's `Content-Length`, so a login page or a misbehaving proxy cannot hand us an unbounded response. A real document is a few kilobytes |
 | `FEDERATION_MAX_TOKEN_BYTES` | 16384 | Largest exchange request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no `Content-Length` is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit |
-| `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Exchange attempts allowed per source address per minute. `0` disables rate limiting entirely |
+| `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Attempts allowed per source address per minute, counted separately for the exchange and for `GET /auth/login`. `0` disables rate limiting entirely, on both |
 | `FEDERATION_JWKS_CA_BUNDLE` | *(empty)* | Path to a PEM bundle of extra certificate authorities to trust when fetching an issuer's JWKS. Empty means the system trust store alone |
 
 ### When an issuer rotates its signing keys

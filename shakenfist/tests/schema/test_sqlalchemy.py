@@ -23,6 +23,9 @@ from shakenfist.schema.sqlalchemy import SQLIndex
 from shakenfist.schema.sqlalchemy import SQLLongText
 from shakenfist.schema.sqlalchemy import SQLNativeUUID
 from shakenfist.schema.sqlalchemy import SQLUniqueIndex
+from shakenfist.schema.sqlalchemy import stored_max_length
+from shakenfist.schema.trusted_issuer_attributes import (
+    TrustedIssuerAttributesData)
 from shakenfist.schema.sqlalchemy import _get_sqlalchemy_type
 from shakenfist.schema.sqlalchemy import _has_native_uuid_marker
 from shakenfist.tests import base
@@ -243,3 +246,80 @@ class UploadDataTableGenerationTestCase(base.ShakenFistTestCase):
         index_names = [idx.name for idx in table.indexes]
         self.assertIn('idx_uploads_node', index_names)
         self.assertIn('idx_uploads_created_at', index_names)
+
+
+class StoredMaxLengthTestCase(base.ShakenFistTestCase):
+    """Tests for stored_max_length().
+
+    The helper exists because Field(max_length=...) and the generated
+    column's capacity are independent numbers, and validators written
+    against the first one accept values the second cannot hold. Every
+    assertion here is about the helper answering with the column rather
+    than with the declaration.
+    """
+
+    def test_a_plain_str_field_is_bounded_by_its_column(self):
+        class Model(BaseModel):
+            value: Annotated[str, Field(max_length=4096)]
+
+        # Declared 4096, stored in a VARCHAR(255).
+        self.assertEqual(255, stored_max_length(Model, 'value'))
+
+    def test_a_longtext_field_is_bounded_by_its_declaration(self):
+        class Model(BaseModel):
+            value: Annotated[str, SQLLongText(), Field(max_length=1024)]
+
+        # The marker buys a LONGTEXT, so the declaration is the only
+        # limit that applies and it is the true one.
+        self.assertEqual(1024, stored_max_length(Model, 'value'))
+
+    def test_a_declaration_under_the_column_wins(self):
+        class Model(BaseModel):
+            value: Annotated[str, Field(max_length=64)]
+
+        self.assertEqual(64, stored_max_length(Model, 'value'))
+
+    def test_an_unbounded_longtext_field_has_no_limit(self):
+        class Model(BaseModel):
+            value: Annotated[Optional[str], SQLLongText()] = None
+
+        self.assertIsNone(stored_max_length(Model, 'value'))
+
+    def test_an_undeclared_str_field_is_still_bounded(self):
+        class Model(BaseModel):
+            value: str
+
+        self.assertEqual(255, stored_max_length(Model, 'value'))
+
+    def test_a_non_string_field_has_no_character_limit(self):
+        class Model(BaseModel):
+            value: float
+
+        self.assertIsNone(stored_max_length(Model, 'value'))
+
+    def test_the_answer_matches_the_column_the_table_really_gets(self):
+        """The property that stops this drifting from the DDL.
+
+        stored_max_length() calls _get_sqlalchemy_type() the same way
+        pydantic_to_sqlalchemy_table() does, but "the same way" is the
+        sort of claim that stays true until somebody changes one of
+        them. So build the table and compare, for every field of a
+        model which has both kinds of string column.
+        """
+        table = pydantic_to_sqlalchemy_table(
+            TrustedIssuerAttributesData, 'trusted_issuer_attributes_probe',
+            sa.MetaData(), primary_key_fields=['uuid'])
+
+        for name, field in TrustedIssuerAttributesData.model_fields.items():
+            declared = next(
+                (item.max_length for item in field.metadata
+                 if getattr(item, 'max_length', None) is not None), None)
+            column_length = table.c[name].type.length if hasattr(
+                table.c[name].type, 'length') else None
+
+            expected = [limit for limit in (column_length, declared)
+                        if limit is not None]
+            self.assertEqual(
+                min(expected) if expected else None,
+                stored_max_length(TrustedIssuerAttributesData, name),
+                f'{name} disagrees with its own column')

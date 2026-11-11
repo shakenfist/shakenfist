@@ -1789,8 +1789,16 @@ When this plan is successfully implemented:
   hatch for the three endpoint URLs it added, because those
   genuinely can exceed 255, and left the three pre-existing
   columns alone because changing them needs a data migration.
-  The issue body is written and ready to file; it was not filed
-  from the session that wrote it.
+  The first review round then made every validator on this
+  surface derive its limit from `stored_max_length()`, which
+  answers from the generated column rather than the
+  declaration, so a value these columns cannot hold is now
+  refused with a 422 instead of truncated. That closes the
+  symptom on the issuer routes and leaves the class open: every
+  other over-declared `str` field in the schema still accepts
+  values its column will not hold. The issue body is written
+  and ready to file; it was not filed from the session that
+  wrote it.
 
 * **A refresh cannot update a `jwks_uri` that discovery
   supplied.** An operator-configured value always wins over a
@@ -1805,16 +1813,6 @@ When this plan is successfully implemented:
   published value. Phase 3 documented the workaround. The fix is
   provenance on the column, so that a refresh replaces a
   discovered value and preserves an operator's.
-
-* **The discovery read timeout bounds each read, not the
-  transfer.** `requests` applies a scalar timeout per connect
-  and per read, so a provider which drips bytes can hold an
-  administrator's request open far longer than
-  `FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS` suggests, up to
-  `FEDERATION_DISCOVERY_MAX_BYTES`. Low severity: the path is
-  administrator-only and the body is capped at 64KB, so the
-  worst case is one held worker and no unbounded read. A whole
-  transfer deadline would close it.
 
 * **Per-resource RBAC.** Roles like "read-only on
   namespace X" or "may create instances but not

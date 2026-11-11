@@ -375,9 +375,9 @@ administrators configure the same provider at the same moment.
 | Field | Required | Notes |
 |-------|----------|-------|
 | `name` | Yes | Unique among live issuers |
-| `issuer_url` | Yes | Exact `iss` value. Up to 1024 characters |
-| `audience` | Yes | Up to 1024 characters |
-| `jwks_uri` | No | Must be `https://` when given. Up to 1024 characters. When omitted, discovery supplies it |
+| `issuer_url` | Yes | Exact `iss` value. Up to 255 characters |
+| `audience` | Yes | Up to 255 characters |
+| `jwks_uri` | No | Must be `https://` when given. Up to 255 characters. When omitted, discovery supplies it |
 | `client_id` | No | Up to 255 characters |
 | `oidc_scopes` | No | Space separated. Up to 255 characters. Stored as `openid` if a `client_id` is set and this is not |
 | `discover` | No | Boolean, default `true`. `false` skips the discovery fetch, and then `jwks_uri` is required |

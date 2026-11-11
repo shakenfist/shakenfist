@@ -45,6 +45,9 @@ from shakenfist.namespace_claim import ClaimRefused
 from shakenfist.namespace_claim import NamespaceClaim
 from shakenfist.namespace_claim import NamespaceClaims
 from shakenfist.namespace_key import NamespaceKey
+from shakenfist.schema.sqlalchemy import stored_max_length
+from shakenfist.schema.trusted_issuer_attributes import \
+    TrustedIssuerAttributesData
 from shakenfist.trusted_issuer import TrustedIssuer
 from shakenfist.trusted_issuer import TrustedIssuers
 from shakenfist.util import access_tokens
@@ -900,6 +903,16 @@ trusted_issuer_example = """{
 }"""
 
 
+def _stored_limit(name):
+    """The character limit the column behind this issuer field really has.
+
+    One lookup so that the validator here, the discovery fetcher's
+    _require_fits() and the documented limits all answer from the schema
+    rather than from three hand-copied numbers.
+    """
+    return stored_max_length(TrustedIssuerAttributesData, name)
+
+
 def _validate_issuer_arguments(issuer_url, jwks_uri, audience,
                                client_id=None, oidc_scopes=None,
                                discover=True):
@@ -924,9 +937,20 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience,
     login flow. An issuer configured to verify a workload's tokens --
     GitHub Actions, say -- has no client registration at the provider
     and never will, so requiring one would break every issuer in
-    existence to serve a flow that issuer will never run. Their limit is
-    255 rather than the 1024 the three fields above carry, because that
-    is what their columns hold.
+    existence to serve a flow that issuer will never run.
+
+    Every length limit below is stored_max_length() of the field's
+    column, not the max_length its model declares. The two are not the
+    same number: str maps to VARCHAR(255) whatever a field declares, so
+    issuer_url, jwks_uri and audience each declare 1024 and hold 255. A
+    value between the two was accepted here and then refused by MariaDB,
+    or silently truncated where strict mode is off -- and a truncated
+    issuer_url or jwks_uri is a token checked against the wrong issuer
+    or a key set fetched from the wrong place. Nothing which worked is
+    refused by using the real number, because a value longer than the
+    column could never have been stored in the first place. The general
+    defect, that a declared limit never reaches the generated DDL, is
+    recorded in the master plan's future work.
     """
     for name, value in (('issuer_url', issuer_url),
                         ('audience', audience)):
@@ -934,9 +958,10 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience,
             return sf_api.error(400, f'no {name} specified')
         if not isinstance(value, str):
             return sf_api.error(400, f'{name} is not a string')
-        if len(value) > 1024:
+        limit = _stored_limit(name)
+        if len(value) > limit:
             return sf_api.error(
-                422, f'{name} cannot be longer than 1024 characters')
+                422, f'{name} cannot be longer than {limit} characters')
 
     for name, value in (('client_id', client_id),
                         ('oidc_scopes', oidc_scopes)):
@@ -944,9 +969,10 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience,
             continue
         if not isinstance(value, str):
             return sf_api.error(400, f'{name} is not a string')
-        if len(value) > 255:
+        limit = _stored_limit(name)
+        if len(value) > limit:
             return sf_api.error(
-                422, f'{name} cannot be longer than 255 characters')
+                422, f'{name} cannot be longer than {limit} characters')
 
     if jwks_uri is None:
         if not discover:
@@ -963,9 +989,10 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience,
     # both of which arrive here as None above.
     if not jwks_uri:
         return sf_api.error(400, 'no jwks_uri specified')
-    if len(jwks_uri) > 1024:
+    limit = _stored_limit('jwks_uri')
+    if len(jwks_uri) > limit:
         return sf_api.error(
-            422, 'jwks_uri cannot be longer than 1024 characters')
+            422, f'jwks_uri cannot be longer than {limit} characters')
 
     # Signing keys must come from somewhere we control the choice of.
     # Refusing plaintext here is not paranoia: a JWKS fetched over HTTP
@@ -1333,10 +1360,14 @@ class AuthIssuerEndpoint(api_base.Resource):
              'The value expected in a token\'s aud claim.', True),
             ('client_id', 'body', 'string',
              'The OAuth client identifier registered at this issuer for '
-             'human login. Only needed for human login.', False),
+             'human login. Only needed for human login. Omitted or null '
+             'leaves the stored value unchanged; send an empty string to '
+             'clear it.', False),
             ('oidc_scopes', 'body', 'string',
              'The OpenID Connect scopes to request at login, as a single '
-             'space separated string. Only needed for human login.', False),
+             'space separated string. Only needed for human login. Omitted '
+             'or null leaves the stored value unchanged; send an empty '
+             'string to clear it.', False),
             ('discover', 'body', 'boolean',
              'Whether to fetch the issuer\'s OpenID Connect discovery '
              'document. Defaults to true.', False)
@@ -1492,16 +1523,41 @@ class AuthIssuerDiscoverEndpoint(api_base.Resource):
         if err:
             return err
 
-        # A stored jwks_uri is never replaced by a discovered one, even
-        # though a refresh is as good a moment as any to notice that
-        # the two differ. The reason is that we cannot tell a value an
-        # operator typed from one a previous discovery run wrote, and
-        # overwriting the first kind is documented as breaking a real
-        # deployment: a provider whose published JWKS path answers with
-        # a redirect to a CDN needs the CDN path configured by hand. An
-        # operator who wants the published value can update the issuer
-        # without one and have discovery fill it in.
-        issuer.record_discovery(jwks_uri, discovered)
+        # The fetch happens outside the lock, as it does on the create
+        # and update paths, because holding a cluster wide lock across
+        # somebody else's network timeout is the worse trade. The write
+        # goes inside it, because record_discovery() names jwks_uri in
+        # its field mask and the value it would write was resolved from
+        # a read taken before the fetch. Interleave this with a PUT
+        # repointing the issuer and that pre-fetch value lands on top of
+        # the one the PUT just committed -- a new issuer_url paired with
+        # the previous provider's key set, which is the exact breakage
+        # _issuer_url_lock() exists to prevent, reached by two
+        # administrators rather than one.
+        with _issuer_url_lock():
+            attrs = issuer.configuration()
+            if not attrs:
+                # Deleted while the provider was being asked.
+                return sf_api.error(404, 'issuer not found')
+
+            # A stored jwks_uri is never replaced by a discovered one,
+            # even though a refresh is as good a moment as any to notice
+            # that the two differ. The reason is that we cannot tell a
+            # value an operator typed from one a previous discovery run
+            # wrote, and overwriting the first kind is documented as
+            # breaking a real deployment: a provider whose published
+            # JWKS path answers with a redirect to a CDN needs the CDN
+            # path configured by hand. An operator who wants the
+            # published value can update the issuer without one and have
+            # discovery fill it in.
+            #
+            # Which is why the value read under this lock decides, not
+            # the one _run_discovery() was given. Where the issuer still
+            # has none, what came back is the published value and fills
+            # it in; where it has one, that one is rewritten unchanged
+            # and nothing a concurrent writer committed is lost.
+            to_write = jwks_uri if attrs.jwks_uri is None else attrs.jwks_uri
+            issuer.record_discovery(attrs, to_write, discovered)
 
         # The write above may have filled in a jwks_uri this issuer did
         # not have. See the update path for why forgetting the cached

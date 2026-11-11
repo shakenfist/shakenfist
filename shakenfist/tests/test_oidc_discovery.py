@@ -210,6 +210,44 @@ class DiscoveryFetchRefusalTestCase(OIDCDiscoveryTestCase):
             exceptions.OIDCDiscoveryFailed, oidc_discovery.fetch, KEYCLOAK)
         self.assertIn('FEDERATION_DISCOVERY_MAX_BYTES', str(e))
 
+    def test_a_dripped_body_is_refused_on_the_transfer_deadline(self):
+        # requests' timeout bounds each read, never the transfer, so a
+        # provider sending one byte just inside the read timeout trips
+        # nothing: the only other bound is the byte cap, and reaching
+        # that one slow read at a time takes days on the defaults. The
+        # clock is driven rather than waited on, so this test is fast
+        # and cannot flake on a loaded machine -- what it proves is that
+        # the loop consults a deadline at all, which is the thing that
+        # was missing.
+        clock = mock.patch.object(
+            oidc_discovery.time, 'monotonic',
+            side_effect=[0.0] + [100.0] * 20)
+        clock.start()
+        self.addCleanup(clock.stop)
+
+        self._serve(_document(KEYCLOAK))
+        e = self.assertRaises(
+            exceptions.OIDCDiscoveryFailed, oidc_discovery.fetch, KEYCLOAK)
+        self.assertIn(
+            'FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS', str(e))
+        self.assertIn('dripped', str(e))
+        # And the connection was returned rather than left held open.
+        self.assertTrue(self.session.response.closed)
+        self.assertTrue(self.session.closed)
+
+    def test_a_prompt_body_does_not_hit_the_transfer_deadline(self):
+        # The same clock, never advanced past the deadline, so the
+        # refusal above cannot pass by refusing every body.
+        clock = mock.patch.object(
+            oidc_discovery.time, 'monotonic',
+            side_effect=[0.0] + [0.1] * 20)
+        clock.start()
+        self.addCleanup(clock.stop)
+
+        self._serve(_document(KEYCLOAK))
+        self.assertEqual(
+            KEYCLOAK + '/jwks', oidc_discovery.fetch(KEYCLOAK)['jwks_uri'])
+
     def test_a_body_which_is_not_json_is_refused(self):
         self._serve(b'<html><body>Sign in</body></html>')
         e = self.assertRaises(
@@ -329,6 +367,49 @@ class DiscoveryDocumentTestCase(OIDCDiscoveryTestCase):
             exceptions.OIDCDiscoveryFailed, oidc_discovery.fetch, KEYCLOAK)
         self.assertIn('authorization_endpoint', str(e))
         self.assertIn('is not https', str(e))
+
+    def test_a_jwks_uri_longer_than_its_column_is_refused(self):
+        # 300 characters: inside the model's declared 1024 and outside
+        # the VARCHAR(255) the column actually is. Before this was
+        # bounded the value reached MariaDB, which either refused it --
+        # a 500 to the administrator, from inside the handler -- or,
+        # with strict mode off, truncated it. A truncated jwks_uri is
+        # signature verification against whatever answers at the
+        # shortened URL, which is the one thing this module exists to
+        # prevent, so this refusal is the point of the check rather
+        # than tidiness about column widths.
+        long_uri = 'https://keycloak.example.com/' + ('k' * 300)
+        self._serve(_document(KEYCLOAK, jwks_uri=long_uri))
+        e = self.assertRaises(
+            exceptions.OIDCDiscoveryFailed, oidc_discovery.fetch, KEYCLOAK)
+        self.assertIn('jwks_uri', str(e))
+        self.assertIn('255 characters', str(e))
+
+    def test_an_endpoint_longer_than_its_column_is_refused(self):
+        # The three endpoint columns are LONGTEXT, so their real limit
+        # is the model's 1024 rather than 255. 2000 characters is over
+        # both, and on the create path it used to raise Pydantic's
+        # ValidationError from inside the handler -- a 500, not the
+        # documented 502 -- while the update path skipped validation
+        # altogether because the model has no validate_assignment. One
+        # refusal here is what makes those two paths agree.
+        long_endpoint = 'https://keycloak.example.com/' + ('a' * 2000)
+        self._serve(_document(KEYCLOAK, authorization_endpoint=long_endpoint))
+        e = self.assertRaises(
+            exceptions.OIDCDiscoveryFailed, oidc_discovery.fetch, KEYCLOAK)
+        self.assertIn('authorization_endpoint', str(e))
+        self.assertIn('1024 characters', str(e))
+
+    def test_an_endpoint_at_its_limit_is_accepted(self):
+        # The boundary in the other direction, so that the refusal
+        # above cannot be satisfied by refusing everything long.
+        at_limit = 'https://keycloak.example.com/' + (
+            'a' * (1024 - len('https://keycloak.example.com/')))
+        self.assertEqual(1024, len(at_limit))
+        self._serve(_document(KEYCLOAK, authorization_endpoint=at_limit))
+        self.assertEqual(
+            at_limit,
+            oidc_discovery.fetch(KEYCLOAK)['authorization_endpoint'])
 
     def test_a_well_formed_document_returns_only_what_we_store(self):
         # The served document carries members a real provider publishes
