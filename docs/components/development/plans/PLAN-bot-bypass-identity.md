@@ -412,8 +412,8 @@ Out of scope:
 |-------|--------|--------|
 | 1. Operator inventory and App creation | Complete | 2a24d00 (#348) |
 | 2. `prune-reviews` mints an App token | Complete | 9f080cd (#354), b3ff906 (#356), 55f554e (#357), 9d1301b (#368) |
-| 3. Move the bypass and enforce it | In progress | |
-| 4. Push audit | Not started | |
+| 3. Move the bypass and enforce it | Complete | e460a2b (#377), 38f15f1 (#380) |
+| 4. Push audit | Complete | |
 
 <!-- shared-block: plan-status-vocabulary v1 -->
 Plan status vocabulary (shared block; do not edit -- the canonical
@@ -2347,17 +2347,676 @@ than reopening them.
 
 ### Phase 4: push audit
 
-Planning effort: medium. The runbook and the ranges are fixed; the
-work is running it.
+Planning effort: medium, as the master plan set it. Review effort:
+medium: the phase changes no code, and its one real risk is an audit
+that reads the wrong range and so reports a clean result over an
+empty diff. Planned on 2026-11-09 (Australian Eastern Daylight Time)
+against `e6e5b31`, on the branch
+`bot-bypass-identity-phase-04-push-audit`. This section replaces the
+sketch the master plan carried for phase 4, whose central premise the
+survey found false.
 
-Run `PUSH-AUDIT.md` once per landing recorded in this repository's
-`Merged` cells, with `AUDIT_RANGE` set as its "How to use this
-runbook" section says. The rollout pull requests in step 2b land in
-other repositories, and each is audited there as part of landing
-it; this phase cites those audits rather than re-running them.
-Phases 1 and 3a land no code anywhere, so the audit of them is a
-review of what this plan recorded against what the GitHub API
-reports on the day the audit runs.
+#### Scope
+
+In: running `PUSH-AUDIT.md` over the seven landings this plan
+recorded in this repository; auditing the eight rollout landings in
+other repositories against the floor the `plan-push-audit-phase`
+block defines, because no per-repository audit exists to cite; the
+record of what the audit found; and this phase's own close-out.
+
+Out: re-running six other repositories' runbooks, which the block
+forbids ("a runbook is written for one repository's blast radius");
+fixing what the audit finds, which lands as its own pull request
+after this one merges; the deferrals already in Future work (#352,
+the team rule behind open question 3, narrowing
+`DEPENDENCIES_TOKEN` and `RENOVATE_TOKEN`), which are recorded
+deferrals rather than findings; and `tools/review-tracking.sh`'s
+drift from its template, which predates the plan (survey item 7).
+
+#### What the survey found
+
+Read on 2026-11-09 AEDT against the tree at `e6e5b31` and the GitHub
+API. The sketch for this phase was three paragraphs, and one of them
+was wrong; it is corrected at source rather than only here.
+
+1. **No rollout pull request was push-audited, so there is nothing
+   to cite.** The sketch said the step 2b and 2c pull requests are
+   "audited there as part of landing it" and that "this phase cites
+   those audits rather than re-running them". For each of andris#65,
+   andris#66, hunkydory#146, ryll#677, kerbside#693, actions#233,
+   sfui#66 and kerbside-client#15, `gh pr view <n> --repo
+   shakenfist/<r> --json body,comments` mentions no push audit at
+   all. The convention in `plan-push-audit-phase` was not followed
+   when those pull requests landed, and nothing can now be cited for
+   them. Decision 2 says what this phase does instead.
+2. **kerbside-client has no runbook.** A read of
+   `repos/shakenfist/<r>/contents/PUSH-AUDIT.md` answers 404 for
+   kerbside-client and returns a file for andris, hunkydory, ryll,
+   kerbside, actions and sfui. So even in principle
+   seven of the eight could have been audited and the eighth could
+   not.
+3. **Every rollout copy is byte-identical to the template this
+   repository audits.** `template-resync status review-tracking`
+   against `origin/main` reports actions, andris, hunkydory,
+   kerbside, kerbside-client, ryll and sfui all `in sync` on
+   `.github/workflows/prune-reviews.yml` and
+   `tools/ci-prune-reviews.sh`, which are the two files every
+   rollout pull request carried. The content of those eight landings
+   is therefore the template, which phases 2a and 2b of this plan
+   landed here and which wave 1 and wave 2 read directly.
+4. **All seven landings recorded in this repository are merge
+   commits**, so each reads as `<sha>^1..<sha>` with no caret
+   ambiguity:
+
+   | Phase | Range | Files | Diff |
+   |-------|-------|-------|------|
+   | 1 | `2a24d00^1..2a24d00` (#348) | 3 | +804 -65 |
+   | 2a | `9f080cd^1..9f080cd` (#354) | 10 | +852 -187 |
+   | 2 (rollout) | `b3ff906^1..b3ff906` (#356) | 3 | +45 -23 |
+   | 2 (proxy) | `55f554e^1..55f554e` (#357) | 5 | +59 -6 |
+   | 2 (record) | `9d1301b^1..9d1301b` (#368) | 1 | +38 -6 |
+   | 3a and 3c | `e460a2b^1..e460a2b` (#377) | 9 | +1090 -24 |
+   | 3b | `38f15f1^1..38f15f1` (#380) | 2 | +122 -47 |
+
+   Nineteen distinct paths across the seven, which decision 1 uses
+   to build the net-effect diff. The count read seventeen when this
+   phase was planned; 4a measured it again and it is nineteen.
+5. **Phase 1 landed documentation only**, as the sketch said:
+   `2a24d00` touches `docs/consistency-audits.md`,
+   `docs/plans/PLAN-bot-bypass-identity.md` and
+   `docs/plans/index.md`, and nothing else. 3a landed no code
+   either, but it shares `e460a2b` with 3c, which landed the
+   criterion, so the two are audited as one range rather than
+   separately.
+6. **`PUSH-AUDIT.md` is as the sketch assumes.** It carries "How to
+   use this runbook" with the `AUDIT_RANGE` rules the sketch cites,
+   a mechanical wave 1, and a wave 2 of four independent sub-agents:
+   2a code quality and 2b test review and 2c documentation review at
+   sonnet and medium effort, 2d security review at opus and high
+   (the runbook's own `Model` and `Effort` rows). It also warns, at
+   length, that a brief handed to a sub-agent with
+   `${AUDIT_RANGE:-origin/main...HEAD}` left in it expands to the
+   default in that agent's shell, which against landed work is an
+   empty diff that reads as a clean review.
+7. **One `template-resync` report is not a finding.** That same
+   status run says this repository is "1 of 3 off:
+   tools/review-tracking.sh differs" from its own template. Both
+   copies last changed in `3d50a6b` (2026-10-24), before phase 1
+   landed; no range in item 4 touches the file; the difference is
+   comment prose only; and the `review-tracking-templates` criterion
+   reports development compliant on the current compliance page. It
+   is outside this plan and no issue is filed for it.
+
+#### Decisions
+
+1. **Wave 1 runs once per range; wave 2 reads all seven ranges and a
+   net-effect diff.** The `plan-push-audit-phase` block requires the
+   accumulated diff of every phase, "not the diff of the last phase
+   alone", because the interesting defects are what the phases did to
+   each other. After merging there is no single range that spans the
+   plan without also spanning unrelated work, so wave 2 is given both
+   halves: the seven per-range diffs, which keep each change
+   attributable, and one net-effect diff restricted to the nineteen
+   paths the plan touched,
+   `git diff 2a24d00^1..e6e5b31 -- <the nineteen paths>`, which shows
+   the state those files ended in. A defect that only exists once two
+   phases have landed appears in the second.
+2. **The eight out-of-repository landings are audited here against
+   the block's floor, not by running six runbooks.** Survey items 1
+   to 3: there is no audit to cite, the convention was missed at
+   landing time, and borrowing another repository's runbook is
+   forbidden. Re-running six runbooks now would audit six
+   repositories' own histories rather than this plan's change, and
+   the change itself is two files that `template-resync` proves
+   byte-identical to the template audited here. So this phase applies
+   the five-item checklist in `plan-push-audit-phase` to those eight
+   landings, cites the byte-identity check and each repository's
+   first `prune-reviews` run from phase 2's record as the behavioural
+   proof, and records the deviation plainly. This is the decision a
+   reviewer is most likely to disagree with, and the counter-argument
+   is real: the block says those pull requests are audited in their
+   own repositories, and this phase is choosing a floor instead of
+   the thing the convention asked for.
+3. **The missed audits are recorded as a deviation, not filed as an
+   issue.** They are this plan's own omission rather than a problem
+   that predates it, so the record names them; filing an issue to
+   audit eight already-merged template copies would create work
+   nobody will do against a change `template-resync` already
+   verifies continuously, through the `review-tracking-templates`
+   criterion.
+4. **Findings land in a follow-up pull request.** The block and the
+   `plan-phase-landing` block agree: this phase closes itself out,
+   and where it finds something, the fix lands afterwards in a pull
+   request that records this phase's merge commit and marks the plan
+   `Complete`. Where it finds nothing, this phase's own pull request
+   sets `Status` to `Complete` with no `Merged` cell, which is the
+   one row permitted to omit one.
+5. **Wave 2's briefs carry concrete ranges, substituted by the
+   management session.** Survey item 6: the runbook's own warning.
+   Each brief names its ranges literally, and every agent is required
+   to report the insertion and deletion totals it measured. A report
+   whose totals do not match the ranges is re-run rather than
+   triaged.
+
+#### Steps
+
+| Step | Effort | Model | Isolation | Brief for sub-agent |
+|------|--------|-------|-----------|---------------------|
+| 4a | medium | opus | none | Management session, inline, no sub-agent: wave 1 of `PUSH-AUDIT.md`. `git fetch origin` first, then run every wave 1 command once per range in survey item 4's table, with `AUDIT_RANGE` exported to that range for each pass, plus `pre-commit run --all-files` and `python3 -m unittest discover -s scripts/tests -t scripts` once on the branch. Record each command's result per range in a table, not as a summary: a grep that matched nothing is a result. Wave 2 is only worth running if wave 1 passes, so stop and report if it does not. |
+| 4b | medium | sonnet | none | Section 2a of `PUSH-AUDIT.md`, code quality, read-only. Substitute the seven concrete ranges from survey item 4 and the net-effect diff from decision 1 into the brief; do not leave `${AUDIT_RANGE:-origin/main...HEAD}` in it. Report the insertion and deletion totals measured per range. |
+| 4c | medium | sonnet | none | Section 2b of `PUSH-AUDIT.md`, test review, read-only, with the same range substitution and the same totals requirement. The tests this plan added are `scripts/tests/test_github_config.py`'s `BypassActorIdentityTest` (eighteen cases) and `scripts/tests/test_ci_prune_reviews.py`'s changes; the question is which properties would survive a regression, not whether the suite passes. |
+| 4d | medium | sonnet | none | Section 2c of `PUSH-AUDIT.md`, documentation review, read-only, same substitution and totals. In scope: `docs/audits/bypass-actor-identity.md`, `docs/audits/README.md`, `docs/code-review-tracking.md`, `docs/consistency-audits.md`, `templates/review-tracking/README.md`, this plan and `PLAN-workflow-ref-trust.md`. The specific question this plan raises is whether any fact about the App, the environment, the key or who pushes is stated differently on two pages. |
+| 4e | high | opus | none | Section 2d of `PUSH-AUDIT.md`, security review, read-only, same substitution and totals. This plan moved a bypass identity, so the brief adds: whether anything the diff landed lets a non-default-branch workflow read `REVIEW_MARKS_APP_KEY` or mint a token, whether any token value, key or private hostname entered the repository, and whether the criterion added in 3c can report compliant when it cannot actually read what it claims to measure. |
+| 4f | medium | opus | none | Management session, inline: the five-item checklist in the `plan-push-audit-phase` block applied to the eight out-of-repository landings in phase 2's rollout table (decision 2). For each: the form of the recorded landing, whether anything it added runs unattended and reports its own failure, that no secret or private hostname entered it, that nothing it removed has a consumer left, and whether a broken change fails closed. Cite `template-resync status review-tracking` for byte-identity and each repository's first `prune-reviews` run from phase 2's record for behaviour. One verdict per item per repository, or one sentence saying why an item does not apply. |
+| 4g | medium | opus | none | Management session, inline: the record and the close-out. Write what each wave found into the Record below, including "nothing" where that is the result, which the block says is worth one sentence. Then set this phase's `Status` to `Complete` in the Execution table and the plan's row in `docs/plans/index.md`, with no `Merged` cell (decision 4), and record the deviation in decision 2 and the open deferrals so the next reader finds them. |
+
+#### Record
+
+Read on 2026-11-09 (planning) and 2026-11-11 (execution) AEDT against
+this branch, whose base `e6e5b31` is the endpoint every range below is
+measured to. Nothing that landed on `main` between `e6e5b31` and the
+audit touches any of the plan's nineteen paths -- `git log
+e6e5b31..origin/main` restricted to them is empty -- so the pinned
+endpoint is still the state the plan left behind, and the audit is not
+reading a stale tree.
+
+**Wave 1 (4a).** `git fetch origin` ran first. Each of the runbook's
+fourteen grep checks then ran once per range, with the range written
+into the command rather than left to a variable, from one generated
+script holding the seven ranges as a literal list. The matrix below
+holds one cell per range per check -- the same coverage as a row per
+range per command, in a form a reader can scan -- and each cell is the
+number of output lines that check produced. A zero is a result: the
+check ran and matched nothing.
+
+| Range | >120 | >800 | imp | compl | spec | froz | title | retd | blk | blkv | todo | supp | plan | docs |
+|-------|------|------|-----|-------|------|------|-------|------|-----|------|------|------|------|------|
+| `2a24d00^1..2a24d00` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 |
+| `9f080cd^1..9f080cd` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 |
+| `b3ff906^1..b3ff906` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 |
+| `55f554e^1..55f554e` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
+| `9d1301b^1..9d1301b` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 |
+| `e460a2b^1..e460a2b` | 0 | 2 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
+| `38f15f1^1..38f15f1` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
+
+The columns, in the runbook's order: added Python lines over 120
+characters; touched source files over 800 lines; added `import` or
+`from` lines; added lines in the generated compliance page; a
+generated block or status table in a criterion spec; the frozen
+issue-title list; `issue_title` in a check; the retired-title list;
+shared-block files touched; shared-block version headers added; TODO,
+FIXME, HACK or XXX; new `noqa` or `type: ignore`; plan references
+added outside markdown; and documentation touched at all, which warns
+when it is zero and never was.
+
+`pre-commit run --all-files` passes on the branch: actionlint over the
+workflows and over the shipped templates, the template lint,
+shellcheck, flake8, skillsaw, the audit package and script tests, and
+the review tracking tests, every hook `Passed`. `python3 -m unittest
+discover -s scripts/tests -t scripts` runs 2545 tests in 65s, `OK`.
+
+Two cells are not zero, and both were looked at rather than accepted.
+In `e460a2b^1..e460a2b`, the file-length check names
+`scripts/tests/test_github_config.py` at 1386 lines and
+`scripts/audit/checks/github_config.py` at 964 -- both past the
+`source-file-size` block's 800-line "ask the question" threshold and
+well short of the 1500 that wants a stated reason, which is what the
+check exists to surface; 4b's judgement on them is below. The same
+range adds one `issue_title`, `'Bypass actor identity'`, which is a
+new criterion's title rather than a rename, so it orphans nothing. The
+frozen-list check reports zero there because its pattern catches a
+renamed or removed entry and not an added one, so the pairing was read
+by hand instead: the check's `issue_title` and
+`scripts/tests/test_metadata.py`'s `'bypass-actor-identity': 'Bypass
+actor identity'` are the same string, and the fleet-wide idempotency
+key is therefore intact.
+
+One zero is worth a sentence too, because it is the surprising one.
+The added-import check reports nothing in `e460a2b^1..e460a2b`, the
+range that added a criterion, its registration and eighteen test cases
+across nine files. It is a true zero rather than a grep that matched
+the wrong thing: the check and its tests went into
+`scripts/audit/checks/github_config.py` and
+`scripts/tests/test_github_config.py`, which both already existed, and
+that module already imports everything the new check uses -- `json`,
+`re`, `subprocess`, `urllib.parse`, `audit.scope`, and `Check` with
+`ToolFailure`. The criterion adds no dependency, which is what the
+check is there to notice.
+
+**Wave 2 (4b to 4e).** Four read-only agents, run in parallel because
+none of them writes to the tree. Every brief named its seven ranges
+literally and carried the net-effect diff as a written-out command; no
+brief, as sent, contained the name of the range variable, which is the
+failure the runbook warns about at most length. Each agent was
+required to report the insertion and deletion totals it measured. All
+four matched survey item 4 range for range; 4b and 4e matched the
+nineteen-path net-effect total as well, and 4c matched the narrower
+test-and-script net effect it was given. None was re-run.
+
+| Step | Section | Model | Effort | Totals | Findings |
+|------|---------|-------|--------|--------|----------|
+| 4b | 2a code quality | sonnet | medium | all 7 ranges and the net effect matched | 0 blocking, 3 advisory |
+| 4c | 2b test review | sonnet | medium | all 7 ranges matched; net effect over the 6 test and script paths, 6 files +521 -53 | 0 blocking, 3 advisory (one per surviving mutation) |
+| 4d | 2c documentation | sonnet | medium | all 7 ranges matched | 0 blocking, 1 advisory |
+| 4e | 2d security | opus | high | all 7 ranges and the net effect matched | none at any severity |
+
+The net-effect diff is `git diff 2a24d00^1..e6e5b31` restricted to the
+nineteen paths: 19 files, +2977 -300. 4d's documentation scope gained
+`.claude/skills/review-tracking-adoption/SKILL.md`, which step 4d's
+brief in the step table omits and which phase 2a changed; the step's
+own list was otherwise followed.
+
+**What the audit found.** Six findings, none blocking, all in work
+this plan added. They are listed in the order a reader should care
+about them, each verified in this session against the tree rather than
+taken from an agent's report, and all six land in the follow-up pull
+request under decision 4.
+
+1. **The specification states a fact the plan's own measurement
+   contradicts.** `docs/audits/bypass-actor-identity.md` says, of the
+   `sf-can-skip-merge-queue` team bypass, that `sfconductor` "pushes
+   to the default branches of shakenfist, ryll and client-python-k3s
+   through it". Two things are wrong with that sentence. The
+   repository list does not match either measurement in this plan:
+   phase 1's bypass table has seven rows and five non-zero
+   `sfconductor` cells (shakenfist 52, kerbside 7, ryll 1, instar 1
+   and client-python-k3s 2, with andris and hunkydory at zero), so it
+   names two repositories the specification leaves out, and phase
+   3a's pre-flight names two for the no-App set, "shakenfist, all 66;
+   client-python-k3s, 3 of 5", with ryll listed among the repositories
+   that hold the App. And the verb is wrong: phase 1 records that
+   "`sfconductor`'s bypasses are pull request merges that skip the
+   queue", not pushes to a default branch. The fix is to drop the list
+   and the verb in favour of what was measured, or to quote the table.
+   Introduced by `e460a2b`; the file is new in that range. It leads
+   because it is a published specification stating a measured fact
+   wrongly, which is the kind of defect this audit exists to find. It
+   carries no human review mark yet -- the page is in scope for
+   whole-file review and has no `REVIEWS.md` row, having been added on
+   2026-11-08 -- so the follow-up's edit stales nothing, and fixing it
+   before anyone reads it for a mark is strictly cheaper than fixing
+   it after.
+
+2. **Three properties of the new criterion are not pinned by its
+   tests.** `BypassActorIdentityTest` has eighteen cases and the suite
+   passes, but three single-edit mutations of
+   `scripts/audit/checks/github_config.py` leave all 133 tests in
+   `test_github_config.py` passing. Each was reproduced independently
+   in this session on a `git archive` copy, never in the worktree.
+   Each consequence below is what the mutated code would do rather
+   than what the audit does today: the shipped `GLOB_CHARACTERS` is
+   `*?[]` and the shipped rule test admits only `pull_request`, so
+   none of this is a live mis-report on the compliance page. Narrowing
+   `GLOB_CHARACTERS` from `*?[]` to `*` survives, and under that
+   mutation a policy named `develop?` or `dev[a-z]` would pass
+   unnoticed, because the only wildcard case is a policy named
+   `develop*`.
+   Dropping the `protected_branches is not False` half of the policy
+   condition survives, because `test_protected_branches_true_fails`
+   also sets `custom_branch_policies` to False and the other half
+   catches it, leaving True with True unexercised. And widening the
+   rule-type test from `pull_request` to also admit `merge_queue`
+   survives, because no fixture reaches the rules read with a
+   merge-queue rule and no pull-request rule: the two
+   environment-absent cases answer `[]` and `[{"type":
+   "pull_request"}]`, built by hand, and the `answers()` helper that
+   does default to both rule types is only used by tests that take the
+   environment-present path, which never reads the rules at all. A
+   default branch with a merge-queue rule and no pull-request rule,
+   with no environment, is therefore untested, and would be reported
+   as protected rather than skipped. The three are
+   one class of gap -- each fixture carries the whole happy-path
+   shape, so a predicate weakened to accept a superset is not caught
+   -- and the fix is three cases, not three rewrites.
+
+3. **The criterion decides not-applicable in `run()` rather than in
+   `applies(repo)`.** `docs/consistency-audits.md` line 471 asks for
+   the applicability test in `applies(repo)`, and the sibling checks
+   in the same module do that. Here the verdict needs the branch-rules
+   API call, so moving it would mean calling that endpoint twice or
+   caching it; the reasonable resolution is to leave it where it is
+   and say why in a line of comment. Advisory.
+
+4. **Two touched files are past the length threshold.**
+   `scripts/audit/checks/github_config.py` is 964 lines, up 200 from
+   764 on 211 added and 11 removed in `e460a2b`, and
+   `scripts/tests/test_github_config.py` is 1386, up 195 from 1191.
+   Both are over 800 and under 1500, so the block asks the
+   question rather than wanting an answer. A seam exists and is the
+   obvious one: one check and its tests per module. Advisory, and a
+   question rather than a defect.
+
+5. **The mint-step tests assert on exact YAML text.** The
+   `test_the_push_token_is_minted_*` cases in
+   `scripts/tests/test_ci_prune_reviews.py` match literal strings
+   including indentation rather than parsing the workflow, so
+   reflowing the YAML breaks them without any behaviour changing. They
+   do cover the properties that matter -- no `owner` or `repositories`
+   input, no `app-id` left in the clear, the secret named exactly
+   twice -- so this is about their durability, not their reach.
+   Advisory.
+
+6. **Security found nothing.** 2d looked for a privileged trigger, a
+   widened `permissions:`, a token in a command line or a file,
+   attacker-controlled text reaching a shell or `gh`, a template
+   weakness propagating fleet-wide, a change to the issue-filing path,
+   and a path built from external data; none of those classes is
+   touched by any range. `review-marks` is named by exactly one
+   workflow in the fleet and its byte-identical template; the triggers
+   are `push`, `schedule` and `workflow_dispatch`, with no
+   `pull_request`, `pull_request_target` or `workflow_run` anywhere,
+   so the fork and privileged-trigger classes do not arise. The token
+   is minted per run, repository-scoped with no `owner` or
+   `repositories` input, `contents: write` only, from an action pinned
+   to a commit sha, and reaches `git` solely through a config value
+   rather than a command line. Every ambiguity in the criterion is an
+   error rather than a verdict, including the one that matters most: a
+   404 on the environment is resolved against the environment listing,
+   and a listing that names the environment, or that does not answer,
+   raises rather than reporting absence -- which is the "token
+   regressed, whole fleet green" failure this criterion exists to
+   prevent. Every added and removed line was scanned for key, token,
+   JWT and cloud-credential shapes, for added e-mail addresses, and
+   for RFC1918 addresses and private hostnames, with no hits: 3368
+   lines across the seven ranges and 3277 in the net-effect diff, both
+   reconciling with survey item 4's table and with the net-effect
+   total above.
+
+**Declined in writing.** Five things were raised and are not findings
+against this change. The criterion does not measure a ruleset's
+`bypass_actors` at all, which 2b and 2d both noticed and the
+specification states twice as a deliberate limit: the audit's read
+token cannot see that field, so actor types are confirmed by a
+reviewer instead. The runner-controller App `shakenfist-k3s-ci-arc`
+holding `administration: write` on hunkydory, which could widen that
+environment's policy, is already recorded as an accepted residual in
+the specification; the plan raised what it is worth without creating
+it. `GET /rules/branches/<branch>` omits rules the caller can bypass,
+so the pass-versus-not-applicable split on one path depends on the
+read token holding no bypass -- both outcomes there are non-failing,
+so it cannot produce a false compliant on the dangerous side.
+`tools/review-tracking.sh`'s drift from its template predates the
+plan, as survey item 7 recorded. And `ci_workflows.py` and
+`packaging.py` being over 1500 lines is backlog that no range in this
+plan touches.
+
+**The out-of-repository floor (4f).** Decision 2's floor, the
+five-item checklist in the `plan-push-audit-phase` block, applied to
+the eight landings in phase 2's rollout table that are in other
+repositories. The columns are the block's items in order.
+
+| Landing | 1 form | 2 unattended | 3 secrets | 4 consumers | 5 fails closed |
+|---------|--------|--------------|-----------|-------------|----------------|
+| andris#65, `dcdee41` | merge, 2 parents | pass | pass | pass | pass, demonstrated |
+| andris#66, `d7f6d42d` | merge, 2 parents | pass | pass | pass | pass |
+| hunkydory#146, `a901d7a9` | merge, 2 parents | pass | pass | pass | pass |
+| ryll#677, `c3253fa5` | merge, 2 parents, bundled | pass | pass | pass | pass |
+| kerbside#693, `d96b2a25` | merge, 2 parents | pass | pass | pass | pass |
+| actions#233, `ff0edf18` | merge, 2 parents, bundled | pass | pass | pass | pass |
+| sfui#66, `e902e7aa` | merge, 2 parents, bundled | pass | pass | pass | pass |
+| kerbside-client#15, `3837549f` | merge, 2 parents | pass | pass | pass | n/a |
+
+**Item 1, the form of the landing.** All eight `Merged` cells hold a
+commit that `gh api repos/shakenfist/<r>/commits/<sha>` reports with
+two parents, so each reads as `<sha>^1..<sha>` with no caret
+ambiguity, and none of them records a branch commit where a merge
+belongs -- the mistake the block warns about and an earlier plan's
+audit found. andris#65's cell carries two extra shas, `eb5278f` and
+`003665c`; both are single-parent commits on the branch, and the
+`Merged` sha `dcdee41` is the merge, so the record is right and the
+parenthetical is context. Three landings bundled unrelated work:
+ryll#677 came in with consistency fixes touching seven files,
+actions#233 and sfui#66 each with a Renovate workflow change. Their
+recorded range is therefore wider than this plan's change, which is
+worth knowing before anyone audits those ranges as if they were this
+plan's. kerbside#693's merge commit returns no file list from the
+commits endpoint, so its two files were read from
+`repos/shakenfist/kerbside/pulls/693/files` instead.
+
+**Item 2, unattended work reporting its own failure.** The workflow
+each landing installs runs on a push to the default branch, on a daily
+`schedule` at 04:23, and on `workflow_dispatch`. It carries no
+`continue-on-error`, so a failure is a red run against the commit that
+caused it and on the repository's Actions tab, and nothing pages
+anyone. That it is enough is not an assumption here: andris's first
+run, 41183486988, answers `failure` from the API today, and the plan's
+own phase 2 record shows that failure being found and fixed by
+andris#66 within a day. The daily consistency audit is the backstop,
+since marks going stale unnoticed is what its review-coverage
+criterion measures.
+
+**Item 3, no secret or private hostname.** The two files are
+byte-identical to the template audited in wave 1 and wave 2, where
+every added and removed line was scanned for credential shapes with no
+hits.
+Neither file contains an RFC1918 address, a `.home`, `.local` or
+`.internal` name, or any hostname: the only identifiers in them are
+secret and variable names, which is what a workflow is supposed to
+hold. The runner is selected by the labels `self-hosted, vm,
+debian-13, s`, which name a pool rather than a host.
+
+**Item 4, nothing removed has a consumer left.** Six of the eight
+landings remove the same line, `PUSH_TOKEN: ${{
+secrets.DEPENDENCIES_TOKEN || github.token }}`, replacing the bot's
+personal access token with the App token and a `github.token`
+fallback; andris#66 is the small re-sync that followed andris#65, and
+kerbside#693's patch was read through the pull request's file list.
+The grep the block asks for, rather than the assumption: `gh search
+code --owner shakenfist "DEPENDENCIES_TOKEN"` returns no
+`prune-reviews.yml` in any repository, so no copy of the workflow
+still asks for the secret. The secret itself keeps six live consumers
+in three repositories -- `code-formatting.yml` in shakenfist and
+client-python, `pin-indirect-dependencies.yml` in shakenfist and
+kerbside, and `functional-tests.yml` and `sync-external-docs.yml` in
+shakenfist -- which is the narrowing this plan deferred rather than a
+loose end it left. The search indexes default branches and can lag,
+which is the limit of that evidence.
+
+**Item 5, a broken change fails closed.** None of the eight landings
+touches a release, package or image path; what the change publishes is
+a commit of review marks to the default branch. A broken one pushes
+nothing rather than pushing something wrong: the mint step is guarded
+on the key being present, the fallback is `github.token`, and a
+refused push leaves the branch as it was. That is demonstrated rather
+than argued -- andris#65's first run failed at the token step and the
+plan's record reads "none: nothing pushed". kerbside-client#15 is
+marked not applicable because that repository keeps the `github.token`
+path and mints nothing, so there is no failure mode of this change to
+fail closed on.
+
+**The deviation, recorded as decision 2 requires.** The
+`plan-push-audit-phase` block says a phase landing in another
+repository is audited there and cited here. That did not happen for
+any of the eight: `gh pr view` on each of andris#65, andris#66,
+hunkydory#146, ryll#677, kerbside#693, actions#233, sfui#66 and
+kerbside-client#15 mentions no push audit in its body or comments, and
+kerbside-client has no `PUSH-AUDIT.md` to have run, so even in
+principle seven of the eight could have been audited and the eighth
+could not. The convention was missed when those pull requests landed,
+and nothing can now be cited for them. What was done instead is the
+floor above, plus the byte-identity proof: `template-resync status
+review-tracking`, run on 2026-11-11 against `origin/main` at
+`bcd768d`, reports actions, andris, hunkydory, kerbside,
+kerbside-client, ryll and sfui all `in sync` on
+`.github/workflows/prune-reviews.yml` and `tools/ci-prune-reviews.sh`,
+so the content of those eight landings is the template that wave 1 and
+wave 2 read directly here; and each repository's first `prune-reviews`
+run, recorded in phase 2's rollout table with the push actor it
+produced, is the behavioural proof. The counter-argument stands as
+decision 2 stated it: a floor was chosen where the convention asked
+for a runbook. Mikal was back briefed on exactly that on 2026-11-11
+and confirmed the floor, the byte-identity proof, and recording this
+as a deviation rather than filing an issue for it.
+
+**Still open after this phase.** Four things this plan deferred rather
+than finished, none of them a finding of this audit: #352, a read-only
+App identity for the audit's own reads; the team rule behind open
+question 3, which is what `sfconductor` should push with; narrowing
+`DEPENDENCIES_TOKEN` and `RENOVATE_TOKEN`, whose six remaining
+workflow consumers item 4 above names. The first three are Future work
+entries. The fourth is not: the bot's token list is the one cell of
+phase 1's record still pending an operator paste, plan-blocker b2, and
+it is recorded there rather than in Future work.
+
+This phase closes itself out, so it sets its own `Status` to
+`Complete`. Its `Merged` cell is empty in this pull request for the
+ordinary reason rather than the special one: a phase cannot record its
+own merge commit. The `plan-phase-landing` block's permission to leave
+that cell empty for good belongs to an audit that finds nothing, where
+there is no carrier; this one found six things, so the follow-up pull
+request that fixes them is the carrier, and it fills the cell and
+marks the plan `Complete`.
+
+#### Execution notes
+
+- 2026-11-09 AEDT: planned, and phase 3 closed out in the same
+  branch's first commit.
+
+- 2026-11-11 AEDT: back brief answered. Decision 2 stands -- the floor
+  plus the byte-identity proof, not six runbooks after the fact -- and
+  so do decisions 3 and 4. This session was given permission to push
+  the branch and open the pull request without asking again, so it
+  did.
+
+- Wave 1's record is a matrix of range against check rather than one
+  row per range per command. It holds the same cell for every pair; a
+  ninety-eight-row list would hold no more and be read by nobody.
+
+- Survey item 4 undercounted the paths the plan touches. It said
+  seventeen; `git diff --name-only` over the seven ranges, sorted
+  unique, is nineteen. Corrected at the source, with the old count
+  named so a reader who saw it is not left wondering. The net-effect
+  diff was built from the measured nineteen, so nothing downstream
+  read the wrong number.
+
+- Step 4d's brief in the step table omits
+  `.claude/skills/review-tracking-adoption/SKILL.md`, which phase 2a
+  changed and which is documentation. It was added to that step's
+  scope rather than left out.
+
+- Four claims reached the record before being derived, and the two
+  review rounds on this phase's own pull request caught three of them.
+  2d gave the size of its credential scan as 4160 diff lines, which
+  reconciles with nothing here: the seven ranges hold 3368 added and
+  removed lines and the net-effect diff 3277. 2a gave the growth of
+  `scripts/audit/checks/github_config.py` as 222 lines, where `git
+  diff --numstat` says 211 added and 11 removed, so 200 net from 764.
+  The record then explained one surviving mutation by saying the
+  environment-absent fixture carries both rule types, which it does
+  not: that default belongs to a helper only the environment-present
+  tests use. And finding 1 said the specification carries a human
+  review mark, where `REVIEWS.md` has no row for a page added on
+  2026-11-08. Two came from sub-agent reports and two were the
+  management session's own, so the pattern is not that agents are
+  unreliable: it is that a figure or a mechanism is cheap to restate
+  and costly to check, and this record restated several before
+  checking them. All four now say what was measured, and the first
+  instance in this plan was a review's claim about which commits were
+  reachable from this repository.
+
+- 4b, 4c, 4d and 4e ran in parallel, which the step table allows
+  because all four are read-only. 4c was the only one to write
+  anything at all, a `git archive` copy in its own scratch directory,
+  and the worktree was confirmed clean after each.
+
+- The three surviving mutations 4c reported were reproduced in the
+  management session before being recorded, on a separate copy of the
+  tree, because a mutation result is the one part of a test review
+  that is cheap to get wrong and expensive to believe. All three
+  survived again. 4d's one contradiction and 4b's convention finding
+  were likewise checked against the files and the lines they name.
+
+#### Risks and mitigations
+
+1. **An empty diff reads as a clean audit.** The failure this
+   runbook warns about at most length: a sub-agent inherits nothing,
+   so an unsubstituted `${AUDIT_RANGE:-origin/main...HEAD}` expands
+   to the default in its own shell, which against landed work is
+   empty. Mitigation, checked by the management session before each
+   brief is sent and again on each report: the brief names its
+   ranges literally, and the report states measured insertion and
+   deletion totals that must match (decision 5). A mismatch is
+   re-run, not triaged.
+2. **The wrong range form silently narrows the audit.** Every
+   landing here is a merge commit, so all seven use
+   `<sha>^1..<sha>`; a bare `A..B` would drop `A`. Mitigation:
+   survey item 4's table is the only source of ranges, and 4a reads
+   it rather than deriving ranges again.
+3. **The out-of-repository floor misses something a runbook would
+   have caught.** Decision 2 accepts this. Mitigation: the floor is
+   applied explicitly rather than skipped, byte-identity is proven
+   by a tool rather than asserted, and the deviation is recorded
+   where the next reader will find it, so the choice can be
+   revisited rather than discovered.
+4. **The audit becomes a rewrite.** A judgement agent reading a
+   plan this size will find prose it would have written differently.
+   Mitigation: 4g records findings; fixes land in a follow-up pull
+   request (decision 4), and a finding that is only a preference is
+   declined in writing rather than actioned.
+5. **The follow-up pull request never lands.** Six findings, this
+   phase's `Merged` cell and the plan's path to `Complete` all depend
+   on a pull request that does not exist when this one merges.
+   Mitigation, and it is deliberately outside the plan file, because a
+   plan cannot remind anyone to read it: the plan's index row stays
+   `In progress` while the findings are unresolved, which keeps it out
+   of the retirement candidates, since those are the plans whose
+   status is terminal; and the next action is recorded with
+   `plan-blockers` against this plan, which is what surfaces at
+   session start in this repository. The `plan-index` criterion is not
+   a guard here -- it polices the status vocabulary rather than
+   whether the status is true, and would accept this row flipped to
+   `Complete` with every finding still open. Neither mitigation
+   depends on someone reopening this section.
+
+#### Definition of done
+
+Every item is checked by the management session from the commands
+and the record, not from a sub-agent's summary.
+
+* Wave 1 has run once per range for all seven ranges in survey item
+  4, and the Record holds a count for every range and command pair,
+  including the pairs that matched nothing, as rows or as a matrix.
+* `pre-commit run --all-files` passes on the branch, and `python3 -m
+  unittest discover -s scripts/tests -t scripts` passes.
+* Each of 4b, 4c, 4d and 4e has reported, and each report's measured
+  insertion and deletion totals match the ranges it was given. Any
+  report that did not match was re-run, and the Record says so.
+* No wave 2 brief, as sent, contains the string `AUDIT_RANGE`.
+* The Record holds five checklist verdicts for each of the eight
+  out-of-repository landings, or a sentence saying why an item does
+  not apply.
+* `template-resync status review-tracking` reports every adopter in
+  sync on `.github/workflows/prune-reviews.yml` and
+  `tools/ci-prune-reviews.sh`, and the Record cites that run.
+* The Record says what the audit found, or in one sentence that it
+  found nothing.
+* This phase's `Status` is `Complete` in the Execution table, the
+  plan's index row describes phase 4 as complete, and this phase's
+  `Merged` cell is empty in this pull request because a phase cannot
+  record its own merge commit. The follow-up pull request fills it.
+* Every finding is either fixed in a follow-up pull request, which
+  records this phase's merge commit and marks the plan `Complete`,
+  or declined in writing in this section.
+* The deviation in decision 2 is recorded in this section, and the
+  deferrals still open (#352, the team rule behind open question 3,
+  the `DEPENDENCIES_TOKEN` and `RENOVATE_TOKEN` narrowing, and the
+  bot's token list, which is phase 1's pending record cell under
+  plan-blocker b2 rather than a Future work entry) are named where the
+  next reader will find them.
+
+#### Back brief
+
+Before 4a, back brief Mikal on decision 2, which is the one with a
+real counter-argument: the `plan-push-audit-phase` block says the
+rollout pull requests are audited in their own repositories as part
+of landing, that did not happen for any of the eight, and this phase
+proposes the block's floor plus a byte-identity proof rather than
+running six repositories' runbooks after the fact. The alternative is
+to run them, which is six runbooks against six histories for a
+two-file template copy. Also confirm decision 3, that the missed
+audits are a recorded deviation rather than a new issue, and that
+findings land in a follow-up pull request rather than growing this
+one (decision 4).
 
 ## Agent guidance
 

@@ -153,7 +153,11 @@ vhdx** only. qemu-img can additionally *create* vdi / parallels / qcow (v1) /
 qed images; instar refuses those by scope, not by inability (note 15).
 For vmdk, `create` and convert output write monolithicSparse,
 streamOptimized and monolithicFlat; neither writes the split
-twoGbMaxExtent subformats.
+twoGbMaxExtent subformats. For vhdx, `create` and convert output write
+both dynamic and fixed (`--subformat fixed`). On vmdk, vpc and vhdx,
+`-o preallocation` accepts `off`, `falloc` and `full` and all three
+write the same image, so the modes are a no-op; `metadata` is refused.
+This matches qemu-img.
 
 | Format | create / convert-output / dd-output |
 |--------|--------------------------------------|
@@ -333,7 +337,7 @@ The `instar convert` operation supports writing output in the following formats:
 | **qcow2** | Supported | QCOW2 v3, 16-bit refcounts, configurable cluster size (512B-64KB), optional zlib compression (`-c`) |
 | **vmdk** | Supported | monolithicSparse (default), streamOptimized with `-c`, monolithicFlat with `--subformat monolithicFlat` (also from `instar create`, written on the host; the extent is named as qemu-img names it), configurable grain size (4KB-64KB via `--grain-size`) for sparse/streamOptimized |
 | **vpc** (VHD) | Supported | Dynamic VHD, configurable block size (512KB+ via `--block-size`, default 2MB), BAT-based allocation |
-| **vhdx** | Supported | Dynamic VHDX, configurable block size (1MB-256MB via `--block-size`, default qemu-img's for the size: 8MB up to 1GB, 16MB up to 100GB, 32MB up to 32TB, then 64MB), CRC-32C checksums |
+| **vhdx** | Supported | Dynamic or fixed VHDX (`--subformat`, default dynamic), configurable block size (1MB-256MB via `--block-size`, default qemu-img's for the size: 8MB up to 1GB, 16MB up to 100GB, 32MB up to 32TB, then 64MB), CRC-32C checksums |
 
 ### Input Format Support for Conversion
 
@@ -842,9 +846,10 @@ qcow2-luks).
 14. **VHDX Input/Output Support** - Convert supports VHDX as both input
     and output format. Input: dynamic VHDX (64-bit BAT with interleaved
     sector bitmap entries, GUID-based metadata, CRC-32C header/region
-    validation). Output: dynamic VHDX with qemu-img's default block
-    size for the size (8 MiB up to 1 GiB), 1MB-aligned structures, and
-    skip-zeros support.
+    validation). Output: dynamic or fixed VHDX (`--subformat`),
+    with qemu-img's default block size for the size (8 MiB up to 1 GiB,
+    16 MiB up to 100 GiB, 32 MiB up to 32 TiB, then 64 MiB), 1MB-aligned
+    structures, and skip-zeros support.
 
 15. **VHDX Structural Integrity Check** - Full validation in check
     operation: dual header CRC-32C validation with active header

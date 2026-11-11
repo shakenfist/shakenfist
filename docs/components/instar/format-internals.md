@@ -14,9 +14,9 @@ implement `measure` for these targets).
 **Creatable target formats**: raw (host-only —
 `open + ftruncate + posix_fallocate`), qcow2 (qemu-img
 info-equivalent modulo `refcount_bits` / `compat` / `zstd`
-hardcodes), vmdk monolithicSparse + streamOptimized, vpc
-dynamic + fixed (modulo CHS `virtual_size` rounding), vhdx
-dynamic.
+hardcodes), vmdk monolithicSparse + streamOptimized +
+monolithicFlat (the last written on the host), vpc dynamic + fixed
+(modulo CHS `virtual_size` rounding), vhdx dynamic + fixed.
 Backing-file references supported on qcow2, vmdk, vpc, vhdx
 (matches qemu-img's permission set). See
 [docs/create.md](/components/instar/create/) for the user reference and
@@ -112,8 +112,23 @@ size validation, and footer copy consistency (start vs end of file).
 ## vhdx
 
 Microsoft VHDX Virtual Hard Disk v2 (Hyper-V). Supported:
-- Dynamic VHDX: BAT-based block allocation with 32 MiB blocks (input,
+- Dynamic VHDX: BAT-based block allocation (input, output, check)
+- Fixed VHDX: every payload block present at a fixed offset (input,
   output, check)
+
+The block size defaults from the virtual size, following qemu: 8 MiB at
+or below 1 GiB, 16 MiB above 1 GiB, 32 MiB above 100 GiB and 64 MiB
+above 32 TiB (see `default_block_size` in the vhdx crate). It can be set
+explicitly to any power of two from 1 MiB to 256 MiB. The options for
+creating, converting to and measuring each subformat are in
+[docs/create.md](/components/instar/create/), [docs/convert.md](/components/instar/convert/) and
+[docs/measure.md](/components/instar/measure/).
+
+A fixed image has every payload BAT entry set to
+`PAYLOAD_BLOCK_FULLY_PRESENT`, each pointing at its fixed offset, so the
+file is laid out in full up front. All-zero blocks are left as holes so
+the file stays sparse, and the file length is the start of the data
+region plus the virtual size.
 
 VHDX uses CRC-32C (Castagnoli) checksums, GUID-identified metadata,
 64-bit BAT entries with interleaved sector bitmap entries, and 1MB-aligned

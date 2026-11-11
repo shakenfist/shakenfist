@@ -719,8 +719,8 @@ rather than merge requests.
 | 8. `convert -O vhdx --subformat fixed` | [PLAN-bat-population-phase-08-convert.md](/components/instar/plans/PLAN-bat-population-phase-08-convert/) | Complete | `e49b6275` (#874) |
 | 9. `measure -O vhdx -o subformat=fixed` | [PLAN-bat-population-phase-09-measure.md](/components/instar/plans/PLAN-bat-population-phase-09-measure/) | Complete | `3b74ba8d` (#877) |
 | 10. Cross-version matrix and derived-profile validation | [PLAN-bat-population-phase-10-matrix.md](/components/instar/plans/PLAN-bat-population-phase-10-matrix/) | Complete | `e0b0fe13` (#881) |
-| 11. Coverage and differential fuzzing | [PLAN-bat-population-phase-11-fuzz.md](/components/instar/plans/PLAN-bat-population-phase-11-fuzz/) | In progress | |
-| 12. Documentation | PLAN-bat-population-phase-12-docs.md | Not started | |
+| 11. Coverage and differential fuzzing | [PLAN-bat-population-phase-11-fuzz.md](/components/instar/plans/PLAN-bat-population-phase-11-fuzz/) | Complete | `41f74d40` (#884) |
+| 12. Documentation | [PLAN-bat-population-phase-12-docs.md](/components/instar/plans/PLAN-bat-population-phase-12-docs/) | In progress | |
 | 13. Push audit: `PUSH-AUDIT.md` over every phase above | PLAN-bat-population-phase-13-push-audit.md | Not started | |
 
 ### Sequencing rationale
@@ -981,13 +981,26 @@ comment in `fuzz_create_emitters` saying fixed output reaches no
 caller has been false since phases 7 and 8.
 
 **Phase 12** carries the cross-cutting documentation. Per-phase pages
-change in their own phases (see the constraints below); phase 12 is
-for `docs/format-coverage.md`'s output-side rows and notes,
-`docs/quirks.md`'s divergences (dynamic `block_state_zero`,
-`log_size`, convert's in-place fixed layout versus qemu's default),
-`docs/format-internals.md`'s VHDX section, `ARCHITECTURE.md` if the
-shared layout function changes the component description, and
-`CHANGELOG.md`.
+change in their own phases (see the constraints below), and phase 12's
+survey confirmed that held: the pages owned by phases 7 to 9 mention
+the fixed subformat, and the two cross-cutting pages do not mention it
+at all. Phase 12 is for `docs/format-coverage.md`'s output-side rows
+and notes, `docs/format-internals.md`'s VHDX section -- which claims
+dynamic-only output and a flat 32 MiB block size, both now false --
+two `docs/quirks.md` divergences (`log_size`, and `block_state_zero`
+accepted and then ignored for a dynamic image), and a two-entry
+correction to `ARCHITECTURE.md`'s creatable-format roster, which omits
+`monolithicFlat` and fixed VHDX.
+
+Three things this paragraph previously claimed are not phase 12's
+work, as its survey established. `CHANGELOG.md` is already complete:
+every phase from 7 to 11 wrote its own `[Unreleased]` entry. The
+third quirk once listed here -- convert's in-place fixed layout versus
+qemu's default -- was written by phase 8, in `docs/convert.md` and the
+"VHDX partial last block" section of `docs/quirks.md`. And the
+`ARCHITECTURE.md` trigger named here, the shared layout function
+changing the component description, did not fire; what is stale there
+is a factual roster.
 
 **Phase 13** is the push audit.
 
