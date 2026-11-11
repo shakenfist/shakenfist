@@ -1364,6 +1364,164 @@ does the same in `create` (`1073741825` records `1073742336`) and sizes
 default block size are all multiples of 512, so rounding never changes
 which side of one a size falls.
 
+### vhdx `log_size` is accept-ignored; qemu-img writes the log it is asked for
+
+`instar create -f vhdx -o log_size=N` accepts the key and ignores the
+value: the arm for it in `parse_create_o_options` neither stores nor
+parses what it is given. The writer's log is a constant, `LOG_LENGTH`
+in the vhdx crate, fixed at 1 MiB, and `BAT_OFFSET` is `LOG_OFFSET`
+plus it, so every VHDX instar writes carries qemu's default log size
+whatever `-o` asked for.
+
+qemu-img honours the option. Measured with the pinned static build of
+qemu-img 10.2.0 at a 16 MiB and a 4 GiB virtual size — the two sides of
+the 8 MiB / 16 MiB default block-size boundary, so the result is not an
+artefact of one geometry — and re-run on all 80 pinned builds from
+6.0.0 to 10.2.0, which agree with it:
+
+```
+$ qemu-img create -f vhdx default.vhdx 16M
+Formatting 'default.vhdx', fmt=vhdx size=16777216 log_size=1048576 block_size=0
+$ qemu-img create -f vhdx -o log_size=2M two.vhdx 16M
+Formatting 'two.vhdx', fmt=vhdx size=16777216 log_size=2097152 block_size=0
+```
+
+Structurally compared with `tests/helpers/vhdx_structure.py`, three
+fields move and only these three:
+
+| Field | default | `log_size=2M` | `log_size=4M` |
+|-------|---------|---------------|---------------|
+| header `LogLength` | 1048576 | 2097152 | 4194304 |
+| `bat` region offset, in both region tables | 2097152 | 3145728 | 5242880 |
+| `metadata` region offset, in both region tables | 3145728 | 4194304 | 6291456 |
+| file length | 8388608 | 9437184 | 11534336 |
+
+The header's `LogOffset` stays at 1 MiB, both regions keep their 1 MiB
+lengths, the metadata items keep their offsets, and every BAT entry is
+unchanged: the log grows in place and pushes what follows it along.
+`vhdx_create_new_headers` writes the requested size into the header's
+`log_length`, and the new region table places the BAT at
+`ROUND_UP(VHDX_HEADER_SECTION_END + log_size, MiB)` (qemu 7.0.0
+`block/vhdx.c`). The 4 GiB virtual size gives the same four numbers.
+
+Two values a user will try:
+
+* **A value that is not a multiple of 1 MiB is rounded up, not
+  refused.** `-o log_size=524288` and `-o log_size=1000000` both record
+  `LogLength` 1048576 and produce a file structurally identical to the
+  default; `-o log_size=1536K` and `-o log_size=1572864` both record
+  2097152. `vhdx_co_create_opts` rounds the option up to a whole MiB
+  before the validity check sees it.
+* **`log_size=0` is refused, and leaves a zero-length file behind**, as
+  a size over the 64 TiB limit does:
+
+```
+$ qemu-img create -f vhdx -o log_size=0 zero.vhdx 16M; echo "exit $?"; stat -c %s zero.vhdx
+Formatting 'zero.vhdx', fmt=vhdx size=16777216 log_size=0 block_size=0
+qemu-img: zero.vhdx: Log size must be a multiple of 1 MB
+exit 1
+0
+```
+
+The message names the multiple rather than the floor because the
+rounding has already happened: zero rounds up to zero, which is then
+below the 1 MiB minimum. `-o log_size=5G` is refused too, with "Log
+size must be smaller than 4 GB", and also leaves the empty file; a
+non-numeric value is refused by option parsing before the file is
+created, with "Parameter 'log_size' expects a non-negative number below
+2^64". Every one of the 80 pinned builds refuses the first two
+identically (measured; the quoted text is 10.2.0's).
+
+For a user: instar accepts every value qemu-img accepts, and the ones
+it refuses as well, and writes the same default-log image for all of
+them. An instar image created with `-o log_size=2M` is therefore not
+the image qemu-img creates with it — at a 16 MiB virtual size it is
+1 MiB shorter and its BAT and metadata regions sit 1 MiB earlier — and
+`instar create -f vhdx -o log_size=0` succeeds where qemu-img exits 1.
+Both images are valid, `qemu-img check` passes on each, and no reader
+sees a difference in the data; only the region offsets and the declared
+log length differ. `convert` is outside this entry: it parses no `-o`
+at all and takes `--subformat`, so there is no way to ask it for a log
+size. `measure -O vhdx` accept-ignores the key as well, and that one
+has no qemu-img counterpart to diverge from — qemu-img cannot measure
+VHDX on any pinned build ("Block driver 'vhdx' does not support size
+measurement", measured on all 80) — and instar's measured numbers match
+instar's own writer, which always uses the 1 MiB log. Honouring
+`log_size` is future work.
+
+### dynamic vhdx `block_state_zero=off` is accepted and ignored; qemu-img writes a different BAT
+
+A fixed image is the documented case, in [convert.md](/components/instar/convert/) and
+in the VHDX partial-last-block section earlier on this page. This entry
+is the dynamic one, where the option looks like a no-op and is one for
+instar only.
+
+`instar create -f vhdx -o subformat=dynamic,block_state_zero=off` is
+accepted: `parse_create_o_options` parses the value for both
+subformats, deliberately, because qemu-img refuses a non-boolean for
+both, and only a fixed create reads the result — the fully-present
+create flag is set only when `is_vhdx_fixed_create` holds. A dynamic
+image instar writes therefore has every payload BAT entry in
+`PAYLOAD_BLOCK_ZERO` whichever way the option is set, or if it is
+absent.
+
+qemu-img does not ignore it on a dynamic image. Measured with the
+pinned static build of qemu-img 10.2.0, at a 16 MiB and a 4 GiB virtual
+size; `stat -c %b` is the 512-byte blocks the filesystem has allocated:
+
+```
+$ qemu-img create -f vhdx -o subformat=dynamic on.vhdx 16M
+$ qemu-img create -f vhdx -o subformat=dynamic,block_state_zero=on explicit-on.vhdx 16M
+$ qemu-img create -f vhdx -o subformat=dynamic,block_state_zero=off off.vhdx 16M
+$ stat -c '%n %s %b' on.vhdx explicit-on.vhdx off.vhdx
+on.vhdx 8388608 2472
+explicit-on.vhdx 8388608 2472
+off.vhdx 8388608 424
+```
+
+Structurally compared with `tests/helpers/vhdx_structure.py`, the
+option absent and `=on` are identical, and `=off` differs in exactly
+one field:
+
+```
+bat run 0: 2 x payload ZERO from entry 0, offset 0 stride 0
+        != 2 x payload NOT_PRESENT from entry 0, offset 0 stride 0
+```
+
+Every payload BAT entry is `PAYLOAD_BLOCK_NOT_PRESENT` (state 0)
+instead of `PAYLOAD_BLOCK_ZERO` (state 2). The file length, the log,
+both region tables, the metadata items, the block size and the BAT
+entry count are all unchanged. The 4 GiB virtual size shows the same
+one difference over its 256 payload entries. All 80 pinned builds from
+6.0.0 to 10.2.0 produce the same three allocation figures for these
+three commands, so this is not version-dependent.
+
+Nothing a reader of the contents sees changes: both images convert to
+16 MiB of zeros (`qemu-img convert -O raw` of each, compared against
+`/dev/zero`, measured on 10.2.0), both pass `qemu-img check`, and
+`qemu-img map --output=json` calls the whole disk one `data: true`
+extent either way — it does not consult the BAT state, which is the
+divergence recorded for VHDX zero-state blocks in the map quirks above.
+What changes is how much of the file is allocated, because an all-zero
+BAT region stays a hole: `qemu-img info` reports `disk size: 1.21 MiB`
+for the zero-state image and `212 KiB` for the not-present one, on the
+ext4 filesystem these were measured on. instar's reader tells the two
+apart as well: `classify_vhdx_bat_entry` reports a `ZERO` block as a
+zero-but-allocated extent and a `NOT_PRESENT` block as a hole.
+
+For a user: this is a divergence, not a shared no-op. Asking instar for
+a dynamic VHDX with `block_state_zero=off` gets an image whose payload
+BAT entries are zero-state where qemu-img's are not-present. The two
+read identically and both are valid, so nothing downstream breaks, but
+they are neither byte-equal nor structurally equal, and instar's
+allocates the BAT region where qemu-img's leaves it sparse. `convert`
+is outside this entry: it parses no `-o`, and its `--subformat dynamic`
+has no block-state switch. `measure -O vhdx` accept-ignores
+`block_state_zero` for either subformat, which changes no measured
+number — a fixed target is dense either way, and qemu-img cannot
+measure VHDX at all. Writing not-present entries for a dynamic
+`block_state_zero=off` is future work.
+
 ### VHD fixed subformat carries footer-only metadata
 
 `instar create -f vpc -o subformat=fixed FILENAME SIZE` produces

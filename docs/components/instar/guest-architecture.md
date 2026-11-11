@@ -385,9 +385,11 @@ provides a modular architecture with:
  (512KB+ via `--block-size`, default 2MB), sector bitmaps, and BAT
  rewriting (blocks aligned to output sector size with carry-buffer
  assembly to handle bitmap+data spanning sector boundaries). VHDX
- writer emits dynamic VHDX with configurable block size (1MB-256MB
- via `--block-size`, default 32MB), 1MB-aligned structures, CRC-32C
- checksums, and BAT rewriting.
+ writer emits dynamic and fixed VHDX with configurable block size
+ (a power of two from 1MB to 256MB via `--block-size`; the default
+ scales with the virtual size, 8MB up to 1GiB, 16MB up to 100GiB,
+ 32MB up to 32TiB and 64MB above, as qemu-img does), 1MB-aligned
+ structures, CRC-32C checksums, and BAT rewriting.
 - **operations/measure/** - Image-size measurement operation. Predicts
  `required` (sparse, holes skipped) and `fully-allocated` (every
  cluster/grain/block written) byte counts for a target output format.
@@ -493,10 +495,10 @@ provides a modular architecture with:
  `fallocate(FALLOC_FL_ZERO_RANGE)` first, falls back to a
  `pwrite` loop with a 64 KiB zero buffer) over the data
  region. Raw also gains the same `full` zero-fill path via
- `fill_zeros(fd, 0, virtual_size)`. Non-qcow2 sparse formats
- (vmdk / vpc / vhdx) reject non-`off` preallocation with a
- "future work" pointer — each format would need its own
- BAT-population pattern. The host enforces
+ `fill_zeros(fd, 0, virtual_size)`. On the non-qcow2 sparse
+ formats (vmdk / vpc / vhdx) `off`, `falloc` and `full` are
+ accepted and write the same image, so they are a no-op, exactly
+ as in qemu-img; `metadata` is refused. The host enforces
  `--sector-size=512` because the `crates/create` MetadataPlan
  entries are 512-byte aligned but not always to larger sector
  sizes — relaxing this needs a planner-side change to emit
@@ -517,9 +519,9 @@ provides a modular architecture with:
  (filename, actual-size, vmdk cid + parent-cid, vhdx log-size,
  the wrapping-file physical size, cache hints) before
  comparison; remaining writer divergences (qcow2 compat
- hardcode, zstd accept-ignore, vhdx default block_size, vhd
- CHS-rounded virtual_size) are documented as per-case skips
- rather than whitelist extensions so each gap stays visible.
+ hardcode, zstd accept-ignore, vhd CHS-rounded virtual_size) are
+ documented as per-case skips rather than whitelist extensions so
+ each gap stays visible.
 - **operations/resize/** - In-place virtual-size mutation
  operation. Reads a `ResizeConfig` (target format, current and
  new virtual sizes, current file size, per-format hints from the

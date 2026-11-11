@@ -127,7 +127,7 @@ instar info --format=qcow2 image.qcow2
 
 | Flag | Description |
 |------|-------------|
-| `-O FORMAT` / `--output-format=FORMAT` | Output format (raw, qcow2) |
+| `-O FORMAT` / `--output-format=FORMAT` | Output format (raw, qcow2, vmdk, vpc, vhdx) |
 | `-c` / `--compress` | Enable zlib compression for QCOW2 output |
 | `-S` / `--skip-zeros` | Skip writing zero-filled clusters (default, sparse output) |
 | `--no-skip-zeros` | Write all clusters including zeros (dense output) |
