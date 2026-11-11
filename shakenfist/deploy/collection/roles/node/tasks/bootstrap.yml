@@ -222,21 +222,29 @@
 # Python source, a CI dirty rebuild (same version string, changed source), or a
 # first install (marker absent) -- and stays quiet otherwise, so folding the
 # deploy into a daily rotation no longer bounces every daemon every morning.
-# Deliberately narrow in two ways. The .dist-info metadata directories are not
-# under these package paths, so a bump that changes only the version string (a
-# docs- or CI-only commit) leaves the hash untouched and correctly restarts
-# nothing. And a pure runtime-dependency bump with no SF source change is not
-# caught either -- acceptable, because uv does not upgrade already-satisfied
-# dependencies on --reinstall, so in practice a dependency only moves alongside a
-# source change this hash already sees. __pycache__ is excluded because .pyc
-# files carry their own embedded timestamps.
+# Deliberately narrow in three ways. A bump that changes only the version
+# string (a docs- or CI-only commit) must leave the hash untouched and restart
+# nothing, which takes an exclusion rather than luck: the .dist-info metadata
+# directories are indeed outside these package paths, but setuptools_scm's
+# write_to puts shakenfist/_version.py (and shakenfist_client/_version.py)
+# INSIDE them, so every develop commit -- and a dirty tree's .dYYYYMMDD suffix
+# rolling over at midnight UTC -- would otherwise restart every sf-* unit on
+# every node (issue 4483). They are excluded by name. The cost is that a daemon
+# reports the release it was started with until something else restarts it;
+# online object upgrades are unaffected, because bumping an object's
+# current_version is a source change this hash still sees. Second, a pure
+# runtime-dependency bump with no SF source change is not caught -- acceptable,
+# because uv does not upgrade already-satisfied dependencies on --reinstall, so
+# in practice a dependency only moves alongside a source change this hash
+# already sees. Third, __pycache__ is excluded because .pyc files carry their
+# own embedded timestamps.
 - name: Compute the installed Shaken Fist code signature
   ansible.builtin.shell:
     cmd: >-
       set -o pipefail;
       find /srv/shakenfist/venv/lib/python3*/site-packages/shakenfist
       /srv/shakenfist/venv/lib/python3*/site-packages/shakenfist_client
-      -type f -not -path '*__pycache__*' -print0
+      -type f -not -path '*__pycache__*' -not -name '_version.py' -print0
       | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}'
     executable: /bin/bash
   register: sf_code_signature
