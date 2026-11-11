@@ -15788,6 +15788,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#what-phase-4-measured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What phase 4 measured
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#why-it-matters" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16419,6 +16430,109 @@ for the drain (phase 4's D29).</p>
 <p><strong>What it means.</strong> The cost fell by the factor phase 3 predicted, the
 tier paid less for more, and the cap is now the only thing setting the
 drain rate. Phase 4 raises it.</p>
+<h3 id="what-phase-4-measured">What phase 4 measured<a class="headerlink" href="#what-phase-4-measured" title="Permanent link">&para;</a></h3>
+<p>Phase 4 (merged in 1bd914aa02) raised sfcbr's
+<code>DELETED_OBJECT_SWEEP_MAX_OBJECTS</code> from 100 to 400. The value reached
+the cluster at 2026-10-29T19:50Z, five minutes after the 33fl pull
+request that carried it merged: the hard-delete rate steps from 1.55/s
+to 5.8/s between 19:45Z and 19:55Z at five minute resolution. The
+numbers below are from the 33fl Prometheus and from the sweep's
+per-pass log lines in Loki, tenant <code>sfcbr</code>.</p>
+<p><strong>The drain.</strong> At 400 a pass the sweep hard deleted 492,818 objects in
+its best 24 hours, the window ending 2026-11-01T00Z, in 1,353 passes.
+<code>sum(cluster_deleted_object_backlog)</code> fell from 1,519,404 at
+2026-10-29T18:00Z, through 52,039 at 2026-11-02T11:20Z, to 37,665 ten
+minutes later and 256 by 16:00Z. The whole backlog was gone in three
+days and sixteen hours, and the peak <code>remaining</code> a pass left for the
+next one fell from 5,607 to 29.</p>
+<p><strong>What the tier paid, against D25's six tests</strong> over the first 24
+hours at 400 and the baseline in "What phase 3 measured":</p>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Baseline</th>
+<th>At 400 a pass</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. MariaDB commits, rise of no more than 5/s</td>
+<td>14.8/s</td>
+<td>17.5/s, a rise of 2.7/s</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>2. Batch latency per operation type, under 0.38 s</td>
+<td>0.21-0.25 s</td>
+<td>0.07-0.22 s</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>2. <code>namespace</code> per-object cost, under 0.4 s</td>
+<td>0.256 s</td>
+<td>0.247 s</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>3. InnoDB row lock waits, not doubled</td>
+<td>0.0416/s</td>
+<td>0.0534/s, 1.28x</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>4. No sf-database restart outside a deploy, no watchdog SIGABRT</td>
+<td>-</td>
+<td>0 restarts on either gateway, no SIGABRT in 14 days of Loki</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>5. Median pass processing time under 15 s</td>
+<td>3.35 s</td>
+<td><strong>15.93 s</strong></td>
+<td><strong>fail</strong></td>
+</tr>
+<tr>
+<td>6. No CI flake-rate alert tracing to the database tier</td>
+<td>-</td>
+<td>the 10-30 and 10-31 infra reports mention no flake finding</td>
+<td>pass</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Test 5 is the finding of this phase.</strong> At 400 a pass the median pass
+took 15.93 s and the ninetieth percentile 20.56 s, against a
+<code>DELETED_OBJECT_SWEEP_SECONDS</code> budget of 20 s. 344 of the 1,319
+working passes, 26%, ran to the budget rather than to the cap, which is
+why the sweep achieved 5.8 hard deletes a second against the 6.67 the
+cap allows. The budget, which the configuration option describes as "a
+ceiling for a slow database tier rather than the way to set the drain
+rate", was within a quarter of becoming the drain rate. The step to
+800 was therefore never taken, and should not have been: it could not
+have delivered more than about a tenth more throughput without the
+budget being raised with it. The backlog was gone three days later at
+400, so nothing was lost by holding.</p>
+<p><strong>Steady state.</strong> Over the 24 hours to 2026-11-11T00Z the sweep made
+1,392 passes, hard deleted 25,787 objects and failed none; the median
+pass on the leader took 0.23 s. The 2026-11-10 nightly fact reads a
+total backlog of 234 objects across 29 types against arrivals of
+22,234 a day, and the largest <code>days_behind</code> of any type is 0.06
+against the mission's bound of 1.0. Every nightly facts file from
+2026-11-01 to 2026-11-10 has <code>behind</code> and <code>growing</code> empty, which is
+ten consecutive clean nights against the seven D28 asked for.</p>
+<p><strong>Load budget (D27).</strong> Over the soak week no pair the sweep calls is
+near the unbudgeted ceiling of 0.30/s. The highest is
+<code>GetObjectsByState</code> at 0.1914/s; <code>HardDeleteObjects</code> is 0.0416/s and
+every other pair is under 0.03/s. So no load-budget entry is added,
+which is the answer D27 expected and the written answer phase 3's D23
+was owed.</p>
+<p><strong>#4399 (D29).</strong> sf-cleaner's <code>GetObjectState</code> rate over the soak week
+is 2.861/s, against 2.835/s over the week before the cap was raised.
+It did not fall with the backlog. So the backlog was not what doubled
+it, #4399 keeps the reading and stays open with one fewer candidate,
+and phase 3's reading of it as "not the sweep" is confirmed by the
+natural experiment rather than by inference.</p>
 <h3 id="why-it-matters">Why it matters<a class="headerlink" href="#why-it-matters" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Database load.</strong> Anything that lists including deleted objects
@@ -16506,7 +16620,9 @@ recommends today.</p>
    plus the event-reference delete that phase 1's scope could not see.
    Reads cost about 2 ms. The instance placement release, a suspect
    when this was written, costs 2 ms. The namespace cascade was never
-   reached, because namespaces starved, so it is still unmeasured.</p>
+   reached by phase 1, because namespaces starved; phase 2 reached it
+   and phase 4 measured it at 0.247 s an object, so it is no longer
+   unmeasured and it is not an outlier.</p>
 </li>
 <li>
 <p><strong>Which order should the drain use within a type?</strong> (Phase 2.)
@@ -16562,8 +16678,17 @@ recommends today.</p>
    MariaDB connection ceiling and the labqnap buffer pool behind the
    watchdog SIGABRTs. <strong>Recommendation:</strong> drain with the production
    sweep, throttled, and watch database load while it runs. Do not
-   use a one-off SQL delete, which would skip the cascades in question
-   4.</p>
+   use a one-off SQL delete, which would skip the cascades in question</p>
+</li>
+<li>
+<p><strong>Answered by phase 4</strong> (see "What phase 4 measured"): the
+   recommendation was followed. One step, from 100 objects a pass to
+   400, drained 1.52M objects in three days and sixteen hours while
+   every one of D25's load tests passed except the sweep's own pass
+   duration, which found the time budget rather than the database
+   tier to be the next limit. The second step the phase planned, to
+   800, was not needed and the numbers say it would not have worked
+   without raising that budget too.</p>
 </li>
 <li>
 <p><strong>Does the hard-delete audit event outlive the object?</strong>
@@ -16647,13 +16772,13 @@ shape of phases 2 and 3, so only their scope is fixed here.</p>
 <tr>
 <td>4. Drain sfcbr and keep it drained</td>
 <td><a href="../PLAN-deleted-object-sweep-phase-04-drain/">PLAN-deleted-object-sweep-phase-04-drain.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td>1bd914aa02</td>
 </tr>
 <tr>
 <td>5. Push audit</td>
-<td>-</td>
-<td>Not started</td>
+<td><a href="../PLAN-deleted-object-sweep-phase-05-push-audit/">PLAN-deleted-object-sweep-phase-05-push-audit.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 </tbody>
@@ -16807,9 +16932,76 @@ phase plan's survey):</p>
   planning time, because phase 3 had been live for 16.7 hours. Step
   4a completes it in the same pull request.</li>
 </ul>
+<p><em>Recorded after phase 4's live steps</em> (4d, 4f and 4g, which ran on the
+cluster after the phase's pull request merged; the numbers are in
+"What phase 4 measured" and the narrative in the phase plan's
+execution notes):</p>
+<ul>
+<li>The cap of 400 was held rather than stepped to 800, because at 400
+  the median pass already used 16 s of the 20 s
+  <code>DELETED_OBJECT_SWEEP_SECONDS</code> budget and a quarter of passes ran
+  to the budget instead of the cap. D24's second step was not taken.
+  The drain finished anyway, in three days and sixteen hours.</li>
+<li>D27's answer is that no pair is over the unbudgeted ceiling, so no
+  load-budget entry is added. D23's deferred question now has its
+  written answer.</li>
+<li>D29's answer is that sf-cleaner's <code>GetObjectState</code> rate did not
+  fall with the backlog, so #4399 stays open.</li>
+<li>D28's soak passed with ten clean nights rather than seven. #4473
+  had already closed on 2026-10-29, two seconds after this phase's
+  pull request merged, because its body said "Closes
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4473" title="GitHub Issue: shakenfist/shakenfist #4473">shakenfist#4473</a>"; the closing numbers brief 4g asked for were added
+  to the issue afterwards.</li>
+<li>sfcbr's cap is deliberately left at 400 rather than returned to the
+  shipped default of 100; see the Future work entry.</li>
+</ul>
 <h3 id="phase-5-push-audit">Phase 5: push audit<a class="headerlink" href="#phase-5-push-audit" title="Permanent link">&para;</a></h3>
 <p>Run <code>PUSH-AUDIT.md</code> over the merged ranges recorded in the table
 above.</p>
+<h4 id="audit-of-phases-1-to-4">Audit of phases 1 to 4<a class="headerlink" href="#audit-of-phases-1-to-4" title="Permanent link">&para;</a></h4>
+<p>Run 2026-11-11 over the four merge commits in the table above, each as
+<code>&lt;sha&gt;^1..&lt;sha&gt;</code>, under every <code>PUSH-AUDIT.md</code> heading plus one of the
+phase's own. The full record is in
+<a href="../PLAN-deleted-object-sweep-phase-05-push-audit/">the phase plan</a>
+under "Findings".</p>
+<p><strong>The question the phase was built around came back clean.</strong> Phase 3
+turned 25 object types' hard deletes into a declaration, and a type
+whose delete went missing in that restatement would leak rows
+silently forever. All 25 were compared against the pre-batch tree:
+every one matches, with no delete missing and none added. That
+comparison had never been made before -- the three places a type's
+delete set is now written down were all authored in the same change,
+so none of them could have caught an error made at that moment.</p>
+<p><strong>One blocking finding, in the adjacent place.</strong>
+<a href="https://github.com/shakenfist/shakenfist/issues/4876">#4876</a>: <code>node</code>
+is swept every pass, but <code>Node.hard_delete()</code> is a deliberate no-op
+that never removes the object's state row, and the sweep's per-object
+path reports <code>hard_deleted</code> without checking that anything was
+removed. So a deleted node is permanently eligible, counted as a
+success on every pass, and its backlog never falls. The false count
+also defeats the nightly regression guard phase 4 added, by inflating
+the arrivals term that <code>days_behind</code> divides by. It is latent on
+sfcbr, which has deleted no node in 30 days, and it became continuous
+rather than occasional when phase 2 gave every type a turn each pass.</p>
+<p>Six advisory issues were filed
+(<a href="https://github.com/shakenfist/shakenfist/issues/4877">#4877</a>,
+<a href="https://github.com/shakenfist/shakenfist/issues/4878">#4878</a>,
+<a href="https://github.com/shakenfist/shakenfist/issues/4879">#4879</a>,
+<a href="https://github.com/shakenfist/shakenfist/issues/4880">#4880</a>,
+<a href="https://github.com/shakenfist/shakenfist/issues/4881">#4881</a>,
+<a href="https://github.com/shakenfist/shakenfist/issues/4882">#4882</a>) and one
+finding declined in writing. Two are worth naming here because they
+bear on what the earlier reviews could have seen: the batch's
+real-SQL tests run only in the merge queue, never on a pull request,
+and the in-memory mock routes hard deletes around the batch to the
+per-call fallback -- so during all four phase reviews, nothing that
+ran on the pull request exercised the batch's SQL at all. The other
+is #4878: the 20 second time budget, not the cap, is the next limit on
+the drain rate, which the operator guide's sizing arithmetic does not
+say.</p>
+<p>Wave 1 was clean apart from the protobuf freshness check, which
+cannot pass on this repository for a reason outside every range
+(#4881).</p>
 <!-- shared-block: plan-push-audit-phase v4 -->
 <p>Push audit phase (shared block; do not edit -- the canonical
 copy lives in shakenfist/development at
@@ -17303,7 +17495,9 @@ chosen to defer to here, so that we do not forget them.</p>
   rule backwards. It is left out because it adds to the arrival rate,
   and fixing it before phase 3 would make the backlog worse. Pick it
   up after phase 4's drain has finished and its soak has passed
-  (phase 4's D28).</li>
+  (phase 4's D28). <strong>That gate has now opened:</strong> the drain finished on
+  2026-11-02 and the soak passed with ten clean nights, so this is
+  ready to pick up.</li>
 <li><strong>Release namespace claims at soft delete.</strong> The REST namespace
   delete revokes inbound trusts straight away because waiting for the
   hard delete would leave them standing (<code>auth.py:409-417</code>). Capacity
@@ -17319,6 +17513,41 @@ chosen to defer to here, so that we do not forget them.</p>
 <li><strong>Retention policy.</strong> If phase 1 shows the 30 second <code>*_op</code> delay
   or the hour for everything else is itself a cost, record it here
   rather than changing it in this plan.</li>
+<li><strong>The time budget is the next limit on the drain rate, and nothing
+  says so.</strong> Phase 4 found that at 400 objects a pass the median pass
+  used 16 s of the 20 s <code>DELETED_OBJECT_SWEEP_SECONDS</code> budget and a
+  quarter of passes ended on the budget rather than the cap (see "What
+  phase 4 measured"). An operator who follows the new "Draining a
+  backlog" section and raises the cap past about 400 gets less than the
+  arithmetic there promises, with nothing to tell them why: the pass
+  log line reports <code>elapsed_seconds</code> and <code>remaining</code>, but nothing
+  distinguishes a pass that stopped at the cap from one that ran out of
+  time. Worth an outcome field or a counter on the pass, and a sentence
+  in that section saying to raise the budget alongside the cap. File it
+  as its own issue.</li>
+<li><strong>A functional test assumed the sweep was slow
+  (<a href="https://github.com/shakenfist/shakenfist/issues/4759">#4759</a>).</strong>
+  <code>test_instance_listing_and_pending_flag</code> asserts that a per-instance
+  listing with <code>all=True</code> reveals a completed cluster operation. That
+  only holds while no sweep pass lands between the operations
+  completing and the read. Phase 3 made the sweep run every pass
+  rather than every other one, and the test began failing in the merge
+  queue on 2026-11-01, during phase 4's drain. The issue is a true
+  consequence of this plan: the sweep now does what it was asked to
+  do, and a test was resting on it not doing so. It is filed with
+  three fix directions and belongs to whoever owns that suite, not to
+  this plan. Its own analysis says the sweep runs every fifteen
+  minutes, which phase 3 made untrue; that is worth correcting on the
+  issue.</li>
+<li><strong>sfcbr's cap is left at 400.</strong> Phase 4 raised it through 33fl's
+  <code>extra_config</code> and did not put it back, although the operator guide
+  that phase wrote says a cap above arrivals changes nothing at steady
+  state. It is harmless -- sfcbr takes about 26,000 objects a day
+  against the 560,000 a day the cap allows, so every pass empties its
+  work and stops -- but it is drift from the shipped default of 100,
+  and it means the busiest cluster we have is not exercising the
+  default every other cluster gets. Returning it is a one-line 33fl
+  change whenever that matters.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during development
@@ -17326,9 +17555,17 @@ that we fixed. You should also scan the project's issue tracker,
 where one exists, for directly related issues that we should
 either resolve as part of this master plan or at least be aware of
 while planning it.</p>
-<p>None yet. This plan closes
-<a href="https://github.com/shakenfist/shakenfist/issues/4473">#4473</a>. Related
-issues to watch while working on it are listed under Situation.</p>
+<p><a href="https://github.com/shakenfist/shakenfist/issues/4473">#4473</a> is
+closed, by phase 4's drain. The backlog it reported was 1.32M objects
+on 2026-10-06 and 1.74M at phase 2's deploy; it is now a few hundred,
+and the largest <code>days_behind</code> of any object type is 0.06. The issue
+closed on 2026-10-29 as a side effect of phase 4's pull request body,
+before the soak that was meant to decide it; the numbers were added as
+a comment once the soak had passed.</p>
+<p>No other bug was fixed by this plan. Related issues to watch while
+working on it are listed under Situation, and
+<a href="https://github.com/shakenfist/shakenfist/issues/4399">#4399</a> stays
+open with the reading D29 took.</p>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
 <p>Before executing any step of this plan, please back brief the
 operator as to your understanding of the plan and how the work you
