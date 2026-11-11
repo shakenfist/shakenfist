@@ -711,6 +711,62 @@ the live cluster afterwards and gate phase 5.
   nightly run or apply by hand with `sf-ctl set-config` and a restart
   of sf-cluster.
 
+- **4d steps 1 to 4, reconstructed 2026-11-11.** The note above was
+  wrong about the cap not reaching sfcbr: the hard-delete rate steps
+  from 1.55/s to 5.8/s between 2026-10-29T19:45Z and 19:55Z at five
+  minute resolution, so it took effect at **19:50Z**, five minutes
+  after Mach33Labs/33fl#1094 merged at 19:45Z, not at the 09:03Z
+  deploy the note was reading. The 09:35Z reading was taken ten hours
+  before the value arrived. Nobody took the 24 hour reading at the
+  time, so D25's six tests were evaluated on 2026-11-11 over the
+  window 2026-10-29T19:50Z to 2026-10-30T19:50Z; the table is in the
+  master plan under "What phase 4 measured". Five tests pass. **Test 5
+  fails**: the median pass took 15.93 s and the ninetieth percentile
+  20.56 s against a 20 s `DELETED_OBJECT_SWEEP_SECONDS` budget, and
+  344 of the 1,319 working passes ran to the budget rather than to the
+  cap, so the sweep reached 5.8 hard deletes a second against the 6.67
+  the cap allows. The cap was never raised to 800, which the failed
+  test says was the right outcome: without raising the budget with it,
+  800 could not have delivered more than about a tenth more. The
+  backlog crossed 50,000 between 2026-11-02T11:20Z and 11:30Z (52,039
+  then 37,665) and was 256 by 16:00Z, so the soak starts 2026-11-02.
+  Two measurement notes for anyone re-running this: a Loki
+  `quantile_over_time` over `| json` alone groups by every extracted
+  JSON field, so it returns one series per distinct field combination
+  and an aggregate over it is meaningless -- extract the one field
+  (`| json elapsed="elapsed_seconds"`) and aggregate `by (host)`, where
+  the non-leader hosts read 0.0. And `cluster_deleted_object_batch_seconds`
+  carries `blob` at 3.5 s and `network` at 2.4 s in the baseline
+  window; neither is an operation type and neither moved with the cap.
+- **4f, 2026-11-11.** D27: over `[7d]` the sweep's highest pair is
+  `GetObjectsByState` at 0.1914/s, then `HardDeleteObjects` at
+  0.0416/s, `DeleteObjectEvents`, `DeleteObjectState` and
+  `DeleteObjectMetadata` at 0.0289/s each, and everything else under
+  0.02/s. The unbudgeted ceiling is 0.30/s on six nodes
+  (`max(unbudgeted_fixed_rate_qps 0.25, 0.05 per node)` in
+  `tools/derive-database-load-budget.py:212`), so nothing is over it
+  and no entry is added. The expected answer, with a 36% margin on the
+  closest pair. D29: sf-cleaner's `GetObjectState` is 2.861/s over the
+  soak week against 2.835/s over `[7d] offset 12d`, the week ending as
+  the cap took effect. It did not fall. #4399 therefore keeps the
+  reading and stays open; the comment is on the issue.
+- **4g, 2026-11-11.** The facts files for 2026-11-01 through
+  2026-11-10 all carry `shakenfist_sweep_backlog` with `behind` and
+  `growing` empty and a total backlog of 354,617, 22,852, 403, 48, 82,
+  317, 268, 273, 305 and 234. The first night is above D28's 50,000
+  but every night from 11-02 is far below it, so the soak is seven
+  clean nights by 2026-11-08 and ten by 11-10. #4473 had already
+  closed on 2026-10-29T10:49:07Z, two seconds after this phase's pull
+  request merged at 10:49:05Z, because the body read "Closes
+  shakenfist#4473 after seven clean nights" and GitHub does not read
+  the qualifier. So the issue closed on day zero of a soak meant to
+  decide it, with none of the numbers brief 4g asked for; those were
+  added as a comment instead. The lesson for a later plan: a closing
+  keyword in a pull request body is unconditional, GitHub does not
+  read the qualifier after it, and an issue whose closure is gated on
+  something that happens after the merge must be referred to without
+  one.
+
 ## Back brief
 
 Before starting, confirm with Michael:
