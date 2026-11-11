@@ -36,11 +36,12 @@ Every workflow in `.github/workflows/`:
 ## Merge lanes and weekly lanes
 
 A *lane* is one functional cluster job: a topology deployed by the
-`shakenfist.shakenfist` collection through `shakenfist/actions`'s reusable
-`smoke-cluster.yml`, and a stestr suite run against it. Every lane is
-defined once, as a job in `.github/workflows/functional-lanes.yml`, and is
-named by its `concurrency_key`. Two workflows call it with a list of lane
-names, and that list is the only thing which decides when a lane runs:
+`shakenfist.shakenfist` collection, and a suite run against it. Most lanes
+call `shakenfist/actions`'s reusable `smoke-cluster.yml` and run a stestr
+suite, and are named by their `concurrency_key`. Every lane is defined
+once, as a job in `.github/workflows/functional-lanes.yml`. Two workflows
+call it with a list of lane names, and that list is the only thing which
+decides when a lane runs:
 
 | Lane | Runs | Topology | Suite |
 |------|------|----------|-------|
@@ -49,6 +50,8 @@ names, and that list is the only thing which decides when a lane runs:
 | `ubuntu-2404-slim-primary` (Ubuntu 24.04 cluster) | Weekly | `slim-primary` | `cluster-ci.conf` |
 | `debian-13-slim-tier` (Debian 13 tier, with Kerbside) | Weekly | `slim-tier` | `cluster-ci.conf` |
 | `debian-13-localhost` (Debian 13 single machine) | Weekly | `localhost` | `cluster-ci.conf` |
+| `ansible-modules` (Ansible modules) | Weekly | `slim-primary` | `ansiblemoduletests.sh`, with `test_kind: ansible-modules` |
+| `node-lifecycle` (Node lifecycle) | Weekly | `slim-primary` | `nodelifecycletests.sh` |
 
 `smoke-cluster.yml`'s `tier` input does not appear in that table because
 it does not select anything: it names the bundle artifact and forms part of
@@ -70,6 +73,26 @@ The Ubuntu 24.04 and slim-tier lanes moved to the weekly run on
 topology, and what the weekly run gives up is catching a base image or
 Kerbside regression on the merge which caused it rather than within a
 week.
+
+The Ansible modules and Node lifecycle lanes followed. Over thirty days
+the first failed alone three times and the second once, and no failure in
+either was caused by the change under test, so what every merge was paying
+for was two more nested clusters on that shared under-cloud rather than a
+bug the lane would have caught. Node lifecycle is the one lane which does
+not call `smoke-cluster.yml`. It shares only the deploy (the
+`build-smoke-cluster` composite action) and runs its own steps, because its
+teardown powers nodes off and the reusable workflow's does not. It has no
+`concurrency_key` to pass, so its own `concurrency.group` carries the lane
+name, and the seam test reads it from there.
+
+A weekly run now deploys all five weekly lanes at once: twenty-two nested
+instances (six each for the three `slim-primary` lanes, three for
+`slim-tier`, one for `localhost`; see `ci-topology-*.yml` in
+`shakenfist/actions`). That is two fewer than every code-changing merge
+deployed before these two lanes left the queue -- four six-instance
+`slim-primary` clusters, at whatever hour the merge happened -- so the
+weekly peak is smaller than one the under-cloud already carried routinely,
+and it now lands in the quietest window of the week.
 
 A weekly lane blocks nothing, so its failures have to reach a person some
 other way. When `weekly_lanes` fails, `report_failures` runs
@@ -585,9 +608,12 @@ entire functional matrix on every description tweak.
 
 Every job that can run in the queue and holds a scarce runner carries a
 `concurrency:` block whose key is merge-group aware — the merge lanes
-`functional_lanes` selects and `ansible_modules_collection` through the
-shared `smoke-cluster.yml`, and `node_lifecycle_collection`,
-`schema_enum_widening` and `automated_delinter` in this repository.
+`functional_lanes` selects, through the shared `smoke-cluster.yml`, and
+`schema_enum_widening` and `automated_delinter` in this repository. The
+weekly lanes carry the same key -- through `smoke-cluster.yml`, or for Node
+lifecycle in its own job -- but need none of it, since a weekly run has no
+merge group to be superseded by; the key's merge group arm is kept so that a
+lane can move back into the queue without an edit.
 `sanity_checks` holds only a static runner, but is keyed the same way so that
 a superseded queue run does not finish its lint and unit tests either.
 
@@ -611,7 +637,7 @@ when two `merge_group` runs share one of these groups, one of them is
 superseded. That alone does not make cancelling safe, because
 `cancel-in-progress` has no idea which one: it cancels whichever run entered
 the group *first*. When GitHub rebuilds a queue entry, the old and new runs
-both run `Check paths`, and the collection jobs of whichever finishes last
+both run `Check paths`, and the queue jobs of whichever finishes last
 enter the groups last and win. Several times that was the superseded run, so
 the live merge group lost every functional job, `Can merge` failed on
 `cancelled` dependencies, and the pull request was ejected with nothing
@@ -640,7 +666,7 @@ abandoned.
 
 Only a run's first attempt uses the base-branch key; the keys in this
 repository, and the one `smoke-cluster.yml` in `shakenfist/actions` gives the
-collection jobs, test `github.run_attempt == '1'` as well as the event. A
+merge lanes, test `github.run_attempt == '1'` as well as the event. A
 re-run is not a queue build: it keeps its original `merge_group` event, so
 with the base-branch key a "Re-run jobs" on an old queue run would cancel the
 live queue entry or be cancelled by it. A re-run therefore keeps its own queue
@@ -997,10 +1023,13 @@ Authorized users can trigger automation by commenting on PRs:
   pushing a new commit. **This is the merge queue's lane, not the pull
   request's, and it is the most expensive thing a comment can start
   here.** The dispatch arrives as a `workflow_dispatch` event, and
-  `functional_lanes`, `ansible_modules_collection`,
-  `node_lifecycle_collection` and `schema_enum_widening` are each gated
-  on `merge_group || workflow_dispatch` -- so a retest runs the
-  multi-node nested-cluster jobs on top of the pull request set. Nor
+  `functional_lanes` and `schema_enum_widening` are each gated on
+  `merge_group || workflow_dispatch` -- so a retest runs the multi-node
+  nested-cluster merge lanes on top of the pull request set. It does not
+  run the weekly lanes (see [Merge lanes and weekly
+  lanes](#merge-lanes-and-weekly-lanes)), the Ansible modules and Node
+  lifecycle lanes among them, so a retest of a change to either suite
+  does not exercise it; dispatch `scheduled-tests.yml` for that. Nor
   does the docs-only skip apply: `check_paths` runs its path filter
   only for events other than `workflow_dispatch` and otherwise defaults
   `code_changed` to `true`, so a documentation-only branch gets the

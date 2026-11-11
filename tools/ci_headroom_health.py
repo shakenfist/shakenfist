@@ -87,13 +87,20 @@ SERIES_PRESENT_FLOOR = 0.90
 # Scaled to the ten newest merge runs the scheduled job harvests. The
 # baseline window yielded 217 records over 66 runs from four instrumented
 # jobs, or 3.3 per run, the shortfall being runs whose functional jobs were
-# skipped because nothing relevant changed. Since 2026-10-25 a merge run has
-# three instrumented jobs -- Debian 13 cluster, Guests and Ansible modules;
-# the Ubuntu 24.04 cluster and Debian 13 tier lanes run weekly from
-# scheduled-tests.yml, which this does not harvest -- so ten runs is at most
-# 30 records. This floor tolerates four of ten runs contributing nothing and
-# still fails a window where the bundles stopped arriving.
-MIN_RECORDS = 18
+# skipped because nothing relevant changed. A merge run now banks one record
+# per instrumented merge lane, named below; every other lane runs weekly from
+# scheduled-tests.yml, which this does not harvest. Ten runs is therefore at
+# most ten records per lane, and the floor is six per lane: it tolerates
+# four of ten runs contributing nothing (a docs-only merge skips the lanes)
+# and still fails a window where the bundles stopped arriving.
+#
+# The lanes are named rather than counted so that moving a lane between the
+# merge queue and the weekly run fails a test (test_ci_headroom_health.py
+# derives this tuple from functional-tests.yml and the harvest's bundle
+# table) instead of the next scheduled run of this check. Ansible modules
+# was the third until it moved to the weekly run, when the floor was 18.
+INSTRUMENTED_MERGE_LANES = ('debian-13-slim-primary', 'guests')
+MIN_RECORDS = 6 * len(INSTRUMENTED_MERGE_LANES)
 
 # No sample may fail. A failed sample is an HTTP or parse error against a
 # cluster which was up enough to run the suite, and the banked datasets have

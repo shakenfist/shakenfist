@@ -28,13 +28,17 @@ was checked against a real artifact rather than reasoned about:
   *that*, at ``bundle/traces/``. Reading the outer zip's namelist for
   ``traces/headroom.jsonl`` finds nothing and would have looked exactly like
   a run whose probe never started.
-* **Five of the six cluster bundles carry the probe.** 'Ansible modules' was
-  moved into ``BUNDLE_TOPOLOGIES`` ahead of the shakenfist/actions change that
-  instruments it (#4377); that change merged on 2026-10-01 and the bundle has
-  carried a real series since. A harvest over the window before it reads
-  ``series_present`` false there -- an expected absence, not a probe failure.
-  The sixth, 'Node lifecycle', is skipped by name rather than recorded as
-  missing data. See ``UNINSTRUMENTED_BUNDLES`` below.
+* **A merge run banks two cluster bundles, and both carry the probe.**
+  Debian 13 cluster and Guests are the only lanes the merge queue runs; the
+  rest run weekly and are never harvested. Two older series are history
+  now. 'Ansible modules' was moved into ``BUNDLE_TOPOLOGIES`` ahead of the
+  shakenfist/actions change that instruments it (#4377), carried a real
+  series from 2026-10-01 until it left the merge queue, and a harvest over
+  the window before that reads ``series_present`` false there -- an
+  expected absence, not a probe failure. 'Node lifecycle' is skipped by
+  name rather than recorded as missing data, should a window reaching back
+  to when it ran on merge be harvested. See ``UNINSTRUMENTED_BUNDLES``
+  below.
 * **The topology is not in the series.** It is passed to the report at run
   time and never written down, so a bundle on disk does not say which shape
   produced it. That was fixed prospectively by having the collect script
@@ -134,8 +138,8 @@ BundleKind = collections.namedtuple(
 # .github/workflows/functional-lanes.yml (the merge queue runs the ones
 # functional-tests.yml selects; until 2026-10-25 they were a matrix in
 # functional-tests.yml itself), plus the Ansible modules entry, which the
-# shakenfist/actions change widening the probe gate onto that job has since
-# made live (#4377). Every job the merge queue measures today runs the
+# shakenfist/actions change widening the probe gate onto that job made live
+# (#4377); its series closed when the lane moved to the weekly run. Every job the merge queue measures today runs the
 # *same* topology, which is the point: if slim-primary's jobs differ from
 # each other in peak demand then the difference is the suite and not the
 # shape, and nobody may respond to it by resizing the cloud. Pooling by
@@ -207,12 +211,13 @@ BUNDLE_TOPOLOGIES = {
 # composite-action seam:
 #
 # * 'Node lifecycle' never reaches the reusable smoke-cluster workflow at
-#   all. It calls the build-smoke-cluster composite action directly
-#   (functional-tests.yml:587), and the probe steps live in the workflow
-#   rather than in the action, so they are not in its job. Fixing this means
-#   moving or duplicating the probe steps into the composite action, which
-#   changes how *every* caller deploys -- shakenfist's five call sites,
-#   client-python's, kerbside's and the canary's -- through an action
+#   all. It calls the build-smoke-cluster composite action directly (it is
+#   the one lane of functional-lanes.yml which runs its own steps), and the
+#   probe steps live in the workflow rather than in the action, so they are
+#   not in its job. Fixing this means moving or duplicating the probe steps
+#   into the composite action, which changes how *every* caller deploys --
+#   shakenfist's five call sites, client-python's, kerbside's and the
+#   canary's -- through an action
 #   consumed at @main with no pin. Instrumenting it is therefore deferred,
 #   and tracked as #4367 rather than done here; kerbside's
 #   'sf-e2e-functional.yml' reaches the same seam but uploads no cluster

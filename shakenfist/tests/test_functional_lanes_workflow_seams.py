@@ -3,15 +3,23 @@
 """The seams between functional-lanes.yml and the workflows which call it.
 
 functional-lanes.yml defines every functional cluster lane once, each as a
-job gated on its name appearing in the caller's 'lanes' input. That shape has
-one dangerous failure: a caller naming a lane which does not exist, or a lane
-whose gate names something other than itself, skips that lane -- and a called
-workflow whose jobs all skip succeeds, so "Can merge" would go green having
-tested nothing. Nothing at runtime notices. These tests are what does.
+job gated on its name appearing in the caller's 'lanes' input. A lane is that
+gate and a name, not a particular kind of job: most lanes call the reusable
+smoke-cluster workflow and name themselves in its concurrency_key input, and
+one runs its own steps and names itself in its own concurrency group.
+
+That shape has one dangerous failure: a caller naming a lane which does not
+exist, or a lane whose gate names something other than itself, skips that
+lane -- and a called workflow whose jobs all skip succeeds, so "Can merge"
+would go green having tested nothing. Nothing at runtime notices. These tests
+are what does.
 
 They also hold the property the split exists for: every lane runs somewhere,
 either in the merge queue (functional-tests.yml) or weekly
-(scheduled-tests.yml), and never in both.
+(scheduled-tests.yml), and never in both. And they hold the other half of a
+demotion: can_merge accepts a skipped dependency only on a docs-only change,
+so a lane which moved to the weekly run and stayed in can_merge's needs would
+fail every code-changing merge group.
 """
 
 import glob
@@ -76,13 +84,30 @@ class FunctionalLanesWorkflowSeamsTestCase(base.ShakenFistTestCase):
 
     def test_a_lane_is_named_by_its_concurrency_key(self):
         # One name per lane, so the name a caller passes is also the one in
-        # the lane's concurrency group and bundle artifact.
+        # the lane's concurrency group and bundle artifact. A lane which
+        # calls the reusable smoke-cluster workflow says that name in its
+        # concurrency_key input. A lane which runs its own steps has no
+        # inputs to say it in, so its own concurrency group carries it, and
+        # that group is the only place the name is written down.
         for lane, job_id in self._defined_lanes().items():
-            key = self.lanes_jobs[job_id]['with']['concurrency_key']
-            self.assertEqual(
-                lane, key,
-                '%s job %s is gated on %r but its concurrency_key is %r.'
-                % (LANES_WORKFLOW, job_id, lane, key))
+            job = self.lanes_jobs[job_id]
+            if job.get('uses'):
+                key = (job.get('with') or {}).get('concurrency_key')
+                self.assertEqual(
+                    lane, key,
+                    '%s job %s is gated on %r but its concurrency_key is %r.'
+                    % (LANES_WORKFLOW, job_id, lane, key))
+            else:
+                # Delimited, so a lane named 'node' is not satisfied by a
+                # group keyed on 'node-lifecycle'.
+                group = (job.get('concurrency') or {}).get('group') or ''
+                self.assertRegex(
+                    group, r'-%s-' % re.escape(lane),
+                    '%s job %s is gated on %r, but that name is not a '
+                    'hyphen-delimited segment of its concurrency group %r. A '
+                    'lane which runs its own steps passes no concurrency_key, '
+                    'so its concurrency group is where its name has to appear.'
+                    % (LANES_WORKFLOW, job_id, lane, group))
 
     def test_the_callers_are_the_ones_expected(self):
         # Guards the scan below: a renamed caller job would otherwise drop
@@ -118,6 +143,28 @@ class FunctionalLanesWorkflowSeamsTestCase(base.ShakenFistTestCase):
         workflow, job_id = MERGE_CALLER
         needs = self.workflows[workflow]['jobs']['can_merge']['needs']
         self.assertIn(job_id, needs)
+
+    def test_no_weekly_lane_gates_the_merge(self):
+        # A demotion is two edits: the lane's name moves between the two
+        # 'lanes' lists, and the lane leaves can_merge's needs. can_merge
+        # passes a skipped dependency only when check_paths found no code
+        # change, so a lane left in that list after it stopped running on
+        # merge_group fails every code-changing merge group -- and that run
+        # is the one release.yml's CI gate counts.
+        merge_workflow, _ = MERGE_CALLER
+        needs = self.workflows[merge_workflow]['jobs']['can_merge']['needs']
+        job_ids = self._defined_lanes()
+        for lane in self._callers()[WEEKLY_CALLER]:
+            # Both spellings: the name the caller passes, and the job id,
+            # which is what a lane demoted out of the merge workflow was
+            # called in that needs: list.
+            for name in sorted({lane, job_ids.get(lane, lane)}):
+                self.assertNotIn(
+                    name, needs,
+                    '%s runs weekly, but can_merge still needs %r. It cannot '
+                    'run on merge_group, so it skips, and can_merge fails a '
+                    'skipped dependency on any change which touches code.'
+                    % (lane, name))
 
     def test_weekly_failures_are_reported(self):
         # The weekly lanes block nothing, so a failure nobody is told about

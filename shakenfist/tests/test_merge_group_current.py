@@ -211,10 +211,13 @@ class MergeGroupCurrentWorkflowSeamsTestCase(base.ShakenFistTestCase):
                     or uses.endswith('smoke-cluster.yml@main')
                     or uses == './.github/workflows/functional-lanes.yml'):
                 keyed.append(name)
-        # Guards the scan itself: these are the jobs the issue names.
-        for name in ['functional_lanes',
-                     'ansible_modules_collection',
-                     'node_lifecycle_collection', 'schema_enum_widening']:
+        # Guards the scan itself: these are the queue jobs of this
+        # workflow. The Ansible modules and Node lifecycle jobs the issue
+        # also named are lanes of functional-lanes.yml now and run weekly,
+        # where there is no merge group to be superseded by; the lanes which
+        # still gate a merge are reached through functional_lanes, which is
+        # in this list.
+        for name in ['functional_lanes', 'schema_enum_widening']:
             self.assertIn(name, keyed)
 
         for name in keyed:
