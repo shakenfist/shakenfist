@@ -846,6 +846,57 @@ execution notes):
 Run `PUSH-AUDIT.md` over the merged ranges recorded in the table
 above.
 
+#### Audit of phases 1 to 4
+
+Run 2026-11-11 over the four merge commits in the table above, each as
+`<sha>^1..<sha>`, under every `PUSH-AUDIT.md` heading plus one of the
+phase's own. The full record is in
+[the phase plan](PLAN-deleted-object-sweep-phase-05-push-audit.md)
+under "Findings".
+
+**The question the phase was built around came back clean.** Phase 3
+turned 25 object types' hard deletes into a declaration, and a type
+whose delete went missing in that restatement would leak rows
+silently forever. All 25 were compared against the pre-batch tree:
+every one matches, with no delete missing and none added. That
+comparison had never been made before -- the three places a type's
+delete set is now written down were all authored in the same change,
+so none of them could have caught an error made at that moment.
+
+**One blocking finding, in the adjacent place.**
+[#4876](https://github.com/shakenfist/shakenfist/issues/4876): `node`
+is swept every pass, but `Node.hard_delete()` is a deliberate no-op
+that never removes the object's state row, and the sweep's per-object
+path reports `hard_deleted` without checking that anything was
+removed. So a deleted node is permanently eligible, counted as a
+success on every pass, and its backlog never falls. The false count
+also defeats the nightly regression guard phase 4 added, by inflating
+the arrivals term that `days_behind` divides by. It is latent on
+sfcbr, which has deleted no node in 30 days, and it became continuous
+rather than occasional when phase 2 gave every type a turn each pass.
+
+Six advisory issues were filed
+([#4877](https://github.com/shakenfist/shakenfist/issues/4877),
+[#4878](https://github.com/shakenfist/shakenfist/issues/4878),
+[#4879](https://github.com/shakenfist/shakenfist/issues/4879),
+[#4880](https://github.com/shakenfist/shakenfist/issues/4880),
+[#4881](https://github.com/shakenfist/shakenfist/issues/4881),
+[#4882](https://github.com/shakenfist/shakenfist/issues/4882)) and one
+finding declined in writing. Two are worth naming here because they
+bear on what the earlier reviews could have seen: the batch's
+real-SQL tests run only in the merge queue, never on a pull request,
+and the in-memory mock routes hard deletes around the batch to the
+per-call fallback -- so during all four phase reviews, nothing that
+ran on the pull request exercised the batch's SQL at all. The other
+is #4878: the 20 second time budget, not the cap, is the next limit on
+the drain rate, which the operator guide's sizing arithmetic does not
+say.
+
+Wave 1 was clean apart from the protobuf freshness check, which
+cannot pass on this repository for a reason outside every range
+(#4881).
+
+
 <!-- shared-block: plan-push-audit-phase v4 -->
 Push audit phase (shared block; do not edit -- the canonical
 copy lives in shakenfist/development at

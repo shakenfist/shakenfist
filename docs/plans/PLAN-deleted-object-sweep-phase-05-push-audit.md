@@ -119,7 +119,10 @@ could not have carried, plus the one thing the section did not say.
    `test_hard_delete_batch_parity.py`**; `d04d5583f5` ("Name the sweep
    queue each log line reports", 2026-11-09) changed
    `scheduled_tasks.py` and `test_daemon_cluster_scheduled_tasks.py`
-   and added fields to the pass log line the operator guide describes.
+   and relabelled the per-blob and per-instance pass log lines. (Survey
+   finding corrected after step 5f: that commit does **not** touch the
+   deleted-object sweep's own pass line or its fields, which this plan first
+   claimed it did.)
    So a finding read from the diff can be already fixed, and a
    documentation claim phase 4 wrote can have been made stale by
    `d04d5583f5` nine days later. D32 handles both.
@@ -643,6 +646,419 @@ docs/release_notes/v07-v08.md
 no output
 
 
+### Style
+
+Step 5c, read across all four ranges. Files read: `mariadb.py` (:4563-4640,
+:5112-5190, :26454-26760, :6428-6436), `daemons/database/main.py` (:770-800,
+:6625-6634), `daemons/cluster/scheduled_tasks.py` (:1030-1050, :1215-1260),
+`baseobject.py` (:790-830), plus the non-test code of all four diffs;
+`PUSH-AUDIT.md`'s style brief, `AGENTS.md` and all 359 lines of
+`docs/developer_guide/standards.md`.
+
+One finding, advisory, still true:
+
+- `shakenfist/tests/test_daemon_cluster_scheduled_tasks.py:1239` reads
+  `# calls, in the same order, with the same arguments (D6).` A decision
+  citation in committed code. Introduced by `a4f5fa1b3f`, inside phase 1's
+  range.
+
+Conventions checked and honoured, named so the pass says what it covers:
+imports at the top and in order with `# noreorder` on `shakenfist_utilities`;
+logging through `logs.setup(__name__)` and `LOG.with_fields`; single quotes
+outside docstrings and no triple-single quotes; 120 character lines; no
+trailing whitespace; the three-layer `_direct_*`/`_grpc_*`/public pattern on
+all three new accessors, with `_direct_*` reached only from its public wrapper;
+proto edits in `protos/database.proto` with both new operations registered in
+the Monitor list at `daemons/database/main.py:6630-6631`; SQL pushdown, every
+new predicate in SQL; `hard_delete()` cleaning up what the object owns; mypy
+annotations on new functions; the guarded-UPDATE-first invariant, which the
+batch satisfies by opening its transaction with the guarded DELETE; event
+coverage preserved. Not applicable: field masks, `SecretStr`, native ENUM
+columns, glossary. Not assessable from a diff, and recorded as such rather
+than passed: whether an index serves the count query, `in_memory_only`
+behaviour, and whether the sweep loops reach `idle()` for the watchdog.
+
+**Management session note.** 5c's first report returned "Style checks passed"
+having read none of `PUSH-AUDIT.md`, `AGENTS.md` or `standards.md` -- it had
+worked from the brief's summary of the conventions. That is a pass against the
+summary, not against the conventions, so it was sent back; the record above is
+the second report. Its specific claims were reproduced before acceptance (the
+three-layer line numbers, the Monitor registration, the event mute). Its count
+of the advisory checker's hits was wrong -- it said 11, the checker reports 406
+repository-wide -- so the management session blamed every one of the 406
+against the four ranges: exactly one is in range, the finding above. The other
+405 predate the ranges and are a question about that check's default, not about
+this plan.
+
+### 2a. Code quality
+
+Step 5d, read across all four ranges, with wave 1's mechanical sweep as input.
+Files read at `$TIP`: `scheduled_tasks.py`, `mariadb.py`'s hard-delete region,
+`daemons/cluster/main.py`, `daemons/database/main.py`, `baseobject.py`,
+`node.py`, `namespace.py`, `namespace_claim.py`, `instance.py`, `constants.py`,
+`config.py`, `protos/database.proto`, `docs/operator_guide/database.md`.
+
+**One blocking finding: the sweep reports `node` objects as hard deleted
+forever, and never deletes one.** Filed as
+[#4876](https://github.com/shakenfist/shakenfist/issues/4876). Every link was
+re-verified in the management session:
+
+- `Node.hard_delete()` is `pass` with no `super()` call (`node.py:896-898`), so
+  nothing removes the node's `object_states` row.
+- `Node.delete()` sets `STATE_DELETED` (`node.py:893`), which is in
+  `FINAL_OBJECT_STATES` (`constants.py:204`).
+- `node` is in `OBJECT_NAMES_TO_CLASSES` (`constants.py:145`) and the sweep's
+  type list is the unfiltered `list(OBJECT_NAMES_TO_CLASSES)`
+  (`scheduled_tasks.py:1077`).
+- `node` is not in `HARD_DELETE_BATCH_FUNCTIONS`, so it takes the per-object
+  path, which sets the outcome without checking that anything was removed
+  (`scheduled_tasks.py:1192-1193`).
+- The same file already excludes `node` from its *other* sweep,
+  `ZOMBIE_REPAIR_EXCLUDED_TYPES = {'node', 'namespace'}` at :1378, so the fix
+  pattern sits beside the defect.
+
+Two things the management session added to the report. First, the bug defeats
+this plan's own regression guard: `shakenfist_sweep_backlog` computes
+`days_behind` as backlog over arrivals, and arrivals are derived from the
+hard-delete counter, so the false `hard_deleted` count inflates arrivals and
+drives `days_behind` to approximately zero. A cluster whose node backlog is
+permanently stuck would never be flagged `behind`. Second, it is **latent, not
+live**: on sfcbr `cluster_deleted_object_backlog{object_type="node"}` reads 0
+and there is no `object_type="node"` series on the hard-delete counter in 30
+days, so no node has been deleted there in that window. No audit event is
+written either, because `Node.hard_delete()` never reaches the base class, so
+there is no event-row flood.
+
+Attribution is phase 2's reachability change rather than the no-op itself,
+which long predates the plan: before the per-type round robin, `node` sat
+behind the single FIFO's large backlogs and was rarely reached.
+
+Advisory findings, all still true, filed together as
+[#4882](https://github.com/shakenfist/shakenfist/issues/4882): `mariadb.py`
+gained about 825 net lines across these phases and has a clean contiguous seam
+at its hard-delete region (roughly :26169-:26692, four public entry points);
+three near-identical sweep work-list wrappers (:262, :313, :343) and a fourth
+copy of `FakeClock`; and a comment in `_fill_deleted_object_work` that
+hard-codes `GRPC_UNAVAILABLE_RETRIES`, `GRPC_RETRIES` and `GRPC_TIMEOUT` values
+which will rot in place.
+
+**The phase 8 question -- what the change switched on.** The four types *not*
+batched are exactly the four whose hard delete has side effects beyond row
+deletes, and they are the ones that previously starved. So the cross-object
+effects now firing at sweep rate are instance placement releases returning
+ledger capacity (`instance.py:1970`), namespace cascades that revoke inbound
+trusts on *other* namespaces (`namespace.py:344-380`), and namespace claim
+releases returning `cluster_capacity.claimed_*` (`namespace_claim.py:387`).
+Nothing there is incorrect, but anything that treats `cluster_capacity` or
+federation trust as slowly-changing now sees a sustained stream of releases it
+did not before. One consequence already landed as #4723 (the audit event's log
+echo, muted three days after phase 4) and another as #4759.
+
+**Can the keyset cursor skip an object? No.** The walk orders by `object_uuid`
+with `limit(page_size + 1)`, so `more_available` is exact; the cursor advances
+only on `more_available and uuids` and resets to `''` with a 300 s recheck at
+the end of a walk; and every drop path returns the entry to the walk
+(`work.extendleft(reversed(batch))` at :1340, :1346 and :1362). An object that
+becomes eligible behind the cursor is delayed by at most one walk plus 300 s,
+never skipped. On a lost election the new leader starts at `''`; with two brief
+leaders the guarded batch and the single path's `suppress_failure_audit` read
+make a double attempt a `skipped` or `gone`, not a wrong delete.
+
+### 2b. Test review
+
+Step 5e, read across all four ranges. Files read: the paging, batch, per-call
+and cache regions of `mariadb.py`, `baseobject.py`, `scheduled_tasks.py`,
+`.github/workflows/functional-tests.yml`, `tools/ci-enum-widening-test.sh`,
+`tox.ini`, and the tests `test_mariadb_objects_by_state_page{,_live}.py`,
+`test_mariadb_hard_delete_objects{,_live}.py`,
+`test_hard_delete_batch_parity.py`, `test_daemon_cluster_scheduled_tasks.py`,
+`mock_mariadb.py`, `test_blob.py`, `test_error_report.py`,
+`test_mapping_rule.py`, `test_agent_operation_expiry.py`.
+
+No blocking finding. The substantive result, filed as
+[#4880](https://github.com/shakenfist/shakenfist/issues/4880), is that the
+batch's real-SQL behaviour had no pull-request-time test during any of the four
+phases' reviews, and the mock-backed tests route around the batch entirely.
+Both halves were verified in the management session:
+
+- The `schema_enum_widening` job's condition is
+  `(github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')`
+  (`functional-tests.yml:570`) -- never `pull_request`. It does gate a merge, so
+  the signal exists; it arrives after review.
+- `MockMariaDB`'s double for `mariadb.hard_delete_objects`
+  (`mock_mariadb.py:3505`) raises `NotImplementedError` for the guarded batch
+  and, for unconditional calls, loops over
+  `mariadb.hard_delete_objects_per_call()`. So no MockMariaDB-backed test
+  exercises the batch path at all, and the post-conditions those tests assert
+  are produced by the fallback through per-table doubles.
+- The non-live siblings do not close the gap: the paging test mocks `_direct_*`
+  out of every case, and the batch test asserts statement order and bound
+  parameters against a `MagicMock` connection, with the table list asserted for
+  2 of the 25 types.
+
+**Phase 2's fairness guard is real, and the management session reproduced it.**
+`DeletedObjectSweepFairnessTestCase.test_a_small_type_is_served_behind_a_large_one`
+(`test_daemon_cluster_scheduled_tasks.py:1433`) was run in the worktree with a
+saved copy of the one file for the restore: baseline OK; with the rotation
+removed (`index = (_DELETED_OBJECT_NEXT_TYPE + offset) % len(object_types)`
+replaced by `index = offset`) FAILED. 5e separately killed a second mutant that
+made the fill return after one type, as the old FIFO did. So the guard holds on
+both axes, and phase 3's batching did not hollow it out -- both its types are
+non-batchable. The tree was restored from the copy, not with `git checkout`, and
+`git status` confirmed clean.
+
+Also advisory, recorded rather than filed separately: no functional test
+exercises the sweep, the backlog gauge or hard deletion at all, so there is no
+functional test that would have failed before phase 2 and passes after. That is
+awkward to fix honestly -- the sweep runs only on the elected maintainer and
+waits `CLEANER_DELAY` -- and is noted in #4880.
+
+### 2c. Documentation review
+
+Step 5f, read across all four ranges. Pages read at `$TIP`:
+`docs/operator_guide/database.md` (:611, :968-1300),
+`docs/developer_guide/database_internals.md`,
+`docs/developer_guide/subsystem_internals.md`,
+`docs/release_notes/v07-v08.md`. Code read: `scheduled_tasks.py`,
+`config.py`, `mariadb.py`, `daemons/cluster/main.py`.
+
+No blocking finding. Four advisory, all still true; the first two are filed as
+[#4878](https://github.com/shakenfist/shakenfist/issues/4878) (the budget) and
+the rest as [#4879](https://github.com/shakenfist/shakenfist/issues/4879):
+
+- The sweep "takes one object from each type in turn" is wrong in three places
+  (`database.md:1028`, `database_internals.md:649`, `v07-v08.md:956`); a turn is
+  up to `DELETED_OBJECT_BATCH_SIZE` entries of one type, and `database.md`
+  contradicts itself by saying "after each batch" at :1000-1002.
+- "Draining a backlog"'s sizing arithmetic assumes every pass reaches the cap,
+  and never says to raise the budget alongside the cap. The only hint sits in
+  the monitoring section *after* the instruction to raise it.
+- The page tells the reader to compare `elapsed_seconds` with the budget, but
+  `elapsed_seconds` excludes the fill, which is charged against the budget. A
+  pass ended by the budget therefore logs a value below it.
+- The `Skipping per-deleted-object drain, database unavailable during the fill`
+  warning is undocumented, so a missing `Processed` line is unexplained.
+
+Everything else checked out, which is a real result: every metric name and
+label, every configuration option and default (20 / 100 / 25, max 1000), every
+pass-log field, the 500-uuid page, the 300 s recheck, the hourly backlog count,
+all six outcomes against `DELETED_OBJECT_OUTCOMES`, and every PromQL expression
+parsing as written with its metrics and labels present. The `mysql_global_status_*`
+and `process_start_time_seconds` queries read external exporters and cannot be
+checked from the repository. Nothing documented has been removed from the code,
+and the plan-reference rules found no hits in any range's added lines, so phase
+4's own grep result was correct rather than a gap.
+
+**A premise in this plan was wrong, and 5f refuted it.** Survey finding 4 and
+5f's brief both said `d04d5583f5` added fields to the sweep's pass log line. It
+did not: it added a `NamedQueue` and relabelled the per-blob and per-instance
+`Processed` lines only. The management session confirmed this by reading the
+commit, and the survey finding is corrected at source in this commit. The
+sweep's own pass line and its fields are unchanged, and the documentation of
+them is complete.
+
+### 2d. Security review
+
+Step 5g, read across all four ranges. Files read at `$TIP`: `mariadb.py`
+(:26141-26712, :4553-4660, :5112-5180, :783-823, :648-668),
+`daemons/database/main.py` (:751-923, :5764-5784, :6570-6591, :7040-7080),
+`scheduled_tasks.py` (:1040-1372), `baseobject.py` (:783-818), `config.py`
+(:832-874), the `protos/database.proto` diffs, and
+`docs/operator_guide/database.md`.
+
+**What the batch may delete: no issue found.** `object_type` is refused before
+any SQL is built -- `hard_delete_objects_request_error()` tests membership of
+`HARD_DELETE_BATCH_FUNCTIONS` first (`mariadb.py:26466`), and every path
+consults it: the public wrapper at :26664, and the servicer independently at
+`daemons/database/main.py:903-908` before calling that wrapper, which checks
+again. `_direct_hard_delete_objects()` has exactly one caller, downstream of
+both checks. No table, column or function name reaches SQL by interpolation;
+every statement is built from SQLAlchemy `Table` objects and the function name
+is a dict key. uuids are bound through `column.in_()`, an empty list returns
+early at :26680, a non-uuid is refused by the `UUID()` loop at :26478, and an
+over-long list is refused against `HARD_DELETE_OBJECTS_MAX = 1000`.
+
+**One in-range finding, advisory, still true**, filed as
+[#4877](https://github.com/shakenfist/shakenfist/issues/4877): the
+cluster-operation statement builders key on the operation's own uuid with no
+operation-type predicate, in tables shared by all fourteen cluster-operation
+types. The batch's opening state delete *is* type-scoped, but in unconditional
+mode the table deletes do not use what it returned -- `mariadb.py:26529` says so
+outright: `deleted = list(object_uuids) if unconditional else returned`. So an
+unconditional batch declaring one operation type and naming another's uuid
+removes that operation's rows and leaves its state row: a phantom. Not reachable
+from any in-tree caller. The management session swept the class: **three**
+builders share the gap, not the one reported (`delete_cluster_operation` on
+`uuid`, `delete_cluster_operation_error` on `op_uuid`,
+`delete_cluster_operation_target` on `operation_uuid`), and every other builder
+in `HARD_DELETE_STATEMENTS` uses a type-specific table, where a uuid-only
+predicate is safe.
+
+**The authorisation answer is "it does not distinguish callers", and it predates
+the ranges.** sf-database binds `add_insecure_port`
+(`daemons/database/main.py:7069`) and its only interceptor counts requests
+(:7042); the `caller_daemon` label is client-supplied and unverified. So
+`GetObjectsByState`, `CountObjectsByState`, `HardDeleteObjects` and
+`DeleteObjectEvents` are reachable by anything that can open the port, and a
+caller that should not hard delete objects can. This is a recorded design
+posture, not a new defect -- `docs/plans/PLAN-embrace-tls.md:68` states it as
+"the mesh is private; trust it" -- so it is **declined as a finding against this
+plan** and not refiled. What the ranges did do is widen that surface from
+per-object deletes to a 1,000-object unconditional batch, and the operator
+guide's database page never states the trust assumption; that sentence is folded
+into #4879.
+
+Two further hardening notes, both advisory and recorded here rather than filed:
+`page_size` is a `uint32` passed through without a server-side clamp
+(`daemons/database/main.py:789`), which is not additive because `page_size=0` is
+already an unbounded read by design; and during a rolling upgrade an
+sf-database predating the paging fields returns the whole reply with
+`more_available=False` (`mariadb.py:4794`), which is the documented pre-paging
+behaviour.
+
+**No issue found** on three further questions. A hostile keyset cursor cannot
+escape its type: the walk always ANDs `object_type` with a bound
+`object_uuid > after_uuid`, so it is strictly monotonic, finite, and
+type-scoped. The audit event carries a constant message plus the object's own
+type and uuid -- no namespace name, no key material, nothing beyond what
+`object_states` already holds. And the sweep cannot hold a transaction
+unboundedly: the batch is capped at 25, the pass at 20 s and 100 objects, the
+deadline is checked before every turn and the fill before every read, and
+`_retry_transaction` is capped at four attempts.
+
+### The hard-delete contract
+
+Step 5h, this phase's own heading, against the pre-batch tree at
+`1090771e64^1`. **All 25 batchable types MATCH: no missing delete, no extra
+one.** The restatement phase 3 made was faithful, which is the answer D35 was
+written to get.
+
+The base class's share was read at pre-batch `baseobject.py:765-769`
+(`delete_state`, `delete_object_metadata`, `delete_object_events`, then the
+audit event) and :858-861 (`delete_cluster_operation_targets_for_object` for a
+`DatabaseBackedObjectWithOperations`). The fourteen cluster-operation types
+share `_CLUSTER_OPERATION_HARD_DELETES`, checked once against pre-batch
+`operations/baseoperation.py:268-287` and then confirmed type by type: none of
+the fourteen modules defines or extends `hard_delete`, so none added anything of
+its own. The other eleven were read individually -- `agentoperation.py:553-563`,
+`artifact.py:748-752`, `network/network.py:814-817`, `blob.py:1050-1058` with
+`_remove_references_held` at :681-686, `managed_executables/dnsmasq.py:125-127`,
+`network/interface.py:302-305`, `ipam.py:428-434`, `namespace_key.py:424-428`,
+`trusted_issuer.py:292-296`, `mapping_rule.py:605-609`, `upload.py:149-151`.
+
+The management session re-read two of the 25 itself before accepting the report,
+as this plan's risk section requires. BLOB: pre-batch calls
+`_remove_references_held()` (which is `remove_all_references_from(BLOB, uuid)`),
+then hashes, transfers, attributes, blob; the declaration lists exactly those
+five in that order. ARTIFACT: pre-batch calls three, plus
+`delete_cluster_operation_targets_for_object` through its `dbowo` base; the
+declaration lists exactly those four. Both match.
+
+**The three paths agree.** The servicer re-enters the same public function, so
+there is one declaration and one implementation, and the server re-runs the
+request check. `hard_delete_objects_per_call` iterates the identical tuple and
+then the base three, so the set is identical by construction; it differs only in
+atomicity, the absence of a guard (it is reached only from the unconditional
+path) and the state row going last. It is reachable at `$TIP` --
+`HardDeleteBatchUnavailable` is raised only by the gRPC wrapper on `UNIMPLEMENTED`
+or inside its 300 s remembered-answer window, which means a rolling upgrade --
+and three tests exercise it rather than assert it exists, two of them in `tox`.
+For the four cascade types nothing is done twice or dropped: the targets delete
+is gated on the same `not in HARD_DELETE_BATCH_FUNCTIONS` test in both places,
+and the sweep chooses batch or singly, never both.
+
+**Part 3, which is why this heading existed.** `EXPECTED_DELETES` in
+`test_hard_delete_batch_parity.py:79-151` is **not** independent of the
+declaration and could not have caught an error made when the declaration was
+written. The only two tests that read the literals compare them with the
+declaration (`test_literal_matches_the_mapping` asserts equality outright) or
+with `hard_delete_objects_per_call`, which iterates that same declaration. The
+live module's fixtures seed themselves from the declaration too
+(`test_mariadb_hard_delete_objects_live.py:264`). So all three copies trace to
+one source, and the docstring's "as read from each class before it moved onto
+the batch" describes an intent the code cannot evidence. What the parity test
+*does* prove independently is the other direction, and it is valuable:
+`test_class_makes_one_batch_call` runs each of the 25 classes' real
+`hard_delete()` and requires exactly one unconditional batch plus one audit
+event, so a row delete left behind in a class would fail. This step's table is,
+as far as can be established, the first comparison of the declaration against
+the pre-batch code. Advisory, and the discipline point is folded into #4880.
+
+### The 33fl floor
+
+Step 5i, over `789d3b45` (Mach33Labs/33fl#1094, sfcbr's cap) and `8740490f`
+(#1095, the `shakenfist_sweep_backlog` fact), under the five-item floor. Nothing
+blocking, nothing advisory.
+
+The floor: (1) form satisfied -- both are two-parent merge commits read against
+their first parents, recorded here because no `Merged` cell names them, which is
+what D31 decided; (2) no new unattended job -- the fact runs inside the existing
+nightly pre-compute and the cap rides the existing deploy; (3) no secrets or
+hostnames in either diff; (4) no removals or renames; (5) nothing published.
+
+D31's three questions, each answered from the code and its tests:
+
+- **Absence reads as `unavailable`, not zero.** `summarize_sweep_backlog`
+  (`tools/infra-report-precompute.py:8250`) returns
+  `{'unavailable': 'cluster_deleted_object_backlog absent (leadership changed
+  within the hour?)'}` when the current rows are empty, which the management
+  session confirmed by reading it. Pinned by
+  `test_gauge_absent_is_unavailable_not_clean`. Both gauge queries use `max by`,
+  pinned by `test_two_leaders_take_the_larger_not_the_sum`, and a missing prior
+  sample gives nulls and no flag, pinned by
+  `test_missing_prior_sample_gives_null_and_no_flag`. All three tests exist.
+- **The cap change is inert elsewhere and leaves `RAM_OVERCOMMIT_RATIO`
+  intact.** The management session parsed `group_vars/allsf.yml`'s
+  `extra_config`: exactly two entries, `RAM_OVERCOMMIT_RATIO` 1.0 and
+  `DELETED_OBJECT_SWEEP_MAX_OBJECTS` 400. Only `sfcbr.yml` consumes
+  `extra_config`, and it asserts every pair back from `cluster_config` after
+  deploy, so a dropped setting fails the deploy loudly.
+- **No silent unattended failure.** `unavailable` reaches the report as "not
+  checked tonight", and the landing adds `behind` and `growing` to
+  `FLAG_CHANGE_SPECS`.
+
+In its own worktree, cut detached at `master` because the primary clone has it
+checked out: `pre-commit run --all-files` exit 0, and
+`python3 tools/test_infra_report_precompute.py` exit 0 with 935 tests OK. The
+worktree was removed afterwards, which the management session confirmed. The
+primary clone's unrelated uncommitted work was never touched -- the brief
+required a separate worktree for exactly that reason.
+
+### Disposition
+
+Seven issues filed, one finding declined in writing, two seeded findings
+recorded without filing. The D38 searches run before filing were
+`hard delete in:title`, `sweep in:title`, `deleted object in:title` and
+`object_states in:title,body`, each `--state all --limit 50`, plus
+`sf-database authentication`, `mTLS`, `insecure_port` and
+`authorise OR authorize in:title` for the security finding. Nothing returned
+covers any filed finding; #3922 is the adjacent case to #4876 and is
+cross-referenced on it, and #3534 (closed) is cross-referenced on #4877.
+
+| Finding | Step | Grade | D32 | Disposition |
+|---------|------|-------|-----|-------------|
+| `node` is swept but never hard deleted; outcome and backlog both lie | 5d | **blocking** | still true | filed [#4876](https://github.com/shakenfist/shakenfist/issues/4876) |
+| Cluster-operation batch statements have no type predicate (3 builders) | 5g | advisory | still true | filed [#4877](https://github.com/shakenfist/shakenfist/issues/4877) |
+| The time budget is the next limit; docs over-promise, pass log is silent | 5f, S1 | advisory | still true | filed [#4878](https://github.com/shakenfist/shakenfist/issues/4878) |
+| Four doc and comment corrections, incl. the `(D6)` citation | 5c, 5f, 5g | advisory | still true | filed [#4879](https://github.com/shakenfist/shakenfist/issues/4879) |
+| No PR-time test of the batch's SQL; the mock bypasses the batch | 5e, 5h | advisory | still true | filed [#4880](https://github.com/shakenfist/shakenfist/issues/4880) |
+| gRPC stubs split across two grpcio-tools versions | 5b | advisory | still true | filed [#4881](https://github.com/shakenfist/shakenfist/issues/4881) |
+| `mariadb.py` seam, duplicated wrappers, config-restating comment | 5d | advisory | still true | filed [#4882](https://github.com/shakenfist/shakenfist/issues/4882) |
+| sf-database authenticates and authorises nobody | 5g | advisory here | still true | **declined**: a recorded posture (`PLAN-embrace-tls.md:68`), not a defect this plan introduced. The surface widening is recorded above and the missing operator-guide sentence folded into #4879 |
+| sfcbr's cap left at 400 (S2) | seeded | advisory | still true | recorded in the master plan's Future work; no issue, it is a one-line 33fl change |
+| #4759 is this plan's doing (S3) | seeded | advisory | still true | already filed; its "every fifteen minutes" claim corrected by a comment on the issue |
+
+All 25 batchable types matched the pre-batch code, so the defect class this
+phase existed to look for -- a silent row leak from the batch restatement -- is
+absent. The blocking finding is in the adjacent place: a type the batch does not
+cover at all, which the sweep nonetheless reports as succeeding.
+
+**Consequence for this plan's status.** D37's second branch applies: one finding
+is blocking, so phase 5 and the plan stay `In progress`, and the plan is
+`Complete` when #4876 is resolved. Per the `plan-phase-landing` convention the
+fix is a follow-up pull request after this audit merges, and that pull request
+records this phase's merge commit.
+
 ## Execution notes
 
 - **Back brief, 2026-11-11.** Michael kept all three points as planned:
@@ -679,6 +1095,42 @@ no output
     the same range (one hit, the generated descriptor, 92,220
     characters). The one hit is in a generated file, which D30 exempts
     from judgement review.
+
+- **Wave 2, 2026-11-11.** 5c to 5i ran in parallel as D33 allows, all
+  read-only; only 5b and this session wrote files or ran the suite. Each report
+  was reviewed against the tree before being recorded, and the checks the
+  management session re-ran are named in the findings above. Three reports
+  needed management-session work beyond recording:
+  - **5c was sent back.** Its first pass returned "Style checks passed" having
+    read none of `PUSH-AUDIT.md`, `AGENTS.md` or `standards.md`. The brief was
+    adequate; the instruction was skipped. Its second pass withdrew the bare
+    pass and produced the `(D6)` finding.
+  - **5f refuted a premise of this plan**, which is recorded as a correction at
+    source rather than as a finding: `d04d5583f5` did not add fields to the
+    sweep's pass log line. Survey finding 4 is corrected in this commit.
+  - **5g's finding F2 was one instance of a class of three.** The management
+    session read every builder in `HARD_DELETE_STATEMENTS` and found the same
+    missing type predicate in `delete_cluster_operation`,
+    `delete_cluster_operation_error` and `delete_cluster_operation_target`;
+    #4877 is filed against all three.
+  Two reports carried a wrong count that did not change their conclusion, noted
+  so the next reader does not inherit either: 5c said the advisory
+  plan-citation checker reports 11 hits (it reports 406, of which exactly one is
+  in range), and 5h said the pre-batch tree has 18 `hard_delete` definitions (it
+  has 22; its substantive claim, that none of the fourteen cluster-operation
+  modules defines one, holds).
+- **The blocking finding, 2026-11-11.** #4876 was verified link by link in the
+  management session before being filed, and two facts were added to it: that
+  the false `hard_deleted` count defeats this plan's own
+  `shakenfist_sweep_backlog` guard by inflating the arrivals term, and that the
+  defect is latent on sfcbr, which has deleted no node in 30 days. Per D37 the
+  plan therefore stays `In progress` and the fix is a follow-up pull request.
+- **Mutation evidence, 2026-11-11.** Phase 2's fairness guard was re-killed in
+  the management session rather than taken from 5e's report: the one file was
+  copied to the scratchpad, the rotation was removed by an inverse edit, the
+  test was run with `-B` under `timeout`, and the file was restored from the
+  copy (not with `git checkout`, which would have discarded the plan edits in
+  the same tree). Baseline OK, mutant FAILED, `git status` clean afterwards.
 
 ## Back brief
 
