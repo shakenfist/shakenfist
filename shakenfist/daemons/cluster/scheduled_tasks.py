@@ -67,7 +67,7 @@ INSTANCE_CHECKS_QUEUE = NamedQueue('per-instance')
 # filled type by type let one large backlog take every pass's whole budget,
 # so the types behind it were never reached at all. Instead the drain takes
 # a turn of up to DELETED_OBJECT_BATCH_SIZE entries from each type that has
-# work in turn, in the order of OBJECT_NAMES_TO_CLASSES, so a type with
+# work in turn, in the order of DELETED_OBJECT_SWEEP_TYPES, so a type with
 # thirty objects gets the same share of the pass as one with hundreds of
 # thousands. The share is counted in entries rather than time: a type whose
 # turn is one cheap batch delete must not crowd out one whose objects are
@@ -92,7 +92,7 @@ INSTANCE_CHECKS_QUEUE = NamedQueue('per-instance')
 # once per pass.
 #
 # _DELETED_OBJECT_NEXT_TYPE is the drain's position in the rotation, an
-# index into list(OBJECT_NAMES_TO_CLASSES). It persists across passes: if
+# index into DELETED_OBJECT_SWEEP_TYPES. It persists across passes: if
 # every pass started from the top, a budget that ran out part way through a
 # round would favour the types at the head of the order every time, which
 # is the same starvation in a milder form.
@@ -115,6 +115,32 @@ _DELETED_OBJECT_NEXT_TYPE: int = 0
 # either way.
 DELETED_OBJECT_OUTCOMES = (
     'gone', 'not_final', 'too_young', 'skipped', 'hard_deleted', 'failed')
+
+# Object types the sweep must not take, the same declaration as
+# ZOMBIE_REPAIR_EXCLUDED_TYPES below. Node.hard_delete() is deliberately a
+# no-op -- a deleted node keeps its rows, because the cluster still has to
+# remember the node it decommissioned -- so there is nothing here for the
+# sweep to do, and nothing it can report truthfully: the per-object path
+# counts an object it called hard_delete() on as hard deleted, without a
+# second read to confirm it, which is right for every type whose
+# hard_delete() ends at the base implementation and wrong for this one. A
+# swept node was therefore re-read every pass, had a no-op called on it, and
+# was counted as hard deleted again, forever (#4876). That inflated the
+# hard-delete counter the nightly days-behind guard derives arrivals from,
+# which is how the defect hid from the check built to catch it.
+#
+# The backlog gauge excludes the same types: a count that nothing will ever
+# drain is not a measure of how far behind the sweep is, and published it
+# would read as a type permanently behind.
+#
+# A type belongs here when its hard_delete() cannot remove its object_states
+# row. DeletedObjectSweepExcludedTypesTestCase pins that: it walks each
+# swept type's hard_delete() chain and fails if one does not reach the base
+# implementation.
+DELETED_OBJECT_SWEEP_EXCLUDED_TYPES = {'node'}
+DELETED_OBJECT_SWEEP_TYPES = [
+    objtype for objtype in OBJECT_NAMES_TO_CLASSES
+    if objtype not in DELETED_OBJECT_SWEEP_EXCLUDED_TYPES]
 
 # What the deleted-object sweep costs and how far behind it is (#4473).
 # The entry histogram is per dequeued entry, and an entry of a batch is
@@ -220,7 +246,7 @@ class WorkList(NamedTuple):
     applies to one type's reply, and the other types are still
     readable), so that caller should move on to the next type. A
     ``DatabaseUnavailable`` is tier-wide, and asking the same dead tier
-    28 more times buys nothing while costing a full ``_grpc_call``
+    27 more times buys nothing while costing a full ``_grpc_call``
     retry budget each time -- see ``_fill_deleted_object_work``.
     """
     uuids: Optional[list[str]]
@@ -1026,13 +1052,15 @@ def per_deleted_object_checks():
 def publish_deleted_object_backlog():
     """Set the backlog gauge from a count of final-state objects per type.
 
-    Every type is published, zeros included, so an alert can rely on the
-    series existing. A failed count removes the type's label set rather than
-    leaving a value the failed read can no longer vouch for. A tier-wide
-    failure stops the pass for the reason given in
-    ``_fill_deleted_object_work()``.
+    Every type the sweep takes is published, zeros included, so an alert can
+    rely on the series existing; the types in
+    DELETED_OBJECT_SWEEP_EXCLUDED_TYPES are not, because a backlog nothing
+    drains is not a measure of how far behind the sweep is. A failed count
+    removes the type's label set rather than leaving a value the failed read
+    can no longer vouch for. A tier-wide failure stops the pass for the
+    reason given in ``_fill_deleted_object_work()``.
     """
-    object_types = list(OBJECT_NAMES_TO_CLASSES)
+    object_types = list(DELETED_OBJECT_SWEEP_TYPES)
     for objtype in _sweep_object_types('deleted_object_backlog', object_types):
         try:
             with mariadb.rpc_timing_scope('deleted_object_backlog', objtype):
@@ -1074,7 +1102,7 @@ def _fill_deleted_object_work(now: float, deadline: float) -> bool:
     # before any processing happened (issue 3533). The age filter is pushed
     # down to SQL so objects too young to hard delete are never fetched at
     # all.
-    object_types = list(OBJECT_NAMES_TO_CLASSES)
+    object_types = list(DELETED_OBJECT_SWEEP_TYPES)
     for objtype in _sweep_object_types('per_deleted_object', object_types):
         work = _DELETED_OBJECT_WORK.setdefault(objtype, collections.deque())
         if work:
@@ -1082,7 +1110,7 @@ def _fill_deleted_object_work(now: float, deadline: float) -> bool:
         if _DELETED_OBJECT_RECHECK_AT.get(objtype, 0.0) > now:
             continue
 
-        # Each read is cheap while MariaDB walks the primary key, but 29 of
+        # Each read is cheap while MariaDB walks the primary key, but 28 of
         # them back to back are not if it ever chooses to sort instead, and
         # the pass is meant to fit its budget whichever it does. Resuming
         # at this type rather than starting from the top again means a run
@@ -1115,7 +1143,7 @@ def _fill_deleted_object_work(now: float, deadline: float) -> bool:
         #   plus sleeps, so about 93s. This is the shape the early return is
         #   sized for.
         #
-        # There are 29 object types here and _run_due_scheduled_jobs()
+        # There are 28 object types here and _run_due_scheduled_jobs()
         # pets the watchdog only between jobs, while sf-cluster runs at
         # WatchdogSec=300s. In the slow shape continuing past the fourth
         # failure already exceeds the window and a full pass would take
@@ -1123,7 +1151,7 @@ def _fill_deleted_object_work(now: float, deadline: float) -> bool:
         # learning nothing. Either way it risks SIGABRTing the elected
         # maintainer and costing a lock failover, where before it merely
         # skipped a pass. Nothing is gained by asking a tier that is not
-        # there 28 more times. This function has blown the watchdog
+        # there 27 more times. This function has blown the watchdog
         # window once already (issue 3533).
         with mariadb.rpc_timing_scope('per_deleted_object_fill', objtype):
             page = _sweep_work_page(
@@ -1291,7 +1319,7 @@ def _drain_deleted_object_work(
     """
     global _DELETED_OBJECT_NEXT_TYPE
 
-    object_types = list(OBJECT_NAMES_TO_CLASSES)
+    object_types = list(DELETED_OBJECT_SWEEP_TYPES)
     processed = 0
     start_time = time.time()
     deadline = start_time + execution_limit

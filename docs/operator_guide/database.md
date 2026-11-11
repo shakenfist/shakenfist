@@ -1009,10 +1009,13 @@ Twenty-five object types are hard deleted in batches, many to a single
 database transaction. The same RPC carries every other hard delete of
 those types too, such as a namespace's keys going with it, one
 transaction per object rather than one commit per table. Instances,
-namespaces, namespace claims and nodes are hard deleted one at a time,
-because their hard delete does more than remove rows keyed on the object
-(an instance releases its placement, and a namespace cascades to what it
-owns). An older `sf-database` which does not have the batch RPC still
+namespaces and namespace claims are hard deleted one at a time, because
+their hard delete does more than remove rows keyed on the object (an
+instance releases its placement, and a namespace cascades to what it
+owns). Nodes are not swept at all: a decommissioned node keeps its rows
+on purpose, so the sweep has nothing it could do with one, and it is
+excluded from the sweep's object types and from the backlog gauge below.
+An older `sf-database` which does not have the batch RPC still
 works: each daemon notices, logs a warning, and hard deletes one object
 at a time, asking again every five minutes. That is slower, which is why
 `sf-database` should be upgraded before `sf-cluster`.
@@ -1097,8 +1100,8 @@ whichever delay reaches back to before it):
   ```
 
 * The cost of a single object, by type, which matters for the types hard
-  deleted one at a time (namespaces, instances, namespace claims and
-  nodes) and is the mean seconds per hard delete query given under
+  deleted one at a time (namespaces, instances and namespace claims) and
+  is the mean seconds per hard delete query given under
   [Watching for sweeps that silently do nothing](#watching-for-sweeps-that-silently-do-nothing).
 * InnoDB row lock waits, which should not climb with the cap:
 
@@ -1176,8 +1179,11 @@ object costs. All are published by the elected cluster maintainer only.
   `CLUSTER_METRICS_PORT`, labelled by `object_type`: the number of
   objects in a final state. It is counted hourly, with no age filter, so
   it includes objects still inside their grace period and is a little
-  higher than what the sweep could delete right now. Every type is
-  published, zeros included, so an alert can rely on the series existing.
+  higher than what the sweep could delete right now. Every type the sweep
+  takes is published, zeros included, so an alert can rely on the series
+  existing. There is no `node` series, because nodes are never hard
+  deleted and so are not swept; a backlog nothing drains would read as a
+  type permanently behind.
   A count that fails drops that type's series until the next hour's count
   succeeds, and these counts are not covered by the failure streak gauge
   above, so alert on
