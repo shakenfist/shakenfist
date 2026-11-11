@@ -976,6 +976,54 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience,
     return None
 
 
+#: The one scope every OpenID Connect flow is required to request, and
+#: so the only sensible value for a login capable issuer which has none.
+DEFAULT_OIDC_SCOPES = 'openid'
+
+
+def _oidc_scopes_default(client_id, oidc_scopes, stored_client_id=None,
+                         stored_oidc_scopes=None):
+    """Hold one invariant: a login capable issuer has a scope list.
+
+    An issuer which ends a write with a client identifier set and no
+    OIDC scopes is given `openid`. That scope is mandatory in every
+    OpenID Connect flow, so a registration without it is one no client
+    can use, and leaving the column null would make every client hard
+    code the same value for itself.
+
+    Expressed as an invariant over what the write leaves behind, rather
+    than as a default on each of the two write paths, because the paths
+    do not mean the same thing by an absent field. A create writes both
+    columns, while an update leaves a field it was not sent alone -- so
+    a per-path default would either write a scope list an operator did
+    not ask for, or miss the issuer whose client identifier arrives in
+    a later request than the one that set its scopes. Both paths pass
+    what the row will say afterwards, which also makes the invariant
+    idempotent: a second identical request finds it already true and
+    writes nothing.
+
+    The exception is an explicit empty string. That is the instruction
+    to clear the column, and an operator who sends it is saying they
+    will manage the scope list themselves, so the default is not
+    re-applied over a clear in the same request -- otherwise the
+    instruction could not be expressed at all.
+
+    Returns the value the write must add, or None when the invariant
+    needs nothing from this write.
+    """
+    if oidc_scopes == '':
+        return None
+
+    if client_id is None:
+        client_id = stored_client_id
+    if oidc_scopes is None:
+        oidc_scopes = stored_oidc_scopes
+
+    if client_id and not oidc_scopes:
+        return DEFAULT_OIDC_SCOPES
+    return None
+
+
 def _issuer_url_lock():
     """Serialise the check-then-write on issuer_url.
 
@@ -1235,7 +1283,10 @@ class AuthIssuersEndpoint(api_base.Resource):
                 # leave the same row behind, and so that a column which
                 # is not set has one spelling.
                 client_id=client_id or None,
-                oidc_scopes=oidc_scopes or None,
+                # A client identifier with no scopes gets the one every
+                # flow must request: see _oidc_scopes_default().
+                oidc_scopes=(_oidc_scopes_default(client_id, oidc_scopes)
+                             or oidc_scopes or None),
                 authorization_endpoint=found.get('authorization_endpoint'),
                 token_endpoint=found.get('token_endpoint'),
                 device_authorization_endpoint=found.get(
@@ -1337,8 +1388,22 @@ class AuthIssuerEndpoint(api_base.Resource):
             if err:
                 return err
 
+            # What the invariant decides depends on what this write
+            # leaves behind, which on this path is partly what the row
+            # already says -- an update which only adds a client
+            # identifier must still end with a scope list. Read under
+            # the lock, immediately before the write it feeds, so
+            # nothing can land between the two. One read, see
+            # TrustedIssuer.configuration().
+            stored = issuer.configuration()
+            scopes = _oidc_scopes_default(
+                client_id, oidc_scopes,
+                stored_client_id=stored.client_id if stored else None,
+                stored_oidc_scopes=(
+                    stored.oidc_scopes if stored else None)) or oidc_scopes
+
             issuer.update(issuer_url, jwks_uri, audience,
-                          client_id=client_id, oidc_scopes=oidc_scopes,
+                          client_id=client_id, oidc_scopes=scopes,
                           discovered=discovered)
 
         # Belt and braces, and cheap. JWKSCache._client_and_lock()
@@ -2503,3 +2568,149 @@ class AuthFederatedEndpoint(api_base.Resource):
             'key_name': key_name,
             'key': secret
         }
+
+
+login_example = """[
+    {
+        "authorization_endpoint": "https://idp.example.com/application/o/authorize/",
+        "client_id": "shakenfist",
+        "device_authorization_endpoint": "https://idp.example.com/application/o/device/",
+        "issuer_url": "https://idp.example.com/application/o/sf/",
+        "name": "corporate",
+        "oidc_scopes": "openid profile groups",
+        "token_endpoint": "https://idp.example.com/application/o/token/"
+    }
+]
+"""
+
+
+class AuthLoginEndpoint(api_base.Resource):
+    # Unauthenticated by nature, for the same reason /auth/federated
+    # is: a person who is about to log in holds no Shaken Fist
+    # credential, and the endpoint which lists issuers for an
+    # administrator is behind caller_is_admin, so there is nowhere
+    # else a client could learn this from. Placed beside that endpoint
+    # because the two public auth routes are easier to review as a
+    # pair than scattered through the file.
+    @api_base.public
+    @swag_from(api_base.swagger_helper(
+        'auth', 'List the identity providers offered for human login.',
+        [],
+        [(200, 'The issuers a human may log in through. An empty list '
+               'means this cluster offers no human login.', login_example),
+         (429, 'Too many login metadata requests from this source.', None),
+         (503, 'The database is unavailable, so the request could not be '
+               'counted against the rate limit.', None)],
+        requires_auth=False))
+    def get(self):
+        """What a client needs to start a login, and nothing more.
+
+        An issuer appears here only when it is login capable: it has a
+        client identifier registered at the provider, and at least one
+        endpoint a flow can begin at. An issuer configured to verify a
+        workload's tokens has no client registration at the provider --
+        which is every issuer in existence today -- and would be
+        disclosed here for no purpose at all if membership were simply
+        "trusted". Its provider may publish endpoints anyway, and
+        discovery stores them, so the client identifier is the half
+        that decides this.
+
+        What this does disclose is which identity provider a cluster
+        trusts for human login. That is mild -- the endpoints are
+        public at the provider, and a client visible login
+        configuration is what every OIDC relying party publishes -- but
+        it is not nothing, because it tells somebody where to aim a
+        phishing page. So the field list is deliberately the shortest
+        one a client can start a flow with, and the response is built
+        field by field below rather than from the issuer's own view of
+        itself.
+        """
+        # Counted before the listing, not after. The listing below
+        # reads the attributes row of every configured issuer, so an
+        # anonymous caller who could reach it unmetered could multiply
+        # one request into a database read per issuer -- which is the
+        # amplification enforce_rate_limit's docstring describes for
+        # the exchange's issuer resolution, in the same shape.
+        #
+        # The key is prefixed so this endpoint has a budget of its own
+        # rather than sharing the exchange's. A CI cluster behind one
+        # NAT can spend a whole address's allowance on exchanges in a
+        # minute, and a shared counter would then answer 429 to every
+        # person trying to log in from that office -- and the reverse,
+        # a burst of logins throttling CI. The two also cost very
+        # different amounts: an exchange fetches a JWKS and runs a
+        # bcrypt, this reads one scan. The cost of the separation is at
+        # most one extra row per source per window, which is the order
+        # of growth enforce_rate_limit's docstring already accounts
+        # for, and the prefixed key still fits the column's 64
+        # characters alongside the longest IPv6 address.
+        source = flask.request.remote_addr or 'unknown'
+        try:
+            federation.enforce_rate_limit(f'login:{source}')
+        except exceptions.RateLimited as e:
+            LOG.with_fields({'source': source}).info(
+                f'Login metadata request rate limited: {e}')
+            return sf_api.error(429, 'too many login metadata requests',
+                                suppress_traceback=True)
+
+        out = []
+        for issuer in TrustedIssuers(
+                [partial(baseobject.state_filter,
+                         TrustedIssuer.ACTIVE_STATES)]):
+            # One read rather than a property per field, see
+            # TrustedIssuer.configuration().
+            attrs = issuer.configuration()
+            if not attrs:
+                # The static row outlived its attributes row. There is
+                # no configuration to publish, so there is nothing a
+                # client could do with this issuer.
+                continue
+
+            # Login capable, which is narrower than trusted. A flow
+            # posts a client identifier to one of two endpoints, so an
+            # issuer missing either half cannot be logged in through,
+            # and offering it would only produce a failure a person
+            # cannot act on.
+            if not attrs.client_id:
+                continue
+            if not (attrs.authorization_endpoint or
+                    attrs.device_authorization_endpoint):
+                continue
+
+            # Built explicitly rather than from external_view(), and
+            # that is the point rather than a verbosity to tidy up
+            # later. external_view() serves the issuer's whole
+            # configuration, so returning it here would publish
+            # whatever field the object grows next without anybody
+            # deciding to publish it -- an unauthenticated disclosure
+            # arriving as a side effect of an unrelated change. Each
+            # key below is here because a client cannot start a flow
+            # without it.
+            #
+            # Withheld on purpose: jwks_uri, which is ours to validate
+            # signatures with and which no client ever fetches;
+            # audience, which is how this cluster names itself to the
+            # provider; and the uuid, state and version, which are
+            # operational detail belonging to an administrator.
+            entry = {
+                'name': issuer.name,
+                'issuer_url': attrs.issuer_url,
+                'client_id': attrs.client_id,
+                'oidc_scopes': attrs.oidc_scopes
+            }
+
+            # The endpoints appear only when they are set, because
+            # their absence is information: a client reads the lack of
+            # a device authorization endpoint as "this provider cannot
+            # do the device flow here" and falls back, where a null
+            # would have to be interpreted the same way with an extra
+            # step.
+            for field in ('authorization_endpoint', 'token_endpoint',
+                          'device_authorization_endpoint'):
+                value = getattr(attrs, field)
+                if value:
+                    entry[field] = value
+
+            out.append(entry)
+
+        return out

@@ -379,6 +379,78 @@ class IssuerDiscoveryTestCase(base.ShakenFistTestCase):
         self.assertEqual('openid', resp.get_json()['oidc_scopes'])
 
     # ------------------------------------------------------------------
+    # A login capable issuer always ends a write with a scope list.
+    # ------------------------------------------------------------------
+    def test_a_client_id_with_no_scopes_gets_the_mandatory_one(self):
+        # openid is required in every OpenID Connect flow, so an issuer
+        # with a registration and no scopes is one no client can use.
+        # Defaulting it here means a client does not hard code it.
+        self.assertEqual(200, self._create(client_id='sf-cli').status_code)
+
+        self.assertEqual('openid', self._issuer()['oidc_scopes'])
+
+    def test_scopes_the_operator_chose_are_kept(self):
+        self.assertEqual(200, self._create(
+            client_id='sf-cli',
+            oidc_scopes='openid profile groups').status_code)
+
+        self.assertEqual('openid profile groups',
+                         self._issuer()['oidc_scopes'])
+
+    def test_an_update_which_adds_a_client_id_gets_the_scope(self):
+        # The case a default written per write path would miss: the
+        # registration arrives in a later request than the one which
+        # created the issuer, and this request mentions no scopes at
+        # all.
+        self.assertEqual(200, self._create().status_code)
+        self.assertIsNone(self._issuer()['oidc_scopes'])
+
+        resp = self._update(client_id='sf-cli')
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('sf-cli', resp.get_json()['client_id'])
+        self.assertEqual('openid', resp.get_json()['oidc_scopes'])
+
+    def test_clearing_the_scopes_is_not_undone_by_the_default(self):
+        # An operator who clears the column is saying they will manage
+        # the scope list themselves, and re-applying the default in the
+        # same request would make that impossible to say.
+        self.assertEqual(200, self._create(
+            client_id='sf-cli', oidc_scopes='openid profile').status_code)
+
+        resp = self._update(oidc_scopes='')
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('sf-cli', resp.get_json()['client_id'])
+        self.assertIsNone(resp.get_json()['oidc_scopes'])
+
+    def test_an_issuer_with_no_client_id_gets_no_scopes(self):
+        # Which is every issuer configured today. A workload issuer has
+        # no registration, so there is no flow to request a scope for
+        # and nothing to default.
+        self.assertEqual(200, self._create().status_code)
+
+        self.assertIsNone(self._issuer()['oidc_scopes'])
+
+    def test_the_default_is_not_rewritten_by_a_later_update(self):
+        # Idempotence, asserted on the write rather than on the value:
+        # once the invariant holds, a PUT which does not mention scopes
+        # must leave the column out of its field mask entirely, or
+        # every unrelated edit would rewrite it and event it.
+        self.assertEqual(200, self._create(client_id='sf-cli').status_code)
+        self.assertEqual('openid', self._issuer()['oidc_scopes'])
+
+        with mock.patch(
+                'shakenfist.mariadb.update_trusted_issuer_attributes',
+                side_effect=(
+                    self.mock_mariadb._mariadb_update_trusted_issuer_attributes
+                )) as update:
+            self.assertEqual(
+                200, self._update(audience='https://sf2.example.com')
+                .status_code)
+
+        [call] = update.call_args_list
+        self.assertNotIn('oidc_scopes', call.kwargs['fields'])
+
+    # ------------------------------------------------------------------
     # A successful run is authoritative about what the provider offers.
     # ------------------------------------------------------------------
     def test_a_withdrawn_endpoint_stops_being_advertised(self):

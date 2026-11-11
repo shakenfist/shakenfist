@@ -474,6 +474,12 @@ API_CAPABILITIES = {
         # whoever is configuring an issuer, because against an older
         # server omitting one is a 400 rather than a fetch.
         'issuer-discovery',
+        # human-login-metadata says that GET /auth/login exists, which
+        # is how a client decides whether this cluster offers human
+        # login at all: it is the only unauthenticated read of which
+        # issuers are login capable, and an empty list from it is a
+        # different answer to a 404 from a server which predates it.
+        'human-login-metadata',
         # namespace-claims advertises the claim CRUD surface. A client
         # cannot feature-detect it any other way, so a client that
         # checks this capability can degrade to unclaimed behaviour
@@ -678,6 +684,7 @@ api.add_resource(api_auth.AuthIssuerEndpoint,
                  '/auth/issuers/<issuer_name>')
 api.add_resource(api_auth.AuthIssuerDiscoverEndpoint,
                  '/auth/issuers/<issuer_name>/discover')
+api.add_resource(api_auth.AuthLoginEndpoint, '/auth/login')
 api.add_resource(api_auth.AuthNamespaceKeysEndpoint,
                  '/auth/namespaces/<namespace>/keys')
 api.add_resource(api_auth.AuthNamespaceKeyEndpoint,
