@@ -322,12 +322,15 @@ class Network(dbowo):
         # `network_deploy` composite task has been retired; the explicit task
         # list preserves its semantic (create on the network node, then
         # ensure the mesh FDB) without going through the obsolete handler.
+        #
+        # No runs_after. The network was minted a few lines above with a
+        # uuid nothing else has seen, so the pointer read this replaces
+        # always answered None (issue 4673).
         net_create_and_enqueue(
             n.uuid,
             [net_tasks.network_apply_create_network_node,
              net_tasks.network_ensure_mesh],
             PRIORITY.user_waiting,
-            runs_after=[n.last_cluster_operation],
             request_id=util_general.get_request_id())
 
         return n
