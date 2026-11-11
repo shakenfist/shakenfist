@@ -478,9 +478,15 @@ Each item is checkable; the command is given where there is one.
   linking to it if it needs it.
 - Nothing in this phase documents the cascade, the settle delay's
   enforcement, the dependency-wait budget or a configuration option.
-  Check: `grep -rni 'dependency.wait\|settle.*budget'
-  docs/operator_guide/ docs/developer_guide/` returns nothing outside
-  `docs/plans/`.
+  Check the phase's own diff, not the tree: `git diff <default> --
+  docs/operator_guide/ docs/developer_guide/ | grep '^+' | grep -niE
+  'dependency.wait|settle.*budget|cascad'` returns nothing. Grepping
+  the tree instead, as this item first said, cannot work: the cluster
+  operation dispatchers have had a documented dependency wait and
+  defer budget for years, in
+  `docs/developer_guide/network_dispatcher.md` and
+  `docs/operator_guide/networking/overview.md`, so a tree-wide grep
+  matches prose this phase must not touch and did not.
 - The master plan's phase 2 row says the `dependency_failure` column
   already exists, its design-sketch line references are current, and
   its #4826 entry records that the bug was fixed (all three done in
@@ -715,3 +721,15 @@ recorded there rather than fixed or filed here.
   API reference for the meaning instead of restating it. Verified by
   grep: each of the three facts appears on exactly one of the two
   pages.
+- **2026-11-11 (AEDT). One definition-of-done check could not be run
+  as written, and is corrected at source.** The item forbidding this
+  phase from documenting a cascade or a wait budget was expressed as a
+  grep over `docs/operator_guide/` and `docs/developer_guide/`, which
+  matches the cluster operation dispatchers' own dependency-wait and
+  defer-budget documentation -- prose which predates this plan by years
+  and which the phase correctly leaves alone. The check now reads the
+  phase's diff rather than the tree, and passes: the phase added no
+  such wording. This is the second criterion in this plan to have been
+  unfalsifiable as first written, after the column-type comparison
+  which could not tell `JSON` from `LONGTEXT`; both were found by
+  running them rather than by reading them.
