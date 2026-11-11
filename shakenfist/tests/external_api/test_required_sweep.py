@@ -61,6 +61,7 @@ from unittest import mock
 from uuid import uuid4
 
 from shakenfist import baseobject
+from shakenfist import exceptions
 from shakenfist.artifact import Artifact
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
@@ -506,13 +507,19 @@ SWEEP = {
         (400, False, 'guarded'),
     ('AuthIssuerEndpoint', 'put', 'issuer_url'):
         (400, False, 'guarded'),
-    ('AuthIssuerEndpoint', 'put', 'jwks_uri'):
-        (400, False, 'guarded'),
+    # jwks_uri was measured `guarded` on both issuer routes and is no
+    # longer in the census, because it is no longer declared required:
+    # an issuer which publishes an OpenID Connect discovery document
+    # says in it where its signing keys are, so omitting the parameter
+    # now asks for the published value instead of being a mistake. It
+    # is not relaxed in the sense RELAXED_BY_STEP_2 means, which is why
+    # it is not listed there: the handler's behaviour changed with it,
+    # rather than a correct declaration being corrected. What an
+    # omission does now -- a fetch, and a refusal if the fetch fails --
+    # is measured in test_issuer_discovery.py.
     ('AuthIssuersEndpoint', 'post', 'audience'):
         (400, False, 'guarded'),
     ('AuthIssuersEndpoint', 'post', 'issuer_url'):
-        (400, False, 'guarded'),
-    ('AuthIssuersEndpoint', 'post', 'jwks_uri'):
         (400, False, 'guarded'),
     ('AuthIssuersEndpoint', 'post', 'name'):
         (400, False, 'guarded'),
@@ -736,6 +743,22 @@ class SweepFixtureTestCase(AuthenticatedStackTestCase):
         agent_state.start()
         self.addCleanup(agent_state.stop)
 
+        # The issuer routes fetch an OpenID Connect discovery document
+        # when one is configured, which is an outbound HTTPS request to
+        # whatever the recipe's issuer_url names. A unit suite makes no
+        # network calls, so the fetch is refused here instead. Every
+        # issuer recipe supplies a jwks_uri, and for those discovery is
+        # best effort, so a refusal is audited and the request answers
+        # exactly as it did before discovery existed. A subclass which
+        # wants a document to be found says so itself --
+        # test_boolean_sweep.py's `discover` rows do.
+        discovery_patch = mock.patch(
+            'shakenfist.oidc_discovery.fetch',
+            side_effect=exceptions.OIDCDiscoveryFailed(
+                'the sweep fixture publishes no discovery document'))
+        discovery_patch.start()
+        self.addCleanup(discovery_patch.stop)
+
         # A trusted issuer and a mapping rule, so the two PUT routes
         # which resolve one by name reach their handlers instead of
         # answering 404.
@@ -931,7 +954,7 @@ class RequiredSweepTestCase(SweepFixtureTestCase):
     keeps the same observability), it just does not act on one, so a
     request reaches its handler exactly as it did before enforcement
     and the table below still describes real handler behaviour. That
-    also makes every one of the 77 rows, not merely the ``guarded`` and
+    also makes every one of the 75 rows, not merely the ``guarded`` and
     ``faults`` ones, evidence that ``warn`` reproduces the
     pre-enforcement answers.
 
@@ -957,7 +980,7 @@ class RequiredSweepTestCase(SweepFixtureTestCase):
             set(), set(RECIPES) - declared,
             'a recipe names a handler which declares nothing required')
 
-    def test_the_census_still_finds_seventy_seven(self):
+    def test_the_census_still_finds_seventy_five(self):
         """Finding F1's premise, re-asked here.
 
         D32 and D35 both rest on the shape of this census rather than
@@ -973,11 +996,16 @@ class RequiredSweepTestCase(SweepFixtureTestCase):
         The census was 76 until the placement query arrived, whose
         shape list is the one declaration added since -- an endpoint
         which takes a required body parameter joins this table, and the
-        number moving is how that obligation is noticed.
+        number moving is how that obligation is noticed. It then went
+        to 75 when ``jwks_uri`` stopped being required on the two
+        issuer routes, which is the first time a declaration has left
+        this census because the server genuinely stopped requiring it;
+        the two rows it took with it are commented where they were in
+        the table above.
         """
         rows = required_declarations()
-        self.assertEqual(77, len(rows))
-        self.assertEqual(76, len([r for r in rows if r[4]]))
+        self.assertEqual(75, len(rows))
+        self.assertEqual(74, len([r for r in rows if r[4]]))
         self.assertEqual(0, len([r for r in rows if not r[4] and r[5]]))
         self.assertEqual(1, len([r for r in rows if not r[5]]))
         self.assertEqual(

@@ -14996,9 +14996,7 @@ def _direct_create_trusted_issuer_attributes(
         with engine.connect() as conn:
             stmt = sa.insert(table).values(
                 uuid=data.uuid,
-                issuer_url=data.issuer_url,
-                jwks_uri=data.jwks_uri,
-                audience=data.audience)
+                **_trusted_issuer_attributes_column_values(data))
             conn.execute(stmt)
             conn.commit()
             return True
@@ -15027,7 +15025,14 @@ def _direct_get_trusted_issuer_attributes(
                 uuid=row.uuid,
                 issuer_url=row.issuer_url,
                 jwks_uri=row.jwks_uri,
-                audience=row.audience)
+                audience=row.audience,
+                authorization_endpoint=row.authorization_endpoint,
+                token_endpoint=row.token_endpoint,
+                device_authorization_endpoint=(
+                    row.device_authorization_endpoint),
+                client_id=row.client_id,
+                oidc_scopes=row.oidc_scopes,
+                discovered_at=row.discovered_at)
     except OperationalError as e:
         LOG.warning(
             'MariaDB get failed for trusted_issuer_attributes '
@@ -15051,16 +15056,34 @@ def _trusted_issuer_attributes_column_values(
     same row cannot lose its committed column to this writer's
     read-modify-write.
 
-    The only caller today names all three, because an issuer's
-    issuer_url, jwks_uri and audience are one coherent configuration
-    and editing them apart is how a cluster ends up pointing at a new
+    The identity half -- issuer_url, jwks_uri and audience -- always
+    moves together, because it is one coherent configuration and
+    editing it apart is how a cluster ends up pointing at a new
     provider while trusting the old one's keys. The mask exists so that
     a later single-field writer cannot silently revert the other two.
+
+    The discovery half is the reason the mask is now load bearing
+    rather than defensive. A run of discovery writes the three endpoint
+    columns and discovered_at and must leave everything else alone,
+    while an operator editing a client registration writes client_id
+    and oidc_scopes and must not revert an endpoint a discovery run
+    found between their read and their write.
+
+    Every column of the table appears here. A model field missing from
+    this map is a column no writer can ever set and no reader of a
+    masked write can ever see, which is silent rather than loud; the
+    test suite holds the two together.
     """
     all_values: Dict[str, Any] = {
         'issuer_url': data.issuer_url,
         'jwks_uri': data.jwks_uri,
         'audience': data.audience,
+        'authorization_endpoint': data.authorization_endpoint,
+        'token_endpoint': data.token_endpoint,
+        'device_authorization_endpoint': data.device_authorization_endpoint,
+        'client_id': data.client_id,
+        'oidc_scopes': data.oidc_scopes,
+        'discovered_at': data.discovered_at,
     }
     if not fields:
         return all_values

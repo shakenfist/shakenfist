@@ -465,6 +465,15 @@ API_CAPABILITIES = {
         # the cluster necessarily accepting exchanges yet.
         'mapping-rules',
         'federated-exchange',
+        # issuer-discovery says that this cluster will fetch an
+        # issuer's OpenID Connect discovery document: that jwks_uri is
+        # optional on issuer create and update, that client_id and
+        # oidc_scopes may be set, and that
+        # POST /auth/issuers/<name>/discover exists. A client which
+        # cannot see this token has to keep demanding a jwks_uri from
+        # whoever is configuring an issuer, because against an older
+        # server omitting one is a 400 rather than a fetch.
+        'issuer-discovery',
         # namespace-claims advertises the claim CRUD surface. A client
         # cannot feature-detect it any other way, so a client that
         # checks this capability can degrade to unclaimed behaviour
@@ -667,6 +676,8 @@ api.add_resource(api_auth.AuthNamespaceEventsEndpoint,
 api.add_resource(api_auth.AuthIssuersEndpoint, '/auth/issuers')
 api.add_resource(api_auth.AuthIssuerEndpoint,
                  '/auth/issuers/<issuer_name>')
+api.add_resource(api_auth.AuthIssuerDiscoverEndpoint,
+                 '/auth/issuers/<issuer_name>/discover')
 api.add_resource(api_auth.AuthNamespaceKeysEndpoint,
                  '/auth/namespaces/<namespace>/keys')
 api.add_resource(api_auth.AuthNamespaceKeyEndpoint,
