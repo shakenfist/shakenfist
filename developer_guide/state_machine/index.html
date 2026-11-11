@@ -16082,8 +16082,18 @@ have not yet aged out.</p>
   in flight. This is deliberately distinct from <code>error</code>, which means the
   Agent Operation itself failed. The reason is recorded as the state's
   message and as an audit event on the operation. Note that the two
-  states are terminal in the same way, but only <code>expired</code> is currently
+  states are terminal in the same way, but of the two only <code>expired</code> is
   swept for hard deletion.</li>
+<li><code>abort</code>: something this Agent Operation declared a <code>depends_on</code>
+  dependency on failed, so the operation itself will never run. This is
+  deliberately distinct from both <code>error</code>, which means the Agent
+  Operation itself failed, and <code>expired</code>, which means a timing budget
+  the caller set ran out. Like <code>expired</code>, and unlike <code>error</code>, an aborted
+  operation is swept for hard deletion, because <code>abort</code> is one of
+  <code>constants.FINAL_OBJECT_STATES</code>. Nothing moves an operation into this
+  state yet: an operation records the dependencies it was created with,
+  but those are not evaluated when it is dispatched, so the state is
+  defined and reachable by the state machine rather than produced.</li>
 </ul>
 <p>The <code>executing --&gt; queued</code> edge is a retry of a stalled attempt, not a
 failure: it fires when the executor made no progress rather than when it
@@ -16099,16 +16109,19 @@ the operation's own deadline, and is never taken by <code>execute</code> operati
   initial --&gt; deleted
   initial --&gt; error
   initial --&gt; expired
+  initial --&gt; abort
 
   preflight --&gt; queued
   preflight --&gt; deleted
   preflight --&gt; error
   preflight --&gt; expired
+  preflight --&gt; abort
 
   queued --&gt; executing
   queued --&gt; deleted
   queued --&gt; error
   queued --&gt; expired
+  queued --&gt; abort
 
   executing --&gt; complete
   executing --&gt; queued
@@ -16121,6 +16134,8 @@ the operation's own deadline, and is never taken by <code>execute</code> operati
   error --&gt; deleted
 
   expired --&gt; deleted
+
+  abort --&gt; deleted
 
   deleted --&gt; [*]</code></pre>
 <h2 id="artifacts">Artifacts<a class="headerlink" href="#artifacts" title="Permanent link">&para;</a></h2>

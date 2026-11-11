@@ -18647,7 +18647,7 @@ values (immutable data set at creation time):</p>
 <tr>
 <td><code>agent_operations</code></td>
 <td>AgentOperation</td>
-<td>uuid, namespace, instance_uuid (indexed), commands (JSON list), deadline (nullable), progress_timeout (nullable), version</td>
+<td>uuid, namespace, instance_uuid (indexed), commands (JSON list), depends_on (JSON list), runs_after (JSON list), deadline (nullable), progress_timeout (nullable), version</td>
 </tr>
 <tr>
 <td><code>instances</code></td>
@@ -18723,7 +18723,7 @@ dedicated attribute tables:</p>
 <tr>
 <td><code>agent_operation_attributes</code></td>
 <td>AgentOperation</td>
-<td>uuid, results (JSON dict), last_progress (nullable), attempts, expiry_reason (nullable)</td>
+<td>uuid, results (JSON dict), last_progress (nullable), attempts, expiry_reason (nullable), dependency_failure (nullable JSON dict)</td>
 </tr>
 <tr>
 <td><code>instance_attributes</code></td>
@@ -18776,6 +18776,31 @@ counts dispatches for the retry bound. <code>expiry_reason</code> is NULL until
 the operation expires, and then records which budget ran out --
 <code>deadline</code> or <code>progress</code> -- as an enumerated value the external view
 surfaces for clients to branch on.</p>
+<p>An agent operation may name other agent operations in its <code>depends_on</code> and
+<code>runs_after</code> columns. Both are <code>LONGTEXT NOT NULL</code> with a server default of
+<code>'[]'</code>, so they are never NULL, and an operation which names nothing holds an
+empty list. An entry in either is stored as
+<code>{"op_type": "agentoperation", "op_uuid": "...", "settle_seconds": N}</code>. All
+three keys are present in anything the API writes, because it normalises
+every edge through its schema model before storing it, and <code>settle_seconds</code>
+is <code>null</code> when the caller asked for no settle delay. A reader should still
+treat an absent <code>settle_seconds</code> as <code>null</code>, since a row this API did not
+write -- a hand-edited one -- can lack the key. <code>dependency_failure</code> is NULL
+unless a <code>depends_on</code> dependency failed and caused this operation to be
+aborted. Nothing evaluates an edge or writes <code>dependency_failure</code> yet: an
+operation created with edges is dispatched exactly as one created without.
+See
+<a href="../../developer_guide/api_reference/instances/#agentdependency">the API reference</a>
+for the shape a caller sends and for what the two columns mean.</p>
+<p>The edges are written to MariaDB by <code>sf-database</code>, while the capability
+token which tells a client the parameters exist is advertised by <code>sf-api</code>.
+Upgrade the database tier before the API tier. A new <code>sf-api</code> talking to an
+older <code>sf-database</code> will accept an operation carrying edges, answer 200, and
+store it with empty edge lists, because the fields the newer API sends are
+unknown to the older service and are dropped: the record is lost rather than
+merely unevaluated, and nothing on the wire reports it. The table version
+check <code>sf-database</code> makes at startup guards the schema, not the vocabulary of
+the service in front of it.</p>
 <p><code>deadline</code> and <code>progress_timeout</code> are enforced: an operation which
 outlives either moves to the terminal <code>expired</code> state, checked at
 dequeue, during preflight and in the sidechannel executor. A NULL
