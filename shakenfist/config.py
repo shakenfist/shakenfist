@@ -548,6 +548,39 @@ class SFConfig(BaseSettings):
             'blackholing traffic exhausts the worker pool.'
         )
     )
+    FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS: int = Field(
+        5,
+        description=(
+            'How long in seconds to wait for a trusted issuer\'s OpenID '
+            'Connect discovery document before giving up. Separate from '
+            'FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS, whose value is tied to '
+            'the request path hazard of one unreachable provider pinning an '
+            'API worker per queued anonymous exchange: discovery runs only '
+            'when an administrator creates, updates or refreshes an issuer, '
+            'where a slow provider costs that administrator their own '
+            'request and nothing else. One setting for both would mean an '
+            'operator who lengthens the administrative timeout lengthens '
+            'the anonymous one too. This bounds each connect and each read '
+            'rather than the whole transfer, which is all the HTTP library '
+            'offers; FEDERATION_DISCOVERY_MAX_BYTES is what bounds the '
+            'transfer.'
+        )
+    )
+    FEDERATION_DISCOVERY_MAX_BYTES: int = Field(
+        65536,
+        description=(
+            'The largest OpenID Connect discovery document accepted from a '
+            'trusted issuer, in bytes. The body is read up to this much and '
+            'refused beyond it, rather than being measured by its '
+            'Content-Length, which is what the provider claims rather than '
+            'what it sends. Nothing else bounds a response which is not a '
+            'discovery document at all -- an HTML login page, or a tarball '
+            'behind a misconfigured reverse proxy. A real document is a few '
+            'kilobytes. Distinct from FEDERATION_MAX_TOKEN_BYTES, which '
+            'bounds a request body we are sent rather than a response we '
+            'fetch.'
+        )
+    )
     FEDERATION_JWKS_CA_BUNDLE: str = Field(
         '',
         description=(

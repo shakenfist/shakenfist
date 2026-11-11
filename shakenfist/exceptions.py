@@ -328,6 +328,25 @@ class JWKSTrustAnchorUnusable(FederationException):
     """
 
 
+class OIDCDiscoveryFailed(FederationException):
+    """An issuer's OpenID Connect discovery document could not be used.
+
+    Covers both the fetch and the document: an unreachable provider, a
+    redirect we will not follow, a body too large or not JSON, a
+    document whose issuer member names somebody other than the issuer we
+    asked about, or a jwks_uri which is missing or not https.
+
+    A FederationException subclass rather than a flattened one, for the
+    reason that family is subclassed in the first place: the endpoint
+    decides what to tell which caller. An administrator configuring an
+    issuer needs the whole message, because it is how they tell which of
+    a dozen plausible mistakes they made, while the exchange endpoint
+    answers callers holding no Shaken Fist credential and must not
+    become an oracle for how a cluster's identity providers are
+    configured.
+    """
+
+
 class CorruptMappingRule(DatabaseException):
     """A mapping rule's policy columns could not be decoded.
 
