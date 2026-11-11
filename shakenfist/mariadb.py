@@ -20247,6 +20247,8 @@ def _grpc_create_agent_operation(data: AgentOperationData) -> bool:
                 namespace=data.namespace or '',
                 instance_uuid=str(data.instance_uuid),
                 commands_json=_json_dumps(data.commands),
+                depends_on_json=_json_dumps(data.depends_on),
+                runs_after_json=_json_dumps(data.runs_after),
                 deadline=data.deadline,
                 progress_timeout=data.progress_timeout,
                 version=data.version
@@ -20273,11 +20275,15 @@ def _grpc_get_agent_operation(
             return None
         d = reply.data
         commands = json.loads(d.commands_json) if d.commands_json else []
+        depends_on = json.loads(d.depends_on_json) if d.depends_on_json else []
+        runs_after = json.loads(d.runs_after_json) if d.runs_after_json else []
         return AgentOperationData(
             uuid=d.uuid,
             namespace=d.namespace or '',
             instance_uuid=d.instance_uuid,
             commands=commands,
+            depends_on=depends_on,
+            runs_after=runs_after,
             deadline=d.deadline if d.HasField('deadline') else None,
             progress_timeout=(d.progress_timeout
                               if d.HasField('progress_timeout') else None),
@@ -20305,6 +20311,19 @@ def _grpc_delete_agent_operation(aop_uuid: UUID) -> bool:
         return False
 
 
+def _dependency_failure_json(
+        data: AgentOperationAttributesData) -> Optional[str]:
+    """Encode dependency_failure for the wire, keeping None as None.
+
+    The proto field has explicit presence and a None kwarg leaves it
+    unset, which the receiver reads back as SQL NULL. Encoding None
+    would send the string 'null' and claim a cascade happened.
+    """
+    if data.dependency_failure is None:
+        return None
+    return _json_dumps(data.dependency_failure)
+
+
 def _grpc_create_agent_operation_attributes(
         data: AgentOperationAttributesData) -> bool:
     """Create AgentOperation attributes via the database service."""
@@ -20316,7 +20335,8 @@ def _grpc_create_agent_operation_attributes(
                 results_json=_json_dumps(data.results),
                 last_progress=data.last_progress,
                 attempts=data.attempts,
-                expiry_reason=data.expiry_reason))
+                expiry_reason=data.expiry_reason,
+                dependency_failure_json=_dependency_failure_json(data)))
         reply = _grpc_call(stub.CreateAgentOperationAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -20347,6 +20367,9 @@ def _grpc_get_agent_operation_attributes(
             attempts=d.attempts,
             expiry_reason=(d.expiry_reason
                            if d.HasField('expiry_reason') else None),
+            dependency_failure=(json.loads(d.dependency_failure_json)
+                                if d.HasField('dependency_failure_json')
+                                else None),
         )
     except grpc.RpcError as e:
         LOG.error(
@@ -20371,7 +20394,8 @@ def _grpc_update_agent_operation_attributes(
                 results_json=_json_dumps(data.results),
                 last_progress=data.last_progress,
                 attempts=data.attempts,
-                expiry_reason=data.expiry_reason),
+                expiry_reason=data.expiry_reason,
+                dependency_failure_json=_dependency_failure_json(data)),
             fields=fields or [])
         reply = _grpc_call(stub.UpdateAgentOperationAttributes, request)
         return bool(reply.success)

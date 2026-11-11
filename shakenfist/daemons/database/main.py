@@ -4692,11 +4692,17 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Convert a proto AgentOperationStaticData to model."""
         commands = (json.loads(d.commands_json)
                     if d.commands_json else [])
+        depends_on = (json.loads(d.depends_on_json)
+                      if d.depends_on_json else [])
+        runs_after = (json.loads(d.runs_after_json)
+                      if d.runs_after_json else [])
         return AgentOperationData(
             uuid=UUID(d.uuid),
             namespace=d.namespace or '',
             instance_uuid=UUID(d.instance_uuid),
             commands=commands,
+            depends_on=depends_on,
+            runs_after=runs_after,
             deadline=d.deadline if d.HasField('deadline') else None,
             progress_timeout=(d.progress_timeout
                               if d.HasField('progress_timeout') else None),
@@ -4713,6 +4719,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             namespace=data.namespace or '',
             instance_uuid=str(data.instance_uuid),
             commands_json=json.dumps(data.commands),
+            depends_on_json=json.dumps(data.depends_on),
+            runs_after_json=json.dumps(data.runs_after),
             deadline=data.deadline,
             progress_timeout=data.progress_timeout,
             version=data.version
@@ -4833,6 +4841,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             attempts=d.attempts,
             expiry_reason=(d.expiry_reason
                            if d.HasField('expiry_reason') else None),
+            dependency_failure=(json.loads(d.dependency_failure_json)
+                                if d.HasField('dependency_failure_json')
+                                else None),
         )
 
     def _agentop_attrs_to_proto(
@@ -4845,7 +4856,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             results_json=json.dumps(data.results),
             last_progress=data.last_progress,
             attempts=data.attempts,
-            expiry_reason=data.expiry_reason)
+            expiry_reason=data.expiry_reason,
+            dependency_failure_json=(
+                json.dumps(data.dependency_failure)
+                if data.dependency_failure is not None else None))
 
     # Artifact Operations (MariaDB)
     def CreateArtifact(

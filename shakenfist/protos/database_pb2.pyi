@@ -7301,6 +7301,11 @@ class AgentOperationStaticData(_message.Message):
     deadline, or the progress timeout disabled. Without presence the
     wire cannot tell those two apart, and every daemon except
     sf-database itself reaches MariaDB across this boundary.
+
+    depends_on_json and runs_after_json are deliberately not optional. The
+    columns are NOT NULL and default to an empty list, so an operation
+    which names nothing carries '[]', and that is an unambiguous "no
+    edges". There is no second state for presence to distinguish.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -7312,6 +7317,8 @@ class AgentOperationStaticData(_message.Message):
     VERSION_FIELD_NUMBER: _builtins.int
     DEADLINE_FIELD_NUMBER: _builtins.int
     PROGRESS_TIMEOUT_FIELD_NUMBER: _builtins.int
+    DEPENDS_ON_JSON_FIELD_NUMBER: _builtins.int
+    RUNS_AFTER_JSON_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     """AgentOperation UUID"""
     namespace: _builtins.str
@@ -7326,6 +7333,10 @@ class AgentOperationStaticData(_message.Message):
     """Absolute epoch seconds; absent = server default"""
     progress_timeout: _builtins.float
     """Seconds; absent = server default"""
+    depends_on_json: _builtins.str
+    """JSON-encoded list of edge dicts; '[]' = none"""
+    runs_after_json: _builtins.str
+    """JSON-encoded list of edge dicts; '[]' = none"""
     def __init__(
         self,
         *,
@@ -7336,10 +7347,12 @@ class AgentOperationStaticData(_message.Message):
         version: _builtins.int = ...,
         deadline: _builtins.float | None = ...,
         progress_timeout: _builtins.float | None = ...,
+        depends_on_json: _builtins.str = ...,
+        runs_after_json: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["_deadline", b"_deadline", "_progress_timeout", b"_progress_timeout", "deadline", b"deadline", "progress_timeout", b"progress_timeout"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["_deadline", b"_deadline", "_progress_timeout", b"_progress_timeout", "commands_json", b"commands_json", "deadline", b"deadline", "instance_uuid", b"instance_uuid", "namespace", b"namespace", "progress_timeout", b"progress_timeout", "uuid", b"uuid", "version", b"version"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_deadline", b"_deadline", "_progress_timeout", b"_progress_timeout", "commands_json", b"commands_json", "deadline", b"deadline", "depends_on_json", b"depends_on_json", "instance_uuid", b"instance_uuid", "namespace", b"namespace", "progress_timeout", b"progress_timeout", "runs_after_json", b"runs_after_json", "uuid", b"uuid", "version", b"version"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     _WhichOneofReturnType__deadline: _TypeAlias = _typing.Literal["deadline"]  # noqa: Y015
     _WhichOneofArgType__deadline: _TypeAlias = _typing.Literal["_deadline", b"_deadline"]  # noqa: Y015
@@ -7444,6 +7457,11 @@ class AgentOperationAttributesProto(_message.Message):
     here means no forward progress has been observed yet / the operation
     has not expired. attempts is not optional because the column is not
     nullable.
+
+    dependency_failure_json also uses presence, because absent means SQL
+    NULL: no dependency failure reached this operation. That is a
+    different fact from a cascade which recorded no detail, which would
+    be the present value '{}', so the two must not be collapsed.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -7453,6 +7471,7 @@ class AgentOperationAttributesProto(_message.Message):
     LAST_PROGRESS_FIELD_NUMBER: _builtins.int
     ATTEMPTS_FIELD_NUMBER: _builtins.int
     EXPIRY_REASON_FIELD_NUMBER: _builtins.int
+    DEPENDENCY_FAILURE_JSON_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     """References agent_operations.uuid"""
     results_json: _builtins.str
@@ -7463,6 +7482,8 @@ class AgentOperationAttributesProto(_message.Message):
     """Dispatch counter for the retry bound"""
     expiry_reason: _builtins.str
     """'deadline' or 'progress'; absent = not expired"""
+    dependency_failure_json: _builtins.str
+    """JSON-encoded dict; absent = no cascade"""
     def __init__(
         self,
         *,
@@ -7471,15 +7492,20 @@ class AgentOperationAttributesProto(_message.Message):
         last_progress: _builtins.float | None = ...,
         attempts: _builtins.int = ...,
         expiry_reason: _builtins.str | None = ...,
+        dependency_failure_json: _builtins.str | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["_expiry_reason", b"_expiry_reason", "_last_progress", b"_last_progress", "expiry_reason", b"expiry_reason", "last_progress", b"last_progress"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_dependency_failure_json", b"_dependency_failure_json", "_expiry_reason", b"_expiry_reason", "_last_progress", b"_last_progress", "dependency_failure_json", b"dependency_failure_json", "expiry_reason", b"expiry_reason", "last_progress", b"last_progress"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["_expiry_reason", b"_expiry_reason", "_last_progress", b"_last_progress", "attempts", b"attempts", "expiry_reason", b"expiry_reason", "last_progress", b"last_progress", "results_json", b"results_json", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_dependency_failure_json", b"_dependency_failure_json", "_expiry_reason", b"_expiry_reason", "_last_progress", b"_last_progress", "attempts", b"attempts", "dependency_failure_json", b"dependency_failure_json", "expiry_reason", b"expiry_reason", "last_progress", b"last_progress", "results_json", b"results_json", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    _WhichOneofReturnType__dependency_failure_json: _TypeAlias = _typing.Literal["dependency_failure_json"]  # noqa: Y015
+    _WhichOneofArgType__dependency_failure_json: _TypeAlias = _typing.Literal["_dependency_failure_json", b"_dependency_failure_json"]  # noqa: Y015
     _WhichOneofReturnType__expiry_reason: _TypeAlias = _typing.Literal["expiry_reason"]  # noqa: Y015
     _WhichOneofArgType__expiry_reason: _TypeAlias = _typing.Literal["_expiry_reason", b"_expiry_reason"]  # noqa: Y015
     _WhichOneofReturnType__last_progress: _TypeAlias = _typing.Literal["last_progress"]  # noqa: Y015
     _WhichOneofArgType__last_progress: _TypeAlias = _typing.Literal["_last_progress", b"_last_progress"]  # noqa: Y015
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__dependency_failure_json) -> _WhichOneofReturnType__dependency_failure_json | None: ...
     @_typing.overload
     def WhichOneof(self, oneof_group: _WhichOneofArgType__expiry_reason) -> _WhichOneofReturnType__expiry_reason | None: ...
     @_typing.overload

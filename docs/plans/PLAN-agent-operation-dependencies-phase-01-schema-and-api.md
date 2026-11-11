@@ -555,3 +555,26 @@ recorded there rather than fixed or filed here.
   runs `flake8 --max-line-length=120` by hand over the files it
   touched, and its brief says so. Step 1a's five files were checked
   that way in the management session and are clean.
+- **2026-11-11 (AEDT). Step 1b found pre-existing drift in the
+  generated gRPC stubs, and it is regenerated in a commit of its
+  own.** Five of the six `*_pb2_grpc.py` files carried
+  `GRPC_GENERATED_VERSION = '1.84.0'` while `pyproject.toml` pins
+  `grpcio-tools==1.84.1` -- and says in a comment that the pin exists
+  so generated stubs match the runtime pins -- and
+  `database_pb2_grpc.py` was already at 1.84.1 because the last
+  person to touch the proto regenerated it. Nothing checks this:
+  there is no proto-staleness job in CI and no pre-commit hook for
+  it. The regeneration is therefore a real fix rather than churn, but
+  it is unrelated to dependency edges, so it lands as its own commit
+  ahead of the edge work.
+- **An unset proto3 string reads back as the empty string, which step
+  1b guarded without being asked to.** `depends_on_json` and
+  `runs_after_json` are plain string fields rather than optional ones,
+  because the columns are `NOT NULL DEFAULT '[]'` and `'[]'` is an
+  unambiguous "no edges". A message from a server which predates the
+  fields carries `''`, so both readers test the string before
+  `json.loads` and fall back to `[]`. Verified in the management
+  session by serialising and re-parsing: absent `dependency_failure`
+  round-trips as NULL, an empty dict round-trips as `{}`, and the two
+  stay distinct, which is the distinction phase 2's cascade depends
+  on.
