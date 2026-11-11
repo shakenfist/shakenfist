@@ -450,10 +450,19 @@ Each item is checkable; the command is given where there is one.
   **not** carry `dependency_failure`. Check: `grep -n
   'dependency_failure' shakenfist/operations/agentoperation.py`
   returns nothing.
-- The live migration test asserts that each new column's type on a
-  migrated database equals its type on a freshly created one, and
-  that assertion has been mutation tested by changing one column's
-  migration type, with the result recorded in the execution notes.
+- The live migration test asserts that each new column's type,
+  nullability **and collation** on a migrated database equal what
+  `create_all` produces on a freshly created one, compared through
+  `information_schema` rather than against hardcoded DDL text.
+  Collation is not a detail here: MariaDB's `JSON` is an alias for
+  `LONGTEXT` with a `json_valid()` constraint, so the two are
+  identical in `DATA_TYPE`, `COLUMN_TYPE` and `IS_NULLABLE`, and
+  `COLLATION_NAME` (`utf8mb4_bin` against `utf8mb4_general_ci`) is the
+  only part of `information_schema` which tells them apart. Without it
+  the assertion passes a migration which adds `JSON` where a fresh
+  create adds `LONGTEXT`, which is the exact divergence this item
+  exists to catch. Mutation tested by typing one migration column
+  `JSON`, with the result in the execution notes.
 - The live test passes against a real MariaDB, and the command and
   its output are recorded in the execution notes. A skipped live
   test is not a pass.
@@ -645,3 +654,49 @@ recorded there rather than fixed or filed here.
   re-run; it watches `roles/internal_ca/` only, nothing under that path
   is touched by this phase, and it left no modified file behind. Noted
   rather than investigated.
+- **2026-11-11 (AEDT). Step 1f found that step 1a had left two existing
+  live tests failing, and that this plan's own column-type criterion
+  was unfalsifiable as written.**
+
+  The regression first. `ef71d4a54a` made the two edge columns
+  `NOT NULL`, which is right, but the live module's rewind helper
+  dropped only the deadline columns, so its hand-written legacy
+  `INSERT` omitted `depends_on` -- and a `create_all` table has no
+  server default for it, the `DEFAULT '[]'` being a property of the
+  `ALTER` alone. Both `test_migration_preserves_existing_rows` and
+  `test_migration_from_v3_adds_only_expiry_reason` failed with
+  `(1364, "Field 'depends_on' doesn't have a default value")`.
+  Reproduced in the management session by running the module at
+  `HEAD`'s version of that file: 12 ran, 2 failed, exactly as
+  reported. The fix is test-side, in the rewind helper, which now
+  drops every column added after the version it rewinds to -- which is
+  also what such a deployment actually looked like. Nothing in the
+  mocked unit suite can see this class of defect, and the live tests
+  skip silently without a DSN, so all sixteen hooks passed on 1a while
+  it was broken. The management session's review of 1a was incomplete
+  in exactly that way: the live suite was not run until the step whose
+  job it was. A phase which adds a column to a migrated table should
+  run the live module at the step which adds the column, not only at
+  the step which tests it.
+
+  Then the criterion. Comparing `DATA_TYPE`, `COLUMN_TYPE` and
+  `IS_NULLABLE` cannot distinguish `JSON` from `LONGTEXT` on MariaDB.
+  Confirmed directly against the live server: a `json` column and a
+  `longtext` column both report `longtext` for all three and differ
+  only in `COLLATION_NAME`. The definition of done is corrected to
+  require collation, and the test compares it, which is what made the
+  `JSON` mutant fail.
+- **The live run, for the record.** MariaDB 10.11.19 in a disposable
+  container bound to `127.0.0.1:13306` only, driven by
+  `SF_MARIADB_TEST_DSN='mariadb+pymysql://shakenfist:<throwaway>@127.0.0.1:13306/shakenfist'`
+  with `PYTHONDONTWRITEBYTECODE=1` and `stestr run --serial` over
+  `shakenfist.tests.test_mariadb_agent_operations_live`, which ran 17
+  tests and skipped none. Reproduced in the management session after
+  the step reported. Two caveats carry forward. The driver is
+  `pymysql` where CI uses `mysqldb`: this project ships no driver at
+  all, `mysqlclient` being commented out of `pyproject.toml` as GPL,
+  so a local run must substitute one; only DDL and
+  `information_schema` are inspected, so it should not matter, but it
+  is not CI's path. And `pre-commit`'s unit test hook re-syncs
+  `.tox/shared` and removes a hand-installed `pymysql`, so a live run
+  after a full hook pass needs it put back.
