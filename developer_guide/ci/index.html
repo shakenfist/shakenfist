@@ -16281,11 +16281,12 @@ commands available on a PR.</p>
 </table>
 <h2 id="merge-lanes-and-weekly-lanes">Merge lanes and weekly lanes<a class="headerlink" href="#merge-lanes-and-weekly-lanes" title="Permanent link">&para;</a></h2>
 <p>A <em>lane</em> is one functional cluster job: a topology deployed by the
-<code>shakenfist.shakenfist</code> collection through <code>shakenfist/actions</code>'s reusable
-<code>smoke-cluster.yml</code>, and a stestr suite run against it. Every lane is
-defined once, as a job in <code>.github/workflows/functional-lanes.yml</code>, and is
-named by its <code>concurrency_key</code>. Two workflows call it with a list of lane
-names, and that list is the only thing which decides when a lane runs:</p>
+<code>shakenfist.shakenfist</code> collection, and a suite run against it. Most lanes
+call <code>shakenfist/actions</code>'s reusable <code>smoke-cluster.yml</code> and run a stestr
+suite, and are named by their <code>concurrency_key</code>. Every lane is defined
+once, as a job in <code>.github/workflows/functional-lanes.yml</code>. Two workflows
+call it with a list of lane names, and that list is the only thing which
+decides when a lane runs:</p>
 <table>
 <thead>
 <tr>
@@ -16326,6 +16327,18 @@ names, and that list is the only thing which decides when a lane runs:</p>
 <td><code>localhost</code></td>
 <td><code>cluster-ci.conf</code></td>
 </tr>
+<tr>
+<td><code>ansible-modules</code> (Ansible modules)</td>
+<td>Weekly</td>
+<td><code>slim-primary</code></td>
+<td><code>ansiblemoduletests.sh</code>, with <code>test_kind: ansible-modules</code></td>
+</tr>
+<tr>
+<td><code>node-lifecycle</code> (Node lifecycle)</td>
+<td>Weekly</td>
+<td><code>slim-primary</code></td>
+<td><code>nodelifecycletests.sh</code></td>
+</tr>
 </tbody>
 </table>
 <p><code>smoke-cluster.yml</code>'s <code>tier</code> input does not appear in that table because
@@ -16347,6 +16360,24 @@ The Ubuntu 24.04 and slim-tier lanes moved to the weekly run on
 topology, and what the weekly run gives up is catching a base image or
 Kerbside regression on the merge which caused it rather than within a
 week.</p>
+<p>The Ansible modules and Node lifecycle lanes followed. Over thirty days
+the first failed alone three times and the second once, and no failure in
+either was caused by the change under test, so what every merge was paying
+for was two more nested clusters on that shared under-cloud rather than a
+bug the lane would have caught. Node lifecycle is the one lane which does
+not call <code>smoke-cluster.yml</code>. It shares only the deploy (the
+<code>build-smoke-cluster</code> composite action) and runs its own steps, because its
+teardown powers nodes off and the reusable workflow's does not. It has no
+<code>concurrency_key</code> to pass, so its own <code>concurrency.group</code> carries the lane
+name, and the seam test reads it from there.</p>
+<p>A weekly run now deploys all five weekly lanes at once: twenty-two nested
+instances (six each for the three <code>slim-primary</code> lanes, three for
+<code>slim-tier</code>, one for <code>localhost</code>; see <code>ci-topology-*.yml</code> in
+<code>shakenfist/actions</code>). That is two fewer than every code-changing merge
+deployed before these two lanes left the queue -- four six-instance
+<code>slim-primary</code> clusters, at whatever hour the merge happened -- so the
+weekly peak is smaller than one the under-cloud already carried routinely,
+and it now lands in the quietest window of the week.</p>
 <p>A weekly lane blocks nothing, so its failures have to reach a person some
 other way. When <code>weekly_lanes</code> fails, <code>report_failures</code> runs
 <code>tools/ci_report_scheduled_failures.py</code>, which files one issue per failed
@@ -16793,9 +16824,12 @@ entire functional matrix on every description tweak.</p>
 <h3 id="superseded-merge-groups-are-cancelled">Superseded merge groups are cancelled<a class="headerlink" href="#superseded-merge-groups-are-cancelled" title="Permanent link">&para;</a></h3>
 <p>Every job that can run in the queue and holds a scarce runner carries a
 <code>concurrency:</code> block whose key is merge-group aware — the merge lanes
-<code>functional_lanes</code> selects and <code>ansible_modules_collection</code> through the
-shared <code>smoke-cluster.yml</code>, and <code>node_lifecycle_collection</code>,
-<code>schema_enum_widening</code> and <code>automated_delinter</code> in this repository.
+<code>functional_lanes</code> selects, through the shared <code>smoke-cluster.yml</code>, and
+<code>schema_enum_widening</code> and <code>automated_delinter</code> in this repository. The
+weekly lanes carry the same key -- through <code>smoke-cluster.yml</code>, or for Node
+lifecycle in its own job -- but need none of it, since a weekly run has no
+merge group to be superseded by; the key's merge group arm is kept so that a
+lane can move back into the queue without an edit.
 <code>sanity_checks</code> holds only a static runner, but is keyed the same way so that
 a superseded queue run does not finish its lint and unit tests either.</p>
 <p><code>github.ref</code> is the obvious key and is right on every other event. On
@@ -16817,7 +16851,7 @@ when two <code>merge_group</code> runs share one of these groups, one of them is
 superseded. That alone does not make cancelling safe, because
 <code>cancel-in-progress</code> has no idea which one: it cancels whichever run entered
 the group <em>first</em>. When GitHub rebuilds a queue entry, the old and new runs
-both run <code>Check paths</code>, and the collection jobs of whichever finishes last
+both run <code>Check paths</code>, and the queue jobs of whichever finishes last
 enter the groups last and win. Several times that was the superseded run, so
 the live merge group lost every functional job, <code>Can merge</code> failed on
 <code>cancelled</code> dependencies, and the pull request was ejected with nothing
@@ -16843,7 +16877,7 @@ queue job and failing <code>Can merge</code> on a commit the queue has already
 abandoned.</p>
 <p>Only a run's first attempt uses the base-branch key; the keys in this
 repository, and the one <code>smoke-cluster.yml</code> in <code>shakenfist/actions</code> gives the
-collection jobs, test <code>github.run_attempt == '1'</code> as well as the event. A
+merge lanes, test <code>github.run_attempt == '1'</code> as well as the event. A
 re-run is not a queue build: it keeps its original <code>merge_group</code> event, so
 with the base-branch key a "Re-run jobs" on an old queue run would cancel the
 live queue entry or be cancelled by it. A re-run therefore keeps its own queue
@@ -17180,10 +17214,13 @@ not a longer flag list.</p>
   pushing a new commit. <strong>This is the merge queue's lane, not the pull
   request's, and it is the most expensive thing a comment can start
   here.</strong> The dispatch arrives as a <code>workflow_dispatch</code> event, and
-  <code>functional_lanes</code>, <code>ansible_modules_collection</code>,
-  <code>node_lifecycle_collection</code> and <code>schema_enum_widening</code> are each gated
-  on <code>merge_group || workflow_dispatch</code> -- so a retest runs the
-  multi-node nested-cluster jobs on top of the pull request set. Nor
+  <code>functional_lanes</code> and <code>schema_enum_widening</code> are each gated on
+  <code>merge_group || workflow_dispatch</code> -- so a retest runs the multi-node
+  nested-cluster merge lanes on top of the pull request set. It does not
+  run the weekly lanes (see <a href="#merge-lanes-and-weekly-lanes">Merge lanes and weekly
+  lanes</a>), the Ansible modules and Node
+  lifecycle lanes among them, so a retest of a change to either suite
+  does not exercise it; dispatch <code>scheduled-tests.yml</code> for that. Nor
   does the docs-only skip apply: <code>check_paths</code> runs its path filter
   only for events other than <code>workflow_dispatch</code> and otherwise defaults
   <code>code_changed</code> to <code>true</code>, so a documentation-only branch gets the
