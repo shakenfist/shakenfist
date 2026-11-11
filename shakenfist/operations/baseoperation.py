@@ -770,6 +770,35 @@ class BaseClusterOperation(BaseOperation):
                 wo.append(wobj.unique_label())
 
         next_defer_count = self.current_defer_count + 1
+
+        # The state write comes first, because it is the one thing here
+        # which can be refused. Both dispatchers check that this operation
+        # is still runnable before they walk its dependencies, and that
+        # check is a read: an instance delete aborting the operations which
+        # target it can take this one terminal while the walk is still
+        # running, and a terminal state has no transition back to queued
+        # (issue 4888, the same race as issue 4722 at the sibling call site
+        # in execute()). A terminal state is not undone, so the refusal is
+        # recorded and the operation left where it was put, rather than
+        # raising a traceback out of a normal race. Doing it before the
+        # enqueue also means an operation which has ended does not leave a
+        # work item behind which exists only to be discarded, and before
+        # the event means the defer event still records deferrals only.
+        try:
+            self.state = self.STATE_QUEUED  # type: ignore[misc]
+        except exceptions.InvalidStateException:
+            self.add_event(
+                EVENT_TYPE_AUDIT,
+                'operation ended before it could be deferred, not '
+                'deferring it',
+                extra={
+                    'state': self.state.value,
+                    'waiting_on': wo,
+                    'defer_count': next_defer_count,
+                    'delay': delay
+                })
+            return
+
         self.add_event(
             EVENT_TYPE_STATUS, f'Execution deferred for {delay} seconds',
             extra={
@@ -784,7 +813,6 @@ class BaseClusterOperation(BaseOperation):
         }
         mariadb.enqueue_work_item(
             self.queue_name, work_item, delay=delay)
-        self.state = self.STATE_QUEUED  # type: ignore[misc]
 
     def defer_with_backoff(
             self,
@@ -798,6 +826,12 @@ class BaseClusterOperation(BaseOperation):
         now back in STATE_QUEUED), or False if the retry budget has
         been exhausted (in which case the caller should error the op
         out itself).
+
+        True also covers an operation which ended underneath this call,
+        because defer() declines to re-queue a terminal operation rather
+        than raising. That is deliberate: False is read as "error this
+        operation out", and erroring out an operation which has already
+        been aborted is the very write defer() just refused to make.
         """
         if self.current_defer_count >= len(delays):
             self.add_event(
