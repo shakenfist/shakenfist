@@ -234,6 +234,14 @@ class TestNamespace(base.BaseNamespacedTestCase):
             net, indent=4, sort_keys=True)))
         self._await_networks_ready([net['uuid']])
 
+        # The instance holding the interface lives in the system
+        # namespace, not in the namespace under test. The delete handler
+        # refuses on instances before it looks at networks, so an
+        # instance of the namespace's own would always be what the
+        # refusal names, and the network check this test is about would
+        # never be reached. An admin may attach an instance to any
+        # namespace's network, so this keeps the network draining while
+        # leaving it as the only thing which blocks the delete.
         inst = self.create_instance(
             'draining', 1, 1024,
             [
@@ -247,11 +255,11 @@ class TestNamespace(base.BaseNamespacedTestCase):
                     'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
-            ], None, None, client=other_client)
+            ], None, None, client=self.system_client)
         # Registered after the network and namespace cleanups so that it
         # runs before them: the network cannot finish draining while the
         # instance holds an interface on it, and the namespace cannot be
-        # removed while either is live.
+        # removed while the network is live.
         self.addCleanup(self._delete_instance_if_present, inst['uuid'],
                         client=nb_client)
         self.addDetail('inst', content.text_content(json.dumps(
