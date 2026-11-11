@@ -59,12 +59,14 @@ import copy
 import json
 from collections import namedtuple
 from unittest import mock
+from uuid import uuid4
 
 from shakenfist import scheduler
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
 from shakenfist.instance import Instance
 from shakenfist.network.interface import NetworkInterface
+from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.tests.external_api.test_required_sweep import (
     SweepFixtureTestCase)
 
@@ -72,9 +74,15 @@ from shakenfist.tests.external_api.test_required_sweep import (
 CREATE = 'create'
 HOTPLUG = 'hotplug'
 PLACEMENT = 'placement'
+AGENT = 'agent'
 
 #: Substituted for the sweep network's uuid when a request is sent.
 NETWORK = '{network}'
+
+#: Substituted for the uuid of an agent operation which really exists, so
+#: that a dependency edge naming it is accepted rather than refused for
+#: naming nothing.
+AGENTOP = '{agentop}'
 
 #: What a recorded value becomes when the caller did not send it: a
 #: random allocation or a server default. Two same-meaning requests
@@ -94,6 +102,10 @@ ROUTES = [
     ('networkspec', HOTPLUG, 'network', False),
     ('videospec', CREATE, 'video', False),
     ('shapespec', PLACEMENT, 'shapes', True),
+    # On agent/get of the three endpoints which take an edge, because it
+    # is the one whose body needs nothing but a path. runs_after takes the
+    # same schema object, so routing depends_on sweeps both.
+    ('agentdependency', AGENT, 'depends_on', True),
 ]
 
 #: A complete, valid example of each spec. The base request for a key
@@ -111,6 +123,7 @@ EXEMPLARS = {
     # visibly different from the omission, not to be accepted.
     'shapespec': {'cpus': 1, 'memory': 1024, 'disk': 8, 'count': 1,
                   'affinity': {}},
+    'agentdependency': {'op_uuid': AGENTOP},
 }
 
 #: The anti-vacuity probe: a real value of the key which the
@@ -153,6 +166,12 @@ PROBES = {
     # route which carries a shape.
     ('shapespec', 'affinity'): {
         PLACEMENT: {'require_with_tag': ['sweeptag']}},
+    # op_uuid's row measures two refusals against each other, the way
+    # networkspec's network_uuid does: it is the required key, so both the
+    # null and the omission are refused, and the probe is the accepted
+    # request they are measured against.
+    ('agentdependency', 'op_uuid'): AGENTOP,
+    ('agentdependency', 'settle_seconds'): 30,
 }
 
 #: Everything one request did, canonicalised. ``instances`` is what
@@ -170,10 +189,14 @@ PROBES = {
 #: well. That is deliberate: it is one more thing a diskspec row's
 #: null is measured against, and a disk sum which started reading a
 #: null size as something other than zero would show up there.
+#: ``agentops`` is the dependency edges as AgentOperation.new() received
+#: them, which is where an agent row's verdict comes from: the edge lists
+#: are the only thing a dependency null can change, and the status code
+#: cannot see them.
 Observable = namedtuple(
     'Observable',
     ['status', 'recorded', 'error', 'instances', 'interfaces', 'floats',
-     'shapes'])
+     'shapes', 'agentops'])
 
 
 def _leaves(value, out):
@@ -222,9 +245,19 @@ class _NullAbsentMixin:
             'nullsweepnet', namespace='system', netblock='10.77.0.0/16',
             provide_dhcp=True, provide_dns=True)
 
+        # Something for a dependency edge to name. An edge naming an
+        # operation which does not exist is refused, so without this every
+        # agentdependency row would measure that refusal rather than what
+        # the null does.
+        self.nullagentop = AgentOperation.new(
+            str(uuid4()), 'system', str(self.instance.uuid),
+            [{'command': 'execute', 'commandline': 'true'}])
+
     def _resolve(self, value):
         if isinstance(value, str):
-            return value.replace(NETWORK, str(self.nullnet.uuid))
+            return value.replace(
+                NETWORK, str(self.nullnet.uuid)).replace(
+                    AGENTOP, str(self.nullagentop.uuid))
         if isinstance(value, dict):
             return {k: self._resolve(v) for k, v in value.items()}
         if isinstance(value, list):
@@ -241,6 +274,12 @@ class _NullAbsentMixin:
                     'memory': 1024, 'disk': [{'size': 8}]}
             body.update(overlay)
             url = '/instances'
+        elif route == AGENT:
+            # agent/get rather than put or execute: its body is a path and
+            # nothing else, so the overlay is the only thing under test.
+            body = {'path': '/etc/hostname'}
+            body.update(overlay)
+            url = '/instances/%s/agent/get' % self.instance.uuid
         elif route == PLACEMENT:
             # The whole body is the overlay: a placement query takes
             # nothing but the shapes it is asking about.
@@ -257,8 +296,10 @@ class _NullAbsentMixin:
         interfaces = []
         floats = []
         shapes = []
+        agentops = []
         real_instance_new = Instance.new
         real_interface_new = NetworkInterface.new
+        real_agentop_new = AgentOperation.new
         real_find_candidates = scheduler.Scheduler.find_candidates_for_shapes
 
         def recording_find_candidates(scheduler_self, requested, *args,
@@ -287,6 +328,16 @@ class _NullAbsentMixin:
         def recording_float(ni):
             floats.append(str(ni.uuid))
 
+        def recording_agentop_new(*args, **kwargs):
+            # The handler normalises a caller's edge into the stored dict
+            # before calling this, and that normalised list is the fact
+            # under test, so it is recorded here rather than read off the
+            # created operation.
+            agentops.append({
+                'depends_on': copy.deepcopy(kwargs.get('depends_on')),
+                'runs_after': copy.deepcopy(kwargs.get('runs_after'))})
+            return real_agentop_new(*args, **kwargs)
+
         before_records = self.mock_record_exception.call_count
         with mock.patch.object(
                 Instance, 'new', side_effect=recording_instance_new), \
@@ -298,7 +349,10 @@ class _NullAbsentMixin:
                     side_effect=recording_float), \
                 mock.patch.object(
                     scheduler.Scheduler, 'find_candidates_for_shapes',
-                    recording_find_candidates):
+                    recording_find_candidates), \
+                mock.patch.object(
+                    AgentOperation, 'new',
+                    side_effect=recording_agentop_new):
             response = self.client.post(
                 url, headers={'Authorization': self.token},
                 content_type='application/json', data=json.dumps(body))
@@ -312,7 +366,8 @@ class _NullAbsentMixin:
             _canonical(instances, sent),
             _canonical(interfaces, sent),
             len(floats),
-            _canonical(shapes[:1], sent))
+            _canonical(shapes[:1], sent),
+            _canonical(agentops, sent))
 
     def test_the_controls_still_work(self):
         """A rotted fixture must fail here, not read as a verdict."""
@@ -343,6 +398,16 @@ class _NullAbsentMixin:
             1, len(placement.shapes[0]),
             'the placement control handed the core no shapes, so every '
             'shapespec row would be measuring nothing: %r' % (placement,))
+
+        agent = self._observe(
+            AGENT, {'depends_on': [{'op_uuid': AGENTOP}]}, 0)
+        self.assertEqual(
+            (200, False), (agent.status, agent.recorded),
+            'the minimal agent request was refused: %r' % (agent,))
+        self.assertEqual(
+            1, len(agent.agentops[0]['depends_on']),
+            'the agent control recorded no dependency edge, so every '
+            'agentdependency row would be measuring nothing: %r' % (agent,))
 
     def test_every_structured_schema_is_swept(self):
         """The derived obligation: a new spec cannot arrive unswept.

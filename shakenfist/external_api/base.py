@@ -48,6 +48,9 @@ from shakenfist.instance import Instance
 from shakenfist.namespace import get_api_token
 from shakenfist.node import Node
 from shakenfist.namespace import Namespace
+from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.schema.agentoperation_dependency import agent_dependency
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.upload import Upload
 from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util.access_tokens import request_namespace
@@ -562,6 +565,129 @@ def _timing_seconds(name, value, maximum=None):
     return seconds, None
 
 
+# What a caller is told when an edge names an operation they may not
+# depend on. One message for all three reasons -- it does not exist, it is
+# not an agent operation, or it is in a namespace this caller cannot read --
+# because any wording which told those apart would answer "that one exists,
+# but not for you", and a caller who cannot read a namespace must not be
+# able to enumerate it by submitting edges. The repository's instinct
+# elsewhere is a 404 for the same reason; a 400 is right here because the
+# caller sent a bad parameter rather than addressed a missing resource, and
+# the shared message is what buys back the non-disclosure the 404 would have.
+#
+# The index is in the message and discloses nothing: it is a position in the
+# caller's own request.
+DEPENDENCY_REFUSAL = '%s[%d]: no such agent operation'
+
+
+def _edge_defect(error):
+    """One readable line saying why a dependency edge would not build.
+
+    pydantic renders a multi-line report with a documentation URL per
+    defect, and a caller reading a JSON error string is served by none of
+    it. Only the first defect is reported, because that is how a caller
+    fixes them, and only its location and message, which are the parts
+    that say something about the request they sent.
+    """
+    errors = getattr(error, 'errors', None)
+    if not callable(errors):
+        return str(error)
+
+    try:
+        first = errors()[0]
+    except (IndexError, KeyError, TypeError):
+        return str(error)
+
+    location = '.'.join(str(part) for part in first.get('loc', ()))
+    message = first.get('msg', 'invalid')
+    if location:
+        return '%s: %s' % (location, message)
+    return message
+
+
+def agent_operation_dependencies(depends_on, runs_after, caller_namespace):
+    """Turn an agent operation request's dependency edges into stored values.
+
+    Returns ``((depends_on, runs_after), None)``, or
+    ``(None, <400 response>)`` if the caller named an operation they may
+    not depend on -- the same convention as ``agent_operation_timing()``
+    above, and called in the same place for the same reason: a refused
+    request must leave nothing behind but the request log.
+
+    Each returned edge is an ``agent_dependency`` dumped to a dict, so the
+    handler stores the shape the schema defines rather than the object the
+    caller sent. In particular the stored edge carries ``op_type``, which
+    the published parameter does not, so a persisted agent edge reads like
+    a persisted cluster one.
+
+    ``caller_namespace`` is the requesting namespace, and an edge may name
+    an operation in that namespace or -- for a system caller -- in any
+    namespace at all. This is the only moment that is checked: re-checking
+    at evaluation time would let a later namespace change break a chain
+    already in flight.
+    """
+    validated = []
+
+    for (name, edges) in (('depends_on', depends_on),
+                          ('runs_after', runs_after)):
+        normalised = []
+
+        for (index, edge) in enumerate(edges or []):
+            # A JSON null inside a structured parameter means "not
+            # supplied" everywhere else in this API, so an explicit null
+            # and an omitted key build the same edge here -- and, for the
+            # required op_uuid, earn the same refusal in the same words.
+            # Without this the two differ only in pydantic's wording,
+            # which is a distinction no caller asked for.
+            if isinstance(edge, dict):
+                edge = {key: value for (key, value) in edge.items()
+                        if value is not None}
+
+            # The published schema already refuses a malformed edge when
+            # API validation is enforcing, but that is an operator setting
+            # with warn and off positions, so the model is constructed
+            # inside a guard rather than trusted. pydantic's
+            # ValidationError is a ValueError; a non-mapping edge is the
+            # TypeError from the keyword expansion.
+            try:
+                dependency = agent_dependency(**edge)
+            except (TypeError, ValueError) as e:
+                return None, sf_api.error(
+                    400, '%s[%d] is not a valid dependency: %s'
+                    % (name, index, _edge_defect(e)),
+                    suppress_traceback=True)
+
+            # suppress_failure_audit because this lookup must not write an
+            # event: a refused request creates nothing, and an audit event
+            # naming the operation would be written against an object in a
+            # namespace the caller may not be able to read, which is the
+            # disclosure the shared message below exists to prevent.
+            dep = AgentOperation.from_db(
+                str(dependency.op_uuid), suppress_failure_audit=True)
+
+            # Three reasons, one answer. The namespace test is the one
+            # requires_instance_ownership() performs, and it admits a
+            # caller in the dependency's own namespace as well as a system
+            # caller: inverted, it would either let any caller name any
+            # operation or lock system out of both.
+            #
+            # The object type test cannot fire today, because from_db() on
+            # this class reads the agent operation table and so builds
+            # nothing else; it is here so that all three reasons share one
+            # refusal if that lookup is ever widened.
+            if (not dep
+                    or dep.object_type != ObjectType.AGENTOPERATION
+                    or caller_namespace not in (dep.namespace, 'system')):
+                return None, sf_api.error(
+                    400, DEPENDENCY_REFUSAL % (name, index))
+
+            normalised.append(dependency.model_dump(mode='json'))
+
+        validated.append(normalised)
+
+    return (validated[0], validated[1]), None
+
+
 # The keys a declaration's optional sixth element may carry. All three
 # are valid Swagger 2.0 parameter keywords and valid JSON Schema, so a
 # constraint renders into the published OpenAPI rather than living only
@@ -903,6 +1029,58 @@ VIDEOSPEC_SCHEMA: dict[str, Any] = {
 }
 
 
+# What one dependency edge on an agent operation looks like on the wire.
+#
+# `op_type` is deliberately absent. The stored edge carries one, so that a
+# persisted agent edge has the same shape as a persisted cluster one and an
+# evaluator can walk either, but only a single value is legal for it, and a
+# published field a caller may not vary is noise which earns a 400 for a
+# constant. Widening the edge to name something other than an agent
+# operation is therefore a change to this published shape rather than a new
+# value of a published field, which is the trade taken knowingly.
+#
+# additionalProperties: False for the reason a diskspec publishes it: this
+# is a new vocabulary with no deployed callers sending keys it has not heard
+# of, so refusing an unknown key costs nothing today and answers the human
+# who typed `settle` rather than silently ignoring them.
+AGENTDEPENDENCYSPEC_SCHEMA: dict[str, Any] = {
+    'type': 'object',
+    'additionalProperties': False,
+    # op_uuid only. An edge which names nothing is not an edge, while
+    # settle_seconds has a meaning when omitted -- satisfied as soon as the
+    # named operation finishes.
+    'required': ['op_uuid'],
+    'properties': {
+        'op_uuid': {
+            'type': 'string',
+            # The format token ARGTYPES['uuid'] publishes, which
+            # validation._FORMATS compiles into a real uuid.UUID parse. A
+            # name is not accepted here and there is nothing to accept: an
+            # agent operation has no name.
+            'format': 'uuid',
+            'description': (
+                'The UUID of the agent operation this one waits for. It '
+                'must already exist, and must be in a namespace the caller '
+                'can read.')
+        },
+        'settle_seconds': {
+            'type': 'number',
+            # A duration, so no negative, and the same operator ceiling the
+            # timing parameters publish -- it already means "the longest a
+            # caller may park an instance's executor slot", which is what a
+            # settle does while it runs.
+            'minimum': 0,
+            'maximum': config.AGENT_OPERATION_MAX_DEADLINE,
+            'description': (
+                'Wait this many seconds after the named operation finished '
+                'before treating this edge as satisfied, for a caller whose '
+                'next step needs the guest to settle after whatever the '
+                'dependency changed. Omit it to be satisfied immediately.')
+        },
+    },
+}
+
+
 # How many shapes one placement query may ask about, after a shape's
 # `count` has been expanded into that many identical shapes.
 #
@@ -1013,6 +1191,13 @@ SHAPESPEC_SCHEMA: dict[str, Any] = {
 
 # Type MUST be one of "string", "number", "integer", "boolean", "array" or "file".
 ARGTYPES: dict[str, dict[str, Any]] = {
+    # An agent operation dependency edge. The single form is here for the
+    # documentation consistency test, which resolves a documented section
+    # through ARGTYPES[token]['properties'] and so keys on the object rather
+    # than on the array; no endpoint declares it on its own. The array form
+    # below nests this very object rather than a copy of it, so the two
+    # cannot drift.
+    'agentdependency': AGENTDEPENDENCYSPEC_SCHEMA,
     # The metadata family's "the API stores this and never interprets
     # it" case: add_metadata_key() (baseobject.py:669) serialises
     # whatever it is given, and sfcbr's k3s orchestration traffic
@@ -1029,6 +1214,8 @@ ARGTYPES: dict[str, dict[str, Any]] = {
     # parameters render through schema objects, where array is
     # legal JSON Schema. Every use in the tree is body-located, and
     # swagger_helper() refuses these outside a body at import time.
+    'arrayofagentdependency': {
+        'type': 'array', 'items': AGENTDEPENDENCYSPEC_SCHEMA},
     'arrayofdict': {'type': 'array', 'items': {'type': 'object'}},
     # The array forms of two of the three structured specs, nesting the
     # very same object their single form names so that the two cannot

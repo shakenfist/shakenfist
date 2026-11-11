@@ -251,6 +251,88 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         ('/instances/{instance_ref}/agent/execute', 'post',
          'deadline_seconds',
          {'type': 'number', 'minimum': 0, 'maximum': 86400}),
+        # The dependency edges, on all three endpoints. The published
+        # object deliberately omits op_type, which the stored edge
+        # carries: only one value is legal for it, and a caller who had
+        # to supply a constant could only get it wrong -- so widening
+        # the edge to name another kind of operation is a change to this
+        # shape rather than a new enum value. op_uuid is the one
+        # required key and carries the uuid format, which compiles to a
+        # real parse, because an agent operation has no name to accept
+        # instead. settle_seconds publishes the same operator ceiling
+        # the timing parameters do, AGENT_OPERATION_MAX_DEADLINE, since
+        # a settle parks the same executor slot while it runs; its
+        # minimum is 0 because a duration cannot be negative, and unlike
+        # the timing parameters 0 is not a sentinel here -- it means
+        # what it says. api_base.agent_operation_dependencies() is what
+        # backs the existence and namespace rules, which no schema can
+        # express; these bounds are backed by the schema itself.
+        ('/instances/{instance_ref}/agent/put', 'post', 'depends_on',
+         {'type': 'array',
+          'items': {
+              'type': 'object',
+              'additionalProperties': False,
+              'required': ['op_uuid'],
+              'properties': {
+                  'op_uuid': {'type': 'string', 'format': 'uuid'},
+                  'settle_seconds': {'type': 'number', 'minimum': 0,
+                                     'maximum': 86400},
+              }}}),
+        ('/instances/{instance_ref}/agent/put', 'post', 'runs_after',
+         {'type': 'array',
+          'items': {
+              'type': 'object',
+              'additionalProperties': False,
+              'required': ['op_uuid'],
+              'properties': {
+                  'op_uuid': {'type': 'string', 'format': 'uuid'},
+                  'settle_seconds': {'type': 'number', 'minimum': 0,
+                                     'maximum': 86400},
+              }}}),
+        ('/instances/{instance_ref}/agent/get', 'post', 'depends_on',
+         {'type': 'array',
+          'items': {
+              'type': 'object',
+              'additionalProperties': False,
+              'required': ['op_uuid'],
+              'properties': {
+                  'op_uuid': {'type': 'string', 'format': 'uuid'},
+                  'settle_seconds': {'type': 'number', 'minimum': 0,
+                                     'maximum': 86400},
+              }}}),
+        ('/instances/{instance_ref}/agent/get', 'post', 'runs_after',
+         {'type': 'array',
+          'items': {
+              'type': 'object',
+              'additionalProperties': False,
+              'required': ['op_uuid'],
+              'properties': {
+                  'op_uuid': {'type': 'string', 'format': 'uuid'},
+                  'settle_seconds': {'type': 'number', 'minimum': 0,
+                                     'maximum': 86400},
+              }}}),
+        ('/instances/{instance_ref}/agent/execute', 'post', 'depends_on',
+         {'type': 'array',
+          'items': {
+              'type': 'object',
+              'additionalProperties': False,
+              'required': ['op_uuid'],
+              'properties': {
+                  'op_uuid': {'type': 'string', 'format': 'uuid'},
+                  'settle_seconds': {'type': 'number', 'minimum': 0,
+                                     'maximum': 86400},
+              }}}),
+        ('/instances/{instance_ref}/agent/execute', 'post', 'runs_after',
+         {'type': 'array',
+          'items': {
+              'type': 'object',
+              'additionalProperties': False,
+              'required': ['op_uuid'],
+              'properties': {
+                  'op_uuid': {'type': 'string', 'format': 'uuid'},
+                  'settle_seconds': {'type': 'number', 'minimum': 0,
+                                     'maximum': 86400},
+              }}}),
         ('/networks', 'post', 'netblock', {'type': 'string'}),
         ('/networks/{network_ref}/events', 'get', 'limit',
          {'type': 'integer', 'minimum': 1, 'maximum': 1000}),

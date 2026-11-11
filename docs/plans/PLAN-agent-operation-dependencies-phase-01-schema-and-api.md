@@ -611,3 +611,37 @@ recorded there rather than fixed or filed here.
   swept for hard deletion" was reworded to "of the two", because beside
   a new bullet which says an aborted operation is swept too it read as
   a contradiction.
+- **2026-11-11 (AEDT). Step 1e's brief missed a real obligation, and
+  meeting it forced the phase's one genuine design addition.**
+  `test_null_absent_sweep.test_every_structured_schema_is_swept` walks
+  `ARGTYPES` for every token which renders an object with a property
+  vocabulary and fails until that schema is routed through the sweep,
+  so adding `agentdependency` obliged routing it -- the same class of
+  miss as the attribute mask vocabulary in 1a. The sweep's own
+  semantics are that a JSON null inside a structured parameter means
+  "not supplied", so the validation helper drops null-valued edge keys
+  and an explicit null builds the same edge as an omitted key. That is
+  the repository's convention rather than an invention, and removing
+  the filter fails the sweep row, which is what proves it live. An
+  explicit null `op_uuid` is still refused, with the malformed-edge
+  message rather than the shared one, which is correct: a defect in the
+  caller's own object discloses nothing about another namespace.
+- **The three refusal reasons share one message and the third cannot
+  fire today.** `AgentOperation.from_db()` reads the agent operation
+  table, so a uuid naming another object type comes back as nothing and
+  earns the shared "no such agent operation" refusal through the
+  missing branch. The object-type test is kept, documented as currently
+  unreachable, so that all three reasons stay on one refusal if that
+  lookup is ever widened; its test reaches it by patching the lookup.
+  The lookup passes `suppress_failure_audit=True`, so a refused request
+  writes no event against an object the caller may not be able to read.
+- **`shapespec`'s gap is documentation only.** The survey recorded that
+  `shapespec` is in `ARGTYPES` but in neither `SPEC_SECTIONS` nor the
+  API reference. It is routed in the null-absent sweep, so the finding
+  narrows to the API reference alone, which is where it was left for
+  `PLAN-placeable-capacity` rather than fixed here.
+- **One pre-commit hook is flaky and unrelated.** `test-internal-ca`
+  failed once with "files were modified by this hook" and passes when
+  re-run; it watches `roles/internal_ca/` only, nothing under that path
+  is touched by this phase, and it left no modified file behind. Noted
+  rather than investigated.
