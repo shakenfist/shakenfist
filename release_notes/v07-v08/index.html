@@ -14208,6 +14208,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#new-work-waits-for-everything-already-in-flight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New work waits for everything already in flight
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -16470,6 +16481,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#new-work-waits-for-everything-already-in-flight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New work waits for everything already in flight
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -18307,9 +18329,11 @@ observational only if all of its tasks are. The tasks classified this way are
   <a href="../../operator_guide/database/#the-deleted-object-sweep">deleted-object sweep</a>,
   it is usually <code>null</code> for an instance at rest. Clients should already treat
   it as optional.</li>
-<li><code>runs_after</code> chains built from an instance's <code>last_cluster_operation</code> now
+<li><code>runs_after</code> chains built from an instance's <code>last_cluster_operation</code>
   serialise behind the last user-requested change rather than behind the
-  last sweep.</li>
+  last sweep. Those chains have since been replaced -- see
+  <a href="#new-work-waits-for-everything-already-in-flight">New work waits for everything already in flight</a>
+  below.</li>
 <li><code>GET /clusteroperations?target_object_type=...&amp;target_uuid=...</code> still
   reports every operation for the object, with <code>observational: true</code> on the
   sweeps. A client that polls this listing to wait for an object to settle
@@ -18409,6 +18433,36 @@ object, each with an <code>observational</code> key, are advertised by the new
 </ul>
 <p>The infra report will show a new <code>HasPendingClusterOperationTarget</code> caller
 from the API, because every object view now makes one more indexed query.</p>
+<h2 id="new-work-waits-for-everything-already-in-flight">New work waits for everything already in flight<a class="headerlink" href="#new-work-waits-for-everything-already-in-flight" title="Permanent link">&para;</a></h2>
+<p>A snapshot, an interface hot plug and a fetch of an existing artifact used to
+be enqueued behind the object's <em>newest</em> mutating operation. That is a wait
+for the older pending operations only if the newest was itself chained behind
+them, and several enqueue sites are not chained at all: the disk fetches an
+instance create enqueues, a start which the scheduler redirected to another
+node, and <code>instance_create</code> itself. An older queued operation was therefore
+skipped, and the two ran together -- a snapshot could capture disks a
+redirected start was still writing, and two fetches of one artifact could both
+add a version.</p>
+<p>Each of those three now waits for every outstanding mutating operation
+targeting the object. Observational work, such as the billing and health
+sweep or a checksum verification, is still not waited for. As before, each
+wait is bounded: a dependency which never finishes is given up on and logged
+rather than holding the new operation forever.</p>
+<p>What you will see:</p>
+<ul>
+<li>A snapshot, a hot plug or an artifact fetch may now start later than it
+  used to on an object with a queue of work, because it waits for all of
+  that work rather than one piece of it.</li>
+<li><code>POST /instances/{instance_ref}/interfaces</code>, <code>POST
+  /instances/{instance_ref}/snapshot</code> and <code>POST /artifacts</code> answer 503 when
+  the object's outstanding operations cannot be read, instead of enqueuing
+  work with no ordering at all. Retry the request.</li>
+<li>Instance create and network create no longer read the pointer when they
+  enqueue. Both objects are minted during the request with a
+  server-generated uuid, so nothing else could have targeted them, and the
+  create's own ordering already came from <code>depends_on</code>. Neither request's
+  behaviour changes.</li>
+</ul>
 
 
 
