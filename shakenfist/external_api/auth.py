@@ -1225,7 +1225,9 @@ class AuthIssuersEndpoint(api_base.Resource):
         ],
         [(200, 'The issuer as created.', trusted_issuer_example),
          (400, 'A required field is missing or malformed.', None),
-         (409, 'An issuer of that name already exists.', None),
+         (409, 'An issuer of that name already exists, or another '
+               'issuer is already configured for that issuer_url.', None),
+         (422, 'A field is longer than its limit.', None),
          (502, 'Discovery was required and the issuer did not answer.', None),
          (503, 'Discovery is unavailable on this cluster.', None)],
         requires_admin=True))
@@ -1342,6 +1344,9 @@ class AuthIssuerEndpoint(api_base.Resource):
         [(200, 'The updated issuer.', trusted_issuer_example),
          (400, 'A required field is missing or malformed.', None),
          (404, 'Issuer not found.', None),
+         (409, 'Another issuer is already configured for that '
+               'issuer_url.', None),
+         (422, 'A field is longer than its limit.', None),
          (502, 'Discovery was required and the issuer did not answer.', None),
          (503, 'Discovery is unavailable on this cluster.', None)],
         requires_admin=True))

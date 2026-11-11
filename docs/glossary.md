@@ -155,6 +155,14 @@ Prometheus/Loki metric and log labels (`docs/operator_guide/events.md`,
 `docs/operator_guide/logging.md`) or GitHub issue labels such as `ci-failure`
 (`docs/developer_guide/workflow.md`).
 
+**login-capable issuer**{#login-capable-issuer} -- A [trusted issuer](#trusted-issuer)
+with a client identifier and at least one endpoint a human login flow can begin
+at (an authorization or a device authorization endpoint). Only these are listed
+by the unauthenticated `GET /auth/login`, so an issuer configured purely to
+verify workload tokens is never disclosed there. Defined in
+`shakenfist/external_api/auth.py` (`AuthLoginEndpoint`) and
+`docs/operator_guide/authentication.md`.
+
 **mapping rule**{#mapping-rule} -- A first-class object, owned by the namespace
 it targets, that is a standing claim-gated authorization to mint keys there: a
 [trusted issuer](#trusted-issuer) reference, bound claims, the [scopes](#scope)
@@ -252,6 +260,14 @@ resolve a name in the caller's own namespace only, so that a name can never
 resolve into another namespace and then destroy what it found there. Defined
 authoritatively in `docs/user_guide/objects.md`.
 
+**OIDC discovery**{#oidc-discovery} -- Fetching a [trusted issuer](#trusted-issuer)'s
+OpenID Connect discovery document, from `/.well-known/openid-configuration`
+beneath its issuer URL, to learn its JWKS location and login endpoints. It runs
+only when an administrator creates, updates or refreshes an issuer, never on a
+timer or while serving a request, and the document is refused unless its
+`issuer` member equals the configured issuer URL exactly. Defined in
+`shakenfist/oidc_discovery.py` and `docs/operator_guide/authentication.md`.
+
 **Release pipeline vocabulary**{#release-pipeline} -- The release process signs
 and publishes releases using Sigstore keyless signing, PyPI Trusted Publishers,
 and a GitHub Actions OIDC token (issuer `token.actions.githubusercontent.com`).
@@ -347,10 +363,13 @@ the release pipeline's Sigstore / PyPI "Trusted Publisher" vocabulary (see
 elsewhere in the documentation.
 
 **trusted issuer**{#trusted-issuer} -- An external token issuer the cluster is
-configured to accept, recorded with its JWKS location and expected audience.
-Cluster level rather than namespaced, because deciding who may vouch for
-identities is an administrative decision, and managed through `/auth/issuers`
-by administrators only. Defined in `shakenfist/trusted_issuer.py` and
+configured to accept, recorded with its issuer URL, JWKS location and expected
+audience. For human login it also records an operator-supplied OAuth client
+identifier and OpenID Connect scope list, and the authorization, token and
+device authorization endpoints that [discovery](#oidc-discovery) found. Cluster
+level rather than namespaced, because deciding who may vouch for identities is
+an administrative decision, and managed through `/auth/issuers` by
+administrators only. Defined in `shakenfist/trusted_issuer.py` and
 `docs/operator_guide/authentication.md`. Not to be
 confused with namespace [trust](#trust), nor with the release pipeline's "Trusted
 Publisher" (see [Release pipeline vocabulary](#release-pipeline)).
