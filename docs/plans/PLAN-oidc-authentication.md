@@ -1376,7 +1376,7 @@ not land anywhere else.
 | 0. Research and decisions | shakenfist | [PLAN-oidc-authentication-phase-00-decisions.md](PLAN-oidc-authentication-phase-00-decisions.md) | Complete | `2bbe472eff` (#4831) |
 | 1. JWT validation refactor (split issuance from validation; introduce per-issuer validators) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as `PLAN-auth-federation.md` phase 3 steps 3a-3c and 3f: `72187d2ff` (#3556), `c64269e63` (#3625) |
 | 2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as `PLAN-auth-federation.md` phase 3 step 3f: `c64269e63` (#3625), `1e7a167ea` (#3641) |
-| 3. OIDC discovery | shakenfist | TBD | Not started | — |
+| 3. OIDC discovery | shakenfist | [PLAN-oidc-authentication-phase-03-discovery.md](PLAN-oidc-authentication-phase-03-discovery.md) | In progress | — |
 | 4. Minting the entitled set of credentials at login | shakenfist | TBD | Not started | — |
 | 5. Admin as a claim | shakenfist | TBD | Abandoned | — |
 | 6. Serving namespace key metadata (#3672) | shakenfist, client-python | TBD | Not started | — |
@@ -1449,6 +1449,24 @@ location is never taken from the token being validated is
 not up for discussion here: discovery populates a
 `TrustedIssuer`'s fields at configuration time, and
 validation keeps reading them from the object.
+
+Two things a client flow needs are **not** in any discovery
+document, and this section did not previously say so: the
+`client_id` registered at the provider, and the OIDC scope
+list to request, without which a group claim never appears
+in a token at all. Both are operator-supplied, both need a
+column on the issuer object, and a phase executing in
+`client-python` cannot add a column to a table in this
+repository -- so they land here.
+
+The endpoint which serves this metadata lands here for the
+same reason. `/auth/issuers` is administrator-only, and a
+person running a login command holds no Shaken Fist
+credential yet by definition, so the metadata has to reach
+them from an unauthenticated endpoint in this repository.
+Phase 3's plan records the argument as its decision D7 and
+gates that step on a back brief, because it is a scope
+judgement rather than a design one.
 
 **Phase 4 — minting the entitled set of credentials at
 login.** Open question 14 is answered no, so this is no
