@@ -14,6 +14,12 @@ from shakenfist.tests import base
 sf_instance = ansible_module_loader.load_collection_module('sf_instance')
 
 
+def _raise(exception):
+    # Lambdas cannot raise, and get_network's stub has to answer
+    # differently per reference.
+    raise exception
+
+
 class SfInstanceDiskDirtinessTestCase(base.ShakenFistTestCase):
     # A minimal instance which is not dirty for any reason other than
     # (possibly) its disks. Interfaces are empty so _check_instance() never
@@ -154,6 +160,127 @@ class SfInstanceDiskDirtinessTestCase(base.ShakenFistTestCase):
         ])
         dirty, _ = self._check(existing, self._params(disks=['10@debian:11']))
         self.assertTrue(dirty)
+
+
+class SfInstanceNetworkDirtinessTestCase(base.ShakenFistTestCase):
+    """The network half of the dirtiness comparison (issue 4277).
+
+    The API accepts a network name or uuid and stores the uuid, so an
+    instance created with a name was judged dirty on every later run
+    and silently deleted and recreated. The module resolves the
+    reference the way the server does before comparing.
+    """
+
+    NETWORK_UUID = '4d61d1f4-0c3b-4c5f-9b1a-9b3f1a4b7c21'
+
+    def _existing(self, count=1, namespace='ns'):
+        return {
+            'name': 'test',
+            'cpus': 1,
+            'memory': 1024,
+            'namespace': namespace,
+            'interfaces': [{'uuid': 'iface-%d' % i} for i in range(count)],
+            'disk_spec': []
+        }
+
+    def _params(self, **kwargs):
+        params = {'name': 'test', 'cpu': 1, 'ram': 1024, 'namespace': 'ns'}
+        params.update(kwargs)
+        return params
+
+    def _client(self, network_uuid=None, resolves=None):
+        client = mock.MagicMock()
+        client.get_interface.return_value = {
+            'network_uuid': network_uuid or self.NETWORK_UUID,
+            'macaddr': '02:00:00:aa:bb:cc',
+            'ipv4': '10.0.0.5',
+            'model': 'virtio',
+            'floating': None
+        }
+        if resolves is None:
+            resolves = {}
+        client.get_network.side_effect = lambda ref, **kwargs: (
+            resolves[ref] if ref in resolves
+            else _raise(sf_instance.apiclient.ResourceNotFoundException()))
+        return client
+
+    def _check(self, client, existing, params):
+        log = []
+        dirty, _, _ = sf_instance._check_instance(
+            client, existing, params, log)
+        return dirty, log
+
+    def test_a_network_named_in_the_request_is_not_dirty(self):
+        # The signature from the issue: created with a name, compared
+        # against the uuid the server stored.
+        client = self._client(
+            resolves={'mynet': {'uuid': self.NETWORK_UUID}})
+        dirty, log = self._check(
+            client, self._existing(), self._params(networks=['mynet']))
+
+        self.assertFalse(dirty, log)
+        client.get_network.assert_called_once_with('mynet', namespace='ns')
+
+    def test_a_network_uuid_in_the_request_needs_no_lookup(self):
+        client = self._client()
+        dirty, log = self._check(
+            client, self._existing(),
+            self._params(networks=[self.NETWORK_UUID]))
+
+        self.assertFalse(dirty, log)
+        client.get_network.assert_not_called()
+
+    def test_a_networkspec_naming_a_network_is_not_dirty(self):
+        # The same asymmetry through the networkspecs spelling, which is
+        # what shakenfist/actions' playbooks use.
+        client = self._client(
+            resolves={'mynet': {'uuid': self.NETWORK_UUID}})
+        dirty, log = self._check(
+            client, self._existing(),
+            self._params(networkspecs=['network_uuid=mynet,address=10.0.0.5']))
+
+        self.assertFalse(dirty, log)
+
+    def test_a_different_network_is_still_dirty(self):
+        other = '9f7c2f10-5a42-4a2e-8a0e-0c4a7c2f1d33'
+        client = self._client(resolves={'othernet': {'uuid': other}})
+        dirty, log = self._check(
+            client, self._existing(), self._params(networks=['othernet']))
+
+        self.assertTrue(dirty)
+        self.assertIn(
+            'Instance dirty: interface 0 changed network from %s to %s'
+            % (self.NETWORK_UUID, other), log)
+
+    def test_one_lookup_serves_every_interface_on_a_network(self):
+        client = self._client(
+            resolves={'mynet': {'uuid': self.NETWORK_UUID}})
+        dirty, log = self._check(
+            client, self._existing(count=2),
+            self._params(networks=['mynet', 'mynet']))
+
+        self.assertFalse(dirty, log)
+        self.assertEqual(1, client.get_network.call_count)
+
+    def test_a_network_which_does_not_exist_is_refused(self):
+        # Previously this reported a difference and recreated the
+        # instance, and the create then failed on the same reference.
+        client = self._client()
+        self.assertRaises(
+            sf_instance.InstanceCreationException,
+            self._check, client, self._existing(),
+            self._params(networks=['nosuchnet']))
+
+    def test_the_lookup_is_namespaceless_when_no_namespace_is_set(self):
+        client = self._client(
+            resolves={'mynet': {'uuid': self.NETWORK_UUID}})
+        params = self._params(networks=['mynet'])
+        params['namespace'] = None
+        dirty, log = self._check(
+            client, self._existing(namespace=None), params)
+
+        self.assertFalse(dirty, log)
+        client.get_network.assert_called_once_with('mynet')
 
 
 class SfInstanceParameterDirtinessTestCase(base.ShakenFistTestCase):
