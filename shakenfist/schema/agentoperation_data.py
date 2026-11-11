@@ -14,8 +14,11 @@ from typing import Optional
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from pydantic import field_validator
 from pydantic import UUID4
+from pydantic import ValidationInfo
 
+from shakenfist.schema.agentoperation_dependency import agent_dependency
 from shakenfist.schema.sqlalchemy import SQLIndex
 from shakenfist.schema.sqlalchemy import SQLNativeUUID
 
@@ -36,6 +39,12 @@ class AgentOperationData(BaseModel):
         instance_uuid: The UUID of the Instance this operation
             targets.
         commands: List of command dicts (stored as JSON).
+        depends_on: Edges whose named operations must succeed before
+            this one runs, and whose failure is this one's failure.
+            Each entry is an agent_dependency serialised to a dict.
+        runs_after: Edges which order this operation after the named
+            operations without sharing their fate. Each entry is an
+            agent_dependency serialised to a dict.
         deadline: Absolute unix timestamp after which the operation
             must not be dispatched and must not continue executing.
             NULL means no client intent was recorded, so the server
@@ -64,6 +73,23 @@ class AgentOperationData(BaseModel):
     # List of command dicts (variable-length, stored as JSON)
     commands: list[dict]
 
+    # The operations this one depends on, and the operations it merely
+    # follows. Both are lists of agent_dependency serialised to dicts,
+    # stored as JSON the same way commands is, and an empty list is the
+    # ordinary case.
+    #
+    # The two differ in fate sharing, not in ordering: a depends_on edge
+    # whose operation fails takes this operation down with it, while a
+    # runs_after edge only says "not before", so this operation still runs
+    # when the edge's operation fails. An edge's settle_seconds, where
+    # present, means the edge is satisfied that many seconds after its
+    # operation completed rather than immediately.
+    #
+    # Nothing evaluates either list yet. An operation created with edges
+    # today is dispatched exactly as one created without them.
+    depends_on: list[dict] = []
+    runs_after: list[dict] = []
+
     # The absolute unix timestamp after which this operation must not
     # be dispatched and must not continue executing. Computed by the
     # API server at request receipt as time.time() + deadline_seconds.
@@ -85,3 +111,24 @@ class AgentOperationData(BaseModel):
 
     # Object version number for schema migrations
     version: int
+
+    @field_validator('depends_on', 'runs_after')
+    @classmethod
+    def validate_dependencies(
+            cls, v: list[dict], info: ValidationInfo) -> list[dict]:
+        """Refuse an edge list which does not describe agent_dependency."""
+        # The columns are JSON, so the shape of what goes in them is
+        # otherwise unchecked. Validating here rather than in the API layer
+        # means a malformed or mixed-type edge is refused when the row is
+        # read back as well as when it is written, so a bad edge which
+        # arrived some other way -- a hand-edited row, an older or
+        # future-dated writer -- surfaces as a refusal rather than as an
+        # evaluator quietly doing nothing with it.
+        for index, entry in enumerate(v):
+            try:
+                agent_dependency(**entry)
+            except Exception as e:
+                raise ValueError(
+                    f'{info.field_name}[{index}] is not a valid agent '
+                    f'operation dependency: {e}')
+        return v

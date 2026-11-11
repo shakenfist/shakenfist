@@ -146,7 +146,8 @@ class AgentOperationColumnValuesTestCase(base.ShakenFistTestCase):
     def test_no_mask_returns_every_column(self):
         values = mariadb._agent_operation_attributes_column_values(self.data)
         self.assertEqual(
-            {'results', 'last_progress', 'attempts', 'expiry_reason'},
+            {'results', 'last_progress', 'attempts', 'expiry_reason',
+             'dependency_failure'},
             set(values))
 
     def test_mask_limits_columns(self):
@@ -174,6 +175,25 @@ class AgentOperationColumnValuesTestCase(base.ShakenFistTestCase):
             self.data, ['expiry_reason'])
         self.assertEqual({'expiry_reason'}, set(values))
         self.assertIsNone(values['expiry_reason'])
+
+    def test_dependency_failure_absence_is_null_not_json_null(self):
+        # The column distinguishes "nothing cascaded here" from "something
+        # cascaded and recorded no detail", so an unset value has to reach
+        # the database as NULL rather than as the string 'null'.
+        values = mariadb._agent_operation_attributes_column_values(
+            self.data, ['dependency_failure'])
+        self.assertEqual({'dependency_failure'}, set(values))
+        self.assertIsNone(values['dependency_failure'])
+
+        self.data.dependency_failure = {
+            'op_type': 'agentoperation', 'op_uuid': 'a-uuid',
+            'state': 'error'}
+        values = mariadb._agent_operation_attributes_column_values(
+            self.data, ['dependency_failure'])
+        self.assertEqual(
+            '{"op_type": "agentoperation", "op_uuid": "a-uuid", '
+            '"state": "error"}',
+            values['dependency_failure'])
 
     def test_unknown_field_rejected(self):
         self.assertRaises(
