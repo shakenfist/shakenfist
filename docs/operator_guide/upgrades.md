@@ -10,6 +10,39 @@ means it is safe to perform a rollout across a cluster without downtime,
 although you might see small transient failures such as single API requests
 failing as processes restart.
 
+That describes an old object read by a new node. The other direction is not
+symmetrical, and it is worth knowing about before you plan a rollout. A node
+which has been upgraded creates objects at the *new* version immediately --
+the cluster minimum governs whether an upgraded object is written back, not
+what a new object is created as -- so for the length of a rollout a
+not-yet-upgraded node may read a row it does not understand. There is no
+downgrade step and never will be, so that read fails, with a log line naming
+the object, the version it is stored at and the version that node
+understands:
+
+```
+Object <uuid> is version 4, but this node only understands version 3 of a
+agentoperation
+```
+
+The practical consequences:
+
+* Only an object type whose version actually moved in the release you are
+  installing is affected, and only for objects created during the rollout.
+  Most releases bump no object versions at all.
+* The exposure is worst where the writing and reading nodes are reliably
+  different machines. An agent operation, for example, is created by
+  `sf-api` and read by `sf-sidechannel` on the instance's hypervisor, so
+  agent operations created during the rollout fail on hypervisors that have
+  not been upgraded yet.
+* The failure is loud and bounded rather than silent: the operation fails,
+  nothing is written at the wrong version, and it works once that node is
+  upgraded. Retry after the rollout.
+
+So the advice is the same advice as always -- do not leave a cluster
+half-upgraded for longer than you have to -- but the reason is now written
+down rather than discovered.
+
 You should note however that "all nodes" includes nodes in non-running states
 such as ERROR and MISSING. The only state which is excluded from the check is
 DELETED. Therefore, in order for online upgrades to work correctly, it is

@@ -222,10 +222,26 @@ class DatabaseBackedObject:
                 static_values['version'] = self.initial_version
             starting_version = static_values['version']
 
+            # A version above ours is not something a step can fix, and
+            # the loop below would walk upwards forever looking for one.
+            # This is the old half of a rolling upgrade reading a row an
+            # already-upgraded node wrote: new() writes
+            # cls.current_version from the moment a rolled node starts,
+            # whatever the cluster minimum is (issue 3857).
+            if static_values['version'] > self.current_version:
+                raise exceptions.ObjectFromNewerNodeException(
+                    'Object %s is version %s, but this node only '
+                    'understands version %s of a %s'
+                    % (static_values.get('uuid'), static_values['version'],
+                       self.current_version, self.object_type))
+
             while static_values['version'] != self.current_version:
                 step = '_upgrade_step_%d_to_%d' % (static_values['version'],
                                                    static_values['version'] + 1)
-                step_func = getattr(self, step)
+                # Without the default this raises AttributeError before
+                # the guard below can run, which made the guard and its
+                # UpgradeException unreachable.
+                step_func = getattr(self, step, None)
                 if not step_func:
                     raise exceptions.UpgradeException(
                         'Upgrade step %s is missing for object %s'
@@ -283,6 +299,8 @@ class DatabaseBackedObject:
 
         Raises:
             UpgradeException: If an upgrade step is missing.
+            ObjectFromNewerNodeException: If the stored version is
+                higher than this node's current_version.
         """
         # Check if upgrade is needed
         current_version = getattr(data, 'version', cls.initial_version)
@@ -298,6 +316,15 @@ class DatabaseBackedObject:
             values['version'] = cls.initial_version
 
         # Apply upgrade steps sequentially
+        # The same refusal as upgrade(), for the same reason: no step
+        # walks a version downwards (issue 3857).
+        if values['version'] > cls.current_version:
+            raise exceptions.ObjectFromNewerNodeException(
+                'Object %s is version %s, but this node only understands '
+                'version %s of a %s'
+                % (values.get('uuid'), values['version'],
+                   cls.current_version, cls.object_type))
+
         while values['version'] != cls.current_version:
             step_name = '_upgrade_step_%d_to_%d' % (
                 values['version'], values['version'] + 1)
