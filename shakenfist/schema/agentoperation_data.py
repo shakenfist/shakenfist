@@ -124,11 +124,16 @@ class AgentOperationData(BaseModel):
         # arrived some other way -- a hand-edited row, an older or
         # future-dated writer -- surfaces as a refusal rather than as an
         # evaluator quietly doing nothing with it.
+        # Narrowed to the two exceptions this can actually raise, matching
+        # the API helper which does the same construction: pydantic's
+        # ValidationError is a ValueError, and a non-mapping entry is the
+        # TypeError from the keyword expansion. Chained, so a traceback keeps
+        # the report which says which field was wrong.
         for index, entry in enumerate(v):
             try:
                 agent_dependency(**entry)
-            except Exception as e:
+            except (TypeError, ValueError) as e:
                 raise ValueError(
                     f'{info.field_name}[{index}] is not a valid agent '
-                    f'operation dependency: {e}')
+                    f'operation dependency: {e}') from e
         return v

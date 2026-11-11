@@ -108,13 +108,15 @@ DEPENDS_ON_DESCRIPTION = (
     'caller can read, and may ask for a settle delay once that operation '
     'finishes. depends_on is the stronger of the two declarations: it says '
     'this operation has no reason to run if the one it names did not '
-    'succeed.')
+    'succeed. At most %d edges, because each one is looked up before the '
+    'operation is created.' % api_base.MAX_AGENT_DEPENDENCIES)
 
 RUNS_AFTER_DESCRIPTION = (
     'Agent operations this one declares an ordering dependency on. The edges '
     'take the same form as depends_on and differ only in strength: '
     'runs_after says "not before", and says nothing about whether this '
-    'operation still makes sense if the one it names failed.')
+    'operation still makes sense if the one it names failed. The same limit '
+    'of %d edges applies.' % api_base.MAX_AGENT_DEPENDENCIES)
 
 
 instance_get_example = """{

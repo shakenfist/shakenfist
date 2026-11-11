@@ -17,10 +17,12 @@
 # shakenfist/schema/operations/, which holds cluster operation schema models
 # exclusively. That is where a reader goes looking for it.
 
+import math
 from typing import Any
 from typing import Optional
 
 from pydantic import BaseModel
+from pydantic import ConfigDict
 from pydantic import field_serializer
 from pydantic import field_validator
 from pydantic import UUID4
@@ -38,6 +40,14 @@ class agent_dependency(BaseModel):
     # The lower case class name follows dependency in
     # baseclusteroperation.py, which is the convention for an edge model in
     # this schema rather than an oversight.
+
+    # An unknown key is refused rather than dropped. pydantic's default is
+    # to ignore one, which would let junk ride along in a stored edge and
+    # read back out again -- and the point of validating here rather than
+    # only at the API layer is that an edge cannot be stored or read back
+    # unnoticed whatever wrote it. The published parameter already refuses
+    # an unknown key, but only while request validation is enforcing.
+    model_config = ConfigDict(extra='forbid')
 
     # op_type is stored even though only one value is legal, so that a
     # persisted agent edge is the same shape as a persisted cluster edge and
@@ -66,15 +76,50 @@ class agent_dependency(BaseModel):
             )
         return v
 
+    @field_validator('settle_seconds', mode='before')
+    @classmethod
+    def refuse_boolean_settle_seconds(cls, v: Any) -> Any:
+        # Before coercion, because that is the only point a bool is still
+        # distinguishable: isinstance(True, int) is true in Python, so a
+        # bool reaches float() happily and arrives as 1.0. JSON true is not
+        # a number of seconds, and accepting it as one second would be worse
+        # than refusing it. The deadline and progress parameters refuse a
+        # bool in external_api/base.py for the same reason.
+        if isinstance(v, bool):
+            raise ValueError(
+                'settle_seconds must be a number of seconds, not a boolean')
+        return v
+
     @field_validator('settle_seconds')
     @classmethod
     def validate_settle_seconds(cls, v: Optional[float]) -> Optional[float]:
+        if v is None:
+            return v
+
+        # Neither infinity nor NaN is a number of seconds, and both arrive
+        # easily: json.loads() accepts the bare Infinity and NaN literals, so
+        # flask hands them straight through. NaN matters most, because it
+        # fails every comparison including the negative test below and so
+        # would otherwise be stored -- to become a wrong answer rather than a
+        # refusal once something does settle arithmetic with it. This is the
+        # same refusal, for the same reason, that the deadline and progress
+        # parameters make in external_api/base.py.
+        if not math.isfinite(v):
+            raise ValueError(
+                f'settle_seconds must be a finite number of seconds, got {v}')
+
         # A negative settle would make the edge satisfied before the thing it
         # depends on had finished, which is an ordering constraint pointing
         # the wrong way.
-        if v is not None and v < 0:
+        if v < 0:
             raise ValueError(
                 f'settle_seconds may not be negative, got {v}')
+
+        # The operator ceiling is deliberately NOT enforced here. It is a
+        # deployment policy value, and nothing else in shakenfist/schema/
+        # imports config -- making forty schema modules depend on it to bound
+        # one field would be a worse trade than checking the bound in the one
+        # place every stored edge passes through, which is the API helper.
         return v
 
     @field_serializer('op_type')

@@ -533,6 +533,76 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         self.assertIn('settle_seconds', resp.get_json()['error'])
         new.assert_not_called()
 
+    def test_the_settle_ceiling_is_enforced_by_the_handler_in_warn_mode(self):
+        # The rollback path, as for deadline_seconds above: with
+        # validation warning rather than enforcing, the declared maximum
+        # is not what refuses this, so the helper's own check has to, and
+        # it names the configuration option an operator would change.
+        self.set_validation_mode('warn')
+
+        resp, new = self._execute(
+            depends_on=[self._edge(
+                self.dependency,
+                settle_seconds=config.AGENT_OPERATION_MAX_DEADLINE + 1)])
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertIn(
+            'AGENT_OPERATION_MAX_DEADLINE', resp.get_json()['error'])
+        new.assert_not_called()
+
+    def test_a_list_at_the_edge_limit_is_accepted(self):
+        # The pair to the test below: the bound is a real number rather
+        # than a number nothing reaches, so one at it must work.
+        edges = [self._edge(self.dependency)
+                 for _ in range(api_base.MAX_AGENT_DEPENDENCIES)]
+        resp, new = self._execute(depends_on=edges)
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(
+            api_base.MAX_AGENT_DEPENDENCIES,
+            len(new.call_args.kwargs['depends_on']))
+
+    def test_a_list_over_the_edge_limit_is_refused_and_creates_nothing(self):
+        # Each edge costs an object read before anything is created, so a
+        # short body must not be able to buy an unbounded number of them.
+        # Checked on each list separately, which is what the published
+        # limit says.
+        for name in ('depends_on', 'runs_after'):
+            with self.subTest(parameter=name):
+                edges = [self._edge(self.dependency) for _ in
+                         range(api_base.MAX_AGENT_DEPENDENCIES + 1)]
+                resp, new = self._execute(**{name: edges})
+                self.assertEqual(400, resp.status_code, resp.get_json())
+                self.assertIn(
+                    str(api_base.MAX_AGENT_DEPENDENCIES),
+                    resp.get_json()['error'])
+                new.assert_not_called()
+
+    def test_a_non_list_edge_parameter_is_a_400_not_a_500(self):
+        # enumerate() of a non-iterable raises TypeError, which uncaught
+        # would answer 500 for what is a caller's mistake. Reachable only
+        # with validation not enforcing, which is the mode the helper
+        # exists not to trust.
+        self.set_validation_mode('warn')
+
+        for value in (5, 'depends', {'op_uuid': 'x'}):
+            with self.subTest(value=value):
+                resp, new = self._execute(depends_on=value)
+                self.assertEqual(400, resp.status_code, resp.get_json())
+                new.assert_not_called()
+
+    def test_a_non_object_edge_does_not_name_an_internal_constructor(self):
+        # The TypeError from the keyword expansion reads "agent_dependency()
+        # argument after ** must be a mapping, not str", which tells a
+        # caller about this codebase rather than about their request.
+        self.set_validation_mode('warn')
+
+        resp, new = self._execute(depends_on=['nonsense'])
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertEqual(
+            {'error': 'depends_on[0] is not a valid dependency: not an object',
+             'status': 400},
+            resp.get_json())
+        new.assert_not_called()
+
     def test_both_parameters_are_declared_on_every_endpoint(self):
         # Unlike progress_timeout_seconds there is no agent operation for
         # which an edge is meaningless, so all three endpoints take both.

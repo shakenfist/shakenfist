@@ -1473,12 +1473,28 @@ An agent operation may name other agent operations in its `depends_on` and
 `runs_after` columns. Both are `LONGTEXT NOT NULL` with a server default of
 `'[]'`, so they are never NULL, and an operation which names nothing holds an
 empty list. An entry in either is stored as
-`{"op_type": "agentoperation", "op_uuid": "...", "settle_seconds": N}`, where
-`settle_seconds` may be absent. `dependency_failure` is NULL unless a
-`depends_on` dependency failed and caused this operation to be aborted. Nothing evaluates an edge or writes `dependency_failure` yet: an
-operation created with edges is dispatched exactly as one created without. See
+`{"op_type": "agentoperation", "op_uuid": "...", "settle_seconds": N}`. All
+three keys are present in anything the API writes, because it normalises
+every edge through its schema model before storing it, and `settle_seconds`
+is `null` when the caller asked for no settle delay. A reader should still
+treat an absent `settle_seconds` as `null`, since a row this API did not
+write -- a hand-edited one -- can lack the key. `dependency_failure` is NULL
+unless a `depends_on` dependency failed and caused this operation to be
+aborted. Nothing evaluates an edge or writes `dependency_failure` yet: an
+operation created with edges is dispatched exactly as one created without.
+See
 [the API reference](../developer_guide/api_reference/instances.md#agentdependency)
 for the shape a caller sends and for what the two columns mean.
+
+The edges are written to MariaDB by `sf-database`, while the capability
+token which tells a client the parameters exist is advertised by `sf-api`.
+Upgrade the database tier before the API tier. A new `sf-api` talking to an
+older `sf-database` will accept an operation carrying edges, answer 200, and
+store it with empty edge lists, because the fields the newer API sends are
+unknown to the older service and are dropped: the record is lost rather than
+merely unevaluated, and nothing on the wire reports it. The table version
+check `sf-database` makes at startup guards the schema, not the vocabulary of
+the service in front of it.
 
 `deadline` and `progress_timeout` are enforced: an operation which
 outlives either moves to the terminal `expired` state, checked at

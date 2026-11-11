@@ -2941,6 +2941,49 @@ class AgentOperationDependencyTestCase(base.ShakenFistTestCase):
             self._make_agentop(runs_after=[
                 {'op_uuid': str(uuid.uuid4()), 'settle_seconds': -1.0}])
 
+    def test_a_non_finite_settle_delay_is_refused(self):
+        # NaN and infinity both arrive easily, because json.loads accepts
+        # the bare literals, and NaN in particular fails every comparison
+        # including the negative test above -- so a model which only
+        # refused negatives would store it, for something later to do
+        # arithmetic with. Constructed on the model rather than through an
+        # endpoint, because this has to hold whatever mode request
+        # validation is in.
+        for value in (float('nan'), float('inf'), float('-inf')):
+            with testtools.ExpectedException(ValidationError):
+                self._make_agentop(depends_on=[
+                    {'op_uuid': str(uuid.uuid4()), 'settle_seconds': value}])
+
+    def test_a_boolean_settle_delay_is_refused(self):
+        # isinstance(True, int) is true in Python, so a bool coerces to
+        # 1.0 and would be stored as a one second settle nobody asked
+        # for. Refused before coercion, which is the only point it is
+        # still distinguishable from the number 1.
+        for value in (True, False):
+            with testtools.ExpectedException(ValidationError):
+                self._make_agentop(depends_on=[
+                    {'op_uuid': str(uuid.uuid4()), 'settle_seconds': value}])
+
+    def test_an_unknown_edge_key_is_refused(self):
+        # The model refuses an unknown key rather than letting pydantic
+        # drop it, so junk cannot ride along in a stored edge and read
+        # back out again. The published parameter refuses one too, but
+        # only while request validation is enforcing.
+        with testtools.ExpectedException(ValidationError):
+            self._make_agentop(depends_on=[
+                {'op_uuid': str(uuid.uuid4()), 'nonsense': 1}])
+
+    def test_the_operator_ceiling_is_not_enforced_on_the_model(self):
+        # Deliberate: the ceiling is a deployment policy value and nothing
+        # in shakenfist/schema/ imports config, so it is enforced in the
+        # API helper which every stored edge passes through. This test
+        # exists so that moving it here is a decision rather than an
+        # accident -- if a later change does enforce it on the model, this
+        # is the test which says to delete it and say why.
+        op = self._make_agentop(depends_on=[
+            {'op_uuid': str(uuid.uuid4()), 'settle_seconds': 1e9}])
+        self.assertEqual(1e9, op.depends_on[0]['settle_seconds'])
+
 
 class InstanceAttributeFieldMaskTestCase(base.ShakenFistTestCase):
     """Regression tests for the cross-attribute lost update.

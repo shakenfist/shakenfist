@@ -901,6 +901,7 @@ is meaningful.
             }
         ],
         "deadline": 1787428090.5,
+        "depends_on": [],
         "expiry_reason": null,
         "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
         "last_progress": null,
@@ -916,6 +917,7 @@ is meaningful.
                 "stdout": "PRETTY_NAME=\"Debian GNU/Linux 11 (bullseye)\"..."
             }
         },
+        "runs_after": [],
         "state": "complete",
         "uuid": "93fb538c-84f5-4ff8-83ba-2be5f5f92954",
         "version": 3
@@ -1076,6 +1078,7 @@ field advertises the `include-queued-agent-operations` capability.
                 }
             ],
             "deadline": 1787428090.5,
+            "depends_on": [],
             "expiry_reason": null,
             "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
             "last_progress": null,
@@ -1090,6 +1093,7 @@ field advertises the `include-queued-agent-operations` capability.
                     "path": "/tmp/README.md"
                 }
             },
+            "runs_after": [],
             "state": "complete",
             "uuid": "343049d7-da2a-46f2-bb5c-edb783ec1fb9",
             "version": 3
@@ -1104,6 +1108,7 @@ field advertises the `include-queued-agent-operations` capability.
                 }
             ],
             "deadline": 1787428090.5,
+            "depends_on": [],
             "expiry_reason": null,
             "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
             "last_progress": null,
@@ -1119,6 +1124,7 @@ field advertises the `include-queued-agent-operations` capability.
                     "stdout": "...content of file..."
                 }
             },
+            "runs_after": [],
             "state": "complete",
             "uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
             "version": 3

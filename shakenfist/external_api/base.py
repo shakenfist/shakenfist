@@ -589,6 +589,14 @@ def _edge_defect(error):
     fixes them, and only its location and message, which are the parts
     that say something about the request they sent.
     """
+    # A TypeError here is the keyword expansion refusing a non-mapping, and
+    # its message names this module's constructor
+    # ("agent_dependency() argument after ** must be a mapping, not str").
+    # That is an internal detail and no help to a caller, so the one thing
+    # they need to know is said instead.
+    if isinstance(error, TypeError):
+        return 'not an object'
+
     errors = getattr(error, 'errors', None)
     if not callable(errors):
         return str(error)
@@ -603,6 +611,17 @@ def _edge_defect(error):
     if location:
         return '%s: %s' % (location, message)
     return message
+
+
+# The most dependency edges one list may carry. Each edge costs a
+# synchronous object read in the API worker before anything is created, so
+# without a bound a four line request body buys ten thousand database reads
+# -- the same asymmetry MAX_PLACEMENT_SHAPES exists for, with a round trip
+# per entry rather than an in-memory walk. The value matches that constant
+# because the trade is the same and a second number would invite a reader to
+# look for a reason there isn't one. It bounds each list separately, which is
+# what the published maxItems can express.
+MAX_AGENT_DEPENDENCIES = 64
 
 
 def agent_operation_dependencies(depends_on, runs_after, caller_namespace):
@@ -630,6 +649,19 @@ def agent_operation_dependencies(depends_on, runs_after, caller_namespace):
 
     for (name, edges) in (('depends_on', depends_on),
                           ('runs_after', runs_after)):
+        # Refused before the loop rather than inside it. The declaration says
+        # array, but that is only enforced while request validation is
+        # enforcing, and enumerate() of a non-iterable raises TypeError --
+        # which, uncaught here, is a 500 for what is a caller's mistake.
+        if edges is not None and not isinstance(edges, list):
+            return None, sf_api.error(
+                400, '%s must be a list of dependencies' % name)
+
+        if edges is not None and len(edges) > MAX_AGENT_DEPENDENCIES:
+            return None, sf_api.error(
+                400, '%s may not name more than %d dependencies'
+                % (name, MAX_AGENT_DEPENDENCIES))
+
         normalised = []
 
         for (index, edge) in enumerate(edges or []):
@@ -656,6 +688,23 @@ def agent_operation_dependencies(depends_on, runs_after, caller_namespace):
                     400, '%s[%d] is not a valid dependency: %s'
                     % (name, index, _edge_defect(e)),
                     suppress_traceback=True)
+
+            # The operator ceiling is checked here rather than on the model,
+            # because it is a deployment policy value and nothing in
+            # shakenfist/schema/ imports config. Every stored edge passes
+            # through this helper, and it runs whatever mode request
+            # validation is in, so this is the bound's one reliable home. The
+            # model refuses a non-finite or negative settle, which are
+            # properties of the value rather than of the deployment.
+            if (dependency.settle_seconds is not None
+                    and dependency.settle_seconds
+                    > config.AGENT_OPERATION_MAX_DEADLINE):
+                return None, sf_api.error(
+                    400,
+                    '%s[%d]: settle_seconds must not exceed this '
+                    'deployment\'s AGENT_OPERATION_MAX_DEADLINE of '
+                    '%d seconds'
+                    % (name, index, config.AGENT_OPERATION_MAX_DEADLINE))
 
             # suppress_failure_audit because this lookup must not write an
             # event: a refused request creates nothing, and an audit event
