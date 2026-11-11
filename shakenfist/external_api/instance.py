@@ -1381,6 +1381,12 @@ class InstancesEndpoint(api_base.Resource):
             request_id=util_general.get_request_id(),
             artifact_event='creation request from REST API') or None
 
+        # No runs_after. The instance was minted earlier in this request
+        # with a server-generated uuid, so the only operations which can
+        # target it are the disk fetches just enqueued -- and depends_on
+        # already names all of them, which is the stronger edge. The
+        # pointer read this replaces always answered with one of those
+        # fetches or with None, so it added no ordering (issue 4673).
         nino_create_and_enqueue(
             placement,
             inst.uuid,
@@ -1389,8 +1395,7 @@ class InstancesEndpoint(api_base.Resource):
              nino_tasks.instance_start],
             PRIORITY.user_waiting,
             request_id=util_general.get_request_id(),
-            depends_on=instance_start_dependencies,
-            runs_after=[inst.last_cluster_operation])
+            depends_on=instance_start_dependencies)
 
         return inst.external_view()
 
@@ -1563,7 +1568,15 @@ class InstanceInterfacesEndpoint(api_base.Resource):
                 dependency(op_type=reconcile_op_type,
                            op_uuid=reconcile_op_uuid)
             ],
-            runs_after=[instance_from_db.last_cluster_operation])
+            # Every outstanding mutating operation on the instance, not
+            # just the newest: a hot plug rewrites the domain a start, a
+            # delete, a snapshot or another hot plug is working on, and
+            # the newest operation is only a sufficient wait when it was
+            # itself chained behind the older ones (issue 4673). The
+            # reconcile op above targets the network, not the instance,
+            # so it is not in this list and is named in depends_on.
+            runs_after=(
+                instance_from_db.pending_cluster_operation_dependencies()))
         # The NetworkInterface row created above is the source of truth
         # for the instance->NI association; no further bookkeeping needed.
 

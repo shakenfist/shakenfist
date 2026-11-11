@@ -3194,13 +3194,18 @@ class Instance(dbowo):
                     thin=thin
                 ))
 
+        # Every outstanding mutating operation on this instance, not just
+        # the newest: a snapshot reads the disks a start, a hot plug, a
+        # delete or another snapshot is changing, and the newest operation
+        # is only a sufficient wait when it was itself chained behind the
+        # older ones (issue 4673).
         niso_create_and_enqueue(
             config.NODE_UUID,
             self.uuid,
             snapshots,
             [niso_tasks.instance_snapshot],
             PRIORITY.user_facing_high_io,
-            runs_after=[self.last_cluster_operation],
+            runs_after=self.pending_cluster_operation_dependencies(),
             request_id=util_general.get_request_id())
 
         self.add_event(EVENT_TYPE_AUDIT, 'snapshot requested', extra=out)

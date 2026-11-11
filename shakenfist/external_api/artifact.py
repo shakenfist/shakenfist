@@ -499,6 +499,13 @@ class ArtifactsEndpoint(api_base.Resource):
                     403, 'only the system namespace can create shared artifacts')
             a.shared = True
 
+        # Every outstanding fetch of this artifact, not just the newest.
+        # A fetch ends in add_index, which ends in delete_old_versions, so
+        # two running together race over the version list -- and the
+        # fetches instance create enqueues carry no runs_after, so the
+        # newest is not a wait for the older ones (issue 4673). An
+        # artifact's only mutating operation type is the fetch, so this
+        # serialises nothing unrelated.
         afo_create_and_enqueue(
             namespace,
             url,
@@ -507,7 +514,7 @@ class ArtifactsEndpoint(api_base.Resource):
             PRIORITY.user_facing,
             artifact_uuid=a.uuid,
             request_id=util_general.get_request_id(),
-            runs_after=[a.last_cluster_operation])
+            runs_after=a.pending_cluster_operation_dependencies())
 
         return a.external_view()
 

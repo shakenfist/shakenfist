@@ -474,14 +474,21 @@ change that adds the task, and add the task to `observational_tasks` only if
 it is observational. The criteria above say why each existing task is
 classified as it is.
 
-`DatabaseBackedObjectWithOperations` exposes three read shapes over the
+`DatabaseBackedObjectWithOperations` exposes four read shapes over the
 history:
 
 - **`last_cluster_operation` (property)**: returns the most recent
   non-observational target row regardless of its state. Consumed by
-  `external_view()` projections and `runs_after=[...]` chains, which
-  want the latest pointer independent of whether it has reached a
-  terminal state.
+  `external_view()` projections, which report the latest pointer
+  independent of whether it has reached a terminal state. It is no
+  longer an ordering primitive: `runs_after=[obj.last_cluster_operation]`
+  is a wait for the newest operation only, which is a wait for the
+  older ones only if the newest was itself chained behind them. Several
+  enqueue sites carry no `runs_after` at all -- the disk fetches of
+  instance create, the redirected start in `node_inst_netdesc_op`,
+  `instance_create` -- so an older pending operation was silently
+  skipped and the two ran together (issue 4673). Use
+  `pending_cluster_operation_dependencies()` instead.
 - **`has_pending_cluster_operation()` (method)**: returns `True` if any
   non-observational target row's operation is in
   `{queued, preflight, executing}`, the `ACTIVE_OPERATION_STATES` set in
@@ -507,6 +514,22 @@ history:
   It aborts everything it finds except a snapshot, whose artifact outlives the
   instance, and a delete already in flight, which is doing the work the request
   asks for -- the delete it enqueues waits for both of those instead.
+- **`pending_cluster_operation_dependencies()` (method)**: the
+  `runs_after` list which serialises a new operation behind everything
+  already happening to the object. It is `get_cluster_operations()`
+  with the observational rows dropped, projected to
+  `{'op_type': ..., 'op_uuid': ...}` pointers. The instance snapshot,
+  the interface hot plug and the artifact fetch route use it.
+  Observational rows are dropped for the same reason the pointer
+  ignores them: a background checksum or health sweep does not change
+  the object, so parking user-facing work behind one would reintroduce
+  the shadowing the `observational` flag removed. It raises
+  `DatabaseUnavailable` on a failed read rather than returning an empty
+  list, because an empty list would enqueue the work with no ordering
+  at all; the REST routes which call it answer 503. An enqueue site
+  whose object was minted in the same request -- `Network.new()`, the
+  start in instance create -- needs none of this and passes no
+  `runs_after`: nothing else can have targeted a uuid nobody has seen.
 
 As a backstop for rows that outlive their operation, the table is bounded by
 a periodic prune in the cluster daemon, alongside the existing

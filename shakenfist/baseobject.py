@@ -992,6 +992,43 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
             outstanding_only=outstanding_only,
             raise_on_error=raise_on_error, limit=limit)
 
+    def pending_cluster_operation_dependencies(
+            self) -> list[dict[str, Any]]:
+        """Every outstanding mutating operation targeting this object,
+        as a ``runs_after`` list.
+
+        A caller which serialises its own work behind "whatever is
+        already happening to this object" wants all of them.
+        ``last_cluster_operation`` names only the newest, which is the
+        right answer only when that operation was itself chained behind
+        the older ones -- and several enqueue sites carry no
+        ``runs_after`` at all (the disk fetches of instance create, the
+        redirected start in node_inst_netdesc_op, instance_create
+        itself), so it is not. Chaining behind the newest therefore
+        skipped an older pending operation and the two ran together
+        (issue 4673).
+
+        Observational operations are excluded, for the same reason the
+        pointer excludes them: a background checksum or health sweep
+        does not change the object, so parking user-facing work behind
+        one would let background housekeeping hold up a caller's
+        request, which is the shadowing the ``observational`` flag
+        exists to prevent.
+
+        Raises DatabaseUnavailable when the outstanding operations
+        cannot be read, as the instance delete walk does. An empty
+        answer from a failed read cannot be told apart from "nothing is
+        in flight", and would enqueue work with no ordering at all --
+        which is the race this method exists to close. The REST routes
+        which call it answer 503.
+        """
+        return [
+            {'op_type': t.op.object_type, 'op_uuid': str(t.op.uuid)}
+            for t in self.get_cluster_operations(
+                outstanding_only=True, raise_on_error=True)
+            if not t.observational
+        ]
+
     def cluster_operation_views(
             self, outstanding_only: bool = True,
             limit: Optional[int] = MAX_TARGETED_OPERATIONS

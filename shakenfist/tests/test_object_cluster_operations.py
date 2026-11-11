@@ -19,6 +19,7 @@ import sqlalchemy as sa
 
 from shakenfist.baseobject import DatabaseBackedObjectWithOperations
 from shakenfist.baseobject import targeted_cluster_operation_views
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.operations.node_inst_op import NodeInstOp
 from shakenfist.schema.object_types import ObjectType
@@ -287,4 +288,102 @@ class ObjectClusterOperationsTestCase(
             instance = _Instance(INSTANCE_UUID, in_memory_only=True)
             self.assertEqual([], instance.get_cluster_operations())
             self.assertEqual([], instance.cluster_operation_views())
+        targets.assert_not_called()
+
+
+class PendingClusterOperationDependenciesTestCase(
+        ClusterOperationTablesFixture, base.ShakenFistTestCase):
+    """The runs_after list which waits for everything already in flight.
+
+    pending_cluster_operation_dependencies() replaced
+    runs_after=[obj.last_cluster_operation] at the instance snapshot, the
+    interface hot plug and the artifact fetch route. The pointer names
+    only the newest mutating operation, so an older pending operation
+    enqueued without runs_after -- a disk fetch, a redirected start,
+    instance_create -- was skipped and ran alongside the new work
+    (issue 4673).
+    """
+
+    def _enqueue_inst(self, tasks, instance_uuid=INSTANCE_UUID):
+        _, op_uuid = node_inst_op.create_and_enqueue(
+            NODE_UUID, instance_uuid, tasks, PRIORITY.background)
+        return op_uuid
+
+    def test_success_criterion(self):
+        # Two queued mutating ops, neither chained behind the other, which
+        # is how the disk fetches and the redirected start arrive. The
+        # pointer names only the newer one; the dependency list names both.
+        older = self._enqueue_inst(MUTATING_TASKS)
+        newer = self._enqueue_inst(MUTATING_TASKS)
+
+        instance = _Instance(INSTANCE_UUID)
+        self.assertEqual(newer, instance.last_cluster_operation['op_uuid'])
+        self.assertEqual(
+            {older, newer},
+            {d['op_uuid']
+             for d in instance.pending_cluster_operation_dependencies()})
+
+    def test_op_type_is_carried_so_the_dispatcher_can_load_it(self):
+        op_uuid = self._enqueue_inst(MUTATING_TASKS)
+        self.assertEqual(
+            [{'op_type': ObjectType.NODE_INST_OP, 'op_uuid': op_uuid}],
+            _Instance(INSTANCE_UUID).pending_cluster_operation_dependencies())
+
+    def test_what_is_and_is_not_waited_for(self):
+        # Terminal ops are not waited for, observational sweeps are not
+        # waited for, and an op targeting another object is not either.
+        queued = self._enqueue_inst(MUTATING_TASKS)
+        self._set_op_state(self._enqueue_inst(MUTATING_TASKS), 'complete')
+        self._set_op_state(self._enqueue_inst(MUTATING_TASKS), 'error')
+        self._enqueue_inst(SWEEP_TASKS)
+        self._enqueue_inst(MUTATING_TASKS, instance_uuid=str(uuid4()))
+
+        instance = _Instance(INSTANCE_UUID)
+        self.assertEqual(
+            [queued],
+            [d['op_uuid']
+             for d in instance.pending_cluster_operation_dependencies()])
+
+        # The sweep really is pending and really is in the listing, so the
+        # assertion above is about the observational filter and not about
+        # an empty listing.
+        views = instance.cluster_operation_views()
+        self.assertEqual(
+            [True], [v['observational'] for v in views
+                     if v['uuid'] != queued])
+
+    def test_nothing_in_flight_is_an_empty_list(self):
+        # An empty list is falsy, and _convert_deps() turns it into None,
+        # so an object with nothing outstanding enqueues unchained.
+        self._set_op_state(self._enqueue_inst(MUTATING_TASKS), 'complete')
+        self.assertEqual(
+            [], _Instance(INSTANCE_UUID).pending_cluster_operation_dependencies())
+
+    def test_a_failed_read_raises_rather_than_answering_empty(self):
+        # A failed read of the target rows answers with no rows, which
+        # cannot be told apart from "nothing is in flight" and would
+        # enqueue the work with no ordering at all. raise_on_error is
+        # passed so that the read raises instead, and the exception is
+        # not swallowed on the way back out.
+        self._enqueue_inst(MUTATING_TASKS)
+        instance = _Instance(INSTANCE_UUID)
+
+        with mock.patch(
+                'shakenfist.mariadb.'
+                'get_cluster_operation_targets_for_object',
+                side_effect=exceptions.DatabaseUnavailable('tier down')) as r:
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                instance.pending_cluster_operation_dependencies)
+        self.assertTrue(r.call_args.kwargs['raise_on_error'])
+
+    def test_in_memory_object_waits_for_nothing(self):
+        self._enqueue_inst(MUTATING_TASKS)
+        with mock.patch(
+                'shakenfist.mariadb.get_cluster_operation_targets_for_object'
+        ) as targets:
+            self.assertEqual(
+                [],
+                _Instance(INSTANCE_UUID, in_memory_only=True)
+                .pending_cluster_operation_dependencies())
         targets.assert_not_called()
