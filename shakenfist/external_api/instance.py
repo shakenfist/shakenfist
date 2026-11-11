@@ -102,6 +102,22 @@ PROGRESS_TIMEOUT_SECONDS_DESCRIPTION = (
     'default, AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT, which is 30 '
     'seconds unless the operator has changed it.')
 
+DEPENDS_ON_DESCRIPTION = (
+    'Agent operations this one declares a fate-sharing dependency on. Each '
+    'edge names an operation which must already exist, in a namespace this '
+    'caller can read, and may ask for a settle delay once that operation '
+    'finishes. depends_on is the stronger of the two declarations: it says '
+    'this operation has no reason to run if the one it names did not '
+    'succeed. At most %d edges, because each one is looked up before the '
+    'operation is created.' % api_base.MAX_AGENT_DEPENDENCIES)
+
+RUNS_AFTER_DESCRIPTION = (
+    'Agent operations this one declares an ordering dependency on. The edges '
+    'take the same form as depends_on and differ only in strength: '
+    'runs_after says "not before", and says nothing about whether this '
+    'operation still makes sense if the one it names failed. The same limit '
+    'of %d edges applies.' % api_base.MAX_AGENT_DEPENDENCIES)
+
 
 instance_get_example = """{
     "agent_start_time": null,
@@ -2329,10 +2345,15 @@ class InstanceAgentPutEndpoint(api_base.Resource):
              {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE}),
             ('progress_timeout_seconds', 'body', 'number',
              PROGRESS_TIMEOUT_SECONDS_DESCRIPTION, False,
-             {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE})
+             {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE}),
+            ('depends_on', 'body', 'arrayofagentdependency',
+             DEPENDS_ON_DESCRIPTION, False),
+            ('runs_after', 'body', 'arrayofagentdependency',
+             RUNS_AFTER_DESCRIPTION, False)
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
-         (400, 'No agent connection to instance, or an invalid timing parameter.', None),
+         (400, 'No agent connection to instance, an invalid timing parameter, '
+          'or an invalid dependency.', None),
          (404, 'Instance or blob not found.', None),
          (406, 'Invalid mode specified', None)]))
     @api_base.arg_is_instance_ref
@@ -2341,7 +2362,7 @@ class InstanceAgentPutEndpoint(api_base.Resource):
     @api_base.log_token_use
     def post(self, instance_ref=None, blob_uuid=None, path=None, mode=None,
              deadline_seconds=None, progress_timeout_seconds=None,
-             instance_from_db=None):
+             depends_on=None, runs_after=None, instance_from_db=None):
         if not instance_from_db.agent_state.value.startswith('ready'):
             return sf_api.error(400, 'instance agent not ready')
 
@@ -2353,6 +2374,15 @@ class InstanceAgentPutEndpoint(api_base.Resource):
         if error:
             return error
         deadline, progress_timeout = timing
+
+        # Here for the reason the timing check is: an edge naming an
+        # operation this caller may not depend on must be refused before
+        # anything exists to have an edge.
+        edges, error = api_base.agent_operation_dependencies(
+            depends_on, runs_after, request_namespace())
+        if error:
+            return error
+        depends_on, runs_after = edges
 
         # Refuse a mode which is not a string before either parse sees it.
         # int() raises TypeError rather than ValueError for a non-number,
@@ -2396,7 +2426,9 @@ class InstanceAgentPutEndpoint(api_base.Resource):
         o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
                                str(instance_from_db.uuid), commands,
                                deadline=deadline,
-                               progress_timeout=progress_timeout)
+                               progress_timeout=progress_timeout,
+                               depends_on=depends_on,
+                               runs_after=runs_after)
         instance_from_db.agent_operation_enqueue(o.uuid)
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'queued agent command requiring preflight',
@@ -2428,10 +2460,15 @@ class InstanceAgentGetEndpoint(api_base.Resource):
              {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE}),
             ('progress_timeout_seconds', 'body', 'number',
              PROGRESS_TIMEOUT_SECONDS_DESCRIPTION, False,
-             {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE})
+             {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE}),
+            ('depends_on', 'body', 'arrayofagentdependency',
+             DEPENDS_ON_DESCRIPTION, False),
+            ('runs_after', 'body', 'arrayofagentdependency',
+             RUNS_AFTER_DESCRIPTION, False)
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
-         (400, 'No agent connection to instance, or an invalid timing parameter.', None),
+         (400, 'No agent connection to instance, an invalid timing parameter, '
+          'or an invalid dependency.', None),
          (404, 'Instance not found.', None),
          (406, 'Instance is not ready.', None)]))
     @api_base.arg_is_instance_ref
@@ -2439,7 +2476,8 @@ class InstanceAgentGetEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     @api_base.log_token_use
     def post(self, instance_ref=None, path=None, deadline_seconds=None,
-             progress_timeout_seconds=None, instance_from_db=None):
+             progress_timeout_seconds=None, depends_on=None, runs_after=None,
+             instance_from_db=None):
         if not instance_from_db.agent_state.value.startswith('ready'):
             return sf_api.error(400, 'instance agent not ready')
 
@@ -2450,6 +2488,12 @@ class InstanceAgentGetEndpoint(api_base.Resource):
         if error:
             return error
         deadline, progress_timeout = timing
+
+        edges, error = api_base.agent_operation_dependencies(
+            depends_on, runs_after, request_namespace())
+        if error:
+            return error
+        depends_on, runs_after = edges
 
         commands = [
             {
@@ -2463,7 +2507,9 @@ class InstanceAgentGetEndpoint(api_base.Resource):
         o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
                                str(instance_from_db.uuid), commands,
                                deadline=deadline,
-                               progress_timeout=progress_timeout)
+                               progress_timeout=progress_timeout,
+                               depends_on=depends_on,
+                               runs_after=runs_after)
         instance_from_db.agent_operation_enqueue(o.uuid)
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'queued agent command not requiring preflight',
@@ -2490,11 +2536,16 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
             ('command_line', 'body', 'string', 'The command to execute.', True),
             ('deadline_seconds', 'body', 'number',
              DEADLINE_SECONDS_DESCRIPTION, False,
-             {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE})
+             {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE}),
+            ('depends_on', 'body', 'arrayofagentdependency',
+             DEPENDS_ON_DESCRIPTION, False),
+            ('runs_after', 'body', 'arrayofagentdependency',
+             RUNS_AFTER_DESCRIPTION, False)
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
-         (400, 'No agent connection to instance, an invalid timing parameter, or a '
-          'progress_timeout_seconds, which this call does not accept.', None),
+         (400, 'No agent connection to instance, an invalid timing parameter, an '
+          'invalid dependency, or a progress_timeout_seconds, which this call '
+          'does not accept.', None),
          (404, 'Instance not found.', None),
          (406, 'Instance is not ready.', None)]))
     @api_base.arg_is_instance_ref
@@ -2502,7 +2553,8 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
     @api_base.requires_instance_active
     @api_base.log_token_use
     def post(self, instance_ref=None, command_line=None,
-             deadline_seconds=None, instance_from_db=None):
+             deadline_seconds=None, depends_on=None, runs_after=None,
+             instance_from_db=None):
         if not instance_from_db.agent_state.value.startswith('ready'):
             return sf_api.error(400, 'instance agent not ready')
 
@@ -2515,6 +2567,12 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
         if error:
             return error
         deadline, progress_timeout = timing
+
+        edges, error = api_base.agent_operation_dependencies(
+            depends_on, runs_after, request_namespace())
+        if error:
+            return error
+        depends_on, runs_after = edges
 
         commands = [
             {
@@ -2529,7 +2587,9 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
         o = AgentOperation.new(str(uuid.uuid4()), instance_from_db.namespace,
                                str(instance_from_db.uuid), commands,
                                deadline=deadline,
-                               progress_timeout=progress_timeout)
+                               progress_timeout=progress_timeout,
+                               depends_on=depends_on,
+                               runs_after=runs_after)
         instance_from_db.agent_operation_enqueue(o.uuid)
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'queued agent command not requiring preflight',

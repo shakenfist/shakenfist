@@ -37,8 +37,18 @@ have not yet aged out.
   in flight. This is deliberately distinct from `error`, which means the
   Agent Operation itself failed. The reason is recorded as the state's
   message and as an audit event on the operation. Note that the two
-  states are terminal in the same way, but only `expired` is currently
+  states are terminal in the same way, but of the two only `expired` is
   swept for hard deletion.
+* `abort`: something this Agent Operation declared a `depends_on`
+  dependency on failed, so the operation itself will never run. This is
+  deliberately distinct from both `error`, which means the Agent
+  Operation itself failed, and `expired`, which means a timing budget
+  the caller set ran out. Like `expired`, and unlike `error`, an aborted
+  operation is swept for hard deletion, because `abort` is one of
+  `constants.FINAL_OBJECT_STATES`. Nothing moves an operation into this
+  state yet: an operation records the dependencies it was created with,
+  but those are not evaluated when it is dispatched, so the state is
+  defined and reachable by the state machine rather than produced.
 
 The `executing --> queued` edge is a retry of a stalled attempt, not a
 failure: it fires when the executor made no progress rather than when it
@@ -57,16 +67,19 @@ stateDiagram-v2
   initial --> deleted
   initial --> error
   initial --> expired
+  initial --> abort
 
   preflight --> queued
   preflight --> deleted
   preflight --> error
   preflight --> expired
+  preflight --> abort
 
   queued --> executing
   queued --> deleted
   queued --> error
   queued --> expired
+  queued --> abort
 
   executing --> complete
   executing --> queued
@@ -79,6 +92,8 @@ stateDiagram-v2
   error --> deleted
 
   expired --> deleted
+
+  abort --> deleted
 
   deleted --> [*]
 ```

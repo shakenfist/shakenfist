@@ -38,6 +38,9 @@ class AgentOperationAttributesData(BaseModel):
         expiry_reason: Which timing budget expired the operation --
             'deadline' or 'progress'. NULL unless the operation is in
             the expired state.
+        dependency_failure: The op_type, op_uuid and state of the
+            failed dependency which aborted this operation. NULL
+            unless that happened.
     """
 
     model_config = ConfigDict(frozen=False)  # Mutable
@@ -67,3 +70,17 @@ class AgentOperationAttributesData(BaseModel):
     # client can branch on it without parsing the state message's
     # prose (issue #4075).
     expiry_reason: Optional[str] = None
+
+    # The op_type, op_uuid and state of the depends_on edge whose failure
+    # cascaded this operation to abort, so a client can tell which of
+    # several dependencies went wrong without walking them all. NULL means
+    # no cascade reached this operation, which is the ordinary case; an
+    # empty dict would instead mean a cascade which recorded no detail, so
+    # the two are not interchangeable.
+    #
+    # The column lands with the rest of the dependency schema, but nothing
+    # writes it yet -- the cascade which does is the next piece of work --
+    # and it is deliberately absent from the external view until then,
+    # because a field which can only ever be null is a field a client
+    # learns to ignore.
+    dependency_failure: Optional[dict] = None

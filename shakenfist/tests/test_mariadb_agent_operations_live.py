@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Live-MariaDB tests for the agent operation deadline migration.
+"""Live-MariaDB tests for the agent operation table migrations.
 
 These tests run only when SF_MARIADB_TEST_DSN points at a disposable
 MariaDB database (CI provides one via tools/ci-enum-widening-test.sh,
@@ -18,15 +18,24 @@ had never been migrated before: both ensure functions consisted of a
 create-if-absent block and nothing else, so there was no established
 ladder to add a rung to.
 
-Each test rewinds a current database to what a pre-upgrade deployment
-looks like (drop the four columns, reset both table versions to 2),
-puts rows in it, and then verifies that reconciliation brings it
-forward without losing them.
+Each test rewinds a current database to what some earlier deployment
+looks like -- drop the columns a step added and reset the table
+versions to what they were before it -- puts rows in it, and then
+verifies that reconciliation brings it forward without losing them.
+Two rewind points are covered: the one before the deadline columns,
+and the one before the dependency edge columns.
+
+The dependency tests also compare a migrated column against the same
+column on a table created straight from create_all(), because a
+migration which types a column differently from the table generator
+leaves a migrated cluster and a fresh cluster with different schemas
+and no version difference to notice it by.
 
 DESTRUCTIVE: tables in the target database are dropped during cleanup.
 Never point SF_MARIADB_TEST_DSN at a real deployment.
 """
 
+import json
 import os
 import unittest
 from unittest import mock
@@ -40,16 +49,29 @@ from shakenfist import mariadb
 from shakenfist.schema.agentoperation_attributes import (
     AgentOperationAttributesData)
 from shakenfist.schema.agentoperation_data import AgentOperationData
+from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
 from shakenfist.tests import base
 
 
 DSN_ENV = 'SF_MARIADB_TEST_DSN'
 
+# Copies of the two tables, built from the same pydantic models and
+# created by create_all(), so that a migrated column can be compared
+# with the one a greenfield deployment gets. They sit in the same
+# schema under a different name rather than in a second schema: the
+# DSN names one database and the test user need not be able to create
+# another, and every information_schema query here can keep its
+# TABLE_SCHEMA = DATABASE() predicate instead of growing a parameter.
+FRESH_TABLES = {
+    'agent_operations': 'agent_operations_fresh',
+    'agent_operation_attributes': 'agent_operation_attributes_fresh',
+}
+
 TEST_TABLES = [
     'agent_operations',
     'agent_operation_attributes',
     'schema_versions',
-]
+] + list(FRESH_TABLES.values())
 
 # The columns this migration adds, by the table they belong to. The
 # attributes table gained last_progress and attempts at v3 and
@@ -61,12 +83,37 @@ NEW_COLUMNS = {
                                    'expiry_reason'],
 }
 
+# The columns the dependency edge work adds, by the table they belong
+# to. These are kept apart from NEW_COLUMNS because they have their own
+# rewind point: a deployment from immediately before them has the
+# deadline columns and sits at agent_operations v3 and
+# agent_operation_attributes v4.
+DEPENDENCY_COLUMNS = {
+    'agent_operations': ['depends_on', 'runs_after'],
+    'agent_operation_attributes': ['dependency_failure'],
+}
+
+PRE_DEPENDENCY_VERSIONS = {
+    'agent_operations': 3,
+    'agent_operation_attributes': 4,
+}
+
+# Written as literals rather than as mariadb's version constants. The
+# version a migration records is the constant, so an assertion made
+# against the constant holds for whatever value the constant has --
+# including one which never moved past the pre-dependency version at
+# all, which is exactly the regression worth catching here.
+POST_DEPENDENCY_VERSIONS = {
+    'agent_operations': 4,
+    'agent_operation_attributes': 5,
+}
+
 
 @unittest.skipUnless(
     os.environ.get(DSN_ENV),
     f'{DSN_ENV} not set; requires a disposable MariaDB database')
 class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
-    """Prove the deadline migration migrates, against a real MariaDB."""
+    """Prove the two agent operation migrations migrate, against a real MariaDB."""
 
     def setUp(self):
         super().setUp()
@@ -111,11 +158,84 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
         self.assertIsNotNone(row)
         return row[0] == 'YES'
 
+    def _column_facts(self, table_name, column_name):
+        """Return the facts about a column which a migration can get wrong.
+
+        COLLATION_NAME is in the list for a reason worth knowing before
+        trusting this comparison: MariaDB's JSON type is an alias for
+        LONGTEXT with a json_valid() check constraint, so a column
+        added as JSON reports a DATA_TYPE and a COLUMN_TYPE of
+        'longtext' exactly as a LONGTEXT column does. The one thing
+        information_schema shows differently is the collation, which is
+        utf8mb4_bin for JSON and the table default otherwise. A
+        comparison on the types alone would not notice the divergence
+        these tests exist to catch.
+
+        COLUMN_DEFAULT is deliberately left out. The migration adds the
+        edge lists with DEFAULT '[]' so that the value backfilled into
+        existing rows does not depend on sql_mode, while
+        pydantic_to_sqlalchemy_table has no server-default support at
+        all, so the migrated and the fresh column legitimately differ
+        there. What that default does is asserted by reading a
+        pre-existing row back instead.
+        """
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.text(
+                    'SELECT DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, '
+                    'CHARACTER_SET_NAME, COLLATION_NAME, '
+                    'CHARACTER_MAXIMUM_LENGTH '
+                    'FROM information_schema.COLUMNS '
+                    'WHERE TABLE_SCHEMA = DATABASE() '
+                    'AND TABLE_NAME = :table_name '
+                    'AND COLUMN_NAME = :column_name'),
+                {'table_name': table_name,
+                 'column_name': column_name}).first()
+        self.assertIsNotNone(
+            row, f'{table_name}.{column_name} does not exist')
+        return dict(row._mapping)
+
+    def _create_fresh_comparison_tables(self):
+        """Create copies of both tables straight from create_all().
+
+        This is the only way to tell what a greenfield deployment's
+        columns look like without being a greenfield deployment, and
+        the comparison is against it rather than against expected DDL
+        written out here, which would just be a second place to make
+        the same mistake.
+
+        A separate MetaData, because the module level ones are cached
+        against the real table names.
+        """
+        metadata = sa.MetaData()
+        tables = [
+            pydantic_to_sqlalchemy_table(
+                AgentOperationData,
+                FRESH_TABLES['agent_operations'],
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False),
+            pydantic_to_sqlalchemy_table(
+                AgentOperationAttributesData,
+                FRESH_TABLES['agent_operation_attributes'],
+                metadata,
+                primary_key_fields=['uuid'],
+                include_id_column=False),
+        ]
+        metadata.create_all(self.engine, tables=tables, checkfirst=True)
+
     def _rewind(self):
-        """Make the database look like a deployment from before the deadline columns."""
+        """Make the database look like a deployment from before the deadline columns.
+
+        Every later column goes too, not just the deadline ones: a v2
+        deployment had none of them, and leaving one behind would also
+        leave _insert_legacy_rows() naming a column set which no longer
+        covers every NOT NULL column in the table, which a strict
+        sql_mode refuses outright.
+        """
         with self.engine.connect() as conn:
             for table_name, columns in NEW_COLUMNS.items():
-                for column in columns:
+                for column in columns + DEPENDENCY_COLUMNS[table_name]:
                     conn.execute(sa.text(
                         f'ALTER TABLE {table_name} DROP COLUMN {column}'))
             conn.commit()
@@ -124,6 +244,27 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
             self.engine, 'agent_operation_attributes', 2)
 
         for table_name, columns in NEW_COLUMNS.items():
+            present = self._columns(table_name)
+            for column in columns + DEPENDENCY_COLUMNS[table_name]:
+                self.assertNotIn(column, present)
+
+    def _rewind_dependency_columns(self):
+        """Make the database look like a deployment from before the edge columns.
+
+        A shallower rewind than _rewind(): the deadline columns stay,
+        because a deployment which is about to gain edges already has
+        them, and the versions go back to 3 and 4 rather than to 2.
+        """
+        with self.engine.connect() as conn:
+            for table_name, columns in DEPENDENCY_COLUMNS.items():
+                for column in columns:
+                    conn.execute(sa.text(
+                        f'ALTER TABLE {table_name} DROP COLUMN {column}'))
+            conn.commit()
+        for table_name, version in PRE_DEPENDENCY_VERSIONS.items():
+            mariadb._set_table_version(self.engine, table_name, version)
+
+        for table_name, columns in DEPENDENCY_COLUMNS.items():
             present = self._columns(table_name)
             for column in columns:
                 self.assertNotIn(column, present)
@@ -154,6 +295,42 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
                     'INSERT INTO agent_operation_attributes '
                     '(uuid, results) VALUES (:uuid, :results)'),
                 {'uuid': aop_uuid.hex, 'results': '{"0": {"status": 0}}'})
+            conn.commit()
+
+    def _insert_pre_dependency_rows(self, aop_uuid):
+        """Insert rows using only the columns a pre-dependency build knew.
+
+        Not _insert_legacy_rows(), which names the columns a
+        pre-deadline build knew. The deadline columns survive the
+        shallower rewind, and attempts among them is NOT NULL with no
+        server default on a freshly created table -- its DEFAULT 0
+        lives in the ALTER, which is a deliberate divergence -- so an
+        insert which omits it is refused outright under a strict
+        sql_mode rather than silently defaulted.
+
+        The uuid columns take the undashed 32 character form, as
+        _insert_legacy_rows() explains.
+        """
+        with self.engine.connect() as conn:
+            conn.execute(
+                sa.text(
+                    'INSERT INTO agent_operations '
+                    '(uuid, namespace, instance_uuid, commands, deadline, '
+                    'progress_timeout, version) '
+                    'VALUES (:uuid, :namespace, :instance_uuid, :commands, '
+                    ':deadline, :progress_timeout, :version)'),
+                {'uuid': aop_uuid.hex, 'namespace': 'unittest',
+                 'instance_uuid': uuid4().hex, 'commands': '[]',
+                 'deadline': None, 'progress_timeout': None, 'version': 3})
+            conn.execute(
+                sa.text(
+                    'INSERT INTO agent_operation_attributes '
+                    '(uuid, results, last_progress, attempts, expiry_reason) '
+                    'VALUES (:uuid, :results, :last_progress, :attempts, '
+                    ':expiry_reason)'),
+                {'uuid': aop_uuid.hex, 'results': '{"0": {"status": 0}}',
+                 'last_progress': None, 'attempts': 0,
+                 'expiry_reason': None})
             conn.commit()
 
     def _migrate(self):
@@ -346,6 +523,109 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
             self.assertEqual(
                 2, mariadb._get_table_version(self.engine, table_name))
 
+    def test_dependency_migration_adds_every_column(self):
+        self._rewind_dependency_columns()
+        ops, attrs = self._migrate()
+
+        self.assertTrue(ops['migrated'])
+        self.assertTrue(attrs['migrated'])
+        for table_name, version in POST_DEPENDENCY_VERSIONS.items():
+            self.assertEqual(
+                version,
+                mariadb._get_table_version(self.engine, table_name),
+                f'{table_name} did not reach version {version}')
+
+        for table_name, columns in DEPENDENCY_COLUMNS.items():
+            present = self._columns(table_name)
+            for column in columns:
+                self.assertIn(
+                    column, present,
+                    f'the migration did not add {table_name}.{column}')
+
+    def test_dependency_columns_match_a_fresh_create(self):
+        # The assertion the live test exists for. The unit suite mocks
+        # MariaDB completely, so a migration which adds JSON where
+        # create_all() adds LONGTEXT, or a nullable column where
+        # create_all() makes it NOT NULL, is invisible everywhere else:
+        # both databases report the same table version while holding
+        # different schemas, and the difference only surfaces as an
+        # insert which works on one cluster and fails on the other.
+        self._rewind_dependency_columns()
+        self._migrate()
+        self._create_fresh_comparison_tables()
+
+        for table_name, columns in DEPENDENCY_COLUMNS.items():
+            for column in columns:
+                self.assertEqual(
+                    self._column_facts(FRESH_TABLES[table_name], column),
+                    self._column_facts(table_name, column),
+                    f'{table_name}.{column} on a migrated database is not '
+                    f'what create_all() produces on a fresh one')
+
+        # And in absolute terms as well, so that the equality above
+        # cannot be satisfied by both paths being wrong together -- a
+        # model field which stopped being Optional, say, would move the
+        # fresh column with the migrated one.
+        self.assertFalse(
+            self._column_is_nullable('agent_operations', 'depends_on'))
+        self.assertFalse(
+            self._column_is_nullable('agent_operations', 'runs_after'))
+        self.assertTrue(
+            self._column_is_nullable(
+                'agent_operation_attributes', 'dependency_failure'))
+
+    def test_dependency_migration_backfills_existing_rows(self):
+        aop_uuid = uuid4()
+        self._rewind_dependency_columns()
+        self._insert_pre_dependency_rows(aop_uuid)
+        self._migrate()
+
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.text('SELECT namespace, depends_on, runs_after '
+                        'FROM agent_operations WHERE uuid = :uuid'),
+                {'uuid': aop_uuid.hex}).first()
+        self.assertIsNotNone(row)
+        self.assertEqual('unittest', row[0])
+        for value in (row[1], row[2]):
+            # The edge columns are NOT NULL, so what an existing row
+            # gets is whatever the ALTER's DEFAULT says -- and '[]' is
+            # the only answer the reader can parse. Asserted on the raw
+            # string before it is parsed, so that a migration which
+            # dropped the DEFAULT fails saying '' is not '[]' rather
+            # than raising a JSON decode error from a helper.
+            self.assertEqual('[]', value)
+            self.assertEqual([], json.loads(value))
+
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.text('SELECT results, dependency_failure '
+                        'FROM agent_operation_attributes '
+                        'WHERE uuid = :uuid'),
+                {'uuid': aop_uuid.hex}).first()
+        self.assertIsNotNone(row)
+        # NULL here, not '{}' and not 'null': no cascade reached this
+        # operation, which is a different fact from a cascade which
+        # recorded no detail.
+        self.assertIsNone(row[1])
+
+    def test_dependency_migration_is_a_clean_no_op_when_re_run(self):
+        self._rewind_dependency_columns()
+        self._migrate()
+
+        ops, attrs = self._migrate()
+        self.assertFalse(ops['migrated'])
+        self.assertFalse(attrs['migrated'])
+        for table_name, version in POST_DEPENDENCY_VERSIONS.items():
+            self.assertEqual(
+                version,
+                mariadb._get_table_version(self.engine, table_name))
+
+        for table_name, columns in DEPENDENCY_COLUMNS.items():
+            present = self._columns(table_name)
+            for column in columns:
+                self.assertIn(column, present)
+
 
 @unittest.skipUnless(
     os.environ.get(DSN_ENV),
@@ -445,6 +725,40 @@ class AgentOperationDirectAccessLiveTestCase(base.ShakenFistTestCase):
         reread = mariadb._direct_get_agent_operation_attributes(aop_uuid)
         self.assertEqual('deadline', reread.expiry_reason)
         self.assertEqual(0, reread.attempts)
+
+    def test_dependency_edges_round_trip_through_the_public_path(self):
+        """Write edges with the public create and read them with the public get.
+
+        Everything else in this class calls the _direct_ functions, but
+        the edge lists are worth a trip through create_agent_operation()
+        and get_agent_operation() because those are what the object
+        layer calls, and the read consults the object cache before the
+        database. A freshly generated uuid is a cache miss, and the
+        entry is evicted anyway below, so what comes back is what
+        MariaDB stored rather than the model that went in.
+        """
+        aop_uuid = uuid4()
+        edges = [{'op_type': 'agentoperation',
+                  'op_uuid': str(uuid4()),
+                  'settle_seconds': 30.0}]
+        self.assertTrue(mariadb.create_agent_operation(
+            AgentOperationData(
+                uuid=aop_uuid,
+                namespace='unittest',
+                instance_uuid=uuid4(),
+                commands=[{'command': 'execute'}],
+                depends_on=edges,
+                runs_after=[],
+                version=3)))
+        mariadb._object_cache_evict('agentoperation', aop_uuid)
+
+        out = mariadb.get_agent_operation(aop_uuid)
+        self.assertIsNotNone(out)
+        self.assertEqual(edges, out.depends_on)
+        # An operation which named nothing comes back as an empty list
+        # rather than as None, which is what lets a reader iterate it
+        # without a guard.
+        self.assertEqual([], out.runs_after)
 
     def test_unknown_uuid_returns_none(self):
         self.assertIsNone(mariadb._direct_get_agent_operation(

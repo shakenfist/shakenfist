@@ -48,8 +48,19 @@ class AgentOperation(BaseOperation):
     # Once an operation reaches one of these it has no further
     # transitions worth making, so expire() and fail() are no-ops from
     # them rather than raising InvalidStateException.
+    #
+    # Membership here is also what lets
+    # Instance.agent_operation_next() retire a finished queue entry. A
+    # terminal state missing from this tuple takes that method's
+    # unknown-state branch instead, which leaves the entry at the head
+    # of the instance's queue forever and stops the instance running
+    # any further agent operations, with nothing in the system able to
+    # recover it. A new terminal state therefore joins this tuple in
+    # the same change which gives state_targets an edge to it, never
+    # one change later.
     TERMINAL_STATES = (BaseOperation.STATE_COMPLETE, dbo.STATE_ERROR,
-                       STATE_EXPIRED, dbo.STATE_DELETED)
+                       STATE_EXPIRED, BaseOperation.STATE_ABORT,
+                       dbo.STATE_DELETED)
 
     # NOTE(mikal): every value here is a tuple, including the
     # single-element ones. baseobject._state_update() tests
@@ -63,17 +74,42 @@ class AgentOperation(BaseOperation):
     # costs nothing and means a future enforcement point (the node-local
     # reaper is the obvious candidate) which does reach one does not
     # raise InvalidStateException.
+    #
+    # STATE_ABORT means something this operation declared a depends_on
+    # dependency on failed, so the operation will never be run. The
+    # initial -> abort and preflight -> abort edges are declared on the
+    # same completeness basis as initial -> expired: the only one of
+    # the three which is reachable is queued -> abort, because the
+    # evaluator which will move an operation to abort runs against the
+    # head of an instance's queue, and a head it can act on is queued
+    # by then. Declaring the other two costs nothing and means a site
+    # which does reach one does not raise InvalidStateException.
+    #
+    # There is deliberately no executing -> abort edge. Stopping work
+    # the guest agent has already started is agent side cancellation,
+    # which Shaken Fist does not implement and which is not being
+    # added here, so an edge declared for it would be an invitation to
+    # a future caller to abort a running operation without the agent
+    # side protocol that would make the state true.
+    #
+    # The abort -> deleted edge is not optional. delete() removes the
+    # operation's rows and only then assigns the deleted state, so
+    # without it a user deleting an aborted operation would raise
+    # InvalidStateException.
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
         dbo.STATE_INITIAL: (BaseOperation.STATE_PREFLIGHT,
                             BaseOperation.STATE_QUEUED, dbo.STATE_DELETED,
-                            dbo.STATE_ERROR, STATE_EXPIRED),
+                            dbo.STATE_ERROR, STATE_EXPIRED,
+                            BaseOperation.STATE_ABORT),
         BaseOperation.STATE_PREFLIGHT: (BaseOperation.STATE_QUEUED,
                                         dbo.STATE_DELETED, dbo.STATE_ERROR,
-                                        STATE_EXPIRED),
+                                        STATE_EXPIRED,
+                                        BaseOperation.STATE_ABORT),
         BaseOperation.STATE_QUEUED: (BaseOperation.STATE_EXECUTING,
                                      dbo.STATE_DELETED, dbo.STATE_ERROR,
-                                     STATE_EXPIRED),
+                                     STATE_EXPIRED,
+                                     BaseOperation.STATE_ABORT),
         BaseOperation.STATE_EXECUTING: (BaseOperation.STATE_COMPLETE,
                                         BaseOperation.STATE_QUEUED,
                                         dbo.STATE_DELETED, dbo.STATE_ERROR,
@@ -81,6 +117,7 @@ class AgentOperation(BaseOperation):
         BaseOperation.STATE_COMPLETE: (dbo.STATE_DELETED,),
         dbo.STATE_ERROR: (dbo.STATE_DELETED,),
         STATE_EXPIRED: (dbo.STATE_DELETED,),
+        BaseOperation.STATE_ABORT: (dbo.STATE_DELETED,),
         dbo.STATE_DELETED: None,
     }
 
@@ -92,6 +129,12 @@ class AgentOperation(BaseOperation):
         self.__namespace = static_values['namespace']
         self.__instance_uuid = static_values['instance_uuid']
         self.__commands = static_values['commands']
+        # An operation which declares no edges has empty lists, never
+        # None: the columns are not nullable, the model defaults to
+        # empty and _db_get() always supplies both keys. The .get() is
+        # for a static values dict built by hand, which some tests do.
+        self.__depends_on = static_values.get('depends_on') or []
+        self.__runs_after = static_values.get('runs_after') or []
         self.__deadline = static_values.get('deadline')
         self.__progress_timeout = static_values.get('progress_timeout')
 
@@ -118,6 +161,8 @@ class AgentOperation(BaseOperation):
             namespace=metadata.get('namespace', ''),
             instance_uuid=_instance_uuid,
             commands=metadata.get('commands', []),
+            depends_on=metadata.get('depends_on', []),
+            runs_after=metadata.get('runs_after', []),
             deadline=metadata.get('deadline'),
             progress_timeout=metadata.get('progress_timeout'),
             version=metadata['version']
@@ -149,6 +194,9 @@ class AgentOperation(BaseOperation):
                 # AgentOperation built from a cache hit would make one
                 # object's mutation everybody's.
                 'commands': list(data.commands),
+                # Copied for the reason commands just above is.
+                'depends_on': list(data.depends_on),
+                'runs_after': list(data.runs_after),
                 'deadline': data.deadline,
                 'progress_timeout': data.progress_timeout,
                 'version': data.version
@@ -165,7 +213,8 @@ class AgentOperation(BaseOperation):
 
     @classmethod
     def new(cls, operation_uuid, namespace, instance_uuid, commands,
-            deadline=None, progress_timeout=None):
+            deadline=None, progress_timeout=None, depends_on=None,
+            runs_after=None):
         """Create a new AgentOperation.
 
         deadline is an absolute unix timestamp after which the
@@ -180,12 +229,26 @@ class AgentOperation(BaseOperation):
         (Instance.agent_operation_next), during preflight
         (NodeAgentopOp._preflight) and in the sidechannel executor
         (SideChannelExecutorJob.expire_if_out_of_budget).
+
+        depends_on and runs_after are lists of dependency edges, each
+        naming another agent operation this one waits for. The two
+        differ in fate sharing rather than in ordering: a depends_on
+        edge whose operation fails takes this operation down with it,
+        while a runs_after edge only says "not before". An edge may
+        only name an operation which already exists, so an operation
+        can point at nothing but its own past and the graph of edges is
+        acyclic by construction. None and an empty list mean the same
+        thing. Nothing evaluates either list yet -- an operation
+        created with edges is dispatched exactly as one created without
+        them.
         """
         AgentOperation._db_create(operation_uuid, {
             'uuid': operation_uuid,
             'namespace': namespace,
             'instance_uuid': instance_uuid,
             'commands': commands,
+            'depends_on': depends_on or [],
+            'runs_after': runs_after or [],
             'deadline': deadline,
             'progress_timeout': progress_timeout,
             'version': cls.current_version
@@ -205,6 +268,8 @@ class AgentOperation(BaseOperation):
             'namespace': self.namespace,
             'instance_uuid': self.instance_uuid,
             'commands': self.commands,
+            'depends_on': self.depends_on,
+            'runs_after': self.runs_after,
             'deadline': self.deadline,
             'progress_timeout': self.progress_timeout,
             'results': attrs.results,
@@ -245,6 +310,17 @@ class AgentOperation(BaseOperation):
         # its own object rather than every reader in the process, but
         # the boundary is containment, not permission.
         return self.__commands
+
+    @property
+    def depends_on(self):
+        # Returned by reference, as commands is and for the same
+        # reasons, so a caller which needs to consume this list takes
+        # its own copy.
+        return self.__depends_on
+
+    @property
+    def runs_after(self):
+        return self.__runs_after
 
     @property
     def deadline(self):

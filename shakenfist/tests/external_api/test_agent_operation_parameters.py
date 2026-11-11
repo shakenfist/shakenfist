@@ -10,6 +10,13 @@
 # created, and that what reaches AgentOperation.new() is the absolute
 # timestamp the enforcement phase will read rather than the relative
 # seconds the caller sent.
+#
+# The dependency edge parameters are here for the same reasons, plus one
+# of their own: their refusal says the same thing however the edge is
+# wrong, so that a caller cannot learn from it that an operation they may
+# not read exists. That equality is asserted on the response bodies
+# themselves rather than as three separate message assertions, because
+# three assertions which happen to agree today are not the guarantee.
 
 import copy
 import json
@@ -21,9 +28,12 @@ from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.external_api import app as external_api
+from shakenfist.external_api import base as api_base
 from shakenfist.external_api import instance as api_instance
 from shakenfist.external_api import validation
 from shakenfist.instance import Instance
+from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -63,17 +73,33 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         agent_state.start()
         self.addCleanup(agent_state.stop)
 
+        # Two real agent operations for an edge to name: one this
+        # caller can read and one it cannot. These go through the real
+        # AgentOperation because the validation helper looks them up in
+        # the database, and _post() stubs out only the class the handler
+        # creates with.
+        self.dependency = self._agentop('foo')
+        self.foreign = self._agentop('other')
+
         self.client = external_api.app.test_client()
+        self.auth = self._auth('foo')
+        self.system_auth = self._auth('system')
+
+    def _agentop(self, namespace):
+        return AgentOperation.new(
+            str(uuid4()), namespace, self.instance_uuid,
+            [{'command': 'execute', 'commandline': 'true'}])
+
+    def _auth(self, namespace):
         resp = self.client.post('/auth', data=json.dumps(
-            {'namespace': 'foo', 'key': 'bar'}))
+            {'namespace': namespace, 'key': 'bar'}))
         self.assertEqual(200, resp.status_code)
-        self.auth = {
-            'Authorization': 'Bearer %s' % resp.get_json()['access_token']}
+        return {'Authorization': 'Bearer %s' % resp.get_json()['access_token']}
 
     def _restore_node_uuid(self):
         config.NODE_UUID = self.saved_node_uuid
 
-    def _post(self, body, path='agent/execute'):
+    def _post(self, body, path='agent/execute', auth=None):
         # The clock is deliberately not frozen here. base.py does
         # "import time", so patching base.time.time patches the
         # attribute on the shared module object and every module in the
@@ -98,7 +124,7 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
             self.before = time.time()
             resp = self.client.post(
                 '/instances/%s/%s' % (self.instance_uuid, path),
-                headers=self.auth, data=json.dumps(body))
+                headers=auth or self.auth, data=json.dumps(body))
             self.after = time.time()
         return resp, agentop.new
 
@@ -108,10 +134,10 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         self.assertGreaterEqual(deadline, self.before + seconds)
         self.assertLessEqual(deadline, self.after + seconds)
 
-    def _execute(self, **extra):
+    def _execute(self, auth=None, **extra):
         body = {'command_line': 'id'}
         body.update(extra)
-        return self._post(body)
+        return self._post(body, auth=auth)
 
     def test_omitted_stores_the_default_deadline(self):
         resp, new = self._execute()
@@ -357,3 +383,276 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             float(config.AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT),
             new.call_args.kwargs['progress_timeout'])
+
+    # ------------------------------------------------------------------
+    # Dependency edges.
+    #
+    # Nothing evaluates an edge yet, so what these pin is the API
+    # contract: what is stored, what is refused, and -- the part a later
+    # reader is most likely to "tidy" -- that every refusal says the same
+    # thing.
+
+    def _edge(self, operation, **extra):
+        edge = {'op_uuid': str(operation.uuid)}
+        edge.update(extra)
+        return edge
+
+    def test_an_edge_is_stored_with_its_op_type_filled_in(self):
+        # The caller sends no op_type, because only one value is legal
+        # for it. The stored edge carries one anyway, so that a persisted
+        # agent edge is the same shape as a persisted cluster one -- and
+        # it is the helper which fills it in, so the handler never writes
+        # the dictionary the caller sent.
+        resp, new = self._execute(depends_on=[self._edge(self.dependency)])
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(
+            [{'op_type': 'agentoperation',
+              'op_uuid': str(self.dependency.uuid),
+              'settle_seconds': None}],
+            new.call_args.kwargs['depends_on'])
+        self.assertEqual([], new.call_args.kwargs['runs_after'])
+
+    def test_omitting_both_lists_stores_two_empty_lists(self):
+        # Empty lists rather than None at the API layer too: the columns
+        # are not nullable, and a client which read back null would have
+        # to guess whether it meant "declares nothing" or "this server
+        # does not know about edges".
+        resp, new = self._execute()
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual([], new.call_args.kwargs['depends_on'])
+        self.assertEqual([], new.call_args.kwargs['runs_after'])
+
+    def test_a_settle_delay_reaches_the_object(self):
+        resp, new = self._execute(
+            depends_on=[self._edge(self.dependency, settle_seconds=30)])
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(
+            30.0, new.call_args.kwargs['depends_on'][0]['settle_seconds'])
+
+    def test_an_edge_naming_nothing_is_refused_and_creates_nothing(self):
+        # The refusal happens where the timing refusal happens, before
+        # any object or event exists, so a request which named a bad
+        # dependency leaves nothing behind but the request log.
+        resp, new = self._execute(
+            depends_on=[{'op_uuid': str(uuid4())}])
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertEqual(
+            {'error': 'depends_on[0]: no such agent operation', 'status': 400},
+            resp.get_json())
+        new.assert_not_called()
+
+    def test_every_refusal_reason_answers_the_same_bytes(self):
+        """The non-disclosure guarantee, and the only test of it.
+
+        An edge is refused for three reasons: the operation does not
+        exist, it is not an agent operation, and it is in a namespace this
+        caller cannot read. If the three answered differently, a caller
+        could submit edges to discover which uuids exist in namespaces
+        they cannot see, which is what the 400-rather-than-404 posture
+        here would otherwise cost. The bodies are compared to each other,
+        not to three copies of one expected string, because the equality
+        is the property.
+        """
+        missing, missing_new = self._execute(
+            depends_on=[{'op_uuid': str(uuid4())}])
+        self.assertEqual(400, missing.status_code, missing.get_json())
+        missing_new.assert_not_called()
+
+        other_namespace, other_new = self._execute(
+            depends_on=[self._edge(self.foreign)])
+        self.assertEqual(
+            400, other_namespace.status_code, other_namespace.get_json())
+        other_new.assert_not_called()
+
+        # The third reason, which cannot arise through the real lookup --
+        # from_db() on this class reads the agent operation table and so
+        # builds nothing else. It is reachable only by making the lookup
+        # answer with something of another type, which is exactly what a
+        # future widening of it would do.
+        not_an_operation = mock.MagicMock()
+        not_an_operation.object_type = ObjectType.INSTANCE
+        not_an_operation.namespace = 'foo'
+        with mock.patch.object(api_base.AgentOperation, 'from_db',
+                               return_value=not_an_operation):
+            wrong_type, wrong_type_new = self._execute(
+                depends_on=[self._edge(self.dependency)])
+        self.assertEqual(400, wrong_type.status_code, wrong_type.get_json())
+        wrong_type_new.assert_not_called()
+
+        self.assertEqual(missing.get_json(), other_namespace.get_json())
+        self.assertEqual(missing.get_json(), wrong_type.get_json())
+        self.assertEqual(
+            {'error': 'depends_on[0]: no such agent operation', 'status': 400},
+            missing.get_json())
+
+    def test_a_system_caller_may_name_another_namespaces_operation(self):
+        # The other half of the namespace test, and the half an inverted
+        # check breaks instead: the test admits a caller in the
+        # dependency's own namespace *and* a system caller, so inverting
+        # it either lets any caller name any operation -- which the
+        # cross-namespace refusal above would catch -- or locks system
+        # out, which only this catches.
+        resp, new = self._execute(
+            auth=self.system_auth,
+            depends_on=[self._edge(self.foreign)])
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(
+            [{'op_type': 'agentoperation', 'op_uuid': str(self.foreign.uuid),
+              'settle_seconds': None}],
+            new.call_args.kwargs['depends_on'])
+
+    def test_a_caller_may_not_publish_an_op_type(self):
+        # additionalProperties: False on the edge object, which is what
+        # keeps op_type out of the published vocabulary rather than merely
+        # undocumented. A caller who sends it is told so.
+        resp, new = self._execute(
+            depends_on=[self._edge(self.dependency,
+                                   op_type='clusteroperation')])
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertEqual(
+            {'error': 'depends_on[0].op_type: Unknown field.', 'status': 400},
+            resp.get_json())
+        new.assert_not_called()
+
+    def test_a_settle_delay_above_the_operator_ceiling_is_refused(self):
+        # The same ceiling the timing parameters publish, and for the same
+        # reason: a settle parks the instance's one executor slot while it
+        # runs.
+        resp, new = self._execute(
+            depends_on=[self._edge(
+                self.dependency,
+                settle_seconds=config.AGENT_OPERATION_MAX_DEADLINE + 1)])
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertIn('settle_seconds', resp.get_json()['error'])
+        new.assert_not_called()
+
+    def test_a_negative_settle_delay_is_refused(self):
+        resp, new = self._execute(
+            depends_on=[self._edge(self.dependency, settle_seconds=-1)])
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertIn('settle_seconds', resp.get_json()['error'])
+        new.assert_not_called()
+
+    def test_the_settle_ceiling_is_enforced_by_the_handler_in_warn_mode(self):
+        # The rollback path, as for deadline_seconds above: with
+        # validation warning rather than enforcing, the declared maximum
+        # is not what refuses this, so the helper's own check has to, and
+        # it names the configuration option an operator would change.
+        self.set_validation_mode('warn')
+
+        resp, new = self._execute(
+            depends_on=[self._edge(
+                self.dependency,
+                settle_seconds=config.AGENT_OPERATION_MAX_DEADLINE + 1)])
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertIn(
+            'AGENT_OPERATION_MAX_DEADLINE', resp.get_json()['error'])
+        new.assert_not_called()
+
+    def test_a_list_at_the_edge_limit_is_accepted(self):
+        # The pair to the test below: the bound is a real number rather
+        # than a number nothing reaches, so one at it must work.
+        edges = [self._edge(self.dependency)
+                 for _ in range(api_base.MAX_AGENT_DEPENDENCIES)]
+        resp, new = self._execute(depends_on=edges)
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(
+            api_base.MAX_AGENT_DEPENDENCIES,
+            len(new.call_args.kwargs['depends_on']))
+
+    def test_a_list_over_the_edge_limit_is_refused_and_creates_nothing(self):
+        # Each edge costs an object read before anything is created, so a
+        # short body must not be able to buy an unbounded number of them.
+        # Checked on each list separately, which is what the published
+        # limit says.
+        for name in ('depends_on', 'runs_after'):
+            with self.subTest(parameter=name):
+                edges = [self._edge(self.dependency) for _ in
+                         range(api_base.MAX_AGENT_DEPENDENCIES + 1)]
+                resp, new = self._execute(**{name: edges})
+                self.assertEqual(400, resp.status_code, resp.get_json())
+                self.assertIn(
+                    str(api_base.MAX_AGENT_DEPENDENCIES),
+                    resp.get_json()['error'])
+                new.assert_not_called()
+
+    def test_a_non_list_edge_parameter_is_a_400_not_a_500(self):
+        # enumerate() of a non-iterable raises TypeError, which uncaught
+        # would answer 500 for what is a caller's mistake. Reachable only
+        # with validation not enforcing, which is the mode the helper
+        # exists not to trust.
+        self.set_validation_mode('warn')
+
+        for value in (5, 'depends', {'op_uuid': 'x'}):
+            with self.subTest(value=value):
+                resp, new = self._execute(depends_on=value)
+                self.assertEqual(400, resp.status_code, resp.get_json())
+                new.assert_not_called()
+
+    def test_a_non_object_edge_does_not_name_an_internal_constructor(self):
+        # The TypeError from the keyword expansion reads "agent_dependency()
+        # argument after ** must be a mapping, not str", which tells a
+        # caller about this codebase rather than about their request.
+        self.set_validation_mode('warn')
+
+        resp, new = self._execute(depends_on=['nonsense'])
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertEqual(
+            {'error': 'depends_on[0] is not a valid dependency: not an object',
+             'status': 400},
+            resp.get_json())
+        new.assert_not_called()
+
+    def test_both_parameters_are_declared_on_every_endpoint(self):
+        # Unlike progress_timeout_seconds there is no agent operation for
+        # which an edge is meaningless, so all three endpoints take both.
+        # The three handlers call the helper separately with near
+        # identical code, so a copy which forgot to pass its result on
+        # would be invisible to a test which drove only one route.
+        bodies = {
+            'agent/execute': {'command_line': 'id'},
+            'agent/get': {'path': '/etc/hostname'},
+            'agent/put': {'blob_uuid': str(uuid4()),
+                          'path': '/tmp/README.md', 'mode': '33188'},
+        }
+        for (path, body) in bodies.items():
+            for parameter in ('depends_on', 'runs_after'):
+                with self.subTest(path=path, parameter=parameter):
+                    sent = dict(body)
+                    sent[parameter] = [self._edge(self.dependency)]
+                    with mock.patch(
+                            'shakenfist.external_api.instance.Blob.from_db',
+                            return_value=mock.MagicMock()):
+                        resp, new = self._post(sent, path=path)
+                    self.assertEqual(200, resp.status_code, resp.get_json())
+                    self.assertEqual(
+                        [{'op_type': 'agentoperation',
+                          'op_uuid': str(self.dependency.uuid),
+                          'settle_seconds': None}],
+                        new.call_args.kwargs[parameter])
+
+    def test_every_endpoint_refuses_a_bad_edge(self):
+        # The refusal half of the sweep above. A handler which called the
+        # helper and ignored its error would pass every test here but this
+        # one.
+        bodies = {
+            'agent/execute': {'command_line': 'id'},
+            'agent/get': {'path': '/etc/hostname'},
+            'agent/put': {'blob_uuid': str(uuid4()),
+                          'path': '/tmp/README.md', 'mode': '33188'},
+        }
+        for (path, body) in bodies.items():
+            for parameter in ('depends_on', 'runs_after'):
+                with self.subTest(path=path, parameter=parameter):
+                    sent = dict(body)
+                    sent[parameter] = [{'op_uuid': str(uuid4())}]
+                    with mock.patch(
+                            'shakenfist.external_api.instance.Blob.from_db',
+                            return_value=mock.MagicMock()):
+                        resp, new = self._post(sent, path=path)
+                    self.assertEqual(400, resp.status_code, resp.get_json())
+                    self.assertEqual(
+                        {'error': '%s[0]: no such agent operation' % parameter,
+                         'status': 400},
+                        resp.get_json())
+                    new.assert_not_called()

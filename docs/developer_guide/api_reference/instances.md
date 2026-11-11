@@ -901,6 +901,7 @@ is meaningful.
             }
         ],
         "deadline": 1787428090.5,
+        "depends_on": [],
         "expiry_reason": null,
         "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
         "last_progress": null,
@@ -916,6 +917,7 @@ is meaningful.
                 "stdout": "PRETTY_NAME=\"Debian GNU/Linux 11 (bullseye)\"..."
             }
         },
+        "runs_after": [],
         "state": "complete",
         "uuid": "93fb538c-84f5-4ff8-83ba-2be5f5f92954",
         "version": 3
@@ -984,6 +986,42 @@ is meaningful.
             f.write(chunk)
     ```
 
+### Declaring dependencies between agent operations
+
+All three creating calls also accept optional `depends_on` and `runs_after`
+parameters, each a list of [agentdependency](#agentdependency) objects naming
+agent operations which already exist. `depends_on` declares that the new
+operation shares the fate of the operations it names, while `runs_after`
+declares ordering only. Because this API allocates an agent operation's UUID,
+an edge can only ever name an operation created before it, so a chain of edges
+cannot contain a cycle. A JSON null for either means the same as omitting it.
+A request is refused with a 400, and nothing is created, if an edge is
+malformed or names an operation which does not exist or which is in a namespace
+you cannot read; the three cases are deliberately indistinguishable. A server
+advertises that it knows these parameters with the `agentoperation-dependencies`
+capability token, which clients should check for before sending them.
+
+!!! note "Not yet evaluated"
+
+    The edges are stored and returned in the operation's `depends_on` and
+    `runs_after` fields, but nothing evaluates them yet. An operation created
+    with edges is dispatched exactly as one created without. See
+    [the database operator guide](../../operator_guide/database.md) for how
+    they are stored.
+
+### agentdependency
+
+An `agentdependency` names one agent operation in a `depends_on` or `runs_after`
+list. It is a JSON dictionary with the following fields:
+
+* op_uuid (string, required): the UUID of the agent operation this one waits
+  for. It must already exist, and must be in a namespace you can read.
+* settle_seconds (number): wait this many seconds after the named operation
+  finished before treating this edge as satisfied, for a caller whose next step
+  needs the guest to settle after whatever the dependency changed. Omit it to be
+  satisfied immediately. It may not be negative, and is capped by the same
+  operator ceiling as `deadline_seconds`, `AGENT_OPERATION_MAX_DEADLINE`.
+
 ### Fetching information about an Instance's Agent Operations
 
 Additionally, you can list the agent operations for a given instance.
@@ -1040,6 +1078,7 @@ field advertises the `include-queued-agent-operations` capability.
                 }
             ],
             "deadline": 1787428090.5,
+            "depends_on": [],
             "expiry_reason": null,
             "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
             "last_progress": null,
@@ -1054,6 +1093,7 @@ field advertises the `include-queued-agent-operations` capability.
                     "path": "/tmp/README.md"
                 }
             },
+            "runs_after": [],
             "state": "complete",
             "uuid": "343049d7-da2a-46f2-bb5c-edb783ec1fb9",
             "version": 3
@@ -1068,6 +1108,7 @@ field advertises the `include-queued-agent-operations` capability.
                 }
             ],
             "deadline": 1787428090.5,
+            "depends_on": [],
             "expiry_reason": null,
             "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
             "last_progress": null,
@@ -1083,6 +1124,7 @@ field advertises the `include-queued-agent-operations` capability.
                     "stdout": "...content of file..."
                 }
             },
+            "runs_after": [],
             "state": "complete",
             "uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
             "version": 3

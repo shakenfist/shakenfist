@@ -490,8 +490,8 @@ NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
 NETWORKS_VERSION = 3
 NETWORK_ATTRIBUTES_VERSION = 3
 IPAMS_VERSION = 2
-AGENT_OPERATIONS_VERSION = 3
-AGENT_OPERATION_ATTRIBUTES_VERSION = 4
+AGENT_OPERATIONS_VERSION = 4
+AGENT_OPERATION_ATTRIBUTES_VERSION = 5
 INSTANCES_VERSION = 3
 INSTANCE_ATTRIBUTES_VERSION = 3
 OBJECT_METADATA_VERSION = 3
@@ -19801,17 +19801,43 @@ def _ensure_agent_operations_schema(
         _set_table_version(engine, table_name, current_ver)
 
     if current_ver < AGENT_OPERATIONS_VERSION:
-        # Add the agent operation deadline columns. Both are nullable
-        # with no backfill, because NULL is a meaningful value here
-        # rather than a gap: it means no client intent was recorded,
-        # so the server default applies. An explicit 0.0 is what
-        # "the client asked for none" looks like. Safe to run
-        # repeatedly -- ADD COLUMN IF NOT EXISTS is a no-op when the
-        # column already exists, which is the case on a new deployment
-        # where create_all() included it.
+        # Add the agent operation deadline columns (v3), and the
+        # dependency edge columns (v4). One block serves both steps
+        # because every ALTER is IF NOT EXISTS: a v3 database re-runs
+        # the v3 additions as no-ops on its way to v4.
+        #
+        # The deadline pair is nullable with no backfill, because NULL
+        # is a meaningful value there rather than a gap: it means no
+        # client intent was recorded, so the server default applies,
+        # and an explicit 0.0 is what "the client asked for none"
+        # looks like.
+        #
+        # The edge lists are not nullable, because an operation which
+        # names nothing has an empty list of edges rather than an
+        # unknown one, and because that is what create_all() produces
+        # for them from the model -- a list field with a default is a
+        # NOT NULL column, the same as commands. Matching it matters:
+        # a migrated database whose columns differ from a freshly
+        # created one is a divergence nothing in the mocked unit suite
+        # can see. They are LONGTEXT for the same reason, since the
+        # type map in schema/sqlalchemy.py stores JSON as LONGTEXT
+        # deliberately. The explicit DEFAULT '[]' is what existing
+        # rows get, chosen so that backfill is deterministic rather
+        # than a function of sql_mode; like the DEFAULT on attempts it
+        # is a deliberate divergence from create_all(), which has no
+        # server-default support, and it is harmless because every
+        # insert supplies the value.
+        #
+        # No edge list is indexed: an edge is read by following it from
+        # the operation which declared it, never searched for.
+        #
+        # Safe to run repeatedly -- ADD COLUMN IF NOT EXISTS is a no-op
+        # when the column already exists, which is the case on a new
+        # deployment where create_all() included it.
         LOG.info(
             f'Upgrading {table_name} table to version '
-            f'{AGENT_OPERATIONS_VERSION} (add deadline columns)')
+            f'{AGENT_OPERATIONS_VERSION} '
+            '(add deadline and dependency columns)')
         #
         # A failure here is deliberately not caught. IF NOT EXISTS
         # already makes "the column is there" a no-op, so anything
@@ -19826,7 +19852,9 @@ def _ensure_agent_operations_schema(
         # false. Failing loudly keeps the migration re-runnable.
         with engine.connect() as conn:
             for column in ('deadline DOUBLE NULL',
-                           'progress_timeout DOUBLE NULL'):
+                           'progress_timeout DOUBLE NULL',
+                           "depends_on LONGTEXT NOT NULL DEFAULT '[]'",
+                           "runs_after LONGTEXT NOT NULL DEFAULT '[]'"):
                 conn.execute(sa.text(
                     f'ALTER TABLE {table_name} '
                     f'ADD COLUMN IF NOT EXISTS {column}'))
@@ -19873,13 +19901,17 @@ def _ensure_agent_operation_attributes_schema(
         _set_table_version(engine, table_name, current_ver)
 
     if current_ver < AGENT_OPERATION_ATTRIBUTES_VERSION:
-        # Add the progress and retry bookkeeping columns (v3), and the
-        # expiry_reason discriminator (v4). One block serves both
-        # steps because every ALTER is IF NOT EXISTS: a v3 database
-        # re-runs the v3 additions as no-ops on its way to v4.
-        # last_progress and expiry_reason are nullable (NULL means no
-        # progress observed yet / the operation has not expired);
-        # attempts is not, and carries an explicit DEFAULT 0.
+        # Add the progress and retry bookkeeping columns (v3), the
+        # expiry_reason discriminator (v4), and dependency_failure
+        # (v5). One block serves every step because every ALTER is IF
+        # NOT EXISTS: a v3 database re-runs the v3 additions as no-ops
+        # on its way to v5.
+        # last_progress, expiry_reason and dependency_failure are
+        # nullable (NULL means no progress observed yet / the operation
+        # has not expired / no dependency failure reached it, which for
+        # dependency_failure is a different fact from a cascade which
+        # recorded no detail); attempts is not, and carries an explicit
+        # DEFAULT 0.
         # MariaDB would fill existing rows with the implicit type
         # default anyway, so the DEFAULT is not rescuing a failing
         # ALTER -- it is there so the value backfilled into existing
@@ -19892,7 +19924,8 @@ def _ensure_agent_operation_attributes_schema(
         LOG.info(
             f'Upgrading {table_name} table to version '
             f'{AGENT_OPERATION_ATTRIBUTES_VERSION} '
-            '(add progress, attempt and expiry reason columns)')
+            '(add progress, attempt, expiry reason and dependency '
+            'failure columns)')
         #
         # As in _ensure_agent_operations_schema, a failing ALTER is
         # allowed to propagate rather than being logged and stepped
@@ -19902,7 +19935,8 @@ def _ensure_agent_operation_attributes_schema(
         with engine.connect() as conn:
             for column in ('last_progress DOUBLE NULL',
                            'attempts BIGINT NOT NULL DEFAULT 0',
-                           'expiry_reason VARCHAR(255) NULL'):
+                           'expiry_reason VARCHAR(255) NULL',
+                           'dependency_failure LONGTEXT NULL'):
                 conn.execute(sa.text(
                     f'ALTER TABLE {table_name} '
                     f'ADD COLUMN IF NOT EXISTS {column}'))
@@ -19944,6 +19978,8 @@ def _direct_create_agent_operation(data: AgentOperationData) -> bool:
                 namespace=data.namespace,
                 instance_uuid=data.instance_uuid,
                 commands=_json_dumps(data.commands),
+                depends_on=_json_dumps(data.depends_on),
+                runs_after=_json_dumps(data.runs_after),
                 deadline=data.deadline,
                 progress_timeout=data.progress_timeout,
                 version=data.version
@@ -19987,11 +20023,26 @@ def _direct_get_agent_operation(
             if isinstance(commands, str):
                 commands = json.loads(commands)
 
+            # Parse the JSON dependency edge lists. Coerced the way
+            # commands is, so that an operation which named nothing
+            # arrives as an empty list however its row was written --
+            # the migration's DEFAULT makes it '[]', but a row written
+            # by hand, or by a column added without that default on
+            # some older cluster, can still be NULL.
+            depends_on = result.depends_on
+            if isinstance(depends_on, str):
+                depends_on = json.loads(depends_on)
+            runs_after = result.runs_after
+            if isinstance(runs_after, str):
+                runs_after = json.loads(runs_after)
+
             return AgentOperationData(
                 uuid=result.uuid,
                 namespace=result.namespace,
                 instance_uuid=result.instance_uuid,
                 commands=commands if commands else [],
+                depends_on=depends_on or [],
+                runs_after=runs_after or [],
                 deadline=result.deadline,
                 progress_timeout=result.progress_timeout,
                 version=result.version
@@ -20042,7 +20093,13 @@ def _direct_create_agent_operation_attributes(
                 results=_json_dumps(data.results),
                 last_progress=data.last_progress,
                 attempts=data.attempts,
-                expiry_reason=data.expiry_reason)
+                expiry_reason=data.expiry_reason,
+                # NULL rather than 'null': no dependency failure reached
+                # this operation, which is not the same fact as a cascade
+                # which recorded nothing.
+                dependency_failure=(
+                    _json_dumps(data.dependency_failure)
+                    if data.dependency_failure is not None else None))
             conn.execute(stmt)
             conn.commit()
             return True
@@ -20076,12 +20133,21 @@ def _direct_get_agent_operation_attributes(
             if isinstance(results, str):
                 results = json.loads(results)
 
+            # Parse the JSON dependency failure. Unlike results it is not
+            # coerced to an empty container when absent: NULL means no
+            # cascade happened, and {} would claim one did and said
+            # nothing about why.
+            dependency_failure = result.dependency_failure
+            if isinstance(dependency_failure, str):
+                dependency_failure = json.loads(dependency_failure)
+
             return AgentOperationAttributesData(
                 uuid=result.uuid,
                 results=results if results else {},
                 last_progress=result.last_progress,
                 attempts=result.attempts,
                 expiry_reason=result.expiry_reason,
+                dependency_failure=dependency_failure,
             )
     except OperationalError as e:
         LOG.warning(
@@ -20105,6 +20171,9 @@ def _agent_operation_attributes_column_values(
         'last_progress': data.last_progress,
         'attempts': data.attempts,
         'expiry_reason': data.expiry_reason,
+        'dependency_failure': (
+            _json_dumps(data.dependency_failure)
+            if data.dependency_failure is not None else None),
     }
     if not fields:
         return all_values
@@ -20178,6 +20247,8 @@ def _grpc_create_agent_operation(data: AgentOperationData) -> bool:
                 namespace=data.namespace or '',
                 instance_uuid=str(data.instance_uuid),
                 commands_json=_json_dumps(data.commands),
+                depends_on_json=_json_dumps(data.depends_on),
+                runs_after_json=_json_dumps(data.runs_after),
                 deadline=data.deadline,
                 progress_timeout=data.progress_timeout,
                 version=data.version
@@ -20204,11 +20275,15 @@ def _grpc_get_agent_operation(
             return None
         d = reply.data
         commands = json.loads(d.commands_json) if d.commands_json else []
+        depends_on = json.loads(d.depends_on_json) if d.depends_on_json else []
+        runs_after = json.loads(d.runs_after_json) if d.runs_after_json else []
         return AgentOperationData(
             uuid=d.uuid,
             namespace=d.namespace or '',
             instance_uuid=d.instance_uuid,
             commands=commands,
+            depends_on=depends_on,
+            runs_after=runs_after,
             deadline=d.deadline if d.HasField('deadline') else None,
             progress_timeout=(d.progress_timeout
                               if d.HasField('progress_timeout') else None),
@@ -20236,6 +20311,19 @@ def _grpc_delete_agent_operation(aop_uuid: UUID) -> bool:
         return False
 
 
+def _dependency_failure_json(
+        data: AgentOperationAttributesData) -> Optional[str]:
+    """Encode dependency_failure for the wire, keeping None as None.
+
+    The proto field has explicit presence and a None kwarg leaves it
+    unset, which the receiver reads back as SQL NULL. Encoding None
+    would send the string 'null' and claim a cascade happened.
+    """
+    if data.dependency_failure is None:
+        return None
+    return _json_dumps(data.dependency_failure)
+
+
 def _grpc_create_agent_operation_attributes(
         data: AgentOperationAttributesData) -> bool:
     """Create AgentOperation attributes via the database service."""
@@ -20247,7 +20335,8 @@ def _grpc_create_agent_operation_attributes(
                 results_json=_json_dumps(data.results),
                 last_progress=data.last_progress,
                 attempts=data.attempts,
-                expiry_reason=data.expiry_reason))
+                expiry_reason=data.expiry_reason,
+                dependency_failure_json=_dependency_failure_json(data)))
         reply = _grpc_call(stub.CreateAgentOperationAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -20278,6 +20367,9 @@ def _grpc_get_agent_operation_attributes(
             attempts=d.attempts,
             expiry_reason=(d.expiry_reason
                            if d.HasField('expiry_reason') else None),
+            dependency_failure=(json.loads(d.dependency_failure_json)
+                                if d.HasField('dependency_failure_json')
+                                else None),
         )
     except grpc.RpcError as e:
         LOG.error(
@@ -20302,7 +20394,8 @@ def _grpc_update_agent_operation_attributes(
                 results_json=_json_dumps(data.results),
                 last_progress=data.last_progress,
                 attempts=data.attempts,
-                expiry_reason=data.expiry_reason),
+                expiry_reason=data.expiry_reason,
+                dependency_failure_json=_dependency_failure_json(data)),
             fields=fields or [])
         reply = _grpc_call(stub.UpdateAgentOperationAttributes, request)
         return bool(reply.success)

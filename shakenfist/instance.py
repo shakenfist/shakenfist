@@ -3397,11 +3397,12 @@ class Instance(dbowo):
                     break
 
                 if state.value in AgentOperation.TERMINAL_STATES:
-                    # COMPLETE, ERROR, EXPIRED or DELETED: this operation
-                    # is finished with the queue. Retire the entry and
-                    # consider the next one. This also unwedges a queue
-                    # whose head errored, expired or was deleted, which
-                    # previously blocked the instance's queue forever.
+                    # COMPLETE, ERROR, EXPIRED, ABORT or DELETED: this
+                    # operation is finished with the queue. Retire the
+                    # entry and consider the next one. This also
+                    # unwedges a queue whose head errored, expired,
+                    # aborted or was deleted, which previously blocked
+                    # the instance's queue forever.
                     queue.pop(0)
                     changed = True
                     continue

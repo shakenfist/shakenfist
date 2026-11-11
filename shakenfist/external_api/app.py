@@ -514,6 +514,23 @@ API_CAPABILITIES = {
         # it. Without the token a new client cannot tell these
         # parameters exist and must not send them.
         'agentoperation-deadlines',
+        # agentoperation-dependencies names the depends_on and runs_after
+        # parameters, which all three of instance-put-blob, instance-get and
+        # instance-execute accept: unlike the timing parameters there is no
+        # agent operation for which an edge is meaningless. Without the token
+        # a new client cannot tell the parameters exist and must not send
+        # them. It is also what makes the abort terminal state safe to emit,
+        # because an operation can only reach abort if the client which
+        # created it declared a dependency, and a client which declared one
+        # read this token first.
+        #
+        # This node advertises the token, but sf-database is what writes an
+        # edge to MariaDB, so during an upgrade the database tier has to go
+        # first. A new sf-api against an older sf-database accepts the
+        # parameters, answers 200, and stores empty edge lists, because the
+        # fields it sends are unknown to the older service and are dropped.
+        # See the agent operation section of the database operator guide.
+        'agentoperation-dependencies',
         # placement-query tells a client it can ask POST /placement
         # whether a set of instance shapes would fit the cluster now,
         # and therefore that it need not rebuild the scheduler's
