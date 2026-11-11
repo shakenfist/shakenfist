@@ -1339,7 +1339,10 @@ class SideChannelExecutorJob(SideChannelJob):
         otherwise is a behaviour change with no end to end test to
         prove it. That gap is pre-existing rather than introduced
         here, and interrupting live work belongs with the node-local
-        reaper in reap_instance_executors(), not here.
+        reaper in reap_instance_executors(), not here. abort is
+        excluded because it cannot be reached from executing at all,
+        so an aborted operation never has a command in flight for this
+        to abandon.
         """
         if self.agentop.state.value in (AgentOperation.STATE_ERROR,
                                         AgentOperation.STATE_EXPIRED):

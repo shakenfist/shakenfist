@@ -48,8 +48,19 @@ class AgentOperation(BaseOperation):
     # Once an operation reaches one of these it has no further
     # transitions worth making, so expire() and fail() are no-ops from
     # them rather than raising InvalidStateException.
+    #
+    # Membership here is also what lets
+    # Instance.agent_operation_next() retire a finished queue entry. A
+    # terminal state missing from this tuple takes that method's
+    # unknown-state branch instead, which leaves the entry at the head
+    # of the instance's queue forever and stops the instance running
+    # any further agent operations, with nothing in the system able to
+    # recover it. A new terminal state therefore joins this tuple in
+    # the same change which gives state_targets an edge to it, never
+    # one change later.
     TERMINAL_STATES = (BaseOperation.STATE_COMPLETE, dbo.STATE_ERROR,
-                       STATE_EXPIRED, dbo.STATE_DELETED)
+                       STATE_EXPIRED, BaseOperation.STATE_ABORT,
+                       dbo.STATE_DELETED)
 
     # NOTE(mikal): every value here is a tuple, including the
     # single-element ones. baseobject._state_update() tests
@@ -63,17 +74,42 @@ class AgentOperation(BaseOperation):
     # costs nothing and means a future enforcement point (the node-local
     # reaper is the obvious candidate) which does reach one does not
     # raise InvalidStateException.
+    #
+    # STATE_ABORT means something this operation declared a depends_on
+    # dependency on failed, so the operation will never be run. The
+    # initial -> abort and preflight -> abort edges are declared on the
+    # same completeness basis as initial -> expired: the only one of
+    # the three which is reachable is queued -> abort, because the
+    # evaluator which will move an operation to abort runs against the
+    # head of an instance's queue, and a head it can act on is queued
+    # by then. Declaring the other two costs nothing and means a site
+    # which does reach one does not raise InvalidStateException.
+    #
+    # There is deliberately no executing -> abort edge. Stopping work
+    # the guest agent has already started is agent side cancellation,
+    # which Shaken Fist does not implement and which is not being
+    # added here, so an edge declared for it would be an invitation to
+    # a future caller to abort a running operation without the agent
+    # side protocol that would make the state true.
+    #
+    # The abort -> deleted edge is not optional. delete() removes the
+    # operation's rows and only then assigns the deleted state, so
+    # without it a user deleting an aborted operation would raise
+    # InvalidStateException.
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
         dbo.STATE_INITIAL: (BaseOperation.STATE_PREFLIGHT,
                             BaseOperation.STATE_QUEUED, dbo.STATE_DELETED,
-                            dbo.STATE_ERROR, STATE_EXPIRED),
+                            dbo.STATE_ERROR, STATE_EXPIRED,
+                            BaseOperation.STATE_ABORT),
         BaseOperation.STATE_PREFLIGHT: (BaseOperation.STATE_QUEUED,
                                         dbo.STATE_DELETED, dbo.STATE_ERROR,
-                                        STATE_EXPIRED),
+                                        STATE_EXPIRED,
+                                        BaseOperation.STATE_ABORT),
         BaseOperation.STATE_QUEUED: (BaseOperation.STATE_EXECUTING,
                                      dbo.STATE_DELETED, dbo.STATE_ERROR,
-                                     STATE_EXPIRED),
+                                     STATE_EXPIRED,
+                                     BaseOperation.STATE_ABORT),
         BaseOperation.STATE_EXECUTING: (BaseOperation.STATE_COMPLETE,
                                         BaseOperation.STATE_QUEUED,
                                         dbo.STATE_DELETED, dbo.STATE_ERROR,
@@ -81,6 +117,7 @@ class AgentOperation(BaseOperation):
         BaseOperation.STATE_COMPLETE: (dbo.STATE_DELETED,),
         dbo.STATE_ERROR: (dbo.STATE_DELETED,),
         STATE_EXPIRED: (dbo.STATE_DELETED,),
+        BaseOperation.STATE_ABORT: (dbo.STATE_DELETED,),
         dbo.STATE_DELETED: None,
     }
 

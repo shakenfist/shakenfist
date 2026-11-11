@@ -578,3 +578,36 @@ recorded there rather than fixed or filed here.
   round-trips as NULL, an empty dict round-trips as `{}`, and the two
   stay distinct, which is the distinction phase 2's cascade depends
   on.
+- **2026-11-11 (AEDT). Step 1d's `abort` state has one wire-visible
+  consequence beyond the state machine, and two stale enumerations were
+  corrected with it.** Adding a member to `TERMINAL_STATES` changes
+  every reader of that tuple, and all five were checked. `expire()` and
+  `fail()` gain an aborted operation as another state they no-op from,
+  and `agent_operation_next()` retires an aborted head, which are both
+  the point. `Instance.external_view()` skips terminal operations when
+  it renders `agent_operations_queue`, so an aborted operation drops
+  off that list -- correct, since the field reports what has not
+  finished, and newly observable because that field read the wrong
+  attribute key and was empty for every instance until #4826 was fixed.
+  `_abort_commands_if_terminal()` in the sidechannel tests `error` and
+  `expired` by name rather than the tuple, so its behaviour genuinely
+  does not change; its docstring reasons about which members of the
+  tuple it omits, and that enumeration plus the one in
+  `agent_operation_next()`'s terminal branch would both have gone stale,
+  so both gained a clause. Neither is a logic change.
+- **The diagram consistency test was mutation tested in the management
+  session as well as by the step.** Removing `queued -> abort` from
+  `state_targets` fails
+  `test_the_diagram_is_the_state_machine` with "Only in state_targets:
+  none. Only in the diagram: queued --> abort.", and the tree was
+  restored from a copy rather than with `git checkout`, with the test
+  green again afterwards.
+- **The `abort` documentation was tightened in review.** The step's
+  bullet said the failed dependency "is recorded on the operation",
+  which promises something a developer cannot see: the column exists
+  but nothing writes it and it is not on the external view until phase
+  2. It now says plainly that nothing moves an operation into the state
+  yet. The adjacent `expired` bullet's "only `expired` is currently
+  swept for hard deletion" was reworded to "of the two", because beside
+  a new bullet which says an aborted operation is swept too it read as
+  a contradiction.
