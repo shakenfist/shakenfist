@@ -385,10 +385,10 @@ def _format_url(value: Any) -> Any:
     * ArtifactUploadEndpoint.post's `source_url` is "the URL the
       artifact should claim to be downloaded from", and its own default
       is `sf://upload/<namespace>/<name>`.
-    * only jwks_uri on the two issuer endpoints is a real web URL, and
-      _validate_issuer_arguments() already refuses anything which is
-      not https there -- in the handler, so it holds in every
-      API_VALIDATION_MODE.
+    * issuer_url and jwks_uri on the two issuer endpoints are the only
+      real web URLs, and _validate_issuer_arguments() already refuses
+      anything which is not https in either -- in the handler, so it
+      holds in every API_VALIDATION_MODE.
 
     So the check is the widest one which is still a check: the string
     must be something urllib.parse can parse. In practice that refuses

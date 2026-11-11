@@ -222,6 +222,64 @@ class IssuerEndpointTestCase(base.ShakenFistTestCase):
         resp = self._create(jwks_uri='http://insecure.example.com/jwks')
         self.assertEqual(400, resp.status_code)
         self.assertIn('https', resp.get_json()['error'])
+        self.assertIn('jwks_uri', resp.get_json()['error'])
+
+        resp = self._create(jwks_uri='http://insecure.example.com/https/jwks')
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('jwks_uri', resp.get_json()['error'])
+
+    def test_plaintext_issuer_url_is_refused(self):
+        # issuer_url is not fetched when a token is verified, so a
+        # plaintext value is not attackable by itself. It is refused
+        # because it names the identity whose keys we are about to
+        # trust, and because anything which does fetch it -- OIDC
+        # discovery builds its request from this field -- would
+        # otherwise have to check the scheme again (issue 4890).
+        resp = self._create(issuer_url='http://insecure.example.com')
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('https', resp.get_json()['error'])
+        self.assertIn('issuer_url', resp.get_json()['error'])
+
+        # The refusal is on the scheme, not on the string appearing
+        # somewhere: a plaintext URL which mentions https in its path
+        # is still plaintext.
+        resp = self._create(issuer_url='http://insecure.example.com/https')
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('issuer_url', resp.get_json()['error'])
+
+    def test_plaintext_issuer_url_is_refused_before_discovery(self):
+        # With no jwks_uri the validator hands over to discovery, and
+        # discovery refuses a plaintext issuer_url of its own accord. The
+        # refusal must still be the validator's, so that the field never
+        # depends on every reader remembering to check the scheme: the
+        # fetch is never attempted, and the message is the validator's.
+        with mock.patch('shakenfist.oidc_discovery.fetch') as fetch:
+            resp = self._create(
+                issuer_url='http://insecure.example.com', jwks_uri=None)
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('issuer_url must', resp.get_json()['error'])
+        fetch.assert_not_called()
+
+    def test_update_cannot_set_a_plaintext_issuer_url(self):
+        # The same refusal on the update path: an issuer configured
+        # with https cannot be repointed at an http URL.
+        self._create()
+        resp = self.client.put(
+            '/auth/issuers/github',
+            headers={'Authorization': self.admin},
+            data=json.dumps({
+                'issuer_url': 'http://insecure.example.com',
+                'jwks_uri': GITHUB_JWKS,
+                'audience': 'https://sf.example.com'}))
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('issuer_url', resp.get_json()['error'])
+
+        # And the stored configuration is unchanged.
+        resp = self.client.get(
+            '/auth/issuers/github',
+            headers={'Authorization': self.admin})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(GITHUB, resp.get_json()['issuer_url'])
 
     def test_update_replaces_the_configuration(self):
         self._create()

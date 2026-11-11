@@ -941,7 +941,8 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience,
 
     issuer_url and audience are required and there is no sensible
     default for either: an issuer missing its audience would accept
-    tokens minted for someone else.
+    tokens minted for someone else. issuer_url must be https, and so
+    must jwks_uri whether it is supplied or discovered.
 
     jwks_uri is optional, because an issuer which publishes a discovery
     document says where its keys are in it, and making an operator find
@@ -981,6 +982,19 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience,
         if len(value) > limit:
             return sf_api.error(
                 422, f'{name} cannot be longer than {limit} characters')
+
+    # issuer_url must be https, for a reason one step further away than
+    # jwks_uri's below. It is compared against a token's iss claim rather
+    # than fetched, so a plaintext value is not attackable by itself -- it
+    # describes an issuer no real provider can satisfy. But it is the
+    # identity of the thing whose keys we are about to trust, and anything
+    # which does fetch it (OIDC discovery builds its request from this
+    # field) then has to remember to check the scheme again. Refusing it
+    # once, here, is why that is not a standing obligation (issue 4890).
+    # It is checked before the jwks_uri branch, because an issuer whose
+    # keys are to be discovered returns early from there.
+    if not issuer_url.startswith('https://'):
+        return sf_api.error(400, 'issuer_url must be https')
 
     for name, value in (('client_id', client_id),
                         ('oidc_scopes', oidc_scopes)):
@@ -1252,10 +1266,11 @@ class AuthIssuersEndpoint(api_base.Resource):
             ('name', 'body', 'string',
              'A unique name for this issuer.', True),
             ('issuer_url', 'body', 'string',
-             'The exact value expected in a token\'s iss claim.', True),
+             'The exact value expected in a token\'s iss claim. Must be '
+             'https.', True),
             ('jwks_uri', 'body', 'url',
-             'Where the issuer publishes its signing keys. Optional: '
-             'discovery fills it in from the issuer\'s published '
+             'Where the issuer publishes its signing keys. Must be https. '
+             'Optional: discovery fills it in from the issuer\'s published '
              'configuration when it is not supplied.', False),
             ('audience', 'body', 'string',
              'The value expected in a token\'s aud claim.', True),
@@ -1370,10 +1385,11 @@ class AuthIssuerEndpoint(api_base.Resource):
         [
             ('issuer_name', 'path', 'string', 'The issuer name.', True),
             ('issuer_url', 'body', 'string',
-             'The exact value expected in a token\'s iss claim.', True),
+             'The exact value expected in a token\'s iss claim. Must be '
+             'https.', True),
             ('jwks_uri', 'body', 'url',
-             'Where the issuer publishes its signing keys. Optional: '
-             'discovery fills it in from the issuer\'s published '
+             'Where the issuer publishes its signing keys. Must be https. '
+             'Optional: discovery fills it in from the issuer\'s published '
              'configuration when it is not supplied.', False),
             ('audience', 'body', 'string',
              'The value expected in a token\'s aud claim.', True),
