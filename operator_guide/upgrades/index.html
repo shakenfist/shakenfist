@@ -15727,6 +15727,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#uefi-instances-with-a-scsi-disk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UEFI instances with a SCSI disk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#network-nodes-need-the-iptables-conntrack-match" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16012,6 +16023,17 @@
     <span class="md-ellipsis">
       
         UEFI instances and the 4 MB OVMF firmware
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#uefi-instances-with-a-scsi-disk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UEFI instances with a SCSI disk
       
     </span>
   </a>
@@ -16341,6 +16363,16 @@ by copying <code>/usr/share/OVMF/OVMF_CODE.fd</code>, <code>OVMF_CODE.secboot.fd
 <code>OVMF_VARS.fd</code> and <code>OVMF_VARS.ms.fd</code> from the older release's <code>ovmf</code>
 package. Treat those copies as unmanaged files that will not receive
 security updates.</p>
+<h3 id="uefi-instances-with-a-scsi-disk">UEFI instances with a SCSI disk<a class="headerlink" href="#uefi-instances-with-a-scsi-disk" title="Permanent link">&para;</a></h3>
+<p>A UEFI instance with a <code>bus=scsi</code> disk never booted before this release: it
+got libvirt's default LSI Logic controller, which OVMF has no driver for, so
+the firmware found no disk and dropped to the EFI shell. Such instances now
+get a virtio-scsi controller instead. As with every other domain template
+change, the persistent definition of an existing instance is not rewritten,
+so an affected instance has to be recreated (or its domain undefined, as
+described above) before it can boot. BIOS instances are deliberately left on
+the LSI Logic controller, which SeaBIOS can boot and which is the only
+controller some appliance images carry a driver for.</p>
 <h3 id="network-nodes-need-the-iptables-conntrack-match">Network nodes need the iptables conntrack match<a class="headerlink" href="#network-nodes-need-the-iptables-conntrack-match" title="Permanent link">&para;</a></h3>
 <p>Since the release which made floating addresses answer from inside their own
 network, a NAT providing network's namespace carries a hairpin masquerade

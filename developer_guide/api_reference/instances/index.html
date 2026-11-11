@@ -16039,7 +16039,11 @@ already a 400.</p>
   available here are: sata; scsi; usb; virtio (the default); and nvme. While ide
   was previously supported, that support was removed in v0.7 due to extremely
   poor performance, and a bus of ide is refused with a 400 along with every other
-  value outside that list.</li>
+  value outside that list. A <code>scsi</code> disk on a <code>uefi</code> instance is placed on a
+  virtio-scsi controller rather than the LSI Logic one libvirt defaults to,
+  because OVMF has no driver for LSI Logic and the guest would find no disk to
+  boot. BIOS instances are unchanged, and the controller model is not currently
+  selectable.</li>
 <li>type (enum): the type of device, either "disk" (the default) or "cdrom". Any
   other value is refused with a 400. Before v0.8 any string was accepted here and
   handed to libvirt as a device name, which meant that libvirt's own device types
