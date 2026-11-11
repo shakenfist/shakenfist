@@ -16073,9 +16073,9 @@ implement <code>measure</code> for these targets).</p>
 <p><strong>Creatable target formats</strong>: raw (host-only —
 <code>open + ftruncate + posix_fallocate</code>), qcow2 (qemu-img
 info-equivalent modulo <code>refcount_bits</code> / <code>compat</code> / <code>zstd</code>
-hardcodes), vmdk monolithicSparse + streamOptimized, vpc
-dynamic + fixed (modulo CHS <code>virtual_size</code> rounding), vhdx
-dynamic.
+hardcodes), vmdk monolithicSparse + streamOptimized +
+monolithicFlat (the last written on the host), vpc dynamic + fixed
+(modulo CHS <code>virtual_size</code> rounding), vhdx dynamic + fixed.
 Backing-file references supported on qcow2, vmdk, vpc, vhdx
 (matches qemu-img's permission set). See
 <a href="/components/instar/create/">docs/create.md</a> for the user reference and
@@ -16156,8 +16156,21 @@ detection via 1-bit-per-block bitmap, fragmentation tracking, fixed VHD
 size validation, and footer copy consistency (start vs end of file).</p>
 <h2 id="vhdx">vhdx<a class="headerlink" href="#vhdx" title="Permanent link">&para;</a></h2>
 <p>Microsoft VHDX Virtual Hard Disk v2 (Hyper-V). Supported:
-- Dynamic VHDX: BAT-based block allocation with 32 MiB blocks (input,
+- Dynamic VHDX: BAT-based block allocation (input, output, check)
+- Fixed VHDX: every payload block present at a fixed offset (input,
   output, check)</p>
+<p>The block size defaults from the virtual size, following qemu: 8 MiB at
+or below 1 GiB, 16 MiB above 1 GiB, 32 MiB above 100 GiB and 64 MiB
+above 32 TiB (see <code>default_block_size</code> in the vhdx crate). It can be set
+explicitly to any power of two from 1 MiB to 256 MiB. The options for
+creating, converting to and measuring each subformat are in
+<a href="/components/instar/create/">docs/create.md</a>, <a href="/components/instar/convert/">docs/convert.md</a> and
+<a href="/components/instar/measure/">docs/measure.md</a>.</p>
+<p>A fixed image has every payload BAT entry set to
+<code>PAYLOAD_BLOCK_FULLY_PRESENT</code>, each pointing at its fixed offset, so the
+file is laid out in full up front. All-zero blocks are left as holes so
+the file stays sparse, and the file length is the start of the data
+region plus the virtual size.</p>
 <p>VHDX uses CRC-32C (Castagnoli) checksums, GUID-identified metadata,
 64-bit BAT entries with interleaved sector bitmap entries, and 1MB-aligned
 structures. All on-disk fields are little-endian.</p>

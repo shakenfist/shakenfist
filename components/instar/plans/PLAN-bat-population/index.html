@@ -16998,13 +16998,13 @@ rather than merge requests.</p>
 <tr>
 <td>11. Coverage and differential fuzzing</td>
 <td><a href="/components/instar/plans/PLAN-bat-population-phase-11-fuzz/">PLAN-bat-population-phase-11-fuzz.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>41f74d40</code> (#884)</td>
 </tr>
 <tr>
 <td>12. Documentation</td>
-<td>PLAN-bat-population-phase-12-docs.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-bat-population-phase-12-docs/">PLAN-bat-population-phase-12-docs.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -17258,13 +17258,25 @@ a structural comparison arm rather than a picker entry. And the
 comment in <code>fuzz_create_emitters</code> saying fixed output reaches no
 caller has been false since phases 7 and 8.</p>
 <p><strong>Phase 12</strong> carries the cross-cutting documentation. Per-phase pages
-change in their own phases (see the constraints below); phase 12 is
-for <code>docs/format-coverage.md</code>'s output-side rows and notes,
-<code>docs/quirks.md</code>'s divergences (dynamic <code>block_state_zero</code>,
-<code>log_size</code>, convert's in-place fixed layout versus qemu's default),
-<code>docs/format-internals.md</code>'s VHDX section, <code>ARCHITECTURE.md</code> if the
-shared layout function changes the component description, and
-<code>CHANGELOG.md</code>.</p>
+change in their own phases (see the constraints below), and phase 12's
+survey confirmed that held: the pages owned by phases 7 to 9 mention
+the fixed subformat, and the two cross-cutting pages do not mention it
+at all. Phase 12 is for <code>docs/format-coverage.md</code>'s output-side rows
+and notes, <code>docs/format-internals.md</code>'s VHDX section -- which claims
+dynamic-only output and a flat 32 MiB block size, both now false --
+two <code>docs/quirks.md</code> divergences (<code>log_size</code>, and <code>block_state_zero</code>
+accepted and then ignored for a dynamic image), and a two-entry
+correction to <code>ARCHITECTURE.md</code>'s creatable-format roster, which omits
+<code>monolithicFlat</code> and fixed VHDX.</p>
+<p>Three things this paragraph previously claimed are not phase 12's
+work, as its survey established. <code>CHANGELOG.md</code> is already complete:
+every phase from 7 to 11 wrote its own <code>[Unreleased]</code> entry. The
+third quirk once listed here -- convert's in-place fixed layout versus
+qemu's default -- was written by phase 8, in <code>docs/convert.md</code> and the
+"VHDX partial last block" section of <code>docs/quirks.md</code>. And the
+<code>ARCHITECTURE.md</code> trigger named here, the shared layout function
+changing the component description, did not fire; what is stale there
+is a factual roster.</p>
 <p><strong>Phase 13</strong> is the push audit.</p>
 <h3 id="constraints-that-apply-throughout">Constraints that apply throughout<a class="headerlink" href="#constraints-that-apply-throughout" title="Permanent link">&para;</a></h3>
 <ul>

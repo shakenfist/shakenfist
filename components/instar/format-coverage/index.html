@@ -17562,7 +17562,11 @@ vhdx</strong> only. qemu-img can additionally <em>create</em> vdi / parallels / 
 qed images; instar refuses those by scope, not by inability (note 15).
 For vmdk, <code>create</code> and convert output write monolithicSparse,
 streamOptimized and monolithicFlat; neither writes the split
-twoGbMaxExtent subformats.</p>
+twoGbMaxExtent subformats. For vhdx, <code>create</code> and convert output write
+both dynamic and fixed (<code>--subformat fixed</code>). On vmdk, vpc and vhdx,
+<code>-o preallocation</code> accepts <code>off</code>, <code>falloc</code> and <code>full</code> and all three
+write the same image, so the modes are a no-op; <code>metadata</code> is refused.
+This matches qemu-img.</p>
 <table>
 <thead>
 <tr>
@@ -17803,7 +17807,7 @@ above.</p>
 <tr>
 <td><strong>vhdx</strong></td>
 <td>Supported</td>
-<td>Dynamic VHDX, configurable block size (1MB-256MB via <code>--block-size</code>, default qemu-img's for the size: 8MB up to 1GB, 16MB up to 100GB, 32MB up to 32TB, then 64MB), CRC-32C checksums</td>
+<td>Dynamic or fixed VHDX (<code>--subformat</code>, default dynamic), configurable block size (1MB-256MB via <code>--block-size</code>, default qemu-img's for the size: 8MB up to 1GB, 16MB up to 100GB, 32MB up to 32TB, then 64MB), CRC-32C checksums</td>
 </tr>
 </tbody>
 </table>
@@ -19445,9 +19449,10 @@ qcow2-luks).</p>
 <p><strong>VHDX Input/Output Support</strong> - Convert supports VHDX as both input
     and output format. Input: dynamic VHDX (64-bit BAT with interleaved
     sector bitmap entries, GUID-based metadata, CRC-32C header/region
-    validation). Output: dynamic VHDX with qemu-img's default block
-    size for the size (8 MiB up to 1 GiB), 1MB-aligned structures, and
-    skip-zeros support.</p>
+    validation). Output: dynamic or fixed VHDX (<code>--subformat</code>),
+    with qemu-img's default block size for the size (8 MiB up to 1 GiB,
+    16 MiB up to 100 GiB, 32 MiB up to 32 TiB, then 64 MiB), 1MB-aligned
+    structures, and skip-zeros support.</p>
 </li>
 <li>
 <p><strong>VHDX Structural Integrity Check</strong> - Full validation in check

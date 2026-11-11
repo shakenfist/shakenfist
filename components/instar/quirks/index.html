@@ -6265,6 +6265,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#vhdx-log_size-is-accept-ignored-qemu-img-writes-the-log-it-is-asked-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vhdx log_size is accept-ignored; qemu-img writes the log it is asked for
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-vhdx-block_state_zerooff-is-accepted-and-ignored-qemu-img-writes-a-different-bat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dynamic vhdx block_state_zero=off is accepted and ignored; qemu-img writes a different BAT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vhd-fixed-subformat-carries-footer-only-metadata" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -21033,6 +21055,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#vhdx-log_size-is-accept-ignored-qemu-img-writes-the-log-it-is-asked-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vhdx log_size is accept-ignored; qemu-img writes the log it is asked for
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-vhdx-block_state_zerooff-is-accepted-and-ignored-qemu-img-writes-a-different-bat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dynamic vhdx block_state_zero=off is accepted and ignored; qemu-img writes a different BAT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vhd-fixed-subformat-carries-footer-only-metadata" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -25098,6 +25142,170 @@ does the same in <code>create</code> (<code>1073741825</code> records <code>1073
 <code>dd</code> already declared. The thresholds of the limit and of qemu's
 default block size are all multiples of 512, so rounding never changes
 which side of one a size falls.</p>
+<h3 id="vhdx-log_size-is-accept-ignored-qemu-img-writes-the-log-it-is-asked-for">vhdx <code>log_size</code> is accept-ignored; qemu-img writes the log it is asked for<a class="headerlink" href="#vhdx-log_size-is-accept-ignored-qemu-img-writes-the-log-it-is-asked-for" title="Permanent link">&para;</a></h3>
+<p><code>instar create -f vhdx -o log_size=N</code> accepts the key and ignores the
+value: the arm for it in <code>parse_create_o_options</code> neither stores nor
+parses what it is given. The writer's log is a constant, <code>LOG_LENGTH</code>
+in the vhdx crate, fixed at 1 MiB, and <code>BAT_OFFSET</code> is <code>LOG_OFFSET</code>
+plus it, so every VHDX instar writes carries qemu's default log size
+whatever <code>-o</code> asked for.</p>
+<p>qemu-img honours the option. Measured with the pinned static build of
+qemu-img 10.2.0 at a 16 MiB and a 4 GiB virtual size — the two sides of
+the 8 MiB / 16 MiB default block-size boundary, so the result is not an
+artefact of one geometry — and re-run on all 80 pinned builds from
+6.0.0 to 10.2.0, which agree with it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>$ qemu-img create -f vhdx default.vhdx 16M
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>Formatting 'default.vhdx', fmt=vhdx size=16777216 log_size=1048576 block_size=0
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>$ qemu-img create -f vhdx -o log_size=2M two.vhdx 16M
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>Formatting 'two.vhdx', fmt=vhdx size=16777216 log_size=2097152 block_size=0
+</code></pre></div>
+<p>Structurally compared with <code>tests/helpers/vhdx_structure.py</code>, three
+fields move and only these three:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>default</th>
+<th><code>log_size=2M</code></th>
+<th><code>log_size=4M</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>header <code>LogLength</code></td>
+<td>1048576</td>
+<td>2097152</td>
+<td>4194304</td>
+</tr>
+<tr>
+<td><code>bat</code> region offset, in both region tables</td>
+<td>2097152</td>
+<td>3145728</td>
+<td>5242880</td>
+</tr>
+<tr>
+<td><code>metadata</code> region offset, in both region tables</td>
+<td>3145728</td>
+<td>4194304</td>
+<td>6291456</td>
+</tr>
+<tr>
+<td>file length</td>
+<td>8388608</td>
+<td>9437184</td>
+<td>11534336</td>
+</tr>
+</tbody>
+</table>
+<p>The header's <code>LogOffset</code> stays at 1 MiB, both regions keep their 1 MiB
+lengths, the metadata items keep their offsets, and every BAT entry is
+unchanged: the log grows in place and pushes what follows it along.
+<code>vhdx_create_new_headers</code> writes the requested size into the header's
+<code>log_length</code>, and the new region table places the BAT at
+<code>ROUND_UP(VHDX_HEADER_SECTION_END + log_size, MiB)</code> (qemu 7.0.0
+<code>block/vhdx.c</code>). The 4 GiB virtual size gives the same four numbers.</p>
+<p>Two values a user will try:</p>
+<ul>
+<li><strong>A value that is not a multiple of 1 MiB is rounded up, not
+  refused.</strong> <code>-o log_size=524288</code> and <code>-o log_size=1000000</code> both record
+  <code>LogLength</code> 1048576 and produce a file structurally identical to the
+  default; <code>-o log_size=1536K</code> and <code>-o log_size=1572864</code> both record</li>
+<li><code>vhdx_co_create_opts</code> rounds the option up to a whole MiB
+  before the validity check sees it.</li>
+<li><strong><code>log_size=0</code> is refused, and leaves a zero-length file behind</strong>, as
+  a size over the 64 TiB limit does:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>$ qemu-img create -f vhdx -o log_size=0 zero.vhdx 16M; echo "exit $?"; stat -c %s zero.vhdx
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>Formatting 'zero.vhdx', fmt=vhdx size=16777216 log_size=0 block_size=0
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>qemu-img: zero.vhdx: Log size must be a multiple of 1 MB
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>exit 1
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>0
+</code></pre></div>
+<p>The message names the multiple rather than the floor because the
+rounding has already happened: zero rounds up to zero, which is then
+below the 1 MiB minimum. <code>-o log_size=5G</code> is refused too, with "Log
+size must be smaller than 4 GB", and also leaves the empty file; a
+non-numeric value is refused by option parsing before the file is
+created, with "Parameter 'log_size' expects a non-negative number below
+2^64". Every one of the 80 pinned builds refuses the first two
+identically (measured; the quoted text is 10.2.0's).</p>
+<p>For a user: instar accepts every value qemu-img accepts, and the ones
+it refuses as well, and writes the same default-log image for all of
+them. An instar image created with <code>-o log_size=2M</code> is therefore not
+the image qemu-img creates with it — at a 16 MiB virtual size it is
+1 MiB shorter and its BAT and metadata regions sit 1 MiB earlier — and
+<code>instar create -f vhdx -o log_size=0</code> succeeds where qemu-img exits 1.
+Both images are valid, <code>qemu-img check</code> passes on each, and no reader
+sees a difference in the data; only the region offsets and the declared
+log length differ. <code>convert</code> is outside this entry: it parses no <code>-o</code>
+at all and takes <code>--subformat</code>, so there is no way to ask it for a log
+size. <code>measure -O vhdx</code> accept-ignores the key as well, and that one
+has no qemu-img counterpart to diverge from — qemu-img cannot measure
+VHDX on any pinned build ("Block driver 'vhdx' does not support size
+measurement", measured on all 80) — and instar's measured numbers match
+instar's own writer, which always uses the 1 MiB log. Honouring
+<code>log_size</code> is future work.</p>
+<h3 id="dynamic-vhdx-block_state_zerooff-is-accepted-and-ignored-qemu-img-writes-a-different-bat">dynamic vhdx <code>block_state_zero=off</code> is accepted and ignored; qemu-img writes a different BAT<a class="headerlink" href="#dynamic-vhdx-block_state_zerooff-is-accepted-and-ignored-qemu-img-writes-a-different-bat" title="Permanent link">&para;</a></h3>
+<p>A fixed image is the documented case, in <a href="/components/instar/convert/">convert.md</a> and
+in the VHDX partial-last-block section earlier on this page. This entry
+is the dynamic one, where the option looks like a no-op and is one for
+instar only.</p>
+<p><code>instar create -f vhdx -o subformat=dynamic,block_state_zero=off</code> is
+accepted: <code>parse_create_o_options</code> parses the value for both
+subformats, deliberately, because qemu-img refuses a non-boolean for
+both, and only a fixed create reads the result — the fully-present
+create flag is set only when <code>is_vhdx_fixed_create</code> holds. A dynamic
+image instar writes therefore has every payload BAT entry in
+<code>PAYLOAD_BLOCK_ZERO</code> whichever way the option is set, or if it is
+absent.</p>
+<p>qemu-img does not ignore it on a dynamic image. Measured with the
+pinned static build of qemu-img 10.2.0, at a 16 MiB and a 4 GiB virtual
+size; <code>stat -c %b</code> is the 512-byte blocks the filesystem has allocated:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>$ qemu-img create -f vhdx -o subformat=dynamic on.vhdx 16M
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>$ qemu-img create -f vhdx -o subformat=dynamic,block_state_zero=on explicit-on.vhdx 16M
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>$ qemu-img create -f vhdx -o subformat=dynamic,block_state_zero=off off.vhdx 16M
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>$ stat -c '%n %s %b' on.vhdx explicit-on.vhdx off.vhdx
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>on.vhdx 8388608 2472
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>explicit-on.vhdx 8388608 2472
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>off.vhdx 8388608 424
+</code></pre></div>
+<p>Structurally compared with <code>tests/helpers/vhdx_structure.py</code>, the
+option absent and <code>=on</code> are identical, and <code>=off</code> differs in exactly
+one field:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>bat run 0: 2 x payload ZERO from entry 0, offset 0 stride 0
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>        != 2 x payload NOT_PRESENT from entry 0, offset 0 stride 0
+</code></pre></div>
+<p>Every payload BAT entry is <code>PAYLOAD_BLOCK_NOT_PRESENT</code> (state 0)
+instead of <code>PAYLOAD_BLOCK_ZERO</code> (state 2). The file length, the log,
+both region tables, the metadata items, the block size and the BAT
+entry count are all unchanged. The 4 GiB virtual size shows the same
+one difference over its 256 payload entries. All 80 pinned builds from
+6.0.0 to 10.2.0 produce the same three allocation figures for these
+three commands, so this is not version-dependent.</p>
+<p>Nothing a reader of the contents sees changes: both images convert to
+16 MiB of zeros (<code>qemu-img convert -O raw</code> of each, compared against
+<code>/dev/zero</code>, measured on 10.2.0), both pass <code>qemu-img check</code>, and
+<code>qemu-img map --output=json</code> calls the whole disk one <code>data: true</code>
+extent either way — it does not consult the BAT state, which is the
+divergence recorded for VHDX zero-state blocks in the map quirks above.
+What changes is how much of the file is allocated, because an all-zero
+BAT region stays a hole: <code>qemu-img info</code> reports <code>disk size: 1.21 MiB</code>
+for the zero-state image and <code>212 KiB</code> for the not-present one, on the
+ext4 filesystem these were measured on. instar's reader tells the two
+apart as well: <code>classify_vhdx_bat_entry</code> reports a <code>ZERO</code> block as a
+zero-but-allocated extent and a <code>NOT_PRESENT</code> block as a hole.</p>
+<p>For a user: this is a divergence, not a shared no-op. Asking instar for
+a dynamic VHDX with <code>block_state_zero=off</code> gets an image whose payload
+BAT entries are zero-state where qemu-img's are not-present. The two
+read identically and both are valid, so nothing downstream breaks, but
+they are neither byte-equal nor structurally equal, and instar's
+allocates the BAT region where qemu-img's leaves it sparse. <code>convert</code>
+is outside this entry: it parses no <code>-o</code>, and its <code>--subformat dynamic</code>
+has no block-state switch. <code>measure -O vhdx</code> accept-ignores
+<code>block_state_zero</code> for either subformat, which changes no measured
+number — a fixed target is dense either way, and qemu-img cannot
+measure VHDX at all. Writing not-present entries for a dynamic
+<code>block_state_zero=off</code> is future work.</p>
 <h3 id="vhd-fixed-subformat-carries-footer-only-metadata">VHD fixed subformat carries footer-only metadata<a class="headerlink" href="#vhd-fixed-subformat-carries-footer-only-metadata" title="Permanent link">&para;</a></h3>
 <p><code>instar create -f vpc -o subformat=fixed FILENAME SIZE</code> produces
 a file of <code>SIZE + 512</code> bytes — zero data plus a 512-byte footer
@@ -25786,14 +25994,14 @@ explicit <code>-l</code> form.</p>
 <h3 id="-force-share-u-is-list-only-d1"><code>--force-share</code> (<code>-U</code>) is list-only (D1)<a class="headerlink" href="#-force-share-u-is-list-only-d1" title="Permanent link">&para;</a></h3>
 <p><code>qemu-img</code> refuses <code>-U</code> combined with any mutating mode (<code>-c</code>, <code>-d</code>,
 <code>-a</code>) with exit 1 and the message:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>qemu-img: Could not open 'IMAGE': force-share=on can only be used with read-only images
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>qemu-img: Could not open 'IMAGE': force-share=on can only be used with read-only images
 </code></pre></div>
 <p>Previously, instar accepted <code>-U</code> with mutating modes and
 performed the mutation (the flag was plumbed to the guest but
 unenforced at the host). A host-side gate exists in
 <code>run_snapshot</code> that fires before any file access: <code>-U</code> combined with
 <code>-c</code>, <code>-d</code>, or <code>-a</code> exits 1 with:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>snapshot: --force-share (-U) can only be used with read-only operations; -l is the only sharing-safe mode
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>snapshot: --force-share (-U) can only be used with read-only operations; -l is the only sharing-safe mode
 </code></pre></div>
 <p>The message wording differs from qemu's (which mentions
 <code>force-share=on</code> and "read-only images" — artefacts of qemu's
@@ -26432,8 +26640,8 @@ image and every mid-chain backing position identically — whenever the
 guest-reported format string is detected but maps to <code>Unknown</code> and is
 not <code>raw</code>, <code>unknown</code>, or <code>iso</code>. The typed error names the format,
 e.g.:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>convert: input format 'bochs' is detected but not supported for
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>reading (detection and info only)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>convert: input format 'bochs' is detected but not supported for
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>reading (detection and info only)
 </code></pre></div>
 <p>This closed the hole for <code>qed</code> (previously silently read as raw,
 contradicting its documented "detected, refused" stance) as well as
@@ -27785,18 +27993,18 @@ is still no qemu-img write path for either format. instar's own output
 is a recorded divergence (an instar-only capability with no qemu-img
 oracle); see <a href="/components/instar/format-coverage/">format-coverage.md</a>.</p>
 <h4 id="observed-behavior_52">Observed Behavior<a class="headerlink" href="#observed-behavior_52" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>$ qemu-img create -f vpc base.vhd 16M
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>Formatting 'base.vhd', fmt=vpc size=16777216
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>$ qemu-img create -f vpc -b base.vhd -F vpc child.vhd 16M
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>qemu-img: child.vhd: Backing file not supported for file format 'vpc'
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>$ echo $?
-<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>1
-<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>$ qemu-img create -f vhdx base.vhdx 16M
-<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>Formatting 'base.vhdx', fmt=vhdx size=16777216 log_size=1048576 block_size=0
-<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>$ qemu-img create -f vhdx -b base.vhdx -F vhdx child.vhdx 16M
-<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>qemu-img: child.vhdx: Backing file not supported for file format 'vhdx'
-<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>$ echo $?
-<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>$ qemu-img create -f vpc base.vhd 16M
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>Formatting 'base.vhd', fmt=vpc size=16777216
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>$ qemu-img create -f vpc -b base.vhd -F vpc child.vhd 16M
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>qemu-img: child.vhd: Backing file not supported for file format 'vpc'
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>$ echo $?
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>1
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>$ qemu-img create -f vhdx base.vhdx 16M
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>Formatting 'base.vhdx', fmt=vhdx size=16777216 log_size=1048576 block_size=0
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>$ qemu-img create -f vhdx -b base.vhdx -F vhdx child.vhdx 16M
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>qemu-img: child.vhdx: Backing file not supported for file format 'vhdx'
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>$ echo $?
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>1
 </code></pre></div>
 <h4 id="why-this-matters_41">Why This Matters<a class="headerlink" href="#why-this-matters_41" title="Permanent link">&para;</a></h4>
 <p>There is no qemu-img write path for either format, so nothing about
@@ -27924,48 +28132,48 @@ tracked as issue #547. instar's side is fixed as of commit <code>10ab838</code>.
 <h4 id="observed-behavior_53">Observed Behavior<a class="headerlink" href="#observed-behavior_53" title="Permanent link">&para;</a></h4>
 <p><code>qemu-img info</code> on a real Hyper-V differencing VHD child reports a plain
 image and never mentions a parent:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>$ qemu-img info fat-differential.vhd
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>image: fat-differential.vhd
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>file format: vpc
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>virtual size: 4 MiB (4194304 bytes)
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>disk size: 2.08 MiB
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>cluster_size: 2097152
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>Child node '/file':
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>    filename: fat-differential.vhd
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>    protocol type: file
-<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>    file length: 2.08 MiB (2183168 bytes)
-<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>    disk size: 2.08 MiB
-<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>$ echo $?
-<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a>0
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>$ qemu-img info fat-differential.vhd
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>image: fat-differential.vhd
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>file format: vpc
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>virtual size: 4 MiB (4194304 bytes)
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>disk size: 2.08 MiB
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>cluster_size: 2097152
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>Child node '/file':
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>    filename: fat-differential.vhd
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>    protocol type: file
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>    file length: 2.08 MiB (2183168 bytes)
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>    disk size: 2.08 MiB
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>$ echo $?
+<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a>0
 </code></pre></div>
 <p>The same command on the VHDX equivalent refuses outright — this is not
 merely a silent-read difference, <code>info</code> itself cannot open the file:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ qemu-img info fat-differential.vhdx
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>qemu-img: Could not open 'fat-differential.vhdx': Could not open
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>'fat-differential.vhdx': Operation not supported
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>$ echo $?
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>$ qemu-img info fat-differential.vhdx
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>qemu-img: Could not open 'fat-differential.vhdx': Could not open
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>'fat-differential.vhdx': Operation not supported
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>$ echo $?
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>1
 </code></pre></div>
 <p><code>qemu-img convert -O raw</code> on the VHD child exits 0 and writes 4 MiB composed
 as though the parent did not exist:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>$ qemu-img convert -f vpc -O raw fat-differential.vhd qemu-child-only.raw
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>$ echo $?
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>0
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>$ cmp qemu-child-only.raw fat-composed.raw
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>qemu-child-only.raw fat-composed.raw differ: byte 1, line 1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>$ qemu-img convert -f vpc -O raw fat-differential.vhd qemu-child-only.raw
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>$ echo $?
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>0
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>$ cmp qemu-child-only.raw fat-composed.raw
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>qemu-child-only.raw fat-composed.raw differ: byte 1, line 1
 </code></pre></div>
 <p>(<code>fat-composed.raw</code> is libvhdi's correct composition of the same chain,
 described below.) The crispest demonstration is <code>file(1)</code> on the two
 outputs. The chain's first block is parent-owned, so a reader that ignores
 the parent produces a file with no valid boot sector at all:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>$ file qemu-child-only.raw
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>qemu-child-only.raw: data
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>$ file fat-composed.raw
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>fat-composed.raw: DOS/MBR boot sector MS-MBR Windows 7 english at offset
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>0x163 "Invalid partition table" at offset 0x17b "Error loading operating
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>system" at offset 0x19a "Missing operating system", disk signature
-<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>0x2598ade5; partition 1 : ID=0xe, start-CHS (0x80,0,1), end-CHS
-<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>(0x3ff,0,1), startsector 128, 6016 sectors
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>$ file qemu-child-only.raw
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>qemu-child-only.raw: data
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>$ file fat-composed.raw
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>fat-composed.raw: DOS/MBR boot sector MS-MBR Windows 7 english at offset
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>0x163 "Invalid partition table" at offset 0x17b "Error loading operating
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>system" at offset 0x19a "Missing operating system", disk signature
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>0x2598ade5; partition 1 : ID=0xe, start-CHS (0x80,0,1), end-CHS
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>(0x3ff,0,1), startsector 128, 6016 sectors
 </code></pre></div>
 <p>So the two formats are not symmetric in qemu: differencing VHD is silently
 mis-read (rc 0, wrong data), differencing VHDX is refused (rc 1,
@@ -27991,25 +28199,25 @@ and had to decide for itself whether to add a differencing-specific check on
 top — most did not (see the per-op table below).</p>
 <p><code>instar info</code> and <code>instar convert -O raw</code> on the same Hyper-V VHD child
 reproduced the qemu behaviour byte for byte:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>$ instar info fat-differential.vhd
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>image: fat-differential.vhd
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>file format: vpc
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>virtual size: 4 MiB (4194304 bytes)
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>disk size: 2.08 MiB
-<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>cluster_size: 2097152
-<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>Child node '/file':
-<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>    filename: fat-differential.vhd
-<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>    protocol type: file
-<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>    file length: 2.08 MiB (2183168 bytes)
-<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>    disk size: 2.08 MiB
-<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>$ instar convert -O raw fat-differential.vhd instar-child-only.raw
-<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a>$ echo $?
-<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a>0
-<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a>$ cmp instar-child-only.raw qemu-child-only.raw
-<a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a>$ echo $?
-<a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a>0
-<a id="__codelineno-19-18" name="__codelineno-19-18" href="#__codelineno-19-18"></a>$ file instar-child-only.raw
-<a id="__codelineno-19-19" name="__codelineno-19-19" href="#__codelineno-19-19"></a>instar-child-only.raw: data
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>$ instar info fat-differential.vhd
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>image: fat-differential.vhd
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>file format: vpc
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>virtual size: 4 MiB (4194304 bytes)
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>disk size: 2.08 MiB
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>cluster_size: 2097152
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>Child node '/file':
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>    filename: fat-differential.vhd
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>    protocol type: file
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>    file length: 2.08 MiB (2183168 bytes)
+<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>    disk size: 2.08 MiB
+<a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>$ instar convert -O raw fat-differential.vhd instar-child-only.raw
+<a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>$ echo $?
+<a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>0
+<a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a>$ cmp instar-child-only.raw qemu-child-only.raw
+<a id="__codelineno-23-16" name="__codelineno-23-16" href="#__codelineno-23-16"></a>$ echo $?
+<a id="__codelineno-23-17" name="__codelineno-23-17" href="#__codelineno-23-17"></a>0
+<a id="__codelineno-23-18" name="__codelineno-23-18" href="#__codelineno-23-18"></a>$ file instar-child-only.raw
+<a id="__codelineno-23-19" name="__codelineno-23-19" href="#__codelineno-23-19"></a>instar-child-only.raw: data
 </code></pre></div>
 <p>instar's output was bit-identical to qemu-img's mis-composed output and
 <code>file(1)</code> called it unidentifiable <code>data</code>, for the same reason: sector 0
@@ -28030,23 +28238,23 @@ give.</p>
 <code>vhdx-diff-child.vhdx</code>, parent
 <code>.\vhdx-diff-parent.vhdx</code> — a different corpus from the <code>fat-differential</code>
 oracle pair used above):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>$ instar convert -O raw vhd-diff-child-aligned.vhd out.raw
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>convert: source is a differencing VHD image whose parent instar cannot
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>yet compose; composition is deferred (see PLAN-differencing.md)
-<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>$ echo $?
-<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>1
-<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>$ ls out.raw
-<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>ls: cannot access 'out.raw': No such file or directory
-<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>$ instar convert -O raw vhdx-diff-child.vhdx out.raw
-<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>convert: source is a differencing VHDX image whose parent instar cannot
-<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>yet compose; composition is deferred (see PLAN-differencing.md)
-<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a>$ echo $?
-<a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a>1
-<a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a>$ instar info vhd-diff-child-aligned.vhd
-<a id="__codelineno-20-14" name="__codelineno-20-14" href="#__codelineno-20-14"></a>...
-<a id="__codelineno-20-15" name="__codelineno-20-15" href="#__codelineno-20-15"></a>backing file: vhd-diff-parent.vhd
-<a id="__codelineno-20-16" name="__codelineno-20-16" href="#__codelineno-20-16"></a>$ echo $?
-<a id="__codelineno-20-17" name="__codelineno-20-17" href="#__codelineno-20-17"></a>0
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>$ instar convert -O raw vhd-diff-child-aligned.vhd out.raw
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>convert: source is a differencing VHD image whose parent instar cannot
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>yet compose; composition is deferred (see PLAN-differencing.md)
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>$ echo $?
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>1
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>$ ls out.raw
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>ls: cannot access 'out.raw': No such file or directory
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>$ instar convert -O raw vhdx-diff-child.vhdx out.raw
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>convert: source is a differencing VHDX image whose parent instar cannot
+<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a>yet compose; composition is deferred (see PLAN-differencing.md)
+<a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>$ echo $?
+<a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a>1
+<a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a>$ instar info vhd-diff-child-aligned.vhd
+<a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a>...
+<a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a>backing file: vhd-diff-parent.vhd
+<a id="__codelineno-24-16" name="__codelineno-24-16" href="#__codelineno-24-16"></a>$ echo $?
+<a id="__codelineno-24-17" name="__codelineno-24-17" href="#__codelineno-24-17"></a>0
 </code></pre></div>
 <p><code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code>, <code>check</code> and <code>measure</code> all refused both
 formats this way at the time of this record, exiting 1 and leaving no
@@ -28060,11 +28268,11 @@ using the same message rather than migrated onto the new channel,
 because it already worked and was already tested.</p>
 <p>A later phase lifted this refusal for five of those six operations.
 Re-run today against the same fixture, with its parent present:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>$ instar convert -O raw vhd-diff-child-aligned.vhd out.raw
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>$ echo $?
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>0
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>$ ls -la out.raw
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>-rw-r--r-- 1 user user 16777216 ... out.raw
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>$ instar convert -O raw vhd-diff-child-aligned.vhd out.raw
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>$ echo $?
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>0
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>$ ls -la out.raw
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>-rw-r--r-- 1 user user 16777216 ... out.raw
 </code></pre></div>
 <p><code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> now compose such a
 source against its parent instead of refusing it; <code>map</code>, <code>measure</code> and
@@ -28214,8 +28422,8 @@ with no output file left behind:</p>
 </table>
 <p>The refusal sentence (for every row marked with it) was, at the time of
 this record:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>&lt;op&gt;: source is a differencing &lt;VHD|VHDX&gt; image whose parent instar cannot
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>yet compose; composition is deferred (see PLAN-differencing.md)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>&lt;op&gt;: source is a differencing &lt;VHD|VHDX&gt; image whose parent instar cannot
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>yet compose; composition is deferred (see PLAN-differencing.md)
 </code></pre></div>
 <p>VHD is where the fix mattered most, because VHD was the format actually at
 risk of silent data corruption — VHDX already failed on every op before
@@ -28264,16 +28472,16 @@ crates had already gained. <code>info</code>, <code>create -b</code>, <code>map<
 </table>
 <p>The refusal sentence these five now use when their own chain has no
 parent to read (measured against the built binary):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>&lt;op&gt;: a differencing &lt;VHD|VHDX&gt; image in the chain &lt;op&gt; was given has no
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>parent behind it, so the sectors it leaves to its parent could not be
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>composed
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>&lt;op&gt;: a differencing &lt;VHD|VHDX&gt; image in the chain &lt;op&gt; was given has no
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>parent behind it, so the sectors it leaves to its parent could not be
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>composed
 </code></pre></div>
 <p><code>map</code>, <code>measure</code> and <code>check</code> go on refusing every differencing source
 unconditionally, each with its own current message naming its own
 operation:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>measure: source is a differencing &lt;VHD|VHDX&gt; image, and measure reads an
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>image on its own rather than composing a parent into it, so the sectors
-<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>it leaves to its parent could not be composed
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>measure: source is a differencing &lt;VHD|VHDX&gt; image, and measure reads an
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>image on its own rather than composing a parent into it, so the sectors
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>it leaves to its parent could not be composed
 </code></pre></div>
 <p>(<code>check</code> renders the same shape with <code>check</code> in place of <code>measure</code>; <code>map</code>
 keeps its own sentence, <code>map: source has a backing/parent reference; map
@@ -28332,33 +28540,33 @@ reason, and the reason is different for every operation on the
 instar)</p>
 <h4 id="observed-behavior_55">Observed Behavior<a class="headerlink" href="#observed-behavior_55" title="Permanent link">&para;</a></h4>
 <p>libvhdi refuses to read a differencing child with no parent attached:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>$ python3 compose.py out.raw fat-differential.vhd
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>media_size=4194304 disk_type=4
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>parent_identifier=5fa21a55-f394-aa4d-9958-1951a67d5540
-<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>parent_filename=C:\Projects\dfvfs\test_data\fat-parent.vhd
-<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>Traceback (most recent call last):
-<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>  ...
-<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>OSError: pyvhdi_file_seek_offset: unable to seek offset.
-<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>libvhdi_internal_file_seek_offset: invalid file - missing parent file.
-<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>libvhdi_file_seek_offset: unable to seek offset.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>$ python3 compose.py out.raw fat-differential.vhd
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>media_size=4194304 disk_type=4
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>parent_identifier=5fa21a55-f394-aa4d-9958-1951a67d5540
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a>parent_filename=C:\Projects\dfvfs\test_data\fat-parent.vhd
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>Traceback (most recent call last):
+<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a>  ...
+<a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a>OSError: pyvhdi_file_seek_offset: unable to seek offset.
+<a id="__codelineno-29-8" name="__codelineno-29-8" href="#__codelineno-29-8"></a>libvhdi_internal_file_seek_offset: invalid file - missing parent file.
+<a id="__codelineno-29-9" name="__codelineno-29-9" href="#__codelineno-29-9"></a>libvhdi_file_seek_offset: unable to seek offset.
 </code></pre></div>
 <p>And it enforces the parent identifier when a parent <em>is</em> attached — the
 wrong one is rejected rather than silently composed against:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>$ python3 compose.py out.raw fat-differential.vhd ntfs-parent.vhd
-<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>Traceback (most recent call last):
-<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>  ...
-<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>OSError: pyvhdi_file_set_parent: unable to set parent file.
-<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>libvhdi_file_set_parent_file: mismatch in identifier.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>$ python3 compose.py out.raw fat-differential.vhd ntfs-parent.vhd
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>Traceback (most recent call last):
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>  ...
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>OSError: pyvhdi_file_set_parent: unable to set parent file.
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a>libvhdi_file_set_parent_file: mismatch in identifier.
 </code></pre></div>
 <p>The correct parent composes cleanly and produces the byte-exact,
 MBR-bearing image shown above:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>$ python3 compose.py out.raw fat-differential.vhd fat-parent.vhd
-<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>media_size=4194304 disk_type=4
-<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>parent_identifier=5fa21a55-f394-aa4d-9958-1951a67d5540
-<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>parent_filename=C:\Projects\dfvfs\test_data\fat-parent.vhd
-<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>wrote 4194304 bytes to out.raw
-<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>$ echo $?
-<a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a>0
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>$ python3 compose.py out.raw fat-differential.vhd fat-parent.vhd
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>media_size=4194304 disk_type=4
+<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>parent_identifier=5fa21a55-f394-aa4d-9958-1951a67d5540
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>parent_filename=C:\Projects\dfvfs\test_data\fat-parent.vhd
+<a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a>wrote 4194304 bytes to out.raw
+<a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a>$ echo $?
+<a id="__codelineno-31-7" name="__codelineno-31-7" href="#__codelineno-31-7"></a>0
 </code></pre></div>
 <h4 id="why-this-matters_44">Why This Matters<a class="headerlink" href="#why-this-matters_44" title="Permanent link">&para;</a></h4>
 <p>libvhdi's stance — refuse when there is no parent to compose against,
@@ -28433,7 +28641,7 @@ and zero. qemu classifies such an entry as invalid
 <h3 id="instar-behavior_53">instar Behavior<a class="headerlink" href="#instar-behavior_53" title="Permanent link">&para;</a></h3>
 <p>instar refuses the same entries. <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code>
 and <code>rebase</code> fail with a message in the same class as qemu's:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>convert: Invalid cluster entry found at virtual offset 65536 (0x10000): corrupt qcow2 L2 entry
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>convert: Invalid cluster entry found at virtual offset 65536 (0x10000): corrupt qcow2 L2 entry
 </code></pre></div>
 <p>(the operation name and offset vary; the message is one line). <code>map</code>
 and <code>measure</code> refuse with the same text. The decision is made in one
