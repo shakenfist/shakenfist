@@ -26159,9 +26159,11 @@ def delete_orphaned_artifact_attributes() -> Optional[int]:
 # scheduled_tasks._process_per_blob_queue() passes suppress_failure_audit;
 # the order only removes the easy half of that race.
 #
-# Instance, namespace, namespace claim and node are absent on purpose: each
+# Instance, namespace and namespace claim are absent on purpose: each
 # hard_delete() does more than delete rows keyed on the object, so they keep
-# their own code.
+# their own code. Node is absent for the opposite reason -- its hard_delete()
+# deletes nothing at all, and the deleted-object sweep skips the type for
+# that reason (scheduled_tasks.DELETED_OBJECT_SWEEP_EXCLUDED_TYPES).
 # =============================================================================
 
 # The most objects one HardDeleteObjects call may name, so that a caller

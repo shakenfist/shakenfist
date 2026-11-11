@@ -894,7 +894,13 @@ class Node(dbo):
         self.state = self.STATE_DELETED
 
     def hard_delete(self):
-        # We do not hard delete nodes, they're special.
+        # We do not hard delete nodes, they're special: a cluster has to
+        # remember the node it decommissioned, so the rows stay. This does
+        # not call super(), so nothing removes the object_states row, which
+        # is why 'node' is in
+        # scheduled_tasks.DELETED_OBJECT_SWEEP_EXCLUDED_TYPES -- a sweep of
+        # this type would call a no-op on the same nodes every pass and
+        # count each one as hard deleted (#4876).
         pass
 
 

@@ -1026,8 +1026,11 @@ rows a type loses are declared in one place, `HARD_DELETE_BATCH_FUNCTIONS`
 in `mariadb.py`, which lists the public delete functions run for the type
 before `delete_state`, `delete_object_metadata` and `delete_object_events`;
 `HARD_DELETE_STATEMENTS` maps each name to its many-object statement and to
-a call of the public function. Instances, namespaces, namespace claims and
-nodes are absent because their hard delete does more than delete rows. An
+a call of the public function. Instances, namespaces and namespace claims
+are absent because their hard delete does more than delete rows. Node is
+absent because its hard delete deletes nothing at all, which is also why
+the deleted-object sweep skips the type
+(`DELETED_OBJECT_SWEEP_EXCLUDED_TYPES`). An
 `sf-database` which predates the RPC makes `hard_delete_objects()` raise
 `HardDeleteBatchUnavailable`, and callers fall back to
 `hard_delete_objects_per_call()`, the same deletes as separate commits. The
