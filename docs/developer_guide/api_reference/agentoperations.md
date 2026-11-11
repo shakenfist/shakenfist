@@ -59,6 +59,7 @@ agent operations for a given instance, refer to the [instances API documentation
             }
         ],
         "deadline": 1787428090.5,
+        "depends_on": [],
         "expiry_reason": null,
         "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
         "last_progress": null,
@@ -74,6 +75,7 @@ agent operations for a given instance, refer to the [instances API documentation
                 "stdout": "..."
             }
         },
+        "runs_after": [],
         "state": "complete",
         "uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
         "version": 3

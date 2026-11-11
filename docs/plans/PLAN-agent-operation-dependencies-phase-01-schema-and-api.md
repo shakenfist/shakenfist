@@ -700,3 +700,18 @@ recorded there rather than fixed or filed here.
   is not CI's path. And `pre-commit`'s unit test hook re-syncs
   `.tox/shared` and removes a hand-installed `pymysql`, so a live run
   after a full hook pass needs it put back.
+- **2026-11-11 (AEDT). Step 1g stated two facts on both pages, and the
+  fix was to put each one where its reason lives rather than to relax
+  the criterion.** The step wrote the `depends_on` versus `runs_after`
+  distinction into the operator guide and the API reference in nearly
+  the same words, which the definition of done forbids, and it flagged
+  the duplication itself. The resolution is that the API reference owns
+  the contract -- what the two parameters mean, and why a chain cannot
+  contain a cycle, which is a consequence of this API allocating the
+  UUIDs and so belongs beside the parameters -- while the operator
+  guide owns the storage: the columns, their nullability, the stored
+  edge shape with its `op_type`, and that nothing evaluates an edge or
+  writes `dependency_failure` yet. The operator guide now links to the
+  API reference for the meaning instead of restating it. Verified by
+  grep: each of the three facts appears on exactly one of the two
+  pages.

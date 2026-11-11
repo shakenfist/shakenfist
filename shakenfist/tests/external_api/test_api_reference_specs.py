@@ -58,6 +58,7 @@ from shakenfist.tests import base
 #: headings are `### diskspec` and friends, in
 #: docs/developer_guide/api_reference/instances.md.
 SPEC_SECTIONS = {
+    'agentdependency': 'agentdependency',
     'diskspec': 'diskspec',
     'networkspec': 'networkspec',
     'videospec': 'videospec',
