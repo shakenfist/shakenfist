@@ -269,6 +269,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         # express; these bounds are backed by the schema itself.
         ('/instances/{instance_ref}/agent/put', 'post', 'depends_on',
          {'type': 'array',
+          'maxItems': 64,
           'items': {
               'type': 'object',
               'additionalProperties': False,
@@ -280,6 +281,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
               }}}),
         ('/instances/{instance_ref}/agent/put', 'post', 'runs_after',
          {'type': 'array',
+          'maxItems': 64,
           'items': {
               'type': 'object',
               'additionalProperties': False,
@@ -291,6 +293,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
               }}}),
         ('/instances/{instance_ref}/agent/get', 'post', 'depends_on',
          {'type': 'array',
+          'maxItems': 64,
           'items': {
               'type': 'object',
               'additionalProperties': False,
@@ -302,6 +305,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
               }}}),
         ('/instances/{instance_ref}/agent/get', 'post', 'runs_after',
          {'type': 'array',
+          'maxItems': 64,
           'items': {
               'type': 'object',
               'additionalProperties': False,
@@ -313,6 +317,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
               }}}),
         ('/instances/{instance_ref}/agent/execute', 'post', 'depends_on',
          {'type': 'array',
+          'maxItems': 64,
           'items': {
               'type': 'object',
               'additionalProperties': False,
@@ -324,6 +329,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
               }}}),
         ('/instances/{instance_ref}/agent/execute', 'post', 'runs_after',
          {'type': 'array',
+          'maxItems': 64,
           'items': {
               'type': 'object',
               'additionalProperties': False,

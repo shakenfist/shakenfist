@@ -620,7 +620,9 @@ def _edge_defect(error):
 # per entry rather than an in-memory walk. The value matches that constant
 # because the trade is the same and a second number would invite a reader to
 # look for a reason there isn't one. It bounds each list separately, which is
-# what the published maxItems can express.
+# what the published maxItems says and what this helper refuses on; the
+# refusal is what enforces it, because the compiler does not build a
+# validator from maxItems.
 MAX_AGENT_DEPENDENCIES = 64
 
 
@@ -714,11 +716,12 @@ def agent_operation_dependencies(depends_on, runs_after, caller_namespace):
             dep = AgentOperation.from_db(
                 str(dependency.op_uuid), suppress_failure_audit=True)
 
-            # Three reasons, one answer. The namespace test is the one
-            # requires_instance_ownership() performs, and it admits a
-            # caller in the dependency's own namespace as well as a system
-            # caller: inverted, it would either let any caller name any
-            # operation or lock system out of both.
+            # Three reasons, one answer. The namespace test is
+            # namespace_owns(), which is what the instance ownership
+            # decorator uses, so the two cannot drift: open-coding it here
+            # would be the restatement coding_rules.md forbids, and
+            # inverted it would either let any caller name any operation or
+            # lock system out of both.
             #
             # The object type test cannot fire today, because from_db() on
             # this class reads the agent operation table and so builds
@@ -726,7 +729,7 @@ def agent_operation_dependencies(depends_on, runs_after, caller_namespace):
             # refusal if that lookup is ever widened.
             if (not dep
                     or dep.object_type != ObjectType.AGENTOPERATION
-                    or caller_namespace not in (dep.namespace, 'system')):
+                    or not namespace_owns(dep.namespace, caller_namespace)):
                 return None, sf_api.error(
                     400, DEPENDENCY_REFUSAL % (name, index))
 
@@ -1264,7 +1267,8 @@ ARGTYPES: dict[str, dict[str, Any]] = {
     # legal JSON Schema. Every use in the tree is body-located, and
     # swagger_helper() refuses these outside a body at import time.
     'arrayofagentdependency': {
-        'type': 'array', 'items': AGENTDEPENDENCYSPEC_SCHEMA},
+        'type': 'array', 'items': AGENTDEPENDENCYSPEC_SCHEMA,
+        'maxItems': MAX_AGENT_DEPENDENCIES},
     'arrayofdict': {'type': 'array', 'items': {'type': 'object'}},
     # The array forms of two of the three structured specs, nesting the
     # very same object their single form names so that the two cannot
@@ -2224,6 +2228,27 @@ def redirect_instance_request(func):
     return wrapper
 
 
+def namespace_owns(obj_namespace, caller_namespace):
+    """Whether a caller may mutate an object in obj_namespace.
+
+    The ownership test: the caller's own namespace, or system. It consults
+    neither a shared flag nor a trust list, because sharing publishes an
+    object for reading and a trust is a visibility grant, and neither hands
+    out a delete button -- see
+    docs/developer_guide/coding_rules.md, whose first rule is that a
+    visibility predicate is called rather than restated, because restating
+    this one inverted it and made every namespace's artifacts readable by
+    uuid.
+
+    This exists because that rule had no function to call for the ownership
+    half: the test was open-coded at eleven sites across this package. The
+    two which share it now are this module's instance ownership decorator
+    and the agent operation dependency helper. Converting the rest is its
+    own change, since it spans artifacts, labels and networks.
+    """
+    return caller_namespace in (obj_namespace, 'system')
+
+
 def requires_instance_ownership(func):
     # Requires that @arg_is_instance_ref has already run
     def wrapper(*args, **kwargs):
@@ -2233,7 +2258,7 @@ def requires_instance_ownership(func):
             return sf_api.error(404, 'instance not found')
 
         i = kwargs['instance_from_db']
-        if request_namespace() not in [i.namespace, 'system']:
+        if not namespace_owns(i.namespace, request_namespace()):
             LOG.with_fields({'instance': i}).info(
                 'Instance not found, ownership test in decorator')
             return sf_api.error(404, 'instance not found')

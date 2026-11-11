@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2019 Michael Still and contributors
+# Copyright 2026 Michael Still and contributors
 #
 # mutate-agent-dependencies.py -- break each guard on an agent
 # operation's dependency edges on purpose, and check that the right test
@@ -45,8 +45,17 @@ WT = os.path.abspath(
 SAVE = tempfile.mkdtemp(prefix='mutate-agent-dependencies-')
 DEP = 'shakenfist/schema/agentoperation_dependency.py'
 BASE = 'shakenfist/external_api/base.py'
+MARIADB = 'shakenfist/mariadb.py'
+MAIN = 'shakenfist/daemons/database/main.py'
 
 # (label, file, old, new, test selector, phrase the failure must name)
+#
+# The wire guards are here as well as the request guards, because an
+# earlier audit of tools/mutate-nested-sweep.sh found its mutation set
+# covered the original change but not the guards a review round added --
+# which is the gap that makes a growing script worth anything.
+FILES = (DEP, BASE, MARIADB, MAIN)
+
 MUTANTS = [
     ('finiteness guard', DEP,
      "        if not math.isfinite(v):\n            raise ValueError(\n"
@@ -82,6 +91,23 @@ MUTANTS = [
      "            if False:",
      r'external_api\.test_agent_operation_parameters',
      'settle_ceiling_is_enforced_by_the_handler_in_warn_mode'),
+    ('servicer empty edge', MAIN,
+     "        depends_on = (json.loads(d.depends_on_json)\n"
+     "                      if d.depends_on_json else [])",
+     "        depends_on = json.loads(d.depends_on_json or '[]')\n"
+     "        depends_on = json.loads(d.depends_on_json) if True else []",
+     r'test_mariadb_agent_operations\.',
+     'without_new_fields'),
+    ('client empty edge', MARIADB,
+     "        depends_on = json.loads(d.depends_on_json) if d.depends_on_json else []",
+     "        depends_on = json.loads(d.depends_on_json)",
+     r'test_mariadb_agent_operations\.',
+     'empty_edge_string'),
+    ('failure json None', MARIADB,
+     "    if data.dependency_failure is None:\n        return None",
+     "    if False:\n        return None",
+     r'test_mariadb_agent_operations\.',
+     'dependency_failure'),
     ('TypeError phrasing', BASE,
      "    if isinstance(error, TypeError):\n        return 'not an object'",
      "    if False:\n        return 'not an object'",
@@ -99,7 +125,7 @@ def run(selector):
 
 
 def main():
-    for path in (DEP, BASE):
+    for path in FILES:
         shutil.copy2(os.path.join(WT, path),
                      os.path.join(SAVE, os.path.basename(path)))
 
@@ -127,7 +153,7 @@ def main():
             shutil.copy2(os.path.join(SAVE, os.path.basename(path)), full)
 
     print()
-    for path in (DEP, BASE):
+    for path in FILES:
         same = open(os.path.join(WT, path)).read() == open(
             os.path.join(SAVE, os.path.basename(path))).read()
         print('restored %-48s %s' % (path, same))
