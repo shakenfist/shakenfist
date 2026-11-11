@@ -1,6 +1,6 @@
 # Populated BAT output: fixed VHDX and non-qcow2 preallocation
 
-## Status: In progress
+## Status: Complete
 
 ## Prompt
 
@@ -718,10 +718,10 @@ rather than merge requests.
 | 7. `create -f vhdx -o subformat=fixed`: guest streaming and host CLI | [PLAN-bat-population-phase-07-create.md](/components/instar/plans/PLAN-bat-population-phase-07-create/) | Complete | `03269d7f` (#858) |
 | 8. `convert -O vhdx --subformat fixed` | [PLAN-bat-population-phase-08-convert.md](/components/instar/plans/PLAN-bat-population-phase-08-convert/) | Complete | `e49b6275` (#874) |
 | 9. `measure -O vhdx -o subformat=fixed` | [PLAN-bat-population-phase-09-measure.md](/components/instar/plans/PLAN-bat-population-phase-09-measure/) | Complete | `3b74ba8d` (#877) |
-| 10. Cross-version matrix and derived-profile validation | [PLAN-bat-population-phase-10-matrix.md](/components/instar/plans/PLAN-bat-population-phase-10-matrix/) | Complete | `e0b0fe13` (#881) |
+| 10. Cross-version matrix and derived-profile validation | [PLAN-bat-population-phase-10-matrix.md](/components/instar/plans/PLAN-bat-population-phase-10-matrix/) | Complete | instar-testdata `99c8663c34..f73d43670a` (direct to `main`, range recovered -- see phase 13); instar `e0b0fe13` (#881) |
 | 11. Coverage and differential fuzzing | [PLAN-bat-population-phase-11-fuzz.md](/components/instar/plans/PLAN-bat-population-phase-11-fuzz/) | Complete | `41f74d40` (#884) |
-| 12. Documentation | [PLAN-bat-population-phase-12-docs.md](/components/instar/plans/PLAN-bat-population-phase-12-docs/) | In progress | |
-| 13. Push audit: `PUSH-AUDIT.md` over every phase above | PLAN-bat-population-phase-13-push-audit.md | Not started | |
+| 12. Documentation | [PLAN-bat-population-phase-12-docs.md](/components/instar/plans/PLAN-bat-population-phase-12-docs/) | Complete | `2da0c22e` (#889) |
+| 13. Push audit: `PUSH-AUDIT.md` over every phase above | [PLAN-bat-population-phase-13-push-audit.md](/components/instar/plans/PLAN-bat-population-phase-13-push-audit/) | Complete | |
 
 ### Sequencing rationale
 
@@ -1576,6 +1576,66 @@ We should list obvious extensions, known issues, unrelated bugs we
 encountered, and anything else we should one day do but have
 chosen to defer to here, so that we do not forget them.
 
+* **Nothing enforces the differential fuzzer's structural counters**
+  (#892). `STRUCTURAL_OUTCOMES` and `KNOWN_DEFECT_SKIPS` in
+  `scripts/differential-fuzz.py` are reported and written to the run
+  summary; nothing reads them. A nightly in which every structural
+  comparison ended `no_pin_for_geometry` -- a pin set that stopped
+  matching, which that code's own comment names as the risk -- logs one
+  INFO line and exits 0. A threshold to fail on would close it. Found by
+  the push audit.
+* **The differential fuzzer's structural oracle covers `convert` only**
+  (#893). `op_create` compares exit codes and `qemu-img info`, so the
+  fuzzer never checks that an instar-*created* fixed VHDX has qemu's
+  structure. That rests on `fuzz_vhdx_fixed_bat`, whose oracle is a
+  specification model rather than qemu, and on the Python pin tests. Found
+  by the push audit.
+* **`instar-testdata`'s profile validator has no gate** (#894).
+  `scripts/validate-profiles.py` exists because that repository's derived
+  profile directories were silently wrong twice while the raw baselines
+  were fine, and it works -- 163,932 comparisons, 0 mismatches. But the
+  repository has no CI, no pre-commit and no `tox`, so it runs only when
+  somebody types `make validate-profiles`. Phase 10 recorded that the
+  repository had no CI and did not carry forward the consequence for the
+  validator it was adding. It also proves only that the profiles equal the
+  raw baselines, not that the raw baselines are right. Found by the push
+  audit.
+* **Two `instar-testdata` generator defects** (#895).
+  `generate-baselines.py` validates `--image` against the manifest and then
+  silently skips images its per-command loop does not apply to, so
+  `--command snapshot-list --image <valid non-qcow2 id>` generates nothing
+  and exits 0 -- the failure the filter's own docstring says it closes. And
+  `validate-profiles.py` treats a profile whose name no source produces as
+  hand-maintained, absorbing a stale leftover from a deleted case instead
+  of reporting it. Found by the push audit; they land as direct commits to
+  that repository's `main`.
+* **Three code-quality advisories from the push audit** (#896). The VHDX
+  BAT entry size has no named constant, though the crate names its region,
+  metadata and parent-locator entry sizes and this plan added six more bare
+  `8`s. Four call-table mirror constants in `src/vmm/src/main.rs` are
+  literals where a fifth added by the same plan uses `shared::`, and no
+  test asserts the mirrors agree. And `src/crates/vhdx/src/lib.rs` reached
+  9,017 lines, with a seam visible in its own banner comments.
+* **convert documents 2 of its 22 `unsafe fn`** (#897), where
+  `src/operations/create/src/main.rs` documents all 8 of its own. The
+  push audit added the second of convert's two, for
+  `convert_to_vhdx_fixed`, and recorded that as bringing an outlier
+  function into line; the review of that pull request established it is
+  the file that is the outlier. The 20 undocumented ones include
+  `convert_to_vhdx`, the dynamic sibling immediately above, and the LUKS
+  and key-derivation entry points, all of which build slices over
+  call-table buffers from raw pointers.
+* **resize `--preallocation falloc|full` is documented for vmdk, vpc and
+  vhdx but barely tested** (#898). This plan's push audit corrected three
+  tables that said those modes were rejected; the code applies them for
+  every format and refuses only `metadata`. But `RESIZE_CASES` has no
+  preallocation case for vmdk, only `off` for vhdx, and `off` and `full`
+  for vhd, so a host-side gate added later would fail no test and the
+  tables would go stale again. qemu-img refuses these resizes, so this
+  wants an instar-only consistency assertion rather than new baselines, and
+  `RESIZE_CASES` mirrors `instar-testdata`'s generator, so it is a
+  cross-repository change. Found by the review of the audit's own pull
+  request.
 * The differential fuzzer's fixed VHDX convert arm is reachable only
   when the source's virtual size exactly equals a pinned fixed
   geometry's, which after the filters is 16M or 64M, and then at

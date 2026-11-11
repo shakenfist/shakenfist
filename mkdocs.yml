@@ -144,6 +144,7 @@ nav:
                 - "Audit: Plan index": components/development/audits/plan-index.md
                 - "Audit: Plan phase references": components/development/audits/plan-phase-references.md
                 - "Audit: Plan references in source": components/development/audits/plan-source-references.md
+                - "Audit: Plan retirement": components/development/audits/plan-retirement.md
                 - "Audit: Plan template": components/development/audits/plan-template.md
                 - "Audit: Pre-commit Node version": components/development/audits/pre-commit-node-version.md
                 - "Audit: Pre-push audit file": components/development/audits/push-audit.md

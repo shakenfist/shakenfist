@@ -413,7 +413,7 @@ Out of scope:
 | 1. Operator inventory and App creation | Complete | 2a24d00 (#348) |
 | 2. `prune-reviews` mints an App token | Complete | 9f080cd (#354), b3ff906 (#356), 55f554e (#357), 9d1301b (#368) |
 | 3. Move the bypass and enforce it | Complete | e460a2b (#377), 38f15f1 (#380) |
-| 4. Push audit | Complete | |
+| 4. Push audit | Complete | b6c315a (#385) |
 
 <!-- shared-block: plan-status-vocabulary v1 -->
 Plan status vocabulary (shared block; do not edit -- the canonical
@@ -2853,10 +2853,11 @@ than finished, none of them a finding of this audit: #352, a read-only
 App identity for the audit's own reads; the team rule behind open
 question 3, which is what `sfconductor` should push with; narrowing
 `DEPENDENCIES_TOKEN` and `RENOVATE_TOKEN`, whose six remaining
-workflow consumers item 4 above names. The first three are Future work
-entries. The fourth is not: the bot's token list is the one cell of
-phase 1's record still pending an operator paste, plan-blocker b2, and
-it is recorded there rather than in Future work.
+workflow consumers item 4 above names. All four are Future work
+entries. The fourth is also phase 1's one record cell still pending an
+operator paste, and a plan blocker; it is in Future work as well
+because that is what retirement reads, and a deferral recorded only in
+the body of a plan goes with the plan's files when they are deleted.
 
 This phase closes itself out, so it sets its own `Status` to
 `Complete`. Its `Merged` cell is empty in this pull request for the
@@ -2866,6 +2867,64 @@ that cell empty for good belongs to an audit that finds nothing, where
 there is no carrier; this one found six things, so the follow-up pull
 request that fixes them is the carrier, and it fills the cell and
 marks the plan `Complete`.
+
+**What the follow-up fixed.** This pull request is that carrier.
+Finding 1: the specification now states what was measured, and
+attributes it where it was measured -- `sfconductor`'s bypasses are
+pull request merges that skip the queue rather than pushes to a
+default branch, in five of the seven repositories, with `mikalstill`'s
+counted but not classified -- and it gives the date the rule-suite
+history was read, 2026-10-29, which is before the team's automation
+member was removed. Finding 2: three cases in
+`BypassActorIdentityTest`, one per surviving mutation, each mutation
+re-run on a copy of the tree and now failing the case written for it;
+the wildcard case covers `?`, `[`, `]` and a bracket expression beside
+the asterisk the shipped case already covered. Finding 3: a paragraph
+in `run()`'s docstring saying why the applicability test is there
+rather than in `applies(repo)`, which is that answering it needs the
+same two reads the verdict needs, and a sentence naming that exception
+in `docs/consistency-audits.md`, where the convention is stated and
+where the next author will otherwise read the check as breaking it.
+Finding 5: the mint-step assertions now match a key and its value at
+any indentation, with parent and child matched together where the
+nesting is the claim; the exact allowed `PUSH_TOKEN` line is struck
+out before the sweep for a token in the wrong step, and only from the
+step entitled to carry it. Finding 6 asked for nothing, being the
+security pass's nil return.
+
+This pull request's own review then found four things in those fixes,
+all of them taken: the strike-out ran on both steps, so the allowed
+line copied into the fetch step would have passed; the specification
+generalised `sfconductor`'s verb to `mikalstill` as well; the
+indentation class was `\s`, which matches a newline and so would have
+admitted a key at column zero; and the mirror of finding 2's policy
+case was still unpinned, so one half of that condition held the other
+up. Six mutations of the template and four of the criterion are now
+killed between them, and a test re-runs the mint-step assertions
+against a copy of the template with every line's indentation doubled,
+so the durability those assertions claim is checked rather than
+promised.
+
+A second round raised nine advisory items and no blocking one, and
+they were taken too: the strongest were that two assertions claimed a
+whole block where the pattern matched only its first child, so a
+second entry under the job's `permissions` would have passed unread,
+and that an input matched anywhere in the mint step would have passed
+had it moved from `with:` to the step's `env:`, where it does nothing
+-- which for `permission-contents` means a token carrying everything
+the App can do. Twelve mutations are killed after that round, the
+wildcard cases are derived from `GLOB_CHARACTERS` rather than listed
+beside it, and the applicability exception in
+`docs/consistency-audits.md` is stated as a line about cost rather
+than as the one criterion that may take it.
+
+Finding 4 is answered rather than fixed, which is what a question
+gets: neither file is split. Both are over the 800 lines that ask the
+question and well short of the 1500 that wants a reason, and the seam
+-- one check and its tests per module -- would scatter checks that
+share this module's GitHub helpers across files. The two files past
+1500 lines are backlog no range in this plan touches, as the declined
+list above says.
 
 #### Execution notes
 
@@ -3000,9 +3059,9 @@ and the record, not from a sub-agent's summary.
 * The deviation in decision 2 is recorded in this section, and the
   deferrals still open (#352, the team rule behind open question 3,
   the `DEPENDENCIES_TOKEN` and `RENOVATE_TOKEN` narrowing, and the
-  bot's token list, which is phase 1's pending record cell under
-  plan-blocker b2 rather than a Future work entry) are named where the
-  next reader will find them.
+  bot's token list, which is phase 1's pending record cell and a plan
+  blocker as well) are each a Future work entry, which is what
+  retirement reads.
 
 #### Back brief
 
@@ -3367,6 +3426,13 @@ intend to do aligns with that plan.
   required checks in four repositories (open question 3). Phase 1
   records where its credential lives; whatever follows from that is
   its own issue.
+- Record the `shakenfist-bot` token list -- name, type, scopes or
+  permissions and expiry per token, never a value -- in phase 1's
+  record, whose table has held an empty cell for it since the plan
+  began. It needs the operator's own session as that account, so it is
+  a plan blocker rather than work anyone else can pick up. Until it is
+  written down, what that account can still reach is known only to
+  whoever reads its settings page.
 - If step 1a finds `AUDIT_TOKEN` is the bot's, 1b's demotion may
   stop it listing repository secrets or reading `bypass_actors`,
   and 3c then moves those halves to its reviewer-confirmed half. The

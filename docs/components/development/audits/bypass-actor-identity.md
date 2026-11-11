@@ -107,11 +107,23 @@ the ruleset) and judges every actor by its type:
 `11722172`) is a bypass actor on all seven of the organisation's
 pull-request rulesets, so by the table above all seven fail this half
 today. Its automation member was removed on 2026-11-08, leaving
-`mikalstill` and `sfconductor`, and `sfconductor` pushes to the default
-branches of shakenfist, ryll and client-python-k3s through it. A
-reviewer records the team as a known exception, with what `sfconductor`
-pushes with still to be settled, rather than as a new finding; the
-exception ends when the team stops being a bypass actor.
+`mikalstill` and `sfconductor`. `sfconductor`'s bypasses are pull request
+merges that skip the queue rather than pushes to a default branch;
+`mikalstill` is a person holding admin, whose bypasses the history counts
+without classifying. The rule-suite history read on 2026-10-29, which
+covers the month before that read and so the period before the removal
+above, records `sfconductor` bypassing in five of the seven repositories
+(shakenfist 52, kerbside 7, client-python-k3s 2, ryll 1 and instar 1) and
+`mikalstill` in all seven. That read is
+`repos/<org>/<repo>/rulesets/rule-suites?time_period=month&rule_suite_result=bypass`
+per repository, counted by each entry's `actor_name`, with the
+merge-rather-than-push classification coming from resolving an entry's
+`after_sha` to the commit it produced. GitHub keeps about a month of that
+history, so the figures above are the record of that read rather than
+something a later reader can re-run; the query is named so the next one can
+be made the same way. A reviewer records the team as a known exception,
+with what `sfconductor` merges with still to be settled, rather than as a
+new finding; the exception ends when the team stops being a bypass actor.
 
 The admin-role and `OrganizationAdmin` passes rest on no automation
 identity holding an organisation-owner or repository-admin role -- in

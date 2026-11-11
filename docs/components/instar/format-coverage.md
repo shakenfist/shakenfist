@@ -337,7 +337,7 @@ The `instar convert` operation supports writing output in the following formats:
 | **qcow2** | Supported | QCOW2 v3, 16-bit refcounts, configurable cluster size (512B-64KB), optional zlib compression (`-c`) |
 | **vmdk** | Supported | monolithicSparse (default), streamOptimized with `-c`, monolithicFlat with `--subformat monolithicFlat` (also from `instar create`, written on the host; the extent is named as qemu-img names it), configurable grain size (4KB-64KB via `--grain-size`) for sparse/streamOptimized |
 | **vpc** (VHD) | Supported | Dynamic VHD, configurable block size (512KB+ via `--block-size`, default 2MB), BAT-based allocation |
-| **vhdx** | Supported | Dynamic or fixed VHDX (`--subformat`, default dynamic), configurable block size (1MB-256MB via `--block-size`, default qemu-img's for the size: 8MB up to 1GB, 16MB up to 100GB, 32MB up to 32TB, then 64MB), CRC-32C checksums |
+| **vhdx** | Supported | Dynamic or fixed VHDX (`--subformat`, default dynamic), configurable block size (any power of two from 1MB to 256MB via `--block-size`, default qemu-img's for the size: 8MB up to 1GB, 16MB up to 100GB, 32MB up to 32TB, then 64MB), CRC-32C checksums |
 
 ### Input Format Support for Conversion
 
@@ -403,11 +403,11 @@ size in place. Per-format support:
 |--------|------|--------|------------------------------|------------------|
 | raw    | Yes  | Yes    | off, falloc, full            | Byte-equivalent across qemu-img 6.0.0–10.2.0 |
 | qcow2  | Yes  | Yes (`--shrink`) | off, falloc, full (metadata planner gap) | Byte-equivalent (modulo `KNOWN_RESIZE_DIVERGENCES`) |
-| vmdk (monolithicSparse) | Yes | reject | off | **instar-only** — qemu rejects |
+| vmdk (monolithicSparse) | Yes | reject | off, falloc, full | **instar-only** — qemu rejects |
 | vmdk (other subformats) | reject | reject | n/a | n/a |
-| vpc (VHD dynamic) | Yes | reject | off | **instar-only** — qemu rejects |
-| vpc (VHD fixed)   | Yes | reject | off | **instar-only** — qemu rejects |
-| vhdx (dynamic)    | Yes | reject | off | **instar-only** — qemu rejects |
+| vpc (VHD dynamic) | Yes | reject | off, falloc, full | **instar-only** — qemu rejects |
+| vpc (VHD fixed)   | Yes | reject | off, falloc, full | **instar-only** — qemu rejects |
+| vhdx (dynamic)    | Yes | reject | off, falloc, full | **instar-only** — qemu rejects |
 | vhdx (fixed, differencing) | reject | reject | n/a | n/a — qemu rejects every VHDX |
 
 For the formats marked **instar-only**, `qemu-img resize` rejects
