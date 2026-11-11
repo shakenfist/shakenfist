@@ -6635,27 +6635,78 @@ class TrustedIssuerAttributesProto(_message.Message):
     ISSUER_URL_FIELD_NUMBER: _builtins.int
     JWKS_URI_FIELD_NUMBER: _builtins.int
     AUDIENCE_FIELD_NUMBER: _builtins.int
+    AUTHORIZATION_ENDPOINT_FIELD_NUMBER: _builtins.int
+    TOKEN_ENDPOINT_FIELD_NUMBER: _builtins.int
+    DEVICE_AUTHORIZATION_ENDPOINT_FIELD_NUMBER: _builtins.int
+    CLIENT_ID_FIELD_NUMBER: _builtins.int
+    OIDC_SCOPES_FIELD_NUMBER: _builtins.int
+    DISCOVERED_AT_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     """References trusted_issuers.uuid"""
     issuer_url: _builtins.str
     """Exact expected value of the token iss claim"""
     jwks_uri: _builtins.str
-    """Where signing keys are fetched"""
+    """Where signing keys are fetched; absent = not set"""
     audience: _builtins.str
     """Expected aud claim"""
+    authorization_endpoint: _builtins.str
+    """Login: browser redirect target"""
+    token_endpoint: _builtins.str
+    """Login: code/device exchange"""
+    device_authorization_endpoint: _builtins.str
+    """Login: device code start"""
+    client_id: _builtins.str
+    """OAuth client id for human login"""
+    oidc_scopes: _builtins.str
+    """Space separated OIDC scopes"""
+    discovered_at: _builtins.float
+    """Epoch seconds of last discovery"""
     def __init__(
         self,
         *,
         uuid: _builtins.str = ...,
         issuer_url: _builtins.str = ...,
-        jwks_uri: _builtins.str = ...,
+        jwks_uri: _builtins.str | None = ...,
         audience: _builtins.str = ...,
+        authorization_endpoint: _builtins.str | None = ...,
+        token_endpoint: _builtins.str | None = ...,
+        device_authorization_endpoint: _builtins.str | None = ...,
+        client_id: _builtins.str | None = ...,
+        oidc_scopes: _builtins.str | None = ...,
+        discovered_at: _builtins.float | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_authorization_endpoint", b"_authorization_endpoint", "_client_id", b"_client_id", "_device_authorization_endpoint", b"_device_authorization_endpoint", "_discovered_at", b"_discovered_at", "_jwks_uri", b"_jwks_uri", "_oidc_scopes", b"_oidc_scopes", "_token_endpoint", b"_token_endpoint", "authorization_endpoint", b"authorization_endpoint", "client_id", b"client_id", "device_authorization_endpoint", b"device_authorization_endpoint", "discovered_at", b"discovered_at", "jwks_uri", b"jwks_uri", "oidc_scopes", b"oidc_scopes", "token_endpoint", b"token_endpoint"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["audience", b"audience", "issuer_url", b"issuer_url", "jwks_uri", b"jwks_uri", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_authorization_endpoint", b"_authorization_endpoint", "_client_id", b"_client_id", "_device_authorization_endpoint", b"_device_authorization_endpoint", "_discovered_at", b"_discovered_at", "_jwks_uri", b"_jwks_uri", "_oidc_scopes", b"_oidc_scopes", "_token_endpoint", b"_token_endpoint", "audience", b"audience", "authorization_endpoint", b"authorization_endpoint", "client_id", b"client_id", "device_authorization_endpoint", b"device_authorization_endpoint", "discovered_at", b"discovered_at", "issuer_url", b"issuer_url", "jwks_uri", b"jwks_uri", "oidc_scopes", b"oidc_scopes", "token_endpoint", b"token_endpoint", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    _WhichOneofReturnType__authorization_endpoint: _TypeAlias = _typing.Literal["authorization_endpoint"]  # noqa: Y015
+    _WhichOneofArgType__authorization_endpoint: _TypeAlias = _typing.Literal["_authorization_endpoint", b"_authorization_endpoint"]  # noqa: Y015
+    _WhichOneofReturnType__client_id: _TypeAlias = _typing.Literal["client_id"]  # noqa: Y015
+    _WhichOneofArgType__client_id: _TypeAlias = _typing.Literal["_client_id", b"_client_id"]  # noqa: Y015
+    _WhichOneofReturnType__device_authorization_endpoint: _TypeAlias = _typing.Literal["device_authorization_endpoint"]  # noqa: Y015
+    _WhichOneofArgType__device_authorization_endpoint: _TypeAlias = _typing.Literal["_device_authorization_endpoint", b"_device_authorization_endpoint"]  # noqa: Y015
+    _WhichOneofReturnType__discovered_at: _TypeAlias = _typing.Literal["discovered_at"]  # noqa: Y015
+    _WhichOneofArgType__discovered_at: _TypeAlias = _typing.Literal["_discovered_at", b"_discovered_at"]  # noqa: Y015
+    _WhichOneofReturnType__jwks_uri: _TypeAlias = _typing.Literal["jwks_uri"]  # noqa: Y015
+    _WhichOneofArgType__jwks_uri: _TypeAlias = _typing.Literal["_jwks_uri", b"_jwks_uri"]  # noqa: Y015
+    _WhichOneofReturnType__oidc_scopes: _TypeAlias = _typing.Literal["oidc_scopes"]  # noqa: Y015
+    _WhichOneofArgType__oidc_scopes: _TypeAlias = _typing.Literal["_oidc_scopes", b"_oidc_scopes"]  # noqa: Y015
+    _WhichOneofReturnType__token_endpoint: _TypeAlias = _typing.Literal["token_endpoint"]  # noqa: Y015
+    _WhichOneofArgType__token_endpoint: _TypeAlias = _typing.Literal["_token_endpoint", b"_token_endpoint"]  # noqa: Y015
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__authorization_endpoint) -> _WhichOneofReturnType__authorization_endpoint | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__client_id) -> _WhichOneofReturnType__client_id | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__device_authorization_endpoint) -> _WhichOneofReturnType__device_authorization_endpoint | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__discovered_at) -> _WhichOneofReturnType__discovered_at | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__jwks_uri) -> _WhichOneofReturnType__jwks_uri | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__oidc_scopes) -> _WhichOneofReturnType__oidc_scopes | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__token_endpoint) -> _WhichOneofReturnType__token_endpoint | None: ...
 
 Global___TrustedIssuerAttributesProto: _TypeAlias = TrustedIssuerAttributesProto  # noqa: Y015
 

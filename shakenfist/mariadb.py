@@ -479,7 +479,7 @@ NAMESPACE_ATTRIBUTES_VERSION = 2
 NAMESPACE_KEYS_VERSION = 2
 NAMESPACE_KEY_ATTRIBUTES_VERSION = 1
 TRUSTED_ISSUERS_VERSION = 1
-TRUSTED_ISSUER_ATTRIBUTES_VERSION = 1
+TRUSTED_ISSUER_ATTRIBUTES_VERSION = 2
 MAPPING_RULES_VERSION = 1
 MAPPING_RULE_ATTRIBUTES_VERSION = 1
 ARTIFACTS_VERSION = 3
@@ -14824,6 +14824,13 @@ def _ensure_trusted_issuers_schema(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+# Columns added to trusted_issuer_attributes by the v2 migration.
+TRUSTED_ISSUER_ATTRIBUTES_V2_COLUMNS = (
+    'authorization_endpoint', 'token_endpoint',
+    'device_authorization_endpoint', 'client_id', 'oidc_scopes',
+    'discovered_at')
+
+
 def _ensure_trusted_issuer_attributes_schema(
         engine: sa.Engine) -> dict[str, Any]:
     """Ensure the trusted_issuer_attributes table schema is up to date."""
@@ -14836,6 +14843,33 @@ def _ensure_trusted_issuer_attributes_schema(
         LOG.info(f'Creating {table_name} table (version 1)')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
         current_ver = 1
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver == 1:
+        # v2 adds the discovery columns and makes jwks_uri nullable, since
+        # discovery can now supply it. Column types come from the table
+        # definition so the DDL cannot drift from the Pydantic model, and
+        # each ADD COLUMN is guarded by an existence check so a re-run, or
+        # a fresh install whose create_all already made the columns, is
+        # safe. MODIFY COLUMN is naturally idempotent.
+        LOG.info(f'Adding discovery columns to {table_name} table (version 2)')
+        mysql_dialect = sa.dialects.mysql.dialect()
+        with engine.begin() as conn:
+            cols = get_table_columns(engine, table_name)
+            for column_name in TRUSTED_ISSUER_ATTRIBUTES_V2_COLUMNS:
+                if column_name in cols:
+                    continue
+                column_type = table.c[column_name].type.compile(
+                    dialect=mysql_dialect)
+                conn.execute(sa.text(
+                    f'ALTER TABLE {table_name} ADD COLUMN '
+                    f'{column_name} {column_type} NULL'))
+            jwks_type = table.c['jwks_uri'].type.compile(
+                dialect=mysql_dialect)
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} MODIFY COLUMN '
+                f'jwks_uri {jwks_type} NULL'))
+        current_ver = 2
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -15104,21 +15138,53 @@ def _trusted_issuer_from_proto(
 def _trusted_issuer_attrs_to_proto(
         data: TrustedIssuerAttributesData
 ) -> 'database_pb2.TrustedIssuerAttributesProto':
-    return database_pb2.TrustedIssuerAttributesProto(
+    """Build a TrustedIssuerAttributesProto from the model.
+
+    Nullable fields use proto3 field presence: they are simply left unset
+    when the model value is None, so NULL survives the round trip.
+    """
+    proto = database_pb2.TrustedIssuerAttributesProto(
         uuid=str(data.uuid),
         issuer_url=data.issuer_url,
-        jwks_uri=data.jwks_uri,
         audience=data.audience)
+    if data.jwks_uri is not None:
+        proto.jwks_uri = data.jwks_uri
+    if data.authorization_endpoint is not None:
+        proto.authorization_endpoint = data.authorization_endpoint
+    if data.token_endpoint is not None:
+        proto.token_endpoint = data.token_endpoint
+    if data.device_authorization_endpoint is not None:
+        proto.device_authorization_endpoint = data.device_authorization_endpoint
+    if data.client_id is not None:
+        proto.client_id = data.client_id
+    if data.oidc_scopes is not None:
+        proto.oidc_scopes = data.oidc_scopes
+    if data.discovered_at is not None:
+        proto.discovered_at = data.discovered_at
+    return proto
 
 
 def _trusted_issuer_attrs_from_proto(
-        proto: 'database_pb2.TrustedIssuerAttributesProto'
+        d: 'database_pb2.TrustedIssuerAttributesProto'
 ) -> TrustedIssuerAttributesData:
+    """Build a TrustedIssuerAttributesData model from its proto."""
     return TrustedIssuerAttributesData(
-        uuid=UUID(proto.uuid),
-        issuer_url=proto.issuer_url,
-        jwks_uri=proto.jwks_uri,
-        audience=proto.audience)
+        uuid=UUID(d.uuid),
+        issuer_url=d.issuer_url,
+        audience=d.audience,
+        jwks_uri=d.jwks_uri if d.HasField('jwks_uri') else None,
+        authorization_endpoint=(
+            d.authorization_endpoint
+            if d.HasField('authorization_endpoint') else None),
+        token_endpoint=(
+            d.token_endpoint if d.HasField('token_endpoint') else None),
+        device_authorization_endpoint=(
+            d.device_authorization_endpoint
+            if d.HasField('device_authorization_endpoint') else None),
+        client_id=d.client_id if d.HasField('client_id') else None,
+        oidc_scopes=d.oidc_scopes if d.HasField('oidc_scopes') else None,
+        discovered_at=(
+            d.discovered_at if d.HasField('discovered_at') else None))
 
 
 def _grpc_create_trusted_issuer(data: TrustedIssuerData) -> bool:

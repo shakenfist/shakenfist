@@ -2111,8 +2111,14 @@ message TrustedIssuerStaticData {
 message TrustedIssuerAttributesProto {
   string uuid = 1;         // References trusted_issuers.uuid
   string issuer_url = 2;   // Exact expected value of the token iss claim
-  string jwks_uri = 3;     // Where signing keys are fetched
+  optional string jwks_uri = 3;  // Where signing keys are fetched; absent = not set
   string audience = 4;     // Expected aud claim
+  optional string authorization_endpoint = 5;        // Login: browser redirect target
+  optional string token_endpoint = 6;                // Login: code/device exchange
+  optional string device_authorization_endpoint = 7; // Login: device code start
+  optional string client_id = 8;                     // OAuth client id for human login
+  optional string oidc_scopes = 9;                   // Space separated OIDC scopes
+  optional double discovered_at = 10;                // Epoch seconds of last discovery
 }
 
 message CreateTrustedIssuerRequest {
