@@ -92,6 +92,17 @@ below it (issue 4760). It still re-reads below the walk for an op which *has*
 dependencies, because the walk's own round trips give a concurrent abort a
 window in which to land.
 
+That window is why the deferral itself is guarded. `defer()` writes `queued`
+before it enqueues the retry work item, and a terminal op has no transition
+back to `queued`, so the write is refused — recorded as an audit event
+("operation ended before it could be deferred") and the op left in the state
+whoever ended it wrote, rather than raising out of what is a normal race
+(issue 4888). Nothing is enqueued on that path, so an op aborted while waiting
+on a dependency does not leave behind a work item which exists only to be
+discarded. The common case is not a write at all: an op the dispatcher
+deferred is already `queued`, and `_state_update()` returns early when the
+state is unchanged.
+
 ## Exponential back-off map
 
 The back-off map (`self._defer_delays`, a plain `dict[str, float]`) records the

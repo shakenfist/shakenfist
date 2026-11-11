@@ -1,18 +1,25 @@
 # Copyright 2026 Michael Still and contributors
 from unittest import mock
 
+import sqlalchemy as sa
+
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist import exceptions
+from shakenfist import mariadb
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import CannotDeferUnqueued
 from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
 from shakenfist.operations.net_op import NetOp
+from shakenfist.operations.node_inst_netdesc_op import NodeInstNetdescOp
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations import artifact_fetch_op as fetch_schema
+from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.schema.operations import net_op as net_op_schema
+from shakenfist.schema.operations import node_inst_netdesc_op
 from shakenfist.tests import base
+from shakenfist.tests.test_observational_current_state import ClusterOperationTablesFixture
 
 
 OP_UUID = '11111111-1111-4111-8111-111111111111'
@@ -20,6 +27,7 @@ NETWORK_UUID = '22222222-2222-4222-8222-222222222222'
 NODE_UUID = '55555555-5555-4555-8555-555555555555'
 OTHER_NODE_UUID = '66666666-6666-4666-8666-666666666666'
 DEP_UUID = '77777777-7777-4777-8777-777777777777'
+INSTANCE_UUID = '88888888-8888-4888-8888-888888888888'
 
 
 class _StubOp(BaseClusterOperation):
@@ -167,6 +175,193 @@ class DeferWithBackoffTestCase(base.ShakenFistTestCase):
         # ops loaded outside the queue dispatch path.
         op = self._make_op()
         self.assertEqual(0, op.current_defer_count)
+
+
+class DeferTerminalOperationTestCase(base.ShakenFistTestCase):
+    """What ``defer()`` does when something ends the op underneath it.
+
+    Both dispatchers check that an op is still runnable before they walk
+    its dependencies, and that check is a read made before the walk's own
+    round trips. An instance delete aborting the operations which target
+    it is what lands in that window, and ``abort`` has no transition back
+    to ``queued`` -- so the deferral of a ``node_inst_netdesc_op`` logged
+    a traceback for what is a normal race (issue 4888, the same defect as
+    issue 4722 at the sibling call site in ``execute()``).
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        # The state property stands in for MariaDB: reads answer with
+        # whatever was last written, and a write of ``queued`` is refused
+        # while ``refuse_queued`` is set, exactly as the real transition
+        # validation refuses it from ``abort``.
+        self.state_value = BaseClusterOperation.STATE_QUEUED
+        self.events = []
+        self.refuse_queued = False
+
+        def state_property(*args):
+            if not args:
+                return State(value=self.state_value, update_time=0)
+
+            if (args[0] == BaseClusterOperation.STATE_QUEUED
+                    and self.refuse_queued):
+                self.state_value = BaseClusterOperation.STATE_ABORT
+                self.events.append(('state', BaseClusterOperation.STATE_ABORT))
+                raise exceptions.InvalidStateException(
+                    'Invalid state change from %s to %s', 'abort', 'queued')
+
+            self.state_value = args[0]
+            self.events.append(('state', args[0]))
+
+        self.state_patcher = mock.patch.object(
+            BaseClusterOperation, 'state', new_callable=mock.PropertyMock,
+            side_effect=state_property)
+        self.state_patcher.start()
+        self.addCleanup(self.state_patcher.stop)
+
+        self.add_event_patcher = mock.patch.object(
+            BaseClusterOperation, 'add_event')
+        self.mock_add_event = self.add_event_patcher.start()
+        self.addCleanup(self.add_event_patcher.stop)
+
+        self.enqueue_patcher = mock.patch(
+            'shakenfist.operations.baseoperation.mariadb.enqueue_work_item',
+            side_effect=lambda *a, **kw: self.events.append(('enqueue',)))
+        self.mock_enqueue = self.enqueue_patcher.start()
+        self.addCleanup(self.enqueue_patcher.stop)
+
+    def _make_op(self):
+        op = _StubOp(_make_static_values())
+        op.queue_name = 'test-queue'
+        return op
+
+    def _event_messages(self):
+        return [c.args[1] for c in self.mock_add_event.call_args_list]
+
+    def test_a_refused_defer_is_recorded_not_raised(self):
+        self.refuse_queued = True
+        op = self._make_op()
+        dep = _StubOp(_make_static_values())
+
+        op.defer(waiting_on=[dep], delay=0.2)
+
+        # No work item: the retry would only have been discarded by the
+        # next dispatch, which skips a terminal op.
+        self.mock_enqueue.assert_not_called()
+        # The state whoever ended this op wrote stands.
+        self.assertEqual(BaseClusterOperation.STATE_ABORT, self.state_value)
+
+        self.assertEqual(
+            ['operation ended before it could be deferred, not deferring it'],
+            self._event_messages())
+        call = self.mock_add_event.call_args
+        self.assertEqual(EVENT_TYPE_AUDIT, call.args[0])
+        self.assertEqual(BaseClusterOperation.STATE_ABORT,
+                         call.kwargs['extra']['state'])
+        self.assertEqual(1, call.kwargs['extra']['defer_count'])
+        self.assertEqual(0.2, call.kwargs['extra']['delay'])
+        self.assertEqual([dep.unique_label()],
+                         call.kwargs['extra']['waiting_on'])
+
+    def test_a_defer_which_is_allowed_still_enqueues(self):
+        op = self._make_op()
+        op.defer(delay=0.2)
+
+        self.mock_enqueue.assert_called_once()
+        self.assertEqual(
+            ['Execution deferred for 0.2 seconds'], self._event_messages())
+
+    def test_the_state_write_precedes_the_enqueue(self):
+        # A deferral from executing (an sf-net coalescing sibling, or a
+        # defer_with_backoff() from inside a task) is a real transition.
+        # It happens before the work item exists so that a refusal
+        # enqueues nothing, and so that a failed enqueue leaves the op
+        # queued -- which the next dispatch will run -- rather than
+        # executing, which sf-queues skips.
+        op = self._make_op()
+        self.state_value = BaseClusterOperation.STATE_EXECUTING
+        self.events = []
+
+        op.defer(delay=0.2)
+
+        self.assertEqual(
+            [('state', BaseClusterOperation.STATE_QUEUED), ('enqueue',)],
+            self.events)
+
+    def test_defer_with_backoff_reports_true_for_an_ended_operation(self):
+        # Deliberate: False is read by callers as "error this operation
+        # out", and that error write is the very one defer() just
+        # declined to make.
+        self.refuse_queued = True
+        op = self._make_op()
+
+        self.assertTrue(op.defer_with_backoff(reason='terminal underneath us'))
+        self.mock_enqueue.assert_not_called()
+
+
+class DeferTerminalOperationSqlTestCase(
+        ClusterOperationTablesFixture, base.ShakenFistTestCase):
+    """The same race against the real tables and the real state machine.
+
+    The mocked case above stubs the transition validation; this one runs
+    an aborted ``node_inst_netdesc_op`` through the real ``state`` setter
+    and the real work queue, so the guard is pinned against what
+    ``state_targets`` actually permits rather than against a stub which
+    agrees with it.
+    """
+
+    def _work_queue_rows(self, queue_name):
+        work_queue = mariadb._get_work_queue_table()
+        with self.engine.connect() as conn:
+            return conn.execute(
+                sa.select(sa.func.count())
+                .select_from(work_queue)
+                .where(work_queue.c.queue_name == queue_name)).scalar()
+
+    def test_deferring_an_aborted_operation_enqueues_nothing(self):
+        _, op_uuid = node_inst_netdesc_op.create_and_enqueue(
+            NODE_UUID, INSTANCE_UUID, [],
+            [node_inst_netdesc_op.model_tasks.instance_create],
+            PRIORITY.user_facing)
+        queue_name = f'{NODE_UUID}-clusteroperation-user_facing'
+        self.assertEqual(1, self._work_queue_rows(queue_name))
+
+        op = NodeInstNetdescOp.from_db(op_uuid)
+        op.queue_name = queue_name
+        self._set_op_state(op_uuid, BaseClusterOperation.STATE_ABORT)
+
+        with mock.patch.object(BaseClusterOperation, 'add_event') as add_event:
+            op.defer(delay=0.2)
+
+        self.assertEqual(BaseClusterOperation.STATE_ABORT,
+                         self._op_state(op_uuid))
+        self.assertEqual(1, self._work_queue_rows(queue_name))
+        self.assertEqual(
+            ['operation ended before it could be deferred, not deferring it'],
+            [c.args[1] for c in add_event.call_args_list])
+
+    def test_deferring_a_queued_operation_enqueues_a_retry(self):
+        # The floor the guard must not lower: the ordinary deferral still
+        # re-queues, and queued -> queued is not a state write at all.
+        _, op_uuid = node_inst_netdesc_op.create_and_enqueue(
+            NODE_UUID, INSTANCE_UUID, [],
+            [node_inst_netdesc_op.model_tasks.instance_create],
+            PRIORITY.user_facing)
+        queue_name = f'{NODE_UUID}-clusteroperation-user_facing'
+
+        op = NodeInstNetdescOp.from_db(op_uuid)
+        op.queue_name = queue_name
+
+        with mock.patch.object(BaseClusterOperation, 'add_event') as add_event:
+            op.defer(delay=0.2)
+
+        self.assertEqual(BaseClusterOperation.STATE_QUEUED,
+                         self._op_state(op_uuid))
+        self.assertEqual(2, self._work_queue_rows(queue_name))
+        self.assertEqual(
+            ['Execution deferred for 0.2 seconds'],
+            [c.args[1] for c in add_event.call_args_list])
 
 
 class AbandonDependencyWaitTestCase(base.ShakenFistTestCase):
