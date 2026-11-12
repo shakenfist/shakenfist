@@ -26,7 +26,9 @@ from shakenfist.eventlog import add_event
 from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import NoSuchChannel
 from shakenfist import instance
+from shakenfist import mariadb
 from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.operations.agentoperation import CASCADE_EVENT_GAVE_UP
 from shakenfist.protos import agent_pb2
 from shakenfist.protos import common_pb2
 from shakenfist.schema.object_types import ObjectType
@@ -141,6 +143,54 @@ MONITOR_START_INTERVAL = 30
 # facts and one agent_state read, and never a change of state in the
 # database, because the reply restores the value the cache held.
 AGENT_REPLY_GAP = 6
+
+# What the dependency evaluator does about each state a dependency can
+# be observed in. Between them these two tuples and complete are the
+# whole of AgentOperation's vocabulary, so the arm below them is
+# complete rather than a fall through.
+#
+# The failed set is why a depends_on edge is called fate sharing: an
+# operation whose dependency reached any of these will never see the
+# thing it was waiting for, so it is aborted rather than run. deleted is
+# in it because a user deleting a dependency is a decision about the
+# chain, not an accident. A runs_after edge is satisfied by every one of
+# them, because it says "not before" and nothing about the outcome.
+DEPENDENCY_FAILED_STATES = (AgentOperation.STATE_ERROR,
+                            AgentOperation.STATE_ABORT,
+                            AgentOperation.STATE_EXPIRED,
+                            AgentOperation.STATE_DELETED)
+
+# A dependency in one of these has not finished yet, so its dependent
+# waits -- bounded by AGENT_OPERATION_DEPENDENCY_WAIT, because a
+# dependency which never goes terminal must not park an instance's queue
+# head forever.
+DEPENDENCY_PENDING_STATES = (AgentOperation.STATE_INITIAL,
+                             AgentOperation.STATE_PREFLIGHT,
+                             AgentOperation.STATE_QUEUED,
+                             AgentOperation.STATE_EXECUTING)
+
+# The sentinel recorded as a dependency's state when the dependency does
+# not exist at all. Deliberately not a state any operation can hold, so
+# that a client reading dependency_failure can tell a dependency which
+# failed from one which is gone -- the two are remedied differently even
+# though they cost the dependent the same fate.
+DEPENDENCY_MISSING = 'missing'
+
+# What a satisfied edge's settle delay has to say for itself. Three
+# answers rather than two, because the two walks treat the last of them
+# differently: a depends_on edge cascades when the wait budget has been
+# spent on a settle, and a runs_after edge warns and runs. Naming them
+# keeps that fork in the walks, which is where the asymmetry belongs,
+# instead of hiding it in a helper's return convention.
+SETTLE_SATISFIED = 'satisfied'
+SETTLE_SETTLING = 'settling'
+SETTLE_EXHAUSTED = 'exhausted'
+
+# How many terminal dependency observations the dispatcher remembers.
+# Not because memory is tight -- an entry is a uuid and a short string --
+# but because an unbounded dictionary in a daemon which runs for weeks
+# is a leak waiting to be found by an audit rather than by a test.
+TERMINAL_DEPENDENCY_CACHE_SIZE = 4096
 
 
 class ConnectionFailed(Exception):
@@ -1641,6 +1691,10 @@ class Monitor(daemon.Daemon):
         self.dispatcher_last_pass = time.time()
         self.dispatcher_thread = None
 
+        # Dependency states observed terminal, by operation uuid. Only
+        # terminal states are ever stored here; see _dependency_state().
+        self.terminal_dependency_cache = {}
+
     def start_instance_monitor(self, instance_uuid):
         # Rate limited for the reason MONITOR_START_INTERVAL records.
         last_attempt = self.monitor_attempts.get(instance_uuid, 0)
@@ -2026,6 +2080,260 @@ class Monitor(daemon.Daemon):
                 EVENT_TYPE_AUDIT, 'instance', instance_uuid,
                 f'side channel {thread_type} finished')
 
+    def _dependency_state(self, dep):
+        """Read one dependency's state, by uuid and without hydrating it.
+
+        Returns the state value, or None when the dependency does not
+        exist any more.
+
+        Not hydrating is a correctness requirement rather than a saving.
+        AgentOperation.delete() removes an operation's static and
+        attribute rows and only then assigns it the deleted state, so
+        from_db() returns nothing for an operation a user has deleted --
+        an evaluator which hydrated would call that dependency missing
+        when it was deleted, which is a different answer for the
+        dependent's dependency_failure. The state row is the one row a
+        delete leaves behind, and this is the read AgentOperation.state
+        itself makes.
+
+        A dependency observed terminal is remembered for the life of this
+        dispatcher generation and never read again. Terminal is
+        absorbing, so that answer cannot go stale. A non-terminal
+        observation is deliberately not cached: re-reading it on every
+        pass is the entire mechanism by which a blocked operation
+        eventually unblocks.
+        """
+        op_uuid = str(dep['op_uuid'])
+
+        cached = self.terminal_dependency_cache.get(op_uuid)
+        if cached is not None:
+            return cached
+
+        state = mariadb.get_state(
+            ObjectType(dep['op_type']), op_uuid)
+        value = state.value if state else None
+
+        if value in AgentOperation.TERMINAL_STATES:
+            self._cache_terminal_dependency(op_uuid, value)
+        return value
+
+    def _cache_terminal_dependency(self, op_uuid, state):
+        """Remember a terminal dependency state, evicting the oldest first.
+
+        Insertion order is dict iteration order, so the oldest entry is
+        the first one. pop() rather than del throughout because
+        start_dispatcher() may have replaced this dictionary underneath a
+        generation which has not noticed it was superseded yet.
+        """
+        cache = self.terminal_dependency_cache
+        if (op_uuid not in cache
+                and len(cache) >= TERMINAL_DEPENDENCY_CACHE_SIZE):
+            oldest = next(iter(cache), None)
+            if oldest is not None:
+                cache.pop(oldest, None)
+        cache[op_uuid] = state
+
+    def _dependencies_met(self, inst, agentop):
+        """Decide whether this operation's dependency edges permit dispatch.
+
+        Returns (may dispatch, reason), where the reason is a short
+        string for the caller's log when dispatch is refused and None
+        when it is not.
+
+        This mirrors the cluster side's dequeue-time walk in
+        shakenfist/daemons/queues/workitem.py, including the asymmetry
+        between the two edge lists, which is deliberate there and
+        deliberate here:
+
+        * depends_on is fate sharing. A dependency which is absent or
+          which failed aborts this operation and refuses dispatch, and a
+          wait which outlives AGENT_OPERATION_DEPENDENCY_WAIT does the
+          same, because an operation parked behind a dependency which
+          never finishes would hold its instance's queue head forever.
+        * runs_after is ordering only. A dependency which is absent
+          warns and the walk moves to the next edge, and a wait which
+          outlives the budget warns and lets this operation run. Neither
+          ever writes dependency_failure, which belongs to the cascade.
+
+        It writes, which is why the caller runs it only after confirming
+        this dispatcher generation is still the live one: a cascade is a
+        terminal state transition and a first block records the budget
+        anchor, and neither should be done by a thread which has been
+        replaced.
+        """
+        # An operation which declared no edges must cost nothing. This
+        # runs once per agent-ready instance per DISPATCH_CHECK_INTERVAL
+        # whether anything in the cluster uses dependencies or not, so
+        # the common case reads no state at all.
+        if not agentop.depends_on and not agentop.runs_after:
+            return True, None
+
+        budget = config.AGENT_OPERATION_DEPENDENCY_WAIT
+
+        for dep in agentop.depends_on:
+            dep_state = self._dependency_state(dep)
+
+            if dep_state is None:
+                # Absence is treated as a failure, and it is narrower
+                # than it looks. A user deleted dependency still has
+                # its state row and reads as deleted, so it never
+                # arrives here. Only a hard delete sweep removes the
+                # state row, and it does that CLEANER_DELAY after the
+                # dependency reached a final state -- so an absent
+                # dependency finished at least an hour ago, and
+                # finished in one of the states the sweep collects.
+                # error is not one of them, so absence cannot
+                # distinguish a success from an abort or an expiry.
+                # Refusing is the safe side of that ambiguity: it
+                # declines work whose precondition probably held,
+                # where running would perform work whose precondition
+                # may have failed, and a fate-sharing edge should fail
+                # safe. A caller who needs to avoid the ambiguity
+                # keeps the dependent's deadline under CLEANER_DELAY,
+                # so it cannot still be queued when the sweep runs.
+                self._cascade_abort(agentop, dep, DEPENDENCY_MISSING)
+                return False, 'dependency is missing'
+
+            if dep_state in DEPENDENCY_FAILED_STATES:
+                self._cascade_abort(agentop, dep, dep_state)
+                return False, f'dependency is {dep_state}'
+
+            if dep_state in DEPENDENCY_PENDING_STATES:
+                anchor = agentop.note_dependency_wait_started()
+                if time.time() - anchor > budget:
+                    # The analogue of the cluster side's
+                    # abandon_dependency_wait(): the dependency may yet
+                    # finish, but not inside a budget this instance's
+                    # other callers can afford to wait out.
+                    self._cascade_abort(
+                        agentop, dep, dep_state,
+                        event=CASCADE_EVENT_GAVE_UP)
+                    return False, f'gave up waiting for a {dep_state} dependency'
+                return False, f'waiting for a {dep_state} dependency'
+
+            # Everything else is complete, which satisfies the edge --
+            # once any settle delay has elapsed.
+            settle = self._settle_verdict(agentop, dep, budget)
+            if settle == SETTLE_EXHAUSTED:
+                self._cascade_abort(
+                    agentop, dep, dep_state,
+                    event=CASCADE_EVENT_GAVE_UP)
+                return False, 'gave up waiting for a settle delay'
+            if settle == SETTLE_SETTLING:
+                return False, 'settling'
+
+        for dep in agentop.runs_after:
+            dep_state = self._dependency_state(dep)
+
+            if dep_state is None:
+                # Not fatal, for the reason the cluster side gives: an
+                # ordering hint whose target has gone must not be able
+                # to stop an object being managed. The warning is the
+                # whole of the response, and the walk continues to the
+                # next edge rather than returning.
+                self._warn_runs_after(
+                    inst, agentop, dep, DEPENDENCY_MISSING,
+                    'warning, runs_after dependency is missing')
+                continue
+
+            if dep_state in DEPENDENCY_PENDING_STATES:
+                anchor = agentop.note_dependency_wait_started()
+                if time.time() - anchor > budget:
+                    # Ordering again: a missing runs_after edge already
+                    # warns and proceeds, so an exhausted wait on one
+                    # does the same. This is where the two lists differ
+                    # most sharply -- the same condition cascades above.
+                    self._warn_runs_after(
+                        inst, agentop, dep, dep_state,
+                        'warning, gave up waiting for runs_after dependency')
+                    continue
+                return False, f'waiting for a {dep_state} runs_after dependency'
+
+            # Any terminal state satisfies an ordering edge, whatever it
+            # says about the outcome, subject to the settle delay.
+            settle = self._settle_verdict(agentop, dep, budget)
+            if settle == SETTLE_EXHAUSTED:
+                self._warn_runs_after(
+                    inst, agentop, dep, dep_state,
+                    'warning, gave up waiting for a runs_after settle delay')
+                continue
+            if settle == SETTLE_SETTLING:
+                return False, 'settling for a runs_after dependency'
+
+        return True, None
+
+    def _settle_verdict(self, agentop, dep, budget):
+        """Where a satisfied edge's settle delay has got to.
+
+        SETTLE_SATISFIED, SETTLE_SETTLING, or SETTLE_EXHAUSTED once the
+        wait budget has been spent waiting for the settle. The last of
+        those is reported rather than acted on, because the two walks
+        answer it differently.
+
+        The delay is measured from the dependency wait anchor rather
+        than from the dependency's own completion, because the state row
+        this evaluator reads carries no completion time it could use
+        without hydrating the dependency. So a settle means "this long
+        after the dispatcher noticed the dependency finish", which is up
+        to one DISPATCH_CHECK_INTERVAL later than the dependency
+        actually finished.
+        """
+        settle = dep.get('settle_seconds')
+        if not settle:
+            return SETTLE_SATISFIED
+
+        anchor = agentop.note_dependency_wait_started()
+        waited = time.time() - anchor
+        if waited >= settle:
+            return SETTLE_SATISFIED
+
+        # A settle longer than the budget can never elapse. The API
+        # refuses one, so reaching this means an edge stored before that
+        # bound existed, and giving up is better than blocking forever.
+        if waited > budget:
+            return SETTLE_EXHAUSTED
+        return SETTLE_SETTLING
+
+    def _cascade_abort(self, agentop, dep, dep_state,
+                       event=None):
+        """Abort an operation because a depends_on edge cannot be met.
+
+        event overrides the audit event text, for the two cases which
+        are a give up rather than a failed dependency: a wait or a
+        settle delay which outran the operator's budget.
+        """
+        kwargs = {'event': event} if event else {}
+        if not agentop.cascade_abort_for_dependency(dep, dep_state,
+                                                    **kwargs):
+            # The operation finished underneath us -- deadline
+            # enforcement expires one out of band -- so there is no
+            # cascade to have performed. The method audits that itself;
+            # this log line says the dispatcher saw it, because a
+            # cascade which did not land means the state moved between
+            # agent_operation_next() and here.
+            LOG.with_fields({
+                'agentoperation': agentop.uuid,
+                'dependency': dep['op_uuid'],
+                'dependency_state': dep_state
+            }).info('Dependency cascade found the operation already finished')
+
+    def _warn_runs_after(self, inst, agentop, dep, dep_state, message):
+        """Audit an unsatisfiable runs_after edge which is being proceeded past.
+
+        Against the instance as well as the operation, for the reason
+        the cascade event gives: a finished operation is hard delete
+        swept and takes its own events with it, and the instance is what
+        an operator looks at.
+        """
+        add_event_multi(
+            EVENT_TYPE_AUDIT,
+            [(ObjectType.AGENTOPERATION, agentop.uuid),
+             (ObjectType.INSTANCE, inst.uuid)],
+            message,
+            extra={'op_type': dep['op_type'], 'op_uuid': dep['op_uuid'],
+                   'dependency_state': dep_state,
+                   'budget': config.AGENT_OPERATION_DEPENDENCY_WAIT})
+
     def _dispatch_loop(self, generation):
         """Dispatch queued agent operations to instances with ready agents.
 
@@ -2100,6 +2408,29 @@ class Monitor(daemon.Daemon):
                                 'exiting without dispatching')
                             return
 
+                        # After the generation check, because evaluation
+                        # writes -- a cascade moves an operation to a
+                        # terminal state and a first block records the
+                        # budget anchor -- and a superseded generation
+                        # must no more write state than it may dispatch.
+                        # Before the event below, because that event
+                        # claims a dispatch, and a blocked operation is
+                        # not dispatched.
+                        dispatchable, reason = self._dependencies_met(
+                            inst, agentop)
+                        if not dispatchable:
+                            # Debug, not info: a blocked operation is
+                            # re-evaluated once every
+                            # DISPATCH_CHECK_INTERVAL for as long as it
+                            # stays blocked.
+                            log.with_fields({
+                                'instance': instance_uuid,
+                                'agentoperation': agentop.uuid
+                            }).debug(
+                                'Not dispatching agent operation: %s'
+                                % reason)
+                            continue
+
                         inst.add_event(
                             EVENT_TYPE_AUDIT, 'dispatching agent operation',
                             extra={'agentoperation': agentop.uuid})
@@ -2134,6 +2465,13 @@ class Monitor(daemon.Daemon):
         """Start a new dispatcher thread generation."""
         self.dispatcher_generation += 1
         generation = self.dispatcher_generation
+
+        # The terminal dependency cache lives exactly as long as a
+        # dispatcher generation does, so a replacement thread starts
+        # cold. A fresh dictionary rather than clear(), so a superseded
+        # generation which has not noticed yet cannot be iterating the
+        # one being emptied.
+        self.terminal_dependency_cache = {}
         self.dispatcher_last_pass = time.time()
         self.dispatcher_thread = threading.Thread(
             target=self._dispatch_loop, args=(generation,), daemon=True,

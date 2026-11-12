@@ -21,6 +21,17 @@ from shakenfist.schema.object_types import ObjectType
 LOG, _ = logs.setup(__name__)
 
 
+# Audit event texts for a dependency cascade. A cascade is not always a
+# failed dependency: a wait or a settle delay which outruns the
+# operator's budget ends an operation whose dependency has not failed
+# and may yet succeed, and an operator keying alerts off the event text
+# should not be told those are the same thing. The stored
+# dependency_failure carries the dependency's live state either way, so
+# a client can always tell them apart.
+CASCADE_EVENT_FAILED = 'operation aborted by failed dependency'
+CASCADE_EVENT_GAVE_UP = 'operation aborted waiting for a dependency'
+
+
 class AgentOperation(BaseOperation):
     object_type = ObjectType.AGENTOPERATION
     initial_version = 2
@@ -507,7 +518,8 @@ class AgentOperation(BaseOperation):
 
         self._state_update(dbo.STATE_ERROR, message=message)
 
-    def cascade_abort_for_dependency(self, dep, dep_state):
+    def cascade_abort_for_dependency(self, dep, dep_state,
+                                     event=CASCADE_EVENT_FAILED):
         """Move this operation to abort because a dependency it needs failed.
 
         dep is the stored depends_on edge, so it carries op_type and
@@ -545,6 +557,14 @@ class AgentOperation(BaseOperation):
         The no-op is noisy rather than silent. A cascade which did not
         land is worth an operator seeing, so it is audited with the
         state the operation was found in.
+
+        event is the audit event text, because not every cascade is a
+        failed dependency. A wait or a settle delay which outruns the
+        operator's budget aborts an operation whose dependency has not
+        failed and may yet succeed, and an event claiming otherwise is
+        what an operator's alerting would key on. The stored
+        dependency_failure carries the dependency's live state either
+        way, so a client can always tell the two apart.
         """
         if self.state.value in self.TERMINAL_STATES:
             add_event_multi(
@@ -584,7 +604,7 @@ class AgentOperation(BaseOperation):
             EVENT_TYPE_AUDIT,
             [(self.object_type, self.uuid),
              (ObjectType.INSTANCE, self.instance_uuid)],
-            'operation aborted by failed dependency',
+            event,
             extra={'op_type': dep['op_type'], 'op_uuid': dep['op_uuid'],
                    'state': dep_state})
         return True
