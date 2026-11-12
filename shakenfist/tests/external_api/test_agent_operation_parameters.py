@@ -515,16 +515,31 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         new.assert_not_called()
 
     def test_a_settle_delay_above_the_operator_ceiling_is_refused(self):
-        # The same ceiling the timing parameters publish, and for the same
-        # reason: a settle parks the instance's one executor slot while it
-        # runs.
+        # The ceiling is the dependency wait budget, not the timing
+        # parameters' one: a settle is spent inside that budget, so a
+        # larger settle could never elapse before the budget aborted the
+        # operation.
         resp, new = self._execute(
             depends_on=[self._edge(
                 self.dependency,
-                settle_seconds=config.AGENT_OPERATION_MAX_DEADLINE + 1)])
+                settle_seconds=config.AGENT_OPERATION_DEPENDENCY_WAIT + 1)])
         self.assertEqual(400, resp.status_code, resp.get_json())
         self.assertIn('settle_seconds', resp.get_json()['error'])
         new.assert_not_called()
+
+    def test_a_settle_delay_at_the_operator_ceiling_is_accepted(self):
+        # The pair to the test above: the bound is a real value rather than
+        # one nothing reaches, so a settle exactly at it has to work. It
+        # also pins which side of the comparison is exclusive, which an
+        # over-the-ceiling test alone cannot.
+        resp, new = self._execute(
+            depends_on=[self._edge(
+                self.dependency,
+                settle_seconds=config.AGENT_OPERATION_DEPENDENCY_WAIT)])
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(
+            float(config.AGENT_OPERATION_DEPENDENCY_WAIT),
+            new.call_args.kwargs['depends_on'][0]['settle_seconds'])
 
     def test_a_negative_settle_delay_is_refused(self):
         resp, new = self._execute(
@@ -543,10 +558,10 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         resp, new = self._execute(
             depends_on=[self._edge(
                 self.dependency,
-                settle_seconds=config.AGENT_OPERATION_MAX_DEADLINE + 1)])
+                settle_seconds=config.AGENT_OPERATION_DEPENDENCY_WAIT + 1)])
         self.assertEqual(400, resp.status_code, resp.get_json())
         self.assertIn(
-            'AGENT_OPERATION_MAX_DEADLINE', resp.get_json()['error'])
+            'AGENT_OPERATION_DEPENDENCY_WAIT', resp.get_json()['error'])
         new.assert_not_called()
 
     def test_a_list_at_the_edge_limit_is_accepted(self):

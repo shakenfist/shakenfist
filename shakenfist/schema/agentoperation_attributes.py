@@ -82,11 +82,13 @@ class AgentOperationAttributesData(BaseModel):
     # empty dict would instead mean a cascade which recorded no detail, so
     # the two are not interchangeable.
     #
-    # The column lands with the rest of the dependency schema, but nothing
-    # writes it yet -- the cascade which does is the next piece of work --
-    # and it is deliberately absent from the external view until then,
-    # because a field which can only ever be null is a field a client
-    # learns to ignore.
+    # Written by AgentOperation.cascade_abort_for_dependency() and by
+    # nothing else, and surfaced on the external view, because a reason
+    # which is not on the wire is a reason a client cannot act on (issue
+    # #4075). The state it records is the dependency's own, except that a
+    # dependency which no longer exists at all is recorded as 'missing' --
+    # not an AgentOperation state value, and distinguishable from every
+    # real one on purpose.
     dependency_failure: Optional[dict] = None
 
     # Wall-clock time of the first dispatcher pass which found this

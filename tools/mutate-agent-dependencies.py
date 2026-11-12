@@ -47,6 +47,7 @@ DEP = 'shakenfist/schema/agentoperation_dependency.py'
 BASE = 'shakenfist/external_api/base.py'
 MARIADB = 'shakenfist/mariadb.py'
 MAIN = 'shakenfist/daemons/database/main.py'
+AGENTOP = 'shakenfist/operations/agentoperation.py'
 
 # (label, file, old, new, test selector, phrase the failure must name)
 #
@@ -54,7 +55,7 @@ MAIN = 'shakenfist/daemons/database/main.py'
 # earlier audit of tools/mutate-nested-sweep.sh found its mutation set
 # covered the original change but not the guards a review round added --
 # which is the gap that makes a growing script worth anything.
-FILES = (DEP, BASE, MARIADB, MAIN)
+FILES = (DEP, BASE, MARIADB, MAIN, AGENTOP)
 
 MUTANTS = [
     ('finiteness guard', DEP,
@@ -87,7 +88,7 @@ MUTANTS = [
     ('settle ceiling', BASE,
      "            if (dependency.settle_seconds is not None\n"
      "                    and dependency.settle_seconds\n"
-     "                    > config.AGENT_OPERATION_MAX_DEADLINE):",
+     "                    > config.AGENT_OPERATION_DEPENDENCY_WAIT):",
      "            if False:",
      r'external_api\.test_agent_operation_parameters',
      'settle_ceiling_is_enforced_by_the_handler_in_warn_mode'),
@@ -108,6 +109,18 @@ MUTANTS = [
      "    if False:\n        return None",
      r'test_mariadb_agent_operations\.',
      'dependency_failure'),
+    # Without the terminal state guard the cascade writes its reason and
+    # only then meets the state machine's refusal, which leaves a
+    # finished operation publishing a dependency_failure that is not
+    # true of it. The expired case is the reachable one, since deadline
+    # enforcement moves an operation out of band.
+    ('cascade terminal guard', AGENTOP,
+     "        if self.state.value in self.TERMINAL_STATES:\n"
+     "            add_event_multi(",
+     "        if False:\n"
+     "            add_event_multi(",
+     r'test_agent_operation_dependency_cascade',
+     'cascade_of_an_expired_operation_writes_nothing'),
     ('TypeError phrasing', BASE,
      "    if isinstance(error, TypeError):\n        return 'not an object'",
      "    if False:\n        return 'not an object'",

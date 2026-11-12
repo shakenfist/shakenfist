@@ -418,6 +418,35 @@ class SFConfig(BaseSettings):
             'the expired state, which is distinct from error.'
         )
     )
+    AGENT_OPERATION_DEPENDENCY_WAIT: int = Field(
+        300,
+        ge=1,
+        description=(
+            'How long in seconds an agent operation may sit at the head of '
+            'its instance\'s queue waiting for an operation it declared a '
+            'dependency on, before it is given up on and moved to the abort '
+            'state. The clock is wall-clock, anchored on the first dispatch '
+            'pass which found the operation blocked and recorded on the '
+            'operation itself, rather than a count of passes -- so how '
+            'often the dispatcher gets around to looking does not change '
+            'how long a caller waits. It is also the ceiling a per-edge '
+            'settle delay is refused against, because a settle longer than '
+            'this budget could never elapse: the budget would abort the '
+            'operation first, and a caller is better told that when they '
+            'ask than five minutes later. A dependency wait legitimately '
+            'contains the dependency\'s own queue wait as well as its '
+            'execution, so the default is roughly twice the worst single '
+            'hop latency a production cluster has produced; a chain several '
+            'hops deep against a busy instance can legitimately exceed it '
+            'and will be aborted. Raising it buys those chains room at '
+            'somebody else\'s expense, which is the trade worth '
+            'understanding before changing it: a blocked operation keeps '
+            'its place in its instance\'s queue and blocks the operations '
+            'behind it, so this is also the longest one caller\'s stalled '
+            'chain may hold up operations another caller submitted against '
+            'the same instance.'
+        )
+    )
     # An attempt is counted at the point the operation transitions to
     # executing, which is immediately before its first command is
     # written to the socket. Two consequences worth knowing, neither

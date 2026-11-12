@@ -259,9 +259,10 @@ class AgentOperation(BaseOperation):
 
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
-        # expect. The attributes row is read once and three values taken
-        # from it, rather than through the per-value properties, so the
-        # view does not cost one database round trip per attribute.
+        # expect. The attributes row is read once and every attribute the
+        # view carries is taken from it, rather than through the per-value
+        # properties, so the view does not cost one database round trip per
+        # attribute.
         attrs = self._attributes()
         retval = self._external_view()
         retval.update({
@@ -276,6 +277,7 @@ class AgentOperation(BaseOperation):
             'last_progress': attrs.last_progress,
             'attempts': attrs.attempts,
             'expiry_reason': attrs.expiry_reason,
+            'dependency_failure': attrs.dependency_failure,
             'error_message': self.error
         })
 
@@ -505,6 +507,115 @@ class AgentOperation(BaseOperation):
 
         self._state_update(dbo.STATE_ERROR, message=message)
 
+    def cascade_abort_for_dependency(self, dep, dep_state):
+        """Move this operation to abort because a dependency it needs failed.
+
+        dep is the stored depends_on edge, so it carries op_type and
+        op_uuid, and dep_state is the state that dependency was
+        observed in. dep_state may be a value no AgentOperation ever
+        holds -- 'missing' for a dependency which no longer exists at
+        all -- which is deliberate: a client has to be able to tell a
+        dependency which failed from one which went away, and both
+        cost the dependent the same fate.
+
+        This is for depends_on only. A runs_after edge is an ordering
+        hint rather than a fate-sharing one, so an unsatisfiable
+        runs_after warns and lets its operation run, and never arrives
+        here.
+
+        Returns True when the cascade was applied and False when the
+        operation had already finished, so a caller can tell a cascade
+        it performed from one it was too late for.
+
+        An operation which is already terminal is left alone, which is
+        the guard expire() and fail() carry and for a sharper reason
+        than theirs. Deadline enforcement can expire an operation out
+        of band at any moment, so this call really does race a
+        finished operation. Writing the reason anyway would leave an
+        operation reading expired on the wire while carrying a
+        dependency_failure claiming a dependency aborted it, and that
+        field exists precisely so a client can branch on it without
+        parsing prose (issue #4075) -- so a client doing exactly what
+        the field was published for would be told something untrue
+        about a finished operation. The state machine's refusal
+        remains the backstop for the window between this check and
+        the write below, but it must not be the primary mechanism:
+        reaching it means the reason has already been persisted.
+
+        The no-op is noisy rather than silent. A cascade which did not
+        land is worth an operator seeing, so it is audited with the
+        state the operation was found in.
+        """
+        if self.state.value in self.TERMINAL_STATES:
+            add_event_multi(
+                EVENT_TYPE_AUDIT,
+                [(self.object_type, self.uuid),
+                 (ObjectType.INSTANCE, self.instance_uuid)],
+                'operation finished before its dependency cascade applied',
+                extra={'op_type': dep['op_type'], 'op_uuid': dep['op_uuid'],
+                       'dependency_state': dep_state,
+                       'state': self.state.value})
+            return False
+
+        # The reason is written before the state transition, so a
+        # reader who sees abort can always see why. The order is not
+        # merely tidiness: delete() removes an operation's attribute
+        # rows and only then assigns its state, so there is no later
+        # moment at which the reason could be filled in, and a state
+        # written first would be observable with its explanation
+        # missing. The field mask is not optional, for the reason
+        # record_progress() spells out in its docstring.
+        attrs = self._attributes()
+        attrs.dependency_failure = {
+            'op_type': dep['op_type'],
+            'op_uuid': dep['op_uuid'],
+            'state': dep_state
+        }
+        mariadb.update_agent_operation_attributes(
+            attrs, fields=['dependency_failure'])
+
+        self.state = BaseOperation.STATE_ABORT
+
+        # Against the instance as well as the operation, for the
+        # reason expire() gives: abort is in FINAL_OBJECT_STATES too,
+        # so the operation is swept for hard deletion and an event
+        # held only against it would go with it.
+        add_event_multi(
+            EVENT_TYPE_AUDIT,
+            [(self.object_type, self.uuid),
+             (ObjectType.INSTANCE, self.instance_uuid)],
+            'operation aborted by failed dependency',
+            extra={'op_type': dep['op_type'], 'op_uuid': dep['op_uuid'],
+                   'state': dep_state})
+        return True
+
+    def note_dependency_wait_started(self):
+        """Record that this operation is blocked on a dependency, and when.
+
+        Returns the instant the dependency wait budget is measured
+        from, whether this call wrote it or an earlier one did, so a
+        caller which has just discovered a block and one which
+        rediscovers it on a later pass both get the same answer.
+
+        The write happens only while the anchor is unset, and that
+        idempotence is a property of this method rather than something
+        each caller has to remember. A blocked operation is
+        re-evaluated on every dispatch pass, so an unconditional write
+        would push the anchor forward a few seconds at a time and
+        leave a budget which can never be exhausted: what is being
+        guarded against is not a lost write but a budget which quietly
+        stops being one.
+        """
+        attrs = self._attributes()
+        if attrs.dependency_wait_started is not None:
+            return attrs.dependency_wait_started
+
+        anchor = time.time()
+        attrs.dependency_wait_started = anchor
+        mariadb.update_agent_operation_attributes(
+            attrs, fields=['dependency_wait_started'])
+        return anchor
+
     def _attributes(self):
         """Read this operation's mutable attributes, creating the row if absent.
 
@@ -543,6 +654,10 @@ class AgentOperation(BaseOperation):
     @property
     def expiry_reason(self):
         return self._attributes().expiry_reason
+
+    @property
+    def dependency_failure(self):
+        return self._attributes().dependency_failure
 
     def record_attempt(self):
         """Persist that another dispatch attempt of this operation has started.
