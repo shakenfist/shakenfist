@@ -1377,7 +1377,7 @@ not land anywhere else.
 | 1. JWT validation refactor (split issuance from validation; introduce per-issuer validators) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as `PLAN-auth-federation.md` phase 3 steps 3a-3c and 3f: `72187d2ff` (#3556), `c64269e63` (#3625) |
 | 2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as `PLAN-auth-federation.md` phase 3 step 3f: `c64269e63` (#3625), `1e7a167ea` (#3641) |
 | 3. OIDC discovery | shakenfist | [PLAN-oidc-authentication-phase-03-discovery.md](PLAN-oidc-authentication-phase-03-discovery.md) | Complete | `d884dd56c1` (#4891) |
-| 4. Minting the entitled set of credentials at login | shakenfist | TBD | Not started | — |
+| 4. Minting the entitled set of credentials at login | shakenfist | [PLAN-oidc-authentication-phase-04-credential-set.md](PLAN-oidc-authentication-phase-04-credential-set.md) | In progress | — |
 | 5. Admin as a claim | shakenfist | TBD | Abandoned | — |
 | 6. Serving namespace key metadata (#3672) | shakenfist, client-python | TBD | Not started | — |
 | 7. Interactive CLI flows, the credential set and the token cache | client-python | TBD | Not started | — |
@@ -1484,6 +1484,26 @@ audit in
 [phase 0](PLAN-oidc-authentication-phase-00-decisions.md) is
 what sized this phase, and it also fixes its boundary: each
 minted credential still names exactly one namespace.
+
+One thing this section did not say, found by phase 4's
+survey and written here because an implementer who reads
+only this section would build a login that cannot work
+against a real provider: **the audience a human's token
+carries is not the audience an issuer's `audience` column
+holds.** OpenID Connect Core 1.0 §2 requires an identity
+token's `aud` to contain the relying party's `client_id`,
+and that is what Keycloak and Authentik stamp. The
+`audience` column is documented to an operator as their
+cluster's API URL
+(`docs/operator_guide/authentication.md:163`), which is
+right for a workload, because a workload asks its provider
+for a token stamped with whatever audience we tell it to
+ask for. A person cannot. So the login path verifies `aud`
+against `client_id` while the workload exchange keeps
+verifying against `audience`, which is phase 4's decision
+D2. Open question 4 settled that the audience is per-issuer
+rather than per-cluster and stopped there, because at the
+time the only tokens were workload tokens.
 
 **Phase 5 — admin as a claim, declined.** Half of it was
 done already: `caller_is_admin` requires the `cluster-admin`
