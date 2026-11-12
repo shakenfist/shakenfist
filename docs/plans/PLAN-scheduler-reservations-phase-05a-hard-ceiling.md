@@ -650,7 +650,252 @@ amendment and its reasoning are recorded at D2 itself. Step 2 must
 still report any `failed` row it finds, with its `detail`, and say
 why it was excluded if it was.
 
+### Step 2 -- the reading, 2026-11-13
+
+**The window closed as pinned, and D2 reads Hold.** Five of its six
+rows pass, four of them by a wide margin; the third row -- namespaces
+in which one instance exceeded the whole claim -- requires 0 and reads
+**5**. Per D2 that is a Hold: the threshold is not renegotiated, the
+defect is filed against `PLAN-claim-coverage-and-sizing.md` in
+private-ci, and steps 4 to 6 do not run.
+
+Sources, and which produced each number. The conductor's
+`claim_events` and `workflow_costs` tables, read from the
+2026-11-13 06:14 copy of `/srv/shakenfist/private-ci/conductor.db`
+(copied per step 1's note, with `~/.ssh/id_ansible_ed25519`; the live
+file was not opened). Loki, for the sfcbr nodes' own warnings under
+`{job="syslog"}` and the conductor's log under `{job="conductor"}`,
+every query excluding `caller=metrics.go` and `caller=engine.go`.
+private-ci's `tools/measure-claim-accuracy.py --since '2026-11-05
+07:47'`, for the sizing and ledger-agreement figures. `sf-client`
+on the development host, for the live claim census.
+
+#### D2, row by row
+
+| Measure | 4c baseline | Flip requires | This window | |
+|---|---|---|---|---|
+| Over-limit admissions per day | 33.4/day | <= 3.3/day | **0.71/day** (5 in 7 days) | pass |
+| Namespaces with any over-limit admission | 101 | <= 10 | **5** | pass |
+| Namespaces where one instance exceeded the whole claim | 24 | 0 | **5** | **FAIL** |
+| Over-limit admissions on an *exact* dimension | not measured | <= 1/day | **0.71/day** (5 in 7 days) | pass |
+| `conductor_claims_failed_total`, claim logic only | 0 | 0 | **0** | pass |
+| Claims created (readability floor) | 2038 | >= 500 | **3770** | pass |
+
+The aggregate arm did not merely pass, it collapsed: 33.4 over-limit
+admissions a day became 0.71, a **47x** reduction against the 10x D2
+asked for, and the namespace count fell from 101 to 5. The row that
+failed is the structural one, and it failed for a reason the
+aggregate improvement cannot touch -- which is precisely why D2 wrote
+it as 0 rather than as a rate.
+
+**Row 4 is the row closest to failing after row 3.** All five
+exceedances are on dimensions claimed *exactly*, so the exact arm
+reads 0.71/day against a threshold of 1/day: one more such event in
+the window would have failed that row too, on the same five
+namespaces. The two failing rows have one cause, below.
+
+The failure row reads 0 from the authoritative record. `claim_events`
+holds no `failed` row inside the window; the three in its entire
+history (2026-09-22, 2026-10-22, 2026-10-25) are the sf-api
+reachability errors step 1 found -- two nginx 502s and a refused
+connection -- and all three predate the window, so D2's amendment
+changed no number here, as it was expected not to.
+
+#### The five events
+
+| When (AEDT) | Node | Namespace | Claim (cpu/MB/GB) | Claim sized for |
+|---|---|---|---|---|
+| 2026-11-07 17:38:22 | sf-1 | `sfcbr-eZxCATBczDNBPKKa` | 10 / 20480 / 460 | kerbside / Proxmox VE end to end |
+| 2026-11-07 18:17:02 | sf-3 | `sfcbr-JTyUmsJCP1OuqikH` | 10 / 20480 / 460 | kerbside / Proxmox VE end to end |
+| 2026-11-07 18:41:20 | sf-4 | `sfcbr-G3Ct7Raud3ebtiKL` | 10 / 20480 / 460 | kerbside / Proxmox VE end to end |
+| 2026-11-08 08:30:32 | sf-2 | `sfcbr-7qqCzzu5nIemF3uf` | 6 / 12288 / 360 | kerbside / compose up / SPICE session / negative cases |
+| 2026-11-09 07:07:13 | sf-3 | `sfcbr-zomJV8yARiuUFjfI` | 6 / 12288 / 360 | kerbside / direct-qemu-lane |
+
+Three on 2026-11-07, one on 2026-11-08, one on 2026-11-09; none on
+the window's other four days. Every one exceeded all three
+dimensions at once, where 4c saw `cpus` exceeded alone never and in
+47% of events overall. How far over, as `(used + requested) /
+limit`: `cpus` 1.80x on the three 10-cpu claims and 3.00x on the two
+6-cpu ones, `memory_mb` 1.40x and 2.33x, `disk_gb` 1.13x and 1.44x.
+Every maximum is far below 4c's (14.50x memory, 33.60x disk, 18.00x
+cpus): the residue is not only rarer, it is shallower.
+
+#### The cause is mis-assignment, not mis-measurement
+
+4c's two failure modes were both measurement defects -- an
+under-measured aggregate peak, and a peak smaller than one runner.
+**Neither is what this window shows.** The conductor's own cost row
+for all five namespaces records the peak correctly:
+
+```
+runner size l (6 / 12288 / 300), peak_allocated 18 / 28672 / 520,
+peak_concurrent_instances 2,
+peak_shapes [{"cpus": 12, "ram_mb": 16384, "disk_gb": 160, "count": 1}]
+```
+
+6 + 12 = 18 cpus, and `claim_peak_*` equals the reconstruction on
+every row. The measurement is right. What is wrong is **which job
+the claim was sized for**: in all five namespaces the job that ran
+was `kerbside / sf-e2e`, whose single nested 12-cpu VM is larger than
+the 10-cpu and 6-cpu claims made for the three *other* kerbside jobs
+named above. The claim was sized for a pending job and then charged
+for a different job's placements.
+
+**Filed as `shakenfist/private-ci#311`**, against
+`PLAN-claim-coverage-and-sizing.md` as D2 requires, with the window's
+evidence and the reproduction. That plan already holds the fix in
+design: phase 3b's per-job binding gives a job a runner GitHub can
+hand to nothing else, so "the claim is sized for the job that will
+run" -- its own words. What this reading adds is that 3b is a
+**prerequisite for hard enforcement** rather than an efficiency
+improvement, and that `sf-e2e` is the job to bind first. The issue
+also costs the cheaper alternative of giving `sf-e2e` its own size
+token, as phase 3a did for cloud jobs, which fixes this case without
+fixing the general one.
+
+**The exposure is 5 in 37, not 5 in 3770.** sf-e2e ran 37 times in
+the window: 32 landed on an 18-cpu claim, which is the combination
+maximum taken while sf-e2e was itself pending, and 5 landed on a
+6- or 10-cpu claim. So the cost of flipping today is not a 0.71/day
+aggregate residue but a **13.5% chance per run** that this one job is
+refused permanently, and the `l` pool it shares holds at least nine
+job names across `kerbside` and `ryll`. That is the number the flip
+decision should be read against.
+
+That mis-assignment is the norm rather than the exception, and
+mostly harmless: across the window the claim was sized for a
+different job than the one which ran in **2464 of the 3771 cost rows
+(65.3%)**, because `combination_claim_size()` claims for the largest
+pending job in the combination. It only bites when the job that
+actually arrives holds a single instance bigger than the claim the
+combination produced -- 5 of those 2464, every one `sf-e2e` landing
+on a claim sized for a smaller lane.
+
+Under hard enforcement those five creates are **refused, not
+delayed**: the 12-cpu VM cannot fit a 6-cpu claim however long it
+waits, and there is no operator remedy short of changing the
+declaration. That is exactly the condition D2's row 3 names
+structural and sets to 0.
+
+#### Why the Loki count is believed
+
+Two independent records name the same five namespaces, which is the
+completeness check 4c relied on and the reason to trust either:
+
+- Loki's five `Placement admitted over the namespace capacity claim`
+  warnings, from four different sfcbr nodes.
+- The conductor's `workflow_costs` rows: of the 3771 cost rows
+  matching the window's claims, exactly 5 have an aggregate peak over
+  their claim, and exactly the same 5 hold one instance shape larger
+  than the whole claim. The two sets are equal, with no member on
+  either side alone.
+
+Log shipping was healthy throughout, which matters because a thin
+count is also what lost logs look like. Every UTC day of the window
+saturated a 2000-line cap of SF JSON log lines, from all six sfcbr
+nodes (`sf-1` to `sf-6`) on every day. The conductor stream agrees
+with the database it writes: 3770 `Claimed` lines in the window
+against 3770 `created` rows in `claim_events`, equal per day as well
+as in total.
+
+Over 30 days the rate is 33 events, so the fall predates this window
+-- there are days in late October (11 on 2026-10-26, 10 on
+2026-10-31) well above anything inside it. The improvement is phase
+3d's sizing work landing, not a quiet week.
+
+#### Claims created and deleted, and the ledger
+
+| | This window | 4c window |
+|---|---|---|
+| created (`claim_events`) | 3770 | 1934 |
+| created (Loki `Claimed`) | 3770 | 1934 |
+| released (Loki `Released`) | 3770 | 1928 |
+| refused on capacity | 8032 | 303 |
+
+Per day, created then refused: 381/650 (2026-11-05, from 07:47),
+337/407, 621/1813, 725/3596, 576/316, 238/514, 720/729, and
+172/7 on 2026-11-12 to 07:47.
+
+**No claim leaked.** Creations and releases balance in the window,
+and the live census agrees: `sf-client namespace claim list` across
+all 14 namespaces finds 11 claims, one per namespace, every
+`sfcbr-*` holder a namespace which still exists. As in 4c this is
+the answer to the `cluster_capacity.claimed_*` drift question, which
+cannot be read as the definition of done words it -- `claimed_*`
+goes to a Prometheus gauge, and no Prometheus is reachable from the
+development host. `measure-claim-accuracy.py`'s item 7 adds the
+stronger statement from the other end: over **2956 runs** the
+ledger's mark and the conductor's reconstruction agree to a median
+of 1.000 on all three dimensions, with **zero** runs outside a 5%
+tolerance.
+
+#### Sizing accuracy, and two things to watch
+
+The sizer is now accurate and the exact rule is doing the work:
+
+| dimension | sized | runs | over-claim | policy | combination |
+|---|---|---|---|---|---|
+| cpus | exact | 2694 | 1.04x | 1.00x | 1.04x |
+| cpus | headroom | 262 | 2.18x | 1.38x | 1.59x |
+| memory_mb | exact | 2694 | 1.04x | 1.00x | 1.04x |
+| memory_mb | headroom | 262 | 2.05x | 1.20x | 1.71x |
+| disk_gb | exact | 2623 | 1.03x | 1.00x | 1.03x |
+| disk_gb | headroom | 333 | 1.67x | 1.20x | 1.39x |
+
+Just under 90% of claims are exact on all three dimensions (3380 of
+3770, with 159 exact on cpus and memory only and 231 headroomed
+throughout),
+and an exact claim lands within 4% of what the run uses. The
+remaining headroom arm is where the over-claim sits, led by
+`client-python / code-formatters` at 8.80x memory over 6 runs.
+
+Two findings outside D2's rows, recorded because they are the next
+thing a reader will ask about and neither is a reason to hold or to
+flip:
+
+- **Capacity refusals are up 26x**, 303 to 8032, and the binding
+  dimension has moved: every refusal in this window names
+  `memory_mb` (180 also name `cpus`), where every one of 4c's 303
+  named `cpus`. The refused jobs are the nested-cluster builders, as
+  before.
+- **The cluster's advertised memory total is still moving**, which
+  is 4c's varying-`limit` finding in the dimension that now
+  refuses. A refusal in this window reads `memory_mb (limit 10396,
+  used 0, requested 49152)` -- a 10 GB view of a cluster far larger
+  than that, refusing a claim it would otherwise have granted. That
+  surface belongs to `PLAN-transient-capacity-refusals.md` and
+  `PLAN-placeable-capacity.md`, not here.
+
 ## Execution notes
+
+**2026-11-13: step 2 ran in the management session and reads Hold.**
+The window closed as pinned, 2026-11-12 07:47:02 AEDT, and was read
+against D2's table as written. Five rows pass -- the aggregate rate
+fell 47x, against the 10x D2 required -- and row 3 fails at 5 against
+a required 0. The reading, its arithmetic, its two cross-checks and
+the mechanism are in *Observations*. Per D2 the threshold was not
+renegotiated: **steps 4, 5 and 6 do not run**, and the defect is
+filed against `PLAN-claim-coverage-and-sizing.md` in private-ci.
+
+The mechanism is worth stating here because it is not the one this
+phase expected. 4c's two failure modes were both measurement
+defects, and both are gone: the conductor's cost rows record these
+namespaces' peaks exactly, and the ledger agrees with the
+reconstruction on 2956 runs. What remains is mis-assignment -- a
+claim sized for the largest *pending* job in a combination, then
+charged for whichever job GitHub actually dispatched. 65.3% of the
+window's claims were sized for a different job than the one which
+ran, which is by design and harmless until the job that arrives
+holds a single instance bigger than the claim. Five times it did,
+every one `kerbside / sf-e2e`'s 12-cpu nested VM landing on a claim
+sized for a smaller kerbside lane.
+
+Step 2's brief also warned that the installed `sf-client` predates
+phase 7b's `claim list --all`. It does, and so does the
+`client-python` checkout on this host (it sits at #432, before
+#442), so the live census was taken by iterating
+`namespace claim list` over all 14 namespaces instead. That reads
+the same ground truth and needed no new checkout.
 
 **2026-11-07 (AEDT).** Back brief answered by Michael before any
 step ran: D2's table binds as written; the read-only `conductor.db`
