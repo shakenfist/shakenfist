@@ -17,7 +17,18 @@ instar compare --output json image1.raw image2.raw
 instar compare --luks-passphrase secret encrypted.qcow2 decrypted.raw
 ```
 
-Exit codes: 0 = identical, 1 = content differs.
+Exit codes, as qemu-img compare's:
+
+| Exit | Meaning |
+|------|---------|
+| 0 | The images are identical. |
+| 1 | The images differ. Only a comparison that found a difference exits 1. |
+| 2 | An image could not be opened or set up for comparison, or any other error: nothing was compared. |
+| 4 | A read failed part-way through the comparison. The error names the image and the virtual offset of the failed read. |
+
+A failure is never reported as a difference. An error goes to stderr as
+`Error: "..."` and nothing is printed on stdout, so a script can rely on
+exit 1 meaning the images really differ.
 
 The compare operation reads the virtual content of both images and reports the
 first byte offset where content diverges. For QCOW2 and VMDK images, this
@@ -53,7 +64,7 @@ has no parent behind it, so the sectors it leaves to its parent could
 not be composed
 ```
 
-and exits 1. A parent reference that cannot be resolved — the file is
+and exits 2. A parent reference that cannot be resolved — the file is
 missing, or outside the backing file allowlist — is refused the same
 way, during chain discovery.
 

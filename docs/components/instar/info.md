@@ -95,31 +95,40 @@ string the image claims, not a file instar has validated.
 
 ## Known limitations
 
-### A Windows-convention parent makes "actual path" unresolvable
+### A Windows-convention parent has no "actual path"
 
-`info`'s "actual path" resolution treats any backing-file string that
-is not POSIX-absolute as relative and joins it onto the image's
-directory. A parent recorded in Windows convention therefore comes out
-as a single literal filename containing backslashes, which cannot exist
-on the filesystem:
+`info` shows where a relative backing reference resolves, joined onto
+the image's directory, as qemu-img does. A parent recorded as a Windows
+absolute path -- a drive letter (`C:\images\parent.vhdx`) or anything
+rooted at `\\` (a UNC share, or a `\\?\Volume{...}` path) -- is
+absolute in its own convention and names no file on this host, so it
+is treated as a POSIX absolute reference is: reported exactly as the
+image records it, with no "actual path", and JSON's
+`full-backing-filename` repeats it verbatim.
 
 ```
-backing file: \\attacker\share\probe (actual path: /images/\\attacker\share\probe)
+backing file: \\attacker\share\probe
 ```
 
-This affects **both** differencing formats, not just VHDX: a VHD parent
-unicode name and a VHDX `absolute_win32_path` or `volume_path` locator
-key are all reported exactly as stored. A relative VHDX locator is the
-one case that is *not* affected — `info` renders the `relative_path`
-key back into POSIX convention, so `create -f vhdx -b parent.vhdx`
-followed by `info` reports `parent.vhdx` and resolves correctly.
+It used to be joined onto the image's directory, producing an "actual
+path" such as `/images/\\attacker\share\probe` that cannot exist
+([issue #658](https://github.com/shakenfist/instar/issues/658)). This
+applies to both differencing formats: a VHD parent unicode name and a
+VHDX `absolute_win32_path` or `volume_path` locator key are all
+reported as stored. A relative VHDX locator is rendered back into POSIX
+convention, so `create -f vhdx -b parent.vhdx` followed by `info`
+reports `parent.vhdx` and resolves correctly. A *relative* reference
+already in Windows convention, such as a VHD parent name of
+`..\parent.vhd`, is still joined onto the image directory without
+being normalised. The full account, including which locator key `info`
+prefers and why the relative case is rendered back, is the "VHD/VHDX
+differencing" section of [quirks.md](/components/instar/quirks/).
 
-The `backing file:` field itself is correct in every case — it is what
-the image's own header records, and reporting it is the point. Fixing
-the "actual path" resolution is path normalisation and needs a decision
-rather than a guard, so it is tracked in
-[issue #658](https://github.com/shakenfist/instar/issues/658);
-suppressing the field instead would paper over the underlying issue
-rather than close it. The full account, including which locator
-key `info` prefers and why the relative case is rendered back, is the
-"VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/).
+For a qcow2 or VMDK backing reference, `info` and the reading operations
+can still disagree. A name such as `C:\images\base.qcow2` is also a
+legal POSIX file name, and chain discovery treats it as relative: if a
+file of exactly that name sits in the image's directory, `convert` and
+`compare` read it, while `info` reports the reference with no "actual
+path". Making discovery refuse a Windows absolute reference instead
+would change what those operations open, so it is left for its own
+change ([issue #899](https://github.com/shakenfist/instar/issues/899)).

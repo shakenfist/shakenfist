@@ -338,13 +338,19 @@ This is a stronger worked example than the oVirt lane's. It is a
 nightly, rather than only on entry to the merge queue; see
 [testing.md](/components/kerbside/testing/#the-shaken-fist-end-to-end-lane-sf-e2e).
 
-Two differences from a real deployment, both CI expedients
-rather than recommendations. Kerbside runs co-located on the
-Shaken Fist primary node, as the role's `kerbside-api` and
-`kerbside-daemon` systemd units, where a real deployment would
-usually put it on a host of its own. And the audience contract
-is exercised over a loopback `http://` URL, not the public HTTPS
-name a deployment would use.
+One difference from a real deployment, and it is a CI expedient
+rather than a recommendation: the audience contract is exercised
+over a loopback `http://` URL, not the public HTTPS name a
+deployment would use.
+
+The co-location is not an expedient. Kerbside runs on
+the Shaken Fist primary node, as the role's `kerbside-api` and
+`kerbside-daemon` systemd units, and that is the topology Shaken
+Fist recommends first -- put Kerbside on a hypervisor unless you
+have a reason not to, because it needs the fewest decisions. A
+dedicated host is the next simplest. See
+[Topologies](https://shakenfist.com/operator_guide/kerbside/#topologies)
+in Shaken Fist's operator guide.
 
 ## User interaction model
 
@@ -383,7 +389,7 @@ Not covered, and worth knowing before you deploy:
 |------------|--------|
 | Single-node clusters only, in testing | The `sf-e2e` lane builds a one-node Shaken Fist, so the node map, the per-node certificate subjects, and consoles spread across hypervisors are each proven against exactly one node. Multi-node clusters should work — the node map is rebuilt every pass and the subject is pinned per console — but no lane covers them. A multinode lane is listed as future work in [PLAN-two-tier-ci.md](/components/kerbside/plans/PLAN-two-tier-ci/). |
 | Backend pinning depends on the cluster | Two conditions have to hold, and either can fail quietly. Pinning only happens on a leg that escalated to TLS, so a node whose qemu does not require a secure channel is relayed over its plaintext port with nothing to verify or pin. Where the escalation does happen, a node that publishes no `spice_server_cert_subject` leaves `host_subject` unset, and the proxy relays that backend without host-subject enforcement rather than refusing it. Whether your cluster publishes one depends on its version and node configuration. The optional knob for turning enforcement on anyway, and the PKI assumption it makes, are in [console-sources.md](/components/kerbside/console-sources/#shaken-fist). |
-| Off-box deployment untested in CI | The lane runs Kerbside on the Shaken Fist primary over loopback. The real topology — Kerbside on its own host, reaching the API by name and the nodes by address — is the shape the oVirt lane proves, not this one. |
+| A dedicated host is untested in CI | The lane runs Kerbside on the Shaken Fist primary over loopback, which is the topology Shaken Fist recommends first. A dedicated host — Kerbside reaching the API by name and the nodes by address — is the next-simplest topology its operator guide documents, and the shape the oVirt lane proves, not this one. |
 | Token exchange can be unavailable while scraping is fine | A cluster Kerbside scrapes happily is not necessarily one it can exchange tokens for; the two capabilities fail independently by design. The causes and the operator fix are in [console-sources.md](/components/kerbside/console-sources/#shaken-fist). |
 | Non-`system` namespaces | A source configured with any other namespace is untested and is not expected to work: only the instance listing uses the configured namespace, while the CA fetch, the signing-key fetch and the node listing are always made as `system` with the same key. The unit tests cover the branch with a namespace-to-mock map, which proves the branch and not that a non-`system` credential works against a real cluster. |
 | Shaken Fist client version | The `shakenfist_client` library is imported by name rather than being a runtime dependency, so any version at all can be installed alongside Kerbside. Versions older than 0.8.3 cannot fetch signing keys, which leaves token exchange unavailable for every Shaken Fist source. |

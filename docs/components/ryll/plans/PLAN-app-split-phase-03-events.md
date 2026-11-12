@@ -625,6 +625,19 @@ Commit: "Name the events the GUI ignores."
   where that claim is a judgement rather than a script, and risk 1
   says how it is checked.
 
+  **What that evidence does not cover.** An unchanged test count
+  proves no test broke; it does not prove the two edited paths are
+  tested, and neither is. Nothing in the tree constructs a
+  `RyllApp`, so no unit test can reach
+  `handle_session_initialized`'s early return on a refused retire
+  (risk 1), `finish_event_drain`'s rule that a connection failure
+  is acted on only once `event_rx` is empty, or
+  `spawn_auto_snapshot_task`'s true-on-spawn contract. This is
+  structural and predates the phase; writing those tests would
+  need a `RyllApp` that can be built headless, which is phase 5's
+  field regrouping at the earliest. Recorded here rather than left
+  implied.
+
 ## Execution notes
 
 - **Back brief, 2026-11-12 (AEDT).** Mikal chose to implement this
@@ -664,7 +677,11 @@ Commit: "Name the events the GUI ignores."
   explicitly, which is the real cost of the rule, and the
   remaining four files this phase creates follow it. The step also
   widened `EVENT_CHANNEL_SIZE`, `INPUT_CHANNEL_SIZE` and
-  `RegionSelectEnd` to `pub(super)`. Note for step 3d:
+  `RegionSelectEnd` to `pub(super)`. The first two were reverted by
+  the automated-review follow-up recorded below, neither having
+  needed widening at all; `RegionSelectEnd` stays `pub(super)`
+  because `connection.rs` reads it across a module boundary, which
+  is why it was correctly left alone. Note for step 3d:
   `connection.rs` imports `RegionSelectEnd` from `super`, so that
   import must follow the enum into `trigger_snapshot.rs`.
 
@@ -730,6 +747,45 @@ Commit: "Name the events the GUI ignores."
   `process_events` was additionally compared body-for-body, 497
   lines byte-identical. A future phase should fix the script
   rather than the expectation.
+
+- **Automated review, 2026-11-12 (AEDT).** #714 drew a
+  consider-only review (seven consider, two informational, no fix
+  or document items) and merged as `79fc466` before the items were
+  worked, so they land in a follow-up on
+  `app-split-p03-review-items`. Taken: the `digest-decode` clippy
+  lane is now part of `make lint`, so the arm that exists to turn a
+  new `ChannelEvent` variant into a compile error is actually
+  compiled on every pull request rather than once by hand; the
+  visibility widenings are reverted, which the review was right to
+  call a breach of decision 7 -- `pub(super)` on an item in
+  `app/mod.rs` means crate-visible, and a child module can read its
+  ancestors' private items anyway, so neither
+  `EVENT_CHANNEL_SIZE` nor `INPUT_CHANNEL_SIZE` needed widening and
+  nor did two of `connection.rs`'s own methods; and
+  `screenshots.rs`'s section banners are gone. The definition of
+  done above now records what the unchanged test count does not
+  prove.
+
+  Declined, with reasons: the twelve-line note above `impl RyllApp`
+  stays where it is rather than returning to the arms, since
+  restoring the pointer costs the eighty-line budget the operator
+  chose to keep; and the `#[expect]`-over-`#[allow]` preference is
+  not written into `STYLEGUIDE.md` here, because the last phase of
+  the master plan establishes that convention and sweeps the
+  seventy-eight existing `#[allow]`s with it.
+
+  Filed rather than fixed: the auto-snapshot retire cap permits one
+  more thread than its doc comment claims, which moved verbatim and
+  predates the plan, as shakenfist/ryll#716.
+
+  Found while acting on the review, and not in it: step 3a left
+  `app/mod.rs` with an intra-doc link to
+  `MAX_RETIRING_AUTO_SNAPSHOT_THREADS` after moving that constant to
+  `app/connection.rs`, so the link had been dangling since that
+  commit. `make lint` runs no rustdoc, so nothing in the repository
+  would have caught it. The link now names the child module, and a
+  `cargo doc` pass over the crate's private items is how it was
+  found.
 
 ## Back brief
 
