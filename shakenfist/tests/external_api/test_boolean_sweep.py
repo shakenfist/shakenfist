@@ -327,6 +327,45 @@ BOOLEAN_READS = {
         'verdict': 'agrees',
     },
 
+    # Whether to fetch an issuer's OpenID Connect discovery document.
+    # The observable is whether the fetch happened at all, which is the
+    # whole meaning of the parameter -- and it cannot be vacuous,
+    # because a row where true and false both dial out, or neither
+    # does, fails the anti-vacuity gate before any spelling is
+    # compared. Spied rather than run because the real thing is an
+    # outbound HTTPS request, and because the document it returns has
+    # to name the issuer being configured or the handler refuses it.
+    #
+    # `jwks_uri` is supplied in both bodies, which makes discovery best
+    # effort. That matters here: it means a misread spelling cannot
+    # turn the request into a refusal, so nothing else about the
+    # response moves while this row measures the call.
+    ('AuthIssuersEndpoint', 'post', 'discover'): {
+        'method': 'post',
+        'url': '/auth/issuers',
+        'body': {'name': 'boolsweep{unique}',
+                 'issuer_url': 'https://bool{unique}.example.com',
+                 'jwks_uri': 'https://bool{unique}.example.com/jwks',
+                 'audience': 'boolsweep'},
+        'spy': {'target': 'shakenfist.oidc_discovery.fetch',
+                'returns': {'issuer': 'https://bool.example.com',
+                            'jwks_uri': 'https://bool.example.com/jwks'}},
+        'read': 'called',
+        'verdict': 'agrees',
+    },
+    ('AuthIssuerEndpoint', 'put', 'discover'): {
+        'method': 'put',
+        'url': '/auth/issuers/sweepissuer',
+        'body': {'issuer_url': 'https://issuer.example.com',
+                 'jwks_uri': 'https://issuer.example.com/jwks',
+                 'audience': 'boolsweep'},
+        'spy': {'target': 'shakenfist.oidc_discovery.fetch',
+                'returns': {'issuer': 'https://issuer.example.com',
+                            'jwks_uri': 'https://issuer.example.com/jwks'}},
+        'read': 'called',
+        'verdict': 'agrees',
+    },
+
     # The three delete-all confirmations. `if confirm is not True` is an
     # identity test, so 'true' is refused even though the published
     # schema says it is a valid boolean meaning True. Kept: a rollback

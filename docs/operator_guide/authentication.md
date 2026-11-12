@@ -154,14 +154,30 @@ namespace operation. It says the cluster will believe tokens this
 provider signs, so the decision belongs with whoever is responsible
 for the cluster rather than with an individual namespace owner.
 
-Four fields, all mandatory:
+Three fields are mandatory, and three more are optional:
 
-| Field | Notes |
-|-------|-------|
-| `name` | How rules refer to this issuer. Treat it as durable |
-| `issuer_url` | Compared to a token's `iss` claim **exactly**: no normalisation, no trailing-slash tolerance |
-| `jwks_uri` | Where the signing keys are published. Always taken from here, never from the token |
-| `audience` | Tokens must be minted for this. Usually your cluster's API URL |
+| Field | Required | Notes |
+|-------|----------|-------|
+| `name` | Yes | How rules refer to this issuer. Treat it as durable |
+| `issuer_url` | Yes | Compared to a token's `iss` claim **exactly**: no normalisation, no trailing-slash tolerance |
+| `audience` | Yes | Tokens must be minted for this. Usually your cluster's API URL |
+| `jwks_uri` | No | Where the signing keys are published. Always taken from here, never from the token. Left out, it is [discovered](#discovery) from the provider |
+| `client_id` | No | The OAuth client identifier you registered at the provider for human login. A workload exchange never reads it |
+| `oidc_scopes` | No | The OpenID Connect scopes to request at human login, as one space separated string such as `openid profile groups`. A workload exchange never reads it |
+
+An issuer which only verifies workload tokens -- GitHub Actions, say --
+has no client registration at its provider and never will, which is why
+`client_id` and `oidc_scopes` are optional. An issuer with a `client_id` and a
+discovered login endpoint is [login capable](#human-login-metadata).
+
+Every one of `issuer_url`, `jwks_uri`, `audience`, `client_id` and
+`oidc_scopes` may be up to 255 characters, which is what their columns
+hold. Discovered endpoints may be up to 1024. A longer value is
+refused with a **422** rather than stored, because a value between the
+limit and the column was previously accepted and then truncated by the
+database -- and a truncated `issuer_url` or `jwks_uri` means tokens
+checked against the wrong issuer, or signing keys fetched from the
+wrong place.
 
 The exact `issuer_url` comparison is deliberate. A loose comparison
 here is a way to accept tokens from somewhere else entirely, so if
@@ -175,6 +191,197 @@ trailing slash before checking anything else.
     same name silently rebinds every rule that named it, potentially
     to a different identity provider than the rules' authors intended.
     Renaming rather than recreating avoids this.
+
+### Discovery
+
+Most identity providers publish an OpenID Connect discovery document
+at `<issuer_url>/.well-known/openid-configuration`, saying where their
+keys and login endpoints are. Shaken Fist fetches it so that you can
+configure a provider by its issuer URL and audience alone.
+
+Discovery runs when an administrator asks and at no other time: when
+an issuer is created, when it is updated, and when it is explicitly
+refreshed (below). It never runs on a timer and never while a request
+is being served, because putting an identity provider on a path that
+cluster operation depends on would make the cluster less reliable in
+the name of making it more convenient. The price is that an endpoint
+which moves at the provider stays stale here until somebody refreshes
+the issuer.
+
+What it fills in on the issuer:
+
+* `jwks_uri`, when you did not supply one.
+* `authorization_endpoint`, `token_endpoint` and
+  `device_authorization_endpoint`, which a human login flow starts
+  from. A provider which does not offer the device code grant simply
+  publishes no device endpoint, and the issuer then has none. A
+  successful run replaces all three, so a provider which stops
+  publishing one stops being advertised as having it.
+* `discovered_at`, the time of the last successful run.
+
+It cannot fill in `client_id` or `oidc_scopes`. Those are a
+registration you make at the provider, and no document says what you
+registered.
+
+The document's `issuer` member must equal the `issuer_url` you
+configured **exactly**, character for character, or the document is
+refused and nothing is taken from it. Without that, a document fetched
+from one place could name endpoints belonging to somewhere else, and
+users would be sent to log in there. The commonest cause of a refusal
+is a trailing slash: Authentik's issuer ends in one
+(`https://idp.example.com/application/o/sf/`) and Keycloak's does not
+(`https://idp.example.com/realms/sf`), and the value you configure has
+to be the one the provider writes in its own document, which is also
+the one it writes in the `iss` claim of its tokens. The refusal names
+both values. Shaken Fist takes care of the slash when it builds the
+URL to fetch, so configuring Authentik's issuer with its slash does not
+produce a doubled one.
+
+The fetch is also refused if `issuer_url` is not `https://` or carries
+a URL query or fragment (an OpenID Connect issuer identifier may have
+neither, and the discovery URL is built by appending to it), if the
+response is a redirect, is larger than
+`FEDERATION_DISCOVERY_MAX_BYTES`, or takes longer than
+`FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS` to send its body, or if
+the document is not JSON, does not carry an `https://` `jwks_uri`, or
+names an endpoint longer than this cluster can store. Redirects are not followed,
+for the same reason and with the same symptom as the JWKS fetch: see
+[The JWKS URI must be the final URL](#the-jwks-uri-must-be-the-final-url).
+Certificate authorities are handled as they are for JWKS fetches too,
+so `FEDERATION_JWKS_CA_BUNDLE` covers a private provider for discovery
+as well.
+
+???+ warning "Configure issuers after a deploy finishes, not during one"
+
+    The discovery columns were added to `trusted_issuer_attributes` in
+    the same release as this feature, so during a rolling upgrade a
+    new `sf-api` may be talking to an `sf-database` that does not know
+    them yet. A create in that window writes the three original
+    columns and silently drops the `client_id` and the discovered
+    endpoints, so the issuer comes back with them null and never
+    appears in `GET /auth/login`. An update fails loudly instead,
+    which is the better half of the behaviour.
+
+    Nothing needs backfilling -- null correctly means "not discovered
+    yet" -- but an issuer configured mid-deploy needs its `client_id`
+    re-sent and its discovery re-run once the deploy has finished.
+
+#### When discovery must succeed
+
+If you did not supply a `jwks_uri`, the issuer depends on discovery to
+have one, so a failed fetch fails the request with a **502** carrying
+the reason, and nothing is created or changed. If this cluster cannot
+build a TLS trust store at all (a bad `FEDERATION_JWKS_CA_BUNDLE`) the
+answer is a **503** instead, because the provider was never asked.
+
+If you did supply a `jwks_uri`, discovery is best effort: it is still
+attempted, for the login endpoints, but a failure is logged, recorded
+as an audit event on the issuer, and the request succeeds. This is what
+keeps an issuer for a provider which publishes no document, or none
+reachable from here, working exactly as it did before discovery
+existed.
+
+Your `jwks_uri` always wins. If the document names a different one,
+yours is kept and the disagreement is recorded as an audit event
+naming both. It is not refused because the right value is sometimes
+deliberately not the published one, such as a provider whose published
+JWKS path redirects to a CDN.
+
+To skip the fetch entirely, send `"discover": false`. A `jwks_uri` is
+then mandatory, since nothing else could supply it.
+
+#### Re-running discovery
+
+```bash
+curl -X POST https://sf.example.com/auth/issuers/corporate/discover \
+  -H "Authorization: Bearer ${SF_ADMIN_TOKEN}"
+```
+
+This fetches the document again and returns the issuer. It changes
+the three endpoints and `discovered_at`, and fills in a `jwks_uri` the
+issuer does not have yet. It never touches your `audience`,
+`client_id` or `oidc_scopes`. Unlike
+a create or an update it always treats a failure as a failure, with a
+**502** or **503** as above, because a fetch is the only thing you
+asked for and a 200 for one that did not happen would be a lie.
+
+A refresh keeps the `jwks_uri` the issuer already has, whether you
+supplied it or an earlier run found it. If a provider has moved its
+keys, send an update without a `jwks_uri` so that discovery supplies
+it afresh.
+
+### Updating an issuer
+
+An update (`PUT /auth/issuers/<name>`) replaces `issuer_url`,
+`jwks_uri` and `audience` together, as it always has: they are one
+coherent configuration, and a new `issuer_url` kept alongside a stale
+`jwks_uri` is a broken issuer rather than a partly updated one.
+Sending the update without a `jwks_uri` therefore does not keep the old
+one; it asks discovery for a fresh one.
+
+`client_id` and `oidc_scopes` behave differently. If the request does
+not mention them they are **left alone**, and sending one as an empty
+string **clears** it. They are a client registration at the provider
+rather than part of the identity of the issuer, and every script
+written before they existed sends an update without them, so
+correcting an `audience` must not quietly turn off human login. An
+explicit `null` counts as not mentioning it.
+
+The discovered endpoints are left alone too when no discovery ran, or
+when a best effort run failed. They are replaced only by a successful
+run.
+
+An issuer which ends a write with a `client_id` and no `oidc_scopes` is
+stored with `oidc_scopes` set to `openid`, because every OpenID Connect
+flow must request that scope and a registration without it is one no
+client could use. This holds whichever request supplied the pieces: set
+the scopes first and the client later, or the reverse, and you get the
+same result. To manage the list yourself, send `oidc_scopes` as an
+empty string in the same request; the default is not applied over an
+explicit clear.
+
+The default has no converse: clearing a `client_id` on its own leaves
+the `oidc_scopes` behind. The issuer stops being login capable, because
+`client_id` is the half that decides that, so nothing is served for it
+and no flow breaks -- but the row keeps a scope list for a registration
+that no longer exists. Clear both in the same request if you want the
+row to read cleanly.
+
+### Human login metadata
+
+`GET /auth/login` lists the identity providers this cluster offers for
+human login. It needs **no credential**, because a person about to log
+in does not have one yet, and the endpoint which lists issuers for
+administrators is not available to them. An issuer is **login
+capable**, and appears, when it has a `client_id` and at least one of
+an `authorization_endpoint` or a `device_authorization_endpoint`. An
+issuer which only verifies workload tokens never appears. An empty
+list means the cluster offers no human login.
+
+Each entry serves `name`, `issuer_url`, `client_id`, `oidc_scopes` and
+whichever of the three endpoints are set, and nothing else. In
+particular the `jwks_uri`, the `audience`, and the issuer's uuid and state
+are withheld. You should still know that it exists, because it tells
+anyone who asks which identity provider your cluster trusts for human
+login, and so where they might aim a phishing page. The provider's
+endpoints are public at the provider anyway, which is why this is
+judged acceptable.
+
+Requests are rate limited per source address, using the same
+`FEDERATION_RATE_LIMIT_PER_MINUTE` value as the exchange but a counter
+of its own. The separation means a CI fleet behind one NAT address
+exhausting its exchange budget does not stop people in the same office
+logging in, nor the reverse. The same caveat about reverse proxies
+applies as for the exchange. A limited caller gets a **429**, and if the
+database cannot be reached to count the request, a **503**.
+
+Setting `FEDERATION_RATE_LIMIT_PER_MINUTE` to `0` disables the limit on
+this endpoint too, not only on the exchange. That is worth knowing
+before you choose it: this endpoint reads one row per configured issuer
+on every request and caches nothing, so with the limit off an anonymous
+caller turns each request into a read per issuer with nothing counting
+them. The exchange, by contrast, bounds its body and does its cheap
+local checks before touching anything.
 
 ### Delegating to namespace owners
 
@@ -324,8 +531,10 @@ exchange answers 503 rather than assuming the request is fine.
 | `FEDERATION_JWKS_CACHE_SECONDS` | 300 | How long an issuer's published keys are cached. Lower shortens the window in which a revoked key is still accepted; higher reduces load on the provider. An unknown key id can also force a refetch before this expires, so raising this does not by itself delay recognising a rotated key |
 | `FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS` | 30 | The shortest interval between a successful JWKS fetch and a refetch forced by an unrecognised key id, measured from any successful fetch and not only from a previous forced one. A rotation landing inside the window is not recognised until it elapses; without a window, every invented key id a stranger sends is another fetch. `0` fetches on every unrecognised key id |
 | `FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait for an issuer's JWKS endpoint. The fetch happens while holding that issuer's refetch lock, so this is also the longest one unreachable provider can pin an API worker |
+| `FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait when fetching an issuer's discovery document. Separate from the JWKS timeout because discovery only runs when an administrator configures an issuer, where a slow provider costs that administrator one request, while the JWKS fetch can pin an API worker per anonymous exchange. Applied three times: to the connect, to each read, and as a deadline over the body once the response starts, so one fetch is bounded at roughly twice this value. Must be at least 1 |
+| `FEDERATION_DISCOVERY_MAX_BYTES` | 65536 | Largest discovery document accepted, in bytes. The body is read up to this limit and refused beyond it, rather than trusting the provider's `Content-Length`, so a login page or a misbehaving proxy cannot hand us an unbounded response. A real document is a few kilobytes |
 | `FEDERATION_MAX_TOKEN_BYTES` | 16384 | Largest exchange request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no `Content-Length` is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit |
-| `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Exchange attempts allowed per source address per minute. `0` disables rate limiting entirely |
+| `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Attempts allowed per source address per minute, counted separately for the exchange and for `GET /auth/login`. `0` disables rate limiting entirely, on both |
 | `FEDERATION_JWKS_CA_BUNDLE` | *(empty)* | Path to a PEM bundle of extra certificate authorities to trust when fetching an issuer's JWKS. Empty means the system trust store alone |
 
 ### When an issuer rotates its signing keys
@@ -388,7 +597,8 @@ PEM file of the extra authorities to trust, and place that file on
 every node — any node may serve `/auth/federated`. The ansible
 collection's `node` role takes this as `federation_jwks_ca_bundle`;
 getting the file itself onto the nodes is yours to arrange, since it is
-usually the same bundle the rest of your fleet already has.
+usually the same bundle the rest of your fleet already has. The same
+bundle is used when fetching the provider's [discovery document](#discovery).
 
 These anchors are **added** to the system ones rather than replacing
 them, so configuring a private provider does not stop a public one such

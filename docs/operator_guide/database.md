@@ -1416,7 +1416,7 @@ dedicated attribute tables:
 | `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written. Instance placement lives in `object_references` as `instance_location` rows since `object_references` schema v3; the dual-write and the union into reads have been removed; the legacy `instances` JSON column itself remains in place (nullable, unread) as a rollback fallback until a later release drops it |
 | `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON). Keys live in `namespace_keys` / `namespace_key_attributes` since the v2 `namespace_keys` migration; the legacy `keys` JSON column is left in place until a later schema bump drops it |
 | `namespace_key_attributes` | NamespaceKey | uuid, key (base64 encoded bcrypt hash), nonce, expiry (nullable epoch seconds), scopes (nullable JSON list), provenance (nullable JSON dict) |
-| `trusted_issuer_attributes` | TrustedIssuer | uuid, issuer_url, jwks_uri, audience |
+| `trusted_issuer_attributes` | TrustedIssuer | uuid, issuer_url, jwks_uri (nullable since v2), audience, authorization_endpoint (nullable LONGTEXT), token_endpoint (nullable LONGTEXT), device_authorization_endpoint (nullable LONGTEXT), client_id (nullable), oidc_scopes (nullable, space separated), discovered_at (nullable epoch seconds) |
 | `mapping_rule_attributes` | MappingRule | uuid, issuer, bound_claims (JSON dict), scopes (JSON list), key_ttl, key_name_prefix |
 | `artifact_attributes` | Artifact | uuid, max_versions, shared, highest_index |
 | `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |

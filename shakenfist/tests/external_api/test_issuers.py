@@ -39,6 +39,26 @@ class IssuerEndpointTestCase(base.ShakenFistTestCase):
         self.mock_mariadb.create_namespace('system', 'key1', 'bar')
         self.mock_mariadb.create_namespace('banana', 'key1', 'bacon')
 
+        # Every create and update below supplies a jwks_uri, which is
+        # the only shape any issuer configured before discovery existed
+        # has -- and for such an issuer discovery is best effort, so
+        # these tests describe what happens against a provider which
+        # publishes no document we can reach. That is also the honest
+        # case for the issuer this file configures: GitHub Actions is
+        # trusted to vouch for workloads and nobody logs into it.
+        #
+        # Mocked rather than left alone because the real thing is an
+        # outbound HTTPS request. Unmocked, this file dials
+        # token.actions.githubusercontent.com on every create, which is
+        # a unit suite making network calls and a unit suite whose
+        # answers depend on somebody else's uptime.
+        self.fetch = mock.patch(
+            'shakenfist.oidc_discovery.fetch',
+            side_effect=exceptions.OIDCDiscoveryFailed(
+                'this test configures no discovery document'))
+        self.fetch.start()
+        self.addCleanup(self.fetch.stop)
+
         self.client = external_api.app.test_client()
         self.admin = self._token('system', 'bar')
         self.user = self._token('banana', 'bacon')
@@ -184,7 +204,13 @@ class IssuerEndpointTestCase(base.ShakenFistTestCase):
                          resp.get_json()['audience'])
 
     def test_required_fields_are_required(self):
-        for field in ('name', 'issuer_url', 'jwks_uri', 'audience'):
+        # jwks_uri is deliberately not in this list any more: it is
+        # optional now, and omitting it asks discovery for the value
+        # instead. What happens then is
+        # test_issuer_discovery.py's subject, including that a failed
+        # discovery refuses the create rather than making a
+        # half-configured issuer.
+        for field in ('name', 'issuer_url', 'audience'):
             resp = self._create(**{field: None})
             self.assertEqual(
                 400, resp.status_code,

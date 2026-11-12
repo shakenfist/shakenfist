@@ -329,8 +329,25 @@ class TrustedIssuerColumnValuesTestCase(base.ShakenFistTestCase):
             audience='https://sf.example.com')
 
     def test_no_mask_returns_every_column(self):
+        # Derived from the model rather than retyped, because this map
+        # is hand written and a field missing from it fails silently:
+        # the insert leaves that column at its default, and the masked
+        # update raises only if some caller happens to name it. The
+        # discovery columns were exactly that -- declared on the model
+        # and on the wire, and absent here -- so an issuer's endpoints
+        # would have read as null however they were configured.
         values = mariadb._trusted_issuer_attributes_column_values(self.data)
-        self.assertEqual({'issuer_url', 'jwks_uri', 'audience'}, set(values))
+        self.assertEqual(
+            # uuid is the primary key, supplied by the writer rather
+            # than mapped, so it is the one field deliberately absent.
+            set(TrustedIssuerAttributesData.model_fields) - {'uuid'},
+            set(values))
+
+    def test_every_column_can_be_masked(self):
+        for field in set(TrustedIssuerAttributesData.model_fields) - {'uuid'}:
+            values = mariadb._trusted_issuer_attributes_column_values(
+                self.data, [field])
+            self.assertEqual([field], list(values))
 
     def test_mask_limits_columns(self):
         # issuer_url and jwks_uri travel together -- a new URL with the

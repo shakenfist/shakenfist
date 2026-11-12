@@ -126,6 +126,50 @@ class KerbsideTokenDurationTestCase(base.ShakenFistTestCase):
         self.assertEqual(300, SFConfig().KERBSIDE_TOKEN_DURATION)
 
 
+class DiscoverySettingBoundsTestCase(base.ShakenFistTestCase):
+    """Neither discovery setting may be zero.
+
+    Zero reads as "no limit" to anybody setting it, and means the
+    opposite here: a zero byte cap refuses every document on its first
+    chunk, and a zero timeout fails every connect and expires the body
+    deadline before the first read. Both break discovery cluster wide
+    with a message which blames the provider, so they are refused at
+    load where the operator can still see what they typed.
+    """
+
+    @mock.patch.dict(
+        'os.environ',
+        {'SHAKENFIST_FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS': '0'})
+    def test_a_zero_fetch_timeout_is_refused(self):
+        self.assertRaises(ValueError, SFConfig)
+
+    @mock.patch.dict(
+        'os.environ',
+        {'SHAKENFIST_FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS': '-1'})
+    def test_a_negative_fetch_timeout_is_refused(self):
+        self.assertRaises(ValueError, SFConfig)
+
+    @mock.patch.dict(
+        'os.environ', {'SHAKENFIST_FEDERATION_DISCOVERY_MAX_BYTES': '0'})
+    def test_a_zero_byte_cap_is_refused(self):
+        self.assertRaises(ValueError, SFConfig)
+
+    @mock.patch.dict(
+        'os.environ', {'SHAKENFIST_FEDERATION_DISCOVERY_MAX_BYTES': '-1'})
+    def test_a_negative_byte_cap_is_refused(self):
+        self.assertRaises(ValueError, SFConfig)
+
+    @mock.patch.dict(
+        'os.environ',
+        {'SHAKENFIST_FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS': '1',
+         'SHAKENFIST_FEDERATION_DISCOVERY_MAX_BYTES': '1024'})
+    def test_the_smallest_usable_values_load(self):
+        config = SFConfig()
+        self.assertEqual(
+            1, config.FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS)
+        self.assertEqual(1024, config.FEDERATION_DISCOVERY_MAX_BYTES)
+
+
 class SecretConfigFieldTestCase(base.ShakenFistTestCase):
     """The three configuration values which carry credentials.
 

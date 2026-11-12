@@ -525,6 +525,45 @@ is the last thing that happens before minting, so a refusal for any
 other reason -- claims that do not match, a rule that has been deleted
 -- leaves the token still usable.
 
+### Discovery
+
+An issuer's configuration does not have to be typed in by hand. When an
+administrator creates, updates or explicitly refreshes an issuer, the
+cluster fetches its OpenID Connect discovery document and stores the
+`jwks_uri` (unless the administrator supplied one, which always wins)
+and the authorisation, token and device authorisation endpoints on the
+issuer object. The mechanics are in `shakenfist/oidc_discovery.py`, and
+the operator's view is in the
+[operator guide](/operator_guide/authentication/#discovery).
+
+Discovery populates configuration, at configuration time, and nothing
+else about the exchange changes. Validation still reads the issuer
+object and never the token: the `jwks_uri` a signature is checked
+against is the one stored on the issuer, whoever or whatever put it
+there, and a token still cannot name its own key source. Nothing in the
+exchange performs discovery, and nothing runs it on a timer, so an
+unreachable identity provider cannot affect a request that does not
+involve it. That is why the security property of the exchange is
+unchanged by this feature.
+
+The one check which makes the fetched document trustworthy is that its
+`issuer` member equals the configured `issuer_url` byte for byte. It is
+the mirror of the exact `iss` comparison in the exchange, and it is
+deliberately not loosened: the document names endpoints a person's
+browser will be sent to, so a document which belongs to a different
+issuer is a complete compromise of human login. The fetch itself is
+https only, refuses redirects, bounds the time and size of the
+response, and uses the same trust store as the JWKS fetch.
+
+Two fields a login flow needs cannot be discovered, because they are a
+registration the operator makes at the provider: `client_id` and
+`oidc_scopes`. An issuer is *login capable* when it has a `client_id`
+and a device or authorisation endpoint, and only those appear in the
+unauthenticated `GET /auth/login` listing a client reads before it holds
+any Shaken Fist credential. That endpoint builds each entry field by
+field rather than from the issuer's own view of itself, so that a field
+added to the object later is not published without somebody deciding to.
+
 ### Configuring it
 
 Configuring an issuer and writing a mapping rule are operator tasks, and

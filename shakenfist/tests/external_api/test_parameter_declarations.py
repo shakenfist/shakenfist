@@ -879,8 +879,8 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
                    'behind' if guarded else 'not behind', declared))
 
         self.assertEqual(
-            28, guarded_count,
-            'expected 28 handlers behind caller_is_admin, found %d. If the '
+            29, guarded_count,
+            'expected 29 handlers behind caller_is_admin, found %d. If the '
             'count changed on purpose, update it here.' % guarded_count)
 
 

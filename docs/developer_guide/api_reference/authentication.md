@@ -306,12 +306,19 @@ signs OIDC-style JWTs. Issuers are cluster-wide and administrative --
 deciding who may vouch for identities here is not a per-namespace
 decision -- so every call below requires the `system` namespace.
 
-An issuer records four things: a `name` used to refer to it, the
-`issuer_url` that must match a token's `iss` claim exactly, the
-`jwks_uri` its signing keys are published at, and the `audience` its
-tokens must be minted for. The `jwks_uri` always comes from this
-record and never from the token, because a token naming its own key
-source is a token vouching for itself.
+An issuer records a `name` used to refer to it, the `issuer_url` that
+must match a token's `iss` claim exactly, the `jwks_uri` its signing keys
+are published at, and the `audience` its tokens must be minted for. The
+`jwks_uri` always comes from this record and never from the token,
+because a token naming its own key source is a token vouching for itself.
+
+It may also record what is needed for human login: a `client_id` and
+`oidc_scopes` (a single space separated string) which an administrator
+supplies, and the `authorization_endpoint`, `token_endpoint` and
+`device_authorization_endpoint` which discovery fills in, with
+`discovered_at` (epoch seconds) recording the last successful run. All
+of these are returned by every call that returns an issuer, as `null`
+when unset. See [Discovery](#discovery) below.
 
 Both the `name` and the `issuer_url` must be unique among live issuers,
 and a second issuer claiming either is refused with a 409. Uniqueness
@@ -337,6 +344,7 @@ administrators configure the same provider at the same moment.
     * [GET /auth/issuers/{issuer_name}](https://openapi.shakenfist.com/#/auth/get_auth_issuers__issuer_name_): Fetch one trusted issuer.
     * [PUT /auth/issuers/{issuer_name}](https://openapi.shakenfist.com/#/auth/put_auth_issuers__issuer_name_): Update a trusted issuer.
     * [DELETE /auth/issuers/{issuer_name}](https://openapi.shakenfist.com/#/auth/delete_auth_issuers__issuer_name_): Remove a trusted issuer.
+    * [POST /auth/issuers/{issuer_name}/discover](https://openapi.shakenfist.com/#/auth/post_auth_issuers__issuer_name__discover): Re-run discovery on a trusted issuer.
 
 ??? example "Configuring GitHub Actions as a trusted issuer"
 
@@ -359,6 +367,133 @@ administrators configure the same provider at the same moment.
     working, because the exchange can no longer resolve the issuer.
     Recreating an issuer under the same name rebinds every rule that
     named it, so treat the name as the durable identifier it is.
+
+### Issuer request bodies
+
+`POST /auth/issuers` takes:
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `name` | Yes | Unique among live issuers |
+| `issuer_url` | Yes | Exact `iss` value. Up to 255 characters |
+| `audience` | Yes | Up to 255 characters |
+| `jwks_uri` | No | Must be `https://` when given. Up to 255 characters. When omitted, discovery supplies it |
+| `client_id` | No | Up to 255 characters |
+| `oidc_scopes` | No | Space separated. Up to 255 characters. Stored as `openid` if a `client_id` is set and this is not |
+| `discover` | No | Boolean, default `true`. `false` skips the discovery fetch, and then `jwks_uri` is required |
+
+`PUT /auth/issuers/{issuer_name}` takes the same body without `name`.
+It replaces `issuer_url`, `jwks_uri` and `audience` together: omitting
+`jwks_uri` does not keep the old value but asks discovery for a new
+one. `client_id` and `oidc_scopes` are different. Omitted (or `null`),
+they are left as they were; sent as an empty string, they are cleared.
+That keeps a body written before these fields existed from switching
+off human login as a side effect of correcting an audience.
+
+The responses are:
+
+| Status | Meaning |
+|--------|---------|
+| 200 | The issuer, as created or updated |
+| 400 | A required field is missing or malformed, or `discover` is false and there is no `jwks_uri` |
+| 404 | `PUT` only: no such issuer |
+| 409 | An issuer with that name (`POST`) or `issuer_url` is already configured |
+| 422 | A field is longer than its limit |
+| 502 | No `jwks_uri` was supplied and the discovery fetch failed or its document was refused. The message says why |
+| 503 | No `jwks_uri` was supplied and this cluster cannot build a TLS trust store to fetch with (a bad `FEDERATION_JWKS_CA_BUNDLE`) |
+
+The 502 and 503 arise only when discovery is required. When a
+`jwks_uri` is supplied, a failed fetch is logged, audited on the issuer
+and ignored, and the call returns 200: that is what keeps every issuer
+configured before discovery existed working against a provider with no
+discovery document. The same applies when the document names a
+different `jwks_uri` from the one supplied; the supplied one is kept and
+the difference is audited.
+
+??? example "Configuring a provider by its issuer URL alone"
+
+    ```bash
+    curl -X POST https://sf.example.com/auth/issuers \
+      -H "Authorization: Bearer ${SF_ADMIN_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d '{
+            "name": "corporate",
+            "issuer_url": "https://idp.example.com/application/o/sf/",
+            "audience": "https://sf.example.com",
+            "client_id": "shakenfist"
+          }'
+    ```
+
+    The `issuer_url` carries a trailing slash because that is what this
+    provider writes in its own discovery document; discovery is refused
+    if the two differ at all. `oidc_scopes` is stored as `openid`.
+
+### Discovery
+
+`POST /auth/issuers/{issuer_name}/discover` fetches the issuer's OpenID
+Connect discovery document again and writes the three endpoints and
+`discovered_at` from it. It takes no body, and requires the `system`
+namespace. It never changes `audience`, `client_id` or `oidc_scopes`,
+and it keeps the `jwks_uri` the issuer already has, filling in one the
+issuer does not have yet. It returns the issuer.
+
+| Status | Meaning |
+|--------|---------|
+| 200 | The issuer, with what discovery found |
+| 404 | No such issuer |
+| 409 | The issuer's `issuer_url` changed while the document was being fetched, so what came back describes a provider this issuer no longer names. Nothing was written; run discovery again |
+| 502 | The fetch failed or the document was refused. The message says why. Unlike a create or update, a failure here is never ignored |
+| 503 | This cluster cannot build a TLS trust store to fetch with |
+
+Discovery runs only on a create, an update and this call, never on a
+timer or while serving another request. A document is refused unless its
+`issuer` member equals the issuer's `issuer_url` exactly and it carries
+an `https://` `jwks_uri`; the fetch does not follow redirects. The
+operator guide has the [full account](/operator_guide/authentication/#discovery).
+
+## Login metadata
+
+`GET /auth/login` lists the identity providers this cluster offers for
+human login. It is unauthenticated by nature: the caller is about to
+log in and holds no Shaken Fist credential, and `GET /auth/issuers` is
+admin only. It is rate limited per source address, with a budget of its
+own separate from `POST /auth/federated`.
+
+```json
+[
+  {
+    "name": "corporate",
+    "issuer_url": "https://idp.example.com/application/o/sf/",
+    "client_id": "shakenfist",
+    "oidc_scopes": "openid profile groups",
+    "authorization_endpoint": "https://idp.example.com/application/o/authorize/",
+    "token_endpoint": "https://idp.example.com/application/o/token/",
+    "device_authorization_endpoint": "https://idp.example.com/application/o/device/"
+  }
+]
+```
+
+Only login capable issuers are listed: those with a `client_id` and at
+least one of `authorization_endpoint` or `device_authorization_endpoint`.
+The three endpoint keys appear only when set, so a missing
+`device_authorization_endpoint` means the provider offers no device flow
+and a client should fall back to the authorisation code flow. Nothing
+else about an issuer is served; in particular `jwks_uri`, `audience`,
+`uuid` and `state` are not. An empty list means this cluster offers no
+human login.
+
+???+ tip "REST API calls"
+
+    * [GET /auth/login](https://openapi.shakenfist.com/#/auth/get_auth_login): List the identity providers offered for human login.
+
+| Status | Meaning |
+|--------|---------|
+| 200 | The list, possibly empty |
+| 429 | Too many requests from this source address |
+| 503 | The database was unavailable, so the request could not be counted |
+
+A client can detect both features from the `auth` family of the API
+capabilities: `issuer-discovery` and `human-login-metadata`.
 
 ## Mapping rules
 

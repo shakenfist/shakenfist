@@ -400,6 +400,44 @@ def _get_sqlalchemy_type(
     return mysql.LONGTEXT()
 
 
+def stored_max_length(
+        model: type[BaseModel], field_name: str) -> Optional[int]:
+    """How many characters this field's generated column can really hold.
+
+    Field(max_length=...) constrains what the model accepts. It does not
+    reach the generated DDL: _get_sqlalchemy_type() maps str to
+    VARCHAR(255) whatever the declared limit says, and only the
+    SQLLongText() marker changes that. The declared limit and the
+    column's capacity are therefore independent numbers, so a field
+    declaring more than its column holds accepts a value which MariaDB
+    then refuses or, with strict mode off, silently truncates.
+
+    This returns the smaller of the two, taken from the same
+    _get_sqlalchemy_type() call pydantic_to_sqlalchemy_table() builds the
+    column with, so a validator written against it cannot drift from the
+    schema. None means nothing applies: a LONGTEXT column whose field
+    declares no limit.
+
+    Validate operator or third party supplied strings against this
+    rather than against the declared limit, which is the number a reader
+    of the model sees and the one that is wrong.
+    """
+    field_info = model.model_fields[field_name]
+    column_limit = getattr(
+        _get_sqlalchemy_type(field_info.annotation, field_info.metadata),
+        'length', None)
+
+    declared = None
+    for item in field_info.metadata:
+        candidate = getattr(item, 'max_length', None)
+        if candidate is None:
+            continue
+        declared = candidate if declared is None else min(declared, candidate)
+
+    limits = [limit for limit in (column_limit, declared) if limit is not None]
+    return min(limits) if limits else None
+
+
 def pydantic_to_sqlalchemy_table(
         model: type[BaseModel],
         table_name: str,

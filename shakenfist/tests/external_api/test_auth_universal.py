@@ -37,6 +37,14 @@ EXPECTED_PUBLIC = {
     # namespace owner wrote; see
     # docs/plans/PLAN-auth-federation-phase-03-exchange.md.
     ('AuthFederatedEndpoint', 'post'),
+    # Lists the identity providers a person may log in through. Reached
+    # by somebody who holds no Shaken Fist credential and is about to
+    # ask a provider for an identity, so it cannot require one, and the
+    # administrator's issuer listing is not available to them. It
+    # serves a deliberately narrow field list -- no jwks_uri, no
+    # audience, no uuid and no state -- and is rate limited per source
+    # like the exchange above.
+    ('AuthLoginEndpoint', 'get'),
 }
 
 HTTP_METHODS = ('get', 'post', 'put', 'delete', 'patch')

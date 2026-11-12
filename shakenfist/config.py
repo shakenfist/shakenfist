@@ -548,6 +548,53 @@ class SFConfig(BaseSettings):
             'blackholing traffic exhausts the worker pool.'
         )
     )
+    FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS: int = Field(
+        5,
+        # ge=1 because 0 does not mean "no timeout" here: the HTTP
+        # library would fail every connect immediately, and the body
+        # deadline below would expire before the first chunk, so every
+        # fetch would be refused with a message blaming the provider.
+        ge=1,
+        description=(
+            'How long in seconds to wait for a trusted issuer\'s OpenID '
+            'Connect discovery document before giving up. Separate from '
+            'FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS, whose value is tied to '
+            'the request path hazard of one unreachable provider pinning an '
+            'API worker per queued anonymous exchange: discovery runs only '
+            'when an administrator creates, updates or refreshes an issuer, '
+            'where a slow provider costs that administrator their own '
+            'request and nothing else. One setting for both would mean an '
+            'operator who lengthens the administrative timeout lengthens '
+            'the anonymous one too. The value is applied three times: as '
+            'the connect timeout, as the timeout for each individual read, '
+            'and as a deadline over the whole body transfer once the '
+            'response has started. The third is needed because the first '
+            'two are all the HTTP library offers, and a provider which '
+            'sends one byte just inside each read timeout would otherwise '
+            'be bounded only by FEDERATION_DISCOVERY_MAX_BYTES -- which on '
+            'the defaults is days rather than seconds. So the worst case '
+            'for one fetch is roughly this value for the connect plus this '
+            'value for the body.'
+        )
+    )
+    FEDERATION_DISCOVERY_MAX_BYTES: int = Field(
+        65536,
+        # ge=1 for the same reason as the timeout above: 0 does not mean
+        # "unlimited", it refuses every document on the first chunk.
+        ge=1,
+        description=(
+            'The largest OpenID Connect discovery document accepted from a '
+            'trusted issuer, in bytes. The body is read up to this much and '
+            'refused beyond it, rather than being measured by its '
+            'Content-Length, which is what the provider claims rather than '
+            'what it sends. Nothing else bounds a response which is not a '
+            'discovery document at all -- an HTML login page, or a tarball '
+            'behind a misconfigured reverse proxy. A real document is a few '
+            'kilobytes. Distinct from FEDERATION_MAX_TOKEN_BYTES, which '
+            'bounds a request body we are sent rather than a response we '
+            'fetch.'
+        )
+    )
     FEDERATION_JWKS_CA_BUNDLE: str = Field(
         '',
         description=(

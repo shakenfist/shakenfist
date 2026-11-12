@@ -24,6 +24,7 @@ from shakenfist import exceptions
 from shakenfist import federation
 from shakenfist import instance
 from shakenfist import locks
+from shakenfist import oidc_discovery
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
@@ -31,6 +32,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import scopes as api_scopes
+from shakenfist.external_api import validation
 from shakenfist.mapping_rule import MappingRule
 from shakenfist.mapping_rule import MappingRules
 from shakenfist.mapping_rule import MAX_KEY_TTL_SECONDS
@@ -43,6 +45,9 @@ from shakenfist.namespace_claim import ClaimRefused
 from shakenfist.namespace_claim import NamespaceClaim
 from shakenfist.namespace_claim import NamespaceClaims
 from shakenfist.namespace_key import NamespaceKey
+from shakenfist.schema.sqlalchemy import stored_max_length
+from shakenfist.schema.trusted_issuer_attributes import \
+    TrustedIssuerAttributesData
 from shakenfist.trusted_issuer import TrustedIssuer
 from shakenfist.trusted_issuer import TrustedIssuers
 from shakenfist.util import access_tokens
@@ -902,33 +907,111 @@ class AuthNamespaceTrustEndpoint(api_base.Resource):
 
 trusted_issuer_example = """{
     "audience": "https://shakenfist.example.com",
+    "authorization_endpoint": null,
+    "client_id": null,
+    "device_authorization_endpoint": null,
+    "discovered_at": null,
     "issuer_url": "https://token.actions.githubusercontent.com",
     "jwks_uri": "https://token.actions.githubusercontent.com/.well-known/jwks",
     "name": "github",
+    "oidc_scopes": null,
     "state": "created",
+    "token_endpoint": null,
     "uuid": "b2b3a04e-8f22-4a1e-8f8e-2f3b1f7a41ab",
     "version": 1
 }"""
 
 
-def _validate_issuer_arguments(issuer_url, jwks_uri, audience):
+def _stored_limit(name):
+    """The character limit the column behind this issuer field really has.
+
+    One lookup so that the validator here, the discovery fetcher's
+    _require_fits() and the documented limits all answer from the schema
+    rather than from three hand-copied numbers.
+    """
+    return stored_max_length(TrustedIssuerAttributesData, name)
+
+
+def _validate_issuer_arguments(issuer_url, jwks_uri, audience,
+                               client_id=None, oidc_scopes=None,
+                               discover=True):
     """Check the configuration of a trusted issuer.
 
-    Returns an error response, or None. Every field is required: an
-    issuer missing its audience would accept tokens minted for someone
-    else, and one missing its JWKS URI cannot verify a signature at
-    all. There is no sensible default for any of them.
+    Returns an error response, or None.
+
+    issuer_url and audience are required and there is no sensible
+    default for either: an issuer missing its audience would accept
+    tokens minted for someone else.
+
+    jwks_uri is optional, because an issuer which publishes a discovery
+    document says where its keys are in it, and making an operator find
+    and paste the value anyway is the thing discovery exists to stop.
+    What is not optional is that the issuer ends up with one from
+    somewhere, so omitting it means the discovery fetch has to succeed
+    -- and asking for no discovery while supplying no JWKS URI asks for
+    an issuer which can never verify a token, which is refused here
+    rather than created and left broken.
+
+    client_id and oidc_scopes are optional and are only read by a human
+    login flow. An issuer configured to verify a workload's tokens --
+    GitHub Actions, say -- has no client registration at the provider
+    and never will, so requiring one would break every issuer in
+    existence to serve a flow that issuer will never run.
+
+    Every length limit below is stored_max_length() of the field's
+    column, not the max_length its model declares. The two are not the
+    same number: str maps to VARCHAR(255) whatever a field declares, so
+    issuer_url, jwks_uri and audience each declare 1024 and hold 255. A
+    value between the two was accepted here and then refused by MariaDB,
+    or silently truncated where strict mode is off -- and a truncated
+    issuer_url or jwks_uri is a token checked against the wrong issuer
+    or a key set fetched from the wrong place. Nothing which worked is
+    refused by using the real number, because a value longer than the
+    column could never have been stored in the first place. The general
+    defect, that a declared limit never reaches the generated DDL, is
+    recorded in the master plan's future work.
     """
     for name, value in (('issuer_url', issuer_url),
-                        ('jwks_uri', jwks_uri),
                         ('audience', audience)):
         if not value:
             return sf_api.error(400, f'no {name} specified')
         if not isinstance(value, str):
             return sf_api.error(400, f'{name} is not a string')
-        if len(value) > 1024:
+        limit = _stored_limit(name)
+        if len(value) > limit:
             return sf_api.error(
-                422, f'{name} cannot be longer than 1024 characters')
+                422, f'{name} cannot be longer than {limit} characters')
+
+    for name, value in (('client_id', client_id),
+                        ('oidc_scopes', oidc_scopes)):
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            return sf_api.error(400, f'{name} is not a string')
+        limit = _stored_limit(name)
+        if len(value) > limit:
+            return sf_api.error(
+                422, f'{name} cannot be longer than {limit} characters')
+
+    if jwks_uri is None:
+        if not discover:
+            return sf_api.error(
+                400, 'jwks_uri is required when discovery is not requested, '
+                     'because an issuer with no JWKS URI cannot verify a '
+                     'signature at all')
+        return None
+
+    if not isinstance(jwks_uri, str):
+        return sf_api.error(400, 'jwks_uri is not a string')
+    # An empty string is a malformed value rather than an omission. A
+    # caller who means "discover it" leaves the key out or sends null,
+    # both of which arrive here as None above.
+    if not jwks_uri:
+        return sf_api.error(400, 'no jwks_uri specified')
+    limit = _stored_limit('jwks_uri')
+    if len(jwks_uri) > limit:
+        return sf_api.error(
+            422, f'jwks_uri cannot be longer than {limit} characters')
 
     # Signing keys must come from somewhere we control the choice of.
     # Refusing plaintext here is not paranoia: a JWKS fetched over HTTP
@@ -936,6 +1019,54 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience):
     # verification into theatre.
     if not jwks_uri.startswith('https://'):
         return sf_api.error(400, 'jwks_uri must be https')
+    return None
+
+
+#: The one scope every OpenID Connect flow is required to request, and
+#: so the only sensible value for a login capable issuer which has none.
+DEFAULT_OIDC_SCOPES = 'openid'
+
+
+def _oidc_scopes_default(client_id, oidc_scopes, stored_client_id=None,
+                         stored_oidc_scopes=None):
+    """Hold one invariant: a login capable issuer has a scope list.
+
+    An issuer which ends a write with a client identifier set and no
+    OIDC scopes is given `openid`. That scope is mandatory in every
+    OpenID Connect flow, so a registration without it is one no client
+    can use, and leaving the column null would make every client hard
+    code the same value for itself.
+
+    Expressed as an invariant over what the write leaves behind, rather
+    than as a default on each of the two write paths, because the paths
+    do not mean the same thing by an absent field. A create writes both
+    columns, while an update leaves a field it was not sent alone -- so
+    a per-path default would either write a scope list an operator did
+    not ask for, or miss the issuer whose client identifier arrives in
+    a later request than the one that set its scopes. Both paths pass
+    what the row will say afterwards, which also makes the invariant
+    idempotent: a second identical request finds it already true and
+    writes nothing.
+
+    The exception is an explicit empty string. That is the instruction
+    to clear the column, and an operator who sends it is saying they
+    will manage the scope list themselves, so the default is not
+    re-applied over a clear in the same request -- otherwise the
+    instruction could not be expressed at all.
+
+    Returns the value the write must add, or None when the invariant
+    needs nothing from this write.
+    """
+    if oidc_scopes == '':
+        return None
+
+    if client_id is None:
+        client_id = stored_client_id
+    if oidc_scopes is None:
+        oidc_scopes = stored_oidc_scopes
+
+    if client_id and not oidc_scopes:
+        return DEFAULT_OIDC_SCOPES
     return None
 
 
@@ -978,6 +1109,125 @@ def _issuer_url_taken(issuer_url, by_someone_other_than=None):
              f'{issuer_url}')
 
 
+def _run_discovery(issuer_url, jwks_uri, mandatory):
+    """Fetch an issuer's discovery document and say what it changes.
+
+    Returns a four-tuple of the endpoint columns a successful run
+    writes, the JWKS URI to store, the audit events the caller owes the
+    issuer, and an error response. Only one of the last two is ever
+    interesting: an error means nothing was decided, and otherwise the
+    caller writes what it was handed and records the events once it has
+    an object to record them against.
+
+    `mandatory` is the whole design of this function, and the asymmetry
+    is deliberate.
+
+    An operator who supplied no JWKS URI is relying on the document for
+    it, so a failed fetch leaves nothing to verify a token with and the
+    request fails with the provider's own symptom in the response. An
+    operator who supplied one is relying on discovery for the login
+    endpoints only, and those matter to a flow that issuer may never
+    run -- so a failure is logged and audited and the request succeeds.
+    Every issuer configured before discovery existed supplies a JWKS
+    URI, so the second half is what keeps a cluster which has never
+    heard of human login working against a provider which publishes no
+    document at all, or none we can reach.
+
+    `mandatory` is therefore "a failure fails the request" rather than
+    "the JWKS URI is missing", which is why it is an argument and not
+    derived from jwks_uri here. The refresh endpoint passes it true
+    whatever the issuer holds, because a fetch is the only thing that
+    request asked for.
+
+    Where both the operator and the document name a JWKS URI and they
+    differ, the operator's value is written and the difference is
+    audited rather than refused. The operator guide describes a
+    deployment where the right value is deliberately not the published
+    one -- a provider whose published JWKS path answers with a redirect
+    to a CDN, which the fetch refuses to follow -- so refusing a
+    disagreement would break a configuration the documentation tells
+    operators to build.
+    """
+    audits = []
+    try:
+        document = oidc_discovery.fetch(issuer_url)
+    except exceptions.JWKSTrustAnchorUnusable as e:
+        # Ours, not theirs: FEDERATION_JWKS_CA_BUNDLE points at a file
+        # this process cannot load, so no provider was contacted and
+        # naming one in the refusal would send an administrator to
+        # debug a system which is not at fault.
+        LOG.with_fields({'issuer_url': issuer_url}).error(
+            f'OIDC discovery cannot build a TLS trust store: {e}')
+        if mandatory:
+            # suppress_traceback because the line above is the
+            # deliberate log of this failure: an unloadable bundle is
+            # an ordinary refusal here, and a traceback at INFO would
+            # make it look like a bug to anything mining for them.
+            return None, None, audits, sf_api.error(
+                503, f'OIDC discovery is unavailable on this cluster: {e}',
+                suppress_traceback=True)
+        audits.append((
+            'OIDC discovery skipped, this cluster cannot build a TLS '
+            'trust store',
+            {'issuer_url': issuer_url, 'error': str(e)}))
+        return None, jwks_uri, audits, None
+    except exceptions.OIDCDiscoveryFailed as e:
+        LOG.with_fields({'issuer_url': issuer_url}).warning(
+            f'OIDC discovery failed: {e}')
+        if mandatory:
+            # 502 rather than 400: the request was well formed and it
+            # is the provider, or the path to it, which did not answer
+            # as it should have. The traceback is suppressed for the
+            # same reason as above -- a provider which does not publish
+            # a document is a thing an operator has done, not a bug --
+            # and the warning above is this failure's deliberate log.
+            return None, None, audits, sf_api.error(
+                502, f'OIDC discovery failed: {e}', suppress_traceback=True)
+        audits.append((
+            'OIDC discovery failed, keeping the configured jwks_uri',
+            {'issuer_url': issuer_url, 'error': str(e)}))
+        return None, jwks_uri, audits, None
+
+    # The four columns a run owns, written as a set. An endpoint the
+    # document does not name is stored as null, because a provider
+    # which has withdrawn a flow should stop advertising it here.
+    discovered = {
+        'authorization_endpoint': document.get('authorization_endpoint'),
+        'token_endpoint': document.get('token_endpoint'),
+        'device_authorization_endpoint': document.get(
+            'device_authorization_endpoint'),
+        'discovered_at': time.time(),
+    }
+
+    # The document's issuer member is ignored on purpose. There is no
+    # column for it, and the fetch refuses any document whose issuer is
+    # not byte for byte the issuer_url passed in, so it is the
+    # configured value by construction.
+    if jwks_uri is None:
+        return discovered, document['jwks_uri'], audits, None
+
+    if document['jwks_uri'] != jwks_uri:
+        audits.append((
+            'kept the configured jwks_uri, which differs from the one this '
+            'issuer publishes',
+            {'issuer_url': issuer_url, 'configured_jwks_uri': jwks_uri,
+             'published_jwks_uri': document['jwks_uri']}))
+    return discovered, jwks_uri, audits, None
+
+
+def _record_discovery_audits(issuer, audits):
+    """Add the events _run_discovery() decided were owed.
+
+    Audit rather than mutate: nothing here changed the issuer, and what
+    is being recorded is that this cluster asked a provider a question
+    and did or did not like the answer. "Which administrator configured
+    this issuer while its provider was unreachable" is exactly the
+    question asked after a login flow stops working.
+    """
+    for message, extra in audits:
+        issuer.add_event(EVENT_TYPE_AUDIT, message, extra=extra)
+
+
 class AuthIssuersEndpoint(api_base.Resource):
     scope_family = 'issuer'
 
@@ -1004,25 +1254,67 @@ class AuthIssuersEndpoint(api_base.Resource):
             ('issuer_url', 'body', 'string',
              'The exact value expected in a token\'s iss claim.', True),
             ('jwks_uri', 'body', 'url',
-             'Where the issuer publishes its signing keys.', True),
+             'Where the issuer publishes its signing keys. Optional: '
+             'discovery fills it in from the issuer\'s published '
+             'configuration when it is not supplied.', False),
             ('audience', 'body', 'string',
-             'The value expected in a token\'s aud claim.', True)
+             'The value expected in a token\'s aud claim.', True),
+            ('client_id', 'body', 'string',
+             'The OAuth client identifier registered at this issuer for '
+             'human login. Only needed for human login.', False),
+            ('oidc_scopes', 'body', 'string',
+             'The OpenID Connect scopes to request at login, as a single '
+             'space separated string. Only needed for human login.', False),
+            ('discover', 'body', 'boolean',
+             'Whether to fetch the issuer\'s OpenID Connect discovery '
+             'document. Defaults to true.', False)
         ],
         [(200, 'The issuer as created.', trusted_issuer_example),
          (400, 'A required field is missing or malformed.', None),
-         (409, 'An issuer of that name already exists.', None)],
+         (409, 'An issuer of that name already exists, or another '
+               'issuer is already configured for that issuer_url.', None),
+         (422, 'A field is longer than its limit.', None),
+         (502, 'Discovery was required and the issuer did not answer.', None),
+         (503, 'Discovery is unavailable on this cluster.', None)],
         requires_admin=True))
     @api_base.caller_is_admin
     @api_base.log_token_use
-    def post(self, name=None, issuer_url=None, jwks_uri=None, audience=None):
+    def post(self, name=None, issuer_url=None, jwks_uri=None, audience=None,
+             client_id=None, oidc_scopes=None, discover=None):
         if not name:
             return sf_api.error(400, 'no name specified')
         if not isinstance(name, str) or len(name) > 255:
             return sf_api.error(400, 'name is not a valid string')
 
-        err = _validate_issuer_arguments(issuer_url, jwks_uri, audience)
+        # An omitted discover is not the same as an explicit false --
+        # the default is to discover, and a caller who says
+        # {"discover": false} has asked for the opposite -- so the None
+        # test comes first and declared_boolean() reads what is left.
+        # The raw body reaches a handler unconverted, and the string
+        # 'false' is true to Python while the published schema says it
+        # is false.
+        if discover is None:
+            discover = True
+        else:
+            discover = validation.declared_boolean(discover)
+
+        err = _validate_issuer_arguments(
+            issuer_url, jwks_uri, audience, client_id=client_id,
+            oidc_scopes=oidc_scopes, discover=discover)
         if err:
             return err
+
+        # Before the lock, because discovery is an outbound fetch with
+        # a timeout on it and the lock is a cluster wide one held
+        # across a read and a write. Nothing here writes, so there is
+        # nothing for the lock to protect yet.
+        discovered = None
+        audits = []
+        if discover:
+            discovered, jwks_uri, audits, err = _run_discovery(
+                issuer_url, jwks_uri, mandatory=jwks_uri is None)
+            if err:
+                return err
 
         # The URL check and the create are one decision, so they are
         # taken together. See _issuer_url_lock.
@@ -1031,10 +1323,28 @@ class AuthIssuersEndpoint(api_base.Resource):
             if err:
                 return err
 
-            issuer = TrustedIssuer.new(name, issuer_url, jwks_uri, audience)
+            found = discovered or {}
+            issuer = TrustedIssuer.new(
+                name, issuer_url, jwks_uri, audience,
+                # An empty string stores as NULL here as well, so that
+                # a create and an update which were sent the same body
+                # leave the same row behind, and so that a column which
+                # is not set has one spelling.
+                client_id=client_id or None,
+                # A client identifier with no scopes gets the one every
+                # flow must request: see _oidc_scopes_default().
+                oidc_scopes=(_oidc_scopes_default(client_id, oidc_scopes)
+                             or oidc_scopes or None),
+                authorization_endpoint=found.get('authorization_endpoint'),
+                token_endpoint=found.get('token_endpoint'),
+                device_authorization_endpoint=found.get(
+                    'device_authorization_endpoint'),
+                discovered_at=found.get('discovered_at'))
 
         if not issuer:
             return sf_api.error(409, 'issuer already exists')
+
+        _record_discovery_audits(issuer, audits)
         return issuer.external_view()
 
 
@@ -1062,25 +1372,65 @@ class AuthIssuerEndpoint(api_base.Resource):
             ('issuer_url', 'body', 'string',
              'The exact value expected in a token\'s iss claim.', True),
             ('jwks_uri', 'body', 'url',
-             'Where the issuer publishes its signing keys.', True),
+             'Where the issuer publishes its signing keys. Optional: '
+             'discovery fills it in from the issuer\'s published '
+             'configuration when it is not supplied.', False),
             ('audience', 'body', 'string',
-             'The value expected in a token\'s aud claim.', True)
+             'The value expected in a token\'s aud claim.', True),
+            ('client_id', 'body', 'string',
+             'The OAuth client identifier registered at this issuer for '
+             'human login. Only needed for human login. Omitted or null '
+             'leaves the stored value unchanged; send an empty string to '
+             'clear it.', False),
+            ('oidc_scopes', 'body', 'string',
+             'The OpenID Connect scopes to request at login, as a single '
+             'space separated string. Only needed for human login. Omitted '
+             'or null leaves the stored value unchanged; send an empty '
+             'string to clear it.', False),
+            ('discover', 'body', 'boolean',
+             'Whether to fetch the issuer\'s OpenID Connect discovery '
+             'document. Defaults to true.', False)
         ],
         [(200, 'The updated issuer.', trusted_issuer_example),
          (400, 'A required field is missing or malformed.', None),
-         (404, 'Issuer not found.', None)],
+         (404, 'Issuer not found.', None),
+         (409, 'Another issuer is already configured for that '
+               'issuer_url.', None),
+         (422, 'A field is longer than its limit.', None),
+         (502, 'Discovery was required and the issuer did not answer.', None),
+         (503, 'Discovery is unavailable on this cluster.', None)],
         requires_admin=True))
     @api_base.caller_is_admin
     @api_base.log_token_use
     def put(self, issuer_name=None, issuer_url=None, jwks_uri=None,
-            audience=None):
+            audience=None, client_id=None, oidc_scopes=None, discover=None):
         issuer = TrustedIssuer.from_db_by_name(issuer_name)
         if not issuer:
             return sf_api.error(404, 'issuer not found')
 
-        err = _validate_issuer_arguments(issuer_url, jwks_uri, audience)
+        # See the create path for why an omitted discover is read
+        # before declared_boolean() rather than through it.
+        if discover is None:
+            discover = True
+        else:
+            discover = validation.declared_boolean(discover)
+
+        err = _validate_issuer_arguments(
+            issuer_url, jwks_uri, audience, client_id=client_id,
+            oidc_scopes=oidc_scopes, discover=discover)
         if err:
             return err
+
+        # Outside the lock, as on the create path: the fetch writes
+        # nothing and holding a cluster wide lock across somebody
+        # else's network timeout is a cost with no benefit.
+        discovered = None
+        audits = []
+        if discover:
+            discovered, jwks_uri, audits, err = _run_discovery(
+                issuer_url, jwks_uri, mandatory=jwks_uri is None)
+            if err:
+                return err
 
         # Excluding this issuer, or repointing anything else about an
         # issuer while leaving its URL alone would conflict with itself.
@@ -1093,8 +1443,34 @@ class AuthIssuerEndpoint(api_base.Resource):
             if err:
                 return err
 
-            issuer.update(issuer_url, jwks_uri, audience)
+            # What the invariant decides depends on what this write
+            # leaves behind, which on this path is partly what the row
+            # already says -- an update which only adds a client
+            # identifier must still end with a scope list. Read under
+            # the lock, immediately before the write it feeds, so
+            # nothing can land between the two. One read, see
+            # TrustedIssuer.configuration().
+            stored = issuer.configuration()
+            scopes = _oidc_scopes_default(
+                client_id, oidc_scopes,
+                stored_client_id=stored.client_id if stored else None,
+                stored_oidc_scopes=(
+                    stored.oidc_scopes if stored else None)) or oidc_scopes
 
+            issuer.update(issuer_url, jwks_uri, audience,
+                          client_id=client_id, oidc_scopes=scopes,
+                          discovered=discovered)
+
+        # Belt and braces, and cheap. JWKSCache._client_and_lock()
+        # already replaces a cached client whose uri no longer matches
+        # the issuer's, so a repointed JWKS URI is picked up without
+        # this -- but a cache which keeps serving the old provider's
+        # keys after an operator has disowned it is the kind of failure
+        # nobody would find quickly, and the write above is exactly the
+        # moment we know the value may have moved.
+        federation.JWKS_CACHE.forget(str(issuer.uuid))
+
+        _record_discovery_audits(issuer, audits)
         return issuer.external_view()
 
     @swag_from(api_base.swagger_helper(
@@ -1113,6 +1489,128 @@ class AuthIssuerEndpoint(api_base.Resource):
         issuer.add_event(
             EVENT_TYPE_AUDIT, 'delete issuer request from REST API')
         issuer.delete()
+        return issuer.external_view()
+
+
+class AuthIssuerDiscoverEndpoint(api_base.Resource):
+    # Named for the issuer family rather than the auth one, because the
+    # leading word of the class name would otherwise derive 'auth' and
+    # a token scoped for issuer administration would not reach it.
+    scope_family = 'issuer'
+
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Re-run OIDC discovery against a trusted issuer.',
+        [('issuer_name', 'path', 'string', 'The issuer name.', True)],
+        [(200, 'The issuer, with what discovery found.',
+          trusted_issuer_example),
+         (404, 'Issuer not found.', None),
+         (409, 'The issuer was repointed while discovery was running.', None),
+         (502, 'The issuer did not answer with a usable document.', None),
+         (503, 'Discovery is unavailable on this cluster.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @api_base.log_token_use
+    def post(self, issuer_name=None):
+        """Ask the provider where its endpoints are now.
+
+        Discovery otherwise runs only when an issuer is configured,
+        which is deliberate -- putting an identity provider on a path
+        that cluster operation depends on is a reliability regression
+        sold as a security improvement -- and the cost of that choice is
+        that an endpoint which moves at the provider stays stale until
+        somebody asks. This is how an administrator asks.
+
+        A failure here is a refusal rather than an audited warning,
+        which is the opposite of what a create or an update does with
+        the same failure. The difference is what was requested: a create
+        wants an issuer and discovery is a convenience on the way, while
+        this request *is* the discovery, so answering 200 to a fetch
+        that did not happen would be a lie about the only thing the
+        caller asked for.
+        """
+        issuer = TrustedIssuer.from_db_by_name(issuer_name)
+        if not issuer:
+            return sf_api.error(404, 'issuer not found')
+
+        # One read rather than two properties, see
+        # TrustedIssuer.configuration().
+        attrs = issuer.configuration()
+        if not attrs:
+            return sf_api.error(404, 'issuer not found')
+
+        # Kept, because every value the fetch returns was validated
+        # against this exact string and means nothing without it.
+        fetched_for = attrs.issuer_url
+
+        discovered, jwks_uri, audits, err = _run_discovery(
+            fetched_for, attrs.jwks_uri, mandatory=True)
+        if err:
+            return err
+
+        # The fetch happens outside the lock, as it does on the create
+        # and update paths, because holding a cluster wide lock across
+        # somebody else's network timeout is the worse trade. The write
+        # goes inside it, because record_discovery() names jwks_uri in
+        # its field mask and the value it would write was resolved from
+        # a read taken before the fetch. Interleave this with a PUT
+        # repointing the issuer and that pre-fetch value lands on top of
+        # the one the PUT just committed -- a new issuer_url paired with
+        # the previous provider's key set, which is the exact breakage
+        # _issuer_url_lock() exists to prevent, reached by two
+        # administrators rather than one.
+        with _issuer_url_lock():
+            attrs = issuer.configuration()
+            if not attrs:
+                # Deleted while the provider was being asked.
+                return sf_api.error(404, 'issuer not found')
+
+            # A stored jwks_uri is never replaced by a discovered one,
+            # even though a refresh is as good a moment as any to notice
+            # that the two differ. The reason is that we cannot tell a
+            # value an operator typed from one a previous discovery run
+            # wrote, and overwriting the first kind is documented as
+            # breaking a real deployment: a provider whose published
+            # JWKS path answers with a redirect to a CDN needs the CDN
+            # path configured by hand. An operator who wants the
+            # published value can update the issuer without one and have
+            # discovery fill it in.
+            #
+            # Which is why the value read under this lock decides, not
+            # the one _run_discovery() was given. Where the issuer still
+            # has none, what came back is the published value and fills
+            # it in; where it has one, that one is rewritten unchanged
+            # and nothing a concurrent writer committed is lost.
+            #
+            # The endpoints need more than that. They were read out of a
+            # document which was accepted only because it advertised
+            # fetched_for as its own issuer, so they describe that
+            # provider and no other. If a PUT repointed this issuer
+            # while the provider was being asked, writing them would put
+            # the previous provider's authorisation endpoint against the
+            # new issuer_url -- and GET /auth/login publishes that to
+            # anyone, so a person following it would be sent to the old
+            # provider to log in. There is nothing to merge in that
+            # case: the document is simply about a different issuer now.
+            if attrs.issuer_url != fetched_for:
+                return sf_api.error(
+                    409, 'this issuer was repointed from %s to %s while '
+                         'its provider was being asked, so what came back '
+                         'describes an issuer this one no longer is. Run '
+                         'discovery again.'
+                         % (fetched_for, attrs.issuer_url))
+
+            to_write = jwks_uri if attrs.jwks_uri is None else attrs.jwks_uri
+            issuer.record_discovery(attrs, to_write, discovered)
+
+        # The write above may have filled in a jwks_uri this issuer did
+        # not have. See the update path for why forgetting the cached
+        # client is belt and braces rather than the mechanism.
+        federation.JWKS_CACHE.forget(str(issuer.uuid))
+
+        issuer.add_event(
+            EVENT_TYPE_AUDIT, 'discovery request from REST API',
+            extra={'issuer_url': attrs.issuer_url})
+        _record_discovery_audits(issuer, audits)
         return issuer.external_view()
 
 
@@ -2174,3 +2672,149 @@ class AuthFederatedEndpoint(api_base.Resource):
             'key_name': key_name,
             'key': secret
         }
+
+
+login_example = """[
+    {
+        "authorization_endpoint": "https://idp.example.com/application/o/authorize/",
+        "client_id": "shakenfist",
+        "device_authorization_endpoint": "https://idp.example.com/application/o/device/",
+        "issuer_url": "https://idp.example.com/application/o/sf/",
+        "name": "corporate",
+        "oidc_scopes": "openid profile groups",
+        "token_endpoint": "https://idp.example.com/application/o/token/"
+    }
+]
+"""
+
+
+class AuthLoginEndpoint(api_base.Resource):
+    # Unauthenticated by nature, for the same reason /auth/federated
+    # is: a person who is about to log in holds no Shaken Fist
+    # credential, and the endpoint which lists issuers for an
+    # administrator is behind caller_is_admin, so there is nowhere
+    # else a client could learn this from. Placed beside that endpoint
+    # because the two public auth routes are easier to review as a
+    # pair than scattered through the file.
+    @api_base.public
+    @swag_from(api_base.swagger_helper(
+        'auth', 'List the identity providers offered for human login.',
+        [],
+        [(200, 'The issuers a human may log in through. An empty list '
+               'means this cluster offers no human login.', login_example),
+         (429, 'Too many login metadata requests from this source.', None),
+         (503, 'The database is unavailable, so the request could not be '
+               'counted against the rate limit.', None)],
+        requires_auth=False))
+    def get(self):
+        """What a client needs to start a login, and nothing more.
+
+        An issuer appears here only when it is login capable: it has a
+        client identifier registered at the provider, and at least one
+        endpoint a flow can begin at. An issuer configured to verify a
+        workload's tokens has no client registration at the provider --
+        which is every issuer in existence today -- and would be
+        disclosed here for no purpose at all if membership were simply
+        "trusted". Its provider may publish endpoints anyway, and
+        discovery stores them, so the client identifier is the half
+        that decides this.
+
+        What this does disclose is which identity provider a cluster
+        trusts for human login. That is mild -- the endpoints are
+        public at the provider, and a client visible login
+        configuration is what every OIDC relying party publishes -- but
+        it is not nothing, because it tells somebody where to aim a
+        phishing page. So the field list is deliberately the shortest
+        one a client can start a flow with, and the response is built
+        field by field below rather than from the issuer's own view of
+        itself.
+        """
+        # Counted before the listing, not after. The listing below
+        # reads the attributes row of every configured issuer, so an
+        # anonymous caller who could reach it unmetered could multiply
+        # one request into a database read per issuer -- which is the
+        # amplification enforce_rate_limit's docstring describes for
+        # the exchange's issuer resolution, in the same shape.
+        #
+        # The key is prefixed so this endpoint has a budget of its own
+        # rather than sharing the exchange's. A CI cluster behind one
+        # NAT can spend a whole address's allowance on exchanges in a
+        # minute, and a shared counter would then answer 429 to every
+        # person trying to log in from that office -- and the reverse,
+        # a burst of logins throttling CI. The two also cost very
+        # different amounts: an exchange fetches a JWKS and runs a
+        # bcrypt, this reads one scan. The cost of the separation is at
+        # most one extra row per source per window, which is the order
+        # of growth enforce_rate_limit's docstring already accounts
+        # for, and the prefixed key still fits the column's 64
+        # characters alongside the longest IPv6 address.
+        source = flask.request.remote_addr or 'unknown'
+        try:
+            federation.enforce_rate_limit(f'login:{source}')
+        except exceptions.RateLimited as e:
+            LOG.with_fields({'source': source}).info(
+                f'Login metadata request rate limited: {e}')
+            return sf_api.error(429, 'too many login metadata requests',
+                                suppress_traceback=True)
+
+        out = []
+        for issuer in TrustedIssuers(
+                [partial(baseobject.state_filter,
+                         TrustedIssuer.ACTIVE_STATES)]):
+            # One read rather than a property per field, see
+            # TrustedIssuer.configuration().
+            attrs = issuer.configuration()
+            if not attrs:
+                # The static row outlived its attributes row. There is
+                # no configuration to publish, so there is nothing a
+                # client could do with this issuer.
+                continue
+
+            # Login capable, which is narrower than trusted. A flow
+            # posts a client identifier to one of two endpoints, so an
+            # issuer missing either half cannot be logged in through,
+            # and offering it would only produce a failure a person
+            # cannot act on.
+            if not attrs.client_id:
+                continue
+            if not (attrs.authorization_endpoint or
+                    attrs.device_authorization_endpoint):
+                continue
+
+            # Built explicitly rather than from external_view(), and
+            # that is the point rather than a verbosity to tidy up
+            # later. external_view() serves the issuer's whole
+            # configuration, so returning it here would publish
+            # whatever field the object grows next without anybody
+            # deciding to publish it -- an unauthenticated disclosure
+            # arriving as a side effect of an unrelated change. Each
+            # key below is here because a client cannot start a flow
+            # without it.
+            #
+            # Withheld on purpose: jwks_uri, which is ours to validate
+            # signatures with and which no client ever fetches;
+            # audience, which is how this cluster names itself to the
+            # provider; and the uuid, state and version, which are
+            # operational detail belonging to an administrator.
+            entry = {
+                'name': issuer.name,
+                'issuer_url': attrs.issuer_url,
+                'client_id': attrs.client_id,
+                'oidc_scopes': attrs.oidc_scopes
+            }
+
+            # The endpoints appear only when they are set, because
+            # their absence is information: a client reads the lack of
+            # a device authorization endpoint as "this provider cannot
+            # do the device flow here" and falls back, where a null
+            # would have to be interpreted the same way with an extra
+            # step.
+            for field in ('authorization_endpoint', 'token_endpoint',
+                          'device_authorization_endpoint'):
+                value = getattr(attrs, field)
+                if value:
+                    entry[field] = value
+
+            out.append(entry)
+
+        return out
