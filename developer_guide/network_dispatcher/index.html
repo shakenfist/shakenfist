@@ -16921,6 +16921,16 @@ the op's state once per dispatch rather than twice, once above the walk and once
 below it (issue 4760). It still re-reads below the walk for an op which <em>has</em>
 dependencies, because the walk's own round trips give a concurrent abort a
 window in which to land.</p>
+<p>That window is why the deferral itself is guarded. <code>defer()</code> writes <code>queued</code>
+before it enqueues the retry work item, and a terminal op has no transition
+back to <code>queued</code>, so the write is refused — recorded as an audit event
+("operation ended before it could be deferred") and the op left in the state
+whoever ended it wrote, rather than raising out of what is a normal race
+(issue 4888). Nothing is enqueued on that path, so an op aborted while waiting
+on a dependency does not leave behind a work item which exists only to be
+discarded. The common case is not a write at all: an op the dispatcher
+deferred is already <code>queued</code>, and <code>_state_update()</code> returns early when the
+state is unchanged.</p>
 <h2 id="exponential-back-off-map">Exponential back-off map<a class="headerlink" href="#exponential-back-off-map" title="Permanent link">&para;</a></h2>
 <p>The back-off map (<code>self._defer_delays</code>, a plain <code>dict[str, float]</code>) records the
 next defer delay for each op UUID. Constants:</p>
