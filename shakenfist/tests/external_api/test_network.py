@@ -269,6 +269,35 @@ class NetworkDeleteEnqueueTaskTestCase(base.ShakenFistTestCase):
             resp.get_json())
         mock_enqueue.assert_called_once()
 
+    @mock.patch('shakenfist.external_api.network.net_create_and_enqueue')
+    def test_delete_errored_network_is_enqueued(self, mock_enqueue):
+        """An errored network can be deleted (issue 4863).
+
+        This guard used to ask ``is_dead()``, which is true of error, so
+        DELETE answered 404 "network is deleted" over a network which
+        still held its vxlan, its netns, its dnsmasq and its NAT rules
+        -- and that 404 was the only delete path such a network had.
+        Namespace delete no longer stands in for it either, so without
+        this an errored network could not be removed at all.
+        """
+        errored_id = str(uuid4())
+        self.mock_mariadb.create_network(
+            name='errorednet',
+            uuid=errored_id,
+            namespace='foo',
+            set_state=dbo.STATE_ERROR)
+        fake_op_uuid = str(uuid4())
+        mock_enqueue.return_value = ('net_op', fake_op_uuid)
+
+        resp = self.client.delete(
+            '/networks/%s' % errored_id,
+            headers={'Authorization': self.auth_token})
+        self.assertEqual(202, resp.status_code)
+        self.assertEqual(
+            {'op_type': 'net_op', 'op_uuid': fake_op_uuid},
+            resp.get_json())
+        mock_enqueue.assert_called_once()
+
 
 class NetworkDeleteAlreadyDeletedTestCase(base.ShakenFistTestCase):
     """DELETE on a network whose state is already 'deleted' must not

@@ -72,12 +72,22 @@ def _delete_network(network_from_db, wait_interfaces=None):
             'delete_network: network does not exist')
         return sf_api.error(404, 'network does not exist'), None, None
 
-    if n.is_dead() and n.state.value != network.Network.STATE_DELETE_WAIT:
-        # The network has been deleted. No need to attempt further effort.
-        # We do allow attempts to delete networks in DELETE_WAIT.
+    if n.state.value == network.Network.STATE_DELETED:
+        # Only a deleted network has nothing left to do. This used to ask
+        # is_dead(), which is also true of delete_wait (explicitly
+        # excepted, because a delete may be retried) and of error -- and
+        # an errored network has not released its vxlan, its dnsmasq, its
+        # NAT rules or its IPAM reservations, so answering 404 "network is
+        # deleted" for one was both untrue and the only delete path it
+        # had. That mattered once namespace delete stopped counting an
+        # errored network as gone (issue 4863): without this, an errored
+        # network could neither be deleted nor have its namespace
+        # deleted. error -> deleted is a permitted transition and the
+        # teardown checks for each thing before removing it, so running
+        # it against a partly built network is exactly what is wanted.
         LOG.with_fields({'network_uuid': n.uuid,
                          'state': n.state.value
-                         }).warning('delete_network: network is dead')
+                         }).warning('delete_network: network is deleted')
         return sf_api.error(404, 'network is deleted'), None, None
 
     network_from_db.add_event(EVENT_TYPE_AUDIT, 'delete request from REST API')
