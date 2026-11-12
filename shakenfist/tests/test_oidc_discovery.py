@@ -180,6 +180,28 @@ class DiscoveryFetchRefusalTestCase(OIDCDiscoveryTestCase):
         self.session_factory.assert_not_called()
         self.assertEqual([], self.session.requests)
 
+    def test_an_issuer_url_with_a_query_is_refused_without_a_fetch(self):
+        # OpenID Connect Discovery 1.0 section 2: an issuer identifier
+        # carries no query. discovery_url() appends, so the well known
+        # path would land inside the query string and the provider would
+        # answer something unrelated.
+        self._serve(_document(KEYCLOAK))
+        e = self.assertRaises(
+            exceptions.OIDCDiscoveryFailed, oidc_discovery.fetch,
+            'https://keycloak.example.com/realms/sf?realm=sf')
+        self.assertIn('query', str(e))
+        self.assertEqual(0, len(self.session.requests))
+
+    def test_an_issuer_url_with_a_fragment_is_refused_without_a_fetch(self):
+        # And no fragment either. A fragment is never sent, so the fetch
+        # would silently go to the bare path instead.
+        self._serve(_document(KEYCLOAK))
+        e = self.assertRaises(
+            exceptions.OIDCDiscoveryFailed, oidc_discovery.fetch,
+            'https://keycloak.example.com/realms/sf#/')
+        self.assertIn('fragment', str(e))
+        self.assertEqual(0, len(self.session.requests))
+
     def test_a_non_2xx_status_is_refused(self):
         self._serve(b'not found', status_code=404)
         e = self.assertRaises(
@@ -230,10 +252,39 @@ class DiscoveryFetchRefusalTestCase(OIDCDiscoveryTestCase):
             exceptions.OIDCDiscoveryFailed, oidc_discovery.fetch, KEYCLOAK)
         self.assertIn(
             'FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS', str(e))
-        self.assertIn('dripped', str(e))
+        self.assertIn('dripping a response', str(e))
         # And the connection was returned rather than left held open.
         self.assertTrue(self.session.response.closed)
         self.assertTrue(self.session.closed)
+
+    def test_the_body_deadline_starts_after_the_response_arrives(self):
+        # The distinction the first version of this got wrong. The
+        # deadline has to begin once the response has started, because
+        # the connect has this same value as its own timeout and a
+        # legitimately slow TLS handshake would otherwise eat the body's
+        # allowance -- and be reported as a provider dripping a
+        # response, which is a misdiagnosis an operator cannot see
+        # through. Asserted as an ordering, because that is the property:
+        # no clock reading may be taken before the request returns.
+        order = []
+        real_get = FakeSession.get
+
+        def recording_get(session, url, **kwargs):
+            order.append('get')
+            return real_get(session, url, **kwargs)
+
+        def recording_clock():
+            order.append('clock')
+            return 0.0 if order.count('clock') == 1 else 0.1
+
+        self._serve(_document(KEYCLOAK))
+        with mock.patch.object(FakeSession, 'get', recording_get):
+            with mock.patch.object(
+                    oidc_discovery.time, 'monotonic', recording_clock):
+                oidc_discovery.fetch(KEYCLOAK)
+
+        self.assertEqual('get', order[0])
+        self.assertIn('clock', order)
 
     def test_a_prompt_body_does_not_hit_the_transfer_deadline(self):
         # The same clock, never advanced past the deadline, so the

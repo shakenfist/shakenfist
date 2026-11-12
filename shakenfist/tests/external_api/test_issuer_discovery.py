@@ -367,6 +367,42 @@ class IssuerDiscoveryTestCase(base.ShakenFistTestCase):
         self.assertIsNone(resp.get_json()['client_id'])
         self.assertIsNone(resp.get_json()['oidc_scopes'])
 
+    def test_a_refresh_is_refused_if_the_issuer_moved_while_fetching(self):
+        # The sibling of the jwks_uri case below, and the worse half.
+        # Every endpoint in the document was accepted only because the
+        # document advertised the pre-fetch issuer_url as its own, so
+        # the endpoints describe that provider. Writing them after a PUT
+        # has repointed the issuer puts the previous provider's
+        # authorisation endpoint against the new issuer_url -- and
+        # GET /auth/login hands that to anyone who asks, so a person
+        # following it would be sent to the old provider to log in.
+        # There is nothing to merge, so the refresh refuses.
+        self.assertEqual(200, self._create().status_code)
+        self.fetch.side_effect = None
+        self.fetch.return_value = document()
+
+        before = self._issuer()
+        moved = TrustedIssuerAttributesData(
+            uuid=before['uuid'],
+            issuer_url='https://elsewhere.example.com/application/o/sf/',
+            jwks_uri=AUTHENTIK_JWKS, audience='https://sf.example.com')
+        original = TrustedIssuerAttributesData(
+            uuid=before['uuid'], issuer_url=AUTHENTIK,
+            jwks_uri=AUTHENTIK_JWKS, audience='https://sf.example.com')
+
+        with mock.patch.object(
+                TrustedIssuer, 'configuration',
+                side_effect=[original, moved, moved, moved]):
+            with mock.patch(
+                    'shakenfist.mariadb.update_trusted_issuer_attributes'
+            ) as update:
+                resp = self._discover()
+
+        self.assertEqual(409, resp.status_code)
+        self.assertIn('repointed', resp.get_json()['error'])
+        # And nothing was written at all, rather than partly written.
+        update.assert_not_called()
+
     def test_a_refresh_writes_the_jwks_uri_it_read_under_the_lock(self):
         # The interleaving the lock was added for, simulated by making
         # the two configuration() reads disagree: the first, before the

@@ -1814,6 +1814,23 @@ When this plan is successfully implemented:
   provenance on the column, so that a refresh replaces a
   discovered value and preserves an operator's.
 
+* **`GET /auth/login` is an uncached per-issuer read.** The
+  endpoint reads one state row plus one `configuration()` per
+  configured issuer on every request, and caches nothing. It is
+  metered before it reads, so the exposure needs
+  `FEDERATION_RATE_LIMIT_PER_MINUTE` set to `0` -- which the
+  operator guide now warns about in both the setting's row and the
+  endpoint's section. It is nevertheless the only unauthenticated
+  endpoint in the tree whose database cost scales with cluster
+  configuration; `/livez`, `/readyz` and `/` are all constant cost.
+  A short in-process TTL cache of the rendered list, invalidated
+  opportunistically on an issuer write, would make a flood cost one
+  read per worker per window instead of two reads per issuer per
+  request. Deliberately not done in phase 3: a cache with an
+  invalidation story is a mechanism of its own, and an endpoint
+  whose correctness depends on being current deserves that
+  mechanism designed rather than added during a review round.
+
 * **Per-resource RBAC.** Roles like "read-only on
   namespace X" or "may create instances but not
   networks". The gap is narrower than it was when this

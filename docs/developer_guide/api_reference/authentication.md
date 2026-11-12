@@ -434,13 +434,14 @@ the difference is audited.
 Connect discovery document again and writes the three endpoints and
 `discovered_at` from it. It takes no body, and requires the `system`
 namespace. It never changes `audience`, `client_id` or `oidc_scopes`,
-and it keeps the `jwks_uri` the issuer already has. It returns the
-issuer.
+and it keeps the `jwks_uri` the issuer already has, filling in one the
+issuer does not have yet. It returns the issuer.
 
 | Status | Meaning |
 |--------|---------|
 | 200 | The issuer, with what discovery found |
 | 404 | No such issuer |
+| 409 | The issuer's `issuer_url` changed while the document was being fetched, so what came back describes a provider this issuer no longer names. Nothing was written; run discovery again |
 | 502 | The fetch failed or the document was refused. The message says why. Unlike a create or update, a failure here is never ignored |
 | 503 | This cluster cannot build a TLS trust store to fetch with |
 

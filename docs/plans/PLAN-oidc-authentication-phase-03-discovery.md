@@ -900,6 +900,68 @@ as they happen.
   it: sixteen mutations across the phase. The set is at
   `scratchpad/round-1/mutants-round1.json`.
 
+* **2026-11-12 (AEDT), second review round.** Two `fix` items, both
+  about code the first round added, which is the signal to bound the
+  loop rather than keep going indefinitely. Both were real.
+
+  The whole-transfer deadline contradicted its own setting's
+  documentation: `config.py` and the operator guide both said the
+  value bounds each connect and each read and explicitly *not* the
+  transfer, with `FEDERATION_DISCOVERY_MAX_BYTES` named as what
+  bounds the transfer. Adding the deadline made both false, and the
+  deadline also started before the connect, so a slow but legitimate
+  TLS handshake would consume the body's allowance and be reported as
+  a provider dripping a response. The deadline now starts once the
+  response has arrived, so it budgets the body; the connect keeps the
+  same value as its own timeout, making one fetch bounded at roughly
+  twice the setting. Both descriptions say that now, and the
+  operator guide's list of refusal reasons names the deadline.
+
+  The second was a hole in the first round's own fix. That round
+  moved the refresh's write under `_issuer_url_lock()` and made the
+  locked read decide the `jwks_uri`, but the three endpoint columns
+  were still written from a document fetched against the pre-lock
+  `issuer_url`. A PUT repointing the issuer mid-fetch would have
+  committed the previous provider's `authorization_endpoint` against
+  the new `issuer_url` -- and `GET /auth/login` publishes that to
+  unauthenticated callers, so a person following it would be sent to
+  the old provider to log in. Worse than the `jwks_uri` case that was
+  fixed, and missed because the fix addressed the instance rather
+  than the class. The refresh now compares the `issuer_url` the fetch
+  was validated against with the one read under the lock, and answers
+  409 without writing anything if they differ.
+
+  Of three `consider` items, two were taken as defects in new code: an
+  `issuer_url` carrying a URL query or fragment produced a nonsense
+  discovery URL and a refusal blaming the provider, now refused in the
+  fetcher citing OpenID Connect Discovery 1.0 section 2, where the
+  refresh route cannot bypass it; and neither new setting carried a
+  lower bound, so a zero byte cap or a zero timeout broke discovery
+  cluster wide while blaming the provider, now `ge=1` like every
+  neighbouring federation setting. The third, a TTL cache for
+  `GET /auth/login`, was declined and recorded in the master plan's
+  future work: a cache with an invalidation story is a mechanism of
+  its own and should not be designed during a review round.
+
+  Both `document` items taken: a rolling upgrade note, because an
+  issuer created while a new `sf-api` is talking to an older
+  `sf-database` silently loses its `client_id` and discovered
+  endpoints, and the API reference's refresh sentence, which omitted
+  that a refresh fills in a missing `jwks_uri`.
+
+  Six further mutants, six killed. One first came back killed by the
+  wrong tests: setting the deadline to zero expressed "always
+  expired" rather than "spans the connect", so it broke every fetch.
+  Replaced with one that reintroduces a clock reading before the
+  request, which the ordering test kills precisely. Twenty-two
+  mutations across the phase.
+
+  The round closes with no `fix` item outstanding, so no further
+  round was requested. Both of this round's came from the previous
+  round's code, and a third round would have reviewed this one's --
+  the counts were falling (3/3/4 to 2/2/3) but the subject was
+  drifting away from the original change.
+
 ## Results
 
 Filled in as the steps complete.

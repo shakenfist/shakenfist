@@ -256,6 +256,37 @@ def _require_https(url: str, what: str) -> None:
             f'would make every other check here theatre')
 
 
+def _require_issuer_identifier(issuer_url: str) -> None:
+    """Refuse an issuer_url which is not a usable Issuer Identifier.
+
+    OpenID Connect Discovery 1.0 section 2 requires an Issuer Identifier
+    to be an https URL with no query or fragment component. The scheme
+    half is _require_https()'s job; this is the rest of it, and it
+    exists because discovery_url() builds the well known URL by string
+    append. Append to an issuer carrying a query and the well known
+    path lands inside the query string
+    (https://h/p?x= becomes https://h/p?x=/.well-known/...); append to
+    one carrying a fragment and the fetch goes to the bare path, because
+    a fragment is never sent. Either way the provider answers something
+    unrelated and the operator is told their provider does not support
+    discovery, which sends them to debug the wrong end.
+
+    Here rather than in the API's argument validation, so that the
+    refresh route cannot reach it with an issuer stored before this
+    check existed.
+    """
+    parsed = urllib.parse.urlparse(issuer_url)
+    for part, value in (('query', parsed.query),
+                        ('fragment', parsed.fragment)):
+        if value:
+            raise exceptions.OIDCDiscoveryFailed(
+                f'issuer_url {_quoted(issuer_url)} carries a URL {part}, '
+                f'and an OpenID Connect issuer identifier may not. The '
+                f'discovery URL is built by appending to it, so a {part} '
+                f'would make us request something which is not the '
+                f'discovery document at all')
+
+
 def fetch(issuer_url: str) -> dict[str, Any]:
     """This issuer's discovery document, validated, or raise.
 
@@ -283,15 +314,15 @@ def fetch(issuer_url: str) -> dict[str, Any]:
     # field is not itself constrained to https, so this is the check
     # which keeps discovery from ever requesting a plaintext URL.
     _require_https(issuer_url, 'issuer_url')
+    _require_issuer_identifier(issuer_url)
 
     url = discovery_url(issuer_url)
 
-    # One deadline over the whole exchange, started before the connect.
     # The scalar passed to requests below is a per-operation timeout and
-    # is kept for what it is good at -- failing a dead host fast -- but
-    # it says nothing about how long the transfer as a whole may take.
+    # is kept for what it is good at -- failing a dead host fast. It says
+    # nothing about how long a transfer may take, which the body deadline
+    # below covers.
     timeout = config.FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS
-    deadline = time.monotonic() + timeout
 
     session = _discovery_session()
     try:
@@ -319,6 +350,15 @@ def fetch(issuer_url: str) -> dict[str, Any]:
                 # whatever the far end decided to send.
                 stream=True,
                 timeout=timeout)
+
+            # Started here rather than before the request, so that the
+            # budget belongs to the body. A deadline spanning the
+            # connect as well would be consumed by a slow but perfectly
+            # legitimate TLS handshake -- the connect already has this
+            # same value as its own timeout -- and the body would then
+            # be refused as "dripped", which is a misdiagnosis an
+            # operator would have no way to see through.
+            deadline = time.monotonic() + timeout
 
             try:
                 # A non-2xx answer, with a redirect called out
@@ -369,10 +409,12 @@ def fetch(issuer_url: str) -> dict[str, Any]:
                     # a slow fetch would otherwise extend it.
                     if time.monotonic() > deadline:
                         raise exceptions.OIDCDiscoveryFailed(
-                            f'{url} took longer than '
+                            f'{url} spent longer than '
                             f'FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS '
-                            f'({timeout}s) to send {len(body)} bytes, so it '
-                            f'is being dripped rather than served')
+                            f'({timeout}s) sending a body, having delivered '
+                            f'{len(body)} bytes. The connect and each read '
+                            f'are bounded separately, so this is a provider '
+                            f'dripping a response rather than a slow one')
             finally:
                 # Closing a streamed response is what returns the
                 # connection, and on the oversized path above it is also

@@ -237,15 +237,34 @@ both values. Shaken Fist takes care of the slash when it builds the
 URL to fetch, so configuring Authentik's issuer with its slash does not
 produce a doubled one.
 
-The fetch is also refused if `issuer_url` is not `https://`, if the
-response is a redirect or is larger than
-`FEDERATION_DISCOVERY_MAX_BYTES`, or if the document is not JSON or
-does not carry an `https://` `jwks_uri`. Redirects are not followed,
+The fetch is also refused if `issuer_url` is not `https://` or carries
+a URL query or fragment (an OpenID Connect issuer identifier may have
+neither, and the discovery URL is built by appending to it), if the
+response is a redirect, is larger than
+`FEDERATION_DISCOVERY_MAX_BYTES`, or takes longer than
+`FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS` to send its body, or if
+the document is not JSON, does not carry an `https://` `jwks_uri`, or
+names an endpoint longer than this cluster can store. Redirects are not followed,
 for the same reason and with the same symptom as the JWKS fetch: see
 [The JWKS URI must be the final URL](#the-jwks-uri-must-be-the-final-url).
 Certificate authorities are handled as they are for JWKS fetches too,
 so `FEDERATION_JWKS_CA_BUNDLE` covers a private provider for discovery
 as well.
+
+???+ warning "Configure issuers after a deploy finishes, not during one"
+
+    The discovery columns were added to `trusted_issuer_attributes` in
+    the same release as this feature, so during a rolling upgrade a
+    new `sf-api` may be talking to an `sf-database` that does not know
+    them yet. A create in that window writes the three original
+    columns and silently drops the `client_id` and the discovered
+    endpoints, so the issuer comes back with them null and never
+    appears in `GET /auth/login`. An update fails loudly instead,
+    which is the better half of the behaviour.
+
+    Nothing needs backfilling -- null correctly means "not discovered
+    yet" -- but an issuer configured mid-deploy needs its `client_id`
+    re-sent and its discovery re-run once the deploy has finished.
 
 #### When discovery must succeed
 
@@ -512,7 +531,7 @@ exchange answers 503 rather than assuming the request is fine.
 | `FEDERATION_JWKS_CACHE_SECONDS` | 300 | How long an issuer's published keys are cached. Lower shortens the window in which a revoked key is still accepted; higher reduces load on the provider. An unknown key id can also force a refetch before this expires, so raising this does not by itself delay recognising a rotated key |
 | `FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS` | 30 | The shortest interval between a successful JWKS fetch and a refetch forced by an unrecognised key id, measured from any successful fetch and not only from a previous forced one. A rotation landing inside the window is not recognised until it elapses; without a window, every invented key id a stranger sends is another fetch. `0` fetches on every unrecognised key id |
 | `FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait for an issuer's JWKS endpoint. The fetch happens while holding that issuer's refetch lock, so this is also the longest one unreachable provider can pin an API worker |
-| `FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait on each connect and each read when fetching an issuer's discovery document. Separate from the JWKS timeout because discovery only runs when an administrator configures an issuer, where a slow provider costs that administrator one request, while the JWKS fetch can pin an API worker per anonymous exchange. This bounds each connect and read rather than the whole transfer; `FEDERATION_DISCOVERY_MAX_BYTES` bounds the transfer |
+| `FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait when fetching an issuer's discovery document. Separate from the JWKS timeout because discovery only runs when an administrator configures an issuer, where a slow provider costs that administrator one request, while the JWKS fetch can pin an API worker per anonymous exchange. Applied three times: to the connect, to each read, and as a deadline over the body once the response starts, so one fetch is bounded at roughly twice this value. Must be at least 1 |
 | `FEDERATION_DISCOVERY_MAX_BYTES` | 65536 | Largest discovery document accepted, in bytes. The body is read up to this limit and refused beyond it, rather than trusting the provider's `Content-Length`, so a login page or a misbehaving proxy cannot hand us an unbounded response. A real document is a few kilobytes |
 | `FEDERATION_MAX_TOKEN_BYTES` | 16384 | Largest exchange request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no `Content-Length` is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit |
 | `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Attempts allowed per source address per minute, counted separately for the exchange and for `GET /auth/login`. `0` disables rate limiting entirely, on both |

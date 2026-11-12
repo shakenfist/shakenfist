@@ -1485,6 +1485,7 @@ class AuthIssuerDiscoverEndpoint(api_base.Resource):
         [(200, 'The issuer, with what discovery found.',
           trusted_issuer_example),
          (404, 'Issuer not found.', None),
+         (409, 'The issuer was repointed while discovery was running.', None),
          (502, 'The issuer did not answer with a usable document.', None),
          (503, 'Discovery is unavailable on this cluster.', None)],
         requires_admin=True))
@@ -1518,8 +1519,12 @@ class AuthIssuerDiscoverEndpoint(api_base.Resource):
         if not attrs:
             return sf_api.error(404, 'issuer not found')
 
+        # Kept, because every value the fetch returns was validated
+        # against this exact string and means nothing without it.
+        fetched_for = attrs.issuer_url
+
         discovered, jwks_uri, audits, err = _run_discovery(
-            attrs.issuer_url, attrs.jwks_uri, mandatory=True)
+            fetched_for, attrs.jwks_uri, mandatory=True)
         if err:
             return err
 
@@ -1556,6 +1561,25 @@ class AuthIssuerDiscoverEndpoint(api_base.Resource):
             # has none, what came back is the published value and fills
             # it in; where it has one, that one is rewritten unchanged
             # and nothing a concurrent writer committed is lost.
+            #
+            # The endpoints need more than that. They were read out of a
+            # document which was accepted only because it advertised
+            # fetched_for as its own issuer, so they describe that
+            # provider and no other. If a PUT repointed this issuer
+            # while the provider was being asked, writing them would put
+            # the previous provider's authorisation endpoint against the
+            # new issuer_url -- and GET /auth/login publishes that to
+            # anyone, so a person following it would be sent to the old
+            # provider to log in. There is nothing to merge in that
+            # case: the document is simply about a different issuer now.
+            if attrs.issuer_url != fetched_for:
+                return sf_api.error(
+                    409, 'this issuer was repointed from %s to %s while '
+                         'its provider was being asked, so what came back '
+                         'describes an issuer this one no longer is. Run '
+                         'discovery again.'
+                         % (fetched_for, attrs.issuer_url))
+
             to_write = jwks_uri if attrs.jwks_uri is None else attrs.jwks_uri
             issuer.record_discovery(attrs, to_write, discovered)
 

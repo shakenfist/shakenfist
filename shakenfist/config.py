@@ -550,6 +550,11 @@ class SFConfig(BaseSettings):
     )
     FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS: int = Field(
         5,
+        # ge=1 because 0 does not mean "no timeout" here: the HTTP
+        # library would fail every connect immediately, and the body
+        # deadline below would expire before the first chunk, so every
+        # fetch would be refused with a message blaming the provider.
+        ge=1,
         description=(
             'How long in seconds to wait for a trusted issuer\'s OpenID '
             'Connect discovery document before giving up. Separate from '
@@ -560,14 +565,23 @@ class SFConfig(BaseSettings):
             'where a slow provider costs that administrator their own '
             'request and nothing else. One setting for both would mean an '
             'operator who lengthens the administrative timeout lengthens '
-            'the anonymous one too. This bounds each connect and each read '
-            'rather than the whole transfer, which is all the HTTP library '
-            'offers; FEDERATION_DISCOVERY_MAX_BYTES is what bounds the '
-            'transfer.'
+            'the anonymous one too. The value is applied three times: as '
+            'the connect timeout, as the timeout for each individual read, '
+            'and as a deadline over the whole body transfer once the '
+            'response has started. The third is needed because the first '
+            'two are all the HTTP library offers, and a provider which '
+            'sends one byte just inside each read timeout would otherwise '
+            'be bounded only by FEDERATION_DISCOVERY_MAX_BYTES -- which on '
+            'the defaults is days rather than seconds. So the worst case '
+            'for one fetch is roughly this value for the connect plus this '
+            'value for the body.'
         )
     )
     FEDERATION_DISCOVERY_MAX_BYTES: int = Field(
         65536,
+        # ge=1 for the same reason as the timeout above: 0 does not mean
+        # "unlimited", it refuses every document on the first chunk.
+        ge=1,
         description=(
             'The largest OpenID Connect discovery document accepted from a '
             'trusted issuer, in bytes. The body is read up to this much and '
