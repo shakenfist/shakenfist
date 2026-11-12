@@ -15,8 +15,11 @@ A delete added to or dropped from the declaration, a row delete left in
 a class beside the batch, or any other database call, lock, event or
 file removal added to a hard_delete(), fails here.
 
-The literals are deliberately a second copy. A change to what a type's
-hard delete removes has to be made here as well as in mariadb.py.
+The literals are deliberately a second copy, and live in
+shakenfist/tests/hard_delete_expected.py so that the row-level tests in
+hard_delete_cases can read the same independent description rather than
+the declaration they are checking. A change to what a type's hard delete
+removes has to be made there as well as in mariadb.py.
 """
 from contextlib import ExitStack
 import importlib
@@ -53,103 +56,12 @@ from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.upload import UploadData
 from shakenfist.tests import base
+from shakenfist.tests.hard_delete_expected import BASE_DELETES
+from shakenfist.tests.hard_delete_expected import EXPECTED_DELETES
 from shakenfist.trusted_issuer import TrustedIssuer
 from shakenfist.upload import Upload
 from shakenfist.util import concurrency as util_concurrency
 
-
-# What every type's hard_delete() runs last, from
-# DatabaseBackedObject.hard_delete().
-BASE_DELETES = (
-    'delete_state',
-    'delete_object_metadata',
-    'delete_object_events',
-)
-
-# BaseClusterOperation.hard_delete(), which every cluster operation
-# inherits unchanged.
-CLUSTER_OPERATION_DELETES = (
-    'delete_cluster_operation_target',
-    'delete_cluster_operation_error',
-    'delete_cluster_operation',
-)
-
-# For each batchable type, the deletes its hard delete runs before
-# BASE_DELETES, in order, as read from each class before it moved onto the
-# batch.
-EXPECTED_DELETES = {
-    ObjectType.ARTIFACT_FETCH_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.IMGCACHE_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NET_IFACE_IP_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NET_IFACE_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NET_IP_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NET_MACADDR_IP_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NET_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_AOP_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_BLOB_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_INST_NET_IFACE_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_INST_NETDESC_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_INST_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_INST_SNAP_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_NET_OP: CLUSTER_OPERATION_DELETES,
-    # AgentOperation derives from BaseOperation, not BaseClusterOperation,
-    # so it has none of the cluster operation deletes.
-    ObjectType.AGENTOPERATION: (
-        'delete_agent_operation_attributes',
-        'delete_agent_operation',
-        'remove_all_references_from',
-    ),
-    # Artifact's own deletes, then the targets delete from
-    # DatabaseBackedObjectWithOperations.
-    ObjectType.ARTIFACT: (
-        'delete_all_artifact_indexes',
-        'delete_artifact_attributes',
-        'delete_artifact',
-        'delete_cluster_operation_targets_for_object',
-    ),
-    # Network's own deletes, then the targets delete from
-    # DatabaseBackedObjectWithOperations.
-    ObjectType.NETWORK: (
-        'delete_network_attributes',
-        'delete_network',
-        'delete_cluster_operation_targets_for_object',
-    ),
-    # The references-held backstop from issue 4558, then Blob's own rows.
-    ObjectType.BLOB: (
-        'remove_all_references_from',
-        'delete_blob_hashes',
-        'delete_blob_transfers_for_blob',
-        'delete_blob_attributes',
-        'delete_blob',
-    ),
-    ObjectType.DHCP: (
-        'delete_dnsmasq',
-    ),
-    ObjectType.INTERFACE: (
-        'delete_network_interface_attributes',
-        'delete_network_interface',
-    ),
-    # An IPAM which is not in memory only.
-    ObjectType.IPAM: (
-        'delete_reservations_for_ipam',
-        'delete_ipam',
-    ),
-    ObjectType.NAMESPACE_KEY: (
-        'delete_namespace_key_attributes',
-        'delete_namespace_key',
-    ),
-    ObjectType.TRUSTED_ISSUER: (
-        'delete_trusted_issuer_attributes',
-        'delete_trusted_issuer',
-    ),
-    ObjectType.MAPPING_RULE: (
-        'delete_mapping_rule_attributes',
-        'delete_mapping_rule',
-    ),
-    ObjectType.UPLOAD: (
-        'delete_upload',
-    ),
-}
 
 # The types whose hard_delete() does more than delete rows keyed on the
 # object, and so is not batched.
