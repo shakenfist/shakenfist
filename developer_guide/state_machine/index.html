@@ -16400,7 +16400,17 @@ not sweep networks (issue 4863).</p>
 <li><code>error</code>: the network has encountered an error and cannot be used.</li>
 </ul>
 <p>A network is regarded as "dead" when it is in state <code>deleted</code>, <code>delete-wait</code> or
-<code>error</code>.</p>
+<code>error</code>. "Dead" means "do not act on this network", not "this network is gone":
+a network in <code>error</code> still holds its vxlan, its network namespace, its dnsmasq,
+its NAT rules and its IPAM reservations, and one in <code>delete-wait</code> is still
+waiting for its interfaces to drain. A guard which asks "is this network gone?"
+therefore has to ask for <code>deleted</code> specifically rather than calling <code>is_dead()</code>
+— which is why a namespace may only be deleted once every network it holds is
+<code>deleted</code>, and why <code>DELETE /networks/&lt;ref&gt;</code> accepts a network in <code>error</code>
+(<code>error</code> → <code>deleted</code> is a permitted transition, and the teardown checks for
+each thing before removing it, so it is safe to run against a partly built
+network). As a backstop, <code>Namespace.hard_delete()</code> enqueues the delete of any
+network which reaches it anyway.</p>
 <p>The following transitions are possible (note that hyphens have been replaced with
 underscores in some state names due to limitations in the diagram renderer):</p>
 <pre class="mermaid"><code>stateDiagram-v2
