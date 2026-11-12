@@ -1033,13 +1033,23 @@ def per_deleted_object_checks():
     fill_cost = time.time() - start_time
     outcomes: collections.Counter[str] = collections.Counter()
     process_start = time.time()
-    processed = _drain_deleted_object_work(budget - fill_cost, outcomes)
+    drain = _drain_deleted_object_work(budget - fill_cost, outcomes)
+    processed = drain.taken
     process_seconds = time.time() - process_start
 
+    # ``stopped_by`` is here because the two limits cannot be told apart
+    # from the times: the fill is charged against the budget but is not in
+    # ``elapsed_seconds``, so a pass the budget ended logs an elapsed time
+    # below the budget (#4878). ``fill_seconds`` and ``budget_seconds`` are
+    # the rest of that arithmetic, so a pass says what it spent and what it
+    # was allowed.
     fields: dict[str, object] = {
         'total': processed,
         'remaining': _deleted_object_work_held(),
         'filled': filled,
+        'stopped_by': drain.stopped_by,
+        'fill_seconds': round(fill_cost, 3),
+        'budget_seconds': budget,
         'elapsed_seconds': round(process_seconds, 3)
     }
     for outcome in DELETED_OBJECT_OUTCOMES:
@@ -1303,9 +1313,33 @@ def _hard_delete_deleted_objects_singly(
     return taken
 
 
+class DrainOutcome(NamedTuple):
+    """How many entries a drain took, and which limit ended it.
+
+    ``stopped_by`` is why the drain returned, and it is the difference
+    between a sweep that is capped and a sweep that is out of time:
+
+      ``cap``         DELETED_OBJECT_SWEEP_MAX_OBJECTS was reached, so
+                      raising the cap would drain faster.
+      ``budget``      the pass's share of DELETED_OBJECT_SWEEP_SECONDS
+                      ran out first, so raising the cap would not, and
+                      the budget is what needs raising (#4878).
+      ``empty``       no type had work left, so the sweep is bound by
+                      arrivals and neither limit matters.
+      ``unavailable`` the database tier failed mid-pass.
+
+    An operator cannot tell the first two apart from the elapsed time,
+    because the pass's reads are charged against the budget and are not
+    in the drain's own ``elapsed_seconds``, so a pass ended by the
+    budget logs a time below it.
+    """
+    taken: int
+    stopped_by: str
+
+
 def _drain_deleted_object_work(
         execution_limit: float,
-        outcomes: Optional[collections.Counter[str]] = None) -> int:
+        outcomes: Optional[collections.Counter[str]] = None) -> DrainOutcome:
     """Take a turn from each type with work in turn, within the pass's limits.
 
     A turn is up to DELETED_OBJECT_BATCH_SIZE entries of one type: one batch
@@ -1314,8 +1348,9 @@ def _drain_deleted_object_work(
     DELETED_OBJECT_SWEEP_MAX_OBJECTS entries, whichever comes first, and a
     turn never takes more entries than the cap has left.
 
-    Returns how many entries were taken. If ``outcomes`` is given it is
-    filled with how many entries ended in each of DELETED_OBJECT_OUTCOMES.
+    Returns how many entries were taken and which limit ended the drain.
+    If ``outcomes`` is given it is filled with how many entries ended in
+    each of DELETED_OBJECT_OUTCOMES.
     """
     global _DELETED_OBJECT_NEXT_TYPE
 
@@ -1327,10 +1362,10 @@ def _drain_deleted_object_work(
     while True:
         # Limit how long we spend in this loop, and how much we take
         if time.time() > deadline:
-            return processed
+            return DrainOutcome(processed, 'budget')
         remaining = config.DELETED_OBJECT_SWEEP_MAX_OBJECTS - processed
         if remaining <= 0:
-            return processed
+            return DrainOutcome(processed, 'cap')
 
         # The first type at or after the rotation's position which has
         # work, wrapping around the end of the list.
@@ -1342,7 +1377,7 @@ def _drain_deleted_object_work(
                 _DELETED_OBJECT_NEXT_TYPE = (index + 1) % len(object_types)
                 break
         if objtype is None:
-            return processed
+            return DrainOutcome(processed, 'empty')
 
         work = _DELETED_OBJECT_WORK[objtype]
         count = min(config.DELETED_OBJECT_BATCH_SIZE, remaining)
@@ -1369,7 +1404,7 @@ def _drain_deleted_object_work(
             LOG.with_fields({'object_type': objtype}).warning(
                 f'Stopping per-deleted-object drain, database unavailable: '
                 f'{e}')
-            return processed
+            return DrainOutcome(processed, 'unavailable')
         except HardDeleteBatchUnavailable:
             # An sf-database which predates the batch. Each object's own
             # hard delete falls back to one delete at a time against it, and
