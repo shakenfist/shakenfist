@@ -38,6 +38,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.mysql import INET4
 
 from shakenfist import mariadb
+from shakenfist import mariadb_hard_delete
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import hard_delete_expected
 
@@ -197,7 +198,7 @@ class HardDeleteObjectsCases:
         """The rows one object of ``object_type`` has, and their tables.
 
         Read from hard_delete_expected.EXPECTED_DELETES rather than from
-        mariadb.HARD_DELETE_BATCH_FUNCTIONS, which is the declaration
+        mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS, which is the declaration
         under test. Derived from the declaration, a case would seed no
         row in a table the declaration had lost, and so could not notice
         that it had lost one -- which is the hole #4880 describes, and
@@ -276,7 +277,7 @@ class HardDeleteObjectsCases:
                          f'{object_type} {uuid}')
 
     def test_rows_cover_every_statement(self):
-        self.assertEqual(set(mariadb.HARD_DELETE_STATEMENTS), set(ROWS))
+        self.assertEqual(set(mariadb_hard_delete.HARD_DELETE_STATEMENTS), set(ROWS))
 
     def test_guarded_deletes_only_the_eligible_object(self):
         for object_type in BATCHABLE:
@@ -287,7 +288,7 @@ class HardDeleteObjectsCases:
                 for uuid in (eligible, live, young):
                     self._assert_all(object_type, uuid, 1)
 
-                deleted = mariadb.hard_delete_objects(
+                deleted = mariadb_hard_delete.hard_delete_objects(
                     object_type, [live, eligible, young],
                     state_values=FINAL_STATES, updated_before=self.cutoff)
 
@@ -298,7 +299,7 @@ class HardDeleteObjectsCases:
 
     def test_guarded_with_nothing_eligible_is_empty_not_a_failure(self):
         live = self._seed(ObjectType.NODE_INST_OP, 'created', self.old)
-        deleted = mariadb.hard_delete_objects(
+        deleted = mariadb_hard_delete.hard_delete_objects(
             ObjectType.NODE_INST_OP, [live, str(uuid4())],
             state_values=FINAL_STATES, updated_before=self.cutoff)
         self.assertEqual([], deleted)
@@ -320,10 +321,10 @@ class HardDeleteObjectsCases:
                                         other_specs))
 
                     if unconditional:
-                        deleted = mariadb.hard_delete_objects(
+                        deleted = mariadb_hard_delete.hard_delete_objects(
                             object_type, [uuid], unconditional=True)
                     else:
-                        deleted = mariadb.hard_delete_objects(
+                        deleted = mariadb_hard_delete.hard_delete_objects(
                             object_type, [uuid], state_values=FINAL_STATES,
                             updated_before=self.cutoff)
 
@@ -353,20 +354,20 @@ class HardDeleteObjectsCases:
                 uuid = self._seed(seeded, 'deleted', self.old)
                 self._assert_all(seeded, uuid, 1)
 
-                mariadb.hard_delete_objects(
+                mariadb_hard_delete.hard_delete_objects(
                     declared, [uuid], unconditional=True)
                 self._assert_all(seeded, uuid, 1)
 
                 # Guarded mode was never able to do this, because what
                 # the state delete returns is what the rest of the
                 # transaction deletes, and it is type-scoped.
-                self.assertEqual([], mariadb.hard_delete_objects(
+                self.assertEqual([], mariadb_hard_delete.hard_delete_objects(
                     declared, [uuid], state_values=FINAL_STATES,
                     updated_before=self.cutoff))
                 self._assert_all(seeded, uuid, 1)
 
                 # And its own type's batch still takes it.
-                self.assertEqual([uuid], mariadb.hard_delete_objects(
+                self.assertEqual([uuid], mariadb_hard_delete.hard_delete_objects(
                     seeded, [uuid], state_values=FINAL_STATES,
                     updated_before=self.cutoff))
                 self._assert_all(seeded, uuid, 0)
@@ -379,7 +380,7 @@ class HardDeleteObjectsCases:
                 stateless = self._seed(object_type, with_state=False)
                 untouched = self._seed(object_type, 'deleted', self.old)
 
-                deleted = mariadb.hard_delete_objects(
+                deleted = mariadb_hard_delete.hard_delete_objects(
                     object_type, [live, young, stateless],
                     unconditional=True)
 
@@ -393,25 +394,25 @@ class HardDeleteObjectsCases:
         # and the statements ahead of it have run in the same
         # transaction. It is found by name, not position, so adding a
         # statement to the blob's batch does not break the test.
-        names = mariadb.HARD_DELETE_BATCH_FUNCTIONS[ObjectType.BLOB]
+        names = mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS[ObjectType.BLOB]
         failing = 'delete_blob_attributes'
         self.assertGreaterEqual(names.index(failing), 2)
         self.assertLess(names.index(failing), len(names) - 1)
-        broken = mariadb.HARD_DELETE_STATEMENTS[failing]._replace(
+        broken = mariadb_hard_delete.HARD_DELETE_STATEMENTS[failing]._replace(
             build=lambda t, u: sa.text(
                 'DELETE FROM blob_attributes WHERE no_such_column = 1'))
 
         for unconditional in (False, True):
             with self.subTest(unconditional=unconditional):
                 uuid = self._seed(ObjectType.BLOB, 'deleted', self.old)
-                with mock.patch.dict(mariadb.HARD_DELETE_STATEMENTS,
+                with mock.patch.dict(mariadb_hard_delete.HARD_DELETE_STATEMENTS,
                                      {failing: broken}), \
-                        mock.patch('shakenfist.mariadb.LOG') as mock_log:
+                        mock.patch('shakenfist.mariadb_hard_delete.LOG') as mock_log:
                     if unconditional:
-                        deleted = mariadb.hard_delete_objects(
+                        deleted = mariadb_hard_delete.hard_delete_objects(
                             ObjectType.BLOB, [uuid], unconditional=True)
                     else:
-                        deleted = mariadb.hard_delete_objects(
+                        deleted = mariadb_hard_delete.hard_delete_objects(
                             ObjectType.BLOB, [uuid],
                             state_values=FINAL_STATES,
                             updated_before=self.cutoff)
@@ -421,7 +422,7 @@ class HardDeleteObjectsCases:
                 self._assert_all(ObjectType.BLOB, uuid, 1)
 
                 # And with the statement restored, the same call works.
-                deleted = mariadb.hard_delete_objects(
+                deleted = mariadb_hard_delete.hard_delete_objects(
                     ObjectType.BLOB, [uuid], state_values=FINAL_STATES,
                     updated_before=self.cutoff)
                 self.assertEqual([uuid], deleted)
@@ -430,15 +431,15 @@ class HardDeleteObjectsCases:
     def test_too_many_uuids_is_refused(self):
         eligible = self._seed(ObjectType.NET_OP, 'deleted', self.old)
         uuids = [eligible] + [str(uuid4()) for _ in range(
-            mariadb.HARD_DELETE_OBJECTS_MAX)]
+            mariadb_hard_delete.HARD_DELETE_OBJECTS_MAX)]
         self.assertRaises(
-            ValueError, mariadb.hard_delete_objects, ObjectType.NET_OP,
+            ValueError, mariadb_hard_delete.hard_delete_objects, ObjectType.NET_OP,
             uuids, state_values=FINAL_STATES, updated_before=self.cutoff)
         self._assert_all(ObjectType.NET_OP, eligible, 1)
 
         # The most one call may name is accepted.
-        deleted = mariadb.hard_delete_objects(
-            ObjectType.NET_OP, uuids[:mariadb.HARD_DELETE_OBJECTS_MAX],
+        deleted = mariadb_hard_delete.hard_delete_objects(
+            ObjectType.NET_OP, uuids[:mariadb_hard_delete.HARD_DELETE_OBJECTS_MAX],
             state_values=FINAL_STATES, updated_before=self.cutoff)
         self.assertEqual([eligible], deleted)
         self._assert_all(ObjectType.NET_OP, eligible, 0)
@@ -449,8 +450,8 @@ class HardDeleteObjectsCases:
         for object_type in BATCHABLE:
             with self.subTest(object_type=object_type):
                 uuid = self._seed(object_type, 'deleted', self.old)
-                with mock.patch('shakenfist.mariadb._direct_hard_delete_objects'
+                with mock.patch('shakenfist.mariadb_hard_delete._direct_hard_delete_objects'
                                 ) as batch:
-                    mariadb.hard_delete_objects_per_call(object_type, uuid)
+                    mariadb_hard_delete.hard_delete_objects_per_call(object_type, uuid)
                 batch.assert_not_called()
                 self._assert_all(object_type, uuid, 0)

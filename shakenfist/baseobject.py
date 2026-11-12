@@ -26,6 +26,7 @@ from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import locks
 from shakenfist import mariadb
+from shakenfist import mariadb_hard_delete
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import callstack as util_callstack
@@ -782,7 +783,7 @@ class DatabaseBackedObject:
 
     def hard_delete(self):
         object_uuid = str(self.uuid)
-        if self.object_type not in mariadb.HARD_DELETE_BATCH_FUNCTIONS:
+        if self.object_type not in mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS:
             mariadb.delete_state(self.object_type, object_uuid)
             mariadb.delete_object_metadata(self.object_type, object_uuid)
             mariadb.delete_object_events(self.object_type, object_uuid)
@@ -799,12 +800,12 @@ class DatabaseBackedObject:
         # every row this type's hard delete removes, so a subclass adds
         # no deletes of its own.
         try:
-            deleted = mariadb.hard_delete_objects(
+            deleted = mariadb_hard_delete.hard_delete_objects(
                 self.object_type, [object_uuid], unconditional=True)
         except exceptions.HardDeleteBatchUnavailable:
             # An sf-database which predates the batch: the same deletes,
             # one call at a time.
-            mariadb.hard_delete_objects_per_call(self.object_type, object_uuid)
+            mariadb_hard_delete.hard_delete_objects_per_call(self.object_type, object_uuid)
         else:
             # None is a batch which rolled back, leaving the object for a
             # later attempt. An unconditional batch returns every uuid it
@@ -1039,7 +1040,7 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
 
     def hard_delete(self):
         # The batch deletes a batchable type's targets itself.
-        if self.object_type not in mariadb.HARD_DELETE_BATCH_FUNCTIONS:
+        if self.object_type not in mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS:
             mariadb.delete_cluster_operation_targets_for_object(
                 self.object_type, str(self.uuid))
         super().hard_delete()

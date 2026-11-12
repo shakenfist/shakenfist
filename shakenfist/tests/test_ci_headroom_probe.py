@@ -32,7 +32,7 @@ These properties are covered:
   back to back, a non-positive ``--interval`` is corrected rather than
   spun on, and the output is appended to rather than replaced.
 
-The loop is driven by a scripted clock (``FakeClock``) rather than by
+The loop is driven by a scripted clock (``FakeTimeModule``) rather than by
 real time, so every case below is deterministic and runs instantly. The
 clock is installed by setting the module attribute, not by a
 string-target patch: ``tools/`` is not a package and this module is
@@ -111,7 +111,7 @@ class FakeClient:
         return self.nodes
 
 
-class FakeClock:
+class FakeTimeModule:
     """A scripted stand-in for the ``time`` module the loop paces itself by.
 
     ``time()`` and ``sleep()`` are the only two functions the sampling
@@ -361,7 +361,7 @@ class MainLoopTestCase(base.ShakenFistTestCase):
         overran its cap would keep polling a leaked VM until the reaper
         found it.
         """
-        clock = FakeClock()
+        clock = FakeTimeModule()
         code, records, _ = self._main(
             clock, CostlyClient(clock), '--interval', '15',
             '--max-seconds', '45')
@@ -385,7 +385,7 @@ class MainLoopTestCase(base.ShakenFistTestCase):
         cluster was already too busy to answer it on time, and banking
         four samples which share a timestamp and describe one instant.
         """
-        clock = FakeClock()
+        clock = FakeTimeModule()
         code, records, _ = self._main(
             clock, CostlyClient(clock, costs=[60.0, 0.0]), '--interval', '15',
             '--max-seconds', '120')
@@ -418,7 +418,7 @@ class MainLoopTestCase(base.ShakenFistTestCase):
             # the second's assertions.
             self.path = os.path.join(
                 self.tempdir, 'interval%s.jsonl' % interval)
-            clock = FakeClock()
+            clock = FakeTimeModule()
             code, records, printed = self._main(
                 clock, CostlyClient(clock), '--interval', interval,
                 '--max-seconds', '45')
@@ -439,7 +439,7 @@ class MainLoopTestCase(base.ShakenFistTestCase):
         not counting, so the healthy case writes the zero explicitly and
         absence is left to mean "not counted".
         """
-        clock = FakeClock()
+        clock = FakeTimeModule()
         _, records, _ = self._main(
             clock, CostlyClient(clock), '--interval', '15',
             '--max-seconds', '45')
@@ -460,7 +460,7 @@ class MainLoopTestCase(base.ShakenFistTestCase):
         series short of two samples and a series of a cluster nobody was
         using are the same file, and nothing computes cadence.
         """
-        clock = FakeClock()
+        clock = FakeTimeModule()
         real_write = probe.write_record
         attempted = []
 
@@ -495,7 +495,7 @@ class MainLoopTestCase(base.ShakenFistTestCase):
         with open(self.path, 'w') as f:
             f.write('{"sampled_at": -1.0}\n')
 
-        clock = FakeClock()
+        clock = FakeTimeModule()
         _, records, _ = self._main(
             clock, CostlyClient(clock), '--interval', '15',
             '--max-seconds', '15')

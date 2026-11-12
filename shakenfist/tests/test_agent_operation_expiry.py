@@ -8,7 +8,7 @@ from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist import mariadb
+from shakenfist import mariadb_hard_delete
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
@@ -383,8 +383,8 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
         # runs through the same public deletes the batch's statements
         # mirror.
         with mock.patch(
-                'shakenfist.mariadb.hard_delete_objects',
-                wraps=mariadb.hard_delete_objects) as mock_batch, \
+                'shakenfist.mariadb_hard_delete.hard_delete_objects',
+                wraps=mariadb_hard_delete.hard_delete_objects) as mock_batch, \
             mock.patch(
                 'shakenfist.operations.agentoperation.mariadb'
                 '.remove_all_references_from') as mock_remove:

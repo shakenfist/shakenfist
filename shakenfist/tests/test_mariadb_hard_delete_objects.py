@@ -20,6 +20,7 @@ from sqlalchemy.exc import OperationalError
 from shakenfist.daemons.database import main as daemons_database_main
 from shakenfist import exceptions
 from shakenfist import mariadb
+from shakenfist import mariadb_hard_delete
 from shakenfist.protos import database_pb2
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
@@ -59,27 +60,27 @@ def _bound(statement):
 
 class MappingTestCase(base.ShakenFistTestCase):
     def test_every_name_has_a_statement_and_a_public_function(self):
-        for object_type, names in mariadb.HARD_DELETE_BATCH_FUNCTIONS.items():
+        for object_type, names in mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS.items():
             self.assertTrue(names, object_type)
             for name in names:
-                self.assertIn(name, mariadb.HARD_DELETE_STATEMENTS)
+                self.assertIn(name, mariadb_hard_delete.HARD_DELETE_STATEMENTS)
                 self.assertTrue(callable(getattr(mariadb, name)), name)
 
     def test_every_statement_is_used(self):
-        used = {name for names in mariadb.HARD_DELETE_BATCH_FUNCTIONS.values()
+        used = {name for names in mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS.values()
                 for name in names}
-        self.assertEqual(used, set(mariadb.HARD_DELETE_STATEMENTS))
+        self.assertEqual(used, set(mariadb_hard_delete.HARD_DELETE_STATEMENTS))
 
     def test_per_object_types_are_not_batched(self):
         for object_type in PER_OBJECT_TYPES:
-            self.assertNotIn(object_type, mariadb.HARD_DELETE_BATCH_FUNCTIONS)
+            self.assertNotIn(object_type, mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS)
 
     def test_base_deletes_are_not_in_the_mapping(self):
         # The state, metadata and event deletes are run for every type by
         # the batch itself, so a type naming them would run them twice.
         for name in ('delete_state', 'delete_object_metadata',
                      'delete_object_events'):
-            self.assertNotIn(name, mariadb.HARD_DELETE_STATEMENTS)
+            self.assertNotIn(name, mariadb_hard_delete.HARD_DELETE_STATEMENTS)
 
     def test_the_error_delete_is_ordered_before_the_operation(self):
         # cluster_operation_errors has no operation type column, so the
@@ -87,7 +88,7 @@ class MappingTestCase(base.ShakenFistTestCase):
         # row (#4877). That is a scope only while the row is there, so
         # the error delete has to run before the operation delete.
         checked = 0
-        for object_type, names in mariadb.HARD_DELETE_BATCH_FUNCTIONS.items():
+        for object_type, names in mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS.items():
             if 'delete_cluster_operation_error' not in names:
                 continue
             self.assertLess(names.index('delete_cluster_operation_error'),
@@ -98,7 +99,7 @@ class MappingTestCase(base.ShakenFistTestCase):
 
     def test_builders_key_on_every_uuid(self):
         uuids = _uuids(3)
-        for name, entry in mariadb.HARD_DELETE_STATEMENTS.items():
+        for name, entry in mariadb_hard_delete.HARD_DELETE_STATEMENTS.items():
             statement = entry.build(ObjectType.ARTIFACT, uuids)
             sql = _sql(statement)
             self.assertTrue(sql.startswith('DELETE FROM '), name)
@@ -116,7 +117,7 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         self.addCleanup(patcher.stop)
 
     def _refused(self, *args, **kwargs):
-        self.assertRaises(ValueError, mariadb.hard_delete_objects,
+        self.assertRaises(ValueError, mariadb_hard_delete.hard_delete_objects,
                           *args, **kwargs)
         self.mock_route.assert_not_called()
 
@@ -140,7 +141,7 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
 
     def test_too_many_uuids_is_refused(self):
         self._refused(ObjectType.BLOB,
-                      _uuids(mariadb.HARD_DELETE_OBJECTS_MAX + 1),
+                      _uuids(mariadb_hard_delete.HARD_DELETE_OBJECTS_MAX + 1),
                       unconditional=True)
 
     def test_per_object_types_are_refused(self):
@@ -152,11 +153,11 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
 
     def test_empty_list_is_no_call(self):
         self.assertEqual(
-            [], mariadb.hard_delete_objects(
+            [], mariadb_hard_delete.hard_delete_objects(
                 ObjectType.BLOB, [], state_values=FINAL_STATES,
                 updated_before=1000.0))
         self.assertEqual(
-            [], mariadb.hard_delete_objects(
+            [], mariadb_hard_delete.hard_delete_objects(
                 ObjectType.BLOB, [], unconditional=True))
         self.mock_route.assert_not_called()
 
@@ -169,9 +170,9 @@ class RoutingTestCase(base.ShakenFistTestCase):
         uuids = _uuids(2)
         with mock.patch('shakenfist.mariadb._use_database_service',
                         return_value=True), \
-                mock.patch('shakenfist.mariadb._grpc_hard_delete_objects',
+                mock.patch('shakenfist.mariadb_hard_delete._grpc_hard_delete_objects',
                            return_value=uuids[:1]) as mock_grpc:
-            result = mariadb.hard_delete_objects(
+            result = mariadb_hard_delete.hard_delete_objects(
                 ObjectType.NODE_INST_OP, uuids, state_values=FINAL_STATES,
                 updated_before=1000.0)
 
@@ -183,9 +184,9 @@ class RoutingTestCase(base.ShakenFistTestCase):
         uuids = _uuids(2)
         with mock.patch('shakenfist.mariadb._use_database_service',
                         return_value=False), \
-                mock.patch('shakenfist.mariadb._direct_hard_delete_objects',
+                mock.patch('shakenfist.mariadb_hard_delete._direct_hard_delete_objects',
                            return_value=uuids) as mock_direct:
-            result = mariadb.hard_delete_objects(
+            result = mariadb_hard_delete.hard_delete_objects(
                 ObjectType.UPLOAD, uuids, unconditional=True)
 
         self.assertEqual(uuids, result)
@@ -195,12 +196,12 @@ class RoutingTestCase(base.ShakenFistTestCase):
     def test_unavailable_propagates(self):
         with mock.patch('shakenfist.mariadb._use_database_service',
                         return_value=True), \
-                mock.patch('shakenfist.mariadb._grpc_hard_delete_objects',
+                mock.patch('shakenfist.mariadb_hard_delete._grpc_hard_delete_objects',
                            side_effect=exceptions.HardDeleteBatchUnavailable(
                                'old')):
             self.assertRaises(
                 exceptions.HardDeleteBatchUnavailable,
-                mariadb.hard_delete_objects, ObjectType.BLOB, _uuids(1),
+                mariadb_hard_delete.hard_delete_objects, ObjectType.BLOB, _uuids(1),
                 unconditional=True)
 
 
@@ -210,10 +211,10 @@ class CacheEvictionTestCase(base.ShakenFistTestCase):
     def _delete(self, object_type, uuids, deleted):
         with mock.patch('shakenfist.mariadb._use_database_service',
                         return_value=False), \
-                mock.patch('shakenfist.mariadb._direct_hard_delete_objects',
+                mock.patch('shakenfist.mariadb_hard_delete._direct_hard_delete_objects',
                            return_value=deleted), \
                 mock.patch('shakenfist.mariadb._object_cache_evict') as evict:
-            mariadb.hard_delete_objects(
+            mariadb_hard_delete.hard_delete_objects(
                 object_type, uuids, state_values=FINAL_STATES,
                 updated_before=1000.0)
         return evict
@@ -247,7 +248,8 @@ class GrpcWrapperTestCase(base.ShakenFistTestCase):
         # Each test starts with no remembered UNIMPLEMENTED answer, and
         # leaves none behind for the next.
         patcher = mock.patch.object(
-            mariadb, '_HARD_DELETE_BATCH_UNAVAILABLE_UNTIL', 0.0)
+            mariadb_hard_delete, '_HARD_DELETE_BATCH_UNAVAILABLE_UNTIL',
+            0.0)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -255,7 +257,7 @@ class GrpcWrapperTestCase(base.ShakenFistTestCase):
         with mock.patch('shakenfist.mariadb._get_database_stub'), \
                 mock.patch('shakenfist.mariadb._grpc_call', return_value=reply,
                            side_effect=side_effect) as mock_call:
-            result = mariadb._grpc_hard_delete_objects(*args)
+            result = mariadb_hard_delete._grpc_hard_delete_objects(*args)
         return result, mock_call
 
     def test_guarded_request_and_reply(self):
@@ -291,7 +293,7 @@ class GrpcWrapperTestCase(base.ShakenFistTestCase):
             reply=database_pb2.HardDeleteObjectsReply())
         self.assertEqual([], result)
 
-    @mock.patch('shakenfist.mariadb.LOG')
+    @mock.patch('shakenfist.mariadb_hard_delete.LOG')
     def test_unimplemented_raises_unavailable(self, mock_log):
         self.assertRaises(
             exceptions.HardDeleteBatchUnavailable, self._call,
@@ -299,35 +301,35 @@ class GrpcWrapperTestCase(base.ShakenFistTestCase):
             side_effect=FakeRpcError(grpc.StatusCode.UNIMPLEMENTED))
         mock_log.warning.assert_called_once()
 
-    @mock.patch('shakenfist.mariadb.LOG')
+    @mock.patch('shakenfist.mariadb_hard_delete.LOG')
     def test_unimplemented_is_not_asked_again_for_a_while(self, mock_log):
         args = (ObjectType.NET_OP, _uuids(1), [], None, True)
-        with mock.patch('shakenfist.mariadb.time.monotonic', return_value=1000.0):
+        with mock.patch('shakenfist.mariadb_hard_delete.time.monotonic', return_value=1000.0):
             self.assertRaises(
                 exceptions.HardDeleteBatchUnavailable, self._call, *args,
                 side_effect=FakeRpcError(grpc.StatusCode.UNIMPLEMENTED))
 
-        recheck = 1000.0 + mariadb.HARD_DELETE_BATCH_RECHECK_SECONDS
-        with mock.patch('shakenfist.mariadb.time.monotonic',
+        recheck = 1000.0 + mariadb_hard_delete.HARD_DELETE_BATCH_RECHECK_SECONDS
+        with mock.patch('shakenfist.mariadb_hard_delete.time.monotonic',
                         return_value=recheck - 1):
             with mock.patch('shakenfist.mariadb._get_database_stub'), \
                     mock.patch('shakenfist.mariadb._grpc_call') as mock_call:
                 self.assertRaises(
                     exceptions.HardDeleteBatchUnavailable,
-                    mariadb._grpc_hard_delete_objects, *args)
+                    mariadb_hard_delete._grpc_hard_delete_objects, *args)
             mock_call.assert_not_called()
         mock_log.warning.assert_called_once()
 
         # Once the window has passed the RPC is asked again, and an upgraded
         # database service is used.
-        with mock.patch('shakenfist.mariadb.time.monotonic', return_value=recheck):
+        with mock.patch('shakenfist.mariadb_hard_delete.time.monotonic', return_value=recheck):
             result, mock_call = self._call(
                 *args, reply=database_pb2.HardDeleteObjectsReply(
                     deleted_uuids=args[1]))
         mock_call.assert_called_once()
         self.assertEqual(args[1], result)
 
-    @mock.patch('shakenfist.mariadb.LOG')
+    @mock.patch('shakenfist.mariadb_hard_delete.LOG')
     def test_other_rpc_errors_are_not_remembered(self, mock_log):
         args = (ObjectType.NET_OP, _uuids(1), [], None, True)
         self._call(*args, side_effect=FakeRpcError(grpc.StatusCode.ABORTED))
@@ -337,7 +339,7 @@ class GrpcWrapperTestCase(base.ShakenFistTestCase):
         mock_call.assert_called_once()
         self.assertEqual(args[1], result)
 
-    @mock.patch('shakenfist.mariadb.LOG')
+    @mock.patch('shakenfist.mariadb_hard_delete.LOG')
     def test_other_rpc_errors_are_a_failed_call(self, mock_log):
         for code in (grpc.StatusCode.ABORTED, grpc.StatusCode.INTERNAL,
                      grpc.StatusCode.INVALID_ARGUMENT):
@@ -375,7 +377,7 @@ class DirectTransactionTestCase(base.ShakenFistTestCase):
         uuids = _uuids(3)
         self.conn.execute.return_value = self._returning(uuids[:1])
 
-        result = mariadb._direct_hard_delete_objects(
+        result = mariadb_hard_delete._direct_hard_delete_objects(
             ObjectType.BLOB, uuids, FINAL_STATES, 1000.0, False)
 
         self.assertEqual(uuids[:1], result)
@@ -396,7 +398,7 @@ class DirectTransactionTestCase(base.ShakenFistTestCase):
         uuids = _uuids(3)
         self.conn.execute.return_value = self._returning(uuids[1:2])
 
-        mariadb._direct_hard_delete_objects(
+        mariadb_hard_delete._direct_hard_delete_objects(
             ObjectType.UPLOAD, uuids, FINAL_STATES, 1000.0, False)
 
         for statement in self._statements()[1:]:
@@ -408,7 +410,7 @@ class DirectTransactionTestCase(base.ShakenFistTestCase):
     def test_guarded_with_nothing_eligible_runs_nothing_else(self):
         self.conn.execute.return_value = self._returning([])
 
-        result = mariadb._direct_hard_delete_objects(
+        result = mariadb_hard_delete._direct_hard_delete_objects(
             ObjectType.NODE_INST_OP, _uuids(2), FINAL_STATES, 1000.0, False)
 
         self.assertEqual([], result)
@@ -419,7 +421,7 @@ class DirectTransactionTestCase(base.ShakenFistTestCase):
         # No state row came back at all, as for objects with none.
         self.conn.execute.return_value = self._returning([])
 
-        result = mariadb._direct_hard_delete_objects(
+        result = mariadb_hard_delete._direct_hard_delete_objects(
             ObjectType.NODE_INST_OP, uuids, [], None, True)
 
         self.assertEqual(uuids, result)
@@ -433,12 +435,12 @@ class DirectTransactionTestCase(base.ShakenFistTestCase):
              'cluster_operations', 'object_metadata', 'event_objects'],
             [statement.table.name for statement in statements[1:]])
 
-    @mock.patch('shakenfist.mariadb.LOG')
+    @mock.patch('shakenfist.mariadb_hard_delete.LOG')
     def test_operational_error_is_a_failed_call(self, mock_log):
         self.conn.execute.side_effect = OperationalError(
             'DELETE', {}, Exception(1054, 'Unknown column'))
 
-        result = mariadb._direct_hard_delete_objects(
+        result = mariadb_hard_delete._direct_hard_delete_objects(
             ObjectType.BLOB, _uuids(1), FINAL_STATES, 1000.0, False)
 
         self.assertIsNone(result)
@@ -452,7 +454,7 @@ class DirectTransactionTestCase(base.ShakenFistTestCase):
             OperationalError('DELETE', {}, Exception(1213, 'Deadlock')),
             returning, None, None, None, None, None, None, None]
 
-        result = mariadb._direct_hard_delete_objects(
+        result = mariadb_hard_delete._direct_hard_delete_objects(
             ObjectType.BLOB, uuids, FINAL_STATES, 1000.0, False)
 
         self.assertEqual(uuids, result)
@@ -460,7 +462,7 @@ class DirectTransactionTestCase(base.ShakenFistTestCase):
 
 class PerCallTestCase(base.ShakenFistTestCase):
     def _calls(self, object_type, object_uuid):
-        names = (list(mariadb.HARD_DELETE_STATEMENTS)
+        names = (list(mariadb_hard_delete.HARD_DELETE_STATEMENTS)
                  + ['delete_state', 'delete_object_metadata',
                     'delete_object_events'])
         manager = mock.MagicMock()
@@ -469,7 +471,7 @@ class PerCallTestCase(base.ShakenFistTestCase):
         for patcher in patchers:
             patcher.start()
             self.addCleanup(patcher.stop)
-        mariadb.hard_delete_objects_per_call(object_type, object_uuid)
+        mariadb_hard_delete.hard_delete_objects_per_call(object_type, object_uuid)
         return manager.mock_calls
 
     def test_cluster_operation(self):
@@ -509,7 +511,7 @@ class PerCallTestCase(base.ShakenFistTestCase):
             self._calls(ObjectType.NETWORK, uuid))
 
     def test_every_type_calls_its_mapping_then_the_base_three(self):
-        for object_type, names in mariadb.HARD_DELETE_BATCH_FUNCTIONS.items():
+        for object_type, names in mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS.items():
             uuid = str(uuid4())
             called = [call[0] for call in self._calls(object_type, uuid)]
             self.assertEqual(
@@ -520,7 +522,7 @@ class PerCallTestCase(base.ShakenFistTestCase):
     def test_per_object_type_is_refused(self):
         for object_type in PER_OBJECT_TYPES:
             self.assertRaises(
-                ValueError, mariadb.hard_delete_objects_per_call,
+                ValueError, mariadb_hard_delete.hard_delete_objects_per_call,
                 object_type, str(uuid4()))
 
 
@@ -534,7 +536,7 @@ class ServicerTestCase(base.ShakenFistTestCase):
             object_type=ObjectType.BLOB.proto_id, object_uuids=self.uuids,
             state_values=FINAL_STATES, updated_before=1000.0)
 
-    @mock.patch('shakenfist.mariadb.hard_delete_objects')
+    @mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects')
     def test_deleted_uuids_are_returned(self, mock_delete):
         mock_delete.return_value = self.uuids[:1]
         context = mock.MagicMock()
@@ -547,7 +549,7 @@ class ServicerTestCase(base.ShakenFistTestCase):
             ObjectType.BLOB, self.uuids, state_values=FINAL_STATES,
             updated_before=1000.0, unconditional=False)
 
-    @mock.patch('shakenfist.mariadb.hard_delete_objects')
+    @mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects')
     def test_unconditional_has_no_age(self, mock_delete):
         mock_delete.return_value = self.uuids
         context = mock.MagicMock()
@@ -564,7 +566,7 @@ class ServicerTestCase(base.ShakenFistTestCase):
             ObjectType.BLOB, self.uuids, state_values=[],
             updated_before=None, unconditional=True)
 
-    @mock.patch('shakenfist.mariadb.hard_delete_objects', return_value=[])
+    @mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects', return_value=[])
     def test_nothing_eligible_is_not_an_error(self, mock_delete):
         context = mock.MagicMock()
 
@@ -573,7 +575,7 @@ class ServicerTestCase(base.ShakenFistTestCase):
         context.set_code.assert_not_called()
         self.assertEqual([], list(reply.deleted_uuids))
 
-    @mock.patch('shakenfist.mariadb.hard_delete_objects', return_value=None)
+    @mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects', return_value=None)
     def test_failed_transaction_is_aborted(self, mock_delete):
         context = mock.MagicMock()
 
@@ -581,7 +583,7 @@ class ServicerTestCase(base.ShakenFistTestCase):
 
         context.set_code.assert_called_once_with(grpc.StatusCode.ABORTED)
 
-    @mock.patch('shakenfist.mariadb.hard_delete_objects',
+    @mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects',
                 side_effect=ValueError('boom'))
     def test_unexpected_exception_is_internal(self, mock_delete):
         context = mock.MagicMock()
@@ -592,7 +594,7 @@ class ServicerTestCase(base.ShakenFistTestCase):
 
     def _assert_bad_request(self, request):
         context = mock.MagicMock()
-        with mock.patch('shakenfist.mariadb.hard_delete_objects') as delete:
+        with mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects') as delete:
             self.servicer.HardDeleteObjects(request, context)
         context.set_code.assert_called_once_with(
             grpc.StatusCode.INVALID_ARGUMENT)
@@ -625,5 +627,5 @@ class ServicerTestCase(base.ShakenFistTestCase):
     def test_too_many_uuids_is_a_bad_request(self):
         self._assert_bad_request(database_pb2.HardDeleteObjectsRequest(
             object_type=ObjectType.BLOB.proto_id,
-            object_uuids=_uuids(mariadb.HARD_DELETE_OBJECTS_MAX + 1),
+            object_uuids=_uuids(mariadb_hard_delete.HARD_DELETE_OBJECTS_MAX + 1),
             unconditional=True))

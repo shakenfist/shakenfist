@@ -17,7 +17,7 @@ from shakenfist.tests import base
 from shakenfist import blob
 
 
-class FakeClock:
+class ScriptedClock:
     """Return canned times, then repeat the last one forever."""
 
     def __init__(self, times):
@@ -81,7 +81,7 @@ class HttpFetchHeartbeatTestCase(base.ShakenFistTestCase):
         resp = FakeResponse([b'x' * 10, b'x' * 10])
 
         with mock.patch('shakenfist.blob.time.time',
-                        side_effect=FakeClock([1000.0, 1031.0, 1031.0, 1040.0])):
+                        side_effect=ScriptedClock([1000.0, 1031.0, 1031.0, 1040.0])):
             blob.http_fetch(
                 'http://example.com/image', resp, self.mock_blob, [])
 

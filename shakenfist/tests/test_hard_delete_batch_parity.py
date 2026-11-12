@@ -2,7 +2,7 @@
 
 """Each batchable class's hard_delete() against the batch's table list.
 
-mariadb.HARD_DELETE_BATCH_FUNCTIONS declares, for each object type whose
+mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS declares, for each object type whose
 hard delete is nothing but row deletes keyed on the object, the public
 delete functions that type's hard delete runs. These tests run each such
 class's real hard_delete() with every function on the mariadb module,
@@ -47,6 +47,7 @@ from shakenfist import locks
 from shakenfist.managed_executables.dnsmasq import DnsMasq
 from shakenfist.mapping_rule import MappingRule
 from shakenfist import mariadb
+from shakenfist import mariadb_hard_delete
 from shakenfist.namespace_key import NamespaceKey
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.network.network import Network
@@ -111,11 +112,17 @@ class _Recorder:
         return record
 
     def install(self, stack, keep=()):
-        """Patch everything, except the mariadb functions named in keep."""
-        for name, value in vars(mariadb).items():
-            if inspect.isfunction(value) and name not in keep:
-                stack.enter_context(
-                    mock.patch.object(mariadb, name, self._stub(name)))
+        """Patch everything, except the mariadb functions named in keep.
+
+        Both modules, because the batch itself lives in
+        mariadb_hard_delete: a hard delete's calls are recorded only if
+        every function it could reach is stubbed.
+        """
+        for module in (mariadb, mariadb_hard_delete):
+            for name, value in vars(module).items():
+                if inspect.isfunction(value) and name not in keep:
+                    stack.enter_context(
+                        mock.patch.object(module, name, self._stub(name)))
 
         targets = [
             (eventlog, 'add_event', AUDIT_EVENT),
@@ -137,7 +144,8 @@ class _Recorder:
 
     def database_calls(self):
         return [call for call in self.calls
-                if hasattr(mariadb, call[0])]
+                if hasattr(mariadb, call[0])
+                or hasattr(mariadb_hard_delete, call[0])]
 
 
 def _cluster_operation(object_type, object_uuid):
@@ -245,7 +253,7 @@ for _name in OPERATION_NAMES_TO_CLASSES:
 
 class ClassificationTestCase(base.ShakenFistTestCase):
     def test_every_type_is_batched_or_per_object(self):
-        batched = set(mariadb.HARD_DELETE_BATCH_FUNCTIONS)
+        batched = set(mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS)
         for name in OBJECT_NAMES_TO_CLASSES:
             object_type = ObjectType(name)
             self.assertNotEqual(
@@ -258,7 +266,7 @@ class ClassificationTestCase(base.ShakenFistTestCase):
 
     def test_every_batched_type_has_a_literal(self):
         self.assertEqual(set(EXPECTED_DELETES),
-                         set(mariadb.HARD_DELETE_BATCH_FUNCTIONS))
+                         set(mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS))
 
     def test_every_literal_type_has_a_builder(self):
         self.assertEqual(set(EXPECTED_DELETES), set(BUILDERS))
@@ -359,7 +367,7 @@ class HardDeleteParityTestCase(base.ShakenFistTestCase):
         for object_type, expected in EXPECTED_DELETES.items():
             self.assertEqual(
                 expected,
-                tuple(mariadb.HARD_DELETE_BATCH_FUNCTIONS.get(object_type, ())),
+                tuple(mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS.get(object_type, ())),
                 object_type)
 
     def test_instance_keeps_its_targets_delete(self):

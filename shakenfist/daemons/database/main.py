@@ -29,6 +29,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import mariadb
+from shakenfist import mariadb_hard_delete
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
@@ -899,14 +900,14 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             object_uuids = list(request.object_uuids)
             state_values = list(request.state_values)
             updated_before = request.updated_before or None
-            error = mariadb.hard_delete_objects_request_error(
+            error = mariadb_hard_delete.hard_delete_objects_request_error(
                 object_type, object_uuids, state_values, updated_before,
                 request.unconditional)
             if error:
                 context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                 context.set_details(error)
                 return database_pb2.HardDeleteObjectsReply()
-            deleted = mariadb.hard_delete_objects(
+            deleted = mariadb_hard_delete.hard_delete_objects(
                 object_type, object_uuids, state_values=state_values,
                 updated_before=updated_before,
                 unconditional=request.unconditional)

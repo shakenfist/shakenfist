@@ -16,7 +16,9 @@ from shakenfist.daemons.cluster import scheduled_tasks
 from shakenfist.tests import base
 
 
-class FakeClock:
+class FakeDatetimeClock:
+    """A clock which answers in datetimes, which is what the cadence reads."""
+
     def __init__(self):
         self.start = datetime.datetime(2026, 1, 1, 0, 0, 0)
         self.current = self.start
@@ -30,7 +32,7 @@ class FakeClock:
 
 class DeletedObjectSweepCadenceTestCase(base.ShakenFistTestCase):
     def test_sweep_runs_on_consecutive_maintenance_passes(self):
-        clock = FakeClock()
+        clock = FakeDatetimeClock()
         now = mock.Mock(side_effect=clock.now)
         fake_datetime = types.SimpleNamespace(
             datetime=mock.Mock(now=now), time=datetime.time,

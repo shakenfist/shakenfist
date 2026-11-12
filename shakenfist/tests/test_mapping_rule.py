@@ -20,7 +20,7 @@ from shakenfist.mapping_rule import rules_in_namespace
 from shakenfist.mapping_rule import validate_bound_claims
 from shakenfist.mapping_rule import validate_key_ttl
 from shakenfist.mapping_rule import validate_scopes
-from shakenfist import mariadb
+from shakenfist import mariadb_hard_delete
 from shakenfist.namespace import Namespace
 from shakenfist.namespace_key import NamespaceKey
 from shakenfist.schema.object_types import ObjectType
@@ -501,8 +501,8 @@ class NamespaceCascadeTestCase(base.ShakenFistTestCase):
                                list(SCOPES), 3600, 'ryll-ci')
         key = NamespaceKey.new('ci', 'deploy', 'sekrit')
 
-        with mock.patch('shakenfist.mariadb.hard_delete_objects',
-                        wraps=mariadb.hard_delete_objects) as mock_batch:
+        with mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects',
+                        wraps=mariadb_hard_delete.hard_delete_objects) as mock_batch:
             Namespace.from_db('ci').hard_delete()
 
         mock_batch.assert_has_calls([

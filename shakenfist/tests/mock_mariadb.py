@@ -16,6 +16,7 @@ from uuid import UUID
 from uuid import uuid4
 
 from shakenfist import mariadb
+from shakenfist import mariadb_hard_delete
 from shakenfist.config import config
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
@@ -996,7 +997,7 @@ class MockMariaDB():
         # pin, so the double deletes through it and so through the
         # doubles above.
         self.mariadb_hard_delete_objects = mock.patch(
-            'shakenfist.mariadb.hard_delete_objects',
+            'shakenfist.mariadb_hard_delete.hard_delete_objects',
             side_effect=self._mariadb_hard_delete_objects)
         self.mariadb_hard_delete_objects.start()
         self.test_obj.addCleanup(self.mariadb_hard_delete_objects.stop)
@@ -3505,12 +3506,12 @@ class MockMariaDB():
     def _mariadb_hard_delete_objects(self, object_type, object_uuids,
                                      state_values=None, updated_before=None,
                                      unconditional=False):
-        """Mock implementation of mariadb.hard_delete_objects()
+        """Mock implementation of mariadb_hard_delete.hard_delete_objects()
 
         Only the unconditional mode is modelled: a guarded batch's
         state and age check has no in-memory equivalent here yet.
         """
-        error = mariadb.hard_delete_objects_request_error(
+        error = mariadb_hard_delete.hard_delete_objects_request_error(
             object_type, object_uuids, state_values or [], updated_before,
             unconditional)
         if error:
@@ -3521,7 +3522,7 @@ class MockMariaDB():
         self._trace(
             f'MockMariaDB.hard_delete_objects({object_type}, {object_uuids})')
         for object_uuid in object_uuids:
-            mariadb.hard_delete_objects_per_call(object_type, object_uuid)
+            mariadb_hard_delete.hard_delete_objects_per_call(object_type, object_uuid)
         return list(object_uuids)
 
     def seed_cluster_operation_target(

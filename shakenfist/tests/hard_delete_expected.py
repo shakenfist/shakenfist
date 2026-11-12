@@ -2,7 +2,7 @@
 
 """Each batchable type's delete set, written down a second time.
 
-mariadb.HARD_DELETE_BATCH_FUNCTIONS declares which public delete
+mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS declares which public delete
 functions a type's hard delete runs. This module is the independent copy
 of the same knowledge, read from each class's own hard_delete() before it
 moved onto the batch, and it exists so that the declaration is checked

@@ -29,6 +29,7 @@ from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
+from shakenfist.tests.fakeclock import FakeClock
 from shakenfist.tests.mock_mariadb import MockMariaDB
 from shakenfist import mariadb
 
@@ -602,14 +603,6 @@ class FakeDeletedObjectStore:
             uuids=after[:page_size], more_available=len(after) > page_size)
 
 
-class FakeClock:
-    def __init__(self, now=1000000000.0):
-        self.now = now
-
-    def __call__(self):
-        return self.now
-
-
 def _attrs(expiry):
     return NamespaceKeyAttributesData(
         uuid=KEY_UUID_1, key='aGFzaA==', nonce='noncenonce', expiry=expiry)
@@ -811,7 +804,7 @@ class HardDeleteExpiredNamespaceKeyTestCase(base.ShakenFistTestCase):
         self.addCleanup(_reset_deleted_object_sweep_state)
 
     @mock.patch('shakenfist.eventlog.add_event')
-    @mock.patch('shakenfist.mariadb.hard_delete_objects')
+    @mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects')
     def test_hard_deletes_a_soft_deleted_key_after_cleaner_delay(
             self, mock_batch, mock_event):
         # Keys are hard deleted in batches, and the database deletes only
@@ -836,7 +829,7 @@ class HardDeleteExpiredNamespaceKeyTestCase(base.ShakenFistTestCase):
             'hard deleted object', suppress_event_logging=True)
 
     @mock.patch('shakenfist.eventlog.add_event')
-    @mock.patch('shakenfist.mariadb.hard_delete_objects', return_value=[])
+    @mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects', return_value=[])
     def test_leaves_a_recently_deleted_key_alone(self, mock_batch, mock_event):
         # A key deleted as the pass runs is younger than the batch's
         # updated_before, so the database leaves it and says so.
@@ -1832,7 +1825,7 @@ class DeletedObjectSweepBatchTestCase(base.ShakenFistTestCase):
         _reset_deleted_object_sweep_state()
         self.addCleanup(_reset_deleted_object_sweep_state)
 
-        patcher = mock.patch('shakenfist.mariadb.hard_delete_objects')
+        patcher = mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects')
         self.mock_batch = patcher.start()
         self.addCleanup(patcher.stop)
         # Every uuid offered is eligible unless a test says otherwise.
@@ -2489,7 +2482,7 @@ class DeletedObjectSweepExcludedTypesTestCase(base.ShakenFistTestCase):
             version=Node.current_version))
 
         with mock.patch('shakenfist.mariadb.delete_state') as mock_delete, \
-                mock.patch('shakenfist.mariadb.hard_delete_objects') as mock_batch:
+                mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects') as mock_batch:
             node.hard_delete()
 
         mock_delete.assert_not_called()

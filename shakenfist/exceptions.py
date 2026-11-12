@@ -754,7 +754,7 @@ class HardDeleteBatchUnavailable(Exception):
     returns because it calls for a different response: a failed batch
     deleted nothing and is tried again later, while an unavailable one
     can be done now, one object at a time, with
-    ``mariadb.hard_delete_objects_per_call()`` against the same server.
+    ``mariadb_hard_delete.hard_delete_objects_per_call()`` against the same server.
 
     Callers catch it. It never propagates to a user."""
     ...

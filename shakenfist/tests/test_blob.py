@@ -27,6 +27,7 @@ from shakenfist.tests import base
 from shakenfist import blob
 from shakenfist import exceptions
 from shakenfist import mariadb
+from shakenfist import mariadb_hard_delete
 
 
 class FakeConfig(BaseSettings):
@@ -573,7 +574,7 @@ class BlobDeleteReferencesTestCase(base.ShakenFistTestCase):
         # the batch's deletes rather than a Blob override.
         self.assertIn(
             'remove_all_references_from',
-            mariadb.HARD_DELETE_BATCH_FUNCTIONS[ObjectType.BLOB])
+            mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS[ObjectType.BLOB])
 
     @mock.patch('shakenfist.blob.Blob.add_event')
     @mock.patch('shakenfist.mariadb.delete_object_events')
@@ -583,7 +584,7 @@ class BlobDeleteReferencesTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb.delete_blob_attributes')
     @mock.patch('shakenfist.mariadb.delete_blob_transfers_for_blob')
     @mock.patch('shakenfist.mariadb.delete_blob_hashes')
-    @mock.patch('shakenfist.mariadb.hard_delete_objects',
+    @mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects',
                 side_effect=exceptions.HardDeleteBatchUnavailable('too old'))
     def test_hard_delete_per_call_removes_references_held(
             self, mock_batch, mock_hashes, mock_transfers, mock_attributes,
