@@ -43,7 +43,8 @@ def requires_operation_ownership(func):
             log.info('Operation not found, kwarg missing')
             return sf_api.error(404, 'agent operation not found')
 
-        if request_namespace() not in [kwargs['operation_from_db'].namespace, 'system']:
+        if not api_base.namespace_owns(kwargs['operation_from_db'].namespace,
+                                       request_namespace()):
             log.info('Agent operation not found, ownership test in decorator')
             return sf_api.error(404, 'agent operation not found')
 

@@ -157,11 +157,10 @@ def requires_artifact_ownership(func):
     # as a way to get the system namespace's cross-namespace *sight* on
     # a smaller scale, and letting somebody delete your artifacts is
     # not a smaller scale version of being able to see them. It is also
-    # what the rest of the codebase already does:
-    # requires_instance_ownership and requires_network_ownership both
-    # test `request_namespace() not in [obj.namespace, 'system']`, and
-    # artifacts were the only object type where trust reached past
-    # reading. Now they match.
+    # what the rest of the codebase already does: this is
+    # api_base.namespace_owns(), which requires_instance_ownership and
+    # requires_network_ownership also call, and artifacts were the only
+    # object type where trust reached past reading. Now they match.
     #
     # Creating an artifact *in* a namespace which trusts you is a
     # different question and still allowed -- see the namespace checks
@@ -174,7 +173,7 @@ def requires_artifact_ownership(func):
             return sf_api.error(404, 'artifact not found')
 
         a = kwargs['artifact_from_db']
-        if request_namespace() not in [a.namespace, 'system']:
+        if not api_base.namespace_owns(a.namespace, request_namespace()):
             LOG.with_fields({'artifact': a}).info(
                 'Artifact not found, ownership test in decorator')
             return sf_api.error(404, 'artifact not found')
@@ -485,7 +484,7 @@ class ArtifactsEndpoint(api_base.Resource):
         a = Artifact.owned_from_url(Artifact.TYPE_IMAGE, url,
                                     namespace=namespace)
         if a:
-            if request_namespace() not in [a.namespace, 'system']:
+            if not api_base.namespace_owns(a.namespace, request_namespace()):
                 return sf_api.error(404, 'namespace not found')
         else:
             a = Artifact.new(Artifact.TYPE_IMAGE, url, namespace=namespace)
@@ -655,7 +654,7 @@ class ArtifactUploadEndpoint(api_base.Resource):
         a = Artifact.owned_from_url(artifact_type_value, source_url,
                                     namespace=namespace)
         if a:
-            if request_namespace() not in [a.namespace, 'system']:
+            if not api_base.namespace_owns(a.namespace, request_namespace()):
                 return sf_api.error(404, 'namespace not found')
         else:
             if not namespace_is_trusted(namespace, request_namespace()):

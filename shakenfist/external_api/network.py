@@ -294,8 +294,12 @@ class NetworksEndpoint(api_base.Resource):
         if not namespace:
             namespace = request_namespace()
 
-        # If accessing a foreign name namespace, we need to be an admin
-        if request_namespace() not in [namespace, 'system']:
+        # If accessing a foreign name namespace, we need to be an admin.
+        # This is the ownership predicate asked of a namespace the request
+        # named rather than of an object's namespace, but it is the same
+        # question -- may the caller act as this namespace -- so it calls
+        # the same helper rather than spelling it out again.
+        if not api_base.namespace_owns(namespace, request_namespace()):
             return sf_api.error(
                 401, 'only admins can create resources in a different namespace')
 

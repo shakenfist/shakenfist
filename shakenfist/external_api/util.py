@@ -3,6 +3,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.network import network
 from shakenfist.daemons import daemon
+from shakenfist.external_api.base import namespace_owns
 from shakenfist.instance import Instance
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.schema.ipam_reservation import ReservationType
@@ -63,12 +64,12 @@ def safe_get_network_interface(interface_uuid):
         log.info('Network not found or deleted')
         return None, None, sf_api.error(404, 'interface network not found')
 
-    if request_namespace() not in [n.namespace, 'system']:
+    if not namespace_owns(n.namespace, request_namespace()):
         log.info('Interface not found, failed ownership test')
         return None, None, sf_api.error(404, 'interface not found')
 
     i = Instance.from_db(ni.instance_uuid)
-    if request_namespace() not in [i.namespace, 'system']:
+    if not namespace_owns(i.namespace, request_namespace()):
         log.with_fields({'instance': i}).info(
             'Instance not found, failed ownership test')
         return None, None, sf_api.error(404, 'interface not found')

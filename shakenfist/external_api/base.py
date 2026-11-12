@@ -2241,10 +2241,17 @@ def namespace_owns(obj_namespace, caller_namespace):
     uuid.
 
     This exists because that rule had no function to call for the ownership
-    half: the test was open-coded at eleven sites across this package. The
-    two which share it now are this module's instance ownership decorator
-    and the agent operation dependency helper. Converting the rest is its
-    own change, since it spans artifacts, labels and networks.
+    half: the test was open-coded at twelve sites across this package, and
+    every one of them now calls here. The unit test
+    test_namespace_ownership_predicate.py fails the build if the literal
+    predicate reappears anywhere under shakenfist/, which is what stops a
+    thirteenth site arriving; the body below is the one place it is spelled
+    out, and that test exempts this function by name rather than by line.
+
+    Note that this is the ownership half only. The artifact read routes
+    ask a wider question and call `namespace_or_shared_filter` instead --
+    do not collapse the two, because that is the inversion the rule
+    records.
     """
     return caller_namespace in (obj_namespace, 'system')
 
@@ -2347,7 +2354,8 @@ def requires_network_ownership(func):
             log.info('Network not found, kwarg missing')
             return sf_api.error(404, 'network not found')
 
-        if request_namespace() not in [kwargs['network_from_db'].namespace, 'system']:
+        if not namespace_owns(kwargs['network_from_db'].namespace,
+                              request_namespace()):
             log.info('Network not found, ownership test in decorator')
             return sf_api.error(404, 'network not found')
 
