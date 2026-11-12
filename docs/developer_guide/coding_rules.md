@@ -15,13 +15,29 @@ For artifacts that function is `namespace_or_shared_filter(namespace, obj)`:
 own namespace, a namespace whose trust list names the caller, `system`, or
 `shared`. `requires_artifact_access` calls it.
 
-`requires_artifact_ownership` is the deliberately stricter mutation guard and
-tests `request_namespace() not in [obj.namespace, 'system']` — the same test
-`requires_instance_ownership` and `requires_network_ownership` use. It
-consults neither the `shared` flag nor the trust list: sharing publishes an
-object for reading, and a trust is a visibility grant, so neither one hands
-out a delete button. Creating an object *in* a namespace that trusts you is a
-separate question and is still allowed.
+The ownership predicate has a function too, and it is
+`api_base.namespace_owns(obj_namespace, caller_namespace)`: the caller's own
+namespace, or `system`. `requires_artifact_ownership` is the deliberately
+stricter mutation guard and calls it, as do
+`requires_instance_ownership`, `requires_network_ownership`,
+`requires_operation_ownership`, the label and artifact write routes, and
+`safe_get_network_interface`. It consults neither the `shared` flag nor the
+trust list: sharing publishes an object for reading, and a trust is a
+visibility grant, so neither one hands out a delete button. Creating an object
+*in* a namespace that trusts you is a separate question and is still allowed.
+
+Access and ownership are two predicates and not one. Do not reach for
+`namespace_or_shared_filter` on a route which changes the object, and do not
+reach for `namespace_owns` on a read route — that is the inversion this rule
+records, in each direction.
+
+Neither predicate is enforced by memory. The unit test
+`test_namespace_ownership_predicate.py` parses every file in the package and
+fails the build if the body of `namespace_owns` — any membership test against
+a literal naming `'system'` — reappears outside the helper itself. That guard
+is what stops the restatement count climbing past the twelve sites #3640 and
+#4887 converted; the predicate had been open-coded at all twelve, across
+instances, networks, artifacts, labels, agent operations and network create.
 
 This is not a style preference. `requires_artifact_access` used to restate the
 rule as `if a.shared and requestor not in [a.namespace, 'system']`, which is

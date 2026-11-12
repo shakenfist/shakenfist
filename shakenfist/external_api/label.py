@@ -142,7 +142,7 @@ class LabelEndpoint(api_base.Resource):
         a = Artifact.owned_from_url(Artifact.TYPE_LABEL, label_url,
                                     namespace=namespace)
         if a:
-            if request_namespace() not in [a.namespace, 'system']:
+            if not api_base.namespace_owns(a.namespace, request_namespace()):
                 return sf_api.error(404, 'namespace not found')
         else:
             if not namespace_is_trusted(namespace, request_namespace()):
@@ -210,7 +210,7 @@ class LabelEndpoint(api_base.Resource):
             return err
         a = Artifact.owned_from_url(Artifact.TYPE_LABEL, label_url,
                                     namespace=namespace)
-        if not a or request_namespace() not in [a.namespace, 'system']:
+        if not a or not api_base.namespace_owns(a.namespace, request_namespace()):
             return sf_api.error(404, 'label %s not found' % label_name)
 
         a.add_event(EVENT_TYPE_AUDIT, 'delete request from REST API')
