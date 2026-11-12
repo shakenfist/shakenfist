@@ -1816,9 +1816,14 @@ When this plan is successfully implemented:
   refused with a 422 instead of truncated. That closes the
   symptom on the issuer routes and leaves the class open: every
   other over-declared `str` field in the schema still accepts
-  values its column will not hold. The issue body is written
-  and ready to file; it was not filed from the session that
-  wrote it.
+  values its column will not hold. Filed as
+  [#4901](https://github.com/shakenfist/shakenfist/issues/4901),
+  which carries the sweep the body originally left open: across
+  all 47 schema models, four fields declare more than their
+  column holds — these three, plus `BlobHash.hash_value` at 256
+  against a `VARCHAR(255)`, which is latent rather than live
+  because the longest digest anything stores is sha512's 128
+  hex characters.
 
 * **A refresh cannot update a `jwks_uri` that discovery
   supplied.** An operator-configured value always wins over a
