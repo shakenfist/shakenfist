@@ -409,7 +409,7 @@ before this repository can emit one (decision 3).
 | Phase | Plan | Status | Content | Merged |
 |-------|------|--------|---------|--------|
 | 0 | [PLAN-agent-operation-dependencies-phase-00-decisions.md](PLAN-agent-operation-dependencies-phase-00-decisions.md) | Complete | Resolve the open questions into the decisions section above, and re-cut this table. Its survey found five of this plan's factual claims wrong or incomplete; its measurement found that instance queues do get deep but that no log can say whether a deep one held two submitters; its consumer audit found one firm break outside this repository and one single-commit obligation inside it | `4c14523a7b` |
-| 1 | [PLAN-agent-operation-dependencies-phase-01-schema-and-api.md](PLAN-agent-operation-dependencies-phase-01-schema-and-api.md) | In progress | Schema, object and API: `depends_on` and `runs_after` on `AgentOperation` with an additive table migration, the agent edge model and `VALID_DEPENDENCY_OPERATIONS` (decision 5), per-edge settle seconds, `abort` in `state_targets` and `TERMINAL_STATES` in one commit (decision 3), the parameters on the three creating endpoints with their declarations and capability token, and submission-time validation (decision 6). Prerequisite: `client-python-k3s` has learned `abort` and released -- met, by [client-python-k3s#164](https://github.com/shakenfist/client-python-k3s/pull/164) in `v0.4.0`. Its plan also lands the `dependency_failure` attribute column phase 2 writes, since this is the schema phase | — |
+| 1 | [PLAN-agent-operation-dependencies-phase-01-schema-and-api.md](PLAN-agent-operation-dependencies-phase-01-schema-and-api.md) | Complete | Schema, object and API: `depends_on` and `runs_after` on `AgentOperation` with an additive table migration, the agent edge model and `VALID_DEPENDENCY_OPERATIONS` (decision 5), per-edge settle seconds, `abort` in `state_targets` and `TERMINAL_STATES` in one commit (decision 3), the parameters on the three creating endpoints with their declarations and capability token, and submission-time validation (decision 6). Prerequisite: `client-python-k3s` has learned `abort` and released -- met, by [client-python-k3s#164](https://github.com/shakenfist/client-python-k3s/pull/164) in `v0.4.0`. Its plan also lands the `dependency_failure` attribute column phase 2 writes, since this is the schema phase | `e6c0ba95a5` |
 | 2 | — | Not started | Dispatch evaluation (decisions 1, 2, 8, 9, 10): same-instance and cross-instance edges evaluated in the dispatcher between `agent_operation_next()` and `start_instance_executor()`, the cascade to `abort`, the settle delay, the dependency-wait budget and its configuration option, the failed dependency on the wire in `external_view()` (the `dependency_failure` attribute column itself lands in phase 1, which is the schema phase, so this phase writes and exposes a column which already exists), the `database_load_budget.yaml` amendment, and the terminal-dependency cache | — |
 | 3 | — | Not started | client-python: chain submission helpers, await-the-chain UX, failure reporting from the chain's first failure, and `abort` in `TERMINAL_AGENT_OPERATION_STATES`. Lands in the sibling repository, so its plan file lives there, following the `PLAN-agent-operation-deadlines` phase 6 precedent | — |
 | 4 | — | Not started | Documentation and examples (decision 11): a new `docs/developer_guide/agent_operations.md` for the model, the dependency vocabulary in the API reference, the lazy-cascade and swept-dependency ambiguities written down, the example index, and `client-python-k3s` adopting dependencies (rolling update as one submitted chain) as the first example application | — |
@@ -419,7 +419,9 @@ The `Merged` column records what put each phase on `develop`: the
 merge commit of its pull request, or an explicit `first..last` range
 where the phase landed directly. Phase 0 landed as pull request
 [#4827](https://github.com/shakenfist/shakenfist/pull/4827), merge
-commit `4c14523a7b`; every other cell reads `—` because nothing
+commit `4c14523a7b`, and phase 1 as pull request
+[#4885](https://github.com/shakenfist/shakenfist/pull/4885), merge
+commit `e6c0ba95a5`; every other cell reads `—` because nothing
 else has landed yet.
 
 ## Future work
@@ -459,3 +461,14 @@ not lost:
   plan only because an instance's external view embeds each queued
   operation's whole `external_view()`, so a field added to an agent
   operation's view appears in the instance's too.
+
+- **Nine sites still restate the namespace ownership predicate.**
+  Phase 1's review round two found that the ownership test
+  (`caller == object's namespace, or caller is system`) is open-coded
+  at eleven sites. Phase 1 introduced `namespace_owns()` and converted
+  the two it touched; the other nine predate this plan and are filed
+  as [#4887](https://github.com/shakenfist/shakenfist/issues/4887)
+  rather than swept here. `docs/developer_guide/coding_rules.md` rule
+  1 forbids restating a visibility predicate, and the issue records
+  why the artifact *access* path must not be collapsed into the
+  ownership one.
