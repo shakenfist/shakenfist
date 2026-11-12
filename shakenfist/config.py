@@ -886,9 +886,13 @@ class SFConfig(BaseSettings):
             'longer than CLEANER_DELAY. Reading the sweep\'s work from the '
             'database counts against the budget. It caps the work rather '
             'than spending it: a pass with nothing to delete finishes at '
-            'once. A pass usually stops at DELETED_OBJECT_SWEEP_MAX_OBJECTS '
-            'first, so this is a ceiling for a slow database tier rather '
-            'than the way to set the drain rate.'
+            'once. At the default cap a pass stops at '
+            'DELETED_OBJECT_SWEEP_MAX_OBJECTS first, but the budget '
+            'becomes the binding limit as the cap is raised -- measured '
+            'at a cap of 400, a quarter of passes ended on a 20 second '
+            'budget -- so raise this with a cap much above the default. '
+            'The per-pass log line says which limit ended a pass in its '
+            'stopped_by field.'
         )
     )
     DELETED_OBJECT_SWEEP_MAX_OBJECTS: int = Field(
@@ -901,8 +905,10 @@ class SFConfig(BaseSettings):
             'object taken is either hard deleted or found no longer '
             'eligible. Raise it to drain a large backlog faster, watching '
             'the load on the database tier as you do; lower it to reduce '
-            'that load. DELETED_OBJECT_SWEEP_SECONDS still ends a pass '
-            'which runs out of time first.'
+            'that load. A pass takes the lower of this and what '
+            'DELETED_OBJECT_SWEEP_SECONDS allows, so past a few hundred '
+            'objects a pass the budget is what limits the drain and wants '
+            'raising alongside this.'
         )
     )
     DELETED_OBJECT_BATCH_SIZE: int = Field(

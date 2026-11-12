@@ -1,6 +1,8 @@
 import collections
 import queue
 import time
+from typing import Any
+from typing import Callable
 from typing import NamedTuple
 from typing import Optional
 
@@ -24,6 +26,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist import eventlog
 from shakenfist import mariadb
+from shakenfist import mariadb_hard_delete
 from shakenfist.schema.operations import baseclusteroperation as bco_schema
 from shakenfist.schema.operations import node_blob_op as nbo_schema
 from shakenfist.schema.operations import node_inst_op as nio_schema
@@ -285,6 +288,40 @@ def _record_sweep_read(sweep: str, object_type: ObjectType,
             sweep=sweep, object_type=str(object_type)).set(0)
 
 
+def _sweep_read(sweep: str, object_type: ObjectType,
+                read: Callable[[], Any],
+                uuids_of: Callable[[Any], Optional[list[str]]]
+                ) -> tuple[Any, bool]:
+    """Run one sweep's work-list read, with its failures accounted for.
+
+    Every work-list read in this module fails in the same two shapes and
+    accounts for them the same way, so they share this rather than a
+    fourth copy of it. ``read`` returns None when one reply could not be
+    read and raises DatabaseUnavailable when the tier is gone; either way
+    the read goes against the failure streak, which is the only signal an
+    operator gets for a sweep that has quietly stopped draining.
+    ``uuids_of`` takes the uuids out of what ``read`` returned, because a
+    paged read answers with a page rather than a list.
+
+    Returns what ``read`` returned -- None after either failure -- and
+    whether the failure was tier-wide. The callers' own docstrings say
+    why that distinction matters to each of them.
+    """
+    try:
+        result = read()
+        error = None
+        tier_unavailable = False
+    except DatabaseUnavailable as e:
+        result = None
+        error = str(e)
+        tier_unavailable = True
+
+    _record_sweep_read(
+        sweep, object_type,
+        uuids_of(result) if result is not None else None, error)
+    return result, tier_unavailable
+
+
 def _sweep_work_list(sweep: str, object_type: ObjectType,
                      state_values: list[str],
                      updated_before: Optional[float] = None
@@ -309,17 +346,11 @@ def _sweep_work_list(sweep: str, object_type: ObjectType,
     deleted-object sweep for every type after it. The two shapes are
     reported separately in the return value -- see ``WorkList``.
     """
-    try:
-        obj_uuids = mariadb.get_objects_by_state(
-            object_type, state_values, updated_before=updated_before)
-        error = None
-        tier_unavailable = False
-    except DatabaseUnavailable as e:
-        obj_uuids = None
-        error = str(e)
-        tier_unavailable = True
-
-    _record_sweep_read(sweep, object_type, obj_uuids, error)
+    obj_uuids, tier_unavailable = _sweep_read(
+        sweep, object_type,
+        lambda: mariadb.get_objects_by_state(
+            object_type, state_values, updated_before=updated_before),
+        lambda read: read)
     return WorkList(uuids=obj_uuids, tier_unavailable=tier_unavailable)
 
 
@@ -348,21 +379,14 @@ def _sweep_work_page(sweep: str, object_type: ObjectType,
     from the gRPC wrapper is per-reply, a raised ``DatabaseUnavailable``
     is tier-wide, and both are accounted against the failure streak.
     """
-    try:
-        page = mariadb.get_objects_by_state_page(
+    page, tier_unavailable = _sweep_read(
+        sweep, object_type,
+        lambda: mariadb.get_objects_by_state_page(
             object_type, state_values, page_size, after_uuid=after_uuid,
-            updated_before=updated_before)
-        error = None
-        tier_unavailable = False
-    except DatabaseUnavailable as e:
-        page = None
-        error = str(e)
-        tier_unavailable = True
-
-    obj_uuids = page.uuids if page is not None else None
-    _record_sweep_read(sweep, object_type, obj_uuids, error)
+            updated_before=updated_before),
+        lambda read: read.uuids)
     return WorkPage(
-        uuids=obj_uuids,
+        uuids=page.uuids if page is not None else None,
         more_available=page.more_available if page is not None else False,
         tier_unavailable=tier_unavailable)
 
@@ -377,16 +401,10 @@ def _stateless_work_list(sweep: str, object_type: ObjectType) -> WorkList:
     silently repairs nothing is as visible as a sweep that silently
     collects nothing.
     """
-    try:
-        obj_uuids = mariadb.get_stateless_object_uuids(object_type)
-        error = None
-        tier_unavailable = False
-    except DatabaseUnavailable as e:
-        obj_uuids = None
-        error = str(e)
-        tier_unavailable = True
-
-    _record_sweep_read(sweep, object_type, obj_uuids, error)
+    obj_uuids, tier_unavailable = _sweep_read(
+        sweep, object_type,
+        lambda: mariadb.get_stateless_object_uuids(object_type),
+        lambda read: read)
     return WorkList(uuids=obj_uuids, tier_unavailable=tier_unavailable)
 
 
@@ -1033,13 +1051,23 @@ def per_deleted_object_checks():
     fill_cost = time.time() - start_time
     outcomes: collections.Counter[str] = collections.Counter()
     process_start = time.time()
-    processed = _drain_deleted_object_work(budget - fill_cost, outcomes)
+    drain = _drain_deleted_object_work(budget - fill_cost, outcomes)
+    processed = drain.taken
     process_seconds = time.time() - process_start
 
+    # ``stopped_by`` is here because the two limits cannot be told apart
+    # from the times: the fill is charged against the budget but is not in
+    # ``elapsed_seconds``, so a pass the budget ended logs an elapsed time
+    # below the budget (#4878). ``fill_seconds`` and ``budget_seconds`` are
+    # the rest of that arithmetic, so a pass says what it spent and what it
+    # was allowed.
     fields: dict[str, object] = {
         'total': processed,
         'remaining': _deleted_object_work_held(),
         'filled': filled,
+        'stopped_by': drain.stopped_by,
+        'fill_seconds': round(fill_cost, 3),
+        'budget_seconds': budget,
         'elapsed_seconds': round(process_seconds, 3)
     }
     for outcome in DELETED_OBJECT_OUTCOMES:
@@ -1134,25 +1162,32 @@ def _fill_deleted_object_work(now: float, deadline: float) -> bool:
         #   UNAVAILABLE -- a dead tier, and the status the servicer now
         #   sets for its own transient MariaDB errors -- fails fast and
         #   does not rebuild the channel, so it spends
-        #   GRPC_UNAVAILABLE_RETRIES (6) attempts and their escalating
-        #   GRPC_RETRY_DELAY sleeps: on the order of ten seconds. This is
-        #   the common shape.
+        #   mariadb.GRPC_UNAVAILABLE_RETRIES attempts and their
+        #   escalating mariadb.GRPC_RETRY_DELAY sleeps. This is the
+        #   common shape, and the cheaper of the two.
         #
         #   DEADLINE_EXCEEDED -- a tier that is up but not answering --
-        #   spends GRPC_RETRIES (3) deadlines of GRPC_TIMEOUT (30s) each
-        #   plus sleeps, so about 93s. This is the shape the early return is
-        #   sized for.
+        #   spends mariadb.GRPC_RETRIES deadlines of mariadb.GRPC_TIMEOUT
+        #   each plus sleeps. This is the expensive shape, and the one
+        #   the early return is sized for.
         #
-        # There are 28 object types here and _run_due_scheduled_jobs()
-        # pets the watchdog only between jobs, while sf-cluster runs at
-        # WatchdogSec=300s. In the slow shape continuing past the fourth
-        # failure already exceeds the window and a full pass would take
-        # some 45 minutes; even the fast shape burns most of the window
-        # learning nothing. Either way it risks SIGABRTing the elected
-        # maintainer and costing a lock failover, where before it merely
-        # skipped a pass. Nothing is gained by asking a tier that is not
-        # there 27 more times. This function has blown the watchdog
-        # window once already (issue 3533).
+        # The costs are not restated here, because they are those
+        # constants' to change: read them there.
+        #
+        # One read per type in DELETED_OBJECT_SWEEP_TYPES is more of them
+        # than the watchdog window has room for, because
+        # _run_due_scheduled_jobs() pets the watchdog only between jobs
+        # and sf-cluster's unit sets WatchdogSec. When this was written
+        # that was 28 types against a 300 second window, where the
+        # expensive shape cost some 93 seconds a type: continuing past the
+        # fourth failure already exceeded the window, and a whole pass
+        # would have taken some 45 minutes. Even the cheap shape burned
+        # most of the window learning nothing. Either way it risks
+        # SIGABRTing the elected maintainer and costing a lock failover,
+        # where before it merely skipped a pass, and nothing is gained by
+        # asking a tier that is not there once per remaining type. This
+        # function has blown the watchdog window once already (issue
+        # 3533).
         with mariadb.rpc_timing_scope('per_deleted_object_fill', objtype):
             page = _sweep_work_page(
                 'per_deleted_object', ObjectType(objtype), FINAL_OBJECT_STATES,
@@ -1248,7 +1283,7 @@ def _hard_delete_deleted_object_batch(
     batch_start = time.monotonic()
     try:
         with mariadb.rpc_timing_scope('per_deleted_object', objtype):
-            deleted = mariadb.hard_delete_objects(
+            deleted = mariadb_hard_delete.hard_delete_objects(
                 ObjectType(objtype), obj_uuids,
                 state_values=FINAL_OBJECT_STATES,
                 updated_before=time.time() - _deleted_object_delay(objtype))
@@ -1303,9 +1338,33 @@ def _hard_delete_deleted_objects_singly(
     return taken
 
 
+class DrainOutcome(NamedTuple):
+    """How many entries a drain took, and which limit ended it.
+
+    ``stopped_by`` is why the drain returned, and it is the difference
+    between a sweep that is capped and a sweep that is out of time:
+
+      ``cap``         DELETED_OBJECT_SWEEP_MAX_OBJECTS was reached, so
+                      raising the cap would drain faster.
+      ``budget``      the pass's share of DELETED_OBJECT_SWEEP_SECONDS
+                      ran out first, so raising the cap would not, and
+                      the budget is what needs raising (#4878).
+      ``empty``       no type had work left, so the sweep is bound by
+                      arrivals and neither limit matters.
+      ``unavailable`` the database tier failed mid-pass.
+
+    An operator cannot tell the first two apart from the elapsed time,
+    because the pass's reads are charged against the budget and are not
+    in the drain's own ``elapsed_seconds``, so a pass ended by the
+    budget logs a time below it.
+    """
+    taken: int
+    stopped_by: str
+
+
 def _drain_deleted_object_work(
         execution_limit: float,
-        outcomes: Optional[collections.Counter[str]] = None) -> int:
+        outcomes: Optional[collections.Counter[str]] = None) -> DrainOutcome:
     """Take a turn from each type with work in turn, within the pass's limits.
 
     A turn is up to DELETED_OBJECT_BATCH_SIZE entries of one type: one batch
@@ -1314,8 +1373,9 @@ def _drain_deleted_object_work(
     DELETED_OBJECT_SWEEP_MAX_OBJECTS entries, whichever comes first, and a
     turn never takes more entries than the cap has left.
 
-    Returns how many entries were taken. If ``outcomes`` is given it is
-    filled with how many entries ended in each of DELETED_OBJECT_OUTCOMES.
+    Returns how many entries were taken and which limit ended the drain.
+    If ``outcomes`` is given it is filled with how many entries ended in
+    each of DELETED_OBJECT_OUTCOMES.
     """
     global _DELETED_OBJECT_NEXT_TYPE
 
@@ -1327,10 +1387,10 @@ def _drain_deleted_object_work(
     while True:
         # Limit how long we spend in this loop, and how much we take
         if time.time() > deadline:
-            return processed
+            return DrainOutcome(processed, 'budget')
         remaining = config.DELETED_OBJECT_SWEEP_MAX_OBJECTS - processed
         if remaining <= 0:
-            return processed
+            return DrainOutcome(processed, 'cap')
 
         # The first type at or after the rotation's position which has
         # work, wrapping around the end of the list.
@@ -1342,7 +1402,7 @@ def _drain_deleted_object_work(
                 _DELETED_OBJECT_NEXT_TYPE = (index + 1) % len(object_types)
                 break
         if objtype is None:
-            return processed
+            return DrainOutcome(processed, 'empty')
 
         work = _DELETED_OBJECT_WORK[objtype]
         count = min(config.DELETED_OBJECT_BATCH_SIZE, remaining)
@@ -1351,7 +1411,7 @@ def _drain_deleted_object_work(
         # releases its placement, a namespace cascades to what it owns -- is
         # hard deleted one object at a time by its own code.
         if (batch_unavailable or
-                ObjectType(objtype) not in mariadb.HARD_DELETE_BATCH_FUNCTIONS):
+                ObjectType(objtype) not in mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS):
             processed += _hard_delete_deleted_objects_singly(
                 objtype, work, count, deadline, outcomes)
             continue
@@ -1369,7 +1429,7 @@ def _drain_deleted_object_work(
             LOG.with_fields({'object_type': objtype}).warning(
                 f'Stopping per-deleted-object drain, database unavailable: '
                 f'{e}')
-            return processed
+            return DrainOutcome(processed, 'unavailable')
         except HardDeleteBatchUnavailable:
             # An sf-database which predates the batch. Each object's own
             # hard delete falls back to one delete at a time against it, and

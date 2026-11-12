@@ -242,6 +242,17 @@ In summary:
 | `sf-database` itself (gRPC listener) | `MARIADB_GATEWAY_PORT` | Port each `sf-database` binds on (default 13005) |
 | Prometheus scraper | `MARIADB_GATEWAY_METRICS_PORT` | Metrics port on each `sf-database` replica (default 13006) |
 
+**The tier's port must be reachable only from the mesh.** `sf-database`
+binds an insecure gRPC port and authorises no caller: its only server
+interceptor counts requests. Anything which can open a connection to
+`MARIADB_GATEWAY_HOSTS` can read and write every object in the cluster,
+including the batch hard delete, which removes up to a thousand objects
+of one type in a single call. That is a deliberate posture rather than
+an oversight — the mesh is treated as private, and mutual TLS between
+daemons is a separate piece of work — but it means the port belongs on
+the cluster's own network, firewalled from anything else, and that a
+BYO deployment which routes it over a shared network is exposed.
+
 **Multi-replica deployments**: More than one `sf-database` replica can run
 against the same MariaDB server. List every replica's mesh IP in
 `MARIADB_GATEWAY_HOSTS`, comma-separated — for example,
@@ -1027,10 +1038,12 @@ type whose list has been read to the end, including one with nothing to
 delete, is not read again for five minutes, so an object whose hard delete
 fails every time is retried every five minutes rather than every pass.
 Each failure is logged at ERROR and counted with the `failed` outcome
-below. Objects are hydrated one at a time at processing time, and the
-sweep takes one object from each type in turn, remembering its place
-between passes, so neither a large backlog in one type nor a single
-failing object can stop the others.
+below. The sweep takes a turn from each type with work in turn, and a
+turn is up to `DELETED_OBJECT_BATCH_SIZE` (25) of that type's entries:
+one transaction for a type hard deleted in batches, and one object at a
+time, each hydrated as it is reached, for a type which is not. It
+remembers its place between passes, so neither a large backlog in one
+type nor a single failing object can stop the others.
 
 #### Draining a backlog
 
@@ -1051,9 +1064,14 @@ is one the default will not clear in useful time.
 
 To size the cap, work in a day. The sweep runs one pass a minute, so its
 capacity is `DELETED_OBJECT_SWEEP_MAX_OBJECTS` times the passes in a day,
-about 1,400 (a little under, as a pass can be skipped). Objects keep
-arriving while it works, so what drains the backlog is the capacity less
-the arrivals:
+about 1,400 (a little under, as a pass can be skipped) — or what
+`DELETED_OBJECT_SWEEP_SECONDS` allows a pass to finish, whichever is
+lower. The arithmetic below is the first of those, which holds while
+passes finish inside their budget; past roughly 400 objects a pass they
+do not, and [raising the budget with the
+cap](#when-the-budget-and-not-the-cap-is-the-limit) is the rest of the
+job. Objects keep arriving while it works, so what drains the backlog is
+the capacity less the arrivals:
 
 * arrivals a day are the hard deletes in the day plus the change in the
   backlog over the same day;
@@ -1067,11 +1085,11 @@ At 400 the capacity is 560,000 a day, a net drain of about 517,000, and
 the drain takes about three days. If the arrivals are higher than the
 capacity the backlog cannot shrink at all, whatever else you do.
 
-`DELETED_OBJECT_SWEEP_SECONDS` is the safety limit and not the knob. A
-pass that reaches it stops taking work, so if the database tier slows
-down the drain slows itself rather than piling load on it. Raise the cap
-in steps, for example doubling it, and hold each step for a day before
-the next. Apply a new value with:
+`DELETED_OBJECT_SWEEP_SECONDS` starts out as a safety limit rather than
+a knob. A pass that reaches it stops taking work, so if the database tier
+slows down the drain slows itself rather than piling load on it. Raise
+the cap in steps, for example doubling it, and hold each step for a day
+before the next. Apply a new value with:
 
 ```
 sf-ctl set-config DELETED_OBJECT_SWEEP_MAX_OBJECTS 400
@@ -1117,15 +1135,53 @@ whichever delay reaches back to before it):
   ```
 
   A watchdog abort of a gateway in its log is the same signal.
-* The sweep's own time per pass, from the `elapsed_seconds` field of the
-  per-pass log line described below. If passes are regularly reaching
-  `DELETED_OBJECT_SWEEP_SECONDS`, the time budget and not the cap is
-  limiting the drain, and raising the cap further will not help.
+* Which limit is ending a pass, from the `stopped_by` field of the
+  per-pass log line described below. If passes regularly report
+  `budget`, the time budget and not the cap is limiting the drain, and
+  raising the cap further will not help: see [when the budget and not
+  the cap is the limit](#when-the-budget-and-not-the-cap-is-the-limit).
 
 Also watch whatever alerting you already have on workloads which depend
 on the database tier. If any signal worsens, hold the cap where it is for
 another day, or put it back to the previous value, rather than raising
 it again.
+
+#### When the budget and not the cap is the limit
+
+A cap raised well above the default stops being what limits the drain.
+Measured on a busy cluster at a cap of 400 and the default 20 second
+budget, the median pass used 15.9 seconds of it, the ninetieth percentile
+exceeded it, and 344 of 1,319 working passes — 26% — ended on the budget
+rather than on the cap. That sweep managed 5.8 hard deletes a second
+against the 6.67 the cap allowed.
+
+Each pass says which limit ended it, in the `stopped_by` field of its log
+line:
+
+* `cap` — the pass took `DELETED_OBJECT_SWEEP_MAX_OBJECTS` entries, so
+  raising the cap drains faster.
+* `budget` — the pass ran out of time, so raising the cap alone changes
+  nothing and `DELETED_OBJECT_SWEEP_SECONDS` is what to raise. The sweep
+  runs once a minute, so a budget well under 60 seconds leaves room; a
+  budget at or above the cadence means passes overlap their slot, which
+  is not what this knob is for.
+* `empty` — no type had work left, so the sweep is bound by arrivals and
+  neither limit is doing anything.
+* `unavailable` — the database tier failed part way through the pass.
+
+Count them over a day to decide, rather than reading one pass:
+
+```logql
+sum by (stopped_by) (count_over_time(
+  {job="shakenfist", daemon="sf-cluster"}
+    |= "per-deleted-object queue" | json [1d]))
+```
+
+Do not try to answer this from the elapsed time instead. A pass's reads
+are charged against the budget but are not included in its
+`elapsed_seconds`, so a pass the budget ended logs a time below the
+budget by the cost of its reads. The `fill_seconds` and `budget_seconds`
+fields on the same line are the rest of that arithmetic.
 
 Once the backlog is gone, put the cap back. At steady state the sweep is
 bound by arrivals, not the cap, so a cap above the arrival rate changes
@@ -1232,7 +1288,23 @@ The per-pass log line `Processed N items from per-deleted-object queue`
 also carries structured fields: a count for each outcome, the number of
 entries still held for later passes across all types (`remaining`), the
 number added by this pass's reads (`filled`), the number processed
-(`total`) and the seconds spent processing (`elapsed_seconds`).
+(`total`), which limit ended the pass (`stopped_by`: `cap`, `budget`,
+`empty` or `unavailable`), the seconds the reads took (`fill_seconds`),
+the pass's whole budget (`budget_seconds`) and the seconds spent
+processing (`elapsed_seconds`). `elapsed_seconds` is the processing
+alone: `fill_seconds` is also charged against `budget_seconds`, so the
+two have to be added before comparing with the budget.
+
+A pass whose reads cannot reach the database logs `Skipping
+per-deleted-object drain, database unavailable during the fill` and then
+drains nothing at all, so no `Processed` line follows it. A missing
+`Processed` line is that, and not the sweep having died: the first read
+of every entry would spend a whole retry budget against a tier which has
+just failed one and fail anyway, so the pass gives up and whatever it
+did read waits for the next one. A pass which reached the tier and then
+lost it mid-drain does log a `Processed` line, with `stopped_by` reading
+`unavailable`.
+
 
 Mean seconds per hard delete, by object type:
 

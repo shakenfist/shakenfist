@@ -2,7 +2,7 @@
 
 """Each batchable class's hard_delete() against the batch's table list.
 
-mariadb.HARD_DELETE_BATCH_FUNCTIONS declares, for each object type whose
+mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS declares, for each object type whose
 hard delete is nothing but row deletes keyed on the object, the public
 delete functions that type's hard delete runs. These tests run each such
 class's real hard_delete() with every function on the mariadb module,
@@ -15,8 +15,11 @@ A delete added to or dropped from the declaration, a row delete left in
 a class beside the batch, or any other database call, lock, event or
 file removal added to a hard_delete(), fails here.
 
-The literals are deliberately a second copy. A change to what a type's
-hard delete removes has to be made here as well as in mariadb.py.
+The literals are deliberately a second copy, and live in
+shakenfist/tests/hard_delete_expected.py so that the row-level tests in
+hard_delete_cases can read the same independent description rather than
+the declaration they are checking. A change to what a type's hard delete
+removes has to be made there as well as in mariadb.py.
 """
 from contextlib import ExitStack
 import importlib
@@ -44,6 +47,7 @@ from shakenfist import locks
 from shakenfist.managed_executables.dnsmasq import DnsMasq
 from shakenfist.mapping_rule import MappingRule
 from shakenfist import mariadb
+from shakenfist import mariadb_hard_delete
 from shakenfist.namespace_key import NamespaceKey
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.network.network import Network
@@ -53,103 +57,12 @@ from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.upload import UploadData
 from shakenfist.tests import base
+from shakenfist.tests.hard_delete_expected import BASE_DELETES
+from shakenfist.tests.hard_delete_expected import EXPECTED_DELETES
 from shakenfist.trusted_issuer import TrustedIssuer
 from shakenfist.upload import Upload
 from shakenfist.util import concurrency as util_concurrency
 
-
-# What every type's hard_delete() runs last, from
-# DatabaseBackedObject.hard_delete().
-BASE_DELETES = (
-    'delete_state',
-    'delete_object_metadata',
-    'delete_object_events',
-)
-
-# BaseClusterOperation.hard_delete(), which every cluster operation
-# inherits unchanged.
-CLUSTER_OPERATION_DELETES = (
-    'delete_cluster_operation_target',
-    'delete_cluster_operation_error',
-    'delete_cluster_operation',
-)
-
-# For each batchable type, the deletes its hard delete runs before
-# BASE_DELETES, in order, as read from each class before it moved onto the
-# batch.
-EXPECTED_DELETES = {
-    ObjectType.ARTIFACT_FETCH_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.IMGCACHE_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NET_IFACE_IP_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NET_IFACE_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NET_IP_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NET_MACADDR_IP_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NET_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_AOP_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_BLOB_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_INST_NET_IFACE_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_INST_NETDESC_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_INST_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_INST_SNAP_OP: CLUSTER_OPERATION_DELETES,
-    ObjectType.NODE_NET_OP: CLUSTER_OPERATION_DELETES,
-    # AgentOperation derives from BaseOperation, not BaseClusterOperation,
-    # so it has none of the cluster operation deletes.
-    ObjectType.AGENTOPERATION: (
-        'delete_agent_operation_attributes',
-        'delete_agent_operation',
-        'remove_all_references_from',
-    ),
-    # Artifact's own deletes, then the targets delete from
-    # DatabaseBackedObjectWithOperations.
-    ObjectType.ARTIFACT: (
-        'delete_all_artifact_indexes',
-        'delete_artifact_attributes',
-        'delete_artifact',
-        'delete_cluster_operation_targets_for_object',
-    ),
-    # Network's own deletes, then the targets delete from
-    # DatabaseBackedObjectWithOperations.
-    ObjectType.NETWORK: (
-        'delete_network_attributes',
-        'delete_network',
-        'delete_cluster_operation_targets_for_object',
-    ),
-    # The references-held backstop from issue 4558, then Blob's own rows.
-    ObjectType.BLOB: (
-        'remove_all_references_from',
-        'delete_blob_hashes',
-        'delete_blob_transfers_for_blob',
-        'delete_blob_attributes',
-        'delete_blob',
-    ),
-    ObjectType.DHCP: (
-        'delete_dnsmasq',
-    ),
-    ObjectType.INTERFACE: (
-        'delete_network_interface_attributes',
-        'delete_network_interface',
-    ),
-    # An IPAM which is not in memory only.
-    ObjectType.IPAM: (
-        'delete_reservations_for_ipam',
-        'delete_ipam',
-    ),
-    ObjectType.NAMESPACE_KEY: (
-        'delete_namespace_key_attributes',
-        'delete_namespace_key',
-    ),
-    ObjectType.TRUSTED_ISSUER: (
-        'delete_trusted_issuer_attributes',
-        'delete_trusted_issuer',
-    ),
-    ObjectType.MAPPING_RULE: (
-        'delete_mapping_rule_attributes',
-        'delete_mapping_rule',
-    ),
-    ObjectType.UPLOAD: (
-        'delete_upload',
-    ),
-}
 
 # The types whose hard_delete() does more than delete rows keyed on the
 # object, and so is not batched.
@@ -199,11 +112,17 @@ class _Recorder:
         return record
 
     def install(self, stack, keep=()):
-        """Patch everything, except the mariadb functions named in keep."""
-        for name, value in vars(mariadb).items():
-            if inspect.isfunction(value) and name not in keep:
-                stack.enter_context(
-                    mock.patch.object(mariadb, name, self._stub(name)))
+        """Patch everything, except the mariadb functions named in keep.
+
+        Both modules, because the batch itself lives in
+        mariadb_hard_delete: a hard delete's calls are recorded only if
+        every function it could reach is stubbed.
+        """
+        for module in (mariadb, mariadb_hard_delete):
+            for name, value in vars(module).items():
+                if inspect.isfunction(value) and name not in keep:
+                    stack.enter_context(
+                        mock.patch.object(module, name, self._stub(name)))
 
         targets = [
             (eventlog, 'add_event', AUDIT_EVENT),
@@ -225,7 +144,8 @@ class _Recorder:
 
     def database_calls(self):
         return [call for call in self.calls
-                if hasattr(mariadb, call[0])]
+                if hasattr(mariadb, call[0])
+                or hasattr(mariadb_hard_delete, call[0])]
 
 
 def _cluster_operation(object_type, object_uuid):
@@ -333,7 +253,7 @@ for _name in OPERATION_NAMES_TO_CLASSES:
 
 class ClassificationTestCase(base.ShakenFistTestCase):
     def test_every_type_is_batched_or_per_object(self):
-        batched = set(mariadb.HARD_DELETE_BATCH_FUNCTIONS)
+        batched = set(mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS)
         for name in OBJECT_NAMES_TO_CLASSES:
             object_type = ObjectType(name)
             self.assertNotEqual(
@@ -346,7 +266,7 @@ class ClassificationTestCase(base.ShakenFistTestCase):
 
     def test_every_batched_type_has_a_literal(self):
         self.assertEqual(set(EXPECTED_DELETES),
-                         set(mariadb.HARD_DELETE_BATCH_FUNCTIONS))
+                         set(mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS))
 
     def test_every_literal_type_has_a_builder(self):
         self.assertEqual(set(EXPECTED_DELETES), set(BUILDERS))
@@ -447,7 +367,7 @@ class HardDeleteParityTestCase(base.ShakenFistTestCase):
         for object_type, expected in EXPECTED_DELETES.items():
             self.assertEqual(
                 expected,
-                tuple(mariadb.HARD_DELETE_BATCH_FUNCTIONS.get(object_type, ())),
+                tuple(mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS.get(object_type, ())),
                 object_type)
 
     def test_instance_keeps_its_targets_delete(self):

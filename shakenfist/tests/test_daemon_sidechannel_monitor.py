@@ -8,15 +8,8 @@ from shakenfist.daemons.sidechannel import main as sidechannel
 from shakenfist import instance
 from shakenfist.protos import agent_pb2
 from shakenfist.tests import base
+from shakenfist.tests.fakeclock import FakeClock
 from shakenfist.util import libvirt as util_libvirt
-
-
-class _Clock:
-    def __init__(self, now):
-        self.now = now
-
-    def __call__(self):
-        return self.now
 
 
 class _FakeInstance:
@@ -119,7 +112,7 @@ class _MonitorScriptTestCase(base.ShakenFistTestCase):
         monitor.instance_ready = cached_state
         inst.agent_state_writes = []
 
-        clock = _Clock(self.NOW)
+        clock = FakeClock(self.NOW)
         sock = _FakeAgentSocket(clock, script)
         with mock.patch('time.time', clock), \
                 mock.patch.object(sidechannel.daemon, 'check_abort_path',

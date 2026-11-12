@@ -8,6 +8,7 @@ from unittest import mock
 from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
+from shakenfist import mariadb_hard_delete
 from shakenfist.config import BaseSettings
 from shakenfist.constants import get_object_class
 from shakenfist.exceptions import AddFloatingIPFailed
@@ -437,7 +438,7 @@ class BaseClusterOperationHardDeleteTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb.delete_state')
     @mock.patch('shakenfist.mariadb.delete_object_metadata')
     @mock.patch('shakenfist.mariadb.delete_object_events')
-    @mock.patch('shakenfist.mariadb.hard_delete_objects')
+    @mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects')
     def test_hard_delete_removes_error_and_operation_rows(
             self, mock_batch, mock_delete_events, mock_delete_metadata,
             mock_delete_state, mock_delete_op, mock_delete_error,
@@ -454,7 +455,7 @@ class BaseClusterOperationHardDeleteTestCase(base.ShakenFistTestCase):
             ('delete_cluster_operation_target',
              'delete_cluster_operation_error',
              'delete_cluster_operation'),
-            mariadb.HARD_DELETE_BATCH_FUNCTIONS[ObjectType.NODE_INST_OP])
+            mariadb_hard_delete.HARD_DELETE_BATCH_FUNCTIONS[ObjectType.NODE_INST_OP])
         for m in (mock_delete_target, mock_delete_error, mock_delete_op,
                   mock_delete_state, mock_delete_metadata,
                   mock_delete_events):
@@ -466,7 +467,7 @@ class BaseClusterOperationHardDeleteTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb.delete_state')
     @mock.patch('shakenfist.mariadb.delete_object_metadata')
     @mock.patch('shakenfist.mariadb.delete_object_events')
-    @mock.patch('shakenfist.mariadb.hard_delete_objects',
+    @mock.patch('shakenfist.mariadb_hard_delete.hard_delete_objects',
                 side_effect=HardDeleteBatchUnavailable('too old'))
     def test_hard_delete_without_the_batch_removes_the_same_rows(
             self, mock_batch, mock_delete_events, mock_delete_metadata,

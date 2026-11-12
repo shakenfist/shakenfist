@@ -7,8 +7,30 @@ import json
 from unittest import mock
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.mysql import INET4
+from sqlalchemy.dialects.mysql import LONGTEXT
+from sqlalchemy.dialects.mysql import MEDIUMTEXT
+from sqlalchemy.ext.compiler import compiles
 
 from shakenfist import mariadb
+
+
+# MariaDB types sqlite cannot render, and the type it holds them in. A
+# table with one of these columns fails to build at all -- CompileError,
+# before a test can run a statement against it -- so a fixture which
+# promises mariadb.py's own table definitions has to say what sqlite
+# should do with them. None of them changes what a row means: an INET4
+# address and a LONGTEXT document are the same values in text. Registered
+# for the sqlite dialect only, so nothing a deployment builds is affected.
+_SQLITE_TYPE_SHIMS = {
+    INET4: 'VARCHAR(15)',
+    LONGTEXT: 'TEXT',
+    MEDIUMTEXT: 'TEXT',
+}
+
+for _mariadb_type, _sqlite_type in _SQLITE_TYPE_SHIMS.items():
+    compiles(_mariadb_type, 'sqlite')(
+        lambda type_, compiler, _rendered=_sqlite_type, **kw: _rendered)
 
 
 class MariaDBTableFixture:

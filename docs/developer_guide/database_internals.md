@@ -669,7 +669,8 @@ The cluster daemon also runs two other reaping sweeps from
 objects that have been in a final state (`deleted`, `complete`,
 `abort`) for longer than their grace period; it holds a list of
 uuids per object type, filled a page at a time with the age filter
-pushed down to SQL, and takes one object from each type in turn.
+pushed down to SQL, and takes a turn from each type in turn, each
+turn being up to `DELETED_OBJECT_BATCH_SIZE` of that type's entries.
 Objects are hydrated one at a time at processing time inside a
 per-item exception guard.
 `reconcile_orphaned_objects()` (hourly) removes "phantom"

@@ -9,6 +9,7 @@ import psutil
 from shakenfist.daemons.resources import main as resources_main
 from shakenfist.node_health import NodeHealthResult
 from shakenfist.tests import base
+from shakenfist.tests.fakeclock import FakeClock
 
 
 class ParseCpuListTestCase(base.ShakenFistTestCase):
@@ -596,19 +597,6 @@ class ShouldPublishMetricsTestCase(base.ShakenFistTestCase):
             1000.0, {17}, None, 1003.0, settle_pending=True))
 
 
-class _FakeClock:
-    """A clock the test advances by hand, so the loop's cadence is exact."""
-
-    def __init__(self, now):
-        self.now = now
-
-    def __call__(self):
-        return self.now
-
-    def advance(self, seconds):
-        self.now += seconds
-
-
 class RunInnerCadenceTestCase(base.ShakenFistTestCase):
     """The wiring: _run_inner() must actually act on the cadence decision.
 
@@ -623,7 +611,7 @@ class RunInnerCadenceTestCase(base.ShakenFistTestCase):
         m._get_stats = mock.MagicMock(
             return_value={'cpu_total_instance_vcpus': 2})
 
-        clock = _FakeClock(1000.0)
+        clock = FakeClock(1000.0)
         # The loop's own pacing call is where time passes in this test.
         m.idle = mock.MagicMock(side_effect=lambda _: clock.advance(clock_step))
 

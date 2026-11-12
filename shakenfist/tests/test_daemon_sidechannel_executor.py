@@ -16,6 +16,7 @@ from shakenfist.daemons.sidechannel import main as sidechannel
 from shakenfist.operations import node_aop_op
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.tests import base
+from shakenfist.tests.fakeclock import FakeClock
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
@@ -991,14 +992,6 @@ class _SlowProgressHandler:
         return ['a-request']
 
 
-class _Clock:
-    def __init__(self, now):
-        self.now = now
-
-    def __call__(self):
-        return self.now
-
-
 class ExecutorDispatchWindowTestCase(base.ShakenFistTestCase):
     """The progress window starts when the command reaches the wire.
 
@@ -1030,7 +1023,7 @@ class ExecutorDispatchWindowTestCase(base.ShakenFistTestCase):
         return job
 
     def test_a_slow_dispatch_does_not_start_the_window(self):
-        clock = _Clock(self.NOW)
+        clock = FakeClock(self.NOW)
         agentop = _BudgetAgentOp(progress_timeout=30.0)
         handler = _SlowProgressHandler(clock, 300.0)
         job = self._make_executor(
@@ -1052,7 +1045,7 @@ class ExecutorDispatchWindowTestCase(base.ShakenFistTestCase):
     def test_the_window_still_expires_a_genuinely_stalled_agent(self):
         # The other half: once the command is on the wire, silence from
         # the agent for longer than the window is still fatal.
-        clock = _Clock(self.NOW)
+        clock = FakeClock(self.NOW)
         agentop = _BudgetAgentOp(progress_timeout=30.0)
         handler = _SlowProgressHandler(clock, 300.0)
         job = self._make_executor(
