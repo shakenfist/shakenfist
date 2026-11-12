@@ -231,7 +231,7 @@ class DatabaseBackedObject:
             if static_values['version'] > self.current_version:
                 raise exceptions.ObjectFromNewerNodeException(
                     'Object %s is version %s, but this node only '
-                    'understands version %s of a %s'
+                    'understands version %s of object type %s'
                     % (static_values.get('uuid'), static_values['version'],
                        self.current_version, self.object_type))
 
@@ -321,7 +321,7 @@ class DatabaseBackedObject:
         if values['version'] > cls.current_version:
             raise exceptions.ObjectFromNewerNodeException(
                 'Object %s is version %s, but this node only understands '
-                'version %s of a %s'
+                'version %s of object type %s'
                 % (values.get('uuid'), values['version'],
                    cls.current_version, cls.object_type))
 

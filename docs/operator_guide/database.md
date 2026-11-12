@@ -1947,7 +1947,9 @@ class ObjectState(BaseModel):
         }
     )
 
-    object_uuid: Annotated[str, SQLUniqueIndex(), Field(max_length=36)]
+    object_uuid: Annotated[
+        str, SQLUniqueIndex(),
+        Field(max_length=constants.OBJECT_KEY_MAX_LENGTH)]
     object_type: Annotated[str, SQLIndex(), Field(max_length=32)]
     state_value: Annotated[str, SQLIndex(), Field(max_length=32)]
     update_time: float

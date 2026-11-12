@@ -21,6 +21,7 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import field_validator
 
+from shakenfist import constants
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.sqlalchemy import SQLIndex
 
@@ -131,7 +132,9 @@ class ObjectState(BaseModel):
     )
 
     # Part of composite primary key (object_type, object_uuid)
-    object_uuid: Annotated[str, Field(max_length=36)]
+    # An object key, not always a uuid: a namespace's is its name.
+    object_uuid: Annotated[
+        str, Field(max_length=constants.OBJECT_KEY_MAX_LENGTH)]
 
     # Part of composite primary key (object_type, object_uuid)
     # Uses ObjectType enum for type safety and efficient storage

@@ -355,7 +355,7 @@ Coverage is not routed through `object_states` because
 `_active_claim_for_namespace()` runs on every instance admission and
 filters `state = 'active' AND expires_at > NOW()` against the claims
 table's own index; moving that predicate would make the hot probe join
-across the two uuid storage conventions (dashed `String(36)` in
+across the two uuid storage conventions (a dashed `String` object key in
 `object_states`, undashed `sa.Uuid` here). There is no soft delete: the
 transaction that removes the row is the one that returns its capacity,
 so `Namespace.hard_delete()` cascades to claims for the same reason it

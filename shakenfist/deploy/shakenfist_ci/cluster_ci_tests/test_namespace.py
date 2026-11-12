@@ -113,10 +113,6 @@ class TestNamespace(base.BaseNamespacedTestCase):
         is the path reachable from the API and the refusal reads the
         state rather than how it got there.
         """
-        # Kept short: a namespace's name is its object_states key, which
-        # is VARCHAR(36), so a name built on self.namespace (26
-        # characters here) overflows it and the create fails with a 500
-        # even though the API accepts names up to 63 characters.
         other = 'ci-errored-%s' % self._uniquifier()
         other_client = self._make_namespace(other, self._uniquifier())
         self.addCleanup(self._remove_namespace, other)

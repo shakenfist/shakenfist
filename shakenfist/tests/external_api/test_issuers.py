@@ -216,6 +216,15 @@ class IssuerEndpointTestCase(base.ShakenFistTestCase):
                 400, resp.status_code,
                 f'omitting {field} should be refused')
 
+    def test_an_upper_case_scheme_is_refused_by_name(self):
+        # Fails closed, and says why: an issuer_url is compared to iss
+        # exactly, so HTTPS:// could never match a real token.
+        resp = self._create(issuer_url='HTTPS://auth.example.com')
+        self.assertEqual(400, resp.status_code)
+        self.assertIn(
+            'issuer_url must begin with https:// (in lower case)',
+            resp.get_json()['error'])
+
     def test_plaintext_jwks_is_refused(self):
         # A JWKS fetched over HTTP can be substituted by anyone on the
         # path, which makes signature verification meaningless.

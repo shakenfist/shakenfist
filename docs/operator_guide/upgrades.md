@@ -21,8 +21,8 @@ the object, the version it is stored at and the version that node
 understands:
 
 ```
-Object <uuid> is version 4, but this node only understands version 3 of a
-agentoperation
+Object <uuid> is version 4, but this node only understands version 3 of
+object type agentoperation
 ```
 
 The practical consequences:
@@ -35,9 +35,13 @@ The practical consequences:
   `sf-api` and read by `sf-sidechannel` on the instance's hypervisor, so
   agent operations created during the rollout fail on hypervisors that have
   not been upgraded yet.
-* The failure is loud and bounded rather than silent: the operation fails,
-  nothing is written at the wrong version, and it works once that node is
-  upgraded. Retry after the rollout.
+* The failure is loud rather than silent: nothing is written at the wrong
+  version, and it works once that node is upgraded. Retry after the
+  rollout.
+* It is not confined to operations on that one object. An object is
+  upgraded as it is loaded, so on a not-yet-upgraded node a listing, or a
+  daemon's periodic sweep, which happens to load one newer object fails as
+  a whole until that node is upgraded.
 
 So the advice is the same advice as always -- do not leave a cluster
 half-upgraded for longer than you have to -- but the reason is now written

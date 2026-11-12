@@ -26,6 +26,8 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
+from shakenfist import constants
+
 
 class ClusterOperationTargetData(BaseModel):
     """Schema for cluster operation targets in MariaDB.
@@ -47,7 +49,8 @@ class ClusterOperationTargetData(BaseModel):
         operation_uuid: UUID of the cluster operation.
         operation_type: The type of operation (e.g. 'instance_preflight').
         target_object_type: The ObjectType of the target object.
-        target_uuid: UUID of the target object.
+        target_uuid: Object key of the target -- its uuid, or a
+            namespace's name. See constants.OBJECT_KEY_MAX_LENGTH.
         sequence_number: Auto-assigned sequence for ordering within a
             target. None on insert (assigned by database).
         created_at: Unix timestamp when the operation was enqueued.
@@ -63,7 +66,8 @@ class ClusterOperationTargetData(BaseModel):
     operation_uuid: str = Field(max_length=36)
     operation_type: str = Field(max_length=64)
     target_object_type: str
-    target_uuid: str = Field(max_length=36)
+    # An object key, not always a uuid: a namespace's is its name.
+    target_uuid: str = Field(max_length=constants.OBJECT_KEY_MAX_LENGTH)
     sequence_number: Optional[int] = Field(default=None)
     created_at: float
     observational: bool = Field(default=False)

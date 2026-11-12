@@ -995,8 +995,14 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience,
     # once, here, is why that is not a standing obligation (issue 4890).
     # It is checked before the jwks_uri branch, because an issuer whose
     # keys are to be discovered returns early from there.
+    #
+    # The scheme is matched in lower case only, although RFC 3986 makes
+    # it case-insensitive. issuer_url is compared to iss exactly, and no
+    # real provider puts HTTPS:// in a token, so accepting one would
+    # register an issuer that can never match. The message says so.
     if not issuer_url.startswith('https://'):
-        return sf_api.error(400, 'issuer_url must be https')
+        return sf_api.error(
+            400, 'issuer_url must begin with https:// (in lower case)')
 
     for name, value in (('client_id', client_id),
                         ('oidc_scopes', oidc_scopes)):
@@ -1034,7 +1040,8 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience,
     # can be substituted by anyone on the path, which turns signature
     # verification into theatre.
     if not jwks_uri.startswith('https://'):
-        return sf_api.error(400, 'jwks_uri must be https')
+        return sf_api.error(
+            400, 'jwks_uri must begin with https:// (in lower case)')
     return None
 
 

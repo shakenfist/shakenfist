@@ -1,4 +1,5 @@
 import importlib
+from typing import Any
 import uuid
 
 # Note the most exciting constants ever
@@ -193,7 +194,7 @@ class NoSuchObject(Exception):
     ...
 
 
-def get_object_class(object_type):
+def get_object_class(object_type: str) -> Any:
     cls = OBJECT_NAMES_TO_CLASSES.get(object_type)
     if not cls:
         raise NoSuchObject(object_type)

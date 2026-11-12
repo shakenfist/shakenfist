@@ -1496,7 +1496,7 @@ class BuildObjectFilterQueryJoinTestCase(base.ShakenFistTestCase):
     The mocking-heavy tests above never execute the rendered SQL, so they
     cannot catch a JOIN whose WHERE clause silently matches zero rows.
     The original SQL-pushdown change introduced exactly that bug:
-    ``object_states.object_uuid`` is ``VARCHAR(36)`` (with dashes) but
+    ``object_states.object_uuid`` is a dashed ``VARCHAR`` object key but
     every per-type ``uuid`` column is ``sa.Uuid()`` which renders as
     ``CHAR(32)`` (no dashes) on MariaDB. The CI smoke tests broke because
     the resulting JOIN never matched anything, making

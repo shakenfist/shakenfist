@@ -1690,6 +1690,11 @@ def _widen_object_key_column(
         try:
             conn.execute(sa.text(f'{alter}, ALGORITHM=INSTANT'))
         except (OperationalError, ProgrammingError) as e:
+            # No rollback is needed first: a failed statement on a Core
+            # Connection (unlike a Session) leaves its transaction usable,
+            # and MariaDB DDL is not transactional anyway. The live test
+            # test_a_refused_instant_widening_falls_back runs this path
+            # against a real server.
             LOG.warning(
                 f'Could not widen {table_name}.{column_name} instantly, '
                 f'falling back to the server\'s choice of algorithm: {e}')
@@ -1796,7 +1801,9 @@ def _build_object_filter_query(
     table (e.g. ``name``/``namespace`` on ``network_interfaces``).
     """
     states_table = _get_object_states_table()
-    # ``object_states.object_uuid`` is VARCHAR(36) (with dashes) while the
+    # ``object_states.object_uuid`` is a VARCHAR object key, dashed for
+    # every type which reaches this query (its width is
+    # ``constants.OBJECT_KEY_MAX_LENGTH``), while the
     # per-type ``uuid`` columns use SQLAlchemy ``Uuid()`` which renders as
     # CHAR(32) (no dashes) on MariaDB, so the JOIN cannot compare the two
     # columns directly. Strip the dashes off the state row's UUID before

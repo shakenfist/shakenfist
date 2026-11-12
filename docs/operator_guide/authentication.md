@@ -184,8 +184,10 @@ here is a way to accept tokens from somewhere else entirely, so if
 your tokens are refused with an untrusted-issuer message, check for a
 trailing slash before checking anything else.
 
-Both URLs must be `https`, and a plaintext one is refused with a 400
-on create and on update. For `jwks_uri` the reason is direct: a JWKS
+Both URLs must begin with `https://`, in lower case, and anything
+else is refused with a 400 on create and on update. (`HTTPS://` is
+refused too: an `issuer_url` spelled that way could never equal a real
+token's `iss`.) For `jwks_uri` the reason is direct: a JWKS
 fetched over HTTP can be substituted by anyone on the path, which
 turns signature verification into theatre. For `issuer_url` it is one
 step further away -- the value is compared against a token's `iss`

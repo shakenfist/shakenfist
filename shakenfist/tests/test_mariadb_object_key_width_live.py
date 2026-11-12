@@ -34,6 +34,7 @@ Never point SF_MARIADB_TEST_DSN at a real deployment.
 import os
 import time
 import unittest
+from unittest import mock
 
 import sqlalchemy as sa
 
@@ -205,3 +206,27 @@ class ObjectKeyWidthLiveTestCase(base.ShakenFistTestCase):
             self.assertEqual(
                 constants.OBJECT_KEY_MAX_LENGTH,
                 self._column_width(table_name, column_name))
+
+    def test_a_refused_instant_widening_falls_back(self):
+        """A server which refuses INSTANT still gets the column widened.
+
+        Widening to 255 characters crosses the two byte length prefix,
+        which MariaDB will not do instantly on a primary key column --
+        the very reason the real ceiling is 63. Asking for it here
+        makes a real server refuse the INSTANT ALTER, so the fallback
+        runs against a connection whose previous statement failed.
+        """
+        self._narrow_to_a_uuid()
+        with mock.patch.object(constants, 'OBJECT_KEY_MAX_LENGTH', 255):
+            with self.assertLogs('shakenfist.mariadb', level='WARNING') as logs:
+                self.assertTrue(mariadb._widen_object_key_column(
+                    self.engine, 'object_states', 'object_uuid'))
+
+        # Vacancy guard: had INSTANT been accepted, this test would not
+        # have exercised the fallback at all.
+        self.assertTrue(
+            any('instantly' in line for line in logs.output),
+            'the INSTANT widening was accepted, so the fallback did not '
+            'run: %s' % logs.output)
+        self.assertEqual(
+            255, self._column_width('object_states', 'object_uuid'))

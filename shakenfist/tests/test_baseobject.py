@@ -446,14 +446,19 @@ class UpgradeFromNewerNodeTestCase(base.ShakenFistTestCase):
             self.assertIn('version 4', str(e))
             self.assertIn('version 3', str(e))
             self.assertIn('cf3f8aa6-9e1d-4a23-9f6c-2a0a2f43c0a1', str(e))
+            self.assertIn('of object type newerversiontest', str(e))
         else:
             self.fail('a newer object version was not refused')
 
     def test_a_missing_intermediate_step_is_an_upgrade_exception(self):
         # The guard this fix made reachable: version 2 is below ours, so
         # it is a genuinely missing step rather than a newer row. It
-        # used to raise AttributeError before the guard could run.
-        with testtools.ExpectedException(exceptions.UpgradeException):
+        # used to raise AttributeError before the guard could run. The
+        # message is matched because ObjectFromNewerNodeException is an
+        # UpgradeException too, and the type alone cannot tell them apart.
+        with testtools.ExpectedException(
+                exceptions.UpgradeException,
+                'Upgrade step _upgrade_step_2_to_3 is missing'):
             self._object().upgrade(
                 {'uuid': 'cf3f8aa6-9e1d-4a23-9f6c-2a0a2f43c0a1',
                  'version': 2})
@@ -482,14 +487,17 @@ class UpgradeFromNewerNodeTestCase(base.ShakenFistTestCase):
         data = NewerVersionTestData(
             uuid='cf3f8aa6-9e1d-4a23-9f6c-2a0a2f43c0a1', version=4)
         with testtools.ExpectedException(
-                exceptions.ObjectFromNewerNodeException):
+                exceptions.ObjectFromNewerNodeException,
+                '.*version 3 of object type newerversionpydantictest'):
             NewerVersionPydanticTestObject.upgrade_pydantic_data(
                 data, NewerVersionTestData)
 
     def test_the_pydantic_path_still_reports_a_missing_step(self):
         data = NewerVersionTestData(
             uuid='cf3f8aa6-9e1d-4a23-9f6c-2a0a2f43c0a1', version=2)
-        with testtools.ExpectedException(exceptions.UpgradeException):
+        with testtools.ExpectedException(
+                exceptions.UpgradeException,
+                'Upgrade step _upgrade_step_2_to_3 is missing'):
             NewerVersionPydanticTestObject.upgrade_pydantic_data(
                 data, NewerVersionTestData)
 
