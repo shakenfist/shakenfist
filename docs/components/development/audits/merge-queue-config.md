@@ -63,9 +63,18 @@ and PUT it back, preserving everything else including `bypass_actors`:
 ```bash
 gh api repos/shakenfist/<repo>/rulesets --jq \
     '.[] | select(.target == "branch") | {id, name}'
+# The bypass_actors guard is inside the transform on purpose. GitHub
+# omits that field for a credential it does not show it to, and the
+# earlier form of this recipe defaulted it with // [], which turned
+# "cannot see the list" into "the list is empty" and removed every
+# bypass actor on the PUT. A separate check before the read would be
+# easy to paste past; error() cannot be, it names the problem on
+# stderr, and jq exits non-zero so the PUT has nothing valid to send.
 gh api repos/shakenfist/<repo>/rulesets/<id> | jq \
     '{name, target, enforcement, conditions,
-      bypass_actors: (.bypass_actors // []),
+      bypass_actors: (if has("bypass_actors") then .bypass_actors
+                      else error("bypass_actors not visible to this credential: "
+                             + "use one that can edit the ruleset") end),
       rules: (.rules | map(
         if .type == "merge_queue"
         then .parameters.max_entries_to_build = 1

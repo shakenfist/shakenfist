@@ -315,10 +315,10 @@ first phase.
 | 3. Display transcoding in Kerbside: feasibility spike (verdict: no-go) | [PLAN-spice-performance-phase-03-transcoding.md](/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/) | Complete | 2e19d737aa (#489), ryll fdb5ead5b4 (#406), eab2c572cf (#494), 9d1b64deae (#505), 13e9e2eb (#581), bba71155 (#616), 7919eadf73 (#630) |
 | 4. Son of SPICE: D-Bus display feasibility spike (verdict: no-go, as measured) | [PLAN-spice-performance-phase-04-dbus-spike.md](/components/kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike/) | Complete | andris 9a997a3 (#56), a90f17ff90 (#637) |
 | 5. spice-server patches, measured: codec choice, the connect crash, trace ring, 60 fps, hardware probing | [PLAN-spice-performance-phase-05-spice-server.md](/components/kerbside/plans/PLAN-spice-performance-phase-05-spice-server/) | Complete | 46c3e9857c (#654), kerbside-patches 2d7b626422 (#2024) |
-| 6. Push audit of phases 1-5 (kerbside, kerbside-patches and ryll #406) | [PLAN-spice-performance-phase-06-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/) | Complete | 2a34fe7ea9 (#668) |
-| 7. QUIC client leg: experiments | | Not started | |
-| 8. QUIC client leg: implementation, if phase 7 says go | | Not started | |
-| 9. Push audit of phases 7-8 (kerbside and ryll) | | Not started | |
+| 6. Push audit of phases 1-5 (kerbside, kerbside-patches and ryll #406) | [PLAN-spice-performance-phase-06-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/) | Complete | 2a34fe7ea9 (#668), 17a31ebf75 (#701) |
+| 7. QUIC client leg: experiments (verdict: no-go, as measured) | [PLAN-spice-performance-phase-07-quic-experiments.md](/components/kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/) | In progress | |
+| 8. QUIC client leg: implementation (abandoned: phase 7's gate said no-go) | | Abandoned | |
+| 9. Push audit of phase 7 (kerbside) | | Not started | |
 
 **Phase 1** sets `TCP_NOTSENT_LOWAT` on the client leg and caps
 the backend leg's receive buffer, with the values made
@@ -331,6 +331,14 @@ latency figures.
   `docs/performance/proxy-backpressure.md`.
 - BBR was not measured: the host has no `tcp_bbr` module, and
   an unprivileged namespace cannot load one.
+  - *Corrected 2026-11-12 by phase 7:* the module is present, at
+    `/lib/modules/6.12.115+deb13.1-amd64/kernel/net/ipv4/tcp_bbr.ko.xz`;
+    it was simply not loaded, so
+    `tcp_available_congestion_control` offered only reno and
+    cubic. The second half of the note holds — an unprivileged
+    namespace cannot load it — but root on the host can, which
+    is what the rig's own `CC` variable documents. Phase 7 loads
+    it to run a BBR arm.
 
 **Phase 2** started on 2026-09-23 as an out-of-tree prototype.
 It is a patch series against qemu `ui/spice-display.c`,
@@ -929,6 +937,16 @@ it is about throughput:
   wait behind a retransmitted display frame, on exactly the
   lossy links where the other benefits matter. QUIC streams are
   independent, with per-stream flow control.
+  - *Corrected 2026-11-11 by phase 7's survey:* this is a
+    benefit over a TCP multiplex that nobody proposed, not over
+    today's code. The client leg is already one TCP connection
+    per channel (`listen.rs:179`, `session.rs:159`), so inputs
+    and display already have independent loss recovery. What is
+    left of the latency case is whether quinn's userspace loss
+    recovery and congestion control beat the kernel's for this
+    traffic shape, and whether one congestion controller per
+    session is better than N. Phase 7's plan reframes the phase
+    around the operational benefits, with latency as a floor.
 - **Faster connects.** One 1-RTT (or 0-RTT on resume)
   handshake, instead of TCP, TLS, link and ticket per channel,
   in at least two serial rounds (main, then the rest).
@@ -964,6 +982,28 @@ least:
   input-to-echo latency under packet loss while the display
   is busy, on the shaped-link rig's profiles plus 1-2% loss.
   This is the measurement that decides the phase;
+  - *Corrected 2026-11-11 by phase 7's survey:* the rig cannot
+    inject loss. `PROFILES` parses as `rtt_ms:rate_mbit`
+    (`tools/shaped-link/run-matrix.sh:138`) and the qdisc it
+    builds carries `delay`, `rate` and `limit` only (line 322),
+    so teaching it a loss term is the phase's first step. The
+    measurement also no longer decides the phase on its own, for
+    the reason given against the head-of-line-blocking bullet
+    above; it is a floor, and the decision rests on the
+    operational benefits and the cost.
+  - *Answered 2026-11-12 by phase 7's bench:* QUIC loses, and
+    the floor fails. At 80 ms / 10 Mbit with 1% loss the
+    interactive p95 is 144.3 ms over one QUIC connection with
+    five streams against 82.8 ms over five TCP connections, with
+    run-to-run spreads of 0.9 ms and 0.1 ms. The mechanism is
+    the shared congestion window: one connection is one window,
+    the saturating stream keeps it full, and the interactive
+    stream's bytes wait for an acknowledgement to open window
+    rather than for a turn. It shows at the median (p50 101.1
+    against 80.4 ms) and not only in the tail, and a quinn
+    per-stream send priority on the interactive stream moved its
+    p95 by 0.2 ms, because priority orders what is sent when the
+    window allows and does not create window.
 - connect time, and behaviour across a path change;
 - how ryll decides QUIC has failed and how long the fallback
   costs;
@@ -982,16 +1022,75 @@ least:
 Its output is a go or no-go recommendation, and if go, a
 phase plan for phase 8.
 
-**Phase 8** builds what phase 7 recommends, in Kerbside and
-ryll, if it recommends anything. If phase 7 is a no-go, phase
-8 is marked `Abandoned` with the reason, and phase 9 audits
-phase 7 alone.
+**Verdict, 2026-11-12: no-go, as measured**
+(`docs/performance/quic-experiment.md`), decided at the phase's
+step 2 gate. Go needed all three of the phase plan's criteria
+(decision 1):
+- **The latency floor fails**, as recorded against the latency
+  bullet above and in `docs/performance/quic-transport-bench.md`:
+  61.6 ms of interactive p95 against a 0.9 ms spread at 80 ms /
+  10 Mbit with 1% loss, 75.0 ms at 2% loss on the same profile
+  (unresolved on its own, one TCP repeat in five at 383 ms), and
+  145.2 ms at 2% loss on 150 ms / 2 Mbit. Throughput is equal
+  within a few percent everywhere, and the no-loss cells are a
+  wash.
+- **The operational benefits were never priced.** They are what
+  the case rested on, and only an end-to-end prototype could
+  have measured them. The gate stopped the phase before one was
+  built, so nothing here says one connection per session is not
+  worth having — only that the entry price is 60 to 75 ms of the
+  p95 a user feels, which is more than it can be expected to
+  earn back. Connect time came out as a by-product of the bench
+  (84.3 against 401.4 ms at 80 ms / 10 Mbit), but its TCP arm
+  has no TLS, link message or ticket check, so the ratio
+  understates the real difference and is not a result. The path
+  change and the fallback cost were not measured at all.
+- **The cost was never priced either**, for the same reason. The
+  UDP exposure recommendation is made anyway, because the phase
+  owed it (decision 8): do not open a UDP port, for this or
+  speculatively. Kerbside has no UDP listener anywhere today and
+  this phase shipped nothing that would want one, so there is no
+  exposure to document.
 
-**Phase 9** is the push audit for phases 7 and 8. It audits
-their accumulated diff and cites phase 6 for phases 1-5,
+Steps 3 to 7's integration work was never funded: no QUIC
+listener exists in the proxy, no `quic` feature in its
+`Cargo.toml`, and no `SpiceStream` variant or dialer in ryll. The
+two architectural findings that survive the no-go are recorded
+in the write-up rather than lost — the proxy's single seam means
+a QUIC stream would reach the firewall as an ordinary channel
+with nothing downstream changed, and the audit trail would gain
+one client port per session instead of one per channel, stale
+after a migration, which an implementation would have to fix by
+recording the QUIC connection id. quinn 0.11.12 did build in the
+proxy's own dev image with its default features off, but the
+proxy itself was never built with it, so the packaging half of
+that question stays reasoned rather than measured.
+
+One finding survives that has nothing to do with QUIC and is
+worth its own investigation: on these shaped links the kernel's
+BBR beats its Cubic badly — 9.27 Mbit against 1.64 at 1% loss on
+80 ms / 10 Mbit, and an interactive p95 of 104 ms against 171 ms
+at no loss. That is a `net.ipv4.tcp_congestion_control` change on
+the proxy host and it applies to today's TCP client leg. It is
+recorded in phase 7's plan under *Future work*.
+
+**Phase 8** was to build what phase 7 recommended, in Kerbside
+and ryll. Phase 7 is a no-go, so phase 8 is `Abandoned`: there
+is nothing to implement. The transport-only gate found one QUIC
+connection per session materially worse than today's connection
+per channel on the interactive round trip under loss, and the
+mechanism — a congestion window shared across a session's
+channels — is structural rather than a tuning mistake, so an
+implementation would ship the regression. *What would change the
+answer* in `docs/performance/quic-experiment.md` names the
+conditions under which this would be worth reopening, and each
+of them needs the bench re-run before any code.
+
+**Phase 9** is the push audit for phase 7 alone, since phase 8
+is abandoned. It audits phase 7's accumulated diff — the rig's
+loss term and the transport bench, all of it in Kerbside, as
+nothing landed in ryll — and cites phase 6 for phases 1-5,
 rather than re-auditing work that has already been audited.
-Work that lands in ryll is audited under ryll's own push
-audit, and phase 9 cites it.
 
 <!-- shared-block: plan-push-audit-phase v4 -->
 Push audit phase (shared block; do not edit -- the canonical

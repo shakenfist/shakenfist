@@ -76,6 +76,16 @@ Where the length is, as of develop at `4d5f9e9`:
 | Reconnect state machine | ~170 | `ReconnectState`, `ReconnectPolicy`, `ModalVariant` |
 | `NotificationSnapshotStore` | ~110 | Self-contained bounded store |
 
+Those figures are the snapshot the plan was written against.
+Phase 3's survey remeasured them against `develop` at `f56b371`,
+after phases 1 and 2: `app/mod.rs` is 5,592 lines, `process_events`
+is 487 rather than ~610, the test module at its foot is 454 rather
+than ~1,020 (phase 2 moved the rest out with the code they test),
+and `eframe::App` has grown a second half -- `logic` (156 lines,
+which is what calls `process_events`) alongside `ui` (~1,685).
+Two `app/` modules the phase list does not mention,
+`agent_state.rs` and `ui_state.rs`, arrived from other plans.
+
 The field comments in `struct RyllApp` already name the seams:
 cursor state, region selection, USB panel, WebDAV panel, traffic
 viewer, notifications panel, bug-report dialog, auto-resize and
@@ -205,8 +215,8 @@ with web mode).
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Reuse survey and shared draw dispatch | [PLAN-app-split-phase-01-reuse.md](/components/ryll/plans/PLAN-app-split-phase-01-reuse/) | Complete | acc7a12 (#483) |
-| 2. Module directory and pure state | [PLAN-app-split-phase-02-pure-state.md](/components/ryll/plans/PLAN-app-split-phase-02-pure-state/) | In progress | |
-| 3. Events and bug-report flow | PLAN-app-split-phase-03-events.md | Not started | |
+| 2. Module directory and pure state | [PLAN-app-split-phase-02-pure-state.md](/components/ryll/plans/PLAN-app-split-phase-02-pure-state/) | Complete | b245380 (#501) |
+| 3. Events and bug-report flow | [PLAN-app-split-phase-03-events.md](/components/ryll/plans/PLAN-app-split-phase-03-events/) | In progress | |
 | 4. Split `ui` into per-panel files | PLAN-app-split-phase-04-panels.md | Not started | |
 | 5. Panel state sub-structs | PLAN-app-split-phase-05-substructs.md | Not started | |
 | 6. Function-length lint | PLAN-app-split-phase-06-lint.md | Not started | |
@@ -257,19 +267,37 @@ but serve `process_events`, so they move with it in phase 3.
 ### Phase 3: Events and bug-report flow
 
 * `app/events.rs` -- `process_events`, with each arm group
-  (display, cursor, audio, USB, WebDAV, notifications, session
-  lifecycle) extracted into its own `handle_*` method so the
-  `match` becomes a dispatcher.
-* `app/bug_report.rs` -- trigger snapshot, `PendingBugReport`,
-  `generate_bug_report`, `finish_bug_report`,
-  `poll_pending_bug_report`, `file_notification_bug_report`,
-  `maybe_write_disconnect_snapshot`, `validate_region`.
+  (session lifecycle, display draw ops, display mark, cursor,
+  monitors config, ping/RTT, channel error, USB, WebDAV, paste,
+  notification, disconnect) extracted into its own `handle_*`
+  method so the `match` becomes a dispatcher. There is no audio
+  arm: this section originally named one, but `ChannelEvent` has
+  no audio variant -- volume and mute travel through
+  `volume_control`.
+* `app/bug_report.rs` -- `PendingBugReport`, `generate_bug_report`,
+  `finish_bug_report`, `poll_pending_bug_report`,
+  `file_notification_bug_report`,
+  `maybe_write_disconnect_snapshot`.
+* `app/trigger_snapshot.rs` -- the trigger snapshot, the eframe
+  window shot, the region-selection state machine and
+  `validate_region`. Split out from `bug_report.rs` because the two
+  together measure ~1,124 lines, which would breach this plan's own
+  roughly-800-line success criterion; see phase 3's decision 1.
 * `app/connection.rs` -- `reconnect`, `reconnect_manual`,
   `handle_critical_disconnect`, `handle_connection_failed`, the
   auto-snapshot task lifecycle, `build_connection_runtime`.
+* `app/screenshots.rs` -- `screenshot_paths`, `save_screenshots`
+  and `open_screenshot_dialog`. Phase 2 left `screenshot_paths`
+  "for phases 3 and 4"; nothing in phase 4's per-panel list would
+  hold it, and the native `rfd` dialog needs no egui, so it lands
+  here.
 
-Update the comments in `surface_mirror.rs`, `session.rs` and
-`bugreport.rs` that point at `app.rs` by name.
+This section also used to ask for the comments in
+`surface_mirror.rs`, `session.rs` and `bugreport.rs` that name
+`app.rs` to be updated. That is already done: phase 1 deleted the
+"mirrors `process_events`" comment outright, and phase 2's step 2e
+repointed the rest. `git grep -n 'app\.rs' -- ':!docs/plans/'`
+finds nothing.
 
 ### Phase 4: Split `ui` into per-panel files
 

@@ -12,13 +12,19 @@
   Renovate bumps: the value of each `PINNED_*_VERSION` variable
   (`PINNED_RENOVATE_VERSION` and `PINNED_HASHIN_VERSION`) and the ref
   of each action it uses.
-* `renovate.json` exists, with package grouping rules and scheduling.
-  It is a per-repository adaptation, not expected to be
-  byte-identical to the template's copy.
+* `renovate.json` exists. Nothing is checked about what it holds
+  beyond the two entries below, so a repository that keeps the fleet
+  policy locally rather than extending the preset still passes; the
+  preset is the convention, not a requirement this check enforces. It
+  is not expected to be byte-identical to the template's copy.
 * `renovate.json` extends `customManagers:githubActionsVersions`, so
-  the Renovate version pinned in `renovate.yml` is bumped.
+  the Renovate version pinned in `renovate.yml` is bumped. Naming it
+  directly passes, and so does extending the fleet preset, which
+  names it.
 * `renovate.json` enables the `pre-commit` manager, where the
-  repository has remote pre-commit hooks to manage.
+  repository has remote pre-commit hooks to manage. Enabling it
+  directly passes, and so does extending the fleet preset, which
+  enables it.
 
 ### Renovate without Docker
 
@@ -31,8 +37,9 @@ uses the action is a finding. The action named in a comment is not.
 
 The template pins Renovate behind a `# renovate:` comment, which only
 the built-in `customManagers:githubActionsVersions` preset reads. A
-copy of the new workflow without the preset in `renovate.json` runs a
-Renovate that never bumps itself, so that is a finding too.
+copy of the new workflow without that preset reaching `renovate.json`,
+directly or through the fleet preset, runs a Renovate that never bumps
+itself, so that is a finding too.
 `regexManagers:githubActionsVersions`, the preset's name before
 Renovate renamed it, also passes.
 
@@ -53,22 +60,84 @@ Renovate bumps in each copy on its own schedule: the value of each
 (with the version comment digest pinning leaves after it). A copy
 whose Renovate or whose actions are ahead of or behind the template's
 still matches; the action's name still has to. `node-version` is not
-among them: the template's `renovate.json` stops Renovate bumping it,
-and it is the line the check exists to hold.
+among them: the fleet preset stops Renovate bumping it, and it is the
+line the check exists to hold.
 
 The drift that prompted this was Node. Renovate proposed Node 26 for
 the workflow's `setup-node` step, the pull request merged in eleven
 repositories, and each one's Renovate, which needs Node `^24.11.0`,
-then failed on every hourly run. The template's `renovate.json` now
-stops Renovate proposing that bump, but a copy can still drift by
-hand, and the workflow is where Node has to match the Renovate it
-runs.
+then failed on every hourly run. The fleet preset now stops Renovate
+proposing that bump, but a copy can still drift by hand, and the
+workflow is where Node has to match the Renovate it runs.
 
 The finding names each place the copy differs, up to three, with the
 copy's line and the template's, and counts the rest. A copy still on
 the container action gets only that finding, which already says to
 copy the template. If the audit cannot read its own template, it
 reports an error rather than a verdict.
+
+### The fleet preset
+
+The policy every repository shares lives once, in `renovate-fleet.json`
+at the root of this repository, and each repository's `renovate.json`
+extends it with `"extends": ["local>shakenfist/development:renovate-fleet"]`.
+A policy copied into every repository only reaches the ones that are
+re-synced, so a schedule or a rule changed after a repository was
+onboarded stayed behind; extended, a change reaches the fleet once.
+
+The preset holds the author and assignee Renovate uses, the dependency
+dashboard, rollback pull requests, a three day `minimumReleaseAge`,
+the `pre-commit` manager, `customManagers:githubActionsVersions`, the
+`Australia/Sydney` timezone, and the cadence: ordinary updates
+`on saturday`, majors and the CI tooling group `on the first day of the
+month`, with at most 2 pull requests an hour and 10 open at once
+(Renovate's own defaults, written down rather than inherited). Minor,
+patch and digest updates are never merged automatically. The CI
+tooling group puts GitHub Actions and pre-commit hook revisions, every
+update type, digests included, into one monthly pull request. The two
+rules that keep `node-version` and the pinned Renovate in step, and the
+`shellcheck-py/shellcheck-py` versioning rule, are in it too. It sets
+no `vulnerabilityAlerts`: Renovate's defaults already drop the
+schedule, `minimumReleaseAge` and grouping for a security fix, so a
+fix for a vulnerability Dependabot reports arrives at once rather than
+waiting for Saturday. One rule is an exception to that. A `packageRules`
+entry with `enabled: false` suppresses even a vulnerability fix, and
+the preset's Node-major disable rule is one, so Node majors in the
+Renovate workflows are the one update type the immediate security path
+does not reach.
+
+Renovate reads a `local>` preset from the default branch of the
+repository that holds it, so a change to `renovate-fleet.json` cannot
+be tried from a pull request branch: it takes effect for the whole
+fleet the moment it merges. The only check before that is
+pre-commit's `renovate-config-validator`. Its default `files:`
+pattern matches `renovate.json` but not `renovate-fleet.json`, and a
+hook that silently skips the file it was added for still passes, so
+the hook's pattern is overridden with one that covers any Renovate
+configuration or `renovate-*.json` preset in any directory, rather
+than the files that happen to exist; `scripts/tests/test_hooks.py`
+holds it to every such file in the tree. It also runs with
+`--no-global`: given a file as an argument the validator treats it as
+a global self-hosted configuration, which accepts a self-hosted-only
+key such as `onboarding` in a file that is meant to be a repository
+preset.
+
+Two of the checks above, the `pre-commit` manager and the version
+comments, accept a repository that extends the preset. Each one reads
+the parsed configuration through a helper that knows nothing about any
+preset, and a single predicate beside them recognises the `extends`
+string; a check passes when either says so. Keeping the name out of
+the helpers is what stops a repository being passed on a string alone.
+That is still trust by name, and it holds only while the preset keeps
+its promises, so the tests load the real `renovate-fleet.json` and
+assert that each helper accepts it on its own. A commit that removed
+the manager or the version comment extend from the preset would
+otherwise leave every repository in the fleet passing on a promise
+nothing kept.
+
+What stays local to a repository is what only that repository needs:
+`development`'s `templates/` patterns below, the Python constraints,
+package grouping and range strategy sections after them.
 
 ### The pre-commit manager
 
@@ -82,7 +151,8 @@ unwatched pin means the thing judging everything else is itself
 unjudged. `instar` was four months behind on `actionlint` while its
 cargo, dockerfile and github-actions dependencies were current.
 
-Any of renovate's three enabling forms passes:
+Any of renovate's three enabling forms passes, as does extending the
+fleet preset, which enables the manager for the repository:
 
 ```json
 {"pre-commit": {"enabled": true}}
@@ -93,10 +163,11 @@ Any of renovate's three enabling forms passes:
 The check applies only when there is something to bump: a repository
 with no `.pre-commit-config.yaml`, or one whose hooks are all
 `repo: local`, passes without the manager. `sfui`'s
-`"pre-commit": {"enabled": true}` is the form the template carries.
+`"pre-commit": {"enabled": true}` is the form repositories carried
+before the preset.
 
 Enabling the manager is not enough for the shellcheck hook:
-shellcheck-py's four-part tags need the template's regex versioning
+shellcheck-py's four-part tags need the fleet preset's regex versioning
 rule, or the lookup fails on the dependency dashboard and the hook is
 never bumped. This check does not look for that rule; see
 [the template README](https://github.com/shakenfist/development/blob/main/templates/renovate/README.md#shellcheck-pys-four-part-tags).
@@ -123,7 +194,9 @@ extra path is named:
 ```
 
 This applies to `development` today, and to any repository that grows
-a second home for workflow files.
+a second home for workflow files. It stays in `development`'s own
+`renovate.json` rather than the fleet preset, because it only applies
+here.
 
 `customManagers:githubActionsVersions` has the same blind spot, and
 its file patterns cannot be extended from outside the preset. So
