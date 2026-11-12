@@ -41,6 +41,10 @@ class AgentOperationAttributesData(BaseModel):
         dependency_failure: The op_type, op_uuid and state of the
             failed dependency which aborted this operation. NULL
             unless that happened.
+        dependency_wait_started: Unix timestamp of the first
+            dispatcher pass which found this operation blocked on a
+            dependency. NULL for an operation which was never
+            blocked.
     """
 
     model_config = ConfigDict(frozen=False)  # Mutable
@@ -84,3 +88,18 @@ class AgentOperationAttributesData(BaseModel):
     # because a field which can only ever be null is a field a client
     # learns to ignore.
     dependency_failure: Optional[dict] = None
+
+    # Wall-clock time of the first dispatcher pass which found this
+    # operation blocked on a dependency, and so the anchor the
+    # dependency wait budget is measured from. Written once and never
+    # updated: a second write would move the anchor forward every time
+    # the operation was looked at, and a budget which restarts whenever
+    # it is checked is not a budget at all. NULL for every operation
+    # which was never blocked, which is the ordinary case.
+    #
+    # Deliberately absent from the external view. A caller needs the
+    # outcome of a wait -- whether the operation ran or was aborted,
+    # and why -- not the instant the server started counting, which it
+    # cannot act on and which would invite clients to re-derive the
+    # budget for themselves.
+    dependency_wait_started: Optional[float] = None

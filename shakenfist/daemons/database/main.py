@@ -4844,6 +4844,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             dependency_failure=(json.loads(d.dependency_failure_json)
                                 if d.HasField('dependency_failure_json')
                                 else None),
+            dependency_wait_started=(
+                d.dependency_wait_started
+                if d.HasField('dependency_wait_started') else None),
         )
 
     def _agentop_attrs_to_proto(
@@ -4859,7 +4862,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             expiry_reason=data.expiry_reason,
             dependency_failure_json=(
                 json.dumps(data.dependency_failure)
-                if data.dependency_failure is not None else None))
+                if data.dependency_failure is not None else None),
+            dependency_wait_started=data.dependency_wait_started)
 
     # Artifact Operations (MariaDB)
     def CreateArtifact(

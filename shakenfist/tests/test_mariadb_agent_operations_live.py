@@ -22,14 +22,18 @@ Each test rewinds a current database to what some earlier deployment
 looks like -- drop the columns a step added and reset the table
 versions to what they were before it -- puts rows in it, and then
 verifies that reconciliation brings it forward without losing them.
-Two rewind points are covered: the one before the deadline columns,
-and the one before the dependency edge columns.
+Three rewind points are covered: the one before the deadline
+columns, the one before the dependency edge columns, and the one
+before the dependency wait anchor.
 
 The dependency tests also compare a migrated column against the same
 column on a table created straight from create_all(), because a
 migration which types a column differently from the table generator
 leaves a migrated cluster and a fresh cluster with different schemas
-and no version difference to notice it by.
+and no version difference to notice it by. The comparison covers the
+collation as well as the type, because MariaDB's JSON type is an alias
+for LONGTEXT and the collation is the only thing information_schema
+shows differently between them.
 
 DESTRUCTIVE: tables in the target database are dropped during cleanup.
 Never point SF_MARIADB_TEST_DSN at a real deployment.
@@ -98,14 +102,38 @@ PRE_DEPENDENCY_VERSIONS = {
     'agent_operation_attributes': 4,
 }
 
+# The column the dependency wait budget adds, which has its own rewind
+# point again: a deployment from immediately before it has every edge
+# column and sits at agent_operations v4 and
+# agent_operation_attributes v5. Only the attributes table moves, so
+# agent_operations keeps the version it already has and nothing is
+# dropped from it.
+WAIT_ANCHOR_COLUMNS = {
+    'agent_operation_attributes': ['dependency_wait_started'],
+}
+
+PRE_WAIT_ANCHOR_VERSIONS = {
+    'agent_operations': 4,
+    'agent_operation_attributes': 5,
+}
+
+# Where every rewind point above lands once it has been migrated. One
+# dict serves all of them, because each ensure function holds a single
+# version-gated block whose ALTER list carries every column ever added
+# to the table: a database rewound to any earlier point runs that one
+# block and arrives at the current target, not at the version which
+# happened to be current when its columns were written.
+#
 # Written as literals rather than as mariadb's version constants. The
 # version a migration records is the constant, so an assertion made
 # against the constant holds for whatever value the constant has --
-# including one which never moved past the pre-dependency version at
-# all, which is exactly the regression worth catching here.
-POST_DEPENDENCY_VERSIONS = {
+# including one which never moved off the rewound version at all,
+# which is exactly the regression worth catching here. Raise these by
+# hand when a column is added, which is the point: the line has to be
+# touched deliberately.
+MIGRATED_VERSIONS = {
     'agent_operations': 4,
-    'agent_operation_attributes': 5,
+    'agent_operation_attributes': 6,
 }
 
 
@@ -235,7 +263,7 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
         """
         with self.engine.connect() as conn:
             for table_name, columns in NEW_COLUMNS.items():
-                for column in columns + DEPENDENCY_COLUMNS[table_name]:
+                for column in self._every_later_column(table_name):
                     conn.execute(sa.text(
                         f'ALTER TABLE {table_name} DROP COLUMN {column}'))
             conn.commit()
@@ -245,8 +273,23 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
 
         for table_name, columns in NEW_COLUMNS.items():
             present = self._columns(table_name)
-            for column in columns + DEPENDENCY_COLUMNS[table_name]:
+            for column in self._every_later_column(table_name):
                 self.assertNotIn(column, present)
+
+    def _every_later_column(self, table_name):
+        """Every column added after v2, for the deepest rewind.
+
+        A v2 deployment had none of them, and leaving one behind would
+        leave _insert_legacy_rows() naming a column set which no longer
+        covers every NOT NULL column in the table, which a strict
+        sql_mode refuses outright. Assembled from the three
+        per-rewind-point lists rather than written out again, so that
+        the next column added to one of them is dropped here without a
+        second edit.
+        """
+        return (NEW_COLUMNS.get(table_name, [])
+                + DEPENDENCY_COLUMNS.get(table_name, [])
+                + WAIT_ANCHOR_COLUMNS.get(table_name, []))
 
     def _rewind_dependency_columns(self):
         """Make the database look like a deployment from before the edge columns.
@@ -257,7 +300,8 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
         """
         with self.engine.connect() as conn:
             for table_name, columns in DEPENDENCY_COLUMNS.items():
-                for column in columns:
+                for column in (columns
+                               + WAIT_ANCHOR_COLUMNS.get(table_name, [])):
                     conn.execute(sa.text(
                         f'ALTER TABLE {table_name} DROP COLUMN {column}'))
             conn.commit()
@@ -265,6 +309,27 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
             mariadb._set_table_version(self.engine, table_name, version)
 
         for table_name, columns in DEPENDENCY_COLUMNS.items():
+            present = self._columns(table_name)
+            for column in columns:
+                self.assertNotIn(column, present)
+
+    def _rewind_wait_anchor_column(self):
+        """Make the database look like a deployment from just before the anchor.
+
+        The shallowest rewind of the three: every edge column stays,
+        because a deployment which is about to gain the anchor already
+        has them, and only the attributes table's version moves.
+        """
+        with self.engine.connect() as conn:
+            for table_name, columns in WAIT_ANCHOR_COLUMNS.items():
+                for column in columns:
+                    conn.execute(sa.text(
+                        f'ALTER TABLE {table_name} DROP COLUMN {column}'))
+            conn.commit()
+        for table_name, version in PRE_WAIT_ANCHOR_VERSIONS.items():
+            mariadb._set_table_version(self.engine, table_name, version)
+
+        for table_name, columns in WAIT_ANCHOR_COLUMNS.items():
             present = self._columns(table_name)
             for column in columns:
                 self.assertNotIn(column, present)
@@ -331,6 +396,45 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
                 {'uuid': aop_uuid.hex, 'results': '{"0": {"status": 0}}',
                  'last_progress': None, 'attempts': 0,
                  'expiry_reason': None})
+            conn.commit()
+
+    def _insert_pre_wait_anchor_rows(self, aop_uuid):
+        """Insert rows using only the columns a pre-anchor build knew.
+
+        Every column but the anchor, which is more than the two helpers
+        above name: the edge lists survive this rewind, and like
+        attempts they are NOT NULL with no server default on a freshly
+        created table -- their DEFAULT lives in the ALTER, which is a
+        deliberate divergence -- so an insert which omits them is
+        refused outright under a strict sql_mode rather than silently
+        defaulted.
+
+        The uuid columns take the undashed 32 character form, as
+        _insert_legacy_rows() explains.
+        """
+        with self.engine.connect() as conn:
+            conn.execute(
+                sa.text(
+                    'INSERT INTO agent_operations '
+                    '(uuid, namespace, instance_uuid, commands, deadline, '
+                    'progress_timeout, depends_on, runs_after, version) '
+                    'VALUES (:uuid, :namespace, :instance_uuid, :commands, '
+                    ':deadline, :progress_timeout, :depends_on, '
+                    ':runs_after, :version)'),
+                {'uuid': aop_uuid.hex, 'namespace': 'unittest',
+                 'instance_uuid': uuid4().hex, 'commands': '[]',
+                 'deadline': None, 'progress_timeout': None,
+                 'depends_on': '[]', 'runs_after': '[]', 'version': 3})
+            conn.execute(
+                sa.text(
+                    'INSERT INTO agent_operation_attributes '
+                    '(uuid, results, last_progress, attempts, '
+                    'expiry_reason, dependency_failure) '
+                    'VALUES (:uuid, :results, :last_progress, :attempts, '
+                    ':expiry_reason, :dependency_failure)'),
+                {'uuid': aop_uuid.hex, 'results': '{"0": {"status": 0}}',
+                 'last_progress': None, 'attempts': 0,
+                 'expiry_reason': None, 'dependency_failure': None})
             conn.commit()
 
     def _migrate(self):
@@ -529,7 +633,7 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
 
         self.assertTrue(ops['migrated'])
         self.assertTrue(attrs['migrated'])
-        for table_name, version in POST_DEPENDENCY_VERSIONS.items():
+        for table_name, version in MIGRATED_VERSIONS.items():
             self.assertEqual(
                 version,
                 mariadb._get_table_version(self.engine, table_name),
@@ -616,12 +720,126 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
         ops, attrs = self._migrate()
         self.assertFalse(ops['migrated'])
         self.assertFalse(attrs['migrated'])
-        for table_name, version in POST_DEPENDENCY_VERSIONS.items():
+        for table_name, version in MIGRATED_VERSIONS.items():
             self.assertEqual(
                 version,
                 mariadb._get_table_version(self.engine, table_name))
 
         for table_name, columns in DEPENDENCY_COLUMNS.items():
+            present = self._columns(table_name)
+            for column in columns:
+                self.assertIn(column, present)
+
+    def test_wait_anchor_migration_adds_the_column(self):
+        self._rewind_wait_anchor_column()
+        ops, attrs = self._migrate()
+
+        # Only the attributes table moves. agent_operations is already
+        # at its target, so a run which reported it as migrated would
+        # mean the ladder had grown a rung nothing asked for.
+        self.assertFalse(ops['migrated'])
+        self.assertTrue(attrs['migrated'])
+        for table_name, version in MIGRATED_VERSIONS.items():
+            self.assertEqual(
+                version,
+                mariadb._get_table_version(self.engine, table_name),
+                f'{table_name} did not reach version {version}')
+
+        for table_name, columns in WAIT_ANCHOR_COLUMNS.items():
+            present = self._columns(table_name)
+            for column in columns:
+                self.assertIn(
+                    column, present,
+                    f'the migration did not add {table_name}.{column}')
+
+    def test_wait_anchor_column_matches_a_fresh_create(self):
+        # As for the edge columns: a hand written ALTER and the table
+        # generator are two different pieces of code producing what has
+        # to be one column, and nothing in the mocked unit suite can
+        # see them diverge.
+        #
+        # The comparison is on every fact _column_facts() collects, so
+        # it covers the collation too, but be clear about what that
+        # buys here: a numeric column has no character set and no
+        # collation, so both sides report NULL for them and this
+        # column's divergences can only show up in the type or the
+        # nullability. The collation is the discriminator for the text
+        # columns, where MariaDB's JSON type reports a DATA_TYPE and a
+        # COLUMN_TYPE indistinguishable from LONGTEXT; sharing one
+        # helper keeps the next column added here covered whichever
+        # kind it turns out to be.
+        self._rewind_wait_anchor_column()
+        self._migrate()
+        self._create_fresh_comparison_tables()
+
+        for table_name, columns in WAIT_ANCHOR_COLUMNS.items():
+            for column in columns:
+                self.assertEqual(
+                    self._column_facts(FRESH_TABLES[table_name], column),
+                    self._column_facts(table_name, column),
+                    f'{table_name}.{column} on a migrated database is not '
+                    f'what create_all() produces on a fresh one')
+
+        # And in absolute terms, so that the equality above cannot be
+        # satisfied by both paths being wrong together: the model field
+        # is Optional, so NULL is the "never blocked" answer and a NOT
+        # NULL column would have to invent a timestamp for every
+        # operation which never waited.
+        self.assertTrue(
+            self._column_is_nullable(
+                'agent_operation_attributes', 'dependency_wait_started'))
+        self.assertEqual(
+            'double',
+            self._column_facts(
+                'agent_operation_attributes',
+                'dependency_wait_started')['DATA_TYPE'])
+
+    def test_wait_anchor_migration_leaves_existing_rows_null(self):
+        aop_uuid = uuid4()
+        self._rewind_wait_anchor_column()
+        self._insert_pre_wait_anchor_rows(aop_uuid)
+        self._migrate()
+
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.text('SELECT results, dependency_failure, '
+                        'dependency_wait_started '
+                        'FROM agent_operation_attributes '
+                        'WHERE uuid = :uuid'),
+                {'uuid': aop_uuid.hex}).first()
+        self.assertIsNotNone(row)
+        self.assertEqual({'0': {'status': 0}}, json.loads(row[0]))
+        self.assertIsNone(row[1])
+        # NULL, and no backfill: an operation which existed before the
+        # budget did has never been found blocked, and 0.0 would claim
+        # its wait began at the epoch and was therefore exhausted
+        # before anyone looked.
+        self.assertIsNone(row[2])
+
+        # The edge columns are untouched by this step, so a rewind
+        # which took them with it would be a wider migration than this
+        # one claims to be.
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.text('SELECT depends_on, runs_after '
+                        'FROM agent_operations WHERE uuid = :uuid'),
+                {'uuid': aop_uuid.hex}).first()
+        self.assertEqual('[]', row[0])
+        self.assertEqual('[]', row[1])
+
+    def test_wait_anchor_migration_is_a_clean_no_op_when_re_run(self):
+        self._rewind_wait_anchor_column()
+        self._migrate()
+
+        ops, attrs = self._migrate()
+        self.assertFalse(ops['migrated'])
+        self.assertFalse(attrs['migrated'])
+        for table_name, version in MIGRATED_VERSIONS.items():
+            self.assertEqual(
+                version,
+                mariadb._get_table_version(self.engine, table_name))
+
+        for table_name, columns in WAIT_ANCHOR_COLUMNS.items():
             present = self._columns(table_name)
             for column in columns:
                 self.assertIn(column, present)
@@ -724,6 +942,32 @@ class AgentOperationDirectAccessLiveTestCase(base.ShakenFistTestCase):
             out, fields=['expiry_reason']))
         reread = mariadb._direct_get_agent_operation_attributes(aop_uuid)
         self.assertEqual('deadline', reread.expiry_reason)
+        self.assertEqual(0, reread.attempts)
+
+    def test_wait_anchor_round_trips_through_the_masked_update(self):
+        """The anchor's single-field write, against a real column.
+
+        The mocked suite can prove the mask names the right field but
+        not that the column accepts the value, and this write is the
+        one the budget cannot survive losing: a NULL read back would
+        restart the budget on every pass.
+        """
+        aop_uuid = uuid4()
+        self.assertTrue(mariadb._direct_create_agent_operation_attributes(
+            AgentOperationAttributesData(
+                uuid=aop_uuid, results={'0': {'status': 0}})))
+        out = mariadb._direct_get_agent_operation_attributes(aop_uuid)
+        self.assertIsNone(out.dependency_wait_started)
+
+        out.dependency_wait_started = 1787427490.5
+        out.attempts = 9
+        self.assertTrue(mariadb._direct_update_agent_operation_attributes(
+            out, fields=['dependency_wait_started']))
+
+        reread = mariadb._direct_get_agent_operation_attributes(aop_uuid)
+        self.assertEqual(1787427490.5, reread.dependency_wait_started)
+        # And nothing else moved, which is what stops the anchor's
+        # writer clobbering a concurrent attempts or results write.
         self.assertEqual(0, reread.attempts)
 
     def test_dependency_edges_round_trip_through_the_public_path(self):

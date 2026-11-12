@@ -91,14 +91,16 @@ class AgentOperationProtoRoundTripTestCase(base.ShakenFistTestCase):
         self.assertEqual(0.0, out.progress_timeout)
 
     def _round_trip_attrs(self, last_progress, attempts,
-                          expiry_reason=None, dependency_failure=None):
+                          expiry_reason=None, dependency_failure=None,
+                          dependency_wait_started=None):
         data = AgentOperationAttributesData(
             uuid=AOP_UUID,
             results={'0': {'status': 0}},
             last_progress=last_progress,
             attempts=attempts,
             expiry_reason=expiry_reason,
-            dependency_failure=dependency_failure)
+            dependency_failure=dependency_failure,
+            dependency_wait_started=dependency_wait_started)
         proto = self.service._agentop_attrs_to_proto(data)
         return proto, self.service._agentop_attrs_from_proto(proto)
 
@@ -175,6 +177,40 @@ class AgentOperationProtoRoundTripTestCase(base.ShakenFistTestCase):
             None, 0, dependency_failure=failure)
         self.assertEqual(failure, out.dependency_failure)
 
+    def test_attributes_wait_anchor_survives(self):
+        _, out = self._round_trip_attrs(
+            None, 0, dependency_wait_started=1787427490.5)
+        self.assertEqual(1787427490.5, out.dependency_wait_started)
+
+    def test_attributes_wait_anchor_none_stays_none(self):
+        # Absent means SQL NULL, which here means the operation has
+        # never been found blocked on a dependency.
+        proto, out = self._round_trip_attrs(None, 0)
+        self.assertFalse(proto.HasField('dependency_wait_started'))
+        self.assertIsNone(out.dependency_wait_started)
+
+    def test_attributes_wait_anchor_epoch_is_not_none(self):
+        # The presence case, which matters more here than for most
+        # fields: a budget anchored at the epoch is already fifty years
+        # exhausted, while no anchor at all means nothing has waited.
+        # Collapsing the two would abort every operation which was
+        # merely looked at.
+        proto, out = self._round_trip_attrs(
+            None, 0, dependency_wait_started=0.0)
+        self.assertTrue(proto.HasField('dependency_wait_started'))
+        self.assertIsNotNone(out.dependency_wait_started)
+        self.assertEqual(0.0, out.dependency_wait_started)
+
+    def test_the_dependency_fields_are_not_transposed(self):
+        # The cascade detail and the wait anchor are adjacent fields
+        # about the same feature, set by adjacent lines, which is the
+        # shape a copy-paste crosses over. Only one of them is set
+        # here, so a swap cannot hide behind equal values.
+        _, out = self._round_trip_attrs(
+            None, 0, dependency_wait_started=1787427490.5)
+        self.assertIsNone(out.dependency_failure)
+        self.assertEqual(1787427490.5, out.dependency_wait_started)
+
 
 class AgentOperationProtoDefaultsTestCase(base.ShakenFistTestCase):
     """An old peer sends no new fields at all."""
@@ -215,6 +251,7 @@ class AgentOperationProtoDefaultsTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, out.attempts)
         self.assertIsNone(out.expiry_reason)
         self.assertIsNone(out.dependency_failure)
+        self.assertIsNone(out.dependency_wait_started)
 
 
 class AgentOperationGrpcClientTestCase(base.ShakenFistTestCase):
@@ -348,6 +385,39 @@ class AgentOperationGrpcClientTestCase(base.ShakenFistTestCase):
             data, fields=['attempts']))
         self.assertFalse(
             self.requests[0].data.HasField('dependency_failure_json'))
+        self.assertFalse(
+            self.requests[0].data.HasField('dependency_wait_started'))
+
+    def test_attributes_update_request_carries_the_wait_anchor(self):
+        # The anchor is written with a single-field mask, and the
+        # servicer rebuilds the model from the message before writing
+        # the columns the mask names. A request which left the field
+        # unset would therefore write NULL and start the budget again
+        # on the next pass, which is the one failure the budget cannot
+        # survive.
+        data = AgentOperationAttributesData(
+            uuid=AOP_UUID, results={}, attempts=0,
+            dependency_wait_started=1787427490.5)
+        self.assertTrue(mariadb._grpc_update_agent_operation_attributes(
+            data, fields=['dependency_wait_started']))
+        request = self.requests[0]
+        self.assertEqual(['dependency_wait_started'], list(request.fields))
+        self.assertTrue(
+            request.data.HasField('dependency_wait_started'))
+        self.assertEqual(
+            1787427490.5,
+            self.service._agentop_attrs_from_proto(
+                request.data).dependency_wait_started)
+
+    def test_attributes_create_request_carries_the_wait_anchor(self):
+        data = AgentOperationAttributesData(
+            uuid=AOP_UUID, results={}, attempts=0,
+            dependency_wait_started=0.0)
+        self.assertTrue(
+            mariadb._grpc_create_agent_operation_attributes(data))
+        proto = self.requests[0].data
+        self.assertTrue(proto.HasField('dependency_wait_started'))
+        self.assertEqual(0.0, proto.dependency_wait_started)
 
     def test_update_mask_survives_the_round_trip_to_the_direct_layer(self):
         # The direct path's mask is covered by the live suite and by

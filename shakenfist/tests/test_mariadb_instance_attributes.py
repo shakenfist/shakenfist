@@ -147,7 +147,7 @@ class AgentOperationColumnValuesTestCase(base.ShakenFistTestCase):
         values = mariadb._agent_operation_attributes_column_values(self.data)
         self.assertEqual(
             {'results', 'last_progress', 'attempts', 'expiry_reason',
-             'dependency_failure'},
+             'dependency_failure', 'dependency_wait_started'},
             set(values))
 
     def test_mask_limits_columns(self):
@@ -194,6 +194,21 @@ class AgentOperationColumnValuesTestCase(base.ShakenFistTestCase):
             '{"op_type": "agentoperation", "op_uuid": "a-uuid", '
             '"state": "error"}',
             values['dependency_failure'])
+
+    def test_wait_anchor_is_in_the_mask_vocabulary(self):
+        # The anchor is written with a single-field mask, and this dict
+        # is the only vocabulary that mask is checked against: a field
+        # missing from here is refused outright rather than silently
+        # skipped, so the attribute could never be written at all.
+        values = mariadb._agent_operation_attributes_column_values(
+            self.data, ['dependency_wait_started'])
+        self.assertEqual({'dependency_wait_started'}, set(values))
+        self.assertIsNone(values['dependency_wait_started'])
+
+        self.data.dependency_wait_started = 1787427490.5
+        values = mariadb._agent_operation_attributes_column_values(
+            self.data, ['dependency_wait_started'])
+        self.assertEqual(1787427490.5, values['dependency_wait_started'])
 
     def test_unknown_field_rejected(self):
         self.assertRaises(
