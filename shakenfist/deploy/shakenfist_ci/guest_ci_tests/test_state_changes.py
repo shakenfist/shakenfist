@@ -197,7 +197,8 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # it cannot run commands on the instance's hypervisor -- see
         # _require_node_exec()'s docstring.
         inst = self._start_target('autostart')
-        node = self._node_by_uuid(inst['node'])
+        node = self._node_by_identifier(
+            self._get_cluster_nodes(), inst['node'])
         self._require_node_exec(node)
 
         self.assertTrue(
@@ -277,7 +278,8 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         #
         # This runs on the instance's hypervisor, so it skips loudly when
         # node exec is unavailable -- see _require_node_exec()'s docstring.
-        node = self._node_by_uuid(inst['node'])
+        node = self._node_by_identifier(
+            self._get_cluster_nodes(), inst['node'])
         self._require_node_exec(node)
         domain = 'sf:%s' % inst['uuid']
 
@@ -419,7 +421,8 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # it cannot run commands on the instance's hypervisor -- see
         # _require_node_exec()'s docstring.
         inst = self._start_target('poweronfail')
-        node = self._node_by_uuid(inst['node'])
+        node = self._node_by_identifier(
+            self._get_cluster_nodes(), inst['node'])
         self._require_node_exec(node)
 
         # The path is stored in the instance's block devices, and every
@@ -554,7 +557,8 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # it cannot run commands on the instance's hypervisor -- see
         # _require_node_exec()'s docstring.
         inst = self._start_target('qemukilled')
-        node = self._node_by_uuid(inst['node'])
+        node = self._node_by_identifier(
+            self._get_cluster_nodes(), inst['node'])
         self._require_node_exec(node)
         after = time.time()
 

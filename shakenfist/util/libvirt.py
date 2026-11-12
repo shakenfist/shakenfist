@@ -59,6 +59,29 @@ def _log_libvirt_error(_ctx: Any, error: Any) -> None:
     LOG.debug(f'libvirt reported: {error[2] if error else error}')
 
 
+def is_domain_not_running(e: BaseException) -> bool:
+    """True if libvirt refused an operation because the domain is stopped.
+
+    libvirt refuses an operation on a domain in the wrong state with
+    VIR_ERR_OPERATION_INVALID, a code shared with every other "not valid in
+    this state" refusal, so the message is the only thing which tells this
+    refusal apart from the rest. That is why it is a string match, and why
+    the match lives here instead of being written out at each of the power
+    operations which handle it. For the looser test which only needs the
+    code, see LibvirtConnection.is_state_invalid().
+    """
+    return 'domain is not running' in str(e)
+
+
+def is_domain_already_running(e: BaseException) -> bool:
+    """True if libvirt refused an operation because the domain is running.
+
+    The counterpart of is_domain_not_running(), and a string match for the
+    same reason.
+    """
+    return 'domain is already running' in str(e)
+
+
 def get_libvirt() -> ModuleType:
     global LIBVIRT
 
@@ -102,13 +125,15 @@ class LibvirtConnection():
         return (isinstance(e, self.libvirt.libvirtError) and
                 e.get_error_code() == self.libvirt.VIR_ERR_NO_DOMAIN)
 
-    def is_domain_not_running(self, e: BaseException) -> bool:
-        """True if e is libvirt refusing a call because the domain is not running.
+    def is_state_invalid(self, e: BaseException) -> bool:
+        """True if e is libvirt refusing a call because of the domain's state.
 
         Runtime queries (CPU, block and interface statistics) on an inactive
         domain raise VIR_ERR_OPERATION_INVALID. That code means "not valid in
         this state" in general, so only use this around calls whose only
-        state requirement is a running domain.
+        state requirement is a running domain. Where the specific refusal
+        matters, match the message with is_domain_not_running() or
+        is_domain_already_running() instead.
         """
         return (isinstance(e, self.libvirt.libvirtError) and
                 e.get_error_code() == self.libvirt.VIR_ERR_OPERATION_INVALID)
