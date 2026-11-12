@@ -1243,7 +1243,7 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     def test_call_order_is_unchanged(self, mock_get_class):
         # Instrumenting the sweep must not change what it does: the same
-        # calls, in the same order, with the same arguments (D6).
+        # calls, in the same order, with the same arguments.
         calls = []
         from_db, objs = self._fixtures(calls)
         mock_get_class.return_value.from_db.side_effect = from_db

@@ -242,6 +242,17 @@ In summary:
 | `sf-database` itself (gRPC listener) | `MARIADB_GATEWAY_PORT` | Port each `sf-database` binds on (default 13005) |
 | Prometheus scraper | `MARIADB_GATEWAY_METRICS_PORT` | Metrics port on each `sf-database` replica (default 13006) |
 
+**The tier's port must be reachable only from the mesh.** `sf-database`
+binds an insecure gRPC port and authorises no caller: its only server
+interceptor counts requests. Anything which can open a connection to
+`MARIADB_GATEWAY_HOSTS` can read and write every object in the cluster,
+including the batch hard delete, which removes up to a thousand objects
+of one type in a single call. That is a deliberate posture rather than
+an oversight — the mesh is treated as private, and mutual TLS between
+daemons is a separate piece of work — but it means the port belongs on
+the cluster's own network, firewalled from anything else, and that a
+BYO deployment which routes it over a shared network is exposed.
+
 **Multi-replica deployments**: More than one `sf-database` replica can run
 against the same MariaDB server. List every replica's mesh IP in
 `MARIADB_GATEWAY_HOSTS`, comma-separated — for example,
@@ -1027,10 +1038,12 @@ type whose list has been read to the end, including one with nothing to
 delete, is not read again for five minutes, so an object whose hard delete
 fails every time is retried every five minutes rather than every pass.
 Each failure is logged at ERROR and counted with the `failed` outcome
-below. Objects are hydrated one at a time at processing time, and the
-sweep takes one object from each type in turn, remembering its place
-between passes, so neither a large backlog in one type nor a single
-failing object can stop the others.
+below. The sweep takes a turn from each type with work in turn, and a
+turn is up to `DELETED_OBJECT_BATCH_SIZE` (25) of that type's entries:
+one transaction for a type hard deleted in batches, and one object at a
+time, each hydrated as it is reached, for a type which is not. It
+remembers its place between passes, so neither a large backlog in one
+type nor a single failing object can stop the others.
 
 #### Draining a backlog
 
@@ -1281,6 +1294,16 @@ the pass's whole budget (`budget_seconds`) and the seconds spent
 processing (`elapsed_seconds`). `elapsed_seconds` is the processing
 alone: `fill_seconds` is also charged against `budget_seconds`, so the
 two have to be added before comparing with the budget.
+
+A pass whose reads cannot reach the database logs `Skipping
+per-deleted-object drain, database unavailable during the fill` and then
+drains nothing at all, so no `Processed` line follows it. A missing
+`Processed` line is that, and not the sweep having died: the first read
+of every entry would spend a whole retry budget against a tier which has
+just failed one and fail anyway, so the pass gives up and whatever it
+did read waits for the next one. A pass which reached the tier and then
+lost it mid-drain does log a `Processed` line, with `stopped_by` reading
+`unavailable`.
 
 
 Mean seconds per hard delete, by object type:
