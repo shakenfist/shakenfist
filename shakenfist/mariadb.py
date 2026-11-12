@@ -26339,7 +26339,11 @@ def delete_orphaned_artifact_attributes() -> Optional[int]:
 # order is invisible to readers, and is kept so the two paths match. On the
 # per-call path a reader must still tolerate a torn read, which is why
 # scheduled_tasks._process_per_blob_queue() passes suppress_failure_audit;
-# the order only removes the easy half of that race.
+# the order only removes the easy half of that race. The order is also what
+# lets the error delete be scoped to the operation type at all: the type
+# lives on the cluster_operations row, so the error delete reads it while
+# it is still there -- see
+# _delete_cluster_operation_errors_for_operations().
 #
 # Instance, namespace and namespace claim are absent on purpose: each
 # hard_delete() does more than delete rows keyed on the object, so they keep
@@ -26399,6 +26403,62 @@ def _delete_cluster_operation_targets_for_objects(
         _uuids_in(table.c.target_uuid, uuids)))
 
 
+# The three builders below are the batch's only ones whose table is
+# shared by every cluster operation type, so keying on the operation's
+# uuid alone does not scope them to the type the batch declares. Every
+# other builder keys on a table one type owns, where the table is the
+# scope.
+#
+# A uuid is globally unique, so an unconditional batch which declared one
+# cluster operation type and named another's uuid deleted that
+# operation's own rows while the type-scoped object_states delete which
+# opens the transaction matched nothing: an object_states row with no
+# object left behind it, which is the shape #3534 had to reconcile. No
+# in-tree caller can do that, since baseobject.hard_delete() and the
+# deleted-object sweep both pass matching pairs, so these predicates
+# restore an invariant rather than fix a live defect (#4877).
+
+
+def _delete_cluster_operation_targets_for_operations(
+        object_type: ObjectType, uuids: list[str]) -> sa.Delete:
+    # As _direct_delete_cluster_operation_target(), for many operations
+    # of one type.
+    table = _get_cluster_operation_targets_table()
+    return sa.delete(table).where(sa.and_(
+        table.c.operation_type == str(object_type),
+        _uuids_in(table.c.operation_uuid, uuids)))
+
+
+def _delete_cluster_operation_errors_for_operations(
+        object_type: ObjectType, uuids: list[str]) -> sa.Delete:
+    """As _direct_delete_cluster_operation_error(), scoped to the type.
+
+    cluster_operation_errors carries no operation type of its own, so the
+    type can only come from the operation's own row. That makes the
+    order of the two deletes load-bearing: this one is a scope only
+    while the cluster_operations row is still there, which is why
+    _CLUSTER_OPERATION_HARD_DELETES deletes the error before the
+    operation. test_the_error_delete_is_ordered_before_the_operation
+    holds them in that order.
+    """
+    table = _get_cluster_operation_errors_table()
+    operations = _get_cluster_operations_table()
+    return sa.delete(table).where(table.c.op_uuid.in_(
+        sa.select(operations.c.uuid).where(sa.and_(
+            operations.c.operation_type == str(object_type),
+            _uuids_in(operations.c.uuid, uuids)))))
+
+
+def _delete_cluster_operations_for_objects(
+        object_type: ObjectType, uuids: list[str]) -> sa.Delete:
+    # As _direct_delete_cluster_operation(), for many operations of one
+    # type.
+    table = _get_cluster_operations_table()
+    return sa.delete(table).where(sa.and_(
+        table.c.operation_type == str(object_type),
+        _uuids_in(table.c.uuid, uuids)))
+
+
 def _remove_all_references_from_objects(
         object_type: ObjectType, uuids: list[str]) -> sa.Delete:
     table = _get_object_references_table()
@@ -26431,16 +26491,15 @@ def _delete_object_events_for_objects(
 HARD_DELETE_STATEMENTS: dict[str, HardDeleteStatement] = {
     # _direct_delete_cluster_operation_target()
     'delete_cluster_operation_target': HardDeleteStatement(
-        _delete_where_uuid_in(
-            _get_cluster_operation_targets_table, 'operation_uuid'),
+        _delete_cluster_operation_targets_for_operations,
         lambda t, u: delete_cluster_operation_target(u)),
     # _direct_delete_cluster_operation_error()
     'delete_cluster_operation_error': HardDeleteStatement(
-        _delete_where_uuid_in(_get_cluster_operation_errors_table, 'op_uuid'),
+        _delete_cluster_operation_errors_for_operations,
         lambda t, u: delete_cluster_operation_error(u)),
     # _direct_delete_cluster_operation()
     'delete_cluster_operation': HardDeleteStatement(
-        _delete_where_uuid_in(_get_cluster_operations_table, 'uuid'),
+        _delete_cluster_operations_for_objects,
         lambda t, u: delete_cluster_operation(u)),
     # _direct_delete_cluster_operation_targets_for_object()
     'delete_cluster_operation_targets_for_object': HardDeleteStatement(

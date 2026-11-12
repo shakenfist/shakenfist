@@ -2,8 +2,8 @@
 
 """The batch hard delete: validation, routing, the wrappers and the servicer.
 
-What the statements delete is shown against a real MariaDB by
-test_mariadb_hard_delete_objects_live.py. These tests cover what does
+What the statements delete is shown against a real database by the
+cases in hard_delete_cases.py, which run on both backends. These tests cover what does
 not need one: which requests are refused, where a call goes, what the
 transaction runs first, how each failure is reported, and that the
 per-call fallback calls the same public functions the batch mirrors.
@@ -80,6 +80,21 @@ class MappingTestCase(base.ShakenFistTestCase):
         for name in ('delete_state', 'delete_object_metadata',
                      'delete_object_events'):
             self.assertNotIn(name, mariadb.HARD_DELETE_STATEMENTS)
+
+    def test_the_error_delete_is_ordered_before_the_operation(self):
+        # cluster_operation_errors has no operation type column, so the
+        # error delete takes its type predicate from the operation's own
+        # row (#4877). That is a scope only while the row is there, so
+        # the error delete has to run before the operation delete.
+        checked = 0
+        for object_type, names in mariadb.HARD_DELETE_BATCH_FUNCTIONS.items():
+            if 'delete_cluster_operation_error' not in names:
+                continue
+            self.assertLess(names.index('delete_cluster_operation_error'),
+                            names.index('delete_cluster_operation'),
+                            object_type)
+            checked += 1
+        self.assertEqual(14, checked)
 
     def test_builders_key_on_every_uuid(self):
         uuids = _uuids(3)

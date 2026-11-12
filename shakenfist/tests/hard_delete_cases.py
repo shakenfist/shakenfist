@@ -43,15 +43,20 @@ from shakenfist.tests import hard_delete_expected
 
 
 ROWS = {
+    # The operation type is part of what makes these rows one
+    # operation's, because every cluster operation type shares these
+    # tables and a batch may only reach rows of the type it declares
+    # (#4877). cluster_operation_errors is the exception: it carries no
+    # type of its own, and is scoped by the operation's own row.
     'delete_cluster_operation_target': (
         mariadb._get_cluster_operation_targets_table,
-        lambda t, u: {'operation_uuid': u}),
+        lambda t, u: {'operation_uuid': u, 'operation_type': str(t)}),
     'delete_cluster_operation_error': (
         mariadb._get_cluster_operation_errors_table,
         lambda t, u: {'op_uuid': UUID(u)}),
     'delete_cluster_operation': (
         mariadb._get_cluster_operations_table,
-        lambda t, u: {'uuid': UUID(u)}),
+        lambda t, u: {'uuid': UUID(u), 'operation_type': str(t)}),
     'delete_cluster_operation_targets_for_object': (
         mariadb._get_cluster_operation_targets_table,
         lambda t, u: {'target_object_type': t, 'target_uuid': u}),
@@ -328,6 +333,43 @@ class HardDeleteObjectsCases:
                         {name: 1 for name, _ in other_specs},
                         self._remaining(ObjectType.INSTANCE, uuid,
                                         other_specs))
+
+    def test_a_batch_declaring_another_type_deletes_nothing(self):
+        """A batch may not reach outside the type it declares (#4877).
+
+        Every cluster operation type shares cluster_operations,
+        cluster_operation_targets and cluster_operation_errors, so a
+        statement keyed on the operation's uuid alone finds another
+        type's rows: a uuid is globally unique. An unconditional batch
+        which named one took that operation's rows while the
+        type-scoped object_states delete which opens the transaction
+        matched nothing, leaving a state row with no object behind it.
+        """
+        for declared, seeded in ((ObjectType.NET_OP,
+                                  ObjectType.NODE_INST_OP),
+                                 (ObjectType.NODE_INST_OP,
+                                  ObjectType.NET_OP)):
+            with self.subTest(declared=declared, seeded=seeded):
+                uuid = self._seed(seeded, 'deleted', self.old)
+                self._assert_all(seeded, uuid, 1)
+
+                mariadb.hard_delete_objects(
+                    declared, [uuid], unconditional=True)
+                self._assert_all(seeded, uuid, 1)
+
+                # Guarded mode was never able to do this, because what
+                # the state delete returns is what the rest of the
+                # transaction deletes, and it is type-scoped.
+                self.assertEqual([], mariadb.hard_delete_objects(
+                    declared, [uuid], state_values=FINAL_STATES,
+                    updated_before=self.cutoff))
+                self._assert_all(seeded, uuid, 1)
+
+                # And its own type's batch still takes it.
+                self.assertEqual([uuid], mariadb.hard_delete_objects(
+                    seeded, [uuid], state_values=FINAL_STATES,
+                    updated_before=self.cutoff))
+                self._assert_all(seeded, uuid, 0)
 
     def test_unconditional_deletes_whatever_the_state(self):
         for object_type in BATCHABLE:
