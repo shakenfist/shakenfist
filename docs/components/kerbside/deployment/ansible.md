@@ -216,19 +216,20 @@ Three more things to know:
 Kerbside is [experimental](/components/kerbside/index/#kerbside-is-experimental)
 overall. The sanity job runs the role's `validate`, `bootstrap`,
 `config` and `register` entry points without root
-(`tools/ci-test-ansible-role.sh`), with `shakenfist`, `ovirt`,
-`openstack` and `static` sources, a stub
-virtual environment, and no migration or units. It also lints, builds
-and import-checks the collection. [`sf-e2e`](/components/kerbside/testing/#the-shaken-fist-end-to-end-lane-sf-e2e)
+(`tools/ci-test-ansible-role.sh`), with a source of each of the five
+types it accepts -- `shakenfist`, `ovirt`, `openstack`, `proxmox` and
+`static` -- a stub virtual environment, and no migration or units. It
+also lints, builds and import-checks the collection.
+[`sf-e2e`](/components/kerbside/testing/#the-shaken-fist-end-to-end-lane-sf-e2e)
 deploys each pull request's Kerbside through the role, on a Shaken
 Fist node, and checks that a second deploy restarts nothing.
 
 | Not covered | Why |
 |-------------|-----|
 | oVirt and OpenStack sources do not work | The role validates and renders all five source types, but installs no client library but `shakenfist-client` ([#602](https://github.com/shakenfist/kerbside/issues/602)). An `ovirt` source is marked errored and ignored, and an `openstack` source's token exchange answers 500. Today the role deploys a Kerbside for Shaken Fist, Proxmox and static sources, which need no other client library. |
-| Proxmox through the role is untested | The role validates a `proxmox` source, and a unit test checks its required fields, but the rootless test renders none and no lane starts one. No CI lane yet proves a proxied session against a real Proxmox VE cluster, by any deployment mechanism. |
+| No lane deploys a `proxmox` source through the role | The role validates and renders a `proxmox` source, a unit test checks its required fields, and the rootless test renders one. No lane starts a role-deployed Kerbside with one. [`proxmox-functional.yml`](/components/kerbside/testing/#the-proxmox-end-to-end-lane) does prove a proxied SPICE session against a real single-node Proxmox VE 9, but it deploys Kerbside on the runner rather than through the role, and no lane has run either against a multi-node PVE cluster. |
 | No setting beyond the fifteen | `kerbside.ini` is rendered from a fixed set, with no way to add to it, so there is no Keystone login, firewall mode or verbose logging through the role ([#629](https://github.com/shakenfist/kerbside/issues/629)). The drop-in in [Settings the role does not write](#settings-the-role-does-not-write) works around it, and is untested. |
-| Kerbside is started only with a Shaken Fist source, co-located | `sf-e2e` is the only lane that runs `register` against a real database and systemd, and it deploys one `shakenfist` source on a Shaken Fist node. The rootless test renders every source type but `proxmox`, and skips the migration and the units. No lane starts a role-deployed Kerbside with a `static` source, or on a host of its own. |
+| Kerbside is started only with a Shaken Fist source, co-located | `sf-e2e` is the only lane that runs `register` against a real database and systemd, and it deploys one `shakenfist` source on a Shaken Fist node. The rootless test renders every source type, but skips the migration and the units. No lane starts a role-deployed Kerbside with a `static` source, or on a host of its own. |
 | Only through Shaken Fist's `site.yml` | `sf-e2e` calls the role from Shaken Fist's playbook. No lane calls it from a playbook of its own, as the second route above does. |
 | One Kerbside host | No lane runs two Kerbside hosts sharing a database. Shaken Fist's [Load balancing](https://shakenfist.com/operator_guide/kerbside/#load-balancing) describes the shape, and says it is untested. |
 | The API is plain HTTP | The role binds gunicorn to every address with no TLS, and no lane puts a reverse proxy in front of it. Until something binds it to loopback or firewalls it, port 13002 serves tokens and credentials in the clear. |

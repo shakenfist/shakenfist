@@ -114,10 +114,10 @@ planning commit corrected that paragraph at source.
      introduction puts it.
    - Where to go: link the four mechanism pages by name in one
      sentence, then send the reader to
-     [Deployment Options](/components/kerbside/plans/index/#deployment-options) for which
+     [Deployment Options](/components/kerbside/index/#deployment-options) for which
      sources each configures and what CI proves.
    - What each cloud needs from Kerbside, and Kerbside from it, is in
-     its use case, linked through [Use Cases](/components/kerbside/plans/index/#use-cases).
+     its use case, linked through [Use Cases](/components/kerbside/index/#use-cases).
 
    Then keep the existing closing paragraph about the pieces,
    `configuration.md` and `console-sources.md` as it is.

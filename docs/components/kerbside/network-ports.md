@@ -67,10 +67,36 @@ Kerbside's defaults put TLS on 5900 and the plaintext redirect on
 5901. Hypervisor SPICE ports use the same 5900-upwards range, but
 their numbering follows the cloud's choices, and the plaintext port is
 often the lower one. A `5900` in a use-case diagram about the backend
-leg is therefore a hypervisor port, not Kerbside's. The overlap also
-matters if Kerbside runs on a host that also runs hypervisor SPICE
-consoles, because the two will contend for the same ports. Move
-Kerbside's `VDI_*_PORT` values out of the range in that case.
+leg is therefore a hypervisor port, not Kerbside's.
+
+Whether the overlap matters on a host that also runs hypervisor SPICE
+consoles depends on the cloud, so it is not a reason to move
+Kerbside's ports everywhere:
+
+- **oVirt** puts a console on whatever port the engine reports,
+  typically from 5900 upwards ([oVirt](/components/kerbside/use-cases/ovirt/)). A
+  Kerbside on one of those hypervisors does contend, and its
+  `VDI_*_PORT` values should move out of the range.
+- **Shaken Fist** allocates each console a random port in the
+  30000-50000 range (`Instance._allocate_console_port` in Shaken
+  Fist's `shakenfist/instance.py`), so Kerbside's defaults clear
+  them. The role reserves nothing by default: on a Shaken Fist
+  hypervisor pass the cluster's daemon ports and a range covering
+  the consoles in `kerbside_reserved_ports`. The Ports section of
+  `ansible/README.md` shows `[30000, 65535]`, which covers them with
+  room to spare; keep ports of your own out of whichever range you
+  reserve. That the consoles are nowhere near 5900 is part of why Shaken
+  Fist's operator guide recommends putting Kerbside on a hypervisor
+  ([Shaken Fist](/components/kerbside/use-cases/shakenfist/)).
+- **Proxmox VE** puts each VM's SPICE listener above this range and
+  fronts it with `spiceproxy` on port 3128, so a PVE node listens on
+  nothing Kerbside's 5900/5901 defaults want. No lane co-locates the
+  two -- the Proxmox lane runs Kerbside off-box from PVE -- so this
+  one is reasoned from where PVE puts its consoles rather than
+  exercised ([Proxmox VE](/components/kerbside/use-cases/proxmox/)).
+
+For any other cloud, check where it puts its consoles before
+co-locating.
 
 ## Connections Kerbside makes
 

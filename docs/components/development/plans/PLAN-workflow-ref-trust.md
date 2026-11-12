@@ -752,7 +752,11 @@ cannot be narrowed to a path.
    returned from `applies()`.** Follows `ScopeCoverage.SCOPE_REPO`.
    Everywhere else the criterion reports `not_applicable` naming the
    repository, which is what keeps it from paying for an API call on
-   23 repositories that cannot fail it.
+   23 repositories that cannot fail it. (The literal shape was
+   revised when the step ran: it is one table keyed `org/name` with
+   each repository's expected contexts beside it, for the reasons in
+   the step 2b record below. The decision stands as written; only its
+   literal is out of date.)
 4. **The bypass list stays confirmed by a reviewer rather than
    measured**, and this rests on a measurement rather than an
    assumption: the audit's read token answers the ruleset endpoint
@@ -1227,6 +1231,176 @@ delete. It is listed in Future work, and the first prune run that
 does prune answers it. The bypass itself is not in doubt -- without
 it that push would be refused exactly as the operator's was -- but
 the reading that would show it has not been taken.
+
+**Step 2b record (2026-11-12).** The criterion landed as
+`moving-ref-source-protection` in a second pull request off `main`
+with 2a's record already merged, as decision 5 requires, so it was
+measurable against the live repository on the day it was written. Run
+against `shakenfist/actions` it passes, with the details string
+naming the branch and all four contexts; run against this repository
+it reports `not_applicable` with the reason naming the repository and
+asks GitHub nothing. Seven files, the seventh being the
+`NETWORK_CHECKS` line the step brief singled out.
+
+Verified in the management session rather than taken from the
+sub-agent's report: 2618 tests pass, `pre-commit run --all-files`
+passes, and the step's eleven mutants were re-run from its own
+specification against a fresh copy of the tree, all eleven killed
+with none surviving. One of them removes the `NETWORK_CHECKS` line
+and is killed by `test_network_checks_matches_the_checker`, so that
+line is now held by a test rather than by this plan's warning about
+it. The pass verdict was also confirmed against the live repository,
+which the brief had only asked to be reasoned about offline.
+
+The before-and-after snapshot that *Before and after a change to a
+check* asks for was run too, which the step's own report had skipped:
+captures from a pristine checkout of `main` at 951fef7 and from this
+branch, over the 29 audited checkouts. No firm differences, and the
+whole of the advisory difference is this criterion appearing -- pass
+on `actions`, not_applicable on the other 28. That is the check no
+unit test performs, because a reworded `details` string is published
+to `docs/audits/compliance.md` and into every issue body filed
+fleet-wide, and nothing fails on it.
+
+*Departure from the step table.* The table marks 2b `worktree`
+isolation. That was satisfied with a worktree created in the
+management session off updated `main`, rather than with the agent
+tool's own isolation, because the latter bases its copy on the shared
+clone's checked-out `HEAD` -- which was still `main` before #388
+merged. The criterion would then have been written against a tree in
+which 2a's record and ruleset did not exist, and its central claim
+could not have been measured. The isolation the column asks for is
+from the shared clone, and that is what it got.
+
+*Two tests beyond the brief, kept.* The brief enumerated three
+tool-failure cases; the criterion has five. The additions are a
+matched rule that names no `ruleset_id`, and a ruleset that answers
+without an `enforcement` field -- the second being the one that
+would otherwise have become a `fail`, which is the error this
+repository's conventions treat as the one a criterion must never
+make, since a fail files an issue about our own outage. Both kill a
+mutant no other test kills.
+
+*The six-file count was left alone, deliberately.* This step's brief
+warns that `AGENTS.md` says six files and `PLAN-TEMPLATE.md`'s
+success criteria say five, while this criterion needed seven. Neither
+was edited, because `AGENTS.md` does not keep its own list: it names
+six and points at *Adding a criterion* in
+`docs/consistency-audits.md`, which carries the conditional seventh
+line for a criterion that reaches the network. The authoritative list
+is right, and the warning in the brief is what a reader needs rather
+than a correction to the summaries.
+
+*What the review round changed, including a decision's shape.* The
+automated review of #392 raised two `fix` items. One was a real defect
+in the criterion: `rule_contexts()` returned an empty list for every
+shape it could not read -- a `parameters` object that is not an object,
+a `required_status_checks` value that is not a list, an entry carrying
+no context -- and that empty list flowed into the empty-context `fail`.
+So an unparseable payload filed an issue telling an operator to restore
+checks that may already have been in place, on a branch that may
+already have been protected. Every unreadable shape is now a
+`ToolFailure`; only a genuinely empty list is still the verdict it was
+meant to be. That is the distinction this repository treats as the one
+a criterion must never get wrong, and the criterion had it wrong in the
+direction that files work for somebody.
+
+Decision 3 said the repositories are a class constant
+`MOVING_REF_REPOS = ('actions',)`, with the expected contexts in a
+constant of their own. The review observed that this pairs a list with
+a single repository's job names, so a second entry would file findings
+at the new repository naming `actions`' checks, and that matching on
+`repo.name` alone would measure an `actions` repository in somebody
+else's organisation as though it were the fleet's. Both are now one
+table keyed `org/name` with each repository's contexts beside it. The
+decision's intent -- the set lives in a documented class constant, not
+in configuration -- is unchanged; its literal shape is not what it
+says.
+
+The second `fix` item is answered as #393 rather than in code, and the
+specification gained a *Known gap* section for it. `development` does
+meet this criterion's definition: `ci-prune-reviews.sh` clones this
+repository unpinned and `review-tracking.sh` `exec`s
+`scripts/review-tracking.py` out of that clone, inside the
+`prune-reviews` job of all eight adopters. It is not in the table
+because its `main` carries only `deletion` and `non_fast_forward`, so
+adding it would report a fail and file an issue no code change here
+could close; the ruleset has to come first, and this repository pushes
+review marks with `GITHUB_TOKEN` rather than the App, which has to be
+settled with it. Declining it in code while declaring it on the page is
+the honest shape, because the alternative was a specification that read
+as a complete set while being an incomplete one.
+
+The `document` item was taken as well: the claim that the
+effective-rules endpoint omits a `disabled` ruleset but not an
+`evaluate` one is now split into what was measured (instar's ruleset
+19389569, named on the page) and what is not settled (`evaluate`, which
+nothing in the organisation uses and which could only be measured by
+changing a live ruleset). The page says the second read is the
+conservative choice rather than a known necessity, and that the
+organisation-sourced error rests on the same unsettled question. The
+mutation set is seventeen now, all killed, six of them new this round.
+
+*What the second review round changed.* One `fix` item, and it was
+about the sentence this criterion publishes most. `applies()` returned
+"Nothing in the fleet consumes <repo> at a moving ref", which is a
+claim about the fleet rather than about the table, and the same pull
+request had just proved it false for `development`. That string is the
+whole of what the compliance page shows for this criterion on 28
+repositories. It now states membership -- what the criterion measures,
+that this repository is not among them, and that the specification
+lists the sources it does not yet measure -- and a test asserts it does
+not make the stronger claim.
+
+Three of that round's `consider` items were defects rather than
+preferences, and were taken. The criterion failed only when the
+context list was entirely empty, so clearing two of four contexts
+passed, while every pull request still offered a merge: the one shape
+nothing else would report. It now compares against the table it
+already prints into the finding, and the rationale in both the comment
+and the specification was corrected, because the reason given --
+"that needs the workflow read as well" -- was about comparing against
+`ci.yml`'s job names, which is a different comparison and still not
+made. An `Enterprise`-sourced rule fell through the `Organization`
+test into a repository read that 404s, so the right answer arrived by
+accident with a message naming the wrong endpoint; anything other than
+`Repository`, and a rule naming no source at all, is now raised with
+the source it saw. And the empty-context fail returned before the
+enforcement reads, so an operator whose contexts were cleared *and*
+whose ruleset only evaluated was told to restore four contexts into a
+ruleset that refuses nothing; every repair is now collected into one
+finding.
+
+One `consider` item exposed an assumption worth recording rather than
+fixing. The verdict for a cleared context list rests on GitHub
+returning `{"required_status_checks": []}` rather than omitting the
+key, which nobody measured and which cannot be measured without
+clearing the contexts on a live ruleset. Had the key been omitted and
+read as unreadable, the criterion would have reported an error for
+exactly the configuration the verdict exists to catch. An absent key
+is now the empty list, a wrong-typed value is still unreadable, and
+the specification says so beside the `disabled`/`evaluate` split it
+already carried.
+
+The `document` items: the specification no longer sources its
+93-reference count and its keep-the-moving-ref reasoning to this plan,
+because plan retirement deletes plan files and neither
+`docs-external-links` nor `plan-source-references` catches a prose
+citation in markdown -- so nothing would have failed when it rotted.
+Both now live on the page. The other asked whether #393 is the issue
+rather than a pull request, since the two share one number sequence;
+`issues/393` reports `pull_request: false`, so both references are
+right.
+
+*Unrelated, and not this phase's to fix.* `plan-source-references`
+fails on this repository, on six `PLAN-a.md`/`PLAN-b.md` fixture
+names in `scripts/tests/test_audit_snapshot.py` that arrived with the
+plan-retirement work. It fails identically on a pristine checkout of
+`main`, so it predates this step; the audit files its own issues, so
+the next scheduled run raises it without help. It is in Future work
+as a pointer rather than fixed here, because mixing it into a
+criterion pull request would hide it.
+
 
 ### Phase 3: pin third-party actions to a sha
 
@@ -1936,6 +2110,28 @@ intend to do aligns with that plan.
   2 creates, and an audit token that can read
   `orgs/{org}/rulesets`, which #352 is about. Revisit once both
   hold.
+- `plan-source-references` fails on this repository, on six
+  `PLAN-a.md`/`PLAN-b.md` fixture names in
+  `scripts/tests/test_audit_snapshot.py`. They are expected-output
+  strings for the plan-retirement criterion rather than references
+  anybody can follow, so the criterion is right that they do not
+  resolve and wrong that they are references. Confirmed failing on a
+  pristine checkout of `main` at 951fef7, so it predates this phase
+  and 2b did not cause it. The audit files its own issues, so the
+  next scheduled run raises it; the fix is either naming the
+  fixtures something the criterion does not read as a plan
+  reference, or teaching it to skip a string that is a test's
+  expected output.
+
+- #393: `development` is a moving-ref source nothing protects. The
+  `prune-reviews` job of all eight adopters clones this repository
+  unpinned and `exec`s `scripts/review-tracking.py` out of that
+  clone, so its default branch runs in eight repositories' jobs,
+  and its `main` carries only `deletion` and `non_fast_forward`.
+  The criterion ships measuring `actions` alone and declares the
+  gap, because adding `development` to the table before its ruleset
+  exists would file a failing issue no code change could close.
+  Raised by the automated review of #392.
 
 Related issues, as of writing:
 

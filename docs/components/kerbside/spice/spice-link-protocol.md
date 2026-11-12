@@ -247,7 +247,10 @@ instead of static VM passwords:
    it expires; expired tokens are reaped only once they also have no open
    proxy channels. The default token lifetime is short (one minute), which
    bounds the reuse window, but a token is not strictly single-use despite
-   older descriptions to that effect.
+   older descriptions to that effect. Whether it ought to be is an open
+   question rather than a settled design point:
+   [#718](https://github.com/shakenfist/kerbside/issues/718) carries the
+   decision, and nothing here should be read as either answer.
 
 4. **Console Lookup**: Valid tokens are mapped to specific VM consoles,
    allowing Kerbside to establish the correct backend connection.
@@ -268,18 +271,23 @@ if (expired) {
 }
 ```
 
-Combined with Kerbside's one-time-use, time-limited token model,
-this has an important consequence:
+Combined with Kerbside's short-lived token model, this has an
+important consequence:
 
 **A channel that drops mid-session is permanently lost.**
-Re-establishing the channel requires presenting a valid, unconsumed
-token to the server. Under Kerbside's auth model:
+Re-establishing the channel requires presenting a valid token to the
+server. Under Kerbside's auth model:
 
-- The token is invalidated on first use (see "Token Validation"
-  above).
-- Even if it weren't, its expiry is short by design.
+- A token is *not* invalidated on first use (see "Token Validation"
+  above), so within its lifetime it would still be accepted.
+- But that lifetime is short by design.
+  `CONSOLE_TOKEN_DURATION` defaults to one minute, so a session that
+  has run for longer than that -- which is every session worth
+  recovering -- has no token left to present.
 
-So if a session establishes (say) main + display + inputs + cursor
+Inside that first minute the token would be accepted, and the
+recovery still does not happen, because nothing asks for it. So if a
+session establishes (say) main + display + inputs + cursor
 + playback + usbredir at connection bring-up, and the playback
 channel later drops due to a transport hiccup, the user permanently
 loses audio for that session. The remaining channels continue to

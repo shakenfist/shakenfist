@@ -279,9 +279,11 @@ remote-viewer ./demo-console.vv
 ```
 
 The viewer deletes `demo-console.vv` once it has read it. The file
-sets `delete-this-file=1` because the ticket inside it is single-use,
-and `remote-viewer` and `ryll` both honour that. To open another
-session, run `./get-console.sh` again.
+sets `delete-this-file=1` because it holds a live console token, and
+`remote-viewer` and `ryll` both honour that. The token is not
+invalidated by being used, but it does expire: the demo sets
+`console_token_duration = 5`, five minutes, where Kerbside's default
+is one. To open another session, run `./get-console.sh` again.
 
 **Expect a black screen with boot firmware text, and expect the boot
 to fail.** The demo VM has no disk, so it tries the network, then a

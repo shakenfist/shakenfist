@@ -124,6 +124,13 @@ able to be opted out of at build time:
   QR-encoded visual digest and emits a `digest_updated`
   control-socket event on each frame counter change.  Built
   only for the kerbside test harness; not in production ryll.
+  `make lint` nonetheless builds ryll with this feature on, so
+  the `#[cfg(feature = "digest-decode")]` arms are compiled in
+  CI rather than only in the harness build -- a new
+  `ChannelEvent` variant has to be cfg-correct in both
+  configurations, because the event match in
+  `ryll/src/app/events.rs` names every variant instead of
+  ending in a wildcard.
 - **`rdp`** (default-off) — the `--rdp` mode, which serves the
   SPICE session to stock RDP clients through the
   shakenfist-spice-rdp crate and IronRDP.  It is a heavy

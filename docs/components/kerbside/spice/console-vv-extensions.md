@@ -48,10 +48,10 @@ documented here are independent of that gap.)
 The standard meaning of `delete-this-file=1` is "the consumer
 should remove this file after reading it, because the
 contents are sensitive". The spec is silent on whether the
-*ticket inside* the file is single-use. Empirically, every
-producer that emits one-shot tickets (Kerbside, oVirt) sets
-`delete-this-file=1`, because a deleted file would be
-useless for reuse anyway.
+*ticket inside* the file is single-use. Empirically, the
+producers that set `delete-this-file=1` (Kerbside, oVirt)
+emit tickets that are not worth replaying -- and a deleted
+file would be useless for reuse anyway.
 
 **ryll treats `delete-this-file=1` as a signal that the
 ticket is single-use** and therefore:
@@ -65,12 +65,19 @@ ticket is single-use** and therefore:
   a stream of failed link-establishment attempts and
   associated bug-report zips.
 
+Kerbside is the near miss here: its console token is not
+invalidated on first use, so it is replayable until it
+expires, `CONSOLE_TOKEN_DURATION` after issue (one minute
+by default). No client in the stack tries to replay it,
+so a copy left on disk after that first minute is not
+worth reusing, and inside it nothing asks to.
+
 If a future producer wants the file deleted but the ticket
-*reusable*, this interpretation will surprise it. We have
-not encountered that case in the wild and consider it a
-deployment contradiction. If it ever arises, an explicit
-override key can be added; we are not speculatively defining
-one.
+*usefully* reusable, this interpretation will surprise it.
+We have not encountered that case in the wild and consider
+it a deployment contradiction. If it ever arises, an
+explicit override key can be added; we are not speculatively
+defining one.
 
 ### `delete-this-file=0` or absent → reusable / permanent
 
@@ -133,8 +140,10 @@ and logs a warning about possible clock skew.
 
 ### Kerbside
 
-Kerbside issues short-lifetime, single-use tickets. The
-recommended console.vv shape:
+Kerbside issues short-lifetime tickets. The `password` it
+writes is a console token which expires a minute after it is
+minted, rather than one invalidated when it is first used.
+The recommended console.vv shape:
 
 ```ini
 [virt-viewer]
@@ -182,13 +191,16 @@ two keys.
 
 The minimum to enable the ryll-specific UX is:
 
-- Set `delete-this-file=1` if the ticket is single-use.
+- Set `delete-this-file=1` if the ticket is single-use, or
+  short-lived enough that a copy left on disk is not worth
+  replaying -- which is the case Kerbside is in.
 - Set `ticket-valid-until` to the unix timestamp at which the
   server will stop accepting the ticket.
 
-Both keys are independent. A reusable ticket with an expiry
-sets only `ticket-valid-until`. A single-use ticket without
-a known expiry sets only `delete-this-file=1`.
+Both keys are independent. A ticket worth replaying for as
+long as it is valid sets only `ticket-valid-until`. A ticket
+not worth replaying, with no known expiry, sets only
+`delete-this-file=1`.
 
 ## Future extensions under consideration
 
@@ -202,7 +214,9 @@ welcome.
   without forcing the user back to the issuing portal. The
   obvious downside is the security model — the renew URL has
   to be authenticated by something other than the existing
-  ticket, since the existing ticket is single-use.
+  ticket: renewal is wanted precisely when the existing
+  ticket is at or past its expiry, which is the point at
+  which it can no longer authenticate anything.
 - `monitors=N`: hint to the client about expected monitor
   count. Today ryll takes this as a CLI flag (`--monitors N`).
   Lifting to console.vv lets the deployment pre-configure

@@ -254,6 +254,20 @@ stay on stdout. `measure` refuses the same entries, and the reading
 operations refuse them when a read reaches one. See
 [docs/quirks.md § Invalid qcow2 subcluster entries are refused, as in qemu-img](/components/instar/quirks/#invalid-qcow2-subcluster-entries-are-refused-as-in-qemu-img).
 
+## An extent in an unrecognised state is refused
+
+The guest names each extent's state, and the host renders only the
+states it knows. An extent in any other state is refused rather than
+printed as data:
+
+```
+map: the guest reported an extent at offset N in an unrecognised state 'S'; refusing to render it as data
+```
+
+Exit 1. As on any other failure, the extents before the refused one stay
+on stdout, so in JSON mode the array is left unterminated: a consumer
+must check the exit status before parsing.
+
 ## Known divergences from qemu-img
 
 Each entry is documented in [quirks.md](/components/instar/quirks/) with the

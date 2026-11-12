@@ -886,6 +886,11 @@ qcow2-luks).
     compressed entry as a corruption. The check operation skips
     overlap/refcount validation for data clusters when the external data
     bit is set, and bounds-checks them against the data file's size.
+    Only the top image of a chain may have a data file: a backing image
+    with one is refused by name ("external data files are only
+    supported on the top image of a chain") by every operation that
+    reads the chain, where qemu-img reads it (#806). `info --chain`
+    still lists such a chain.
 
 18. **VDI Input Support** - Convert, compare, and dd support VDI
     (VirtualBox Disk Image) as read-only input, both dynamic and

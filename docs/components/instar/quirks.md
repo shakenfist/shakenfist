@@ -3230,7 +3230,7 @@ already carries unconsumed VDI check baselines from `generate-baselines.py`
 operation); wiring instar's `check` up to consume them is recorded as
 master-plan future work.
 
-### Malformed VDI: `compare` Reports a Mismatch, `info` Stays Lenient
+### Malformed VDI: `compare` Refuses, `info` Stays Lenient
 
 **Classification: Safe Quirk**
 
@@ -3245,12 +3245,13 @@ identically — but *how* each op surfaces that refusal differs, because
 
 #### Why This Matters
 
-`convert` and `dd` surface the reader's init failure as a normal
-operation error on stderr. `compare`, however, treats a source it
-cannot open as a content mismatch rather than a hard error: comparing
-a malformed VDI against any other file reports a non-zero-exit
-mismatch on stdout, not "Images are identical" — proving compare is
-not silently falling back to a raw read of the malformed container.
+`convert`, `dd` and `compare` surface the reader's init failure as an
+operation error on stderr. `compare` once reported a source it could
+not open as a content mismatch on stdout, with exit 1, the "images
+differ" code; it now refuses with exit 2, qemu-img's code for an image
+it cannot open (#807). Either way it does not report "Images are
+identical", which shows it is not silently falling back to a raw read
+of the malformed container.
 `info`'s header parser (`parse_vdi_header`) is intentionally out of
 scope for the reader graduation — it still reports whatever
 detection-level fields (format name, a plausible virtual size) the
@@ -3261,10 +3262,11 @@ established for malformed DMGs (see above).
 #### instar Behavior
 
 **Always**: `convert`/`dd` exit non-zero with a clean error;
-`compare` exits non-zero reporting a mismatch; `info` exits 0 with
-best-effort header fields. Pinned by `TestAdversarialVdiManifest` in
-`tests/test_adversarial.py`, which asserts exit codes and non-empty
-output for all four ops across the five malformed fixtures without
+`compare` exits 2 or 4 with an error and never reports a mismatch;
+`info` exits 0 with best-effort header fields. Pinned by
+`TestAdversarialVdiManifest` in `tests/test_adversarial.py`, which
+asserts exit codes and output for all four ops across the five
+malformed fixtures without
 pinning instar's exact error string (only qemu-img's error strings are
 version-stable enough to pin).
 
@@ -5186,30 +5188,34 @@ rather than fixed, because none of them was that change's job to close:
    compose its sectors into their own read. See
    [chain-discovery.md](/components/instar/chain-discovery/#known-limitations) for the
    current policy.
-2. **`instar info` prints an unresolvable "actual path" for a parent
-   recorded in Windows convention — in either format.** The host's
-   "actual path" resolution treats any string that is not POSIX-absolute
-   as relative and joins it onto the image's directory, so a parent name
-   carrying backslashes becomes a single literal filename that cannot
-   exist on the filesystem. This was originally recorded as a VHDX-only
-   limitation, on the strength of an instar-created child reporting
-   `.\vhdx-diff-parent.vhdx`; that particular case is now closed. `info`
-   renders the VHDX `relative_path` locator key back into POSIX
-   convention — see "**`instar info` reports a parent path in POSIX
-   convention where the stored form permits it**" above — so a relative
-   VHDX locator reports and resolves correctly today. What remains open
-   is every parent string that is *already* in Windows convention and so
-   is reported verbatim: a VHDX `absolute_win32_path` or `volume_path`
-   locator key, and a VHD parent unicode name, which is never normalised
-   in either direction. The adversarial fixture `vhd-diff-locator-unc`
-   is the concrete case — a VHD whose parent name is
-   `\\attacker\share\probe`, reported exactly as stored
-   (`ADVERSARIAL_LOCATOR_FIXTURES` in `tests/test_differencing.py`) and
-   then joined onto the image
-   directory. Fixing it is path normalisation and needs a decision
-   rather than a guard, so it is tracked in
-   [issue #658](https://github.com/shakenfist/instar/issues/658). See
-   [info.md](/components/instar/info/#known-limitations).
+2. **`instar info` printed an unresolvable "actual path" for a parent
+   recorded in Windows convention — in either format** (fixed for
+   absolute references). The host's "actual path" resolution treated any
+   string that is not POSIX-absolute as relative and joined it onto the
+   image's directory, so a parent name carrying backslashes became a
+   single literal filename that cannot exist on the filesystem. This was
+   originally recorded as a VHDX-only limitation, on the strength of an
+   instar-created child reporting `.\vhdx-diff-parent.vhdx`; that
+   particular case is now closed. `info` renders the VHDX
+   `relative_path` locator key back into POSIX convention — see
+   "**`instar info` reports a parent path in POSIX convention where the
+   stored form permits it**" above — so a relative VHDX locator reports
+   and resolves correctly today. What remains open is every parent
+   string that is *already* in Windows convention and so is reported
+   verbatim: a VHDX `absolute_win32_path` or `volume_path` locator key,
+   and a VHD parent unicode name, which is never normalised in either
+   direction. The adversarial fixture `vhd-diff-locator-unc` is the
+   concrete case — a VHD whose parent name is `\\attacker\share\probe`,
+   reported exactly as stored (`ADVERSARIAL_LOCATOR_FIXTURES` in
+   `tests/test_differencing.py`), which used to be joined onto the image
+   directory. A Windows absolute reference -- a drive letter, or
+   anything rooted at `\\` -- is now classified as absolute, as the
+   reporting walk already classified it ("a Windows absolute path and
+   cannot be resolved on this host"), so `info` prints no "actual path"
+   for it and JSON's `full-backing-filename` repeats it verbatim ([issue
+   #658](https://github.com/shakenfist/instar/issues/658)). A relative
+   reference in Windows convention is still joined without being
+   normalised. See [info.md](/components/instar/info/#known-limitations).
 3. **`instar resize` accepted a differencing VHDX** (fixed). This was a
    write path, predated the differencing work, and `resize` never called
    `VhdxState::init`, so the read-side refusal neither caused it nor fixed

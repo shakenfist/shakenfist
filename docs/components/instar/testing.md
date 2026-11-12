@@ -541,8 +541,9 @@ spread is still this narrow; a fresh measurement is being taken on
 once — or any other heavy job on the host — starves the suite, and the
 resulting failures do not look like resource problems. The large
 `test_convert` re-encodes fail under load with
-`Error: "convert operation failed"` and `Content mismatch at offset 0!`,
-which reads as data corruption, and they abort early (~26s) rather than
+`Error: "convert operation failed"` and, from `compare`, a read error
+(before #807, `Content mismatch at offset 0!`), which reads as data
+corruption, and they abort early (~26s) rather than
 timing out at the ~110s they need when passing. Nine such failures
 appeared across the 2026-08-09 matrix inventory and **every one passed
 on an idle host**. A failure counts as a divergence only once it

@@ -281,6 +281,15 @@ behaviour.
  stock-producible and check-clean — was silently
  corrupted (see docs/quirks.md). qemu-img proceeds
  check-clean on it.
+- **External data files refused.** A qcow2 overlay or
+ backing with the external-data-file feature refuses before
+ any byte changes, and the message names the image that
+ owns the data file: ``qcow2 overlays with the
+ external-data-file feature cannot be committed`` (error 3)
+ for the overlay, ``the backing file uses the qcow2
+ external-data-file feature; instar cannot commit into it.
+ Fall back to `qemu-img commit` `` (error 18) for the
+ backing. qemu-img commits both shapes.
 - **Compressed backing clusters refused.** A committed
  extent landing on a compressed backing L2 entry refuses
  with the existing `ERROR_UNSUPPORTED_FORMAT` (the code

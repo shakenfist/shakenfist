@@ -205,7 +205,14 @@ reaches the guest as the size it ended on, then sends a
 not yet announced its capabilities to it, the size is held, and sent
 once the agent connects or the guest announces its own capabilities,
 which is when spice-gtk sends its display configuration too. A size
-equal to the last one sent is not sent again.
+equal to the last one sent is not sent again. A size with either side
+above 16384, the largest surface ryll displays, is ignored with a
+warning. The GUI and the control socket refuse such a size before it
+is queued; the main channel's check also covers the sizes that are
+not checked first, web mode's browser viewport and the RDP client's
+size. With `--monitors`, each monitor's position is the requested
+width times its index, so this check also keeps those positions
+within the protocol's 32-bit field.
 
 The GUI also tells the main channel when it has fitted its window to
 a new guest surface, as a size the guest already has rather than one
@@ -552,6 +559,25 @@ size helper live in the [`limits`
 module](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-compression/src/limits.rs)
 of `shakenfist-spice-compression`. A refused image is dropped and
 not painted, in the same way as a truncated LZ4 image above.
+
+Display surfaces are clamped rather than refused. Each side is
+clamped to `MAX_IMAGE_DIMENSION`, then the height is clamped to
+keep the surface within `MAX_IMAGE_PIXELS`. The surface mirror that
+every mode shares also caps how many surfaces exist. It refuses a
+surface id of 1024 or more: spice-server keeps its surfaces in an
+array of that size (`NUM_SURFACES`) and never sends a larger id. It
+also refuses a new surface that would take the total across all
+surfaces past twice `MAX_IMAGE_PIXELS`. Draws to a refused surface
+are dropped, and the first refusal of each kind is logged once as a
+protocol gap.
+
+The cursor channel's cache of `CACHE_ME` cursors is bounded the same
+way. It holds at most 256 cursors, the client cache size spice-server
+assumes (`CLIENT_CURSOR_CACHE_SIZE`), and at most 32 MiB of RGBA in
+all. When either limit is reached, the least recently used cursor is
+evicted. A cursor larger than the whole budget is shown but not
+cached. If the server later asks for an evicted cursor `FROM_CACHE`,
+that is an ordinary cache miss: the cursor shape is left unchanged.
 
 Decoders that wrap a codec library (H.264, and the WIC and ImageIO
 JPEG backends) only learn the dimensions once the library has parsed
