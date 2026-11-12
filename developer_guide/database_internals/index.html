@@ -16696,7 +16696,8 @@ would have found it executing, skipped it and stranded it.</p>
 objects that have been in a final state (<code>deleted</code>, <code>complete</code>,
 <code>abort</code>) for longer than their grace period; it holds a list of
 uuids per object type, filled a page at a time with the age filter
-pushed down to SQL, and takes one object from each type in turn.
+pushed down to SQL, and takes a turn from each type in turn, each
+turn being up to <code>DELETED_OBJECT_BATCH_SIZE</code> of that type's entries.
 Objects are hydrated one at a time at processing time inside a
 per-item exception guard.
 <code>reconcile_orphaned_objects()</code> (hourly) removes "phantom"

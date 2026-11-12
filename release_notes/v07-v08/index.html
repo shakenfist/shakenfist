@@ -17585,7 +17585,8 @@ own is refreshed exactly as it always was.</p>
 <li>The cluster daemon's deleted-object sweep now runs every minute rather
   than every 15, within a time budget set by the new
   <code>DELETED_OBJECT_SWEEP_SECONDS</code> option (default 20). It reads a page of
-  work per object type and takes one object from each type in turn, so a
+  work per object type and takes a turn from each type in turn, up to
+  <code>DELETED_OBJECT_BATCH_SIZE</code> of one type's entries at a time, so a
   large backlog in one type no longer delays the others. Upgrade
   <code>sf-database</code> before <code>sf-cluster</code>: until it is upgraded, an older
   <code>sf-database</code> ignores the paging and the sweep reads each type's whole
