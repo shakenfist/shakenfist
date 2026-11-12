@@ -420,9 +420,13 @@ An item that cannot be checked is reported as such, not ticked.
   'AGENT_OPERATION_ATTRIBUTES_VERSION =' shakenfist/mariadb.py` and
   `grep -n 'current_version' shakenfist/operations/agentoperation.py`.
 - `_ensure_agent_operation_attributes_schema` contains exactly **one**
-  version-gated block, whose ALTER list names both
+  version-gated migration block, whose ALTER list names both
   `dependency_failure` and `dependency_wait_started`. Check: `grep -c
-  'if current_ver <' ` over that function's body returns 1.
+  'if current_ver < AGENT_OPERATION_ATTRIBUTES_VERSION'` over that
+  function's body returns 1. The looser pattern `if current_ver <`
+  returns 2 and always has, because the function also holds the
+  create-if-absent gate `if current_ver <= 0:`; step 2a found this
+  criterion written with the looser pattern, so it could never pass.
 - `dependency_wait_started` has exactly one writer. Check: `grep -rn
   'dependency_wait_started' --include=*.py shakenfist/ | grep -v
   tests | grep -v _pb2` shows the schema field, the mariadb layers,
@@ -500,7 +504,70 @@ most to reverse later.
 
 ## Execution notes
 
-Filled in as the phase runs: departures from this plan, decisions
-that changed, the CI run and its result, and the date with its
-timezone. Correct a fact at its source when a step proves this plan
-wrong, and say here that it was done.
+**2026-11-13, AEDT.** Back brief answered before any step ran, and
+all four answers confirmed the plan as written: lower the
+`settle_seconds` ceiling to `AGENT_OPERATION_DEPENDENCY_WAIT`
+(decision 4), abort on an absent `depends_on` dependency (decision 2),
+add no second capability token (decision 9), and push and open the
+pull request when the phase is done.
+
+The back brief's fourth question was settled in the management session
+rather than asked, because re-auditing consumers is verification and
+not a decision. Its result matters to phase 3 more than to this phase:
+
+- Every in-repo reader of `AgentOperation.TERMINAL_STATES`
+  (`instance.py:849`, `instance.py:3399`,
+  `daemons/sidechannel/main.py:1405`) uses the canonical tuple, which
+  has held `abort` since phase 1, so none needs a change.
+- Two cluster CI modules spell their own terminal sets
+  (`cluster_ci_tests/test_per_object_operations.py:12` and
+  `test_observational_sweeps.py:23`) and both omit `expired`. That is
+  correct rather than a defect: `STATE_EXPIRED` is an
+  `AgentOperation` constant and not on `BaseOperation`, and neither
+  module reads agent operations at all.
+- `client-python` does **not** know `abort`:
+  `TERMINAL_AGENT_OPERATION_STATES` at `apiclient.py:234` is
+  `{complete, error, expired, deleted}`, and the await loop at
+  `:1443` would spin on an aborted operation. It cannot reach one
+  today, because `instance_execute` and its siblings take explicit
+  named parameters with no `depends_on` and no `**kwargs`
+  passthrough, so this phase is safe to land first. **Phase 3 must
+  add `abort` to that frozenset in the same commit as the submission
+  parameters, or before them, never after**: landing the parameter
+  first opens a window in which a caller can create an operation
+  which aborts and then hang awaiting it. That is the same
+  single-commit obligation phase 0 found between `TERMINAL_STATES`
+  and `state_targets`, and it is recorded on phase 3's row in the
+  master plan.
+
+**Step 2a** (`79a3637d34`) ran first and alone, as planned. Three
+corrections came out of it:
+
+- This plan's definition-of-done criterion for the single migration
+  block was unfalsifiable as written, matching the create-if-absent
+  gate as well as the version gate. Corrected at source above.
+- The live migration tests run out of `.tox/py3`, not `.tox/shared`,
+  which is what the management session's brief claimed. `pymysql` has
+  to be installed there, because this project ships no MySQL driver
+  (`mysqlclient` is commented out as GPL). Recorded for later steps.
+- The live module's expected post-migration versions asserted
+  `agent_operation_attributes: 5`, which was wrong rather than stale
+  once 6 existed: because each ensure function holds a single ladder
+  block, a database rewound to any earlier point arrives at the
+  current target. Step 2a collapsed the per-rewind-point copies into
+  one `MIGRATED_VERSIONS` dict and added `_every_later_column()`, so
+  the deepest rewind picks up a newly added column without a second
+  edit. Both kept.
+
+The collation half of that column comparison is vacuous for a numeric
+column: both sides report NULL, so only the type or the nullability
+can diverge. Step 2a rewrote the test comment to say so rather than
+imply the collation was doing work, and it stays in the shared helper
+because it is the only discriminator for the text columns.
+
+The management session reproduced step 2a's load-bearing claim rather
+than accepting the report. Mutating the migration to add `LONGTEXT`
+where `create_all` produces `DOUBLE` fails
+`test_wait_anchor_column_matches_a_fresh_create` and nothing else, 1
+of 22 live tests. Restored from a pristine copy, the guard confirmed
+present by name, no mutant traces left.
