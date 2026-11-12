@@ -16110,9 +16110,9 @@ numbers here it cannot recompute.</p>
 <tr>
 <td>2026-06-01</td>
 <td><a href="PLAN-oidc-authentication/">OIDC authentication</a></td>
-<td>Federated login against an external OIDC provider. Phases 1 and 2 were superseded by the auth federation plan, which built the verification half of a relying party; discovery and the whole client half are still unbuilt. Phase 0 settles the two questions everything else waits on -- whether a human session presents the IdP's own token or exchanges it for a namespace key, and whether one credential may name several namespaces. Its planning pass found that the distribution evidence the plan expected to settle the first is not obtainable: the only real deployment holds one human-held key in one namespace, and already meets the multi-namespace need with namespace trust</td>
+<td>Federated login against an external OIDC provider. Phases 1 and 2 were superseded by the auth federation plan, which built the verification half of a relying party; discovery and the whole client half are still unbuilt. Phase 0 settled the two questions everything else waited on: a human session exchanges the IdP's token for a namespace key, and a credential stays one namespace deep with the multiplicity held by the client. Phase 3 builds discovery, and its survey found that the two fields no discovery document can supply -- the client identifier registered at the provider, and the OIDC scope list to request -- are absent from the issuer object entirely, so they land with it, as does the unauthenticated endpoint that serves them to a caller who has not logged in yet</td>
 <td>In progress</td>
-<td>0 of 11</td>
+<td>1 of 11</td>
 </tr>
 <tr>
 <td>2026-06-02</td>

@@ -15900,6 +15900,13 @@ also <code>docs/plans/PLAN-artifact-ux-rework.md</code>). Not to be confused wit
 Prometheus/Loki metric and log labels (<code>docs/operator_guide/events.md</code>,
 <code>docs/operator_guide/logging.md</code>) or GitHub issue labels such as <code>ci-failure</code>
 (<code>docs/developer_guide/workflow.md</code>).</p>
+<p><strong id="login-capable-issuer">login-capable issuer</strong> -- A <a href="#trusted-issuer">trusted issuer</a>
+with a client identifier and at least one endpoint a human login flow can begin
+at (an authorization or a device authorization endpoint). Only these are listed
+by the unauthenticated <code>GET /auth/login</code>, so an issuer configured purely to
+verify workload tokens is never disclosed there. Defined in
+<code>shakenfist/external_api/auth.py</code> (<code>AuthLoginEndpoint</code>) and
+<code>docs/operator_guide/authentication.md</code>.</p>
 <p><strong id="mapping-rule">mapping rule</strong> -- A first-class object, owned by the namespace
 it targets, that is a standing claim-gated authorization to mint keys there: a
 <a href="#trusted-issuer">trusted issuer</a> reference, bound claims, the <a href="#scope">scopes</a>
@@ -15990,6 +15997,13 @@ change what a name already means to you. Operations which <em>modify</em> an obj
 resolve a name in the caller's own namespace only, so that a name can never
 resolve into another namespace and then destroy what it found there. Defined
 authoritatively in <code>docs/user_guide/objects.md</code>.</p>
+<p><strong id="oidc-discovery">OIDC discovery</strong> -- Fetching a <a href="#trusted-issuer">trusted issuer</a>'s
+OpenID Connect discovery document, from <code>/.well-known/openid-configuration</code>
+beneath its issuer URL, to learn its JWKS location and login endpoints. It runs
+only when an administrator creates, updates or refreshes an issuer, never on a
+timer or while serving a request, and the document is refused unless its
+<code>issuer</code> member equals the configured issuer URL exactly. Defined in
+<code>shakenfist/oidc_discovery.py</code> and <code>docs/operator_guide/authentication.md</code>.</p>
 <p><strong id="release-pipeline">Release pipeline vocabulary</strong> -- The release process signs
 and publishes releases using Sigstore keyless signing, PyPI Trusted Publishers,
 and a GitHub Actions OIDC token (issuer <code>token.actions.githubusercontent.com</code>).
@@ -16075,10 +16089,13 @@ the release pipeline's Sigstore / PyPI "Trusted Publisher" vocabulary (see
 <a href="#release-pipeline">Release pipeline vocabulary</a>); or generic network-trust prose
 elsewhere in the documentation.</p>
 <p><strong id="trusted-issuer">trusted issuer</strong> -- An external token issuer the cluster is
-configured to accept, recorded with its JWKS location and expected audience.
-Cluster level rather than namespaced, because deciding who may vouch for
-identities is an administrative decision, and managed through <code>/auth/issuers</code>
-by administrators only. Defined in <code>shakenfist/trusted_issuer.py</code> and
+configured to accept, recorded with its issuer URL, JWKS location and expected
+audience. For human login it also records an operator-supplied OAuth client
+identifier and OpenID Connect scope list, and the authorization, token and
+device authorization endpoints that <a href="#oidc-discovery">discovery</a> found. Cluster
+level rather than namespaced, because deciding who may vouch for identities is
+an administrative decision, and managed through <code>/auth/issuers</code> by
+administrators only. Defined in <code>shakenfist/trusted_issuer.py</code> and
 <code>docs/operator_guide/authentication.md</code>. Not to be
 confused with namespace <a href="#trust">trust</a>, nor with the release pipeline's "Trusted
 Publisher" (see <a href="#release-pipeline">Release pipeline vocabulary</a>).</p>

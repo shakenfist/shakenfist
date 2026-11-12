@@ -14472,6 +14472,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Trusted issuers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#issuer-request-bodies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issuer request bodies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#login-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Login metadata
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15911,6 +15950,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Trusted issuers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#issuer-request-bodies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issuer request bodies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#login-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Login metadata
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -16228,12 +16306,18 @@ believe: GitHub Actions, an Authentik instance, or anything else that
 signs OIDC-style JWTs. Issuers are cluster-wide and administrative --
 deciding who may vouch for identities here is not a per-namespace
 decision -- so every call below requires the <code>system</code> namespace.</p>
-<p>An issuer records four things: a <code>name</code> used to refer to it, the
-<code>issuer_url</code> that must match a token's <code>iss</code> claim exactly, the
-<code>jwks_uri</code> its signing keys are published at, and the <code>audience</code> its
-tokens must be minted for. The <code>jwks_uri</code> always comes from this
-record and never from the token, because a token naming its own key
-source is a token vouching for itself.</p>
+<p>An issuer records a <code>name</code> used to refer to it, the <code>issuer_url</code> that
+must match a token's <code>iss</code> claim exactly, the <code>jwks_uri</code> its signing keys
+are published at, and the <code>audience</code> its tokens must be minted for. The
+<code>jwks_uri</code> always comes from this record and never from the token,
+because a token naming its own key source is a token vouching for itself.</p>
+<p>It may also record what is needed for human login: a <code>client_id</code> and
+<code>oidc_scopes</code> (a single space separated string) which an administrator
+supplies, and the <code>authorization_endpoint</code>, <code>token_endpoint</code> and
+<code>device_authorization_endpoint</code> which discovery fills in, with
+<code>discovered_at</code> (epoch seconds) recording the last successful run. All
+of these are returned by every call that returns an issuer, as <code>null</code>
+when unset. See <a href="#discovery">Discovery</a> below.</p>
 <p>Both the <code>name</code> and the <code>issuer_url</code> must be unique among live issuers,
 and a second issuer claiming either is refused with a 409. Uniqueness
 on the URL matters because token validation resolves an issuer by it:
@@ -16257,6 +16341,7 @@ administrators configure the same provider at the same moment.</p>
 <li><a href="https://openapi.shakenfist.com/#/auth/get_auth_issuers__issuer_name_">GET /auth/issuers/{issuer_name}</a>: Fetch one trusted issuer.</li>
 <li><a href="https://openapi.shakenfist.com/#/auth/put_auth_issuers__issuer_name_">PUT /auth/issuers/{issuer_name}</a>: Update a trusted issuer.</li>
 <li><a href="https://openapi.shakenfist.com/#/auth/delete_auth_issuers__issuer_name_">DELETE /auth/issuers/{issuer_name}</a>: Remove a trusted issuer.</li>
+<li><a href="https://openapi.shakenfist.com/#/auth/post_auth_issuers__issuer_name__discover">POST /auth/issuers/{issuer_name}/discover</a>: Re-run discovery on a trusted issuer.</li>
 </ul>
 </details>
 <details class="example">
@@ -16280,6 +16365,221 @@ working, because the exchange can no longer resolve the issuer.
 Recreating an issuer under the same name rebinds every rule that
 named it, so treat the name as the durable identifier it is.</p>
 </details>
+<h3 id="issuer-request-bodies">Issuer request bodies<a class="headerlink" href="#issuer-request-bodies" title="Permanent link">&para;</a></h3>
+<p><code>POST /auth/issuers</code> takes:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Yes</td>
+<td>Unique among live issuers</td>
+</tr>
+<tr>
+<td><code>issuer_url</code></td>
+<td>Yes</td>
+<td>Exact <code>iss</code> value. Up to 255 characters</td>
+</tr>
+<tr>
+<td><code>audience</code></td>
+<td>Yes</td>
+<td>Up to 255 characters</td>
+</tr>
+<tr>
+<td><code>jwks_uri</code></td>
+<td>No</td>
+<td>Must be <code>https://</code> when given. Up to 255 characters. When omitted, discovery supplies it</td>
+</tr>
+<tr>
+<td><code>client_id</code></td>
+<td>No</td>
+<td>Up to 255 characters</td>
+</tr>
+<tr>
+<td><code>oidc_scopes</code></td>
+<td>No</td>
+<td>Space separated. Up to 255 characters. Stored as <code>openid</code> if a <code>client_id</code> is set and this is not</td>
+</tr>
+<tr>
+<td><code>discover</code></td>
+<td>No</td>
+<td>Boolean, default <code>true</code>. <code>false</code> skips the discovery fetch, and then <code>jwks_uri</code> is required</td>
+</tr>
+</tbody>
+</table>
+<p><code>PUT /auth/issuers/{issuer_name}</code> takes the same body without <code>name</code>.
+It replaces <code>issuer_url</code>, <code>jwks_uri</code> and <code>audience</code> together: omitting
+<code>jwks_uri</code> does not keep the old value but asks discovery for a new
+one. <code>client_id</code> and <code>oidc_scopes</code> are different. Omitted (or <code>null</code>),
+they are left as they were; sent as an empty string, they are cleared.
+That keeps a body written before these fields existed from switching
+off human login as a side effect of correcting an audience.</p>
+<p>The responses are:</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>The issuer, as created or updated</td>
+</tr>
+<tr>
+<td>400</td>
+<td>A required field is missing or malformed, or <code>discover</code> is false and there is no <code>jwks_uri</code></td>
+</tr>
+<tr>
+<td>404</td>
+<td><code>PUT</code> only: no such issuer</td>
+</tr>
+<tr>
+<td>409</td>
+<td>An issuer with that name (<code>POST</code>) or <code>issuer_url</code> is already configured</td>
+</tr>
+<tr>
+<td>422</td>
+<td>A field is longer than its limit</td>
+</tr>
+<tr>
+<td>502</td>
+<td>No <code>jwks_uri</code> was supplied and the discovery fetch failed or its document was refused. The message says why</td>
+</tr>
+<tr>
+<td>503</td>
+<td>No <code>jwks_uri</code> was supplied and this cluster cannot build a TLS trust store to fetch with (a bad <code>FEDERATION_JWKS_CA_BUNDLE</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>The 502 and 503 arise only when discovery is required. When a
+<code>jwks_uri</code> is supplied, a failed fetch is logged, audited on the issuer
+and ignored, and the call returns 200: that is what keeps every issuer
+configured before discovery existed working against a provider with no
+discovery document. The same applies when the document names a
+different <code>jwks_uri</code> from the one supplied; the supplied one is kept and
+the difference is audited.</p>
+<details class="example">
+<summary>Configuring a provider by its issuer URL alone</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/issuers<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_ADMIN_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="s1">        "name": "corporate",</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="s1">        "issuer_url": "https://idp.example.com/application/o/sf/",</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="s1">        "audience": "https://sf.example.com",</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="s1">        "client_id": "shakenfist"</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="s1">      }'</span>
+</code></pre></div>
+<p>The <code>issuer_url</code> carries a trailing slash because that is what this
+provider writes in its own discovery document; discovery is refused
+if the two differ at all. <code>oidc_scopes</code> is stored as <code>openid</code>.</p>
+</details>
+<h3 id="discovery">Discovery<a class="headerlink" href="#discovery" title="Permanent link">&para;</a></h3>
+<p><code>POST /auth/issuers/{issuer_name}/discover</code> fetches the issuer's OpenID
+Connect discovery document again and writes the three endpoints and
+<code>discovered_at</code> from it. It takes no body, and requires the <code>system</code>
+namespace. It never changes <code>audience</code>, <code>client_id</code> or <code>oidc_scopes</code>,
+and it keeps the <code>jwks_uri</code> the issuer already has, filling in one the
+issuer does not have yet. It returns the issuer.</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>The issuer, with what discovery found</td>
+</tr>
+<tr>
+<td>404</td>
+<td>No such issuer</td>
+</tr>
+<tr>
+<td>409</td>
+<td>The issuer's <code>issuer_url</code> changed while the document was being fetched, so what came back describes a provider this issuer no longer names. Nothing was written; run discovery again</td>
+</tr>
+<tr>
+<td>502</td>
+<td>The fetch failed or the document was refused. The message says why. Unlike a create or update, a failure here is never ignored</td>
+</tr>
+<tr>
+<td>503</td>
+<td>This cluster cannot build a TLS trust store to fetch with</td>
+</tr>
+</tbody>
+</table>
+<p>Discovery runs only on a create, an update and this call, never on a
+timer or while serving another request. A document is refused unless its
+<code>issuer</code> member equals the issuer's <code>issuer_url</code> exactly and it carries
+an <code>https://</code> <code>jwks_uri</code>; the fetch does not follow redirects. The
+operator guide has the <a href="/operator_guide/authentication/#discovery">full account</a>.</p>
+<h2 id="login-metadata">Login metadata<a class="headerlink" href="#login-metadata" title="Permanent link">&para;</a></h2>
+<p><code>GET /auth/login</code> lists the identity providers this cluster offers for
+human login. It is unauthenticated by nature: the caller is about to
+log in and holds no Shaken Fist credential, and <code>GET /auth/issuers</code> is
+admin only. It is rate limited per source address, with a budget of its
+own separate from <code>POST /auth/federated</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p">[</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">  </span><span class="p">{</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">    </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"corporate"</span><span class="p">,</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">    </span><span class="nt">"issuer_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://idp.example.com/application/o/sf/"</span><span class="p">,</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">    </span><span class="nt">"client_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"shakenfist"</span><span class="p">,</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">    </span><span class="nt">"oidc_scopes"</span><span class="p">:</span><span class="w"> </span><span class="s2">"openid profile groups"</span><span class="p">,</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">    </span><span class="nt">"authorization_endpoint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://idp.example.com/application/o/authorize/"</span><span class="p">,</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="w">    </span><span class="nt">"token_endpoint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://idp.example.com/application/o/token/"</span><span class="p">,</span>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="w">    </span><span class="nt">"device_authorization_endpoint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://idp.example.com/application/o/device/"</span>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="p">]</span>
+</code></pre></div>
+<p>Only login capable issuers are listed: those with a <code>client_id</code> and at
+least one of <code>authorization_endpoint</code> or <code>device_authorization_endpoint</code>.
+The three endpoint keys appear only when set, so a missing
+<code>device_authorization_endpoint</code> means the provider offers no device flow
+and a client should fall back to the authorisation code flow. Nothing
+else about an issuer is served; in particular <code>jwks_uri</code>, <code>audience</code>,
+<code>uuid</code> and <code>state</code> are not. An empty list means this cluster offers no
+human login.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/auth/get_auth_login">GET /auth/login</a>: List the identity providers offered for human login.</li>
+</ul>
+</details>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>The list, possibly empty</td>
+</tr>
+<tr>
+<td>429</td>
+<td>Too many requests from this source address</td>
+</tr>
+<tr>
+<td>503</td>
+<td>The database was unavailable, so the request could not be counted</td>
+</tr>
+</tbody>
+</table>
+<p>A client can detect both features from the <code>auth</code> family of the API
+capabilities: <code>issuer-discovery</code> and <code>human-login-metadata</code>.</p>
 <h2 id="mapping-rules">Mapping rules<a class="headerlink" href="#mapping-rules" title="Permanent link">&para;</a></h2>
 <p>A <strong>mapping rule</strong> is a namespace's standing offer: "an identity from
 this issuer, carrying these claims, may mint a key here with these
@@ -16364,20 +16664,20 @@ field, rather than a 500 from the database.</p>
 </details>
 <details class="example">
 <summary>A rule for one repository and two branches</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/ci/rules<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="s1">        "name": "ryll",</span>
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="s1">        "issuer": "github",</span>
-<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="s1">        "bound_claims": {</span>
-<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="s1">          "repository": "shakenfist/ryll",</span>
-<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="s1">          "ref": ["refs/heads/develop", "refs/heads/main"]</span>
-<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="s1">        },</span>
-<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="s1">        "scopes": ["blob.read", "artifact.*"],</span>
-<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="s1">        "key_ttl": 3600,</span>
-<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="s1">        "key_name_prefix": "ryll-ci"</span>
-<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a><span class="s1">      }'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/ci/rules<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="s1">        "name": "ryll",</span>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="s1">        "issuer": "github",</span>
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="s1">        "bound_claims": {</span>
+<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="s1">          "repository": "shakenfist/ryll",</span>
+<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="s1">          "ref": ["refs/heads/develop", "refs/heads/main"]</span>
+<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="s1">        },</span>
+<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a><span class="s1">        "scopes": ["blob.read", "artifact.*"],</span>
+<a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a><span class="s1">        "key_ttl": 3600,</span>
+<a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a><span class="s1">        "key_name_prefix": "ryll-ci"</span>
+<a id="__codelineno-20-14" name="__codelineno-20-14" href="#__codelineno-20-14"></a><span class="s1">      }'</span>
 </code></pre></div>
 </details>
 <details class="info" open="open">
@@ -16397,9 +16697,9 @@ signature, checked against the issuer's published keys, plus a
 mapping rule the namespace owner wrote in advance.</p>
 <p>The request names three things, and the response returns the minted
 secret exactly once:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p">{</span><span class="nt">"token"</span><span class="p">:</span><span class="w"> </span><span class="s2">"eyJ..."</span><span class="p">,</span><span class="w"> </span><span class="nt">"namespace"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ci"</span><span class="p">,</span><span class="w"> </span><span class="nt">"rule"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ryll"</span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="p">{</span><span class="nt">"token"</span><span class="p">:</span><span class="w"> </span><span class="s2">"eyJ..."</span><span class="p">,</span><span class="w"> </span><span class="nt">"namespace"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ci"</span><span class="p">,</span><span class="w"> </span><span class="nt">"rule"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ryll"</span><span class="p">}</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="p">{</span><span class="nt">"namespace"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ci"</span><span class="p">,</span><span class="w"> </span><span class="nt">"key_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ryll-ci-8fJ2mQ"</span><span class="p">,</span><span class="w"> </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sfk_..."</span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="p">{</span><span class="nt">"namespace"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ci"</span><span class="p">,</span><span class="w"> </span><span class="nt">"key_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ryll-ci-8fJ2mQ"</span><span class="p">,</span><span class="w"> </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sfk_..."</span><span class="p">}</span>
 </code></pre></div>
 <p>The secret is never returned again and is never written to an event or
 a log -- only its bcrypt hash is stored. Use it immediately to call
@@ -16478,29 +16778,29 @@ is available <a href="/user_guide/metadata/">in the user guide</a>.</p>
 </details>
 <details class="example">
 <summary>Python API client: set metadata on a namespace</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">set_artifact_metadata_item</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">,</span> <span class="s1">'foo'</span><span class="p">,</span> <span class="s1">'bar'</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">set_artifact_metadata_item</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">,</span> <span class="s1">'foo'</span><span class="p">,</span> <span class="s1">'bar'</span><span class="p">)</span>
 </code></pre></div>
 </details>
 <details class="example">
 <summary>Python API client: get metadata for a namespace</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
-<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_artifact_metadata</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">)</span>
-<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_artifact_metadata</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">)</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
 </details>
 <details class="example">
 <summary>Python API client: delete metadata for a namespace</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">delete_artifact_metadata_item</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">,</span> <span class="s1">'foo'</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">delete_artifact_metadata_item</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">,</span> <span class="s1">'foo'</span><span class="p">)</span>
 </code></pre></div>
 </details>
 

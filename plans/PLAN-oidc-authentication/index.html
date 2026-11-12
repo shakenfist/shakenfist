@@ -17141,8 +17141,8 @@ not land anywhere else.</p>
 <td>0. Research and decisions</td>
 <td>shakenfist</td>
 <td><a href="../PLAN-oidc-authentication-phase-00-decisions/">PLAN-oidc-authentication-phase-00-decisions.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>2bbe472eff</code> (#4831)</td>
 </tr>
 <tr>
 <td>1. JWT validation refactor (split issuance from validation; introduce per-issuer validators)</td>
@@ -17161,8 +17161,8 @@ not land anywhere else.</p>
 <tr>
 <td>3. OIDC discovery</td>
 <td>shakenfist</td>
-<td>TBD</td>
-<td>Not started</td>
+<td><a href="../PLAN-oidc-authentication-phase-03-discovery/">PLAN-oidc-authentication-phase-03-discovery.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -17276,6 +17276,22 @@ location is never taken from the token being validated is
 not up for discussion here: discovery populates a
 <code>TrustedIssuer</code>'s fields at configuration time, and
 validation keeps reading them from the object.</p>
+<p>Two things a client flow needs are <strong>not</strong> in any discovery
+document, and this section did not previously say so: the
+<code>client_id</code> registered at the provider, and the OIDC scope
+list to request, without which a group claim never appears
+in a token at all. Both are operator-supplied, both need a
+column on the issuer object, and a phase executing in
+<code>client-python</code> cannot add a column to a table in this
+repository -- so they land here.</p>
+<p>The endpoint which serves this metadata lands here for the
+same reason. <code>/auth/issuers</code> is administrator-only, and a
+person running a login command holds no Shaken Fist
+credential yet by definition, so the metadata has to reach
+them from an unauthenticated endpoint in this repository.
+Phase 3's plan records the argument as its decision D7 and
+gates that step on a back brief, because it is a scope
+judgement rather than a design one.</p>
 <p><strong>Phase 4 — minting the entitled set of credentials at
 login.</strong> Open question 14 is answered no, so this is no
 longer where <code>request_namespace()</code> stops being a string
@@ -17558,7 +17574,76 @@ attached has skipped the part that mattered.</p>
 </ul>
 <h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Per-resource RBAC.</strong> Roles like "read-only on
+<li>
+<p><strong><code>issuer_url</code> is not required to be https</strong>, although
+  <code>jwks_uri</code> is and says why
+  (<code>shakenfist/external_api/auth.py:919</code>). Filed as
+  <a href="https://github.com/shakenfist/shakenfist/issues/4890">#4890</a>
+  by phase 3 rather than fixed there: it is a breaking change
+  to an administrative API for deployments that cannot be
+  inspected from here, so whether it wants a deprecation window
+  is a judgement about real deployments. Phase 3's discovery
+  fetcher refuses a plaintext URL of its own accord, so nothing
+  fetches one today.</p>
+</li>
+<li>
+<p><strong><code>Field(max_length=...)</code> never reaches the generated DDL.</strong>
+  <code>PYTHON_TO_SQLALCHEMY</code> maps <code>str</code> to <code>sa.String(255)</code>
+  unconditionally (<code>shakenfist/schema/sqlalchemy.py:285</code>), so
+  <code>issuer_url</code>, <code>jwks_uri</code> and <code>audience</code> have each declared a
+  1024 character limit since they were written and are stored as
+  <code>VARCHAR(255)</code>. The same root cause as #4559, which was fixed
+  for one field without touching the mapping, so the class
+  remains. Phase 3 used the documented <code>SQLLongText()</code> escape
+  hatch for the three endpoint URLs it added, because those
+  genuinely can exceed 255, and left the three pre-existing
+  columns alone because changing them needs a data migration.
+  The first review round then made every validator on this
+  surface derive its limit from <code>stored_max_length()</code>, which
+  answers from the generated column rather than the
+  declaration, so a value these columns cannot hold is now
+  refused with a 422 instead of truncated. That closes the
+  symptom on the issuer routes and leaves the class open: every
+  other over-declared <code>str</code> field in the schema still accepts
+  values its column will not hold. The issue body is written
+  and ready to file; it was not filed from the session that
+  wrote it.</p>
+</li>
+<li>
+<p><strong>A refresh cannot update a <code>jwks_uri</code> that discovery
+  supplied.</strong> An operator-configured value always wins over a
+  discovered one, which is the right default -- silently
+  repointing where a cluster fetches signing keys is worse than
+  a stale endpoint -- but it is applied to the stored value
+  rather than to the operator's intent, and nothing records
+  which of the two a stored <code>jwks_uri</code> came from. So an issuer
+  configured by discovery alone can never have that field
+  refreshed, and an operator whose provider moves its key set
+  has to issue a PUT omitting <code>jwks_uri</code> to re-adopt the
+  published value. Phase 3 documented the workaround. The fix is
+  provenance on the column, so that a refresh replaces a
+  discovered value and preserves an operator's.</p>
+</li>
+<li>
+<p><strong><code>GET /auth/login</code> is an uncached per-issuer read.</strong> The
+  endpoint reads one state row plus one <code>configuration()</code> per
+  configured issuer on every request, and caches nothing. It is
+  metered before it reads, so the exposure needs
+  <code>FEDERATION_RATE_LIMIT_PER_MINUTE</code> set to <code>0</code> -- which the
+  operator guide now warns about in both the setting's row and the
+  endpoint's section. It is nevertheless the only unauthenticated
+  endpoint in the tree whose database cost scales with cluster
+  configuration; <code>/livez</code>, <code>/readyz</code> and <code>/</code> are all constant cost.
+  A short in-process TTL cache of the rendered list, invalidated
+  opportunistically on an issuer write, would make a flood cost one
+  read per worker per window instead of two reads per issuer per
+  request. Deliberately not done in phase 3: a cache with an
+  invalidation story is a mechanism of its own, and an endpoint
+  whose correctness depends on being current deserves that
+  mechanism designed rather than added during a review round.</p>
+</li>
+<li>
+<p><strong>Per-resource RBAC.</strong> Roles like "read-only on
   namespace X" or "may create instances but not
   networks". The gap is narrower than it was when this
   bullet was written: <a href="/glossary/#scope">scopes</a> now
@@ -17569,7 +17654,8 @@ attached has skipped the part that mattered.</p>
   that one" — a verb vocabulary finer than read / write /
   delete, and a way to name a bundle of scopes as a role
   rather than enumerating them on every key. The unit of
-  identity stays the namespace.</li>
+  identity stays the namespace.</p>
+</li>
 <li><strong>Federated trust.</strong> Mapping a single human across
   several IdPs (e.g. internal IdP + partner IdP for
   contractors) onto one logical SF identity. Speculative.</li>

@@ -18721,7 +18721,7 @@ dedicated attribute tables:</p>
 <tr>
 <td><code>trusted_issuer_attributes</code></td>
 <td>TrustedIssuer</td>
-<td>uuid, issuer_url, jwks_uri, audience</td>
+<td>uuid, issuer_url, jwks_uri (nullable since v2), audience, authorization_endpoint (nullable LONGTEXT), token_endpoint (nullable LONGTEXT), device_authorization_endpoint (nullable LONGTEXT), client_id (nullable), oidc_scopes (nullable, space separated), discovered_at (nullable epoch seconds)</td>
 </tr>
 <tr>
 <td><code>mapping_rule_attributes</code></td>
