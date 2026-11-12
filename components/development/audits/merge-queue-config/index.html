@@ -7950,6 +7950,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/performance/quic-experiment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A QUIC client leg: the experiment's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/performance/dbus-helper-measurements/" class="md-nav__link">
         
   
@@ -8014,6 +8042,34 @@
     
   
     Proxy backpressure on a shaped client link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/quic-transport-bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QUIC against per-channel TCP on a shaped link
   
 
     
@@ -8210,10 +8266,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_12" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_12" id="__nav_3_8_12_12_label" tabindex="0">
             
   
   
@@ -8231,8 +8287,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_10">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9188,6 +9244,34 @@
     
   
     Phase 5: the index slim-down and closeout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: QUIC client leg, experiments
   
 
     
@@ -15952,16 +16036,25 @@ ALLGREEN, MERGE, 5, and 360 respectively.</p>
 and PUT it back, preserving everything else including <code>bypass_actors</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="s1">'.[] | select(.target == "branch") | {id, name}'</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets/&lt;id&gt;<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="s1">'{name, target, enforcement, conditions,</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="s1">      bypass_actors: (.bypass_actors // []),</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="s1">      rules: (.rules | map(</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="s1">        if .type == "merge_queue"</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="s1">        then .parameters.max_entries_to_build = 1</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="s1">           | .parameters.min_entries_to_merge = 1</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="s1">        else . end))}'</span><span class="w"> </span>&gt;<span class="w"> </span>/tmp/ruleset.json
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets/&lt;id&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span>--input<span class="w"> </span>/tmp/ruleset.json
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># The bypass_actors guard is inside the transform on purpose. GitHub</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># omits that field for a credential it does not show it to, and the</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># earlier form of this recipe defaulted it with // [], which turned</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># "cannot see the list" into "the list is empty" and removed every</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># bypass actor on the PUT. A separate check before the read would be</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># easy to paste past; error() cannot be, it names the problem on</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="c1"># stderr, and jq exits non-zero so the PUT has nothing valid to send.</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets/&lt;id&gt;<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="s1">'{name, target, enforcement, conditions,</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="s1">      bypass_actors: (if has("bypass_actors") then .bypass_actors</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="s1">                      else error("bypass_actors not visible to this credential: "</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="s1">                             + "use one that can edit the ruleset") end),</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="s1">      rules: (.rules | map(</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="s1">        if .type == "merge_queue"</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="s1">        then .parameters.max_entries_to_build = 1</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="s1">           | .parameters.min_entries_to_merge = 1</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="s1">        else . end))}'</span><span class="w"> </span>&gt;<span class="w"> </span>/tmp/ruleset.json
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets/&lt;id&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span>--input<span class="w"> </span>/tmp/ruleset.json
 </code></pre></div>
 <p>Afterwards, trigger the repository's <code>export-repo-config</code> workflow so
 the change is captured in <code>.github/exported-config/</code>.</p>

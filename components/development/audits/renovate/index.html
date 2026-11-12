@@ -3011,6 +3011,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-fleet-preset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The fleet preset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-pre-commit-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8011,6 +8022,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/performance/quic-experiment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A QUIC client leg: the experiment's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/performance/dbus-helper-measurements/" class="md-nav__link">
         
   
@@ -8075,6 +8114,34 @@
     
   
     Proxy backpressure on a shaped client link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/quic-transport-bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QUIC against per-channel TCP on a shaped link
   
 
     
@@ -8271,10 +8338,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_12" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_12" id="__nav_3_8_12_12_label" tabindex="0">
             
   
   
@@ -8292,8 +8359,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_10">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9249,6 +9316,34 @@
     
   
     Phase 5: the index slim-down and closeout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: QUIC client leg, experiments
   
 
     
@@ -15934,6 +16029,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-fleet-preset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The fleet preset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-pre-commit-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16038,13 +16144,19 @@
   Renovate bumps: the value of each <code>PINNED_*_VERSION</code> variable
   (<code>PINNED_RENOVATE_VERSION</code> and <code>PINNED_HASHIN_VERSION</code>) and the ref
   of each action it uses.</li>
-<li><code>renovate.json</code> exists, with package grouping rules and scheduling.
-  It is a per-repository adaptation, not expected to be
-  byte-identical to the template's copy.</li>
+<li><code>renovate.json</code> exists. Nothing is checked about what it holds
+  beyond the two entries below, so a repository that keeps the fleet
+  policy locally rather than extending the preset still passes; the
+  preset is the convention, not a requirement this check enforces. It
+  is not expected to be byte-identical to the template's copy.</li>
 <li><code>renovate.json</code> extends <code>customManagers:githubActionsVersions</code>, so
-  the Renovate version pinned in <code>renovate.yml</code> is bumped.</li>
+  the Renovate version pinned in <code>renovate.yml</code> is bumped. Naming it
+  directly passes, and so does extending the fleet preset, which
+  names it.</li>
 <li><code>renovate.json</code> enables the <code>pre-commit</code> manager, where the
-  repository has remote pre-commit hooks to manage.</li>
+  repository has remote pre-commit hooks to manage. Enabling it
+  directly passes, and so does extending the fleet preset, which
+  enables it.</li>
 </ul>
 <h3 id="renovate-without-docker">Renovate without Docker<a class="headerlink" href="#renovate-without-docker" title="Permanent link">&para;</a></h3>
 <p><code>renovatebot/github-action</code> runs Renovate as a container. The static
@@ -16055,8 +16167,9 @@ npm, which works on a VM and a pod alike. A workflow step that still
 uses the action is a finding. The action named in a comment is not.</p>
 <p>The template pins Renovate behind a <code># renovate:</code> comment, which only
 the built-in <code>customManagers:githubActionsVersions</code> preset reads. A
-copy of the new workflow without the preset in <code>renovate.json</code> runs a
-Renovate that never bumps itself, so that is a finding too.
+copy of the new workflow without that preset reaching <code>renovate.json</code>,
+directly or through the fleet preset, runs a Renovate that never bumps
+itself, so that is a finding too.
 <code>regexManagers:githubActionsVersions</code>, the preset's name before
 Renovate renamed it, also passes.</p>
 <p>Both findings go in the one issue, so a repository still on the old
@@ -16074,20 +16187,76 @@ Renovate bumps in each copy on its own schedule: the value of each
 (with the version comment digest pinning leaves after it). A copy
 whose Renovate or whose actions are ahead of or behind the template's
 still matches; the action's name still has to. <code>node-version</code> is not
-among them: the template's <code>renovate.json</code> stops Renovate bumping it,
-and it is the line the check exists to hold.</p>
+among them: the fleet preset stops Renovate bumping it, and it is the
+line the check exists to hold.</p>
 <p>The drift that prompted this was Node. Renovate proposed Node 26 for
 the workflow's <code>setup-node</code> step, the pull request merged in eleven
 repositories, and each one's Renovate, which needs Node <code>^24.11.0</code>,
-then failed on every hourly run. The template's <code>renovate.json</code> now
-stops Renovate proposing that bump, but a copy can still drift by
-hand, and the workflow is where Node has to match the Renovate it
-runs.</p>
+then failed on every hourly run. The fleet preset now stops Renovate
+proposing that bump, but a copy can still drift by hand, and the
+workflow is where Node has to match the Renovate it runs.</p>
 <p>The finding names each place the copy differs, up to three, with the
 copy's line and the template's, and counts the rest. A copy still on
 the container action gets only that finding, which already says to
 copy the template. If the audit cannot read its own template, it
 reports an error rather than a verdict.</p>
+<h3 id="the-fleet-preset">The fleet preset<a class="headerlink" href="#the-fleet-preset" title="Permanent link">&para;</a></h3>
+<p>The policy every repository shares lives once, in <code>renovate-fleet.json</code>
+at the root of this repository, and each repository's <code>renovate.json</code>
+extends it with <code>"extends": ["local&gt;shakenfist/development:renovate-fleet"]</code>.
+A policy copied into every repository only reaches the ones that are
+re-synced, so a schedule or a rule changed after a repository was
+onboarded stayed behind; extended, a change reaches the fleet once.</p>
+<p>The preset holds the author and assignee Renovate uses, the dependency
+dashboard, rollback pull requests, a three day <code>minimumReleaseAge</code>,
+the <code>pre-commit</code> manager, <code>customManagers:githubActionsVersions</code>, the
+<code>Australia/Sydney</code> timezone, and the cadence: ordinary updates
+<code>on saturday</code>, majors and the CI tooling group <code>on the first day of the
+month</code>, with at most 2 pull requests an hour and 10 open at once
+(Renovate's own defaults, written down rather than inherited). Minor,
+patch and digest updates are never merged automatically. The CI
+tooling group puts GitHub Actions and pre-commit hook revisions, every
+update type, digests included, into one monthly pull request. The two
+rules that keep <code>node-version</code> and the pinned Renovate in step, and the
+<code>shellcheck-py/shellcheck-py</code> versioning rule, are in it too. It sets
+no <code>vulnerabilityAlerts</code>: Renovate's defaults already drop the
+schedule, <code>minimumReleaseAge</code> and grouping for a security fix, so a
+fix for a vulnerability Dependabot reports arrives at once rather than
+waiting for Saturday. One rule is an exception to that. A <code>packageRules</code>
+entry with <code>enabled: false</code> suppresses even a vulnerability fix, and
+the preset's Node-major disable rule is one, so Node majors in the
+Renovate workflows are the one update type the immediate security path
+does not reach.</p>
+<p>Renovate reads a <code>local&gt;</code> preset from the default branch of the
+repository that holds it, so a change to <code>renovate-fleet.json</code> cannot
+be tried from a pull request branch: it takes effect for the whole
+fleet the moment it merges. The only check before that is
+pre-commit's <code>renovate-config-validator</code>. Its default <code>files:</code>
+pattern matches <code>renovate.json</code> but not <code>renovate-fleet.json</code>, and a
+hook that silently skips the file it was added for still passes, so
+the hook's pattern is overridden with one that covers any Renovate
+configuration or <code>renovate-*.json</code> preset in any directory, rather
+than the files that happen to exist; <code>scripts/tests/test_hooks.py</code>
+holds it to every such file in the tree. It also runs with
+<code>--no-global</code>: given a file as an argument the validator treats it as
+a global self-hosted configuration, which accepts a self-hosted-only
+key such as <code>onboarding</code> in a file that is meant to be a repository
+preset.</p>
+<p>Two of the checks above, the <code>pre-commit</code> manager and the version
+comments, accept a repository that extends the preset. Each one reads
+the parsed configuration through a helper that knows nothing about any
+preset, and a single predicate beside them recognises the <code>extends</code>
+string; a check passes when either says so. Keeping the name out of
+the helpers is what stops a repository being passed on a string alone.
+That is still trust by name, and it holds only while the preset keeps
+its promises, so the tests load the real <code>renovate-fleet.json</code> and
+assert that each helper accepts it on its own. A commit that removed
+the manager or the version comment extend from the preset would
+otherwise leave every repository in the fleet passing on a promise
+nothing kept.</p>
+<p>What stays local to a repository is what only that repository needs:
+<code>development</code>'s <code>templates/</code> patterns below, the Python constraints,
+package grouping and range strategy sections after them.</p>
 <h3 id="the-pre-commit-manager">The pre-commit manager<a class="headerlink" href="#the-pre-commit-manager" title="Permanent link">&para;</a></h3>
 <p>Renovate's <code>pre-commit</code> manager is opt-in: cargo, dockerfile,
 github-actions and the Python managers are on by default, but
@@ -16098,7 +16267,8 @@ dependency: pre-commit hooks are the linters gating every commit, so an
 unwatched pin means the thing judging everything else is itself
 unjudged. <code>instar</code> was four months behind on <code>actionlint</code> while its
 cargo, dockerfile and github-actions dependencies were current.</p>
-<p>Any of renovate's three enabling forms passes:</p>
+<p>Any of renovate's three enabling forms passes, as does extending the
+fleet preset, which enables the manager for the repository:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span><span class="nt">"pre-commit"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"enabled"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}}</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="p">{</span><span class="nt">"enabledManagers"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"pre-commit"</span><span class="p">,</span><span class="w"> </span><span class="s2">"..."</span><span class="p">]}</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">{</span><span class="nt">"extends"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">":enablePreCommit"</span><span class="p">]}</span>
@@ -16106,9 +16276,10 @@ cargo, dockerfile and github-actions dependencies were current.</p>
 <p>The check applies only when there is something to bump: a repository
 with no <code>.pre-commit-config.yaml</code>, or one whose hooks are all
 <code>repo: local</code>, passes without the manager. <code>sfui</code>'s
-<code>"pre-commit": {"enabled": true}</code> is the form the template carries.</p>
+<code>"pre-commit": {"enabled": true}</code> is the form repositories carried
+before the preset.</p>
 <p>Enabling the manager is not enough for the shellcheck hook:
-shellcheck-py's four-part tags need the template's regex versioning
+shellcheck-py's four-part tags need the fleet preset's regex versioning
 rule, or the lookup fails on the dependency dashboard and the hook is
 never bumped. This check does not look for that rule; see
 <a href="https://github.com/shakenfist/development/blob/main/templates/renovate/README.md#shellcheck-pys-four-part-tags">the template README</a>.</p>
@@ -16129,7 +16300,9 @@ extra path is named:</p>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">}</span>
 </code></pre></div>
 <p>This applies to <code>development</code> today, and to any repository that grows
-a second home for workflow files.</p>
+a second home for workflow files. It stays in <code>development</code>'s own
+<code>renovate.json</code> rather than the fleet preset, because it only applies
+here.</p>
 <p><code>customManagers:githubActionsVersions</code> has the same blind spot, and
 its file patterns cannot be extended from outside the preset. So
 <code>development</code> also carries a <code>customManagers</code> entry with the preset's

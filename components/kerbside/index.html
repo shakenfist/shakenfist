@@ -8186,6 +8186,34 @@
   
   
     <li class="md-nav__item">
+      <a href="performance/quic-experiment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A QUIC client leg: the experiment's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="performance/dbus-helper-measurements/" class="md-nav__link">
         
   
@@ -8250,6 +8278,34 @@
     
   
     Proxy backpressure on a shaped client link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="performance/quic-transport-bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QUIC against per-channel TCP on a shaped link
   
 
     
@@ -8446,10 +8502,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_12" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_12" id="__nav_3_8_12_12_label" tabindex="0">
             
   
   
@@ -8467,8 +8523,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_10">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9424,6 +9480,34 @@
     
   
     Phase 5: the index slim-down and closeout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plans/PLAN-spice-performance-phase-07-quic-experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: QUIC client leg, experiments
   
 
     
@@ -16674,6 +16758,20 @@ the exception: it deploys Kerbside inside one OpenStack cloud.</p>
   Which codec the streaming pages really used, the connect crash in every
   released spice-server and its fix, hardware encoding on any GPU, and
   what upgrading 0.15.2 to master gains</p>
+</li>
+<li>
+<p><a href="/components/kerbside/performance/quic-transport-bench/">QUIC against per-channel TCP on a shaped link</a> -
+  A transport-only bench of one QUIC connection with a stream per
+  channel against today's connection per channel, under loss: what a
+  shared congestion window costs the interactive round trip, and why
+  the kernel's BBR is the more interesting result</p>
+</li>
+<li>
+<p><a href="/components/kerbside/performance/quic-experiment/">A QUIC client leg: the experiment's verdict</a> -
+  Why the client leg stays on a TCP connection per channel, what one
+  connection per session would have bought and what was never priced,
+  the recommendation on exposing UDP, and the kernel congestion
+  control finding that came out of it</p>
 </li>
 </ul>
 <h3 id="architecture-documentation">Architecture Documentation<a class="headerlink" href="#architecture-documentation" title="Permanent link">&para;</a></h3>

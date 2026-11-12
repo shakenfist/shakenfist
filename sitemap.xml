@@ -1721,6 +1721,14 @@
          <lastmod>2026-11-12</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/performance/quic-experiment/</loc>
+         <lastmod>2026-11-12</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/performance/quic-transport-bench/</loc>
+         <lastmod>2026-11-12</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/kerbside/performance/spice-server-patches/</loc>
          <lastmod>2026-11-12</lastmod>
     </url>
@@ -1958,6 +1966,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/</loc>
+         <lastmod>2026-11-12</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/</loc>
          <lastmod>2026-11-12</lastmod>
     </url>
     <url>
@@ -2326,6 +2338,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-app-split-phase-02-pure-state/</loc>
+         <lastmod>2026-11-12</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/plans/PLAN-app-split-phase-03-events/</loc>
          <lastmod>2026-11-12</lastmod>
     </url>
     <url>

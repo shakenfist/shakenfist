@@ -7857,6 +7857,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../performance/quic-experiment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A QUIC client leg: the experiment's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../performance/dbus-helper-measurements/" class="md-nav__link">
         
   
@@ -7921,6 +7949,34 @@
     
   
     Proxy backpressure on a shaped client link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/quic-transport-bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QUIC against per-channel TCP on a shaped link
   
 
     
@@ -8117,10 +8173,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_12" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_12" id="__nav_3_8_12_12_label" tabindex="0">
             
   
   
@@ -8138,8 +8194,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_10">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9097,6 +9153,34 @@
     
   
     Phase 5: the index slim-down and closeout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-spice-performance-phase-07-quic-experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: QUIC client leg, experiments
   
 
     
@@ -16470,22 +16554,22 @@ first phase.</p>
 <td>6. Push audit of phases 1-5 (kerbside, kerbside-patches and ryll #406)</td>
 <td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/">PLAN-spice-performance-phase-06-push-audit.md</a></td>
 <td>Complete</td>
-<td>2a34fe7ea9 (#668)</td>
+<td>2a34fe7ea9 (#668), 17a31ebf75 (#701)</td>
 </tr>
 <tr>
-<td>7. QUIC client leg: experiments</td>
-<td></td>
-<td>Not started</td>
-<td></td>
-</tr>
-<tr>
-<td>8. QUIC client leg: implementation, if phase 7 says go</td>
-<td></td>
-<td>Not started</td>
+<td>7. QUIC client leg: experiments (verdict: no-go, as measured)</td>
+<td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/">PLAN-spice-performance-phase-07-quic-experiments.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
-<td>9. Push audit of phases 7-8 (kerbside and ryll)</td>
+<td>8. QUIC client leg: implementation (abandoned: phase 7's gate said no-go)</td>
+<td></td>
+<td>Abandoned</td>
+<td></td>
+</tr>
+<tr>
+<td>9. Push audit of phase 7 (kerbside)</td>
 <td></td>
 <td>Not started</td>
 <td></td>
@@ -16502,7 +16586,15 @@ latency figures.
 - The lasting outputs are the shaped-link rig and
   <code>docs/performance/proxy-backpressure.md</code>.
 - BBR was not measured: the host has no <code>tcp_bbr</code> module, and
-  an unprivileged namespace cannot load one.</p>
+  an unprivileged namespace cannot load one.
+  - <em>Corrected 2026-11-12 by phase 7:</em> the module is present, at
+    <code>/lib/modules/6.12.115+deb13.1-amd64/kernel/net/ipv4/tcp_bbr.ko.xz</code>;
+    it was simply not loaded, so
+    <code>tcp_available_congestion_control</code> offered only reno and
+    cubic. The second half of the note holds — an unprivileged
+    namespace cannot load it — but root on the host can, which
+    is what the rig's own <code>CC</code> variable documents. Phase 7 loads
+    it to run a BBR arm.</p>
 <p><strong>Phase 2</strong> started on 2026-09-23 as an out-of-tree prototype.
 It is a patch series against qemu <code>ui/spice-display.c</code>,
 measured with Ryll in headless mode against a virtio-gpu guest.
@@ -17079,6 +17171,16 @@ it is about throughput:
   wait behind a retransmitted display frame, on exactly the
   lossy links where the other benefits matter. QUIC streams are
   independent, with per-stream flow control.
+  - <em>Corrected 2026-11-11 by phase 7's survey:</em> this is a
+    benefit over a TCP multiplex that nobody proposed, not over
+    today's code. The client leg is already one TCP connection
+    per channel (<code>listen.rs:179</code>, <code>session.rs:159</code>), so inputs
+    and display already have independent loss recovery. What is
+    left of the latency case is whether quinn's userspace loss
+    recovery and congestion control beat the kernel's for this
+    traffic shape, and whether one congestion controller per
+    session is better than N. Phase 7's plan reframes the phase
+    around the operational benefits, with latency as a floor.
 - <strong>Faster connects.</strong> One 1-RTT (or 0-RTT on resume)
   handshake, instead of TCP, TLS, link and ticket per channel,
   in at least two serial rounds (main, then the rest).
@@ -17112,6 +17214,28 @@ least:
   input-to-echo latency under packet loss while the display
   is busy, on the shaped-link rig's profiles plus 1-2% loss.
   This is the measurement that decides the phase;
+  - <em>Corrected 2026-11-11 by phase 7's survey:</em> the rig cannot
+    inject loss. <code>PROFILES</code> parses as <code>rtt_ms:rate_mbit</code>
+    (<code>tools/shaped-link/run-matrix.sh:138</code>) and the qdisc it
+    builds carries <code>delay</code>, <code>rate</code> and <code>limit</code> only (line 322),
+    so teaching it a loss term is the phase's first step. The
+    measurement also no longer decides the phase on its own, for
+    the reason given against the head-of-line-blocking bullet
+    above; it is a floor, and the decision rests on the
+    operational benefits and the cost.
+  - <em>Answered 2026-11-12 by phase 7's bench:</em> QUIC loses, and
+    the floor fails. At 80 ms / 10 Mbit with 1% loss the
+    interactive p95 is 144.3 ms over one QUIC connection with
+    five streams against 82.8 ms over five TCP connections, with
+    run-to-run spreads of 0.9 ms and 0.1 ms. The mechanism is
+    the shared congestion window: one connection is one window,
+    the saturating stream keeps it full, and the interactive
+    stream's bytes wait for an acknowledgement to open window
+    rather than for a turn. It shows at the median (p50 101.1
+    against 80.4 ms) and not only in the tail, and a quinn
+    per-stream send priority on the interactive stream moved its
+    p95 by 0.2 ms, because priority orders what is sent when the
+    window allows and does not create window.
 - connect time, and behaviour across a path change;
 - how ryll decides QUIC has failed and how long the fallback
   costs;
@@ -17128,15 +17252,71 @@ least:
   candidate) fits the proxy's runtime and packaging.</p>
 <p>Its output is a go or no-go recommendation, and if go, a
 phase plan for phase 8.</p>
-<p><strong>Phase 8</strong> builds what phase 7 recommends, in Kerbside and
-ryll, if it recommends anything. If phase 7 is a no-go, phase
-8 is marked <code>Abandoned</code> with the reason, and phase 9 audits
-phase 7 alone.</p>
-<p><strong>Phase 9</strong> is the push audit for phases 7 and 8. It audits
-their accumulated diff and cites phase 6 for phases 1-5,
-rather than re-auditing work that has already been audited.
-Work that lands in ryll is audited under ryll's own push
-audit, and phase 9 cites it.</p>
+<p><strong>Verdict, 2026-11-12: no-go, as measured</strong>
+(<code>docs/performance/quic-experiment.md</code>), decided at the phase's
+step 2 gate. Go needed all three of the phase plan's criteria
+(decision 1):
+- <strong>The latency floor fails</strong>, as recorded against the latency
+  bullet above and in <code>docs/performance/quic-transport-bench.md</code>:
+  61.6 ms of interactive p95 against a 0.9 ms spread at 80 ms /
+  10 Mbit with 1% loss, 75.0 ms at 2% loss on the same profile
+  (unresolved on its own, one TCP repeat in five at 383 ms), and
+  145.2 ms at 2% loss on 150 ms / 2 Mbit. Throughput is equal
+  within a few percent everywhere, and the no-loss cells are a
+  wash.
+- <strong>The operational benefits were never priced.</strong> They are what
+  the case rested on, and only an end-to-end prototype could
+  have measured them. The gate stopped the phase before one was
+  built, so nothing here says one connection per session is not
+  worth having — only that the entry price is 60 to 75 ms of the
+  p95 a user feels, which is more than it can be expected to
+  earn back. Connect time came out as a by-product of the bench
+  (84.3 against 401.4 ms at 80 ms / 10 Mbit), but its TCP arm
+  has no TLS, link message or ticket check, so the ratio
+  understates the real difference and is not a result. The path
+  change and the fallback cost were not measured at all.
+- <strong>The cost was never priced either</strong>, for the same reason. The
+  UDP exposure recommendation is made anyway, because the phase
+  owed it (decision 8): do not open a UDP port, for this or
+  speculatively. Kerbside has no UDP listener anywhere today and
+  this phase shipped nothing that would want one, so there is no
+  exposure to document.</p>
+<p>Steps 3 to 7's integration work was never funded: no QUIC
+listener exists in the proxy, no <code>quic</code> feature in its
+<code>Cargo.toml</code>, and no <code>SpiceStream</code> variant or dialer in ryll. The
+two architectural findings that survive the no-go are recorded
+in the write-up rather than lost — the proxy's single seam means
+a QUIC stream would reach the firewall as an ordinary channel
+with nothing downstream changed, and the audit trail would gain
+one client port per session instead of one per channel, stale
+after a migration, which an implementation would have to fix by
+recording the QUIC connection id. quinn 0.11.12 did build in the
+proxy's own dev image with its default features off, but the
+proxy itself was never built with it, so the packaging half of
+that question stays reasoned rather than measured.</p>
+<p>One finding survives that has nothing to do with QUIC and is
+worth its own investigation: on these shaped links the kernel's
+BBR beats its Cubic badly — 9.27 Mbit against 1.64 at 1% loss on
+80 ms / 10 Mbit, and an interactive p95 of 104 ms against 171 ms
+at no loss. That is a <code>net.ipv4.tcp_congestion_control</code> change on
+the proxy host and it applies to today's TCP client leg. It is
+recorded in phase 7's plan under <em>Future work</em>.</p>
+<p><strong>Phase 8</strong> was to build what phase 7 recommended, in Kerbside
+and ryll. Phase 7 is a no-go, so phase 8 is <code>Abandoned</code>: there
+is nothing to implement. The transport-only gate found one QUIC
+connection per session materially worse than today's connection
+per channel on the interactive round trip under loss, and the
+mechanism — a congestion window shared across a session's
+channels — is structural rather than a tuning mistake, so an
+implementation would ship the regression. <em>What would change the
+answer</em> in <code>docs/performance/quic-experiment.md</code> names the
+conditions under which this would be worth reopening, and each
+of them needs the bench re-run before any code.</p>
+<p><strong>Phase 9</strong> is the push audit for phase 7 alone, since phase 8
+is abandoned. It audits phase 7's accumulated diff — the rig's
+loss term and the transport bench, all of it in Kerbside, as
+nothing landed in ryll — and cites phase 6 for phases 1-5,
+rather than re-auditing work that has already been audited.</p>
 <!-- shared-block: plan-push-audit-phase v4 -->
 <p>Push audit phase (shared block; do not edit -- the canonical
 copy lives in shakenfist/development at

@@ -7855,6 +7855,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/performance/quic-experiment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A QUIC client leg: the experiment's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/performance/dbus-helper-measurements/" class="md-nav__link">
         
   
@@ -7919,6 +7947,34 @@
     
   
     Proxy backpressure on a shaped client link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/quic-transport-bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QUIC against per-channel TCP on a shaped link
   
 
     
@@ -8115,10 +8171,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_12" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_12" id="__nav_3_8_12_12_label" tabindex="0">
             
   
   
@@ -8136,8 +8192,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_10">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9093,6 +9149,34 @@
     
   
     Phase 5: the index slim-down and closeout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: QUIC client leg, experiments
   
 
     
@@ -16572,6 +16656,15 @@ in <code>ryll/src/main.rs</code>); headless mode lives in <code>run_headless</co
 </tr>
 </tbody>
 </table>
+<p>Those figures are the snapshot the plan was written against.
+Phase 3's survey remeasured them against <code>develop</code> at <code>f56b371</code>,
+after phases 1 and 2: <code>app/mod.rs</code> is 5,592 lines, <code>process_events</code>
+is 487 rather than ~610, the test module at its foot is 454 rather
+than ~1,020 (phase 2 moved the rest out with the code they test),
+and <code>eframe::App</code> has grown a second half -- <code>logic</code> (156 lines,
+which is what calls <code>process_events</code>) alongside <code>ui</code> (~1,685).
+Two <code>app/</code> modules the phase list does not mention,
+<code>agent_state.rs</code> and <code>ui_state.rs</code>, arrived from other plans.</p>
 <p>The field comments in <code>struct RyllApp</code> already name the seams:
 cursor state, region selection, USB panel, WebDAV panel, traffic
 viewer, notifications panel, bug-report dialog, auto-resize and
@@ -16710,13 +16803,13 @@ with web mode).</p>
 <tr>
 <td>2. Module directory and pure state</td>
 <td><a href="/components/ryll/plans/PLAN-app-split-phase-02-pure-state/">PLAN-app-split-phase-02-pure-state.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>b245380 (#501)</td>
 </tr>
 <tr>
 <td>3. Events and bug-report flow</td>
-<td>PLAN-app-split-phase-03-events.md</td>
-<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-app-split-phase-03-events/">PLAN-app-split-phase-03-events.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16784,19 +16877,37 @@ but serve <code>process_events</code>, so they move with it in phase 3.</p>
 <h3 id="phase-3-events-and-bug-report-flow">Phase 3: Events and bug-report flow<a class="headerlink" href="#phase-3-events-and-bug-report-flow" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>app/events.rs</code> -- <code>process_events</code>, with each arm group
-  (display, cursor, audio, USB, WebDAV, notifications, session
-  lifecycle) extracted into its own <code>handle_*</code> method so the
-  <code>match</code> becomes a dispatcher.</li>
-<li><code>app/bug_report.rs</code> -- trigger snapshot, <code>PendingBugReport</code>,
-  <code>generate_bug_report</code>, <code>finish_bug_report</code>,
-  <code>poll_pending_bug_report</code>, <code>file_notification_bug_report</code>,
-  <code>maybe_write_disconnect_snapshot</code>, <code>validate_region</code>.</li>
+  (session lifecycle, display draw ops, display mark, cursor,
+  monitors config, ping/RTT, channel error, USB, WebDAV, paste,
+  notification, disconnect) extracted into its own <code>handle_*</code>
+  method so the <code>match</code> becomes a dispatcher. There is no audio
+  arm: this section originally named one, but <code>ChannelEvent</code> has
+  no audio variant -- volume and mute travel through
+  <code>volume_control</code>.</li>
+<li><code>app/bug_report.rs</code> -- <code>PendingBugReport</code>, <code>generate_bug_report</code>,
+  <code>finish_bug_report</code>, <code>poll_pending_bug_report</code>,
+  <code>file_notification_bug_report</code>,
+  <code>maybe_write_disconnect_snapshot</code>.</li>
+<li><code>app/trigger_snapshot.rs</code> -- the trigger snapshot, the eframe
+  window shot, the region-selection state machine and
+  <code>validate_region</code>. Split out from <code>bug_report.rs</code> because the two
+  together measure ~1,124 lines, which would breach this plan's own
+  roughly-800-line success criterion; see phase 3's decision 1.</li>
 <li><code>app/connection.rs</code> -- <code>reconnect</code>, <code>reconnect_manual</code>,
   <code>handle_critical_disconnect</code>, <code>handle_connection_failed</code>, the
   auto-snapshot task lifecycle, <code>build_connection_runtime</code>.</li>
+<li><code>app/screenshots.rs</code> -- <code>screenshot_paths</code>, <code>save_screenshots</code>
+  and <code>open_screenshot_dialog</code>. Phase 2 left <code>screenshot_paths</code>
+  "for phases 3 and 4"; nothing in phase 4's per-panel list would
+  hold it, and the native <code>rfd</code> dialog needs no egui, so it lands
+  here.</li>
 </ul>
-<p>Update the comments in <code>surface_mirror.rs</code>, <code>session.rs</code> and
-<code>bugreport.rs</code> that point at <code>app.rs</code> by name.</p>
+<p>This section also used to ask for the comments in
+<code>surface_mirror.rs</code>, <code>session.rs</code> and <code>bugreport.rs</code> that name
+<code>app.rs</code> to be updated. That is already done: phase 1 deleted the
+"mirrors <code>process_events</code>" comment outright, and phase 2's step 2e
+repointed the rest. <code>git grep -n 'app\.rs' -- ':!docs/plans/'</code>
+finds nothing.</p>
 <h3 id="phase-4-split-ui-into-per-panel-files">Phase 4: Split <code>ui</code> into per-panel files<a class="headerlink" href="#phase-4-split-ui-into-per-panel-files" title="Permanent link">&para;</a></h3>
 <p>Reduce <code>eframe::App::ui</code> to a sequence of calls, one per panel,
 each a <code>fn draw_*(&amp;mut self, ui: &amp;mut egui::Ui)</code> in <code>app/ui/</code>:

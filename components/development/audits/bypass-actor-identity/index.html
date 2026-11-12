@@ -7956,6 +7956,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/performance/quic-experiment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A QUIC client leg: the experiment's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/performance/dbus-helper-measurements/" class="md-nav__link">
         
   
@@ -8020,6 +8048,34 @@
     
   
     Proxy backpressure on a shaped client link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/quic-transport-bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QUIC against per-channel TCP on a shaped link
   
 
     
@@ -8216,10 +8272,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_12" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_12" id="__nav_3_8_12_12_label" tabindex="0">
             
   
   
@@ -8237,8 +8293,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_10">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9194,6 +9250,34 @@
     
   
     Phase 5: the index slim-down and closeout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: QUIC client leg, experiments
   
 
     
@@ -16034,26 +16118,37 @@ the ruleset) and judges every actor by its type:</p>
 </tbody>
 </table>
 <p><strong>One known team bypass.</strong> <code>sf-can-skip-merge-queue</code> (<code>Team</code>, actor id
-<code>11722172</code>) is a bypass actor on all seven of the organisation's
-pull-request rulesets, so by the table above all seven fail this half
-today. Its automation member was removed on 2026-11-08, leaving
-<code>mikalstill</code> and <code>sfconductor</code>. <code>sfconductor</code>'s bypasses are pull request
-merges that skip the queue rather than pushes to a default branch;
-<code>mikalstill</code> is a person holding admin, whose bypasses the history counts
-without classifying. The rule-suite history read on 2026-10-29, which
-covers the month before that read and so the period before the removal
-above, records <code>sfconductor</code> bypassing in five of the seven repositories
-(shakenfist 52, kerbside 7, client-python-k3s 2, ryll 1 and instar 1) and
-<code>mikalstill</code> in all seven. That read is
+<code>11722172</code>) is a bypass actor on every one of the organisation's
+pull-request rulesets except <code>actions</code>' <code>21132503</code>, so by the table
+above all of those fail this half today. <code>actions</code> is the exception
+because its ruleset carries the review-marks App as its only bypass
+actor; it gained its pull-request rule on 2026-11-11. Stated without a
+count deliberately: the previous wording here named a number, which
+went stale as repositories were standardised and then read as a verdict
+about the ones it no longer covered. (Checked across the organisation
+on 2026-11-11. Three private repositories answer 403 to the rulesets
+endpoint and hold no rulesets at all.)</p>
+<p>The team's automation member was removed on 2026-11-08, leaving
+<code>mikalstill</code> and <code>sfconductor</code>. <code>sfconductor</code>'s bypasses are pull
+request merges that skip the queue rather than pushes to a default
+branch; <code>mikalstill</code> is a person holding admin, whose bypasses the
+history counts without classifying. The rule-suite history read on
+2026-10-29 covered the seven repositories <code>PLAN-bot-bypass-identity.md</code>
+names rather than the whole organisation, and covers the month before
+that read and so the period before the removal above; it records
+<code>sfconductor</code> bypassing in five of those seven (shakenfist 52,
+kerbside 7, client-python-k3s 2, ryll 1 and instar 1) and <code>mikalstill</code>
+in all seven. That read is
 <code>repos/&lt;org&gt;/&lt;repo&gt;/rulesets/rule-suites?time_period=month&amp;rule_suite_result=bypass</code>
 per repository, counted by each entry's <code>actor_name</code>, with the
 merge-rather-than-push classification coming from resolving an entry's
-<code>after_sha</code> to the commit it produced. GitHub keeps about a month of that
-history, so the figures above are the record of that read rather than
-something a later reader can re-run; the query is named so the next one can
-be made the same way. A reviewer records the team as a known exception,
-with what <code>sfconductor</code> merges with still to be settled, rather than as a
-new finding; the exception ends when the team stops being a bypass actor.</p>
+<code>after_sha</code> to the commit it produced. GitHub keeps about a month of
+that history, so the figures above are the record of that read rather
+than something a later reader can re-run; the query is named so the
+next one can be made the same way. A reviewer records the team as a
+known exception, with what <code>sfconductor</code> merges with still to be
+settled, rather than as a new finding; the exception ends when the team
+stops being a bypass actor.</p>
 <p>The admin-role and <code>OrganizationAdmin</code> passes rest on no automation
 identity holding an organisation-owner or repository-admin role -- in
 particular on any repository where the review-marks App is installed,
@@ -16080,6 +16175,15 @@ every repository the review-marks App is installed on. The residual
 stands until the runner-controller App's permission is narrowed to the
 runner registration it actually needs; until then a reviewer accepts it
 knowingly rather than the audit reporting it clean.</p>
+<p>Since 2026-11-11 that residual reaches further than the product
+repositories. <code>PLAN-workflow-ref-trust.md</code> step 2a installed the
+review-marks App on <code>shakenfist/actions</code>, which serves the fleet's
+composite actions and reusable workflows at <code>@main</code>, so the same chain
+now ends in a push to the repository whose code runs inside every other
+repository's jobs -- and in a bypass of the pull-request ruleset that
+step created. Nothing about the chain changed; what changed is what sits
+at the end of it. A reviewer accepting the residual should know that is
+the reach.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- this is a one-time ruleset and environment configuration
 change.</p>
@@ -16111,10 +16215,22 @@ actor, fetch the ruleset, append the App to <code>bypass_actors</code> preservin
 every other field, and PUT it back:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="s1">'.[] | select(.target == "branch") | {id, name}'</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets/&lt;id&gt;<span class="w"> </span>&gt;<span class="w"> </span>/tmp/ruleset.json
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Append {"actor_id": 5538020, "actor_type": "Integration",</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1">#         "bypass_mode": "always"} to .bypass_actors, then:</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets/&lt;id&gt;<span class="w"> </span>--input<span class="w"> </span>/tmp/ruleset.json
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># The guard is inside the transform rather than before it. GitHub</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># omits bypass_actors for a credential it does not show it to, so</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># appending to a field that is not there would drop every actor the</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1"># ruleset has. error() says so on stderr and exits non-zero, which a</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># check pasted in as a separate command would not. The map() drops</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># any existing entry for the App first, so running this twice leaves</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="c1"># one entry rather than two.</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets/&lt;id&gt;<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="s1">'{name, target, enforcement, conditions, rules,</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="s1">      bypass_actors: (if has("bypass_actors")</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="s1">                      then [.bypass_actors[] | select(.actor_id != 5538020)]</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="s1">                           + [{actor_id: 5538020, actor_type: "Integration",</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="s1">                               bypass_mode: "always"}]</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="s1">                      else error("bypass_actors not visible to this credential: "</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="s1">                             + "use one that can edit the ruleset") end)}'</span><span class="w"> </span>&gt;<span class="w"> </span>/tmp/ruleset.json
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets/&lt;id&gt;<span class="w"> </span>--input<span class="w"> </span>/tmp/ruleset.json
 </code></pre></div>
 <p>GitHub refuses an App that is not installed on the repository as a
 bypass actor, so a PUT that is rejected means the installation is

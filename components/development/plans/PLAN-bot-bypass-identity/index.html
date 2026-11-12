@@ -8039,6 +8039,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/performance/quic-experiment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A QUIC client leg: the experiment's verdict
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/performance/dbus-helper-measurements/" class="md-nav__link">
         
   
@@ -8103,6 +8131,34 @@
     
   
     Proxy backpressure on a shaped client link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/performance/quic-transport-bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QUIC against per-channel TCP on a shaped link
   
 
     
@@ -8299,10 +8355,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8_12_12" >
         
           
-          <label class="md-nav__link" for="__nav_3_8_12_10" id="__nav_3_8_12_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_8_12_12" id="__nav_3_8_12_12_label" tabindex="0">
             
   
   
@@ -8320,8 +8376,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_8_12_10">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_8_12_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8_12_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9277,6 +9333,34 @@
     
   
     Phase 5: the index slim-down and closeout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 7: QUIC client leg, experiments
   
 
     
@@ -17579,6 +17663,17 @@ after the PUT, identical on andris (24700229), hunkydory
   REST-creation route was not needed. No fourth review round
   arrived on #348, which merged at 11:07 AEDT as 2a24d00 (branch
   head 2fbf7c7).</li>
+<li>2026-11-11: the one-key property recorded below is no longer
+  true, and it was this plan's reading rather than the other
+  plan's, so it is corrected here. <code>PLAN-workflow-ref-trust.md</code>
+  step 2a installed the App on <code>shakenfist/actions</code> and set a
+  newly generated key in that repository's <code>review-marks</code>
+  environment without rotating the other four, which
+  <code>docs/code-review-tracking.md</code> step 7.3 requires. The App should
+  therefore hold two private keys, <code>actions</code> now holds the key
+  where the definition of done below says it holds nothing, and
+  completing the rotation is tracked as #389. Nothing measures the
+  key count: an App's keys are visible only on its settings page.</li>
 <li>2026-10-31 14:05 AEDT: phase 1 closed out. Mikal confirmed from
   the App's page that exactly one private key remains (b4
   resolved), and chose to close the phase with the bot's token list
@@ -17648,7 +17743,9 @@ and the API, not from the operator's summary.</p>
 <li><code>repos/shakenfist/&lt;r&gt;/environments/review-marks/secrets</code> lists
   <code>REVIEW_MARKS_APP_KEY</code> in andris, hunkydory, kerbside and ryll,
   and lists nothing in actions, development, sfui and
-  kerbside-client.</li>
+  kerbside-client. <em>(<code>actions</code> has held it since 2026-11-11, from
+  <code>PLAN-workflow-ref-trust.md</code> step 2a; the other three still hold
+  nothing.)</em></li>
 <li><code>gh secret list --repo shakenfist/&lt;r&gt;</code> for all 30 repositories
   and <code>gh secret list --org shakenfist</code> show no
   <code>REVIEW_MARKS_APP_KEY</code>.</li>
@@ -17662,7 +17759,11 @@ and the API, not from the operator's summary.</p>
   (<code>Integration</code>, <code>always</code>).</li>
 <li><code>gh issue view 211 --json state --jq .state</code> prints <code>OPEN</code>.</li>
 <li>The App's page lists exactly one private key, the one the four
-  secrets were set from, and the record says so.</li>
+  secrets were set from, and the record says so. <em>(True when
+  checked on 2026-10-31; falsified on 2026-11-11 by
+  <code>PLAN-workflow-ref-trust.md</code> step 2a, which generated a second
+  key for <code>actions</code> rather than rotating all five. Tracked as
+  #389.)</em></li>
 <li>The probe branch does not exist, and <code>gh run list --repo
   shakenfist/development --branch &lt;probe branch&gt;</code> prints nothing.</li>
 <li>The three soak URLs in the record are runs that succeeded after
@@ -20251,7 +20352,17 @@ canonical copy lives in shakenfist/development at
 <p>We should list obvious extensions, known issues, unrelated bugs we
 encountered, and anything else we should one day do but have
 chosen to defer to here, so that we do not forget them.</p>
-<p>...</p>
+<ul>
+<li>
+<h1 id="389-the-app-holds-two-private-keys-and-phase-1s-one-key">389: the App holds two private keys, and phase 1's one-key<a class="headerlink" href="#389-the-app-holds-two-private-keys-and-phase-1s-one-key" title="Permanent link">&para;</a></h1>
+  property is false. <code>PLAN-workflow-ref-trust.md</code> step 2a added
+  <code>actions</code> by generating a key for it alone rather than rotating
+  all five environments, which is the failure this plan's own
+  review round rewrote adoption step 7 to prevent. Completing the
+  rotation is one pass over five repositories; the property can
+  only be confirmed by eye on the App's settings page, which is
+  also why nothing caught it.</li>
+</ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during development
 that we fixed. You should also scan the project's issue tracker,
