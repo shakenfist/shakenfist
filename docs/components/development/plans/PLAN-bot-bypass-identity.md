@@ -1236,6 +1236,17 @@ after the PUT, identical on andris (24700229), hunkydory
   REST-creation route was not needed. No fourth review round
   arrived on #348, which merged at 11:07 AEDT as 2a24d00 (branch
   head 2fbf7c7).
+- 2026-11-11: the one-key property recorded below is no longer
+  true, and it was this plan's reading rather than the other
+  plan's, so it is corrected here. `PLAN-workflow-ref-trust.md`
+  step 2a installed the App on `shakenfist/actions` and set a
+  newly generated key in that repository's `review-marks`
+  environment without rotating the other four, which
+  `docs/code-review-tracking.md` step 7.3 requires. The App should
+  therefore hold two private keys, `actions` now holds the key
+  where the definition of done below says it holds nothing, and
+  completing the rotation is tracked as #389. Nothing measures the
+  key count: an App's keys are visible only on its settings page.
 - 2026-10-31 14:05 AEDT: phase 1 closed out. Mikal confirmed from
   the App's page that exactly one private key remains (b4
   resolved), and chose to close the phase with the bot's token list
@@ -1307,7 +1318,9 @@ and the API, not from the operator's summary.
 * `repos/shakenfist/<r>/environments/review-marks/secrets` lists
   `REVIEW_MARKS_APP_KEY` in andris, hunkydory, kerbside and ryll,
   and lists nothing in actions, development, sfui and
-  kerbside-client.
+  kerbside-client. *(`actions` has held it since 2026-11-11, from
+  `PLAN-workflow-ref-trust.md` step 2a; the other three still hold
+  nothing.)*
 * `gh secret list --repo shakenfist/<r>` for all 30 repositories
   and `gh secret list --org shakenfist` show no
   `REVIEW_MARKS_APP_KEY`.
@@ -1321,7 +1334,11 @@ and the API, not from the operator's summary.
   (`Integration`, `always`).
 * `gh issue view 211 --json state --jq .state` prints `OPEN`.
 * The App's page lists exactly one private key, the one the four
-  secrets were set from, and the record says so.
+  secrets were set from, and the record says so. *(True when
+  checked on 2026-10-31; falsified on 2026-11-11 by
+  `PLAN-workflow-ref-trust.md` step 2a, which generated a second
+  key for `actions` rather than rotating all five. Tracked as
+  #389.)*
 * The probe branch does not exist, and `gh run list --repo
   shakenfist/development --branch <probe branch>` prints nothing.
 * The three soak URLs in the record are runs that succeeded after
@@ -3394,7 +3411,14 @@ We should list obvious extensions, known issues, unrelated bugs we
 encountered, and anything else we should one day do but have
 chosen to defer to here, so that we do not forget them.
 
-...
+- #389: the App holds two private keys, and phase 1's one-key
+  property is false. `PLAN-workflow-ref-trust.md` step 2a added
+  `actions` by generating a key for it alone rather than rotating
+  all five environments, which is the failure this plan's own
+  review round rewrote adoption step 7 to prevent. Completing the
+  rotation is one pass over five repositories; the property can
+  only be confirmed by eye on the App's settings page, which is
+  also why nothing caught it.
 
 ### Bugs fixed during this work
 

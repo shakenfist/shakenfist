@@ -104,26 +104,38 @@ the ruleset) and judges every actor by its type:
 | any other value | An error, never a pass: an actor type the audit does not recognise has not been judged. |
 
 **One known team bypass.** `sf-can-skip-merge-queue` (`Team`, actor id
-`11722172`) is a bypass actor on all seven of the organisation's
-pull-request rulesets, so by the table above all seven fail this half
-today. Its automation member was removed on 2026-11-08, leaving
-`mikalstill` and `sfconductor`. `sfconductor`'s bypasses are pull request
-merges that skip the queue rather than pushes to a default branch;
-`mikalstill` is a person holding admin, whose bypasses the history counts
-without classifying. The rule-suite history read on 2026-10-29, which
-covers the month before that read and so the period before the removal
-above, records `sfconductor` bypassing in five of the seven repositories
-(shakenfist 52, kerbside 7, client-python-k3s 2, ryll 1 and instar 1) and
-`mikalstill` in all seven. That read is
+`11722172`) is a bypass actor on every one of the organisation's
+pull-request rulesets except `actions`' `21132503`, so by the table
+above all of those fail this half today. `actions` is the exception
+because its ruleset carries the review-marks App as its only bypass
+actor; it gained its pull-request rule on 2026-11-11. Stated without a
+count deliberately: the previous wording here named a number, which
+went stale as repositories were standardised and then read as a verdict
+about the ones it no longer covered. (Checked across the organisation
+on 2026-11-11. Three private repositories answer 403 to the rulesets
+endpoint and hold no rulesets at all.)
+
+The team's automation member was removed on 2026-11-08, leaving
+`mikalstill` and `sfconductor`. `sfconductor`'s bypasses are pull
+request merges that skip the queue rather than pushes to a default
+branch; `mikalstill` is a person holding admin, whose bypasses the
+history counts without classifying. The rule-suite history read on
+2026-10-29 covered the seven repositories `PLAN-bot-bypass-identity.md`
+names rather than the whole organisation, and covers the month before
+that read and so the period before the removal above; it records
+`sfconductor` bypassing in five of those seven (shakenfist 52,
+kerbside 7, client-python-k3s 2, ryll 1 and instar 1) and `mikalstill`
+in all seven. That read is
 `repos/<org>/<repo>/rulesets/rule-suites?time_period=month&rule_suite_result=bypass`
 per repository, counted by each entry's `actor_name`, with the
 merge-rather-than-push classification coming from resolving an entry's
-`after_sha` to the commit it produced. GitHub keeps about a month of that
-history, so the figures above are the record of that read rather than
-something a later reader can re-run; the query is named so the next one can
-be made the same way. A reviewer records the team as a known exception,
-with what `sfconductor` merges with still to be settled, rather than as a
-new finding; the exception ends when the team stops being a bypass actor.
+`after_sha` to the commit it produced. GitHub keeps about a month of
+that history, so the figures above are the record of that read rather
+than something a later reader can re-run; the query is named so the
+next one can be made the same way. A reviewer records the team as a
+known exception, with what `sfconductor` merges with still to be
+settled, rather than as a new finding; the exception ends when the team
+stops being a bypass actor.
 
 The admin-role and `OrganizationAdmin` passes rest on no automation
 identity holding an organisation-owner or repository-admin role -- in
@@ -154,6 +166,16 @@ every repository the review-marks App is installed on. The residual
 stands until the runner-controller App's permission is narrowed to the
 runner registration it actually needs; until then a reviewer accepts it
 knowingly rather than the audit reporting it clean.
+
+Since 2026-11-11 that residual reaches further than the product
+repositories. `PLAN-workflow-ref-trust.md` step 2a installed the
+review-marks App on `shakenfist/actions`, which serves the fleet's
+composite actions and reusable workflows at `@main`, so the same chain
+now ends in a push to the repository whose code runs inside every other
+repository's jobs -- and in a bypass of the pull-request ruleset that
+step created. Nothing about the chain changed; what changed is what sits
+at the end of it. A reviewer accepting the residual should know that is
+the reach.
 
 ## Template
 
@@ -197,9 +219,21 @@ every other field, and PUT it back:
 ```bash
 gh api repos/shakenfist/<repo>/rulesets --jq \
     '.[] | select(.target == "branch") | {id, name}'
-gh api repos/shakenfist/<repo>/rulesets/<id> > /tmp/ruleset.json
-# Append {"actor_id": 5538020, "actor_type": "Integration",
-#         "bypass_mode": "always"} to .bypass_actors, then:
+# The guard is inside the transform rather than before it. GitHub
+# omits bypass_actors for a credential it does not show it to, so
+# appending to a field that is not there would drop every actor the
+# ruleset has. error() says so on stderr and exits non-zero, which a
+# check pasted in as a separate command would not. The map() drops
+# any existing entry for the App first, so running this twice leaves
+# one entry rather than two.
+gh api repos/shakenfist/<repo>/rulesets/<id> | jq \
+    '{name, target, enforcement, conditions, rules,
+      bypass_actors: (if has("bypass_actors")
+                      then [.bypass_actors[] | select(.actor_id != 5538020)]
+                           + [{actor_id: 5538020, actor_type: "Integration",
+                               bypass_mode: "always"}]
+                      else error("bypass_actors not visible to this credential: "
+                             + "use one that can edit the ruleset") end)}' > /tmp/ruleset.json
 gh api -X PUT repos/shakenfist/<repo>/rulesets/<id> --input /tmp/ruleset.json
 ```
 
