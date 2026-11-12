@@ -125,10 +125,18 @@ MONITOR_START_INTERVAL = 30
 #
 # unpause(), and a power on which starts the domain, also have this
 # monitor restarted (see Instance._restart_sidechannel_monitor()), which
-# covers a pause of any length. This check is the backstop for when that cannot happen -- the
-# abort file could not be written, or the guest was frozen and thawed by
-# something other than pause() and unpause(), such as a host stall or a
-# suspend and resume made directly through libvirt.
+# covers a pause of any length. This check is the backstop for when that
+# cannot happen -- the abort file could not be written, or the guest was
+# frozen and thawed by something other than pause() and unpause(), such
+# as a host stall or a suspend and resume made directly through libvirt.
+#
+# Only the cache is reset, never agent_state itself. Whoever froze the
+# guest has already written something more informative than we could
+# (pause() writes "instance paused"), and the reply to the next
+# is_system_running request writes the truth through the usual change
+# detection in _handle_is_system_running(). That includes the move into
+# ready, so facts are gathered again after a pause, which is wanted: the
+# guest may have changed while frozen.
 #
 # A healthy agent is never silent for long: a ping goes out once nothing
 # has been seen for two seconds, and the socket timeout is one second,
@@ -375,6 +383,9 @@ class SideChannelMonitorJob(SideChannelJob):
         self.instance.agent_facts = facts
 
     def _note_data_received(self):
+        # Why a gap in replies resets the cache at all is beside
+        # AGENT_REPLY_GAP. Two things about where the check sits:
+        #
         # self.last_data cannot detect a gap, because sending a ping
         # moves it too. The check is made when data arrives rather than
         # on every pass of the loop: a frozen guest then costs nothing
@@ -382,16 +393,9 @@ class SideChannelMonitorJob(SideChannelJob):
         # and a reply which arrives just as the gap crosses the threshold
         # is not missed between two passes.
         #
-        # Only the cache is reset. Whoever froze the guest has already
-        # written something more informative than we could (pause()
-        # writes "instance paused"), and the reply to the next
-        # is_system_running request writes the truth through the usual
-        # change detection in _handle_is_system_running(). That includes
-        # the move into ready, so facts are gathered again after a pause,
-        # which is wanted: the guest may have changed while frozen. Every
-        # cached state is reset, not just the ready ones -- a degraded
-        # guest is asked is_system_running on every ping, but its reply
-        # is still only written when it differs from the cache.
+        # Every cached state is reset, not just the ready ones -- a
+        # degraded guest is asked is_system_running on every ping, but
+        # its reply is still only written when it differs from the cache.
         now = time.time()
         if now - self.last_received > AGENT_REPLY_GAP:
             if self.instance_ready != constants.AGENT_NEVER_TALKED:

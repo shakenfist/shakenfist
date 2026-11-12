@@ -743,11 +743,16 @@ class BaseTestCase(testtools.TestCase):
     def _node_by_identifier(self, nodes, identifier):
         """The node dict for a placement identifier, or None.
 
-        ``Instance.placement['node']`` is written by the placement RPC
-        and read back through ``Node.from_db()``, which accepts either
-        a node uuid or a node name -- and both forms have been in that
-        field. Match on both rather than picking one and being subtly
-        wrong on a cluster which uses the other.
+        This is how an instance's ``node`` field becomes the node dict
+        ``_node_exec()`` wants. ``Instance.placement['node']`` is written by
+        the placement RPC and read back through ``Node.from_db()``, which
+        accepts either a node uuid or a node name -- and both forms have
+        been in that field. Match on both rather than picking one and being
+        subtly wrong on a cluster which uses the other.
+
+        Pass the roster from ``_get_cluster_nodes()``, or the one the caller
+        already holds. Unlike ``_network_node()``, which finds the one node
+        flagged as the network node, this resolves an arbitrary identity.
         """
         if not identifier:
             return None
@@ -806,21 +811,6 @@ class BaseTestCase(testtools.TestCase):
         """Return the node dict for the cluster's network node, or None."""
         for n in self._get_cluster_nodes():
             if n.get('is_network_node'):
-                return n
-        return None
-
-    def _node_by_uuid(self, node_uuid):
-        """Return the node dict matching node_uuid, or None.
-
-        Unlike _network_node(), which finds the one node flagged as the
-        network node, this resolves an arbitrary node identity to the node
-        dict _node_exec() wants. An instance's 'node' field is exactly this
-        uuid: place_instance() (instance.py) writes the placement
-        attribute's 'node' key from config.NODE_UUID, and external_view()
-        passes it straight through.
-        """
-        for n in self._get_cluster_nodes():
-            if n.get('uuid') == node_uuid:
                 return n
         return None
 
@@ -1397,8 +1387,7 @@ class BaseTestCase(testtools.TestCase):
             f'state, and {expiry}. Instance state is {i["state"]} and the '
             f'last recorded event was {last_event}.')
 
-    def _await_instance_event(
-            self, instance_uuid, operation, message=None, after=None):
+    def _await_instance_event(self, instance_uuid, operation, after=None):
         self._await_instance_create(instance_uuid)
 
         # Once created, we shouldn't need more than another 5 minutes for boot.
@@ -1413,8 +1402,7 @@ class BaseTestCase(testtools.TestCase):
                 if after and event['timestamp'] <= after:
                     continue
 
-                if (event['message'] == operation and
-                        (not message or event['message'] == message)):
+                if event['message'] == operation:
                     return event['timestamp']
 
             time.sleep(5)
@@ -1423,7 +1411,7 @@ class BaseTestCase(testtools.TestCase):
         self._log_instance_events(instance_uuid)
         raise TimeoutException(
             f'After time {after}, instance {instance_uuid} had no event '
-            f'"{operation}:{message}"')
+            f'"{operation}"')
 
     def _await_domain_xml(self, instance_uuid):
         """The newest libvirt domain XML a hypervisor recorded for an instance.

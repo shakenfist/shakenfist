@@ -1,5 +1,10 @@
 # Copyright 2019 Michael Still and contributors
-"""Unit tests for ``BaseTestCase._assert_power_state()``.
+"""Unit tests for the power state helpers in ``shakenfist_ci/base.py``.
+
+``_assert_power_state()``, ``_domain_autostart()``,
+``_domain_root_disk_path()``, ``_node_by_identifier()`` and
+``_await_instance_event()`` are all read by the power state tests in
+``guest_ci_tests/test_state_changes.py``.
 
 The helper reads ``system_client.get_instance()['power_state']`` exactly
 once and fails without waiting or retrying: a wait would let a later
@@ -174,6 +179,103 @@ class AssertPowerStateTestCase(test_base.ShakenFistTestCase):
         self.assertRaises(
             AssertionError, self.harness._assert_power_state,
             'uuid1', 'on', 'after create')
+
+
+class _NodeLookupHarness(ci_base.BaseTestCase):
+    """A bound ``self`` for the node and event lookups, without setUp().
+
+    Mirrors _PowerStateHarness above.
+    """
+
+    def __init__(self, system_client):
+        self.system_client = system_client
+
+
+class NodeByIdentifierTestCase(test_base.ShakenFistTestCase):
+    """One lookup resolves an instance's ``node`` field to a node dict.
+
+    The field has carried both a node uuid and a node name, because
+    ``Node.from_db()`` accepts either, so the lookup matches on both
+    rather than on whichever form the cluster under test happens to use.
+    """
+
+    NODES = [
+        {'uuid': 'uuid-1', 'name': 'sf-1', 'fqdn': 'sf-1.example.com'},
+        {'uuid': 'uuid-2', 'name': 'sf-2', 'fqdn': 'sf-2.example.com'},
+    ]
+
+    def setUp(self):
+        super().setUp()
+        self.system_client = mock.MagicMock()
+        self.system_client.get_nodes.return_value = self.NODES
+        self.harness = _NodeLookupHarness(self.system_client)
+
+    def _lookup(self, identifier):
+        return self.harness._node_by_identifier(
+            self.harness._get_cluster_nodes(), identifier)
+
+    def test_a_uuid_resolves(self):
+        self.assertEqual(self.NODES[1], self._lookup('uuid-2'))
+
+    def test_a_name_resolves(self):
+        self.assertEqual(self.NODES[1], self._lookup('sf-2'))
+
+    def test_an_fqdn_resolves(self):
+        self.assertEqual(self.NODES[0], self._lookup('sf-1.example.com'))
+
+    def test_an_unknown_identifier_is_none(self):
+        self.assertIsNone(self._lookup('sf-9'))
+
+    def test_no_identifier_is_none(self):
+        # An instance which has not been placed yet has no node, which is
+        # not an error for a caller which then skips the node exec.
+        self.assertIsNone(self._lookup(None))
+
+
+class AwaitInstanceEventTestCase(test_base.ShakenFistTestCase):
+    """The wait matches an event's ``message``, which is the only field it
+    could match: ``EventReadRow`` has no ``operation``. The second matcher
+    it used to carry could only ever repeat the first, so it is gone.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.system_client = mock.MagicMock()
+        self.harness = _NodeLookupHarness(self.system_client)
+        self.harness._await_instance_create = mock.MagicMock()
+        self.harness._log_console = mock.MagicMock()
+        self.harness._log_instance_events = mock.MagicMock()
+
+    def test_a_matching_message_returns_its_timestamp(self):
+        self.system_client.get_instance_events.return_value = [
+            {'message': 'poweroff', 'timestamp': 10},
+            {'message': 'detected poweroff', 'timestamp': 20},
+        ]
+
+        self.assertEqual(
+            20,
+            self.harness._await_instance_event('uuid1', 'detected poweroff'))
+
+    def test_an_event_from_before_after_is_ignored(self):
+        # The same operation can happen more than once in a test, so a wait
+        # must not be satisfied by the previous one.
+        self.system_client.get_instance_events.return_value = [
+            {'message': 'detected poweroff', 'timestamp': 10},
+            {'message': 'detected poweroff', 'timestamp': 30},
+        ]
+
+        self.assertEqual(
+            30,
+            self.harness._await_instance_event(
+                'uuid1', 'detected poweroff', after=20))
+
+    def test_the_instance_must_be_created_first(self):
+        self.system_client.get_instance_events.return_value = [
+            {'message': 'poweron', 'timestamp': 10}]
+
+        self.harness._await_instance_event('uuid1', 'poweron')
+
+        self.harness._await_instance_create.assert_called_once_with('uuid1')
 
 
 # Realistic `virsh dominfo` output, trimmed to the lines _domain_autostart()

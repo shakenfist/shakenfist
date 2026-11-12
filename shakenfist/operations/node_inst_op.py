@@ -160,7 +160,7 @@ class NodeInstOp(BaseClusterOperation):
                         try:
                             statistics.update(util_libvirt.extract_statistics(domain))
                         except lc.libvirt.libvirtError as e:
-                            if not lc.is_domain_not_running(e):
+                            if not lc.is_state_invalid(e):
                                 raise
                             self.log.debug(f'Domain stopped while its statistics were read: {e}')
 

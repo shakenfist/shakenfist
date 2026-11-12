@@ -922,18 +922,18 @@ Extensions:
   `nvram_template` might work, but that needs a spike.
 - A memory exhaustion signal for power on, belonging with the placement
   ledger.
-- Clean-ups ([#4487](https://github.com/shakenfist/shakenfist/issues/4487)):
-  - one matcher for libvirt's "domain is not running";
-  - fewer copies of pause and unpause;
-  - one CI node lookup;
-  - the dead `message` parameter of `_await_instance_event()`.
 - `_await_image_event()` in `shakenfist_ci/base.py` matches an
   `operation` field which events do not have, and has no callers.
   Delete it or fix it.
 - Splitting `instance.py`'s power operations into their own module.
 
 Resolved: F9 was re-read and deliberately left alone. A CI check for
-unit test fakes was judged unwarranted (phase 4, 4d).
+unit test fakes was judged unwarranted (phase 4, 4d). The clean-ups
+([#4487](https://github.com/shakenfist/shakenfist/issues/4487)) landed:
+one matcher each for libvirt's "domain is not running" and "domain is
+already running", one guard and one bounded retry behind reboot, pause
+and unpause, one CI node lookup, the dead `message` parameter of
+`_await_instance_event()`, and one explanation of the stale agent cache.
 
 ### Bugs fixed during this work
 

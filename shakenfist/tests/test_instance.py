@@ -1839,6 +1839,93 @@ class InstancePauseUnpauseTestCase(InstanceLibvirtTestCase):
 
         self.assertEqual('paused', self.inst.power_state['power_state'])
 
+    def test_the_guard_names_the_operation_it_refused(self):
+        # reboot(), pause() and unpause() share one active domain guard, so
+        # the operation in its refusal comes from the caller. A guard which
+        # named one of them would answer a misleading 409 for the others.
+        self._mock_libvirt(FakeDomain(active=False), power_state='off')
+
+        for operation, call in [('reboot', self.inst.reboot),
+                                ('pause', self.inst.pause),
+                                ('unpause', self.inst.unpause)]:
+            with testtools.ExpectedException(
+                    exceptions.InvalidLifecycleState,
+                    f'you cannot {operation} a powered off instance'):
+                call()
+
+    def test_a_domain_which_stops_mid_call_names_the_operation(self):
+        # The same message where the domain stops between the guard and the
+        # libvirt call, which the retry helper raises rather than the guard.
+        for operation, call, state in [
+                ('pause', self.inst.pause, 'on'),
+                ('unpause', self.inst.unpause, 'paused')]:
+            domain = FakeDomain(error=FakeLibvirtError(
+                'Requested operation is not valid: domain is not running'))
+            self._mock_libvirt(domain, power_state=state)
+            with testtools.ExpectedException(
+                    exceptions.InvalidLifecycleState,
+                    f'you cannot {operation} a powered off instance'):
+                call()
+
+    def test_pause_events_name_each_attempt_and_the_failure(self):
+        # The events are built from the operation's name, so a shared retry
+        # helper must not leave a pause recorded as an unpause.
+        self._mock_libvirt(FakeDomain(), power_state='on')
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+                self.inst.pause()
+
+        self.assertEqual(
+            ['pause', 'pause', 'pause', 'pause failed'],
+            [c.args[1] for c in add_event.call_args_list])
+        self.assertEqual(
+            [1, 2, 3],
+            [c.kwargs['extra']['attempt'] for c in add_event.call_args_list
+             if c.args[1] == 'pause'])
+
+    def test_unpause_events_name_each_attempt_and_the_failure(self):
+        self._mock_libvirt(FakeDomain(), power_state='paused')
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+                self.inst.unpause()
+
+        self.assertEqual(
+            ['unpause', 'unpause', 'unpause', 'unpause failed'],
+            [c.args[1] for c in add_event.call_args_list])
+
+    def test_pause_does_not_treat_already_running_as_success(self):
+        # "Already running" is the state unpause() wanted, and only unpause()
+        # recognises it. Tolerating it for every operation on the shared
+        # retry would answer success for a pause which did not happen.
+        domain = FakeDomain(error=ALREADY_RUNNING)
+        self._mock_libvirt(domain, power_state='on')
+
+        with testtools.ExpectedException(
+                FakeLibvirtError, '.*domain is already running'):
+            self.inst.pause()
+
+    def test_pause_writes_the_power_state_before_the_agent_state(self):
+        # Same ordering requirement as power_off(): with agent_state first,
+        # a sidechannel monitor which read power_state in between saw a
+        # running instance and was free to write 'ready' over the pause.
+        self._mock_libvirt_transition(
+            FakeDomain(), 'suspend_calls', before='on', after='paused')
+
+        calls = mock.Mock()
+        with mock.patch.object(instance.Instance, 'update_power_state',
+                               calls.update_power_state), \
+                mock.patch.object(instance.Instance, 'agent_state',
+                                  new_callable=mock.PropertyMock) as agent:
+            calls.attach_mock(agent, 'agent_state')
+            self.inst.pause()
+
+        self.assertEqual(
+            [mock.call.update_power_state('paused'),
+             mock.call.agent_state(constants.AGENT_INSTANCE_PAUSED)],
+            calls.mock_calls)
+
 
 class ResumeDomain(FakeDomain):
     """A domain whose resume() raises each of resume_errors in turn, a None

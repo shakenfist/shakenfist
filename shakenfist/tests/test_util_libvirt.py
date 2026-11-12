@@ -534,21 +534,67 @@ class UtilLibvirtErrorClassification(base.ShakenFistTestCase):
             'domain is not running',
             code=FakeLibvirtModule.VIR_ERR_OPERATION_INVALID)
         self.assertFalse(lc.is_domain_gone(error))
-        self.assertTrue(lc.is_domain_not_running(error))
+        self.assertTrue(lc.is_state_invalid(error))
 
     def test_other_codes_are_neither(self):
         lc = _connection()
         error = FakeLibvirtError(
             'internal error', code=FakeLibvirtModule.VIR_ERR_INTERNAL_ERROR)
         self.assertFalse(lc.is_domain_gone(error))
-        self.assertFalse(lc.is_domain_not_running(error))
+        self.assertFalse(lc.is_state_invalid(error))
 
     def test_errors_which_are_not_libvirt_errors_are_neither(self):
         # The cleaner's per-domain handler also catches database and
         # process errors, which have no libvirt error code.
         lc = _connection()
         self.assertFalse(lc.is_domain_gone(RuntimeError('x')))
-        self.assertFalse(lc.is_domain_not_running(RuntimeError('x')))
+        self.assertFalse(lc.is_state_invalid(RuntimeError('x')))
+
+
+class UtilLibvirtRunningStateMessages(base.ShakenFistTestCase):
+    """VIR_ERR_OPERATION_INVALID covers every "not valid in this state"
+    refusal, so the power operations tell the two power state refusals
+    apart by libvirt's message. One matcher each, rather than the string
+    written out at every site which handles it.
+    """
+
+    def test_the_messages_libvirt_actually_sends(self):
+        # Exactly as libvirt words them, which is what every power
+        # operation in instance.py was matching by hand.
+        self.assertTrue(util_libvirt.is_domain_not_running(
+            FakeLibvirtError(
+                'Requested operation is not valid: domain is not running',
+                code=FakeLibvirtModule.VIR_ERR_OPERATION_INVALID)))
+        self.assertTrue(util_libvirt.is_domain_already_running(
+            FakeLibvirtError(
+                'Requested operation is not valid: domain is already running',
+                code=FakeLibvirtModule.VIR_ERR_OPERATION_INVALID)))
+
+    def test_the_two_messages_do_not_match_each_other(self):
+        already = FakeLibvirtError(
+            'Requested operation is not valid: domain is already running',
+            code=FakeLibvirtModule.VIR_ERR_OPERATION_INVALID)
+        self.assertFalse(util_libvirt.is_domain_not_running(already))
+
+        not_running = FakeLibvirtError(
+            'Requested operation is not valid: domain is not running',
+            code=FakeLibvirtModule.VIR_ERR_OPERATION_INVALID)
+        self.assertFalse(util_libvirt.is_domain_already_running(not_running))
+
+    def test_another_state_refusal_matches_neither(self):
+        # The code alone cannot be the test: this shares it.
+        error = FakeLibvirtError(
+            'Requested operation is not valid: domain is not suspended',
+            code=FakeLibvirtModule.VIR_ERR_OPERATION_INVALID)
+        self.assertFalse(util_libvirt.is_domain_not_running(error))
+        self.assertFalse(util_libvirt.is_domain_already_running(error))
+
+    def test_errors_which_are_not_libvirt_errors_match_neither(self):
+        # The matchers read str(e), so they must be safe to point at
+        # whatever an except block caught.
+        self.assertFalse(util_libvirt.is_domain_not_running(RuntimeError('x')))
+        self.assertFalse(
+            util_libvirt.is_domain_already_running(RuntimeError('x')))
 
 
 class UtilLibvirtErrorHandler(base.ShakenFistTestCase):
