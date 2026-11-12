@@ -233,6 +233,10 @@
          <lastmod>2026-11-12</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/audits/moving-ref-source-protection/</loc>
+         <lastmod>2026-11-12</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/audits/npm-pin-indirect-dependencies/</loc>
          <lastmod>2026-11-12</lastmod>
     </url>

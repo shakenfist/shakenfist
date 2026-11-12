@@ -2325,6 +2325,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/moving-ref-source-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Moving ref source protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
@@ -16803,7 +16831,10 @@ instead of static VM passwords:</p>
    it expires; expired tokens are reaped only once they also have no open
    proxy channels. The default token lifetime is short (one minute), which
    bounds the reuse window, but a token is not strictly single-use despite
-   older descriptions to that effect.</p>
+   older descriptions to that effect. Whether it ought to be is an open
+   question rather than a settled design point:
+   <a href="https://github.com/shakenfist/kerbside/issues/718">#718</a> carries the
+   decision, and nothing here should be read as either answer.</p>
 <ol>
 <li><strong>Console Lookup</strong>: Valid tokens are mapped to specific VM consoles,
    allowing Kerbside to establish the correct backend connection.</li>
@@ -16820,17 +16851,22 @@ reference implementation (<code>reds_handle_ticket()</code> in
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="k">goto</span><span class="w"> </span><span class="n">error</span><span class="p">;</span>
 <a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">}</span>
 </code></pre></div>
-<p>Combined with Kerbside's one-time-use, time-limited token model,
-this has an important consequence:</p>
+<p>Combined with Kerbside's short-lived token model, this has an
+important consequence:</p>
 <p><strong>A channel that drops mid-session is permanently lost.</strong>
-Re-establishing the channel requires presenting a valid, unconsumed
-token to the server. Under Kerbside's auth model:</p>
+Re-establishing the channel requires presenting a valid token to the
+server. Under Kerbside's auth model:</p>
 <ul>
-<li>The token is invalidated on first use (see "Token Validation"
-  above).</li>
-<li>Even if it weren't, its expiry is short by design.</li>
+<li>A token is <em>not</em> invalidated on first use (see "Token Validation"
+  above), so within its lifetime it would still be accepted.</li>
+<li>But that lifetime is short by design.
+  <code>CONSOLE_TOKEN_DURATION</code> defaults to one minute, so a session that
+  has run for longer than that -- which is every session worth
+  recovering -- has no token left to present.</li>
 </ul>
-<p>So if a session establishes (say) main + display + inputs + cursor
+<p>Inside that first minute the token would be accepted, and the
+recovery still does not happen, because nothing asks for it. So if a
+session establishes (say) main + display + inputs + cursor
 + playback + usbredir at connection bring-up, and the playback
 channel later drops due to a transport hiccup, the user permanently
 loses audio for that session. The remaining channels continue to

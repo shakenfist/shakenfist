@@ -2325,6 +2325,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/moving-ref-source-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Moving ref source protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
@@ -15934,7 +15962,36 @@ drop-in replacement for <code>qemu-img compare</code>.</p>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Compare LUKS-encrypted QCOW2 against decrypted raw</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>instar<span class="w"> </span>compare<span class="w"> </span>--luks-passphrase<span class="w"> </span>secret<span class="w"> </span>encrypted.qcow2<span class="w"> </span>decrypted.raw
 </code></pre></div>
-<p>Exit codes: 0 = identical, 1 = content differs.</p>
+<p>Exit codes, as qemu-img compare's:</p>
+<table>
+<thead>
+<tr>
+<th>Exit</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>The images are identical.</td>
+</tr>
+<tr>
+<td>1</td>
+<td>The images differ. Only a comparison that found a difference exits 1.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>An image could not be opened or set up for comparison, or any other error: nothing was compared.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>A read failed part-way through the comparison. The error names the image and the virtual offset of the failed read.</td>
+</tr>
+</tbody>
+</table>
+<p>A failure is never reported as a difference. An error goes to stderr as
+<code>Error: "..."</code> and nothing is printed on stdout, so a script can rely on
+exit 1 meaning the images really differ.</p>
 <p>The compare operation reads the virtual content of both images and reports the
 first byte offset where content diverges. For QCOW2 and VMDK images, this
 includes cluster/grain/block table lookup and compressed cluster decompression
@@ -15962,7 +16019,7 @@ account for:</p>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>has no parent behind it, so the sectors it leaves to its parent could
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>not be composed
 </code></pre></div>
-<p>and exits 1. A parent reference that cannot be resolved — the file is
+<p>and exits 2. A parent reference that cannot be resolved — the file is
 missing, or outside the backing file allowlist — is refused the same
 way, during chain discovery.</p>
 <p>See the "VHD/VHDX differencing" section of <a href="/components/instar/quirks/">quirks.md</a> for the

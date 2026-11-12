@@ -2325,6 +2325,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/moving-ref-source-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Moving ref source protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
@@ -16243,10 +16271,11 @@ Restarting the daemon ends every live SPICE session on the host.</p>
 <p>Kerbside is <a href="/components/kerbside/index/#kerbside-is-experimental">experimental</a>
 overall. The sanity job runs the role's <code>validate</code>, <code>bootstrap</code>,
 <code>config</code> and <code>register</code> entry points without root
-(<code>tools/ci-test-ansible-role.sh</code>), with <code>shakenfist</code>, <code>ovirt</code>,
-<code>openstack</code> and <code>static</code> sources, a stub
-virtual environment, and no migration or units. It also lints, builds
-and import-checks the collection. <a href="/components/kerbside/testing/#the-shaken-fist-end-to-end-lane-sf-e2e"><code>sf-e2e</code></a>
+(<code>tools/ci-test-ansible-role.sh</code>), with a source of each of the five
+types it accepts -- <code>shakenfist</code>, <code>ovirt</code>, <code>openstack</code>, <code>proxmox</code> and
+<code>static</code> -- a stub virtual environment, and no migration or units. It
+also lints, builds and import-checks the collection.
+<a href="/components/kerbside/testing/#the-shaken-fist-end-to-end-lane-sf-e2e"><code>sf-e2e</code></a>
 deploys each pull request's Kerbside through the role, on a Shaken
 Fist node, and checks that a second deploy restarts nothing.</p>
 <table>
@@ -16262,8 +16291,8 @@ Fist node, and checks that a second deploy restarts nothing.</p>
 <td>The role validates and renders all five source types, but installs no client library but <code>shakenfist-client</code> (<a href="https://github.com/shakenfist/kerbside/issues/602">#602</a>). An <code>ovirt</code> source is marked errored and ignored, and an <code>openstack</code> source's token exchange answers 500. Today the role deploys a Kerbside for Shaken Fist, Proxmox and static sources, which need no other client library.</td>
 </tr>
 <tr>
-<td>Proxmox through the role is untested</td>
-<td>The role validates a <code>proxmox</code> source, and a unit test checks its required fields, but the rootless test renders none and no lane starts one. No CI lane yet proves a proxied session against a real Proxmox VE cluster, by any deployment mechanism.</td>
+<td>No lane deploys a <code>proxmox</code> source through the role</td>
+<td>The role validates and renders a <code>proxmox</code> source, a unit test checks its required fields, and the rootless test renders one. No lane starts a role-deployed Kerbside with one. <a href="/components/kerbside/testing/#the-proxmox-end-to-end-lane"><code>proxmox-functional.yml</code></a> does prove a proxied SPICE session against a real single-node Proxmox VE 9, but it deploys Kerbside on the runner rather than through the role, and no lane has run either against a multi-node PVE cluster.</td>
 </tr>
 <tr>
 <td>No setting beyond the fifteen</td>
@@ -16271,7 +16300,7 @@ Fist node, and checks that a second deploy restarts nothing.</p>
 </tr>
 <tr>
 <td>Kerbside is started only with a Shaken Fist source, co-located</td>
-<td><code>sf-e2e</code> is the only lane that runs <code>register</code> against a real database and systemd, and it deploys one <code>shakenfist</code> source on a Shaken Fist node. The rootless test renders every source type but <code>proxmox</code>, and skips the migration and the units. No lane starts a role-deployed Kerbside with a <code>static</code> source, or on a host of its own.</td>
+<td><code>sf-e2e</code> is the only lane that runs <code>register</code> against a real database and systemd, and it deploys one <code>shakenfist</code> source on a Shaken Fist node. The rootless test renders every source type, but skips the migration and the units. No lane starts a role-deployed Kerbside with a <code>static</code> source, or on a host of its own.</td>
 </tr>
 <tr>
 <td>Only through Shaken Fist's <code>site.yml</code></td>

@@ -2325,6 +2325,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/moving-ref-source-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Moving ref source protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
@@ -16180,7 +16208,7 @@ lanes the sibling pages describe.</p>
 <tbody>
 <tr>
 <td>Nothing in CI runs two sources at once</td>
-<td>Each lane writes a single-source <code>sources.yaml</code> and says so itself: <code>tools/ovirt-e2e/gen-sources.py</code> emits "exactly one <code>type: ovirt</code> source", <code>tools/proxmox-e2e/gen-sources.py</code> emits "exactly one <code>type: proxmox</code> source", <code>tools/sf-e2e/deploy-kerbside.sh</code> writes "sources.yaml with one type: shakenfist source", and the heredoc in <code>tools/direct-qemu/lane-up.sh</code> declares one static entry. Aggregation itself is therefore untested end to end: every property on this page is read out of code which is only ever exercised one source at a time.</td>
+<td>Every lane ends up with a single-source <code>sources.yaml</code>. Three write it themselves and say so: <code>tools/ovirt-e2e/gen-sources.py</code> emits "exactly one <code>type: ovirt</code> source", <code>tools/proxmox-e2e/gen-sources.py</code> emits "exactly one <code>type: proxmox</code> source", and the heredoc in <code>tools/direct-qemu/lane-up.sh</code> declares one static entry. <code>sf-e2e</code> has the file rendered for it by the <code>kerbside</code> role, from the <code>kerbside_sources</code> that Shaken Fist's <code>examples/_shared/site.yml</code> derives: this cluster's own source, plus an optional <code>kerbside_extra_sources</code> the lane never sets. <code>tools/sf-e2e/prepare-drivers.sh</code> then stops the lane unless the rendered file holds exactly one <code>shakenfist</code> source. Aggregation itself is therefore untested end to end: every property on this page is read out of code which is only ever exercised one source at a time.</td>
 </tr>
 <tr>
 <td>Configured OpenStack clouds share a trust domain</td>

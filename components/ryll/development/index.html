@@ -2325,6 +2325,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/moving-ref-source-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Moving ref source protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
@@ -16493,7 +16521,14 @@ able to be opted out of at build time:</p>
   enables a polling task that scans the primary surface for a
   QR-encoded visual digest and emits a <code>digest_updated</code>
   control-socket event on each frame counter change.  Built
-  only for the kerbside test harness; not in production ryll.</li>
+  only for the kerbside test harness; not in production ryll.
+  <code>make lint</code> nonetheless builds ryll with this feature on, so
+  the <code>#[cfg(feature = "digest-decode")]</code> arms are compiled in
+  CI rather than only in the harness build -- a new
+  <code>ChannelEvent</code> variant has to be cfg-correct in both
+  configurations, because the event match in
+  <code>ryll/src/app/events.rs</code> names every variant instead of
+  ending in a wildcard.</li>
 <li><strong><code>rdp</code></strong> (default-off) — the <code>--rdp</code> mode, which serves the
   SPICE session to stock RDP clients through the
   shakenfist-spice-rdp crate and IronRDP.  It is a heavy

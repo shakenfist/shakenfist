@@ -2319,6 +2319,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/moving-ref-source-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Moving ref source protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
@@ -16772,6 +16800,18 @@ changed in this phase.</p>
   says how it is checked.</p>
 </li>
 </ul>
+<p><strong>What that evidence does not cover.</strong> An unchanged test count
+  proves no test broke; it does not prove the two edited paths are
+  tested, and neither is. Nothing in the tree constructs a
+  <code>RyllApp</code>, so no unit test can reach
+  <code>handle_session_initialized</code>'s early return on a refused retire
+  (risk 1), <code>finish_event_drain</code>'s rule that a connection failure
+  is acted on only once <code>event_rx</code> is empty, or
+  <code>spawn_auto_snapshot_task</code>'s true-on-spawn contract. This is
+  structural and predates the phase; writing those tests would
+  need a <code>RyllApp</code> that can be built headless, which is phase 5's
+  field regrouping at the earliest. Recorded here rather than left
+  implied.</p>
 <h2 id="execution-notes">Execution notes<a class="headerlink" href="#execution-notes" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
@@ -16815,7 +16855,11 @@ changed in this phase.</p>
   explicitly, which is the real cost of the rule, and the
   remaining four files this phase creates follow it. The step also
   widened <code>EVENT_CHANNEL_SIZE</code>, <code>INPUT_CHANNEL_SIZE</code> and
-  <code>RegionSelectEnd</code> to <code>pub(super)</code>. Note for step 3d:
+  <code>RegionSelectEnd</code> to <code>pub(super)</code>. The first two were reverted by
+  the automated-review follow-up recorded below, neither having
+  needed widening at all; <code>RegionSelectEnd</code> stays <code>pub(super)</code>
+  because <code>connection.rs</code> reads it across a module boundary, which
+  is why it was correctly left alone. Note for step 3d:
   <code>connection.rs</code> imports <code>RegionSelectEnd</code> from <code>super</code>, so that
   import must follow the enum into <code>trigger_snapshot.rs</code>.</p>
 </li>
@@ -16886,6 +16930,43 @@ changed in this phase.</p>
   <code>process_events</code> was additionally compared body-for-body, 497
   lines byte-identical. A future phase should fix the script
   rather than the expectation.</p>
+<ul>
+<li><strong>Automated review, 2026-11-12 (AEDT).</strong> #714 drew a
+  consider-only review (seven consider, two informational, no fix
+  or document items) and merged as <code>79fc466</code> before the items were
+  worked, so they land in a follow-up on
+  <code>app-split-p03-review-items</code>. Taken: the <code>digest-decode</code> clippy
+  lane is now part of <code>make lint</code>, so the arm that exists to turn a
+  new <code>ChannelEvent</code> variant into a compile error is actually
+  compiled on every pull request rather than once by hand; the
+  visibility widenings are reverted, which the review was right to
+  call a breach of decision 7 -- <code>pub(super)</code> on an item in
+  <code>app/mod.rs</code> means crate-visible, and a child module can read its
+  ancestors' private items anyway, so neither
+  <code>EVENT_CHANNEL_SIZE</code> nor <code>INPUT_CHANNEL_SIZE</code> needed widening and
+  nor did two of <code>connection.rs</code>'s own methods; and
+  <code>screenshots.rs</code>'s section banners are gone. The definition of
+  done above now records what the unchanged test count does not
+  prove.</li>
+</ul>
+<p>Declined, with reasons: the twelve-line note above <code>impl RyllApp</code>
+  stays where it is rather than returning to the arms, since
+  restoring the pointer costs the eighty-line budget the operator
+  chose to keep; and the <code>#[expect]</code>-over-<code>#[allow]</code> preference is
+  not written into <code>STYLEGUIDE.md</code> here, because the last phase of
+  the master plan establishes that convention and sweeps the
+  seventy-eight existing <code>#[allow]</code>s with it.</p>
+<p>Filed rather than fixed: the auto-snapshot retire cap permits one
+  more thread than its doc comment claims, which moved verbatim and
+  predates the plan, as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/716" title="GitHub Issue: shakenfist/ryll #716">ryll#716</a>.</p>
+<p>Found while acting on the review, and not in it: step 3a left
+  <code>app/mod.rs</code> with an intra-doc link to
+  <code>MAX_RETIRING_AUTO_SNAPSHOT_THREADS</code> after moving that constant to
+  <code>app/connection.rs</code>, so the link had been dangling since that
+  commit. <code>make lint</code> runs no rustdoc, so nothing in the repository
+  would have caught it. The link now names the child module, and a
+  <code>cargo doc</code> pass over the crate's private items is how it was
+  found.</p>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, please back brief the
 operator as to your understanding of the plan and how the work you

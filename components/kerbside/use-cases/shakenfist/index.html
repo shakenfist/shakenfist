@@ -2325,6 +2325,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/moving-ref-source-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Moving ref source protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
@@ -16464,13 +16492,18 @@ token at all.</p>
 <strong>smoke-tier gate</strong>, so it runs on every pull request as well as
 nightly, rather than only on entry to the merge queue; see
 <a href="/components/kerbside/testing/#the-shaken-fist-end-to-end-lane-sf-e2e">testing.md</a>.</p>
-<p>Two differences from a real deployment, both CI expedients
-rather than recommendations. Kerbside runs co-located on the
-Shaken Fist primary node, as the role's <code>kerbside-api</code> and
-<code>kerbside-daemon</code> systemd units, where a real deployment would
-usually put it on a host of its own. And the audience contract
-is exercised over a loopback <code>http://</code> URL, not the public HTTPS
-name a deployment would use.</p>
+<p>One difference from a real deployment, and it is a CI expedient
+rather than a recommendation: the audience contract is exercised
+over a loopback <code>http://</code> URL, not the public HTTPS name a
+deployment would use.</p>
+<p>The co-location is not an expedient. Kerbside runs on
+the Shaken Fist primary node, as the role's <code>kerbside-api</code> and
+<code>kerbside-daemon</code> systemd units, and that is the topology Shaken
+Fist recommends first -- put Kerbside on a hypervisor unless you
+have a reason not to, because it needs the fewest decisions. A
+dedicated host is the next simplest. See
+<a href="https://shakenfist.com/operator_guide/kerbside/#topologies">Topologies</a>
+in Shaken Fist's operator guide.</p>
 <h2 id="user-interaction-model">User interaction model<a class="headerlink" href="#user-interaction-model" title="Permanent link">&para;</a></h2>
 <p>Kerbside is a proxy, not a portal. Something has to ask it for a
 console on the user's behalf and deliver the resulting <code>.vv</code>
@@ -16517,8 +16550,8 @@ termination, and an adversarial matrix of rejections.</p>
 <td>Two conditions have to hold, and either can fail quietly. Pinning only happens on a leg that escalated to TLS, so a node whose qemu does not require a secure channel is relayed over its plaintext port with nothing to verify or pin. Where the escalation does happen, a node that publishes no <code>spice_server_cert_subject</code> leaves <code>host_subject</code> unset, and the proxy relays that backend without host-subject enforcement rather than refusing it. Whether your cluster publishes one depends on its version and node configuration. The optional knob for turning enforcement on anyway, and the PKI assumption it makes, are in <a href="/components/kerbside/console-sources/#shaken-fist">console-sources.md</a>.</td>
 </tr>
 <tr>
-<td>Off-box deployment untested in CI</td>
-<td>The lane runs Kerbside on the Shaken Fist primary over loopback. The real topology — Kerbside on its own host, reaching the API by name and the nodes by address — is the shape the oVirt lane proves, not this one.</td>
+<td>A dedicated host is untested in CI</td>
+<td>The lane runs Kerbside on the Shaken Fist primary over loopback, which is the topology Shaken Fist recommends first. A dedicated host — Kerbside reaching the API by name and the nodes by address — is the next-simplest topology its operator guide documents, and the shape the oVirt lane proves, not this one.</td>
 </tr>
 <tr>
 <td>Token exchange can be unavailable while scraping is fine</td>

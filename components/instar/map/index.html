@@ -2325,6 +2325,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/moving-ref-source-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Moving ref source protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
@@ -4534,6 +4562,17 @@
     <span class="md-ellipsis">
       
         Refused qcow2 L2 entries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-extent-in-an-unrecognised-state-is-refused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An extent in an unrecognised state is refused
       
     </span>
   </a>
@@ -16232,6 +16271,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#an-extent-in-an-unrecognised-state-is-refused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An extent in an unrecognised state is refused
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#known-divergences-from-qemu-img" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16569,6 +16619,15 @@ Exit 1; as on any other failure, the extents before the refused entry
 stay on stdout. <code>measure</code> refuses the same entries, and the reading
 operations refuse them when a read reaches one. See
 <a href="/components/instar/quirks/#invalid-qcow2-subcluster-entries-are-refused-as-in-qemu-img">docs/quirks.md § Invalid qcow2 subcluster entries are refused, as in qemu-img</a>.</p>
+<h2 id="an-extent-in-an-unrecognised-state-is-refused">An extent in an unrecognised state is refused<a class="headerlink" href="#an-extent-in-an-unrecognised-state-is-refused" title="Permanent link">&para;</a></h2>
+<p>The guest names each extent's state, and the host renders only the
+states it knows. An extent in any other state is refused rather than
+printed as data:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>map: the guest reported an extent at offset N in an unrecognised state 'S'; refusing to render it as data
+</code></pre></div>
+<p>Exit 1. As on any other failure, the extents before the refused one stay
+on stdout, so in JSON mode the array is left unterminated: a consumer
+must check the exit status before parsing.</p>
 <h2 id="known-divergences-from-qemu-img">Known divergences from qemu-img<a class="headerlink" href="#known-divergences-from-qemu-img" title="Permanent link">&para;</a></h2>
 <p>Each entry is documented in <a href="/components/instar/quirks/">quirks.md</a> with the
 rationale and the future-work pointer.</p>
@@ -16648,19 +16707,19 @@ sources for the same VHD-unallocated reason.</p>
 </ul>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Default human output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar map disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar map disk.qcow2
 </code></pre></div>
 <p>JSON for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar map --output=json disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar map --output=json disk.qcow2
 </code></pre></div>
 <p>Window slice — emit only the extents covering bytes <code>[1 MiB, 5 MiB)</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar map --start-offset=1M --max-length=4M disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar map --start-offset=1M --max-length=4M disk.qcow2
 </code></pre></div>
 <p>Format hint (skip auto-detection):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar map -f vmdk disk.vmdk
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>instar map -f vmdk disk.vmdk
 </code></pre></div>
 <p>Stream into <code>jq</code> to extract just the data extents:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>instar map --output=json disk.qcow2 | jq '.[] | select(.data == true)'
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>instar map --output=json disk.qcow2 | jq '.[] | select(.data == true)'
 </code></pre></div>
 
 

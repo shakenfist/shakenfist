@@ -2325,6 +2325,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/moving-ref-source-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Moving ref source protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
@@ -19603,7 +19631,12 @@ qcow2-luks).</p>
     reading operations, <code>map</code> and <code>measure</code>, and <code>check</code> reports a
     compressed entry as a corruption. The check operation skips
     overlap/refcount validation for data clusters when the external data
-    bit is set, and bounds-checks them against the data file's size.</p>
+    bit is set, and bounds-checks them against the data file's size.
+    Only the top image of a chain may have a data file: a backing image
+    with one is refused by name ("external data files are only
+    supported on the top image of a chain") by every operation that
+    reads the chain, where qemu-img reads it (#806). <code>info --chain</code>
+    still lists such a chain.</p>
 </li>
 <li>
 <p><strong>VDI Input Support</strong> - Convert, compare, and dd support VDI

@@ -2325,6 +2325,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/moving-ref-source-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Moving ref source protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
@@ -16240,10 +16268,10 @@ documented here are independent of that gap.)</p>
 <p>The standard meaning of <code>delete-this-file=1</code> is "the consumer
 should remove this file after reading it, because the
 contents are sensitive". The spec is silent on whether the
-<em>ticket inside</em> the file is single-use. Empirically, every
-producer that emits one-shot tickets (Kerbside, oVirt) sets
-<code>delete-this-file=1</code>, because a deleted file would be
-useless for reuse anyway.</p>
+<em>ticket inside</em> the file is single-use. Empirically, the
+producers that set <code>delete-this-file=1</code> (Kerbside, oVirt)
+emit tickets that are not worth replaying -- and a deleted
+file would be useless for reuse anyway.</p>
 <p><strong>ryll treats <code>delete-this-file=1</code> as a signal that the
 ticket is single-use</strong> and therefore:</p>
 <ul>
@@ -16256,12 +16284,18 @@ ticket is single-use</strong> and therefore:</p>
   a stream of failed link-establishment attempts and
   associated bug-report zips.</li>
 </ul>
+<p>Kerbside is the near miss here: its console token is not
+invalidated on first use, so it is replayable until it
+expires, <code>CONSOLE_TOKEN_DURATION</code> after issue (one minute
+by default). No client in the stack tries to replay it,
+so a copy left on disk after that first minute is not
+worth reusing, and inside it nothing asks to.</p>
 <p>If a future producer wants the file deleted but the ticket
-<em>reusable</em>, this interpretation will surprise it. We have
-not encountered that case in the wild and consider it a
-deployment contradiction. If it ever arises, an explicit
-override key can be added; we are not speculatively defining
-one.</p>
+<em>usefully</em> reusable, this interpretation will surprise it.
+We have not encountered that case in the wild and consider
+it a deployment contradiction. If it ever arises, an
+explicit override key can be added; we are not speculatively
+defining one.</p>
 <h3 id="delete-this-file0-or-absent-reusable-permanent"><code>delete-this-file=0</code> or absent → reusable / permanent<a class="headerlink" href="#delete-this-file0-or-absent-reusable-permanent" title="Permanent link">&para;</a></h3>
 <p>ryll allows automatic reconnect against the same <code>password</code>
 ticket. Suitable for development setups, local QEMU
@@ -16309,8 +16343,10 @@ expired-ticket modal (the server's view is authoritative)
 and logs a warning about possible clock skew.</p>
 <h2 id="how-to-support-these-in-your-producer">How to support these in your producer<a class="headerlink" href="#how-to-support-these-in-your-producer" title="Permanent link">&para;</a></h2>
 <h3 id="kerbside">Kerbside<a class="headerlink" href="#kerbside" title="Permanent link">&para;</a></h3>
-<p>Kerbside issues short-lifetime, single-use tickets. The
-recommended console.vv shape:</p>
+<p>Kerbside issues short-lifetime tickets. The <code>password</code> it
+writes is a console token which expires a minute after it is
+minted, rather than one invalidated when it is first used.
+The recommended console.vv shape:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[virt-viewer]</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="na">type</span><span class="o">=</span><span class="s">spice</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="na">host</span><span class="o">=</span><span class="s">{{ gateway_host }}</span>
@@ -16347,13 +16383,16 @@ two keys.</p>
 <h3 id="custom-homebrew-gateways">Custom / homebrew gateways<a class="headerlink" href="#custom-homebrew-gateways" title="Permanent link">&para;</a></h3>
 <p>The minimum to enable the ryll-specific UX is:</p>
 <ul>
-<li>Set <code>delete-this-file=1</code> if the ticket is single-use.</li>
+<li>Set <code>delete-this-file=1</code> if the ticket is single-use, or
+  short-lived enough that a copy left on disk is not worth
+  replaying -- which is the case Kerbside is in.</li>
 <li>Set <code>ticket-valid-until</code> to the unix timestamp at which the
   server will stop accepting the ticket.</li>
 </ul>
-<p>Both keys are independent. A reusable ticket with an expiry
-sets only <code>ticket-valid-until</code>. A single-use ticket without
-a known expiry sets only <code>delete-this-file=1</code>.</p>
+<p>Both keys are independent. A ticket worth replaying for as
+long as it is valid sets only <code>ticket-valid-until</code>. A ticket
+not worth replaying, with no known expiry, sets only
+<code>delete-this-file=1</code>.</p>
 <h2 id="future-extensions-under-consideration">Future extensions under consideration<a class="headerlink" href="#future-extensions-under-consideration" title="Permanent link">&para;</a></h2>
 <p>These are not implemented yet — they are placeholders to be
 discussed before any client-side work begins. PRs / issues
@@ -16365,7 +16404,9 @@ welcome.</p>
   without forcing the user back to the issuing portal. The
   obvious downside is the security model — the renew URL has
   to be authenticated by something other than the existing
-  ticket, since the existing ticket is single-use.</li>
+  ticket: renewal is wanted precisely when the existing
+  ticket is at or past its expiry, which is the point at
+  which it can no longer authenticate anything.</li>
 <li><code>monitors=N</code>: hint to the client about expected monitor
   count. Today ryll takes this as a CLI flag (<code>--monitors N</code>).
   Lifting to console.vv lets the deployment pre-configure

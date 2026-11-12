@@ -2325,6 +2325,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/moving-ref-source-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Moving ref source protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
@@ -16377,6 +16405,15 @@ behaviour.</p>
  stock-producible and check-clean — was silently
  corrupted (see docs/quirks.md). qemu-img proceeds
  check-clean on it.</li>
+<li><strong>External data files refused.</strong> A qcow2 overlay or
+ backing with the external-data-file feature refuses before
+ any byte changes, and the message names the image that
+ owns the data file: <code>qcow2 overlays with the
+ external-data-file feature cannot be committed</code> (error 3)
+ for the overlay, <code>the backing file uses the qcow2
+ external-data-file feature; instar cannot commit into it.
+ Fall back to `qemu-img commit`</code> (error 18) for the
+ backing. qemu-img commits both shapes.</li>
 <li><strong>Compressed backing clusters refused.</strong> A committed
  extent landing on a compressed backing L2 entry refuses
  with the existing <code>ERROR_UNSUPPORTED_FORMAT</code> (the code

@@ -2325,6 +2325,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/moving-ref-source-protection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Moving ref source protection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
@@ -16136,10 +16164,35 @@ must forward <strong>both</strong> public ports, for the reason above.</p>
 5901. Hypervisor SPICE ports use the same 5900-upwards range, but
 their numbering follows the cloud's choices, and the plaintext port is
 often the lower one. A <code>5900</code> in a use-case diagram about the backend
-leg is therefore a hypervisor port, not Kerbside's. The overlap also
-matters if Kerbside runs on a host that also runs hypervisor SPICE
-consoles, because the two will contend for the same ports. Move
-Kerbside's <code>VDI_*_PORT</code> values out of the range in that case.</p>
+leg is therefore a hypervisor port, not Kerbside's.</p>
+<p>Whether the overlap matters on a host that also runs hypervisor SPICE
+consoles depends on the cloud, so it is not a reason to move
+Kerbside's ports everywhere:</p>
+<ul>
+<li><strong>oVirt</strong> puts a console on whatever port the engine reports,
+  typically from 5900 upwards (<a href="/components/kerbside/use-cases/ovirt/">oVirt</a>). A
+  Kerbside on one of those hypervisors does contend, and its
+  <code>VDI_*_PORT</code> values should move out of the range.</li>
+<li><strong>Shaken Fist</strong> allocates each console a random port in the
+  30000-50000 range (<code>Instance._allocate_console_port</code> in Shaken
+  Fist's <code>shakenfist/instance.py</code>), so Kerbside's defaults clear
+  them. The role reserves nothing by default: on a Shaken Fist
+  hypervisor pass the cluster's daemon ports and a range covering
+  the consoles in <code>kerbside_reserved_ports</code>. The Ports section of
+  <code>ansible/README.md</code> shows <code>[30000, 65535]</code>, which covers them with
+  room to spare; keep ports of your own out of whichever range you
+  reserve. That the consoles are nowhere near 5900 is part of why Shaken
+  Fist's operator guide recommends putting Kerbside on a hypervisor
+  (<a href="/components/kerbside/use-cases/shakenfist/">Shaken Fist</a>).</li>
+<li><strong>Proxmox VE</strong> puts each VM's SPICE listener above this range and
+  fronts it with <code>spiceproxy</code> on port 3128, so a PVE node listens on
+  nothing Kerbside's 5900/5901 defaults want. No lane co-locates the
+  two -- the Proxmox lane runs Kerbside off-box from PVE -- so this
+  one is reasoned from where PVE puts its consoles rather than
+  exercised (<a href="/components/kerbside/use-cases/proxmox/">Proxmox VE</a>).</li>
+</ul>
+<p>For any other cloud, check where it puts its consoles before
+co-locating.</p>
 <h2 id="connections-kerbside-makes">Connections Kerbside makes<a class="headerlink" href="#connections-kerbside-makes" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
