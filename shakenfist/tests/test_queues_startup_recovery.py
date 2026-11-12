@@ -13,13 +13,20 @@ The same recovery now reaches the shared any-* queues, which every node's
 sf-queues drains. It could not before, because claimed_by named the database
 daemon's node rather than the worker's, so a stopped node's claim there was
 indistinguishable from a live peer's (#4652).
+
+Re-running is only correct for an operation whose tasks converge on a desired
+state, because this interruption, unlike a defer, lands wherever the SIGKILL
+did. A type which creates or appends declares RESTARTABLE = False and is
+errored instead; RestartabilityAuditTestCase holds that audit (#4656).
 """
 
 import types
 from unittest import mock
 
 from shakenfist import exceptions
+from shakenfist.constants import get_object_class
 from shakenfist.constants import NoSuchObject
+from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
 from shakenfist.daemons.queues import startup_tasks
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -37,9 +44,10 @@ SHARED_QUEUE = 'any-clusteroperation-user_facing'
 
 
 class FakeOp:
-    def __init__(self, state, refuse=False):
+    def __init__(self, state, refuse=False, restartable=True):
         self._state = state
         self.refuse = refuse
+        self.RESTARTABLE = restartable
         self.events = []
 
     @property
@@ -188,6 +196,43 @@ class RecoverInterruptedOperationsTestCase(base.ShakenFistTestCase):
         self.mariadb.delete_work_queue_row.assert_called_once_with(42)
         self.assertEqual(BaseClusterOperation.STATE_ERROR, op.state.value)
 
+    def test_non_restartable_op_is_errored_rather_than_requeued(self):
+        # #4656: a defer happens where the task chose to, but this
+        # interruption can land part way through a libvirt attach or a
+        # blob write. A type whose tasks create or append is errored, as
+        # the reaper's orphan pass did before this recovery existed.
+        op = self.ops['op'] = FakeOp(
+            BaseClusterOperation.STATE_EXECUTING, restartable=False)
+        self.rows.append(row(OWN_QUEUE, 'op', attempts=1, row_id=7))
+        startup_tasks.recover_interrupted_operations(NODE_UUID)
+        self.assertEqual(BaseClusterOperation.STATE_ERROR, op.state.value)
+        # The item goes too, or a worker would dequeue it, find the
+        # operation not executing, and resolve it anyway.
+        self.mariadb.delete_work_queue_row.assert_called_once_with(7)
+        self.assertEqual(1, len(op.events))
+        self.assertIn('cannot be safely re-run', op.events[0])
+
+    def test_non_restartable_op_is_left_alone_if_its_row_is_gone(self):
+        # Erroring an operation whose item another process has already
+        # taken would error work which is about to run.
+        op = self.ops['op'] = FakeOp(
+            BaseClusterOperation.STATE_EXECUTING, restartable=False)
+        self.rows.append(row(OWN_QUEUE, 'op'))
+        self.mariadb.delete_work_queue_row.return_value = False
+        startup_tasks.recover_interrupted_operations(NODE_UUID)
+        self.assertEqual(BaseClusterOperation.STATE_EXECUTING, op.state.value)
+        self.assertEqual([], op.events)
+
+    def test_a_non_restartable_op_does_not_stop_the_pass(self):
+        unsafe = self.ops['unsafe'] = FakeOp(
+            BaseClusterOperation.STATE_EXECUTING, restartable=False)
+        later = self.ops['later'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
+        self.rows.extend([row(OWN_QUEUE, 'unsafe'),
+                          row(OWN_QUEUE, 'later', row_id=2)])
+        startup_tasks.recover_interrupted_operations(NODE_UUID)
+        self.assertEqual(BaseClusterOperation.STATE_ERROR, unsafe.state.value)
+        self.assertEqual(BaseClusterOperation.STATE_QUEUED, later.state.value)
+
     def test_last_attempt_below_the_ceiling_is_still_requeued(self):
         op = self.ops['op'] = FakeOp(BaseClusterOperation.STATE_EXECUTING)
         self.rows.append(row(OWN_QUEUE, 'op', attempts=4))
@@ -229,6 +274,60 @@ class RecoverInterruptedOperationsTestCase(base.ShakenFistTestCase):
         self.rows.extend([row(OWN_QUEUE, 'refuses'), row(OWN_QUEUE, 'later', row_id=2)])
         startup_tasks.recover_interrupted_operations(NODE_UUID)
         self.assertEqual(BaseClusterOperation.STATE_QUEUED, later.state.value)
+
+
+class RestartabilityAuditTestCase(base.ShakenFistTestCase):
+    """Every cluster operation type declares whether it may be re-run.
+
+    This is the audit of #4656, kept as a test so that a new operation
+    type -- or a new task on an existing one -- has to make the same
+    decision rather than inheriting a default nobody looked at.
+
+    Restartable, because every task converges on a desired state:
+
+    * artifact_fetch_op, node_blob_op -- both already re-queue
+      themselves with defer_with_backoff(), and a fetch which finds the
+      blob local returns.
+    * imgcache_op -- each run mints a fresh transcode blob uuid, and
+      add_transcode() refuses a description the blob already has, so a
+      re-run deletes its own attempt. The interrupted run's blob is
+      unreferenced and the cluster daemon reaps it.
+    * node_aop_op -- returns unless the agent operation is still in
+      preflight, and ensure_local() is convergent.
+    * node_net_op, net_op, net_ip_op, net_iface_op, net_iface_ip_op,
+      net_macaddr_ip_op -- apply the network's current database state to
+      this host. (The net_* types are on sf-net's queues, which this
+      recovery does not read, but the declaration has to be right if
+      that changes.)
+    * node_inst_op -- instance_delete is the path the cleaner already
+      re-enqueues, and both sweep tasks return unless the instance is
+      created. collect_billing_statistics appends one duplicate usage
+      event if it is interrupted after recording one, which is a
+      repeated sample of a sweep that samples repeatedly, not work
+      applied twice.
+
+    Not restartable: see the RESTARTABLE comment on each class.
+    """
+
+    EXPECTED_NOT_RESTARTABLE = {
+        'node_inst_net_iface_op',
+        'node_inst_netdesc_op',
+        'node_inst_snap_op',
+    }
+
+    def test_the_audit_is_complete(self):
+        not_restartable = {
+            name for name in OPERATION_NAMES_TO_CLASSES
+            if not get_object_class(name).RESTARTABLE}
+        self.assertEqual(self.EXPECTED_NOT_RESTARTABLE, not_restartable)
+
+    def test_restartable_is_a_bool_everywhere(self):
+        # A truthy non-bool would work here and read as a mistake in the
+        # declaration, which is a decision, not a flag.
+        for name in OPERATION_NAMES_TO_CLASSES:
+            self.assertIsInstance(
+                get_object_class(name).RESTARTABLE, bool,
+                f'{name} must declare RESTARTABLE as a bool')
 
 
 class StartupResetTestCase(base.ShakenFistTestCase):

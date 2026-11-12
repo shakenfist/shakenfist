@@ -66,6 +66,17 @@ class NodeInstSnapOp(BaseClusterOperation):
     initial_version = schema.initial_version
     current_version = schema.current_version
 
+    # The blob uuid is allocated by the API before the operation is
+    # enqueued, so if the interrupted run got as far as Blob.new() the
+    # re-run calls it on a uuid which already exists -- create_blob()
+    # returns False, _db_create raises, and the generic handler in
+    # dispatch_task() errors the instance, the artifact and the blob.
+    # A run which reached add_index() would append a second index for
+    # the same blob as well, because a user snapshot forces a new
+    # index. The interruption point is unknowable from here, so no
+    # re-run of this type is safe.
+    RESTARTABLE = False
+
     def __init__(self, static_values):
         self.upgrade(static_values)
         super().__init__(static_values, schema)

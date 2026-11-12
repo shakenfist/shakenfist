@@ -74,6 +74,16 @@ class NodeInstNetdescOp(BaseClusterOperation):
     initial_version = schema.initial_version
     current_version = schema.current_version
 
+    # instance_create re-run against an instance it already created
+    # deletes it: Instance.create() starts by writing state creating,
+    # which is not a legal transition out of created, and the
+    # InvalidStateException handler below reads a failed transition as a
+    # race and calls enqueue_delete_due_error(). instance_start ends by
+    # enqueuing the instance_create op, so a re-run enqueues a second
+    # one and reaches the same place; instance_preflight re-run spends
+    # another of the four placement attempts.
+    RESTARTABLE = False
+
     def __init__(self, static_values):
         self.upgrade(static_values)
         super().__init__(static_values, schema)

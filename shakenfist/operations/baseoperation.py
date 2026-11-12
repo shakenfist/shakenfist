@@ -158,6 +158,28 @@ class BaseClusterOperation(BaseOperation):
     coalescible_tasks: 'frozenset[Enum]' = frozenset()
     coalescible_key_columns: tuple[str, ...] = ()
 
+    # Whether this operation may be re-run from its first task after
+    # being interrupted at a point it did not choose.
+    #
+    # ``defer_with_backoff()`` also moves an operation from executing
+    # back to queued, but a task defers where it decided to, having
+    # either not yet done or already undone anything which matters.
+    # sf-queues' startup recovery re-queues an operation the previous
+    # process was killed in the middle of (#4543), and that SIGKILL can
+    # land anywhere: part way through a libvirt attach, between writing
+    # a blob and recording it, or after enqueuing a follow-up operation
+    # but before the operation which enqueued it completed. A type
+    # whose tasks converge on a desired state does not care; one which
+    # creates or appends applies its side effects a second time.
+    #
+    # ``False`` means "error me rather than re-run me", which is what
+    # the reaper's orphan pass did before startup recovery existed. The
+    # audit behind each declaration is in
+    # docs/developer_guide/database_internals.md, and a new operation
+    # type has to make the same decision -- which
+    # test_queues_startup_recovery pins by enumerating every class.
+    RESTARTABLE: bool = True
+
     def execution_duration_extra(
             self,
             start_time: float,

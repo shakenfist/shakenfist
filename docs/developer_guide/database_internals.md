@@ -649,6 +649,36 @@ is this node's, whatever `claimed_by` says. (The cluster daemon drains
 a node's own queues once the node is deleted, so a deleted node which
 came back under the same uuid could reset a claim that drain holds.)
 
+Re-running is only correct for an operation whose tasks converge on a
+desired state. `defer_with_backoff()` makes the same `executing` to
+`queued` transition, but a task defers at a point it chose; this
+interruption lands wherever the SIGKILL did, which may be part way
+through a libvirt attach, between writing a blob and recording it, or
+after enqueuing a follow-up operation but before the operation which
+enqueued it completed. So a cluster operation class declares
+`RESTARTABLE`, and startup recovery errors an operation declaring
+`False` and drops its item instead of re-queuing it -- which is what
+the orphan pass did with every interrupted operation before this
+recovery existed (issue 4656).
+
+Three types declare `False`, each because a task creates or appends
+rather than converging: `node_inst_snap_op` (the blob uuid is allocated
+before the operation is enqueued, so a second `Blob.new()` on it is
+refused and the handler errors the instance, the artifact and the
+blob), `node_inst_net_iface_op` (the hot plug enqueues the attach, and
+the attach asks libvirt for a mac address the domain already has) and
+`node_inst_netdesc_op` (`instance_create` writes state `creating`,
+which is not a legal transition out of `created`, and the handler reads
+the failed transition as a race and deletes the instance). Everything
+else converges: the artifact fetch and blob replication paths already
+re-queue themselves, the image cache transcode mints a fresh blob uuid
+per run and refuses a duplicate description, the agent operation
+preflight and all of the network apply tasks reapply current database
+state, and the instance delete is the path the cleaner already
+re-enqueues. The audit is pinned by `RestartabilityAuditTestCase` in
+`shakenfist/tests/test_queues_startup_recovery.py`, so a new operation
+type has to make the same decision.
+
 Recovery is best effort, one item at a time. An item it cannot recover,
 for example because its operation type no longer exists, is logged and
 left for the reaper. If the claims cannot be listed at all, startup

@@ -56,6 +56,14 @@ class NodeInstNetIfaceOp(BaseClusterOperation):
     initial_version = schema.initial_version
     current_version = schema.current_version
 
+    # Both tasks append rather than converge. hot_plug_instance_interface
+    # ends by enqueuing an attach_instance_interface op, so a re-run
+    # enqueues a second one and the interface is attached twice; and
+    # attach_instance_interface's own re-run asks libvirt to attach a
+    # device with a mac address the domain already has, which either
+    # duplicates it or fails and errors the instance and the interface.
+    RESTARTABLE = False
+
     def __init__(self, static_values):
         self.upgrade(static_values)
         super().__init__(static_values, schema)

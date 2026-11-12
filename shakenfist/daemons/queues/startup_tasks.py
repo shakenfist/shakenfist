@@ -391,6 +391,14 @@ def recover_interrupted_operations(node_uuid):
     as the reaper would, so an operation which kills sf-queues cannot keep
     killing it.
 
+    A defer happens at a point the task chose; this interruption does not, so
+    re-running is only correct for a type whose tasks converge on a desired
+    state. A type which creates or appends -- a snapshot writing a blob whose
+    uuid the API already allocated, an interface attach, an instance create --
+    declares RESTARTABLE = False, and such an operation is errored and its
+    item dropped rather than re-queued, which is what the reaper's orphan pass
+    did with every interrupted operation before this recovery existed (#4656).
+
     A claim this node left on one of the shared any-* queues is recovered on
     the same basis, but only when claimed_by is this node's uuid. Every
     node's sf-queues drains those queues, so a claim there which names
@@ -456,6 +464,20 @@ def _recover_interrupted_operation(row):
                 EVENT_TYPE_AUDIT,
                 f'errored at sf-queues startup: interrupted after '
                 f'{row["attempts"]} claim attempts', extra=details)
+        elif not op.RESTARTABLE:
+            # This type's tasks create or append, so running them again
+            # from the top applies their side effects twice rather than
+            # converging. Error it and drop its item, which is what the
+            # reaper's orphan pass did with every interrupted operation
+            # before this recovery existed (#4656).
+            if not mariadb.delete_work_queue_row(row['id']):
+                return
+            op.state = BaseClusterOperation.STATE_ERROR
+            op.add_event(
+                EVENT_TYPE_AUDIT,
+                'errored at sf-queues startup: interrupted, and this '
+                'operation type cannot be safely re-run from its first '
+                'task', extra=details)
         else:
             op.state = BaseClusterOperation.STATE_QUEUED
             op.add_event(
