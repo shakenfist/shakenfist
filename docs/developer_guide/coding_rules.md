@@ -247,6 +247,43 @@ replacement raced the dying process's sockets (#4472) -- must not be able to
 abort the teardown it was added to. Observing an exit is instrumentation; when
 instrumentation cannot answer, it says so and the cleanup still runs.
 
+## Releasing a lock is not part of the work
+
+`NodeLock.__exit__` was the whole unlock request and nothing else, so a
+nodelock daemon which went away between the acquire and the release turned a
+*completed* operation into a failed one. On sfcbr during an ordinary rolling
+restart, `_apply_delete_on_hypervisor` ran its whole teardown, left the
+`with` block, and then raised `ConnectionResetError` out of the unlock: the
+instance was gone, the network teardown had run, and the delete operation was
+marked failed anyway, so the client retried into an operation which found
+everything already deleted (#4902). Three milliseconds later the enclosing
+instance lock's release failed the same way.
+
+A context manager's `__exit__` has a second, worse failure mode: an exception
+raised there replaces whatever the body raised. The real error becomes a
+message about tidying up after it.
+
+So a release failure is logged, not raised — `ClusterLock.__exit__` has
+swallowed its own `LockNotHeld` for this reason far longer. For a node lock
+that is also *safe*, and the reason is worth stating because it is a property
+of the daemon rather than of the lock: `daemons/nodelock/main.py` holds its
+lock table as a plain dict local to `main()` and deletes a key before it
+answers, so a daemon which cannot answer an unlock has either dropped every
+lock it held or has already released this one. There is nothing leaked to
+clean up.
+
+The exception is a request which never arrived, because a nodelock has no
+lease and so really would stay held until the daemon restarted — and a refused
+connection is not proof the daemon is gone, since a healthy daemon with a full
+listen backlog refuses connections too. `__exit__` therefore retries the
+unlock `NODELOCK_UNLOCK_ATTEMPTS` times before it gives up and logs.
+
+`UnknownNodeLockReplyException` is deliberately outside
+`NODELOCK_TRANSPORT_ERRORS`, the one list of what a restarting nodelock daemon
+looks like to a client: a reply which parses but carries no known field is a
+bug in this protocol, not a daemon blip, and it stays loud in `__exit__` and in
+`health_check_nodelock()` alike.
+
 ## Fail closed on a field, not on a formatting accident
 
 A reply that says "this went wrong" must say so in a field set only on the
