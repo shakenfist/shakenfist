@@ -47,6 +47,7 @@ from sqlalchemy.dialects.mysql import INET4
 from sqlalchemy.exc import DataError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import ProgrammingError
 from shakenfist_utilities import logs
 
 from shakenfist.config import config
@@ -55,6 +56,7 @@ from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
 from shakenfist.constants import GiB
 from shakenfist.constants import NODE_ACTIVE_STATES
 from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
+from shakenfist import constants
 from shakenfist import exceptions
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
@@ -458,7 +460,9 @@ _event_objects_table: Optional[sa.Table] = None
 #   All tables v1: Initial schema creation
 #   All tables v2: Data migration from etcd to MariaDB
 #   blob_hashes: Same pattern - v1 schema, v2 data migration from etcd
-OBJECT_STATES_VERSION = 3
+# v4: object_uuid widened from a uuid's width to an object key's width,
+# because a namespace's key is its name (issue 4856).
+OBJECT_STATES_VERSION = 4
 IPAM_RESERVATIONS_VERSION = 2
 UPLOADS_VERSION = 2
 DNSMASQ_VERSION = 2
@@ -494,7 +498,7 @@ AGENT_OPERATIONS_VERSION = 4
 AGENT_OPERATION_ATTRIBUTES_VERSION = 5
 INSTANCES_VERSION = 3
 INSTANCE_ATTRIBUTES_VERSION = 3
-OBJECT_METADATA_VERSION = 3
+OBJECT_METADATA_VERSION = 4
 # v1: schema creation.
 # v2: replace column-level UNIQUE on operation_uuid with a composite
 # UNIQUE on (operation_uuid, target_object_type, target_uuid). The v1
@@ -509,7 +513,7 @@ OBJECT_METADATA_VERSION = 3
 # idx_cot_target to (target_object_type, target_uuid, observational) so
 # the "current state" readers can skip observational ops (background
 # sweeps that do not change the object) without a row lookup.
-CLUSTER_OPERATION_TARGETS_VERSION = 3
+CLUSTER_OPERATION_TARGETS_VERSION = 4
 # v1: schema creation. v2: etcd data-import marker (historical).
 # v3: adds 15 typed nullable capacity columns projected from
 # metrics_json at upsert time, for the capacity reconciler to read.
@@ -534,7 +538,7 @@ CLUSTER_CONFIG_VERSION = 2
 EVENTS_VERSION = 1
 # v2 denormalises events.timestamp into event_objects so that an
 # object's newest events have an index to come off.
-EVENT_OBJECTS_VERSION = 2
+EVENT_OBJECTS_VERSION = 3
 # Scheduler-reservations capacity tables (see docs/plans/
 # PLAN-scheduler-reservations-phase-02-capacity-tables.md). v1: schema
 # creation.
@@ -1549,7 +1553,9 @@ def _get_object_states_table() -> sa.Table:
             _object_states_table = sa.Table(
                 'object_states',
                 metadata,
-                sa.Column('object_uuid', sa.String(36), nullable=False),
+                sa.Column('object_uuid',
+                          sa.String(constants.OBJECT_KEY_MAX_LENGTH),
+                          nullable=False),
                 sa.Column(
                     'object_type', sa.Enum(ObjectType), nullable=False),
                 sa.Column('state_value', sa.String(32), nullable=True),
@@ -1628,6 +1634,69 @@ def _render_enum_ddl(values: list[str]) -> str:
     """Render an ENUM(...) type clause for the given values."""
     quoted = ', '.join("'" + v.replace("'", "''") + "'" for v in values)
     return f'ENUM({quoted})'
+
+
+def _widen_object_key_column(
+        engine: sa.Engine, table_name: str, column_name: str) -> bool:
+    """Widen a column which stores an object key to OBJECT_KEY_MAX_LENGTH.
+
+    These columns were VARCHAR(36), a uuid's width, but a namespace's
+    object key is its name and names are longer -- see
+    constants.OBJECT_KEY_MAX_LENGTH for the defect that made this
+    necessary (issue 4856).
+
+    The widening is metadata-only. Measured on MariaDB 10.11 (the oldest
+    release SF supports, and the one CI runs): VARCHAR(36) to VARCHAR(63)
+    in utf8mb4 is accepted with ALGORITHM=INSTANT, including on a column
+    inside a primary key and a secondary index, because 63 utf8mb4
+    characters is 252 bytes and so still carries a one byte length
+    prefix. Widening further -- to 255, say, at 1020 bytes -- crosses to
+    a two byte prefix and MariaDB refuses both INSTANT and INPLACE
+    ("Cannot change column type. Try ALGORITHM=COPY"), which would
+    rebuild every row of these tables under a metadata lock during a
+    deploy. That is why the ceiling is 63 and not something rounder.
+
+    INSTANT is asked for explicitly so that a server which cannot do it
+    instantly is noticed rather than silently rewriting a large table,
+    and then retried without the clause so that the deploy still
+    completes. Returns True if the column was widened.
+    """
+    with engine.connect() as conn:
+        row = conn.execute(
+            sa.text(
+                'SELECT CHARACTER_MAXIMUM_LENGTH FROM '
+                'information_schema.COLUMNS '
+                'WHERE TABLE_SCHEMA = DATABASE() '
+                'AND TABLE_NAME = :table_name '
+                'AND COLUMN_NAME = :column_name'),
+            {'table_name': table_name, 'column_name': column_name}
+        ).first()
+
+        if row is None:
+            LOG.debug(
+                f'Key column widening skipping {table_name}.{column_name}: '
+                f'column not present in database')
+            return False
+
+        if row[0] is not None and int(row[0]) >= constants.OBJECT_KEY_MAX_LENGTH:
+            return False
+
+        LOG.info(
+            f'Widening {table_name}.{column_name} from VARCHAR({row[0]}) to '
+            f'VARCHAR({constants.OBJECT_KEY_MAX_LENGTH})')
+        alter = (
+            f'ALTER TABLE {table_name} MODIFY COLUMN {column_name} '
+            f'VARCHAR({constants.OBJECT_KEY_MAX_LENGTH}) NOT NULL')
+        try:
+            conn.execute(sa.text(f'{alter}, ALGORITHM=INSTANT'))
+        except (OperationalError, ProgrammingError) as e:
+            LOG.warning(
+                f'Could not widen {table_name}.{column_name} instantly, '
+                f'falling back to the server\'s choice of algorithm: {e}')
+            conn.execute(sa.text(alter))
+        conn.commit()
+
+    return True
 
 
 def _ensure_native_enum_columns(engine: sa.Engine) -> dict[str, Any]:
@@ -1815,6 +1884,16 @@ def _ensure_object_states_schema(engine: sa.Engine) -> dict[str, Any]:
         current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver < 4:
+        # v3 -> v4: object_uuid was a uuid's width, but a namespace's
+        # object key is its name. See _widen_object_key_column().
+        LOG.info(
+            f'Upgrading {table_name} from v{current_ver} to v4: '
+            'widening object_uuid to an object key.')
+        _widen_object_key_column(engine, table_name, 'object_uuid')
+        current_ver = 4
+        _set_table_version(engine, table_name, current_ver)
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -1840,7 +1919,9 @@ def _get_object_metadata_table() -> sa.Table:
             _object_metadata_table = sa.Table(
                 'object_metadata',
                 metadata,
-                sa.Column('object_uuid', sa.String(36), nullable=False),
+                sa.Column('object_uuid',
+                          sa.String(constants.OBJECT_KEY_MAX_LENGTH),
+                          nullable=False),
                 sa.Column('object_type', sa.Enum(ObjectType), nullable=False),
                 sa.Column('metadata_json', sa.Text(), nullable=True),
                 # Composite primary key
@@ -1877,6 +1958,15 @@ def _ensure_object_metadata_schema(engine: sa.Engine) -> dict[str, Any]:
             ))
             conn.commit()
         current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 4:
+        # v3 -> v4: see _widen_object_key_column().
+        LOG.info(
+            f'Upgrading {table_name} from v{current_ver} to v4: '
+            'widening object_uuid to an object key.')
+        _widen_object_key_column(engine, table_name, 'object_uuid')
+        current_ver = 4
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -1938,7 +2028,9 @@ def _get_cluster_operation_targets_table() -> sa.Table:
                 sa.Column('operation_type', sa.String(64), nullable=False),
                 sa.Column('target_object_type', sa.Enum(ObjectType),
                           nullable=False),
-                sa.Column('target_uuid', sa.String(36), nullable=False),
+                sa.Column('target_uuid',
+                          sa.String(constants.OBJECT_KEY_MAX_LENGTH),
+                          nullable=False),
                 sa.Column('created_at', sa.Double(), nullable=False),
                 sa.Column('observational', sa.Boolean(), nullable=False,
                           server_default=sa.false()),
@@ -2074,6 +2166,19 @@ def _ensure_cluster_operation_targets_schema(
                 f'(target_object_type, target_uuid, observational)'))
             conn.commit()
         current_ver = 3
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 4:
+        # v3 -> v4: target_uuid holds an object key, and a namespace's
+        # key is its name. No operation targets a namespace today, so
+        # this is the latent half of issue 4856 rather than a live
+        # defect -- but the column is the same column, and the widening
+        # is metadata-only. See _widen_object_key_column().
+        LOG.info(
+            f'Upgrading {table_name} from v{current_ver} to v4: '
+            'widening target_uuid to an object key.')
+        _widen_object_key_column(engine, table_name, 'target_uuid')
+        current_ver = 4
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -2960,7 +3065,9 @@ def _get_event_objects_table() -> sa.Table:
                 'event_objects',
                 metadata,
                 sa.Column('object_type', sa.String(32), nullable=False),
-                sa.Column('object_uuid', sa.String(36), nullable=False),
+                sa.Column('object_uuid',
+                          sa.String(constants.OBJECT_KEY_MAX_LENGTH),
+                          nullable=False),
                 sa.Column('event_uuid', sa.CHAR(36), nullable=False),
                 sa.Column('timestamp', sa.Double(), nullable=False,
                           server_default=sa.text('0')),
@@ -3035,6 +3142,18 @@ def _ensure_event_objects_schema(engine: sa.Engine) -> dict[str, Any]:
             conn.commit()
 
         current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 3:
+        # v2 -> v3: see _widen_object_key_column(). Every event about a
+        # namespace lands here, so a namespace name this column could
+        # not hold cost the namespace its audit trail as well as its
+        # state row.
+        LOG.info(
+            f'Upgrading {table_name} from v{current_ver} to v3: '
+            'widening object_uuid to an object key.')
+        _widen_object_key_column(engine, table_name, 'object_uuid')
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {

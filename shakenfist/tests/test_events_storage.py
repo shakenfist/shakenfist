@@ -58,18 +58,25 @@ class _MockRow:
 
 
 class _MockResult:
-    """Minimal result stub supporting scalar(), fetchall(), and rowcount."""
+    """Minimal result stub supporting scalar(), fetchall(), first() and rowcount."""
 
-    def __init__(self, scalar_val=0, rowcount=0, rows=None):
+    def __init__(self, scalar_val=0, rowcount=0, rows=None, first=None):
         self._scalar = scalar_val
         self.rowcount = rowcount
         self._rows = rows if rows is not None else []
+        self._first = first
 
     def scalar(self):
         return self._scalar
 
     def fetchall(self):
         return self._rows
+
+    def first(self):
+        # None reads as "no such column" to the information_schema
+        # probes the migrations make, which is the quiet answer: a
+        # mocked engine has no columns to widen.
+        return self._first
 
 
 class _MockConnection:
@@ -224,7 +231,7 @@ class EnsureEventObjectsSchemaTestCase(base.ShakenFistTestCase):
         result = mariadb._ensure_event_objects_schema(mock_engine)
 
         rendered = [str(stmt) for stmt in conn.executed]
-        self.assertEqual(3, len(rendered))
+        self.assertEqual(4, len(rendered))
         self.assertIn('ADD COLUMN timestamp DOUBLE NOT NULL DEFAULT 0',
                       rendered[0])
         self.assertIn('SELECT event_uuid AS cursor_value FROM event_objects',
@@ -232,11 +239,16 @@ class EnsureEventObjectsSchemaTestCase(base.ShakenFistTestCase):
         self.assertIn('CREATE INDEX IF NOT EXISTS '
                       'idx_event_objects_object_timestamp', rendered[2])
         self.assertIn('(object_type, object_uuid, timestamp)', rendered[2])
+        # And then v2 -> v3, which reads the column's width before
+        # deciding whether to widen it (issue 4856). This connection
+        # reports no such column, so no ALTER follows.
+        self.assertIn('CHARACTER_MAXIMUM_LENGTH', rendered[3])
 
-        self.assertEqual(result['end_version'], 2)
+        self.assertEqual(result['end_version'], 3)
         self.assertTrue(result['migrated'])
-        mock_set_version.assert_called_once_with(
-            mock_engine, 'event_objects', 2)
+        # v1 -> v2 (this migration), then v2 -> v3 (the key width).
+        mock_set_version.assert_any_call(mock_engine, 'event_objects', 2)
+        mock_set_version.assert_any_call(mock_engine, 'event_objects', 3)
 
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)

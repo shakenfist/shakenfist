@@ -31,14 +31,20 @@ from shakenfist.tests import base
 
 
 class _MockResult:
-    """Minimal result stub supporting fetchall() and rowcount."""
+    """Minimal result stub supporting fetchall(), first() and rowcount."""
 
-    def __init__(self, rowcount=0, rows=None):
+    def __init__(self, rowcount=0, rows=None, first=None):
         self.rowcount = rowcount
         self._rows = rows if rows is not None else []
+        self._first = first
 
     def fetchall(self):
         return self._rows
+
+    def first(self):
+        # None reads as "no such column" to a migration's
+        # information_schema probe; a mocked engine has none.
+        return self._first
 
 
 class _MockRow:
@@ -380,7 +386,7 @@ class EventObjectsBackfillIsBatchedTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)
     def test_the_backfill_is_handed_to_the_batched_helper(
             self, mock_get_version, mock_set_version):
-        conn = _MockConnection([_MockResult(), _MockResult()])
+        conn = _MockConnection([_MockResult(), _MockResult(), _MockResult()])
         engine = _MockEngine(conn)
 
         with mock.patch(
@@ -403,7 +409,9 @@ class EventObjectsBackfillIsBatchedTestCase(base.ShakenFistTestCase):
         # built afterwards from finished data.
         self.assertIn('ADD COLUMN timestamp', conn.calls[0][0])
         self.assertIn('idx_event_objects_object_timestamp', conn.calls[1][0])
-        mock_set_version.assert_called_once_with(engine, 'event_objects', 2)
+        # v1 -> v2 (the backfill), then v2 -> v3 (the key width).
+        mock_set_version.assert_any_call(engine, 'event_objects', 2)
+        mock_set_version.assert_any_call(engine, 'event_objects', 3)
 
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)

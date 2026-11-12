@@ -20,6 +20,7 @@ from shakenfist_utilities import random as sf_random  # noreorder
 
 from shakenfist import artifact
 from shakenfist import baseobject
+from shakenfist import constants
 from shakenfist import exceptions
 from shakenfist import federation
 from shakenfist import instance
@@ -77,7 +78,8 @@ daemon.set_log_level(LOG, 'api')
 # resolves the name against the database and answers 404, which is a
 # stronger check than a format one (see validation.py's module
 # docstring), but on create there is nothing to resolve.
-NAMESPACE_NAME_PATTERN = '^[a-zA-Z0-9_-]{1,63}$'
+NAMESPACE_NAME_PATTERN = '^[a-zA-Z0-9_-]{1,%d}$' % (
+    constants.NAMESPACE_NAME_MAX_LENGTH)
 
 
 def _live_namespace(name):

@@ -321,6 +321,16 @@ let it finish rather than interrupting it. If it does fail part way
 through, the table's schema version is not advanced and re-running the
 command resumes where it stopped.
 
+Not every migration costs that, and the cheap ones are kept cheap
+deliberately. Widening the columns which hold an object key, for
+example, is metadata-only: 63 characters of `utf8mb4` is 252 bytes,
+under the 256 byte boundary where a `VARCHAR`'s stored length prefix
+grows from one byte to two, so MariaDB accepts the change with
+`ALGORITHM=INSTANT` even on a column inside a primary key. A wider
+ceiling would have crossed that boundary and rebuilt every row of
+those tables under a metadata lock instead, which is why the ceiling
+is 63 and not something rounder.
+
 ### Manual schema verification
 
 You can manually check or apply schema migrations by running on a node
