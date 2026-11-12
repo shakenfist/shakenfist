@@ -15832,199 +15832,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#credential-carrying-routes-are-not-logged-not-redacted" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Credential-carrying routes are not logged, not redacted
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-check-that-runs-after-the-parse-is-not-a-check" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A check that runs after the parse is not a check
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#two-records-must-not-claim-one-lookup-key" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Two records must not claim one lookup key
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#put-the-meter-above-the-expensive-thing-not-below-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Put the meter above the expensive thing, not below it
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-guard-has-to-sit-where-the-exception-is-raised" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A guard has to sit where the exception is raised
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-cleanup-step-must-not-be-abortable-by-its-own-instrumentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A cleanup step must not be abortable by its own instrumentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#fail-closed-on-a-field-not-on-a-formatting-accident" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fail closed on a field, not on a formatting accident
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-state-an-object-can-leave-is-not-a-terminal-state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A state an object can leave is not a terminal state
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#or-is-a-decision-about-what-a-failed-read-means" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        or [] is a decision about what a failed read means
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cluster-ci-tests-only-run-in-the-merge-queue" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cluster CI tests only run in the merge queue
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Cluster CI tests only run in the merge queue">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#if-a-cluster-test-can-run-on-one-node-share-it-with-the-smoke-suite" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        If a cluster test can run on one node, share it with the smoke suite
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#teardown-runs-before-addcleanup-and-the-base-class-already-deletes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        tearDown runs before addCleanup, and the base class already deletes
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-signal-handler-only-sets-flags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A signal handler only sets flags
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-column-to-column-comparison-has-no-bind-processor" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A column-to-column comparison has no bind processor
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-uuid-columns-type-is-uuid_column_type-never-a-bare-sauuid" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A uuid column's type is uuid_column_type(), never a bare sa.Uuid()
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-frozen-model-is-not-a-deep-frozen-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A frozen model is not a deep frozen model
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-per-item-convenience-wrapper-does-not-belong-in-a-loop" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A per-item convenience wrapper does not belong in a loop
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -16058,13 +15865,27 @@ filters with rather than open-coding the equivalent test.</p>
 <p>For artifacts that function is <code>namespace_or_shared_filter(namespace, obj)</code>:
 own namespace, a namespace whose trust list names the caller, <code>system</code>, or
 <code>shared</code>. <code>requires_artifact_access</code> calls it.</p>
-<p><code>requires_artifact_ownership</code> is the deliberately stricter mutation guard and
-tests <code>request_namespace() not in [obj.namespace, 'system']</code> — the same test
-<code>requires_instance_ownership</code> and <code>requires_network_ownership</code> use. It
-consults neither the <code>shared</code> flag nor the trust list: sharing publishes an
-object for reading, and a trust is a visibility grant, so neither one hands
-out a delete button. Creating an object <em>in</em> a namespace that trusts you is a
-separate question and is still allowed.</p>
+<p>The ownership predicate has a function too, and it is
+<code>api_base.namespace_owns(obj_namespace, caller_namespace)</code>: the caller's own
+namespace, or <code>system</code>. <code>requires_artifact_ownership</code> is the deliberately
+stricter mutation guard and calls it, as do
+<code>requires_instance_ownership</code>, <code>requires_network_ownership</code>,
+<code>requires_operation_ownership</code>, the label and artifact write routes, and
+<code>safe_get_network_interface</code>. It consults neither the <code>shared</code> flag nor the
+trust list: sharing publishes an object for reading, and a trust is a
+visibility grant, so neither one hands out a delete button. Creating an object
+<em>in</em> a namespace that trusts you is a separate question and is still allowed.</p>
+<p>Access and ownership are two predicates and not one. Do not reach for
+<code>namespace_or_shared_filter</code> on a route which changes the object, and do not
+reach for <code>namespace_owns</code> on a read route — that is the inversion this rule
+records, in each direction.</p>
+<p>Neither predicate is enforced by memory. The unit test
+<code>test_namespace_ownership_predicate.py</code> parses every file in the package and
+fails the build if the body of <code>namespace_owns</code> — any membership test against
+a literal naming <code>'system'</code> — reappears outside the helper itself. That guard
+is what stops the restatement count climbing past the twelve sites #3640 and</p>
+<h1 id="4887-converted-the-predicate-had-been-open-coded-at-all-twelve-across">4887 converted; the predicate had been open-coded at all twelve, across<a class="headerlink" href="#4887-converted-the-predicate-had-been-open-coded-at-all-twelve-across" title="Permanent link">&para;</a></h1>
+<p>instances, networks, artifacts, labels, agent operations and network create.</p>
 <p>This is not a style preference. <code>requires_artifact_access</code> used to restate the
 rule as <code>if a.shared and requestor not in [a.namespace, 'system']</code>, which is
 inverted in both directions, and because <code>arg_is_artifact_ref</code> resolves a UUID
