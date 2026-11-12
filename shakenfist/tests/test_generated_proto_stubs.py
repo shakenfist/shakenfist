@@ -1,0 +1,172 @@
+# Copyright 2026 Michael Still and contributors
+
+"""The committed gRPC stubs must match the pinned generator.
+
+`shakenfist/protos/` is generated output which is checked in.
+`tox -e genprotos` regenerates it using the `grpcio-tools` version
+pinned in `pyproject.toml`, and every generated `*_pb2_grpc.py` records
+the version which wrote it in `GRPC_GENERATED_VERSION`. Nothing
+compared the two, so a commit which moved the pin without regenerating
+left the tree carrying stubs from a generator it no longer installs.
+That happened twice: `4e9a327cec` found five files still at 1.83.0
+after the 1.83.1 bump, and `fa4a69aa86` found the same five at 1.84.0
+after the 1.84.1 bump (issue 4881). Both times the drift was found by
+someone who ran `genprotos` for an unrelated reason, and who then had
+to prove the diff was not theirs before they could trust the check they
+were actually running -- `PUSH-AUDIT.md`'s stub freshness step, which
+cannot exit 0 while the stamps disagree with the pin.
+
+These tests move that discovery to the pull request which causes it.
+`renovate.json` groups `grpcio`, `grpcio-tools` and `protobuf` into a
+single update, so the grouped bump is where the regeneration is
+demanded: it fails here until someone runs `tox -e genprotos` and
+commits the result.
+
+The committed `protos/shakenfist_enums.proto` is checked the same way,
+and against its actual generator rather than a version string, because
+that one can be run in process: it is `ast`-based and imports nothing.
+A missing enum member there is a value absent from the wire protocol,
+which is a worse failure than a stale version stamp and has the same
+cause -- generated output in the tree that nothing compares to its
+generator.
+"""
+
+import glob
+import os
+import re
+import subprocess
+import sys
+import tomllib
+
+from packaging.version import Version
+
+from shakenfist.tests import base
+
+
+def _root():
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(os.path.dirname(here))
+
+
+def _protos_dir():
+    return os.path.join(_root(), 'shakenfist', 'protos')
+
+
+def _pinned_version(package):
+    with open(os.path.join(_root(), 'pyproject.toml'), 'rb') as f:
+        pyproject = tomllib.load(f)
+
+    for dependency in pyproject['project']['dependencies']:
+        match = re.fullmatch(r'%s==(\S+)' % re.escape(package), dependency.strip())
+        if match:
+            return match.group(1)
+
+    return None
+
+
+def _stamps(pattern, expression):
+    """Map each matching generated file to the version it records."""
+
+    found = {}
+    for path in sorted(glob.glob(os.path.join(_protos_dir(), pattern))):
+        with open(path) as f:
+            match = re.search(expression, f.read(), re.MULTILINE)
+        found[os.path.basename(path)] = match.group(1) if match else None
+    return found
+
+
+class GeneratedProtoStubTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        self.grpc_stamps = _stamps(
+            '*_pb2_grpc.py', r"^GRPC_GENERATED_VERSION = '(\S+)'$")
+        self.protobuf_stamps = _stamps(
+            '*_pb2.py', r'^# Protobuf Python Version: (\S+)$')
+
+    def test_every_grpc_stub_records_its_generator(self):
+        # Without this the rest of the class passes vacuously if the
+        # generated header changes shape, or if the stubs move.
+        self.assertNotEqual(
+            {}, self.grpc_stamps,
+            'No *_pb2_grpc.py files found in %s. If the generated stubs '
+            'moved, move this test with them.' % _protos_dir())
+        missing = sorted(n for n, v in self.grpc_stamps.items() if v is None)
+        self.assertEqual(
+            [], missing,
+            'These generated stubs declare no GRPC_GENERATED_VERSION, so '
+            'nothing here can tell which generator wrote them: %s'
+            % ', '.join(missing))
+
+    def test_grpc_stubs_come_from_one_generator(self):
+        # This is the state issue 4881 reported: five families at 1.84.0
+        # and one at 1.84.1, because the laggards were regenerated one
+        # commit at a time.
+        self.assertEqual(
+            1, len(set(self.grpc_stamps.values())),
+            'The generated gRPC stubs come from more than one '
+            'grpcio-tools version: %s. Run "tox -e genprotos" and commit '
+            'all of the result, not just the families your change '
+            'touched.' % self.grpc_stamps)
+
+    def test_grpc_stubs_match_the_pinned_grpcio_tools(self):
+        pin = _pinned_version('grpcio-tools')
+        self.assertIsNotNone(
+            pin,
+            'pyproject.toml no longer pins grpcio-tools to an exact '
+            'version, so the committed stubs cannot be checked against '
+            'the generator which will next write them.')
+        for name, stamp in sorted(self.grpc_stamps.items()):
+            self.assertEqual(
+                pin, stamp,
+                '%s was generated by grpcio-tools %s, but pyproject.toml '
+                'pins %s. Run "tox -e genprotos" and commit the result.'
+                % (name, stamp, pin))
+
+    def test_runtime_grpcio_is_not_older_than_the_stubs(self):
+        # Each stub raises RuntimeError at import when the installed
+        # grpcio is older than the generator, so a pin which lets that
+        # happen is a deployment that will not start.
+        pin = _pinned_version('grpcio')
+        self.assertIsNotNone(pin, 'pyproject.toml no longer pins grpcio.')
+        for name, stamp in sorted(self.grpc_stamps.items()):
+            self.assertFalse(
+                Version(pin) < Version(stamp),
+                '%s requires grpcio>=%s at import, but pyproject.toml pins '
+                'grpcio==%s.' % (name, stamp, pin))
+
+    def test_protobuf_gencode_comes_from_one_generator(self):
+        # The same split, in the other half of what genprotos writes:
+        # the message modules stamp the protobuf gencode version of the
+        # protoc that grpcio-tools bundles, which is not the runtime
+        # protobuf pin and so is only checkable against itself.
+        self.assertNotEqual(
+            {}, self.protobuf_stamps,
+            'No *_pb2.py files found in %s.' % _protos_dir())
+        self.assertEqual(
+            1, len(set(self.protobuf_stamps.values())),
+            'The generated protobuf message modules come from more than '
+            'one protoc version: %s. Run "tox -e genprotos" and commit '
+            'all of the result.' % self.protobuf_stamps)
+
+
+class GeneratedEnumProtoTestCase(base.ShakenFistTestCase):
+    def test_committed_enum_proto_matches_its_generator(self):
+        # Step one of _make_stubs.sh writes this file from the Python
+        # enums, so a member added without running genprotos leaves the
+        # wire protocol without the value. The generator parses the
+        # schema with ast and imports no shakenfist code, so it is safe
+        # to run here.
+        generator = os.path.join(_root(), 'protos', '_generate_enums.py')
+        committed = os.path.join(_root(), 'protos', 'shakenfist_enums.proto')
+        self.assertTrue(os.path.exists(generator), generator)
+
+        generated = subprocess.run(
+            [sys.executable, generator], check=True, capture_output=True,
+            text=True, cwd=_root()).stdout
+        with open(committed) as f:
+            self.assertEqual(
+                f.read(), generated,
+                'protos/shakenfist_enums.proto is not what '
+                'protos/_generate_enums.py produces, so the protobuf enums '
+                'no longer match the Python enums they are generated from. '
+                'Run "tox -e genprotos" and commit the result.')

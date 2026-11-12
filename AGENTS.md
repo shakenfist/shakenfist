@@ -110,6 +110,11 @@ metrics. The headlines:
   an existing `proto_id`. Never run `grpc_tools.protoc` directly: the
   tox environment pins the library versions and rewrites the generated
   `import foo_pb2` lines into `from shakenfist.protos import foo_pb2`.
+  Moving the `grpcio` pins is a regeneration too, and the whole of what
+  `genprotos` writes is committed, not just the families you touched: the
+  stubs record the generator which wrote them and a unit test compares
+  that against the pin. See
+  [DEVELOPER.md](DEVELOPER.md#regenerating-protobuf-and-grpc-code).
 
 - **A new entry point calls `set_caller_identity()` before anything that
   touches the database.** Whether a process may go direct to MariaDB is

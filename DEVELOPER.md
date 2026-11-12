@@ -30,6 +30,17 @@ generation pipeline including:
 2. Compiling all `.proto` files to Python code and type stubs
 3. Fixing import statements for the shakenfist package structure
 
+Moving the `grpcio` family of pins in `pyproject.toml` is also a reason to
+regenerate, because each generated `*_pb2_grpc.py` records the generator
+which wrote it in `GRPC_GENERATED_VERSION`. A pin bump which does not
+regenerate leaves the committed stubs disagreeing with the generator the
+repository installs, and the next person to run `tox -e genprotos` for an
+unrelated reason inherits the diff. `shakenfist/tests/test_generated_proto_stubs.py`
+fails when that happens, and when the stubs come from more than one
+generator version, so the regeneration is demanded in the pull request
+which moves the pin. Commit everything `genprotos` writes, not only the
+families your change touches.
+
 # Finding commits made by a human
 
 Now that shakenfist-bot is making a lot of automated commits, its sometimes
