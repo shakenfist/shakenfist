@@ -17151,18 +17151,18 @@ checked against <code>develop</code>.</p>
   <code>nvram_template</code> might work, but that needs a spike.</li>
 <li>A memory exhaustion signal for power on, belonging with the placement
   ledger.</li>
-<li>Clean-ups (<a href="https://github.com/shakenfist/shakenfist/issues/4487">#4487</a>):</li>
-<li>one matcher for libvirt's "domain is not running";</li>
-<li>fewer copies of pause and unpause;</li>
-<li>one CI node lookup;</li>
-<li>the dead <code>message</code> parameter of <code>_await_instance_event()</code>.</li>
 <li><code>_await_image_event()</code> in <code>shakenfist_ci/base.py</code> matches an
   <code>operation</code> field which events do not have, and has no callers.
   Delete it or fix it.</li>
 <li>Splitting <code>instance.py</code>'s power operations into their own module.</li>
 </ul>
 <p>Resolved: F9 was re-read and deliberately left alone. A CI check for
-unit test fakes was judged unwarranted (phase 4, 4d).</p>
+unit test fakes was judged unwarranted (phase 4, 4d). The clean-ups
+(<a href="https://github.com/shakenfist/shakenfist/issues/4487">#4487</a>) landed:
+one matcher each for libvirt's "domain is not running" and "domain is
+already running", one guard and one bounded retry behind reboot, pause
+and unpause, one CI node lookup, the dead <code>message</code> parameter of
+<code>_await_instance_event()</code>, and one explanation of the stale agent cache.</p>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during development
 that we fixed. You should also scan the project's issue tracker,
