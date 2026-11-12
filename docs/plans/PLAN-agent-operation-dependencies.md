@@ -228,7 +228,10 @@ are in
    is aborted, in the manner of `abandon_dependency_wait()`. The
    budget is wall-clock from the first blocked evaluation, recorded
    as an operation attribute on first block, rather than a count of
-   dispatcher passes: the dispatcher's pass rate is throttled and
+   dispatcher passes. That attribute does not exist yet: phase 1
+   landed `dependency_failure` and nothing else, so phase 2 adds
+   `dependency_wait_started` and the migration for it. The dispatcher's
+   pass rate is throttled and
    variable where the cluster dispatchers' backoff is not, and one
    write beats one write per pass. It is a configuration option.
 
@@ -340,9 +343,18 @@ are in
    (`DISPATCH_CHECK_INTERVAL`, five seconds) rather than adding a
    cadence; a dependency observed in a terminal state is cached in
    process for the life of the dispatcher generation, since terminal
-   is absorbing; and the `(GetInstanceAttributes, sidechannel)` entry
-   in `shakenfist/data/database_load_budget.yaml` is amended in the
-   same phase as the code, as a code-derived term. The dispatcher's
+   is absorbing; and the reads are **not** budgeted, which phase 2's
+   survey established and this sentence used to get wrong. The pair
+   which grows is `(GetObjectState, sidechannel)`, a member of
+   `HARNESS_DRIVEN_PAIRS` in
+   `shakenfist/deploy/shakenfist_ci/load_budget.py` with no entry in
+   `shakenfist/data/database_load_budget.yaml` on purpose, because the
+   model has no term for load which scales with in-flight operations.
+   The `(GetInstanceAttributes, sidechannel)` entry this decision used
+   to name covers `agent_operation_next()`'s instance attribute read
+   and not a state read, so amending it would mis-attribute the cost.
+   What phase 2 owes is a sentence in that exclusion's note naming the
+   evaluator as a second producer. The dispatcher's
    supervisor replaces a thread which has not completed a pass in 120
    seconds, which is the ceiling on how much work a pass may grow by.
 
@@ -410,7 +422,7 @@ before this repository can emit one (decision 3).
 |-------|------|--------|---------|--------|
 | 0 | [PLAN-agent-operation-dependencies-phase-00-decisions.md](PLAN-agent-operation-dependencies-phase-00-decisions.md) | Complete | Resolve the open questions into the decisions section above, and re-cut this table. Its survey found five of this plan's factual claims wrong or incomplete; its measurement found that instance queues do get deep but that no log can say whether a deep one held two submitters; its consumer audit found one firm break outside this repository and one single-commit obligation inside it | `4c14523a7b` |
 | 1 | [PLAN-agent-operation-dependencies-phase-01-schema-and-api.md](PLAN-agent-operation-dependencies-phase-01-schema-and-api.md) | Complete | Schema, object and API: `depends_on` and `runs_after` on `AgentOperation` with an additive table migration, the agent edge model and `VALID_DEPENDENCY_OPERATIONS` (decision 5), per-edge settle seconds, `abort` in `state_targets` and `TERMINAL_STATES` in one commit (decision 3), the parameters on the three creating endpoints with their declarations and capability token, and submission-time validation (decision 6). Prerequisite: `client-python-k3s` has learned `abort` and released -- met, by [client-python-k3s#164](https://github.com/shakenfist/client-python-k3s/pull/164) in `v0.4.0`. Its plan also lands the `dependency_failure` attribute column phase 2 writes, since this is the schema phase | `e6c0ba95a5` |
-| 2 | — | Not started | Dispatch evaluation (decisions 1, 2, 8, 9, 10): same-instance and cross-instance edges evaluated in the dispatcher between `agent_operation_next()` and `start_instance_executor()`, the cascade to `abort`, the settle delay, the dependency-wait budget and its configuration option, the failed dependency on the wire in `external_view()` (the `dependency_failure` attribute column itself lands in phase 1, which is the schema phase, so this phase writes and exposes a column which already exists), the `database_load_budget.yaml` amendment, and the terminal-dependency cache | — |
+| 2 | [PLAN-agent-operation-dependencies-phase-02-dispatch-evaluation.md](PLAN-agent-operation-dependencies-phase-02-dispatch-evaluation.md) | In progress | Dispatch evaluation (decisions 1, 2, 8, 9, 10): same-instance and cross-instance edges evaluated in the dispatcher between `agent_operation_next()` and `start_instance_executor()`, the cascade to `abort`, the settle delay, the dependency-wait budget and its configuration option, the failed dependency on the wire in `external_view()`, and the terminal-dependency cache. Phase 1 landed the `dependency_failure` column this phase writes, but **not** the wait anchor decision 2 requires, so this phase still carries an attributes-table migration (version 5 to 6) -- its survey found that. Its survey also found that the `database_load_budget.yaml` amendment this row used to promise is not owed: the reads this phase adds are `GetObjectState` from the sidechannel, a pair deliberately excluded from the budget in `load_budget.py`, so only that exclusion's note is amended. Its contested decision lowers phase 1's published `settle_seconds` ceiling to the new wait budget, because any settle above the budget is unsatisfiable | — |
 | 3 | — | Not started | client-python: chain submission helpers, await-the-chain UX, failure reporting from the chain's first failure, and `abort` in `TERMINAL_AGENT_OPERATION_STATES`. Lands in the sibling repository, so its plan file lives there, following the `PLAN-agent-operation-deadlines` phase 6 precedent | — |
 | 4 | — | Not started | Documentation and examples (decision 11): a new `docs/developer_guide/agent_operations.md` for the model, the dependency vocabulary in the API reference, the lazy-cascade and swept-dependency ambiguities written down, the example index, and `client-python-k3s` adopting dependencies (rolling update as one submitted chain) as the first example application | — |
 | 5 | — | Not started | Push audit: runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence | — |
@@ -472,3 +484,4 @@ not lost:
   1 forbids restating a visibility predicate, and the issue records
   why the artifact *access* path must not be collapsed into the
   ownership one.
+
