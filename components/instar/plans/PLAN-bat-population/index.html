@@ -2549,6 +2549,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/plan-retirement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan retirement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/plan-template/" class="md-nav__link">
         
   
@@ -6302,10 +6330,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-in-progress" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: In progress
+        Status: Complete
       
     </span>
   </a>
@@ -15933,10 +15961,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-in-progress" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: In progress
+        Status: Complete
       
     </span>
   </a>
@@ -16120,7 +16148,7 @@
 
 
 <h1 id="populated-bat-output-fixed-vhdx-and-non-qcow2-preallocation">Populated BAT output: fixed VHDX and non-qcow2 preallocation<a class="headerlink" href="#populated-bat-output-fixed-vhdx-and-non-qcow2-preallocation" title="Permanent link">&para;</a></h1>
-<h2 id="status-in-progress">Status: In progress<a class="headerlink" href="#status-in-progress" title="Permanent link">&para;</a></h2>
+<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
@@ -16993,7 +17021,7 @@ rather than merge requests.</p>
 <td>10. Cross-version matrix and derived-profile validation</td>
 <td><a href="/components/instar/plans/PLAN-bat-population-phase-10-matrix/">PLAN-bat-population-phase-10-matrix.md</a></td>
 <td>Complete</td>
-<td><code>e0b0fe13</code> (#881)</td>
+<td>instar-testdata <code>99c8663c34..f73d43670a</code> (direct to <code>main</code>, range recovered -- see phase 13); instar <code>e0b0fe13</code> (#881)</td>
 </tr>
 <tr>
 <td>11. Coverage and differential fuzzing</td>
@@ -17004,13 +17032,13 @@ rather than merge requests.</p>
 <tr>
 <td>12. Documentation</td>
 <td><a href="/components/instar/plans/PLAN-bat-population-phase-12-docs/">PLAN-bat-population-phase-12-docs.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>2da0c22e</code> (#889)</td>
 </tr>
 <tr>
 <td>13. Push audit: <code>PUSH-AUDIT.md</code> over every phase above</td>
-<td>PLAN-bat-population-phase-13-push-audit.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-bat-population-phase-13-push-audit/">PLAN-bat-population-phase-13-push-audit.md</a></td>
+<td>Complete</td>
 <td></td>
 </tr>
 </tbody>
@@ -17847,6 +17875,66 @@ canonical copy lives in shakenfist/development at
 encountered, and anything else we should one day do but have
 chosen to defer to here, so that we do not forget them.</p>
 <ul>
+<li><strong>Nothing enforces the differential fuzzer's structural counters</strong>
+  (#892). <code>STRUCTURAL_OUTCOMES</code> and <code>KNOWN_DEFECT_SKIPS</code> in
+  <code>scripts/differential-fuzz.py</code> are reported and written to the run
+  summary; nothing reads them. A nightly in which every structural
+  comparison ended <code>no_pin_for_geometry</code> -- a pin set that stopped
+  matching, which that code's own comment names as the risk -- logs one
+  INFO line and exits 0. A threshold to fail on would close it. Found by
+  the push audit.</li>
+<li><strong>The differential fuzzer's structural oracle covers <code>convert</code> only</strong>
+  (#893). <code>op_create</code> compares exit codes and <code>qemu-img info</code>, so the
+  fuzzer never checks that an instar-<em>created</em> fixed VHDX has qemu's
+  structure. That rests on <code>fuzz_vhdx_fixed_bat</code>, whose oracle is a
+  specification model rather than qemu, and on the Python pin tests. Found
+  by the push audit.</li>
+<li><strong><code>instar-testdata</code>'s profile validator has no gate</strong> (#894).
+  <code>scripts/validate-profiles.py</code> exists because that repository's derived
+  profile directories were silently wrong twice while the raw baselines
+  were fine, and it works -- 163,932 comparisons, 0 mismatches. But the
+  repository has no CI, no pre-commit and no <code>tox</code>, so it runs only when
+  somebody types <code>make validate-profiles</code>. Phase 10 recorded that the
+  repository had no CI and did not carry forward the consequence for the
+  validator it was adding. It also proves only that the profiles equal the
+  raw baselines, not that the raw baselines are right. Found by the push
+  audit.</li>
+<li><strong>Two <code>instar-testdata</code> generator defects</strong> (#895).
+  <code>generate-baselines.py</code> validates <code>--image</code> against the manifest and then
+  silently skips images its per-command loop does not apply to, so
+  <code>--command snapshot-list --image &lt;valid non-qcow2 id&gt;</code> generates nothing
+  and exits 0 -- the failure the filter's own docstring says it closes. And
+  <code>validate-profiles.py</code> treats a profile whose name no source produces as
+  hand-maintained, absorbing a stale leftover from a deleted case instead
+  of reporting it. Found by the push audit; they land as direct commits to
+  that repository's <code>main</code>.</li>
+<li><strong>Three code-quality advisories from the push audit</strong> (#896). The VHDX
+  BAT entry size has no named constant, though the crate names its region,
+  metadata and parent-locator entry sizes and this plan added six more bare
+  <code>8</code>s. Four call-table mirror constants in <code>src/vmm/src/main.rs</code> are
+  literals where a fifth added by the same plan uses <code>shared::</code>, and no
+  test asserts the mirrors agree. And <code>src/crates/vhdx/src/lib.rs</code> reached
+  9,017 lines, with a seam visible in its own banner comments.</li>
+<li><strong>convert documents 2 of its 22 <code>unsafe fn</code></strong> (#897), where
+  <code>src/operations/create/src/main.rs</code> documents all 8 of its own. The
+  push audit added the second of convert's two, for
+  <code>convert_to_vhdx_fixed</code>, and recorded that as bringing an outlier
+  function into line; the review of that pull request established it is
+  the file that is the outlier. The 20 undocumented ones include
+  <code>convert_to_vhdx</code>, the dynamic sibling immediately above, and the LUKS
+  and key-derivation entry points, all of which build slices over
+  call-table buffers from raw pointers.</li>
+<li><strong>resize <code>--preallocation falloc|full</code> is documented for vmdk, vpc and
+  vhdx but barely tested</strong> (#898). This plan's push audit corrected three
+  tables that said those modes were rejected; the code applies them for
+  every format and refuses only <code>metadata</code>. But <code>RESIZE_CASES</code> has no
+  preallocation case for vmdk, only <code>off</code> for vhdx, and <code>off</code> and <code>full</code>
+  for vhd, so a host-side gate added later would fail no test and the
+  tables would go stale again. qemu-img refuses these resizes, so this
+  wants an instar-only consistency assertion rather than new baselines, and
+  <code>RESIZE_CASES</code> mirrors <code>instar-testdata</code>'s generator, so it is a
+  cross-repository change. Found by the review of the audit's own pull
+  request.</li>
 <li>The differential fuzzer's fixed VHDX convert arm is reachable only
   when the source's virtual size exactly equals a pinned fixed
   geometry's, which after the filters is 16M or 64M, and then at

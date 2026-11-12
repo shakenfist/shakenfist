@@ -2549,6 +2549,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-retirement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan retirement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-template/" class="md-nav__link">
         
   
@@ -15881,9 +15909,9 @@ replacement for <code>qemu-img convert</code>.</p>
 <a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a><span class="c1"># Specify VHD block size (524288+, default: 2097152)</span>
 <a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>instar<span class="w"> </span>convert<span class="w"> </span>-O<span class="w"> </span>vpc<span class="w"> </span>--block-size<span class="w"> </span><span class="m">1048576</span><span class="w"> </span>input.raw<span class="w"> </span>output.vhd
 <a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>
-<a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a><span class="c1"># Specify VHDX block size (1048576 to 268435456, default: qemu-img's for</span>
-<a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="c1"># the size, 8388608 up to 1 GiB, 16777216 up to 100 GiB, 33554432 up to</span>
-<a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="c1"># 32 TiB, then 67108864)</span>
+<a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a><span class="c1"># Specify VHDX block size (a power of two from 1048576 to 268435456,</span>
+<a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="c1"># default: qemu-img's for the size, 8388608 up to 1 GiB, 16777216 up to</span>
+<a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="c1"># 100 GiB, 33554432 up to 32 TiB, then 67108864)</span>
 <a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>instar<span class="w"> </span>convert<span class="w"> </span>-O<span class="w"> </span>vhdx<span class="w"> </span>--block-size<span class="w"> </span><span class="m">4194304</span><span class="w"> </span>input.raw<span class="w"> </span>output.vhdx
 <a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>
 <a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="c1"># Progress reporting</span>
@@ -15924,7 +15952,7 @@ The default can also be set via <code>convert.sparse</code> in the config file.<
 <li><strong>vpc</strong> - VHD dynamic output, configurable block size (512KB+,
   default 2MB via <code>--block-size</code>)</li>
 <li><strong>vhdx</strong> - VHDX dynamic (default) or fixed (<code>--subformat fixed</code>)
-  output, configurable block size (1MB-256MB
+  output, configurable block size (any power of two from 1MB to 256MB
   via <code>--block-size</code>; by default qemu-img's for the size: 8MB up to 1GB,
   16MB up to 100GB, 32MB up to 32TB, then 64MB). The virtual size is at
   most 64 TiB (70368744177664 bytes), the largest VHDX qemu-img creates:

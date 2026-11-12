@@ -2551,6 +2551,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/plan-retirement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan retirement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/plan-template/" class="md-nav__link">
         
   
@@ -15870,8 +15898,8 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tr>
 <td>2026-10-07</td>
 <td><a href="/components/development/plans/PLAN-bot-bypass-identity/">Bot bypass identity</a></td>
-<td>Settle #211: make the only automation bypass on default-branch rulesets a GitHub App whose key only default-branch code can read, and take the bypass away from <code>shakenfist-bot</code>, whose PATs every Renovate run and several pull-request jobs carry. Phase 1 (#348, complete, with the bot's token list the one record cell deferred) created the App, the eight <code>review-marks</code> environments and the four keys, demoted the bot, and found the audit's read token needing the bot's owner reach, now replaced by the security manager role. Phase 2 (complete) moved <code>prune-reviews</code> onto the App token and the ephemeral vm pool and re-synced the eight adopters, whose script copies were stale; phase 3 (complete) took the bypass away from <code>shakenfist-bot</code> on the merge-queue team, proved the refusal with two authenticated pushes, and added the <code>bypass-actor-identity</code> audit criterion, which the first scheduled run after it reports compliant fleet-wide with nothing newly failing; phase 4 (complete) ran the push audit over the seven landings recorded here and, against the shared block's floor, the eight rollout landings in other repositories, none of which was push-audited when it landed. It found nothing blocking and six advisory defects, all in work the plan added, and the security review found nothing; the fixes land in a follow-up pull request, which is what takes this plan to complete</td>
-<td>In progress</td>
+<td>Settle #211: make the only automation bypass on default-branch rulesets a GitHub App whose key only default-branch code can read, and take the bypass away from <code>shakenfist-bot</code>, whose PATs every Renovate run and several pull-request jobs carry. Phase 1 (#348, complete, with the bot's token list the one record cell deferred) created the App, the eight <code>review-marks</code> environments and the four keys, demoted the bot, and found the audit's read token needing the bot's owner reach, now replaced by the security manager role. Phase 2 (complete) moved <code>prune-reviews</code> onto the App token and the ephemeral vm pool and re-synced the eight adopters, whose script copies were stale; phase 3 (complete) took the bypass away from <code>shakenfist-bot</code> on the merge-queue team, proved the refusal with two authenticated pushes, and added the <code>bypass-actor-identity</code> audit criterion, which the first scheduled run after it reports compliant fleet-wide with nothing newly failing; phase 4 (complete) ran the push audit over the seven landings recorded here and, against the shared block's floor, the eight rollout landings in other repositories, none of which was push-audited when it landed. It found nothing blocking and six advisory defects, all in work the plan added, and the security review found nothing. Five of those six are fixed and the sixth, whether two files past 800 lines should be split, is answered in the plan; what is still open is deferred work rather than this plan's: #352, the team rule behind open question 3, narrowing the two bot tokens, and the bot's token list</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2026-10-10</td>
@@ -15888,7 +15916,7 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tr>
 <td>2026-10-28</td>
 <td><a href="/components/development/plans/PLAN-plan-retirement/">Plan retirement</a></td>
-<td>Give finished plans an end of life: a plan terminal for 90 days has its reasoning moved into docs/, its future work filed as issues and its files deleted, through a reviewed pull request per repository opened by a <code>retire-plans</code> skill, with a <code>plan-retirement</code> criterion finding the candidates</td>
+<td>Give finished plans an end of life: a plan terminal for 90 days has its reasoning moved into docs/, its future work filed as issues and its files deleted, through a reviewed pull request per repository opened by a <code>retire-plans</code> skill, with a <code>plan-retirement</code> criterion finding the candidates. The convention, the skill and the three-repository pilot have landed: 13 plans retired, 23,600 lines deleted and 19 issues filed, and the skill was revised three times by what the pilots found. The criterion has landed too, measured over all 24 audited repositories as failing five of them and naming 34 plans, so the backlog files itself from now on; the push audit of the whole plan has run and found six things: four in this repository, and two in others -- reasoning a pilot deleted that five repositories still point at, and pointers two retirements left dangling -- so the plan stays open until the follow-up work lands</td>
 <td>In progress</td>
 </tr>
 </tbody>

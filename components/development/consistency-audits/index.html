@@ -2709,6 +2709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/plan-retirement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan retirement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/plan-template/" class="md-nav__link">
         
   
@@ -16088,19 +16116,25 @@ an override, a corrected check, a new matrix entry -- closes nothing
 elsewhere, so dispatch the workflow after merging it and let the run
 close the issues the fix resolved.</p>
 <p>The audit workflow has four jobs.</p>
-<p><strong>1. <code>audit</code></strong> -- a matrix job per repository. Each leg shallow-clones
-the target with <code>gh repo clone</code>, installs a pinned <code>skillsaw</code> into a
-virtualenv, asserts that skillsaw answers at that pinned version, then
-runs <code>scripts/audit-check.py</code> and uploads its result,
-<code>audit-result-&lt;repo&gt;.json</code>, as an artifact named <code>audit-&lt;repo&gt;</code>. The
-two later jobs download every artifact matching <code>audit-*</code>, so that
-prefix is what ties a leg's result to them.</p>
+<p><strong>1. <code>audit</code></strong> -- a matrix job per repository. Each leg clones the
+target with <code>gh repo clone -- --filter=blob:none</code>, installs a pinned
+<code>skillsaw</code> into a virtualenv, asserts that skillsaw answers at that
+pinned version, then runs <code>scripts/audit-check.py</code> and uploads its
+result, <code>audit-result-&lt;repo&gt;.json</code>, as an artifact named
+<code>audit-&lt;repo&gt;</code>. The two later jobs download every artifact matching
+<code>audit-*</code>, so that prefix is what ties a leg's result to them.</p>
+<p>The checkout is filtered of blobs rather than shallow because
+<code>plan-retirement</code> reads the history of <code>docs/plans/index.md</code> to date a
+plan's status change, and a shallow checkout carries no history to
+read. A filtered checkout holds every commit and fetches a blob when
+something reads one, which for every other criterion is no fetch at
+all: the checkout brings the blobs at HEAD with it.</p>
 <p>Most checks read files out of the clone, several of them by asking
-<code>git</code> inside it what the index holds. A few reach the network instead:
-they query the GitHub API through <code>gh</code>, or clone another repository to
-compare against. That set is <code>NETWORK_CHECKS</code> in
-<code>scripts/audit_snapshot.py</code>, which a test keeps in step with the code
-(see <a href="#before-and-after-a-change-to-a-check">Before and after a change to a
+<code>git</code> inside it what the index holds, and one by asking it what a file
+used to say. A few reach the network instead: they query the GitHub
+API through <code>gh</code>, or clone another repository to compare against. That
+set is <code>NETWORK_CHECKS</code> in <code>scripts/audit_snapshot.py</code>, which a test
+keeps in step with the code (see <a href="#before-and-after-a-change-to-a-check">Before and after a change to a
 check</a>). Repository visibility
 is among what they query, live rather than hardcoded, because it
 changes.</p>
@@ -16468,7 +16502,17 @@ so a step added to it reaches both.</p>
    what lets a repository scoped by <code>only_checks</code> skip a criterion
    without paying for it -- several of them query the GitHub API, and
    on a private repository those calls fail for reasons that say
-   nothing about compliance.</p>
+   nothing about compliance. The line is what the question costs:
+   applicability that is cheap to answer -- a file's presence, the
+   repository's identity, how it is scoped -- belongs in <code>applies()</code>,
+   while a <code>not_applicable</code> that only the measurement itself can
+   establish is reported from <code>run()</code>, which is why there are far more
+   <code>skip()</code> calls than <code>applies()</code> definitions. <code>BypassActorIdentity</code>
+   is the case where the two cost the same: answering whether it
+   applies needs the environment and branch-rules reads the verdict
+   needs, so an <code>applies()</code> would either make those calls twice or
+   cache them for a <code>run()</code> that may never ask. Where a criterion
+   decides in <code>run()</code> for a reason like that, say so in its docstring.</p>
 <p>Read the audited repository through the helpers rather than around
    them. <code>audit.files.tracked_paths(path, *pathspec)</code> is how to ask git
    what the index holds: it lists with <code>-z</code>, because <code>git ls-files</code>
@@ -16667,14 +16711,14 @@ standalone:</p>
 <code>scripts/tests/base.py</code> rather than building its own fixture and
 assertion scaffolding. It provides <code>self.fixture</code>, a <code>FixtureRepo</code>
 over a throwaway checkout (<code>write()</code>, <code>write_all()</code>, <code>workflow()</code>,
-<code>workflows()</code>, <code>init_git()</code>, <code>commit()</code>); <code>self.fresh_fixture()</code>,
-which replaces it with an empty one; <code>self.check(**props)</code>,
-which runs <code>check_class</code> against the fixture with repository
-properties supplied directly rather than detected; <code>check_args=</code> on
-<code>self.check()</code> for the three checks whose constructors take an
-argument (<code>PushAudit</code>, <code>PlanTemplate</code> and <code>SfuiVendor</code> -- a set
-<code>ContractTest</code> pins against the registry, so a fourth cannot
-appear without this sentence failing); and the
+<code>workflows()</code>, <code>init_git()</code>, <code>commit()</code>, <code>commit_files()</code>);
+<code>self.fresh_fixture()</code>, which replaces it with an empty one;
+<code>self.check(**props)</code>, which runs <code>check_class</code> against the fixture
+with repository properties supplied directly rather than detected;
+<code>check_args=</code> on <code>self.check()</code> for the three checks whose
+constructors take an argument (<code>PushAudit</code>, <code>PlanTemplate</code> and
+<code>SfuiVendor</code> -- a set <code>ContractTest</code> pins against the registry, so a
+fourth cannot appear without this sentence failing); and the
 <code>assert_pass(result)</code> / <code>assert_fail(result, containing=)</code> /
 <code>assert_skip(result, containing=)</code> triple in place of a bare
 <code>assertEqual</code> against <code>result['status']</code>. A class that tests a pure
@@ -16691,6 +16735,15 @@ from an empty one would quietly pass. And a helper that runs the
 check more than once in a single test method must rebuild the
 fixture first, by calling <code>self.fresh_fixture()</code>, or the first
 call's files are still on disk for the second.</p>
+<p>A criterion that reads git history needs a fixture with one, and
+<code>commit_files({path: content}, message, when=)</code> is a revision of it:
+it writes the mapping and commits it, dated <code>when</code> if given, which
+sets the author and the committer date together. A check reading an
+age out of the history has to be handed commits that are not all a
+moment old, and <code>plan-retirement</code>'s cases are built around the
+ninety-day boundary, so they pass git the raw <code>&lt;seconds&gt; &lt;offset&gt;</code>
+form computed from the same clock the check reads rather than a
+formatted date.</p>
 <p>The tests cover the machinery, not what a check <em>decides</em> about a real
 repository. Test that half against local clones:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>mkdir -p /tmp/results

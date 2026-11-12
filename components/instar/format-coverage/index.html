@@ -2549,6 +2549,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-retirement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan retirement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-template/" class="md-nav__link">
         
   
@@ -17807,7 +17835,7 @@ above.</p>
 <tr>
 <td><strong>vhdx</strong></td>
 <td>Supported</td>
-<td>Dynamic or fixed VHDX (<code>--subformat</code>, default dynamic), configurable block size (1MB-256MB via <code>--block-size</code>, default qemu-img's for the size: 8MB up to 1GB, 16MB up to 100GB, 32MB up to 32TB, then 64MB), CRC-32C checksums</td>
+<td>Dynamic or fixed VHDX (<code>--subformat</code>, default dynamic), configurable block size (any power of two from 1MB to 256MB via <code>--block-size</code>, default qemu-img's for the size: 8MB up to 1GB, 16MB up to 100GB, 32MB up to 32TB, then 64MB), CRC-32C checksums</td>
 </tr>
 </tbody>
 </table>
@@ -17968,7 +17996,7 @@ size in place. Per-format support:</p>
 <td>vmdk (monolithicSparse)</td>
 <td>Yes</td>
 <td>reject</td>
-<td>off</td>
+<td>off, falloc, full</td>
 <td><strong>instar-only</strong> — qemu rejects</td>
 </tr>
 <tr>
@@ -17982,21 +18010,21 @@ size in place. Per-format support:</p>
 <td>vpc (VHD dynamic)</td>
 <td>Yes</td>
 <td>reject</td>
-<td>off</td>
+<td>off, falloc, full</td>
 <td><strong>instar-only</strong> — qemu rejects</td>
 </tr>
 <tr>
 <td>vpc (VHD fixed)</td>
 <td>Yes</td>
 <td>reject</td>
-<td>off</td>
+<td>off, falloc, full</td>
 <td><strong>instar-only</strong> — qemu rejects</td>
 </tr>
 <tr>
 <td>vhdx (dynamic)</td>
 <td>Yes</td>
 <td>reject</td>
-<td>off</td>
+<td>off, falloc, full</td>
 <td><strong>instar-only</strong> — qemu rejects</td>
 </tr>
 <tr>

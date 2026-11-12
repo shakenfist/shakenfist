@@ -2553,6 +2553,34 @@
   
   
     <li class="md-nav__item">
+      <a href="plan-retirement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan retirement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="plan-template/" class="md-nav__link">
         
   
@@ -16016,23 +16044,30 @@ which is why the tables were moved to one page in the first place.</p>
 <li>
 <p>private-ci is audited for the <code>plan-phase-references</code>,
   <code>plan-source-references</code>, <code>plan-index</code>, <code>plan-template</code>,
-  <code>eol-producers</code> and <code>sfui-vendor</code> checks, and nothing else. It is
-  internal tooling and excluded from the conventions, but it vendors
-  sfui and a vendored copy drifts silently: nothing in the consumer
-  fails when the copy falls behind, or when someone edits it in place
-  and the next sync discards the edit. It also owns the runner-label
-  producer definitions <code>eol-producers</code> checks against the end-of-life
-  table, so that applies too. It plans like the rest of the fleet too,
-  so the four criteria that report a defect in a plan as written
-  apply. The three that do not are <code>plan-audit-phase</code>, because the
-  plans written there before it adopted the template track progress
-  as checkpoint sections rather than as a phase table and enabling it
-  would file an issue for a retrofit nobody has decided to do;
-  <code>push-audit</code>, which has no <code>PUSH-AUDIT.md</code> to read until that
-  changes; and <code>plan-history-in-source</code>, which comes in with
-  <code>push-audit</code>, since that runbook carries the rule it measures. It is
-  not expected to grow a <code>pyproject.toml</code>, a renovate config,
-  release workflows, or a <code>develop</code> branch.</p>
+  <code>plan-retirement</code>, <code>eol-producers</code> and <code>sfui-vendor</code> checks, and
+  nothing else. It is internal tooling and excluded from the
+  conventions, but it vendors sfui and a vendored copy drifts
+  silently: nothing in the consumer fails when the copy falls behind,
+  or when someone edits it in place and the next sync discards the
+  edit. It also owns the runner-label producer definitions
+  <code>eol-producers</code> checks against the end-of-life table, so that
+  applies too. It plans like the rest of the fleet too, so the four
+  criteria that report a defect in a plan as written apply, and
+  <code>plan-retirement</code> with them: a plan index is maintained here like
+  anywhere else, and retirement maintains that page rather than
+  changing how a plan is written. Its table records no status, so
+  nothing in it is eligible and the criterion reports those plans on a
+  passing result instead -- which is the only place the fleet's
+  largest statusless table is visible at all. The three that do not
+  are <code>plan-audit-phase</code>, because the plans written there before it
+  adopted the template track progress as checkpoint sections rather
+  than as a phase table and enabling it would file an issue for a
+  retrofit nobody has decided to do; <code>push-audit</code>, which has no
+  <code>PUSH-AUDIT.md</code> to read until that changes; and
+  <code>plan-history-in-source</code>, which comes in with <code>push-audit</code>, since
+  that runbook carries the rule it measures. It is not expected to
+  grow a <code>pyproject.toml</code>, a renovate config, release workflows, or a
+  <code>develop</code> branch.</p>
 </li>
 <li>
 <p>images is audited for the <code>eol-distro</code> check, and nothing else. It
@@ -16304,6 +16339,10 @@ attached rather than quietly disappearing from the table.</p>
 <tr>
 <td><a href="/components/development/audits/plan-template/">plan-template.md</a></td>
 <td>PLAN-TEMPLATE.md shared blocks, including the sub-agent model roster and the push-audit phase</td>
+</tr>
+<tr>
+<td><a href="/components/development/audits/plan-retirement/">plan-retirement.md</a></td>
+<td>Plans whose index row went terminal more than 90 days ago have been retired</td>
 </tr>
 <tr>
 <td><a href="/components/development/audits/test-coverage/">test-coverage.md</a></td>

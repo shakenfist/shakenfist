@@ -2653,6 +2653,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/plan-retirement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan retirement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/plan-template/" class="md-nav__link">
         
   
@@ -15934,6 +15962,13 @@ alone, such as rewriting the row's link, do not.
 <code>Superseded</code> and <code>Abandoned</code> plans retire on the same clock; for an
 abandoned plan, the reasoning worth keeping is usually why it was
 abandoned.</p>
+<p>A plan listed in a table with no <code>Status</code> column records no status,
+so it is never eligible. The audit reports such plans and never
+fails for them, because the alternative is demanding a status that
+somebody invents to clear an issue, and an invented status in the
+one page people read to decide what wants attention is worse than
+none. A repository that keeps such a table should say in its index
+why, as <code>private-ci</code> does.</p>
 <h2 id="what-retiring-involves">What retiring involves<a class="headerlink" href="#what-retiring-involves" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong><code>docs/</code> describes what the plan built.</strong> Usually it already
@@ -15962,7 +15997,10 @@ abandoned.</p>
    Nothing catches the rest, which become silent 404s and stale
    names: absolute <code>blob/&lt;branch&gt;</code> links in <code>README.md</code>, and plan
    names in backticks in <code>AGENTS.md</code>, <code>ARCHITECTURE.md</code>, other plans
-   and <code>.claude/</code>.</li>
+   and <code>.claude/</code>. A build input under <code>docs/plans/</code>, such as
+   <code>order.yml</code>, is the exception: it is keyed by file name, and the
+   file is going away, so its entry is deleted rather than pinned
+   to a permalink.</li>
 <li><strong>The master plan and its phase files are deleted.</strong></li>
 <li><strong>The index row stays.</strong> It keeps its date, intent and status,
    and its link becomes a permalink to the plan's final text:</li>
@@ -15973,19 +16011,27 @@ abandoned.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git log -1 --format=%H origin/&lt;default&gt; -- docs/plans/&lt;file&gt;
 </code></pre></div>
 <p>That is the last commit on the default branch that changed the
-   file, so it holds the final text and, being on the default
-   branch, is never garbage collected. Never link <code>blob/main</code>: once
-   the file is deleted that is a 404. The index stays the complete
-   history of what the repository has planned, and <code>git</code> keeps the
-   text. A row whose link is an absolute URL registers no local
-   plan, so <a href="/components/development/audits/plan-index/"><code>plan-index</code></a> accepts a retired
-   row as it stands.</p>
+   file, so it holds the final text and, being on the default branch,
+   is never garbage collected. Never link <code>blob/main</code>: once the file
+   is deleted that is a 404. The index stays the complete history of
+   what the repository has planned, and <code>git</code> keeps the text. The row
+   is marked <code>(retired)</code> after its link, in the <code>Plan</code> cell, and the
+   index says once, in a paragraph before its table, what a pinned
+   link means. That paragraph says the pinned copy is frozen history
+   rather than a maintained document, so it may state things a later
+   phase overturned. A row whose link is an absolute URL registers no
+   local plan, so <a href="/components/development/audits/plan-index/"><code>plan-index</code></a> accepts a
+   retired row as it stands.</p>
 <h2 id="what-it-is-not">What it is not<a class="headerlink" href="#what-it-is-not" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Retired is not a status.</strong> A retired plan's row still reads
   <code>Complete</code>, <code>Superseded</code> or <code>Abandoned</code>. A status says whether a
   plan still wants attention, and a retired plan does not; that its
-  text now lives only in history is already shown by the link.</li>
+  text now lives only in history is already shown by the link. The
+  <code>(retired)</code> marker does not contradict this: it sits in the <code>Plan</code>
+  cell, beside the link, and the <code>Status</code> cell is untouched. It
+  labels the link, saying that the text behind it is frozen, and
+  does not say anything about the plan's status.</li>
 <li><strong>A plan whose reasoning cannot be placed is not retired.</strong> If
   there is no sensible home in <code>docs/</code> for why the code is the shape
   it is, the plan is left where it is and reported, so that a person
@@ -16003,6 +16049,10 @@ abandoned.</p>
 <p>ryll's <code>docs/plans/completed/</code> was an earlier approach: finished
 phase files were moved there by hand and kept in the tree.
 Retirement replaces it; the files in it retire like any others.</p>
+<p>That is true of any local convention for finished plans: a
+<code>completed/</code> directory, a prose status, a per-repository rule. A
+retirement that contradicts one reconciles it. The retirement wins,
+and its commit says so.</p>
 <p>The <code>retire-plans</code> skill in the private <code>llm-setup</code> repository does
 this, one pull request per repository. Its <code>retire-plans</code> helper does
 the parts with one right answer: listing eligible plans, finding

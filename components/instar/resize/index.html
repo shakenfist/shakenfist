@@ -2549,6 +2549,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-retirement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan retirement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-template/" class="md-nav__link">
         
   
@@ -16068,21 +16096,21 @@ beyond the new EOF.</p>
 <td>vmdk</td>
 <td>✓</td>
 <td>reject</td>
-<td>off</td>
+<td>off, falloc, full</td>
 <td>monolithicSparse only</td>
 </tr>
 <tr>
 <td>vpc</td>
 <td>✓</td>
 <td>reject</td>
-<td>off</td>
+<td>off, falloc, full</td>
 <td>dynamic + fixed grow</td>
 </tr>
 <tr>
 <td>vhdx</td>
 <td>✓</td>
 <td>reject</td>
-<td>off</td>
+<td>off, falloc, full</td>
 <td>dynamic only; two-header dance</td>
 </tr>
 </tbody>
@@ -16154,7 +16182,7 @@ grow. Shrink and noop ignore the mode; pairing
 <td><code>off</code></td>
 <td>sparse (default)</td>
 <td>sparse (default)</td>
-<td>sparse (only mode supported)</td>
+<td>sparse (default)</td>
 </tr>
 <tr>
 <td><code>metadata</code></td>
@@ -16166,13 +16194,13 @@ grow. Shrink and noop ignore the mode; pairing
 <td><code>falloc</code></td>
 <td><code>posix_fallocate</code> on the added region</td>
 <td><code>posix_fallocate</code> on the added region</td>
-<td>rejected (planner gap)</td>
+<td><code>posix_fallocate</code> on the added region</td>
 </tr>
 <tr>
 <td><code>full</code></td>
 <td><code>fallocate(ZERO_RANGE)</code> with <code>pwrite</code> fallback</td>
 <td><code>fallocate(ZERO_RANGE)</code> with <code>pwrite</code> fallback</td>
-<td>rejected (planner gap)</td>
+<td><code>fallocate(ZERO_RANGE)</code> with <code>pwrite</code> fallback</td>
 </tr>
 </tbody>
 </table>
