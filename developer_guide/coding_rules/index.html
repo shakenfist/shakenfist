@@ -16101,6 +16101,37 @@ added to make a teardown <em>safer</em> -- this wait exists because dnsmasq's
 replacement raced the dying process's sockets (#4472) -- must not be able to
 abort the teardown it was added to. Observing an exit is instrumentation; when
 instrumentation cannot answer, it says so and the cleanup still runs.</p>
+<h2 id="releasing-a-lock-is-not-part-of-the-work">Releasing a lock is not part of the work<a class="headerlink" href="#releasing-a-lock-is-not-part-of-the-work" title="Permanent link">&para;</a></h2>
+<p><code>NodeLock.__exit__</code> was the whole unlock request and nothing else, so a
+nodelock daemon which went away between the acquire and the release turned a
+<em>completed</em> operation into a failed one. On sfcbr during an ordinary rolling
+restart, <code>_apply_delete_on_hypervisor</code> ran its whole teardown, left the
+<code>with</code> block, and then raised <code>ConnectionResetError</code> out of the unlock: the
+instance was gone, the network teardown had run, and the delete operation was
+marked failed anyway, so the client retried into an operation which found
+everything already deleted (#4902). Three milliseconds later the enclosing
+instance lock's release failed the same way.</p>
+<p>A context manager's <code>__exit__</code> has a second, worse failure mode: an exception
+raised there replaces whatever the body raised. The real error becomes a
+message about tidying up after it.</p>
+<p>So a release failure is logged, not raised — <code>ClusterLock.__exit__</code> has
+swallowed its own <code>LockNotHeld</code> for this reason far longer. For a node lock
+that is also <em>safe</em>, and the reason is worth stating because it is a property
+of the daemon rather than of the lock: <code>daemons/nodelock/main.py</code> holds its
+lock table as a plain dict local to <code>main()</code> and deletes a key before it
+answers, so a daemon which cannot answer an unlock has either dropped every
+lock it held or has already released this one. There is nothing leaked to
+clean up.</p>
+<p>The exception is a request which never arrived, because a nodelock has no
+lease and so really would stay held until the daemon restarted — and a refused
+connection is not proof the daemon is gone, since a healthy daemon with a full
+listen backlog refuses connections too. <code>__exit__</code> therefore retries the
+unlock <code>NODELOCK_UNLOCK_ATTEMPTS</code> times before it gives up and logs.</p>
+<p><code>UnknownNodeLockReplyException</code> is deliberately outside
+<code>NODELOCK_TRANSPORT_ERRORS</code>, the one list of what a restarting nodelock daemon
+looks like to a client: a reply which parses but carries no known field is a
+bug in this protocol, not a daemon blip, and it stays loud in <code>__exit__</code> and in
+<code>health_check_nodelock()</code> alike.</p>
 <h2 id="fail-closed-on-a-field-not-on-a-formatting-accident">Fail closed on a field, not on a formatting accident<a class="headerlink" href="#fail-closed-on-a-field-not-on-a-formatting-accident" title="Permanent link">&para;</a></h2>
 <p>A reply that says "this went wrong" must say so in a field set only on the
 success path. <code>CountFederatedAttemptReply</code> used to signal failure by carrying a
