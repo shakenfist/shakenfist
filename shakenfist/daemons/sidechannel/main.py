@@ -200,6 +200,14 @@ SETTLE_EXHAUSTED = 'exhausted'
 # is a leak waiting to be found by an audit rather than by a test.
 TERMINAL_DEPENDENCY_CACHE_SIZE = 4096
 
+# How many runs_after warnings the dispatcher remembers having already
+# audited, bounded for the reason above and not for a different one.
+# Smaller because the condition is rare -- an ordering edge whose
+# dependency has gone, or which outlasted the budget -- and because
+# evicting an entry costs one repeated event rather than a wrong answer,
+# which is the gentlest consequence an eviction in this file has.
+RUNS_AFTER_WARNING_CACHE_SIZE = 1024
+
 
 class ConnectionFailed(Exception):
     ...
@@ -1709,9 +1717,11 @@ class Monitor(daemon.Daemon):
         # terminal states are ever stored here; see _dependency_state().
         self.terminal_dependency_cache = {}
 
-        # runs_after warnings already audited, as (operation, dependency,
-        # message); see _warn_runs_after().
-        self.runs_after_warnings = set()
+        # runs_after warnings already audited, keyed by (operation,
+        # dependency, message); see _warn_runs_after(). A dict used as a
+        # set, because the eviction policy both caches share needs
+        # insertion order.
+        self.runs_after_warnings = {}
 
     def start_instance_monitor(self, instance_uuid):
         # Rate limited for the reason MONITOR_START_INTERVAL records.
@@ -2136,6 +2146,10 @@ class Monitor(daemon.Daemon):
         delay has to be measured from that rather than from when the
         dependent was parked.
         """
+        # Keyed on the uuid alone, which is correct only while
+        # VALID_DEPENDENCY_OPERATIONS admits exactly one op_type. The
+        # mixed-type edges of issue #4824 would make this key ambiguous,
+        # so it has to become (op_type, op_uuid) with them.
         op_uuid = str(dep['op_uuid'])
 
         cached = self.terminal_dependency_cache.get(op_uuid)
@@ -2152,21 +2166,28 @@ class Monitor(daemon.Daemon):
             self._cache_terminal_dependency(op_uuid, value)
         return True, value
 
-    def _cache_terminal_dependency(self, op_uuid, state):
-        """Remember a terminal dependency state, evicting the oldest first.
+    def _remember_capped(self, cache, key, value, limit):
+        """Add to one of the dispatcher's caches, evicting the oldest first.
 
         Insertion order is dict iteration order, so the oldest entry is
         the first one. pop() rather than del throughout because
         start_dispatcher() may have replaced this dictionary underneath a
         generation which has not noticed it was superseded yet.
+
+        Shared by both of this class's caches so that there is one
+        eviction policy rather than two which have to be kept the same.
         """
-        cache = self.terminal_dependency_cache
-        if (op_uuid not in cache
-                and len(cache) >= TERMINAL_DEPENDENCY_CACHE_SIZE):
+        if key not in cache and len(cache) >= limit:
             oldest = next(iter(cache), None)
             if oldest is not None:
                 cache.pop(oldest, None)
-        cache[op_uuid] = (state, time.time())
+        cache[key] = value
+
+    def _cache_terminal_dependency(self, op_uuid, state):
+        """Remember a terminal dependency state, and when it was seen."""
+        self._remember_capped(
+            self.terminal_dependency_cache, op_uuid,
+            (state, time.time()), TERMINAL_DEPENDENCY_CACHE_SIZE)
 
     def _dependency_finished_at(self, dep, dep_state):
         """When this dispatcher first observed this dependency finished.
@@ -2249,8 +2270,18 @@ class Monitor(daemon.Daemon):
                 # state row", which is a fact about the database and not
                 # about a read of it. Holding costs a transient blip one
                 # DISPATCH_CHECK_INTERVAL instead of costing every
-                # queued dependent on this node its operation, and the
-                # budget still bounds an outage which does not clear.
+                # queued dependent on this node its operation.
+                #
+                # The budget below bounds an outage which does not clear
+                # only while the anchor can still be written, which
+                # means only while the failure is confined to this read.
+                # A backend which is down for everything fails the
+                # anchor write too, _attributes() then answers with a
+                # default carrying no anchor, and every pass re-anchors
+                # at now -- so the operation holds indefinitely rather
+                # than being aborted for a dependency nobody could read.
+                # That is the direction to fail in, and it is why this
+                # arm is a hold and not a judgement.
                 if self._wait_budget_spent(agentop, budget):
                     self._cascade_abort(
                         agentop, dep, DEPENDENCY_UNREADABLE,
@@ -2483,12 +2514,16 @@ class Monitor(daemon.Daemon):
         over one budget and the only per-pass write either walk makes.
         The record is kept for the life of a dispatcher generation, the
         same lifetime the terminal dependency cache has, so a restart
-        re-warns once rather than going quiet forever.
+        re-warns once rather than going quiet forever, and it is capped
+        the same way for the same reason: a container which only ever
+        grows, in a daemon which runs for weeks, is a leak.
         """
         warned = (str(agentop.uuid), str(dep['op_uuid']), message)
         if warned in self.runs_after_warnings:
             return
-        self.runs_after_warnings.add(warned)
+        self._remember_capped(
+            self.runs_after_warnings, warned, True,
+            RUNS_AFTER_WARNING_CACHE_SIZE)
 
         add_event_multi(
             EVENT_TYPE_AUDIT,
@@ -2637,7 +2672,7 @@ class Monitor(daemon.Daemon):
         # rather than clear(), so a superseded generation which has not
         # noticed yet cannot be iterating one being emptied.
         self.terminal_dependency_cache = {}
-        self.runs_after_warnings = set()
+        self.runs_after_warnings = {}
         self.dispatcher_last_pass = time.time()
         self.dispatcher_thread = threading.Thread(
             target=self._dispatch_loop, args=(generation,), daemon=True,

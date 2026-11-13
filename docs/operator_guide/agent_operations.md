@@ -272,4 +272,14 @@ If that happens:
   stall another caller's operations against the same instance. Raise
   it only if your callers chain operations deeply and the aborts are
   spurious, and lower it if the operations behind a blocked one matter
-  more than the chain.
+  more than the chain. Lowering it is also an API change and not only a
+  scheduling one: this option is the published ceiling on
+  `settle_seconds`, so a lower value refuses settle delays callers could
+  previously submit, and the OpenAPI document a deployment serves
+  changes with it.
+
+  The guarantee that a settle inside that ceiling can always elapse
+  holds for the edge carrying the settle, and only while it is the last
+  thing holding the operation. An operation with another unfinished
+  edge has already spent this budget by the time a long settle elapses,
+  so that edge gives up as soon as it is reached.

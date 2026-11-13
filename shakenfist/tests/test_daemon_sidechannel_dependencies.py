@@ -65,7 +65,7 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
 
         self.daemon = sidechannel.Monitor.__new__(sidechannel.Monitor)
         self.daemon.terminal_dependency_cache = {}
-        self.daemon.runs_after_warnings = set()
+        self.daemon.runs_after_warnings = {}
 
     # Helpers.
     def _agentop(self, states=None, depends_on=None, runs_after=None,
@@ -633,12 +633,12 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
         # replacement thread has not warned about anything yet.
         self.daemon.dispatcher_generation = 7
         self.daemon.dispatcher_thread = None
-        self.daemon.runs_after_warnings = {('op', 'dep', 'warning')}
+        self.daemon.runs_after_warnings = {('op', 'dep', 'warning'): True}
 
         with mock.patch.object(sidechannel.threading, 'Thread'):
             self.daemon.start_dispatcher()
 
-        self.assertEqual(set(), self.daemon.runs_after_warnings)
+        self.assertEqual({}, self.daemon.runs_after_warnings)
 
     # A read which failed says nothing, and must not be mistaken for an
     # answer. Both of mariadb.get_state()'s backends return None when
@@ -935,6 +935,57 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
 
         mock_event.assert_called_once()
 
+    def test_the_warning_record_evicts_the_oldest_entry(self):
+        # Its neighbour is capped for a stated reason -- a container
+        # which only grows, in a daemon which runs for weeks, is a leak
+        # -- and this one gains an entry per operation which ever warns.
+        #
+        # Driven through _warn_runs_after() rather than through the
+        # helper it calls: a test of the helper alone passes just as
+        # happily when the call site is not there, which a mutation
+        # proved by surviving.
+        edges = [self._missing_edge() for _ in range(3)]
+        agentop = self._agentop(runs_after=edges)
+
+        with mock.patch.object(
+                sidechannel, 'RUNS_AFTER_WARNING_CACHE_SIZE', 2):
+            with mock.patch.object(sidechannel, 'add_event_multi'):
+                self.assertTrue(
+                    self.daemon._dependencies_met(self.inst, agentop)[0])
+
+        self.assertEqual(2, len(self.daemon.runs_after_warnings))
+        # Oldest first, so the surviving keys name the last two edges.
+        self.assertEqual(
+            [str(e['op_uuid']) for e in edges[1:]],
+            [key[1] for key in self.daemon.runs_after_warnings])
+
+    def test_an_evicted_warning_is_audited_again(self):
+        # The behavioural consequence of the cap, and the reason it can
+        # be smaller than its neighbour's: an eviction costs one
+        # repeated event rather than a wrong answer.
+        agentop = self._agentop(runs_after=[self._missing_edge(),
+                                            self._missing_edge()])
+
+        with mock.patch.object(
+                sidechannel, 'RUNS_AFTER_WARNING_CACHE_SIZE', 1):
+            with mock.patch.object(
+                    sidechannel, 'add_event_multi') as mock_event:
+                for _ in range(2):
+                    self.daemon._dependencies_met(self.inst, agentop)
+
+        self.assertEqual(4, mock_event.call_count)
+
+    def test_both_caches_share_one_eviction_policy(self):
+        # Two copies of an eviction rule is two things to keep the same,
+        # so the cache writer goes through the shared helper.
+        with mock.patch.object(self.daemon, '_remember_capped') as mock_cap:
+            self.daemon._cache_terminal_dependency(
+                'an-operation', BaseOperation.STATE_COMPLETE)
+
+        mock_cap.assert_called_once()
+        self.assertIs(self.daemon.terminal_dependency_cache,
+                      mock_cap.call_args.args[0])
+
     def test_a_second_runs_after_edge_warns_on_its_own_account(self):
         # Deduplicated per edge, not per operation: two gone edges are
         # two findings an operator should see.
@@ -946,6 +997,49 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
                 self.daemon._dependencies_met(self.inst, agentop)[0])
 
         self.assertEqual(2, mock_event.call_count)
+
+    def test_a_cascade_losing_the_race_does_not_raise(self):
+        # Deadline enforcement can expire an operation out of band at
+        # any moment, including between the cascade's terminal-state
+        # guard and its state assignment. The state machine refuses that
+        # transition by raising, and the caller is one operation inside
+        # a pass which walks every agent-ready instance on this node --
+        # a pass wrapped in a broad except, so an escaping exception
+        # would cost every other instance its dispatch.
+        _, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING,
+                    dbo.STATE_ERROR])
+        agentop = self._agentop(depends_on=[edge])
+
+        real_attributes = agentop._attributes
+
+        def expire_mid_cascade():
+            # Called by the cascade after its guard has passed, which is
+            # exactly the window the guard cannot close.
+            attrs = real_attributes()
+            if agentop.state.value != AgentOperation.STATE_EXPIRED:
+                agentop.state = AgentOperation.STATE_EXPIRED
+            return attrs
+
+        with mock.patch.object(agentop, '_attributes',
+                               side_effect=expire_mid_cascade):
+            # The cascade's events are emitted from agentoperation, not
+            # from the dispatcher module.
+            with mock.patch.object(
+                    agentoperation, 'add_event_multi') as mock_event:
+                dispatchable, reason = self.daemon._dependencies_met(
+                    self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        # Audited as the no-op it became, in the same words the guard
+        # uses, so an operator finds one event either way.
+        self.assertTrue(
+            any('finished before its dependency cascade applied'
+                in str(c.args[2]) for c in mock_event.call_args_list),
+            'a cascade which did not take was not audited')
+        self.assertIsNotNone(reason)
 
 
 class SidechannelDispatchSeamTestCase(base.ShakenFistTestCase):

@@ -485,3 +485,18 @@ not lost:
   why the artifact *access* path must not be collapsed into the
   ownership one.
 
+- **The cluster-side dependency walk carries both defects phase 2's
+  first review round fixed on the agent side.** The walk at
+  `shakenfist/daemons/queues/workitem.py:143-180` cancels a work item
+  for a missing dependency when a `from_db()` read merely failed, and
+  its `depends_on` walk falls through to satisfied for any state in
+  neither of its two lists. The agent side answers the first with
+  `mariadb.get_state_checked()` and a hold, and the second with a named
+  satisfied arm plus a test derived from `state_targets`; neither
+  transfers mechanically, because the cluster side hydrates its
+  dependency rather than reading a state row, so the readability
+  signal has to be designed rather than copied. Filed as
+  [#4910](https://github.com/shakenfist/shakenfist/issues/4910) rather
+  than swept into phase 2, whose scope is confined to agent
+  operations. Phase 5's push audit should not re-derive it.
+

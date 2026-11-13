@@ -1020,7 +1020,13 @@ dispatched exactly as one without. Otherwise:
   the dependency takes. That budget covers the operation's whole wait and not
   each edge's, so for an operation with several edges the dependency named in
   `dependency_failure` is whichever one was blocking when the budget ran out,
-  which is not necessarily the one which consumed it.
+  which is not necessarily the one which consumed it. A blocked
+  operation also remains subject to its own `deadline`, which is
+  enforced before the edges are looked at, so a dependent whose
+  deadline is shorter than its remaining wait reaches `expired` with no
+  `dependency_failure` at all rather than `abort`. The two bounds are
+  independent by design, and a client awaiting a chain has to treat
+  both states as terminal.
 * A `runs_after` dependency orders the operation, and never decides its fate.
   Any finished state, including a failed one, lets it run, and a dependency
   which is absent, which cannot be read, or which outlasts the same wait is
@@ -1041,8 +1047,11 @@ one whose state could not be read before the budget ran out, which is a report
 about the node's database connectivity rather than about the chain you
 submitted. An operation
 aborted for outlasting the wait budget carries the dependency's state at that
-moment, which may be `queued` or `executing`, so `state` alone does not say that
-the dependency failed. See
+moment, which may be `queued` or `executing` -- or `complete`, which means the
+dependency succeeded and it was the settle delay after it which outlasted the
+budget. So `state` alone does not say that the dependency failed, and nothing on
+the wire separates a give-up from a failure: the audit event's text is what
+distinguishes them. See
 [the database operator guide](../../operator_guide/database.md) for how the
 edges are stored.
 
@@ -1092,6 +1101,14 @@ list. It is a JSON dictionary with the following fields:
   settle delay can hold an operation at the head of its queue for the budget
   plus the delay, rather than for the budget alone. A request over the ceiling
   is refused with a 400.
+
+    That extension applies to the edge being settled, and only for as long as
+    it is the last thing holding the operation. An operation with a second
+    edge still unfinished when a long settle elapses has already spent its
+    budget, so that second edge gives up as soon as it is reached -- and the
+    `dependency_failure` names the second dependency rather than the settle.
+    In practice a settle at or near the ceiling is only safe on an operation
+    whose other dependencies have already finished.
 
 ### Fetching information about an Instance's Agent Operations
 

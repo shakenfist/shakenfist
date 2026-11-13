@@ -1494,7 +1494,15 @@ blocked. It is never moved forward while one attempt is being evaluated,
 because it anchors the `AGENT_OPERATION_DEPENDENCY_WAIT` budget and a second
 write would restart it, but it is cleared back to NULL when a retry requeues
 the operation, so the next attempt is allowed the whole budget. It is not
-part of the API view. See
+part of the API view.
+
+The anchor is written with a single-field mask, and a database tier which has
+not yet reached attributes version 6 does not know the field, so during an
+upgrade in which the hypervisors are ahead of the database the write fails. A
+dependency-blocked operation then holds at the head of its queue instead of
+accruing budget towards an abort, which is the safe direction and clears
+itself once the database tier catches up -- and it is one more reason the
+database tier is upgraded first. See
 [the API reference](../developer_guide/api_reference/instances.md#agentdependency)
 for the shape a caller sends and for what the two columns mean.
 

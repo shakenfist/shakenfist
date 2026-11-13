@@ -487,13 +487,13 @@ An item that cannot be checked is reported as such, not ticked.
   collation against a fresh `create_all`. Report the count of tests
   run; zero is a failure of this criterion, not a pass.
 - `tools/mutate-agent-dependencies.py` kills every mutant, run
-  serially, and the report names the test that failed for each.
-  Phase 1 left the set at 10; this phase adds 10, so a report of
-  fewer than 20 is a failed criterion. The first review round on the
-  pull request took it to 36. A report which skips a mutant counts as a
-  failure and not a pass: an anchor a later change has moved means the
-  guard is no longer being tested, which is what the script's SKIP is
-  for.
+  serially, and the report names the test that failed for each. Phase
+  1 left the set at 10; this phase adds 10, so a report of fewer than
+  20 is a failed criterion. The first review round on the pull request
+  took it to 36 and the second to 38. A report which skips a mutant
+  counts as a failure and not a pass: an anchor a later change has
+  moved means the guard is no longer being tested, which is what the
+  script's SKIP is for.
 - `shakenfist/data/database_load_budget.yaml` is unchanged. Check:
   `git diff develop -- shakenfist/data/database_load_budget.yaml` is
   empty. This is the inverse of what the master plan asked for, and
@@ -955,3 +955,91 @@ construct the rows behind the API it is meant to be testing through.
 Phase 3 opens the client path and is where the test belongs; it is
 recorded against that phase rather than filed as an issue, since it is
 scope rather than a defect.
+
+### Review round 2 on the pull request, 2026-11-13 (AEDT)
+
+No fix items: 6 document, 4 consider and 2 informational on
+`e83f8d5b`, against round 1's 3 fix. All six document items were
+taken, three of the four considers, and the fourth was filed as an
+issue. Five of the six document items correct claims round 1 itself
+wrote, which is the shape to expect from a round that follows a large
+one.
+
+**Two of them were corrections to guarantees stated too broadly.** The
+settle extension that round 1 added -- bounding a settling operation
+at `budget + settle` -- was described in four places as making a settle
+inside the ceiling always able to elapse. It does, for the edge
+carrying the settle, and only while that edge is the last thing
+holding the operation. An operation with a second unfinished edge has
+already spent the budget by the time a long settle elapses, so the
+second edge's pending arm, which compares against `budget` and not
+`budget + settle`, gives up as soon as it is reached and names the
+second dependency. The practical guidance -- a settle near the ceiling
+is only safe on an operation whose other edges have finished -- is now
+in the API reference and in the option's help.
+
+The other was the unreadable-dependency comment, which said the
+budget still bounds an outage that does not clear. It bounds it only
+while the anchor can be written. `_wait_budget_spent()` reaches the
+same backend that just failed the state read, and `_attributes()`
+answers a failed read with a default carrying no anchor, so a total
+outage re-anchors at now on every pass and the operation holds
+indefinitely instead of being aborted. That is the direction to fail
+in and it is why the arm is a hold, but the comment claimed a bound it
+does not have.
+
+**A lost cascade race could have cost a whole dispatch pass.**
+`cascade_abort_for_dependency()` guards on `TERMINAL_STATES` and then
+writes the attribute before assigning the state, and its docstring
+named the state machine as the backstop for the window between the
+two. The state machine refuses by raising, and the caller is one
+operation inside a pass that walks every agent-ready instance on the
+node, wrapped in a broad except -- so an operation expired out of band
+inside that window would have abandoned every other instance's
+dispatch for that pass, and left the expired operation carrying the
+`dependency_failure` the guard exists to prevent. The assignment is
+now wrapped, and the race degrades to exactly the no-op the guard
+performs, audited in the same words. The test that pinned the backstop
+asserted the state machine refuses, not that the refusal propagates,
+so it stayed valid -- which is why nothing failed when this was wrong.
+
+**The sibling container was unbounded.** `terminal_dependency_cache`
+is capped at 4096 with a stated reason: a container that only grows,
+in a daemon that runs for weeks, is a leak found by an audit rather
+than by a test. `runs_after_warnings`, added in round 1 beside it, had
+no cap. Both now go through one `_remember_capped()` helper, so there
+is a single eviction policy rather than two to keep in step, and the
+new cap is smaller because the condition is rare and an eviction here
+costs one repeated event rather than a wrong answer.
+
+The declined consider is the cluster-side walk at
+`shakenfist/daemons/queues/workitem.py:143-180`, which carries both of
+round 1's defects unchanged: a `from_db()` read that failed cancels
+the work item for a missing dependency, and its `depends_on` walk
+falls through to satisfied. The reasoning that justified fixing them
+here applies there verbatim, but the fix does not -- the cluster side
+hydrates its dependency rather than reading a state row, so the
+readability signal has to be designed rather than copied, and that
+path is far busier than this one and was never surveyed by this plan.
+Filed as
+[#4910](https://github.com/shakenfist/shakenfist/issues/4910) and
+recorded in the master plan's future work so phase 5's audit does not
+re-derive it.
+
+The mutation set is at 38, and it earned its keep twice in this round.
+The cap's first test called `_remember_capped()` directly, so removing
+the call site from `_warn_runs_after()` left it green -- a test of a
+helper passes just as happily when nothing calls the helper, and the
+mutant surviving is what said so. It now drives the walk, with a
+second test for the behavioural consequence of an eviction. The
+`cascade write order` mutant also had to be re-anchored, because
+wrapping the state assignment moved the two statements whose order it
+inverts; that is the third anchor this pull request has had to repair,
+and the pattern is clear enough to state plainly: any change to the
+lines a mutant names invalidates that mutant, and the script reporting
+a skip is the only thing which catches it.
+
+The round stopped here rather than asking for a third: the exit
+condition is no fix items, not the reviewer running out of things to
+say, and it reviews whatever is in the diff including what the last
+round was told to add.

@@ -300,6 +300,26 @@ MUTANTS = [
      "                        if False:",
      r'test_daemon_sidechannel',
      'test_a_refused_verdict_dispatches_nothing'),
+    # The second review round's two behaviour changes. The first is a
+    # leak rather than a wrong answer, which is why its neighbour was
+    # capped in the first place; the second is an exception whose blast
+    # radius is every other instance's dispatch on this node.
+    ('warning record is unbounded', SIDECHANNEL,
+     "        self._remember_capped(\n"
+     "            self.runs_after_warnings, warned, True,\n"
+     "            RUNS_AFTER_WARNING_CACHE_SIZE)",
+     "        self.runs_after_warnings[warned] = True",
+     r'test_daemon_sidechannel_dependencies',
+     'test_the_warning_record_evicts_the_oldest_entry'),
+    ('lost cascade race raises', AGENTOP,
+     "        try:\n"
+     "            self.state = BaseOperation.STATE_ABORT\n"
+     "        except exceptions.InvalidStateException:",
+     "        if True:\n"
+     "            self.state = BaseOperation.STATE_ABORT\n"
+     "        if False:",
+     r'test_daemon_sidechannel_dependencies',
+     'test_a_cascade_losing_the_race_does_not_raise'),
     ('superseded generation evaluates', SIDECHANNEL,
      "                        if generation != self.dispatcher_generation:\n"
      "                            # Replaced mid-pass (see above); the operation",
@@ -359,11 +379,14 @@ MUTANTS = [
      "        mariadb.update_agent_operation_attributes(\n"
      "            attrs, fields=['dependency_failure'])\n"
      "\n"
-     "        self.state = BaseOperation.STATE_ABORT",
-     "        self.state = BaseOperation.STATE_ABORT\n"
-     "\n"
-     "        mariadb.update_agent_operation_attributes(\n"
-     "            attrs, fields=['dependency_failure'])",
+     "        try:\n"
+     "            self.state = BaseOperation.STATE_ABORT\n"
+     "        except exceptions.InvalidStateException:",
+     "        try:\n"
+     "            self.state = BaseOperation.STATE_ABORT\n"
+     "            mariadb.update_agent_operation_attributes(\n"
+     "                attrs, fields=['dependency_failure'])\n"
+     "        except exceptions.InvalidStateException:",
      r'test_agent_operation_dependency_cascade',
      'test_a_cascade_writes_the_reason_before_the_state'),
 ]

@@ -4,6 +4,7 @@ from uuid import UUID
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
@@ -557,6 +558,15 @@ class AgentOperation(BaseOperation):
         the write below, but it must not be the primary mechanism:
         reaching it means the reason has already been persisted.
 
+        That backstop refuses by raising, so it is caught here rather
+        than allowed to propagate. The caller is the dispatcher's
+        evaluation of one operation inside a pass which walks every
+        agent-ready instance on the node, and that pass is wrapped in
+        a broad except -- so an escaping exception would make a race on
+        one operation cost every other instance on the node its
+        dispatch. Caught, the race degrades to exactly what the guard
+        above does, which is what the guard is for.
+
         The no-op is noisy rather than silent. A cascade which did not
         land is worth an operator seeing, so it is audited with the
         state the operation was found in.
@@ -597,7 +607,24 @@ class AgentOperation(BaseOperation):
         mariadb.update_agent_operation_attributes(
             attrs, fields=['dependency_failure'])
 
-        self.state = BaseOperation.STATE_ABORT
+        try:
+            self.state = BaseOperation.STATE_ABORT
+        except exceptions.InvalidStateException:
+            # The operation went terminal between the guard above and
+            # here, which is the window the guard cannot close. The
+            # dependency_failure write has already landed, which the
+            # docstring accounts for, so this audits the same no-op the
+            # guard audits: an operator looking for a cascade which did
+            # not take finds the same event either way.
+            add_event_multi(
+                EVENT_TYPE_AUDIT,
+                [(self.object_type, self.uuid),
+                 (ObjectType.INSTANCE, self.instance_uuid)],
+                'operation finished before its dependency cascade applied',
+                extra={'op_type': dep['op_type'], 'op_uuid': dep['op_uuid'],
+                       'dependency_state': dep_state,
+                       'state': self.state.value})
+            return False
 
         # Against the instance as well as the operation, for the
         # reason expire() gives: abort is in FINAL_OBJECT_STATES too,
