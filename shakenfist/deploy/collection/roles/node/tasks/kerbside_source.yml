@@ -254,25 +254,61 @@
 
 # The proxy certificate is signed by the same CA as the hypervisors'
 # certificates (the Deploy Kerbside play's host_certificate call sets cert_cn
-# to kerbside_public_fqdn). If that subject is an allsf host's name, the
-# kerbside group holds a key whose certificate satisfies that hypervisor's
-# pinned host subject -- which matters once the scrape key is no longer cluster
-# admin. The check is on the inventory host name, as the audit (#4709) framed
-# it; a distinct public FQDN (or a distinguishing OU) avoids it. Host names are
-# not secrets.
-- name: Refuse a Kerbside public FQDN equal to a Shaken Fist host name
+# to kerbside_public_fqdn). If that subject is one a hypervisor's certificate
+# also carries, the kerbside group holds a key whose certificate satisfies
+# that hypervisor's pinned host subject -- which matters once the scrape key
+# is no longer cluster admin. A distinct public FQDN (or a distinguishing OU)
+# avoids it.
+#
+# Two names per allsf host, because a hypervisor's identity is asserted as a
+# name in two places, and only the first was checked (#4817, from the audit
+# #4709 framed). internal_ca issues each host's SPICE certificate with
+# cn = cert_cn, which the play that issues them leaves at its default of the
+# inventory host name. And where a node publishes no
+# spice_server_cert_subject, Kerbside's synthesize_host_subject substitutes
+# CN=<the node's Shaken Fist name>, which is node_name. An inventory whose
+# host names are short (sf1) but whose nodes are named by their fully
+# qualified name (sf1.example.com) therefore has two subjects per host.
+# Where the inventory sets no node_name, the second comparison falls back to
+# the inventory name and so collapses into the first, rather than inventing a
+# name no certificate carries.
+#
+# Compared trimmed and case-insensitively, because the SPICE verifier
+# compares subject values case- and whitespace-normalised: a certificate with
+# CN=SF1 satisfies a pin of CN=sf1.
+#
+# Not compared: ansible_host, node_mesh_ip and node_egress_ip. They are where
+# a hypervisor is reached, not what a certificate says it is -- nothing
+# issues one for them -- and this very message recommends the host's address
+# as the remedy on a single-host cluster, which is what the Kerbside CI lane
+# deploys with (tools/ci-deploy-profiles/kerbside-slim-tier.yml.j2).
+# ansible_fqdn is a gathered fact, and neither Kerbside play gathers facts,
+# so like the api_url predicate above this reads inventory values only: a
+# fact-based comparison would pass in the validation play and refuse in the
+# deploy play, by which time hosts have been changed.
+#
+# Host names are not secrets, so the message names them.
+- name: Refuse a Kerbside public FQDN equal to a Shaken Fist certificate subject
   ansible.builtin.assert:
-    that: kerbside_public_fqdn not in groups.get('allsf', [])
+    that:
+      - (kerbside_public_fqdn | trim | lower) != (item | trim | lower)
+      - >-
+        (kerbside_public_fqdn | trim | lower)
+        != (hostvars[item]['node_name'] | default(item, true) | trim | lower)
     fail_msg: >-
-      kerbside_public_fqdn is {{ kerbside_public_fqdn }}, the name of a host in
-      the allsf group. The Kerbside proxy certificate is signed by the same CA
-      as the hypervisors', so a proxy subject equal to a hypervisor's name
-      would satisfy that hypervisor's pinned host subject. Give Kerbside a
-      distinct public FQDN. On a single-host cluster that can be a second name
-      for the same host, such as console.{{ inventory_hostname }}, or the
-      host's address, which the Deploy Kerbside play puts in an IP SAN rather
-      than a DNS one.
+      kerbside_public_fqdn is {{ kerbside_public_fqdn }}, which is a name the
+      allsf host {{ item }} is identified by: its inventory name is
+      {{ item }} and its node_name is
+      {{ hostvars[item]['node_name'] | default(item, true) }}. The Kerbside
+      proxy certificate's CN is kerbside_public_fqdn, and it is signed by the
+      same CA as the hypervisors', so a proxy subject equal to one of a
+      hypervisor's would satisfy that hypervisor's pinned host subject. Give
+      Kerbside a distinct public FQDN. On a single-host cluster that can be a
+      second name for the same host, such as
+      console.{{ inventory_hostname }}, or the host's address, which the
+      Deploy Kerbside play puts in an IP SAN rather than a DNS one.
     quiet: true
+  loop: "{{ groups.get('allsf', []) }}"
   when: kerbside_public_fqdn | default('', true) | length > 0
 
 # kerbside_pki_dir defaults to <kerbside_config_dir>/pki. Set to the SPICE
