@@ -18976,7 +18976,7 @@ dedicated attribute tables:</p>
 <tr>
 <td><code>agent_operation_attributes</code></td>
 <td>AgentOperation</td>
-<td>uuid, results (JSON dict), last_progress (nullable), attempts, expiry_reason (nullable), dependency_failure (nullable JSON dict)</td>
+<td>uuid, results (JSON dict), last_progress (nullable), attempts, expiry_reason (nullable), dependency_failure (nullable JSON dict), dependency_wait_started (nullable)</td>
 </tr>
 <tr>
 <td><code>instance_attributes</code></td>
@@ -19040,9 +19040,22 @@ is <code>null</code> when the caller asked for no settle delay. A reader should 
 treat an absent <code>settle_seconds</code> as <code>null</code>, since a row this API did not
 write -- a hand-edited one -- can lack the key. <code>dependency_failure</code> is NULL
 unless a <code>depends_on</code> dependency failed and caused this operation to be
-aborted. Nothing evaluates an edge or writes <code>dependency_failure</code> yet: an
-operation created with edges is dispatched exactly as one created without.
-See
+aborted, and it is the sidechannel dispatcher which writes it when the
+operation reaches the head of its instance's queue. <code>dependency_wait_started</code>
+is NULL for an operation which was never blocked on a dependency, and
+otherwise the wall-clock time of the first dispatcher pass which found it
+blocked. It is never moved forward while one attempt is being evaluated,
+because it anchors the <code>AGENT_OPERATION_DEPENDENCY_WAIT</code> budget and a second
+write would restart it, but it is cleared back to NULL when a retry requeues
+the operation, so the next attempt is allowed the whole budget. It is not
+part of the API view.</p>
+<p>The anchor is written with a single-field mask, and a database tier which has
+not yet reached attributes version 6 does not know the field, so during an
+upgrade in which the hypervisors are ahead of the database the write fails. A
+dependency-blocked operation then holds at the head of its queue instead of
+accruing budget towards an abort, which is the safe direction and clears
+itself once the database tier catches up -- and it is one more reason the
+database tier is upgraded first. See
 <a href="../../developer_guide/api_reference/instances/#agentdependency">the API reference</a>
 for the shape a caller sends and for what the two columns mean.</p>
 <p>The edges are written to MariaDB by <code>sf-database</code>, while the capability

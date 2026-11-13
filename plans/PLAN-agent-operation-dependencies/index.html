@@ -16214,7 +16214,10 @@ are in
    is aborted, in the manner of <code>abandon_dependency_wait()</code>. The
    budget is wall-clock from the first blocked evaluation, recorded
    as an operation attribute on first block, rather than a count of
-   dispatcher passes: the dispatcher's pass rate is throttled and
+   dispatcher passes. That attribute does not exist yet: phase 1
+   landed <code>dependency_failure</code> and nothing else, so phase 2 adds
+   <code>dependency_wait_started</code> and the migration for it. The dispatcher's
+   pass rate is throttled and
    variable where the cluster dispatchers' backoff is not, and one
    write beats one write per pass. It is a configuration option.</li>
 </ol>
@@ -16329,9 +16332,18 @@ are in
    (<code>DISPATCH_CHECK_INTERVAL</code>, five seconds) rather than adding a
    cadence; a dependency observed in a terminal state is cached in
    process for the life of the dispatcher generation, since terminal
-   is absorbing; and the <code>(GetInstanceAttributes, sidechannel)</code> entry
-   in <code>shakenfist/data/database_load_budget.yaml</code> is amended in the
-   same phase as the code, as a code-derived term. The dispatcher's
+   is absorbing; and the reads are <strong>not</strong> budgeted, which phase 2's
+   survey established and this sentence used to get wrong. The pair
+   which grows is <code>(GetObjectState, sidechannel)</code>, a member of
+   <code>HARNESS_DRIVEN_PAIRS</code> in
+   <code>shakenfist/deploy/shakenfist_ci/load_budget.py</code> with no entry in
+   <code>shakenfist/data/database_load_budget.yaml</code> on purpose, because the
+   model has no term for load which scales with in-flight operations.
+   The <code>(GetInstanceAttributes, sidechannel)</code> entry this decision used
+   to name covers <code>agent_operation_next()</code>'s instance attribute read
+   and not a state read, so amending it would mis-attribute the cost.
+   What phase 2 owes is a sentence in that exclusion's note naming the
+   evaluator as a second producer. The dispatcher's
    supervisor replaces a thread which has not completed a pass in 120
    seconds, which is the ceiling on how much work a pass may grow by.</p>
 <p>One consequence to document rather than fix: the cascade is lazy,
@@ -16417,22 +16429,22 @@ before this repository can emit one (decision 3).</p>
 <tr>
 <td>1</td>
 <td><a href="../PLAN-agent-operation-dependencies-phase-01-schema-and-api/">PLAN-agent-operation-dependencies-phase-01-schema-and-api.md</a></td>
-<td>In progress</td>
+<td>Complete</td>
 <td>Schema, object and API: <code>depends_on</code> and <code>runs_after</code> on <code>AgentOperation</code> with an additive table migration, the agent edge model and <code>VALID_DEPENDENCY_OPERATIONS</code> (decision 5), per-edge settle seconds, <code>abort</code> in <code>state_targets</code> and <code>TERMINAL_STATES</code> in one commit (decision 3), the parameters on the three creating endpoints with their declarations and capability token, and submission-time validation (decision 6). Prerequisite: <code>client-python-k3s</code> has learned <code>abort</code> and released -- met, by <a href="https://github.com/shakenfist/client-python-k3s/pull/164">client-python-k3s#164</a> in <code>v0.4.0</code>. Its plan also lands the <code>dependency_failure</code> attribute column phase 2 writes, since this is the schema phase</td>
-<td>—</td>
+<td><code>e6c0ba95a5</code></td>
 </tr>
 <tr>
 <td>2</td>
-<td>—</td>
-<td>Not started</td>
-<td>Dispatch evaluation (decisions 1, 2, 8, 9, 10): same-instance and cross-instance edges evaluated in the dispatcher between <code>agent_operation_next()</code> and <code>start_instance_executor()</code>, the cascade to <code>abort</code>, the settle delay, the dependency-wait budget and its configuration option, the failed dependency on the wire in <code>external_view()</code> (the <code>dependency_failure</code> attribute column itself lands in phase 1, which is the schema phase, so this phase writes and exposes a column which already exists), the <code>database_load_budget.yaml</code> amendment, and the terminal-dependency cache</td>
+<td><a href="../PLAN-agent-operation-dependencies-phase-02-dispatch-evaluation/">PLAN-agent-operation-dependencies-phase-02-dispatch-evaluation.md</a></td>
+<td>In progress</td>
+<td>Dispatch evaluation (decisions 1, 2, 8, 9, 10): same-instance and cross-instance edges evaluated in the dispatcher between <code>agent_operation_next()</code> and <code>start_instance_executor()</code>, the cascade to <code>abort</code>, the settle delay, the dependency-wait budget and its configuration option, the failed dependency on the wire in <code>external_view()</code>, and the terminal-dependency cache. Phase 1 landed the <code>dependency_failure</code> column this phase writes, but <strong>not</strong> the wait anchor decision 2 requires, so this phase still carries an attributes-table migration (version 5 to 6) -- its survey found that. Its survey also found that the <code>database_load_budget.yaml</code> amendment this row used to promise is not owed: the reads this phase adds are <code>GetObjectState</code> from the sidechannel, a pair deliberately excluded from the budget in <code>load_budget.py</code>, so only that exclusion's note is amended. Its contested decision lowers phase 1's published <code>settle_seconds</code> ceiling to the new wait budget, because any settle above the budget is unsatisfiable</td>
 <td>—</td>
 </tr>
 <tr>
 <td>3</td>
 <td>—</td>
 <td>Not started</td>
-<td>client-python: chain submission helpers, await-the-chain UX, failure reporting from the chain's first failure, and <code>abort</code> in <code>TERMINAL_AGENT_OPERATION_STATES</code>. Lands in the sibling repository, so its plan file lives there, following the <code>PLAN-agent-operation-deadlines</code> phase 6 precedent</td>
+<td>client-python: chain submission helpers, await-the-chain UX, failure reporting from the chain's first failure, and <code>abort</code> in <code>TERMINAL_AGENT_OPERATION_STATES</code>. <strong>That frozenset must gain <code>abort</code> in the same commit as the submission parameters, or before them, never after.</strong> Phase 2's audit found <code>apiclient.py:234</code> holds <code>{complete, error, expired, deleted}</code> and the await loop at <code>:1443</code> would spin on an aborted operation; it cannot reach one today only because the submission methods take explicit named parameters with no <code>depends_on</code> and no <code>**kwargs</code> passthrough, so adding the parameter first opens a window in which a caller can create an operation which aborts and then hang awaiting it forever. This is the same single-commit obligation phase 0 found between <code>TERMINAL_STATES</code> and <code>state_targets</code>. Lands in the sibling repository, so its plan file lives there, following the <code>PLAN-agent-operation-deadlines</code> phase 6 precedent. It also owns the first functional test of a dependency chain against a real cluster -- submit two operations with a <code>depends_on</code> edge, assert the ordering, then fail the dependency and assert the dependent reaches <code>abort</code> carrying <code>dependency_failure</code>. Phase 2's first review round asked for that test and it was declined there on the grounds that no client can submit an edge yet, so the test would have to build the rows behind the API it is meant to exercise</td>
 <td>—</td>
 </tr>
 <tr>
@@ -16455,7 +16467,9 @@ before this repository can emit one (decision 3).</p>
 merge commit of its pull request, or an explicit <code>first..last</code> range
 where the phase landed directly. Phase 0 landed as pull request
 <a href="https://github.com/shakenfist/shakenfist/pull/4827">#4827</a>, merge
-commit <code>4c14523a7b</code>; every other cell reads <code>—</code> because nothing
+commit <code>4c14523a7b</code>, and phase 1 as pull request
+<a href="https://github.com/shakenfist/shakenfist/pull/4885">#4885</a>, merge
+commit <code>e6c0ba95a5</code>; every other cell reads <code>—</code> because nothing
 else has landed yet.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <p>Work this plan has deliberately declined or deferred, so that it is
@@ -16477,7 +16491,8 @@ not lost:</p>
 </ul>
 <h3 id="bugs-found-during-this-work">Bugs found during this work<a class="headerlink" href="#bugs-found-during-this-work" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong><code>agent_operations_queue</code> in an instance's external view is always
+<li>
+<p><strong><code>agent_operations_queue</code> in an instance's external view is always
   empty.</strong> <code>Instance.external_view()</code> reads the <code>queued</code> key of the
   <code>agent_operations</code> attribute, but every writer and every other
   reader uses <code>queue</code>, so the field is empty and the
@@ -16492,7 +16507,36 @@ not lost:</p>
   through it. Phase 1's survey confirmed it, which matters to this
   plan only because an instance's external view embeds each queued
   operation's whole <code>external_view()</code>, so a field added to an agent
-  operation's view appears in the instance's too.</li>
+  operation's view appears in the instance's too.</p>
+</li>
+<li>
+<p><strong>Nine sites still restate the namespace ownership predicate.</strong>
+  Phase 1's review round two found that the ownership test
+  (<code>caller == object's namespace, or caller is system</code>) is open-coded
+  at eleven sites. Phase 1 introduced <code>namespace_owns()</code> and converted
+  the two it touched; the other nine predate this plan and are filed
+  as <a href="https://github.com/shakenfist/shakenfist/issues/4887">#4887</a>
+  rather than swept here. <code>docs/developer_guide/coding_rules.md</code> rule
+  1 forbids restating a visibility predicate, and the issue records
+  why the artifact <em>access</em> path must not be collapsed into the
+  ownership one.</p>
+</li>
+<li>
+<p><strong>The cluster-side dependency walk carries both defects phase 2's
+  first review round fixed on the agent side.</strong> The walk at
+  <code>shakenfist/daemons/queues/workitem.py:143-180</code> cancels a work item
+  for a missing dependency when a <code>from_db()</code> read merely failed, and
+  its <code>depends_on</code> walk falls through to satisfied for any state in
+  neither of its two lists. The agent side answers the first with
+  <code>mariadb.get_state_checked()</code> and a hold, and the second with a named
+  satisfied arm plus a test derived from <code>state_targets</code>; neither
+  transfers mechanically, because the cluster side hydrates its
+  dependency rather than reading a state row, so the readability
+  signal has to be designed rather than copied. Filed as
+  <a href="https://github.com/shakenfist/shakenfist/issues/4910">#4910</a> rather
+  than swept into phase 2, whose scope is confined to agent
+  operations. Phase 5's push audit should not re-derive it.</p>
+</li>
 </ul>
 
 
