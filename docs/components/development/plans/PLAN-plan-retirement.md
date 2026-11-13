@@ -232,6 +232,11 @@ day it merges, in every repository with an eligible plan -- five of
 the 24, by phase 4's survey, naming 34 plans -- and an issue pointing
 at a skill nobody has run is an issue nobody can act on.
 
+Phase 5's `Merged` cell is empty because the push-audit block says
+it may be: an audit phase's findings land as their own pull request,
+so that pull request is this plan's last change rather than a phase
+of it, and it is where the phase's merge commit is recorded.
+
 <!-- shared-block: plan-status-vocabulary v1 -->
 Plan status vocabulary (shared block; do not edit -- the canonical
 copy lives in shakenfist/development at
@@ -2292,34 +2297,60 @@ scope: the private clone, whose share ran inline, and the stale
 pointers on unmerged branches. Vendored third-party copies under a
 cargo cache were ignored as snapshots.
 
-**What is outstanding.** Decision 5 holds: this phase closes itself
-out, and the plan is not complete until the findings are resolved or
-declined in writing.
+**What was outstanding, and where it went.** Decision 5 said the
+plan is not complete until the findings are resolved or declined in
+writing. This is that writing.
 
-F1, F2, F3 and F6 and the three test gaps are one follow-up pull
-request against this repository. It records this phase's merge commit
-in its own close-out text and marks the plan `Complete`; phase 5's
-`Merged` cell stays empty, which the push-audit block permits for
-this row alone, so the follow-up must not be read as owing that cell
-a value.
+F1, F2, F3 and F6 and the three test gaps are the follow-up pull
+request the push-audit block asks for, cut from this phase's merge
+commit `4fdd5d8`. Phase 5's `Merged` cell stays empty, which the
+block permits for this row alone, so the follow-up is not read as
+owing that cell a value.
 
-F4 and F5 are work in kerbside, ryll, visual-digest-rust,
-uncalibrated-sextant and shakenfist. Neither has an issue yet:
-filing outward is the operator's call and was put to him with
-the
-record, so until he answers, this paragraph is their only tracked
-home. F4 is a deletion to undo from history rather than a pointer to
-rewrite, and it is the one a reader should look at first.
+F3 landed differently from the way this record described it. The
+record said the criterion treats an unreadable index as an absent one
+"rather than raising", and raising is what the first version of the
+fix did. `scripts/tests/test_containment.py` refused it, against all
+three hostile shapes at once: no criterion may be stopped from
+reaching a verdict by something an audited repository commits at a
+path the audit reads. So an unreadable index is a `fail` instead --
+the repository put it there, and `plan-index` already reports the
+same shape as its own finding -- which removes the defect, a backlog
+issue closed as "not applicable to this project", without handing a
+repository a way to error its own leg.
 
-F4 also has a systemic cause worth fixing above the instance.
+F4 and F5 are filed as issues in the repositories that have to fix
+them, which was the operator's call and was made with this record in
+hand:
+
+| Finding | Issue | What it is |
+|---------|-------|------------|
+| F4 | shakenfist/ryll#719 | the control-socket and Cargo-feature reasoning, and the four pointers wanting it |
+| F4 | shakenfist/visual-digest-rust#76 | the crate decisions, and the four pointers calling the deleted plan authoritative |
+| F4 | shakenfist/uncalibrated-sextant#26 | a prose citation of the retired plan's phase and step |
+| F5 | shakenfist/shakenfist#4898 | eight bare cross-repository plan names in a live plan |
+| F4's cause | shakenfist/development#394 | the pointer sweep reads one repository, not the fleet |
+
+Nothing was filed against kerbside, where the deletion happened. Its
+retirement commit asserted something false, but history is immutable
+and kerbside's own tree holds no pointer to fix: the work is in the
+repositories whose documentation was said to hold the reasoning and
+does not.
+
+One correction to this record, found while filing. It counted two
+sextant repositories. There is one:
+`uncalibrated-sextant-spice-repro` is a second local clone of
+`shakenfist/uncalibrated-sextant`, with the same origin, so its
+`AGENTS.md:103` is the line already counted. The ten files it names
+are nine, and the five repositories are four.
+
+F4's systemic cause is development#394 rather than a paragraph here.
 `retire-plans pointers` greps the repository being retired from, and
 `docs/plan-retirement.md` tells the operator to rewrite "every
-pointer" that reports -- which is every pointer the helper can see.
+pointer" it reports -- which is every pointer the helper can see.
 Nothing in the convention or the helper looks at the other
 twenty-three repositories, so a plan whose readers are elsewhere can
 pass every check in its own repository and still lose its reasoning.
-That is what happened here, and it is a change to the convention and
-the helper rather than to this repository.
 
 #### Risks and mitigations
 
@@ -2426,6 +2457,37 @@ repositories already carry it. The audit's verdict as planned is to
 record the measurement and leave it, because scrubbing three lines
 changes nothing disclosed. Whether to scrub anyway, or to open a
 fleet-wide question, is his call and not the audit's.
+
+#### Phase 5 execution notes
+
+Back brief answered on 2026-11-12, both gates as planned: the audit
+widened to llm-setup's !23, and the net-effect diff stayed restricted
+to the twelve paths no unrelated commit touched. The private GitLab
+hostname survey item was answered "record it, do not scrub".
+
+The five readers ran in parallel, as the step table says they may:
+they are read-only, so none could disturb another's tree. Two of them
+read the twelve clean paths as they stand instead of running the
+net-effect diff as a command; the state is the same, and the
+shared-path attribution neither did was done in the management
+session. Step 5g ran inline rather than as a sub-agent because
+llm-setup is private and this record is public.
+
+The phase merged as `4fdd5d8` (#390), after one review round that
+raised twelve items and took all of them -- including arithmetic in
+this record that was wrong, a per-plan verdict table the definition
+of done required and the prose lacked, and two claims of mine that
+did not survive being checked.
+
+The findings landed in the follow-up pull request rather than here,
+as the push-audit block requires. Two things in it are worth reading
+beside the record: F3's verdict is a `fail` and not the `error` the
+record predicted, for the reason given under *What was outstanding*;
+and F6's fix moves this repository's `plan-source-references`
+verdict from `fail` to `not_applicable` rather than to `pass`,
+because the six fixture references were the only plan references
+outside markdown here, and an exempted line is skipped before the
+total is counted.
 
 ## Agent guidance
 

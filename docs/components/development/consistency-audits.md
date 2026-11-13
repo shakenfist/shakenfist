@@ -102,6 +102,11 @@ check](#before-and-after-a-change-to-a-check)). Repository visibility
 is among what they query, live rather than hardcoded, because it
 changes.
 
+The one that asks what a file used to say reaches the network too,
+without belonging to that set: a blob-filtered clone holds no
+historical blobs, so reading one fetches it. What that means for a
+failed read is in the same section.
+
 The skillsaw pin is deliberate, and so is the assertion next to it.
 `llm-context-lint` reports what skillsaw calls an error, and skillsaw's
 rule set moves between releases, so an unpinned upgrade would change the
@@ -443,19 +448,37 @@ answers. `check-audit-smoke.py`, which runs in CI without a token,
 excuses a `tool_failure` from the checks that ask GitHub and nothing
 else.
 
-The scheduled run excuses the same results, and only those
-(`github_did_not_answer()` in `scripts/audit_snapshot.py` is the one
-rule both scripts use). For a network check whose tooling could not
-ask GitHub, *Fail if any check raised* prints a workflow warning and
-does not fail the leg. A failed leg holds back the compliance page for
-the whole fleet, which one transient 502 or rate limit in one
-repository is not worth. The page shows that cell as a check error
-saying what could not be asked, and the criterion's issue is left as it
-was. An outage that lasts is not hidden by this. A token that has
-expired or lost access fails every leg at *Check the read token*,
-before anything is measured. A tool failure from any other check is
-the runner's own git, skillsaw or `review-tracking.py` not answering,
-which the next run would meet too, so it still fails the leg.
+The scheduled run excuses slightly more than that, for a reason the
+smoke run does not have. *Fail if any check raised* prints a workflow
+warning and does not fail the leg for a `tool_failure` from a check in
+`NETWORK_CHECKS`, and also for one the raise site marked transient
+(`transient_tool_failure()` in `scripts/audit_snapshot.py`). A failed
+leg holds back the compliance page for the whole fleet, which one
+transient 502, reset or rate limit in one repository is not worth. The
+page shows that cell as a check error saying what could not be asked,
+and the criterion's issue is left as it was. An outage that lasts is
+not hidden by this. A token that has expired or lost access fails
+every leg at *Check the read token*, before anything is measured. A
+tool failure from any other check is the runner's own git, skillsaw or
+`review-tracking.py` not answering, which the next run would meet too,
+so it still fails the leg.
+
+The mark exists because a criterion can read a remote without its
+verdict depending on one, and only the raise site knows which of its
+reads did. `plan-retirement` is the case. Its verdict comes from the
+tree and from this repository's own history, so it is held to the
+byte-for-byte comparison and stays out of `NETWORK_CHECKS` -- but it
+reads a historical `docs/plans/index.md` with `git show`, and the
+scheduled run clones with `--filter=blob:none`, where that read
+fetches the blob from the promisor remote. So `ToolFailure(...,
+transient=True)` is raised for that read and for the walk budget it
+can exhaust, and not for the seven other things that can go wrong in
+the same function: a shallow checkout, a failed `git log`, a tree
+listing, the read cap. Marking the criterion by id instead would
+excuse all of them, so a clone step regressing to `--depth 1` would
+warn and pass on every leg of every run while the criterion reported
+`error` fleet-wide -- stage 4's "a broken audit looks like a healthy
+one", exactly.
 
 The tests call `run()` directly and assert a verdict, so a check that
 raises unexpectedly still fails them. A test of a tool-failure path
@@ -552,6 +575,14 @@ A criterion that reaches the network needs one more line: its id in
 fails until it is there, and
 [Before and after a change to a check](#before-and-after-a-change-to-a-check)
 says what the list is for.
+
+A criterion that reads a remote *without* its verdict depending on one
+-- a blob out of history in the filtered clone, say -- stays out of
+that list and marks the failures that can be the remote's instead:
+`raise ToolFailure(..., transient=True)`, or `run_tool(...,
+transient=True)` for a call whose timeout would be the remote's. Mark
+only those; the same function's local failures have to keep failing
+the leg. The same section says why.
 
 `AUDIT_METADATA` and `ISSUE_TITLES` in `scripts/audit_common.py`, and
 `COLUMN_NAMES` in `scripts/audit-update-docs.py`, are views over the

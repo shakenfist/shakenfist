@@ -316,9 +316,9 @@ first phase.
 | 4. Son of SPICE: D-Bus display feasibility spike (verdict: no-go, as measured) | [PLAN-spice-performance-phase-04-dbus-spike.md](/components/kerbside/plans/PLAN-spice-performance-phase-04-dbus-spike/) | Complete | andris 9a997a3 (#56), a90f17ff90 (#637) |
 | 5. spice-server patches, measured: codec choice, the connect crash, trace ring, 60 fps, hardware probing | [PLAN-spice-performance-phase-05-spice-server.md](/components/kerbside/plans/PLAN-spice-performance-phase-05-spice-server/) | Complete | 46c3e9857c (#654), kerbside-patches 2d7b626422 (#2024) |
 | 6. Push audit of phases 1-5 (kerbside, kerbside-patches and ryll #406) | [PLAN-spice-performance-phase-06-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/) | Complete | 2a34fe7ea9 (#668), 17a31ebf75 (#701) |
-| 7. QUIC client leg: experiments (verdict: no-go, as measured) | [PLAN-spice-performance-phase-07-quic-experiments.md](/components/kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/) | In progress | |
+| 7. QUIC client leg: experiments (verdict: no-go, as measured) | [PLAN-spice-performance-phase-07-quic-experiments.md](/components/kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/) | Complete | e0f53fb04a (#716) |
 | 8. QUIC client leg: implementation (abandoned: phase 7's gate said no-go) | | Abandoned | |
-| 9. Push audit of phase 7 (kerbside) | | Not started | |
+| 9. Push audit of phases 6 and 7 (kerbside) | [PLAN-spice-performance-phase-09-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-09-push-audit/) | Complete | |
 
 **Phase 1** sets `TCP_NOTSENT_LOWAT` on the client leg and caps
 the backend leg's receive buffer, with the values made
@@ -1086,11 +1086,21 @@ answer* in `docs/performance/quic-experiment.md` names the
 conditions under which this would be worth reopening, and each
 of them needs the bench re-run before any code.
 
-**Phase 9** is the push audit for phase 7 alone, since phase 8
-is abandoned. It audits phase 7's accumulated diff — the rig's
-loss term and the transport bench, all of it in Kerbside, as
-nothing landed in ryll — and cites phase 6 for phases 1-5,
-rather than re-auditing work that has already been audited.
+**Phase 9** is the push audit for phases 6 and 7, since phase 8
+is abandoned. It audits two landings, each read as a merge commit
+against its first parent: phase 6's follow-up, 17a31ebf75 (#701),
+and phase 7, e0f53fb04a (#716). All of it is in Kerbside, as
+phase 7 landed nothing in ryll. Phases 1-5 are cited from phase
+6's audit rather than re-audited, as are the kerbside-patches
+landings and ryll #406.
+- *Corrected 2026-11-12 by phase 9's survey:* this section said
+  the phase audits phase 7 alone. Phase 6's audit merged as #668
+  on 2026-10-31, and the follow-up pull request it called for
+  merged as #701 on 2026-11-07, seven days later, so nothing
+  audited those 736 insertions — most of them in the shipped
+  proxy, including 135 lines in `caps.rs`, which parses a
+  client's link message. The shared block's accumulated-diff
+  rule exists to catch exactly that, so #701 is in range.
 
 <!-- shared-block: plan-push-audit-phase v4 -->
 Push audit phase (shared block; do not edit -- the canonical

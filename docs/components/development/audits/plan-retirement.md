@@ -71,11 +71,52 @@ leaves no credential behind, so that fetch is anonymous: the criterion
 can only read the history of a repository the audit can read
 anonymously.
 
-There are three ways the criterion reports `error` rather than a
-verdict: a shallow checkout, a revision of the index larger than the
-2 MB cap a file is read under, and a walk that exceeds its five-minute
-budget. Each is a statement about the audit rather than a finding about
-the repository, which is why it files no issue and closes none.
+The criterion reports `error` rather than a verdict whenever git
+cannot answer for the history it has to read, which is eight paths:
+the shallowness question itself failing, a shallow checkout, a failed
+`git log` of the index, a walk that exceeds its five-minute budget, a
+failed `git ls-tree` of a revision, a failed `git show` of a revision
+whose tree says the index is in it, a revision of the index larger
+than the 2 MB cap a file is read under, and a git call that times out
+or cannot be started at all. Each is a statement about the audit
+rather than a finding about the repository, which is why it files no
+issue and closes none.
+
+Two of those eight do not fail that repository's leg of the scheduled
+run: the `git show` of a historical index, and the walk budget it can
+exhaust. Reading a historical index is a fetch from the promisor
+remote in the `--filter=blob:none` clone the workflow makes, so either
+can be the remote rather than this runner, and the criterion raises
+them marked transient. The leg prints a workflow warning instead, the
+compliance page shows the cell as a check error saying what could not
+be asked, and the criterion's issue is left exactly as it was. An
+outage that lasts is not hidden by this, because the cell says so on
+every run.
+
+The other six do fail the leg, and that is the point of marking only
+two. A shallow checkout, a failed `git log`, a failed tree listing and
+a revision over the read cap are this runner's clone step or this
+repository's own content, not a remote declining to answer. Excusing
+them all would mean a clone step regressing to `--depth 1` warned and
+passed on every leg of every run while this criterion reported `error`
+for all 24 repositories.
+
+An index that is *there* and is not a file the audit will read -- a
+directory, a link out of the checkout, a dangling link, or a file over
+the same 2 MB cap -- is the one unreadable shape that is a finding
+rather than an error. The repository put it there, so it is the
+repository's to fix, and [plan-index](/components/development/audits/plan-index/) and
+[plan-audit-phase](/components/development/audits/plan-audit-phase/) report it too -- the first as
+an index that is missing or could not be read, and only when
+`docs/plans/` also holds a master plan. What this criterion adds is
+that it does not
+read it as an index that is not there: that answer closes the
+retirement backlog issue of a repository that keeps plans, telling it
+the criterion is not applicable to the project. The exception is a
+`docs/plans` that is itself a link out of the clone, which
+[plan-index](/components/development/audits/plan-index/) already decides is not a directory this
+audit has -- an index inside one is absent rather than unreadable, and
+the criteria reading it agree about that.
 
 ### Rows that are reported rather than counted
 
@@ -156,13 +197,13 @@ its last work lands, when nobody is reading the template.
 
 The fix is the `retire-plans` skill, in the private `llm-setup`
 repository. It lists the eligible plans, moves each one's reasoning
-into the documentation that will be maintained, files the deferred work
-still worth doing as issues labelled `from-retired-plan`, rewrites
-every pointer to the plan, turns its index row's link into a permalink
-and deletes its files -- one commit per plan, one pull request per
-repository. The parts with one right answer are its `retire-plans`
-helper; deciding where a plan's reasoning belongs is not one of them,
-which is why retirement is never automatic.
+into the documentation that will be maintained, files the deferred
+work still worth doing as issues labelled `from-retired-plan`,
+rewrites every pointer to the plan, turns its index row's link into a
+permalink and deletes its files -- one commit per plan, one pull
+request per repository. The parts with one right answer are its
+`retire-plans` helper; deciding where a plan's reasoning belongs is
+not one of them, which is why retirement is never automatic.
 
 A plan whose reasoning has no sensible home in `docs/` is not retired.
 It is left where it is and reported, so that a person can decide:
