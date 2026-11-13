@@ -29,8 +29,10 @@ These things are checked:
   `plan-push-audit-phase` shared block requires every open plan to end with
   a phase that runs it, and the consistency audit that enforces the block
   fleet-wide only reports the drift the morning after it lands;
-* every markdown link between plans resolves to a file that exists; and
-* every phase plan is linked from somewhere in `docs/plans/`.
+* every markdown link between plans resolves to a file that exists;
+* every phase plan is linked from somewhere in `docs/plans/`; and
+* no finished row of a phase table names a plan file as bare text when no
+  such file is here.
 
 Example tables and example links do not count as either. Plans document the
 phase-table convention by showing one -- the `plan-file-conventions` shared
@@ -54,6 +56,28 @@ phase plan passes. The message says only what is checked. Walking the link
 graph transitively from the index would close that and would also catch an
 orphaned master plan, and is the obvious next move if the weaker rule ever
 misses something real.
+
+The last rule is the other half of the same invariant, and the link checks
+cannot see it. A phase of a cross-repository plan is planned in the
+repository whose code it changes, and the convention was to name that file
+rather than link it, because a relative link cannot leave this repository.
+Such a name is neither a link, so nothing resolves it, nor a local file, so
+nothing checks that it is reachable: when the other repository retires its
+plan the name resolves to nothing at all, and reads as a file in
+`docs/plans/` which was never there. Eight lines of the Kerbside VDI
+console tokens plan were in that state once six kerbside and ryll plans had
+been retired (#4898). A finished phase therefore cites a plan in another
+repository as an absolute link: the live file where it is still maintained,
+or a permalink pinned to the SHA that last changed it where it has been
+retired, as the retirement convention asks. The rule is confined to
+finished rows because an unfinished phase legitimately names the file it is
+going to write.
+
+It reads phase tables, so it does not see a name in prose -- two of that
+issue's lines were prose, and were fixed by hand. Reading prose as well
+would report about 160 names across `docs/plans/`, nearly all of them
+future phase files of plans which have not started, so narrowing that is a
+separate piece of work rather than a stricter regular expression here.
 
 The published site is a weaker claim than it looks: `mkdocs.yml.tmpl`
 lists the Plans nav by hand and names three plans, so most master plans do
@@ -128,6 +152,13 @@ PROVISIONAL = {
 # rule which hold whatever a plan does with abandoned or superseded phases.
 UNFINISHED = {'proposed', 'not started', 'in progress', 'blocked'}
 STARTLESS = {'proposed', 'not started'}
+TERMINAL = {'complete', 'abandoned', 'superseded'}
+
+# A plan filename written as text. The leading guard keeps a name inside a
+# path or a longer word from matching, so that a link target left behind by
+# LINK_RE is not read as prose.
+PLAN_NAME_RE = re.compile(r'(?<![\w/.-])(PLAN-[A-Za-z0-9._-]*\.md)')
+URL_RE = re.compile(r'https?://\S+')
 
 PHASE_FILE_RE = re.compile(r'-phase-\d')
 FENCE_RE = re.compile(r'^\s*(?:```|~~~)')
@@ -199,9 +230,11 @@ def status_tables(path, require_phase=False):
     the template could have had its arithmetic computed from the template's
     own placeholder rows.
 
-    Returns tables as {'index', 'rows', 'short'}: 'short' collects rows with
-    too few cells to reach the status column, which are reported rather than
-    dropped -- a hidden row is the drift this checker exists to catch.
+    Returns tables as {'index', 'rows', 'cells', 'short'}: 'rows' is the
+    status cell of each row and 'cells' every cell of it, for the checks
+    which read what a row says as well as its verdict. 'short' collects rows
+    with too few cells to reach the status column, which are reported rather
+    than dropped -- a hidden row is the drift this checker exists to catch.
     """
     with open(path, encoding='utf-8') as f:
         lines = outside_code(f.read().splitlines())
@@ -220,7 +253,8 @@ def status_tables(path, require_phase=False):
             names = [c.lower() for c in cells(line)]
             current = None
             if 'status' in names and (not require_phase or 'phase' in names):
-                current = {'index': names.index('status'), 'rows': [], 'short': []}
+                current = {'index': names.index('status'), 'rows': [],
+                           'cells': [], 'short': []}
                 tables.append(current)
             continue
 
@@ -229,6 +263,7 @@ def status_tables(path, require_phase=False):
         row = cells(line)
         if current['index'] < len(row):
             current['rows'].append((offset + 1, row[current['index']]))
+            current['cells'].append((offset + 1, row))
         else:
             current['short'].append((offset + 1, len(row)))
     return tables
@@ -323,6 +358,19 @@ def plan_links(plans_dir):
                 inbound.add(base)
                 targets.append((path, lineno, target))
     return targets, inbound
+
+
+def unlinked_plan_names(row):
+    """The plan filenames a table row names as text rather than as a link.
+
+    Markdown links and bare URLs go first, so what is left is what a reader
+    is given no way to follow: a filename in prose or in backticks. A link's
+    own target is removed with it, since whether that resolves is
+    plan_links()' business and an absolute one is the docs-external-links
+    audit's.
+    """
+    bare = URL_RE.sub(' ', LINK_RE.sub(' ', ' | '.join(row)))
+    return PLAN_NAME_RE.findall(bare)
 
 
 def problems():
@@ -464,6 +512,26 @@ def problems():
         if not os.path.isfile(resolved):
             found.append('%s:%d: link to %r, which does not exist'
                          % (source, lineno, target))
+
+    for name in sorted(os.listdir(plans_dir)):
+        if not name.endswith('.md') or name == 'index.md':
+            continue
+        plan_path = os.path.join(plans_dir, name)
+        for table in status_tables(plan_path):
+            for lineno, row in table['cells']:
+                if row[table['index']].strip().lower() not in TERMINAL:
+                    continue
+                for cited in unlinked_plan_names(row):
+                    if cited == TEMPLATE:
+                        continue
+                    if os.path.isfile(os.path.join(plans_dir, cited)):
+                        continue
+                    found.append(
+                        '%s:%d: a finished phase names %r as text, and there '
+                        'is no such file in %s. A plan in another repository '
+                        'is cited as an absolute link: the live file, or a '
+                        'permalink pinned to a SHA once it has been retired.'
+                        % (plan_path, lineno, cited, plans_dir))
 
     for name in sorted(os.listdir(plans_dir)):
         if not name.endswith('.md') or not PHASE_FILE_RE.search(name):

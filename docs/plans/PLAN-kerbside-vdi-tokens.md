@@ -374,13 +374,13 @@ Recommendations are recorded inline.
 | 0. Decisions and token format | shakenfist | Folded into this document (no separate plan file) | Complete | shakenfist `9d41a1716` (#3491) |
 | 1. Cluster signing key + pubkey publication | shakenfist | [PLAN-kerbside-vdi-tokens-phase-01-signing-key.md](PLAN-kerbside-vdi-tokens-phase-01-signing-key.md) | Complete | shakenfist `9d41a1716` (#3491) |
 | 2. vdiconsoleproxy endpoint | shakenfist | [PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md](PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md) | Complete | shakenfist `9d41a1716` (#3491) |
-| 3. Pip-installable ryll | ryll | PLAN-pip-distribution.md (in ryll's docs/plans/) | Complete | ryll `fa7ee21d8` (#190) |
-| 4. Client, CLI, and viewer launch | client-python | PLAN-vdi-console-tokens.md (in that repo, branch `vdi-console-tokens-client`) | Complete | client-python `b426e1f86` (#350) |
-| 5. Kerbside exchange endpoint | kerbside | PLAN-kerbside-vdi-tokens-phase-05-exchange.md (in kerbside, branch `sf-vdi-tokens`) | Complete | kerbside `f50ea59c2` (#167) |
-| 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside) | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59c2` (#167) |
-| 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59c2` (#167) |
-| 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59c2` (#167) |
-| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Complete | kerbside `115416ccc` (#194), `78033687d` (#201); shakenfist `07d7081b7` (#3580) |
+| 3. Pip-installable ryll | ryll | [PLAN-pip-distribution.md](https://github.com/shakenfist/ryll/blob/26424384bb7510279cccd1df21edab6052d3fbe6/docs/plans/PLAN-pip-distribution.md) (retired in ryll) | Complete | ryll `fa7ee21d8` (#190) |
+| 4. Client, CLI, and viewer launch | client-python | [PLAN-vdi-console-tokens.md](https://github.com/shakenfist/client-python/blob/develop/docs/plans/PLAN-vdi-console-tokens.md) (in client-python) | Complete | client-python `b426e1f86` (#350) |
+| 5. Kerbside exchange endpoint | kerbside | [PLAN-kerbside-vdi-tokens-phase-05-exchange.md](https://github.com/shakenfist/kerbside/blob/4bfd433e4e1f3033cefaeb02bbf7962b186276bf/docs/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange.md) (retired in kerbside) | Complete | kerbside `f50ea59c2` (#167) |
+| 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | [PLAN-kerbside-vdi-tokens-phase-06-scrape.md](https://github.com/shakenfist/kerbside/blob/502a7f563575124b6fa422de1b1a882e21ced724/docs/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape.md) (retired in kerbside) | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59c2` (#167) |
+| 7. Functional test: SF mint path | shakenfist | [PLAN-kerbside-vdi-tokens-phase-07-ci.md](https://github.com/shakenfist/kerbside/blob/4effca6100f8fb6c6321d63dcfdccad1af897109/docs/plans/PLAN-kerbside-vdi-tokens-phase-07-ci.md) (retired in kerbside) | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59c2` (#167) |
+| 8. Documentation | all | [PLAN-kerbside-vdi-tokens-phase-08-docs.md](https://github.com/shakenfist/kerbside/blob/531218dda7b11a465fc8aa40af6a2034d1d88f94/docs/plans/PLAN-kerbside-vdi-tokens-phase-08-docs.md) (retired in kerbside) | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59c2` (#167) |
+| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | [PLAN-kerbside-vdi-tokens-phase-09-e2e.md](https://github.com/shakenfist/kerbside/blob/66dff1200a00e949efab9b4b16dec769fbf56c93/docs/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e.md) (retired in kerbside) | Complete | kerbside `115416ccc` (#194), `78033687d` (#201); shakenfist `07d7081b7` (#3580) |
 | 11. Close out the post-completion defects (#4003, #4004, #4009) | shakenfist | See *Post-completion defects* below | Complete | shakenfist `5ef83c065` (#4016), `913411586` (#4018), `f2df423d8` (#4024) |
 | 10. Push audit | all | [PLAN-kerbside-vdi-tokens-phase-10-push-audit.md](PLAN-kerbside-vdi-tokens-phase-10-push-audit.md) | Complete | shakenfist `2d585cd1a` (#4099), `ccc1b5ff2` (#4137); kerbside `e2a493ea6` (#412), `29323fb85` (#413); ryll `aac25cf3c` (#358), `0113f0ff7` (#366) |
 
@@ -576,8 +576,9 @@ on the venv's PATH, the way kerbside's pip install ships
 ### Phase 7: Functional test — SF mint path
 
 Narrowed to the SF-side mint test; the kerbside functional lane
-moved to phase 9 (see below and the phase-7 plan in kerbside for
-the grounding).
+moved to phase 9 (see below, and
+[PLAN-kerbside-vdi-tokens-phase-07-ci.md](https://github.com/shakenfist/kerbside/blob/4effca6100f8fb6c6321d63dcfdccad1af897109/docs/plans/PLAN-kerbside-vdi-tokens-phase-07-ci.md),
+retired in kerbside, for the grounding).
 
 - SF: a `cluster_ci_tests` functional test
   (`deploy/shakenfist_ci/cluster_ci_tests/test_vdi_tokens.py`)
@@ -592,8 +593,9 @@ the grounding).
 ### Phase 8: Documentation
 
 Done. The detailed plan of record for this phase is
-`PLAN-kerbside-vdi-tokens-phase-08-docs.md` (authored in the kerbside repo
-alongside phases 5–7). The four repos' doc PRs are independent.
+[PLAN-kerbside-vdi-tokens-phase-08-docs.md](https://github.com/shakenfist/kerbside/blob/531218dda7b11a465fc8aa40af6a2034d1d88f94/docs/plans/PLAN-kerbside-vdi-tokens-phase-08-docs.md),
+retired in kerbside, where it was authored alongside phases 5–7. The
+four repos' doc PRs are independent.
 
 - SF: user guide (how to open a proxied console), operator
   guide (enabling `KERBSIDE_URL`, key rotation runbook),

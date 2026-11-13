@@ -51,6 +51,24 @@ copy lives in shakenfist/development at
   a message explaining what changed and why.
 <!-- shared-block-end -->
 
+!!! note "In this project"
+
+    A phase of a cross-repository plan is planned in the
+    repository whose code it changes, so its plan file is not in
+    this `docs/plans/`. Cite it as an absolute link rather than by
+    name: a relative link cannot leave this repository, but a
+    bare name is not a link at all, and once the other repository
+    retires that plan the name reads as a file here which was
+    never here. Link the live file on the other repository's
+    default branch while it is maintained, and a permalink pinned
+    to the SHA that last changed it once it has been retired --
+    which is what
+    [retiring finished plans](docs/components/development/plan-retirement.md)
+    asks of anything citing a retired plan, and a link to a branch
+    is a 404 as soon as the file is deleted.
+    `tools/check-plan-status.py` rejects a finished phase row
+    which names a plan file this repository does not have.
+
 ## Situation
 
 ...

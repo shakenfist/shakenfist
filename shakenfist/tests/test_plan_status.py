@@ -15,6 +15,14 @@ master plan's Execution table as the only path to them. Thirty-eight of the
 ninety-two phase plans had no inbound link at all when that check was
 written.
 
+It also enforces the other half of that invariant, which the link checks
+cannot see: a phase of a cross-repository plan is planned in the repository
+whose code it changes, and naming that file rather than linking it leaves a
+pointer nothing resolves and nothing checks for reachability -- so when the
+other repository retires the plan, the name reads as a file here which was
+never here. Eight such lines were in the Kerbside VDI console tokens
+plan.
+
 The final test is the regression guard for `docs/plans/` itself. No workflow
 runs pre-commit, so the hook alone would not catch a contributor who has not
 installed it. The guard only closes that gap because `functional-tests.yml`
@@ -181,6 +189,49 @@ class PlanStatusHelperTestCase(base.ShakenFistTestCase):
             _, status, phases = rows['FIXTURE-plan.md'][0]
             self.assertEqual('In progress', status)
             self.assertEqual('1 of 2', phases)
+
+    def test_unlinked_plan_names_finds_a_bare_name(self):
+        self.assertEqual(
+            ['PLAN-elsewhere-phase-01-one.md'],
+            checker.unlinked_plan_names(
+                ['1. One', 'PLAN-elsewhere-phase-01-one.md (in elsewhere)',
+                 'Complete']))
+
+    def test_unlinked_plan_names_finds_a_backticked_name(self):
+        # Backticks are how two of this repository's cross-repository rows
+        # wrote it. A name in a code span is no more followable than one in
+        # prose.
+        self.assertEqual(
+            ['PLAN-elsewhere-phase-01-one.md'],
+            checker.unlinked_plan_names(
+                ['1. One', '`PLAN-elsewhere-phase-01-one.md`', 'Complete']))
+
+    def test_unlinked_plan_names_ignores_a_link(self):
+        self.assertEqual([], checker.unlinked_plan_names(
+            ['1. One',
+             '[PLAN-elsewhere-phase-01-one.md]'
+             '(https://example.com/docs/plans/'
+             'PLAN-elsewhere-phase-01-one.md)',
+             'Complete']))
+
+    def test_unlinked_plan_names_ignores_a_bare_url(self):
+        # A URL written without link syntax still renders as a link, and
+        # the name inside it is part of an address rather than prose.
+        self.assertEqual([], checker.unlinked_plan_names(
+            ['1. One',
+             'see https://example.com/docs/plans/'
+             'PLAN-elsewhere-phase-01-one.md',
+             'Complete']))
+
+    def test_unlinked_plan_names_reads_the_rest_of_a_linked_row(self):
+        # Removing the link must not hide a second citation beside it.
+        self.assertEqual(
+            ['PLAN-elsewhere-phase-02-two.md'],
+            checker.unlinked_plan_names(
+                ['1. One',
+                 '[PLAN-elsewhere-phase-01-one.md](https://example.com/a.md)'
+                 ', following PLAN-elsewhere-phase-02-two.md',
+                 'Complete']))
 
     def test_index_rows_keeps_every_row_for_a_plan(self):
         # A dict keyed on the filename would drop the stale row, which is
@@ -413,6 +464,38 @@ class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
                                  '- FIXTURE-plan.md: A plan\n'
                                  '- FIXTURE-gone.md: Gone\n')
         self.assertProblem('which is not a file in')
+
+    def test_a_finished_row_naming_a_missing_plan_file_fails(self):
+        # The regression this check exists for: the plan file of a phase
+        # which landed in another repository, named rather than linked, and
+        # then retired there. The name is read wherever in the row it sits,
+        # because the real ones are spread across a Phase, Repo and Plan
+        # cell.
+        self._write('FIXTURE-plan.md', MASTER.replace(
+            '| 1. One |', '| 1. One, planned as PLAN-gone-phase-01-one.md |'))
+        self.assertProblem('as text, and there is no such file')
+
+    def test_a_finished_row_may_link_a_plan_in_another_repository(self):
+        self._write('FIXTURE-plan.md', MASTER.replace(
+            '| 1. One |',
+            '| 1. One, planned as [PLAN-gone-phase-01-one.md]'
+            '(https://example.com/x/blob/abc123/docs/plans/'
+            'PLAN-gone-phase-01-one.md) |'))
+        self.assertEqual([], checker.problems())
+
+    def test_an_unfinished_row_may_name_a_file_it_will_write(self):
+        # Most of the bare names in docs/plans/ are this: an Execution
+        # table saying what the file a future phase writes will be called.
+        self._write('FIXTURE-plan.md', MASTER.replace(
+            '| 2. Two |', '| 2. Two, to be PLAN-later-phase-02-two.md |'))
+        self.assertEqual([], checker.problems())
+
+    def test_the_template_is_not_a_missing_plan_file(self):
+        # It is a real file, at the repository root rather than in
+        # docs/plans/, and plans cite it when they describe the convention.
+        self._write('FIXTURE-plan.md', MASTER.replace(
+            '| 1. One |', '| 1. One, per PLAN-TEMPLATE.md |'))
+        self.assertEqual([], checker.problems())
 
 
 class PlanStatusRegressionTestCase(base.ShakenFistTestCase):
