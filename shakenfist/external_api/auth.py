@@ -3138,15 +3138,17 @@ class AuthLoginEndpoint(api_base.Resource):
         #    is federation's, exact and ungloblike, and a rule which
         #    cannot grant anything is skipped and counted there rather
         #    than refusing a login the cluster's other rules would have
-        #    granted. The count is the only signal an operator gets
-        #    that a rule they wrote did nothing, so it is logged.
+        #    granted.
+        #
+        #    Each skip is already logged where it is decided, with the
+        #    uuid of the rule that caused it, which is what an operator
+        #    needs to go and fix one. Logging the count again here
+        #    would write a second line about the same rules on every
+        #    login for as long as one stays damaged, and say less. The
+        #    count is still carried into a refusal below, where it
+        #    explains an answer rather than repeating a warning.
         matches, skipped = federation.matching_rules(
             claims, issuer.name, rules)
-        if skipped:
-            LOG.with_fields({
-                'issuer': issuer.name, 'skipped': skipped
-            }).warning(
-                f'Login skipped {skipped} unusable mapping rules')
 
         # 9. No match is a refusal, not a 200 carrying an empty list. A
         #    client receiving an empty set would have to treat "you are

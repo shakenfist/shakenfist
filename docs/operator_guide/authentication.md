@@ -493,11 +493,33 @@ leaves up to `FEDERATION_MAX_LOGIN_CREDENTIALS` keys per login for the whole of
 that window, which is worth knowing when you size a cluster for many users. See
 [key expiry and reaping](#key-expiry-and-reaping).
 
+**A minted key records who it was minted for.** The key's provenance
+carries the person's subject identifier, the token's `jti`, and the claims
+that actually matched -- and provenance is part of a key's external view,
+which is readable by anyone who can list keys in that namespace. So every
+namespace a person is entitled to can see that they logged in and when. That
+is deliberate, because it is what makes a federated grant auditable, and it
+is why the key's *name* carries a random discriminator instead of the
+person's identity. But it means the claims you bind are published to every
+namespace the rule mints into: bind `email` or `preferred_username` and you
+have put that address in front of every one of those namespace owners. Bind
+the narrowest claim that expresses the entitlement, usually a group.
+
 Requests are rate limited per source address like the others, on a counter
 of their own, so a burst of logins does not throttle CI and the reverse. As for
 the exchange and the listing, setting `FEDERATION_RATE_LIMIT_PER_MINUTE` to
 `0` disables the limit, and a login is the most expensive of the three
 unauthenticated routes: a JWKS fetch and then a bcrypt hash per credential.
+
+"Source address" means the address `sf-api` itself sees, which is the
+caveat in [abuse resistance](#abuse-resistance) and it bites harder here
+than on the exchange. Behind a reverse proxy or NAT that does not preserve
+the client address, every person on the site shares one budget rather than
+holding one each, and the symptom is everybody getting 429s together at the
+start of the working day while nothing is wrong with any of their tokens.
+The three counters are separate budgets but take their size from the one
+`FEDERATION_RATE_LIMIT_PER_MINUTE` value, so raising it for logins raises
+it for the exchange too.
 A limited caller gets a **429**.
 
 ### Delegating to namespace owners
@@ -651,8 +673,8 @@ exchange answers 503 rather than assuming the request is fine.
 | `FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait when fetching an issuer's discovery document. Separate from the JWKS timeout because discovery only runs when an administrator configures an issuer, where a slow provider costs that administrator one request, while the JWKS fetch can pin an API worker per anonymous exchange. Applied three times: to the connect, to each read, and as a deadline over the body once the response starts, so one fetch is bounded at roughly twice this value. Must be at least 1 |
 | `FEDERATION_DISCOVERY_MAX_BYTES` | 65536 | Largest discovery document accepted, in bytes. The body is read up to this limit and refused beyond it, rather than trusting the provider's `Content-Length`, so a login page or a misbehaving proxy cannot hand us an unbounded response. A real document is a few kilobytes |
 | `FEDERATION_MAX_TOKEN_BYTES` | 16384 | Largest exchange or login request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no `Content-Length` is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit |
-| `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Attempts allowed per source address per minute, counted separately for the exchange, for `GET /auth/login` and for `POST /auth/login`. `0` disables rate limiting entirely, on all three, including the per-issuer read that the listing does on every request |
-| `FEDERATION_MAX_LOGIN_CREDENTIALS` | 16 | The most namespace keys one `POST /auth/login` may mint, minimum 1. Each key costs a bcrypt hash, so without a cap one valid identity token commands as much deliberately slow work as the cluster has matching mapping rules. A login matching more rules than this is refused with 507 rather than truncated. Raising it raises the work one token can command; `FEDERATION_RATE_LIMIT_PER_MINUTE` bounds how often a source may try, and `0` removes that bound for every unauthenticated endpoint in this family |
+| `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Attempts allowed per source address per minute, counted separately for the exchange, for `GET /auth/login` and for `POST /auth/login` -- three budgets, but one value sizing all three, so raising it for one raises it for the others. `0` disables rate limiting entirely, on all three, including the per-issuer read that the listing does on every request |
+| `FEDERATION_MAX_LOGIN_CREDENTIALS` | 16 | The most namespace keys one `POST /auth/login` may mint, minimum 1. Each key costs a bcrypt hash, so without a cap one valid identity token commands as much deliberately slow work as the cluster has matching mapping rules. A login matching more rules than this is refused with 507 rather than truncated. Raising it raises the work one token can command; `FEDERATION_RATE_LIMIT_PER_MINUTE` bounds how often a source may try, and `0` removes that bound for every unauthenticated endpoint in this family. The two multiply, which is the number to size `sf-api` against: at both defaults one source address can command up to 960 bcrypt hashes a minute, each needing a fresh unreplayed token |
 | `FEDERATION_JWKS_CA_BUNDLE` | *(empty)* | Path to a PEM bundle of extra certificate authorities to trust when fetching an issuer's JWKS. Empty means the system trust store alone |
 
 ### When an issuer rotates its signing keys

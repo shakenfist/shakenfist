@@ -630,6 +630,21 @@ class DeletedRuleTestCase(LoginMintTestCase):
         self.assertEqual(503, resp.status_code)
         self.assertEqual(before, self._key_counts())
 
+    def test_an_unreadable_rule_listing_refuses_rather_than_mints(self):
+        # The fourth database read this path makes, and the only one
+        # whose failure is handled by the shared decorator rather than
+        # by anything the method does. Pinned here anyway: "the
+        # decorator covers it" is a claim about code somebody may move,
+        # and the other three failures are pinned a few lines away.
+        before = self._key_counts()
+
+        with mock.patch('shakenfist.mariadb.find_mapping_rules',
+                        side_effect=exceptions.DatabaseUnavailable('down')):
+            resp = self._login()
+
+        self.assertEqual(503, resp.status_code)
+        self.assertEqual(before, self._key_counts())
+
     def test_the_state_query_asks_for_the_actionable_states(self):
         with mock.patch(
                 'shakenfist.mariadb.get_objects_by_state',
