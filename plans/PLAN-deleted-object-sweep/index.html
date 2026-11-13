@@ -16946,8 +16946,8 @@ shape of phases 2 and 3, so only their scope is fixed here.</p>
 <tr>
 <td>5. Push audit</td>
 <td><a href="../PLAN-deleted-object-sweep-phase-05-push-audit/">PLAN-deleted-object-sweep-phase-05-push-audit.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td>7d5a3ff028</td>
 </tr>
 </tbody>
 </table>
@@ -17132,6 +17132,16 @@ above.</p>
 phase's own. The full record is in
 <a href="../PLAN-deleted-object-sweep-phase-05-push-audit/">the phase plan</a>
 under "Findings".</p>
+<p>All seven issues the audit filed are resolved, which is what completes
+this plan. The blocking one, #4876, and #4881 were fixed by the
+repository's own issue-fix automation while this phase was still being
+reviewed, and the other five by #4897, which took them as a themed
+batch. One of the audit's claims was overstated: #4877 is smaller than
+filed, because <code>cluster_operation_targets</code> already carries an
+<code>operation_type</code> column, so only one of its three statements needed a
+subquery. The phase plan's disposition records that, and records that
+five of the seven were fixed twice over because two sessions worked
+them at once with nothing to reserve an issue against the other.</p>
 <p><strong>The question the phase was built around came back clean.</strong> Phase 3
 turned 25 object types' hard deletes into a declaration, and a type
 whose delete went missing in that restatement would leak rows

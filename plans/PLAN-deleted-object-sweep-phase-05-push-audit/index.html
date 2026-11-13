@@ -16220,6 +16220,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#how-the-findings-resolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the findings resolved
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -17362,6 +17373,76 @@ is blocking, so phase 5 and the plan stay <code>In progress</code>, and the plan
 <code>Complete</code> when #4876 is resolved. Per the <code>plan-phase-landing</code> convention the
 fix is a follow-up pull request after this audit merges, and that pull request
 records this phase's merge commit.</p>
+<h3 id="how-the-findings-resolved">How the findings resolved<a class="headerlink" href="#how-the-findings-resolved" title="Permanent link">&para;</a></h3>
+<p>Recorded 2026-11-13, in the pull request which set this phase's <code>Status</code> and
+<code>Merged</code> cells and the plan's index row.</p>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Resolved by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>#4876</td>
+<td>The repository's issue-fix automation, PR #4884 (<code>9914efa207</code>), while this phase was still open. It took the suggested fix, <code>DELETED_OBJECT_SWEEP_EXCLUDED_TYPES = {'node'}</code></td>
+</tr>
+<tr>
+<td>#4877</td>
+<td>PR #4897 (<code>4ef08c4b10</code>). Two of the three builders take the predicate directly; only <code>cluster_operation_errors</code> needs a subquery</td>
+</tr>
+<tr>
+<td>#4878</td>
+<td>PR #4897. The drain returns a <code>DrainOutcome</code> naming the limit which ended it, logged as <code>stopped_by</code> with <code>fill_seconds</code> and <code>budget_seconds</code>, and the sizing arithmetic corrected in the operator guide and both config descriptions</td>
+</tr>
+<tr>
+<td>#4879</td>
+<td>PR #4897, all four items</td>
+</tr>
+<tr>
+<td>#4880</td>
+<td>PR #4897. The eight live cases move to <code>shakenfist/tests/hard_delete_cases.py</code> and now also run against an in-memory sqlite engine built from <code>mariadb.py</code>'s own table definitions, so they run on a pull request; the live module still gates a merge</td>
+</tr>
+<tr>
+<td>#4881</td>
+<td>The issue-fix automation, PR #4896 (<code>ccd8f6b701</code>)</td>
+</tr>
+<tr>
+<td>#4882</td>
+<td>PR #4897, all four items: the hard delete moves to <code>shakenfist/mariadb_hard_delete.py</code>, the three sweep wrappers share <code>_sweep_read()</code>, the settable-seconds clock moves to <code>shakenfist/tests/fakeclock.py</code>, and the comment restating the gRPC retry budget names those constants instead of copying their values</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Five of the seven were fixed twice.</strong> A second session took #4877 to #4882
+as a themed batch while this phase's own follow-up was in review, and PR #4897
+merged first, so the follow-up's five fix commits were dropped rather than
+rebased and it carries only this close-out. The cost was a day's work and a
+reviewer's attention, and nothing reserved the issues against it: the
+<code>automated-fix-attempted</code> label guards against the issue-fix automation only,
+and <code>plan-blockers</code> records what a plan is waiting on rather than which issues
+an in-flight branch has claimed.</p>
+<p><strong>#4877 was filed larger than it was.</strong> It said the three cluster-operation
+statements key on the uuid "in tables shared by all fourteen
+cluster-operation types", implying none could carry a type predicate.
+<code>cluster_operation_targets</code> already has an <code>operation_type</code> column, so two of
+the three take the predicate directly and only <code>cluster_operation_errors</code>
+needs to reach through <code>cluster_operations</code>. The invariant restored is the one
+the issue describes; the work was smaller. Both independent fixes reached that
+reading of it.</p>
+<p><strong>#4882's <code>FakeClock</code> item was read as false, and it is not.</strong> Checking it by
+comparing the four classes <em>named</em> <code>FakeClock</code> found four unrelated
+interfaces -- one <code>datetime</code>-based with an <code>advance()</code>, one a bare float
+returned from <code>__call__</code>, one implementing <code>time()</code> and <code>sleep()</code> with a
+<code>max_reads</code> valve, one replaying a canned list -- and the conclusion drawn was
+that the issue had grepped a name and reported it as duplication. PR #4897
+traced the idea rather than the name, and found four modules which had each
+written the same settable-seconds callable, under three names between them; it
+moved that one idea to <code>shakenfist/tests/fakeclock.py</code> and renamed the
+genuinely different stand-ins for what they are. So the lesson is the reverse
+of the one first recorded here: a name is the wrong unit for either judgement,
+because it over-reports duplication and hides it just as easily, and the only
+check is to read the bodies across names.</p>
 <h2 id="execution-notes">Execution notes<a class="headerlink" href="#execution-notes" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Back brief, 2026-11-11.</strong> Michael kept all three points as planned:
