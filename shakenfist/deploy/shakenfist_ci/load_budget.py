@@ -364,7 +364,21 @@ POLL_OVERCOUNT_TOLERANCE = 1.60
 # per executor regardless, see expire_if_out_of_budget() in
 # shakenfist/daemons/sidechannel/main.py.)
 #
-# The budget is the wrong home for all three, and not only because no
+# GetObjectState/sidechannel has a second producer, paced the same way.
+# The dependency evaluator in the dispatcher pass of
+# shakenfist/daemons/sidechannel/main.py, _dependencies_met(), reads a
+# dependency's state by uuid once per declared edge on every pass for
+# which the dependent is still blocked. The harness sets that rate too,
+# since it is the suite which decides how many operations declare edges
+# and how long their dependencies take to finish, so this arrives at a
+# harness-paced rate for the same reason the stream above does. What it
+# is not is a poll: it scales with how many in-flight operations declare
+# edges rather than with instances, nodes, or a timer, which is exactly
+# the term the model below does not have. An operation which declares no
+# edges reads nothing here -- that is the first branch of the method --
+# so this pair's floor is unchanged by the evaluator.
+#
+# The budget is the wrong home for all three pairs, and not only because no
 # deployed cluster runs agent operations on a one second timer. The model
 # has no term for load which scales with in-flight operations: an instance
 # doing no agent work costs nothing here and one streaming a large put-blob
