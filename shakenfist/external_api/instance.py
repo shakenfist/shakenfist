@@ -67,6 +67,7 @@ from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
 from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import general as util_general
+from shakenfist.util import keymap as util_keymap
 from shakenfist.util import network as util_network
 from shakenfist.util import vdi_tokens
 
@@ -2619,6 +2620,100 @@ class InstanceScreenshotEndpoint(api_base.Resource):
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'screenshot request from REST API')
         return instance_from_db.get_screenshot()
+
+
+# What a console keystroke request may ask for. The thing worth bounding
+# is how long the request blocks an API worker: libvirt's holdtime paces
+# the keystrokes, so the product of these two is the wait one call can
+# buy. Both are enforced in the handler -- the keystroke count because
+# maxItems and maxLength are not constraint keys a declaration may
+# carry, and the hold by clamping on top of its declared bound, because
+# a declaration rolls back with API_VALIDATION_MODE and the worst case
+# here must not.
+MAX_CONSOLE_KEYSTROKES = 256
+MAX_CONSOLE_HOLD_MS = 100
+
+
+class InstanceConsoleKeysEndpoint(api_base.Resource):
+    # Typing at the console is interactive control of the guest, which is
+    # exactly what the .vv file and the Kerbside token hand out, so it
+    # takes the same verb as those rather than instance.write. Deriving
+    # it from the POST would let a credential granted only to create
+    # instances drive somebody else's first boot wizard.
+    @api_base.scope(verb='console')
+    @swag_from(api_base.swagger_helper(
+        'instances', 'Send keystrokes to the console of an instance.',
+        [
+            ('instance_ref', 'path', 'uuidorname',
+             'The UUID or name of the instance.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
+            ('text', 'body', 'string',
+             'Literal text to type, one keystroke per character. A newline '
+             'is the enter key and a tab is the tab key. At most %d '
+             'characters, and exactly one of text or keys must be sent.'
+             % MAX_CONSOLE_KEYSTROKES, False),
+            ('keys', 'body', 'arrayofstring',
+             'Key names to send, such as "enter", "f2" or "down". A name '
+             'may also be a chord of names joined with "+", such as '
+             '"ctrl+alt+delete". At most %d of them, and exactly one of '
+             'text or keys must be sent.' % MAX_CONSOLE_KEYSTROKES, False),
+            ('hold_ms', 'body', 'integer',
+             'How long each keystroke is held down, in milliseconds. qemu '
+             'also delays the following keystroke by it, so this is how a '
+             'console too slow to keep up is paced. Defaults to 0, and a '
+             'value outside the bounds is clamped into them.', False,
+             {'minimum': 0, 'maximum': MAX_CONSOLE_HOLD_MS})
+        ],
+        [(200, 'The number of keystrokes sent.', '{"keystrokes": 5}'),
+         (400, 'Neither or both of text and keys were sent, too many '
+          'keystrokes were requested, or a key name is not one Shaken Fist '
+          'can send.', None),
+         (404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None),
+         (409, 'The instance is not running.', None)]))
+    @api_base.arg_is_instance_ref
+    @api_base.requires_instance_ownership
+    @api_base.redirect_instance_request
+    @api_base.requires_instance_active
+    @api_base.log_token_use
+    def post(self, instance_ref=None, text=None, keys=None, hold_ms=None,
+             instance_from_db=None):
+        if (text is None) == (keys is None):
+            return sf_api.error(400, 'exactly one of text or keys is required')
+        # Only reachable with API_VALIDATION_MODE at warn or off, where the
+        # schema stands aside; at enforce the wrong type is already a 400.
+        if text is not None and not isinstance(text, str):
+            return sf_api.error(400, 'text must be a string')
+        if keys is not None and not isinstance(keys, list):
+            return sf_api.error(400, 'keys must be a list of key names')
+
+        if len(text if text is not None else keys) > MAX_CONSOLE_KEYSTROKES:
+            return sf_api.error(
+                400, 'at most %d keystrokes may be sent in one request'
+                % MAX_CONSOLE_KEYSTROKES)
+
+        try:
+            hold_ms = validation.declared_integer(hold_ms) or 0
+        except marshmallow.ValidationError:
+            return sf_api.error(400, 'hold_ms must be an integer',
+                                suppress_traceback=True)
+        hold_ms = min(max(hold_ms, 0), MAX_CONSOLE_HOLD_MS)
+
+        try:
+            if text is not None:
+                chords = util_keymap.chords_for_text(text)
+            else:
+                chords = util_keymap.chords_for_keys(keys)
+        except exceptions.InvalidKeyName as e:
+            return sf_api.error(400, str(e), suppress_traceback=True)
+
+        try:
+            instance_from_db.send_console_keys(chords, hold_ms)
+        except exceptions.InvalidLifecycleState as e:
+            return sf_api.error(409, f'Invalid lifecycle state: {e}',
+                                suppress_traceback=True)
+        return {'keystrokes': len(chords)}
 
 
 instance_outstanding_operations_example = """[

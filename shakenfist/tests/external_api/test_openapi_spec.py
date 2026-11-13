@@ -9,6 +9,7 @@ from shakenfist.external_api import admin as api_admin
 from shakenfist.external_api import app as external_api
 from shakenfist.external_api import auth as api_auth
 from shakenfist.external_api import base as api_base
+from shakenfist.external_api import instance as api_instance
 from shakenfist.tests import base
 from shakenfist.util import network as util_network
 
@@ -221,6 +222,20 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                         'pattern': api_base.DEVICE_MODEL_PATTERN},
               'float': {'type': 'boolean'},
           }}),
+        # The console keystroke parameters. keys is a list of key names
+        # and chords, so an array of strings, with no bound published
+        # on the array itself: the handler refuses more than
+        # MAX_CONSOLE_KEYSTROKES of them, and maxItems is not one of
+        # the three constraint keys a declaration may carry. hold_ms
+        # publishes both bounds because the handler clamps into them
+        # rather than passing a larger value to libvirt, which is what
+        # keeps the time one request can block an API worker bounded
+        # at every API_VALIDATION_MODE.
+        ('/instances/{instance_ref}/console/keys', 'post', 'keys',
+         {'type': 'array', 'items': {'type': 'string'}}),
+        ('/instances/{instance_ref}/console/keys', 'post', 'hold_ms',
+         {'type': 'integer', 'minimum': 0,
+          'maximum': api_instance.MAX_CONSOLE_HOLD_MS}),
         ('/instances/{instance_ref}/events', 'get', 'limit',
          {'type': 'integer', 'minimum': 1, 'maximum': 1000}),
         ('/instances/{instance_ref}/snapshot', 'post', 'max_versions',

@@ -1247,6 +1247,51 @@ returns an iterator of binary chunks ready for you to process or write to a file
             f.write(chunk)
     ```
 
+## Typing at the console
+
+Since v0.9, Shaken Fist can type at an instance's console. This is for
+appliances configured through an interactive first boot wizard on the VGA
+console, which have no agent and no cloud-init: paired with the screen
+captures above, the read-the-prompt, send-the-answer loop is scriptable over
+the API alone, where before it needed a VNC connection to the hypervisor and
+OCR of the framebuffer.
+
+???+ tip "REST API calls"
+
+    * [POST ​/instances​/{instance_ref}​/console​/keys](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__console_keys): Send keystrokes to the console of an instance.
+
+The request carries exactly one of `text`, which is typed one keystroke per
+character, or `keys`, which is a list of key names and chords. `hold_ms` is
+libvirt's holdtime, which qemu also uses to delay the following keystroke, so
+it is how a slow console is paced rather than something the caller sleeps for.
+The response is the number of keystrokes sent.
+
+The keystrokes go to the guest's emulated keyboard via libvirt's `send-key`,
+in the Linux keycode set. The name tables are in
+`shakenfist/util/keymap.py`, because the python libvirt bindings do not expose
+the ones `virsh send-key` uses. See the
+[user guide](/user_guide/consoles/#typing-at-the-console) for the key names
+and the bounds.
+
+This endpoint requires the `instance.console` scope, the same as the VDI
+console routes, rather than `instance.write`: typing at the console is
+interactive control of the guest.
+
+The python API client has no verb for this yet, so until it does the
+endpoint is called directly. `_request_url` is private, and is named here
+because it is the only way to reach a route the client does not wrap:
+
+??? example "Python API client: answer a console prompt"
+
+    ```python
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    sf_client._request_url(
+        'POST', '/instances/%s/console/keys' % instance_ref,
+        data={'text': 'admin\n', 'hold_ms': 10})
+    ```
+
 ## Object References
 
 Instance API responses include `references_to` and `references_from` fields that

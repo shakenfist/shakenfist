@@ -5,6 +5,8 @@ from xml.etree import ElementTree
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import exceptions
+
 
 LOG, _ = logs.setup(__name__)
 LIBVIRT: ModuleType | None = None
@@ -364,6 +366,38 @@ class LibvirtConnection():
                 f.write(d)
 
         stream.finish()
+
+    def send_keys(self, instance_uuid: str, chords: list[list[int]],
+                  hold_ms: int) -> None:
+        """Press chords of Linux keycodes on a domain's emulated keyboard.
+
+        Each chord is pressed together and released before the next one,
+        which is what virDomainSendKey() does with a keycode list. hold_ms
+        is libvirt's holdtime: qemu delays the following key events by it,
+        so a console too slow to keep up is a caller choosing a larger
+        value rather than this method sleeping in an API worker.
+
+        NoDomainException means there is no *running* domain to type at,
+        whether because none is defined or because the one which is
+        defined is not running.
+        """
+        domain = self.get_domain_from_sf_uuid(instance_uuid)
+        if not domain:
+            raise exceptions.NoDomainException(instance_uuid)
+
+        for chord in chords:
+            try:
+                domain.sendKey(self.libvirt.VIR_KEYCODE_SET_LINUX, hold_ms,
+                               chord, len(chord), 0)
+            except self.libvirt.libvirtError as e:
+                # A defined but powered off domain refuses with
+                # VIR_ERR_OPERATION_INVALID, and so does one destroyed
+                # between the lookup above and this call. The guard sits
+                # where the refusal is raised rather than on a prior
+                # isActive(), which would leave that race open.
+                if self.is_state_invalid(e):
+                    raise exceptions.NoDomainException(instance_uuid)
+                raise
 
 
 def extract_hypervisor_devices(domain: Any) -> dict[str, list[Any]]:

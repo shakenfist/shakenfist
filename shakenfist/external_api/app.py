@@ -518,7 +518,13 @@ API_CAPABILITIES = {
         ConditionalCapability(
             'vdi-console-proxy', lambda: config.KERBSIDE_URL),
         'instance-put-blob', 'instance-execute',
-        'instance-get', 'instance-screenshot', 'get-instance-namespace',
+        'instance-get', 'instance-screenshot',
+        # instance-console-keys names POST /instances/<ref>/console/keys,
+        # which types at the guest's console. A client cannot feature
+        # detect it any other way, and the type-and-screenshot loop it
+        # exists for is only scriptable over the API once both halves
+        # are there.
+        'instance-console-keys', 'get-instance-namespace',
         'hot-plug-interface', 'include-queued-agent-operations',
         'instance-clusteroperations',
         # agentoperation-deadlines names, as a set, the parameters a
@@ -769,6 +775,8 @@ api.add_resource(api_instance.InstanceAgentExecuteEndpoint,
                  '/instances/<instance_ref>/agent/execute')
 api.add_resource(api_instance.InstanceScreenshotEndpoint,
                  '/instances/<instance_ref>/screenshot')
+api.add_resource(api_instance.InstanceConsoleKeysEndpoint,
+                 '/instances/<instance_ref>/console/keys')
 api.add_resource(api_instance.InstanceOutstandingOperationsEndpoint,
                  '/instances/<instance_ref>/clusteroperations')
 

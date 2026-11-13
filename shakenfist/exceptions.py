@@ -392,6 +392,17 @@ class InvalidDomainXML(VirtException):
     ...
 
 
+class InvalidKeyName(VirtException):
+    """A console keystroke request named a key Shaken Fist cannot send.
+
+    Raised by shakenfist.util.keymap while translating names and text
+    into the Linux keycodes libvirt's send-key takes. The API turns it
+    into a 400 naming the offending key, because the alternative is
+    libvirt refusing a keycode list and saying nothing about which
+    element of the caller's request produced it.
+    """
+
+
 # Config
 class FlagException(Exception):
     ...
