@@ -16561,49 +16561,49 @@ Recommendations are recorded inline.</p>
 <tr>
 <td>3. Pip-installable ryll</td>
 <td>ryll</td>
-<td>PLAN-pip-distribution.md (in ryll's docs/plans/)</td>
+<td><a href="https://github.com/shakenfist/ryll/blob/26424384bb7510279cccd1df21edab6052d3fbe6/docs/plans/PLAN-pip-distribution.md">PLAN-pip-distribution.md</a> (retired in ryll)</td>
 <td>Complete</td>
 <td>ryll <code>fa7ee21d8</code> (#190)</td>
 </tr>
 <tr>
 <td>4. Client, CLI, and viewer launch</td>
 <td>client-python</td>
-<td>PLAN-vdi-console-tokens.md (in that repo, branch <code>vdi-console-tokens-client</code>)</td>
+<td><a href="https://github.com/shakenfist/client-python/blob/develop/docs/plans/PLAN-vdi-console-tokens.md">PLAN-vdi-console-tokens.md</a> (in client-python)</td>
 <td>Complete</td>
 <td>client-python <code>b426e1f86</code> (#350)</td>
 </tr>
 <tr>
 <td>5. Kerbside exchange endpoint</td>
 <td>kerbside</td>
-<td>PLAN-kerbside-vdi-tokens-phase-05-exchange.md (in kerbside, branch <code>sf-vdi-tokens</code>)</td>
+<td><a href="https://github.com/shakenfist/kerbside/blob/4bfd433e4e1f3033cefaeb02bbf7962b186276bf/docs/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange.md">PLAN-kerbside-vdi-tokens-phase-05-exchange.md</a> (retired in kerbside)</td>
 <td>Complete</td>
 <td>kerbside <code>f50ea59c2</code> (#167)</td>
 </tr>
 <tr>
 <td>6. Cluster-wide scrape and host_subject</td>
 <td>kerbside + shakenfist</td>
-<td>PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside)</td>
+<td><a href="https://github.com/shakenfist/kerbside/blob/502a7f563575124b6fa422de1b1a882e21ced724/docs/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape.md">PLAN-kerbside-vdi-tokens-phase-06-scrape.md</a> (retired in kerbside)</td>
 <td>Complete</td>
 <td>shakenfist <code>9d41a1716</code> (#3491); kerbside <code>f50ea59c2</code> (#167)</td>
 </tr>
 <tr>
 <td>7. Functional test: SF mint path</td>
 <td>shakenfist</td>
-<td>PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside)</td>
+<td><a href="https://github.com/shakenfist/kerbside/blob/4effca6100f8fb6c6321d63dcfdccad1af897109/docs/plans/PLAN-kerbside-vdi-tokens-phase-07-ci.md">PLAN-kerbside-vdi-tokens-phase-07-ci.md</a> (retired in kerbside)</td>
 <td>Complete</td>
 <td>shakenfist <code>9d41a1716</code> (#3491); kerbside <code>f50ea59c2</code> (#167)</td>
 </tr>
 <tr>
 <td>8. Documentation</td>
 <td>all</td>
-<td>PLAN-kerbside-vdi-tokens-phase-08-docs.md</td>
+<td><a href="https://github.com/shakenfist/kerbside/blob/531218dda7b11a465fc8aa40af6a2034d1d88f94/docs/plans/PLAN-kerbside-vdi-tokens-phase-08-docs.md">PLAN-kerbside-vdi-tokens-phase-08-docs.md</a> (retired in kerbside)</td>
 <td>Complete</td>
 <td>shakenfist <code>9d41a1716</code> (#3491); kerbside <code>f50ea59c2</code> (#167)</td>
 </tr>
 <tr>
 <td>9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF)</td>
 <td>all</td>
-<td>PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside)</td>
+<td><a href="https://github.com/shakenfist/kerbside/blob/66dff1200a00e949efab9b4b16dec769fbf56c93/docs/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e.md">PLAN-kerbside-vdi-tokens-phase-09-e2e.md</a> (retired in kerbside)</td>
 <td>Complete</td>
 <td>kerbside <code>115416ccc</code> (#194), <code>78033687d</code> (#201); shakenfist <code>07d7081b7</code> (#3580)</td>
 </tr>
@@ -16900,8 +16900,9 @@ on the venv's PATH, the way kerbside's pip install ships
 </ul>
 <h3 id="phase-7-functional-test-sf-mint-path">Phase 7: Functional test — SF mint path<a class="headerlink" href="#phase-7-functional-test-sf-mint-path" title="Permanent link">&para;</a></h3>
 <p>Narrowed to the SF-side mint test; the kerbside functional lane
-moved to phase 9 (see below and the phase-7 plan in kerbside for
-the grounding).</p>
+moved to phase 9 (see below, and
+<a href="https://github.com/shakenfist/kerbside/blob/4effca6100f8fb6c6321d63dcfdccad1af897109/docs/plans/PLAN-kerbside-vdi-tokens-phase-07-ci.md">PLAN-kerbside-vdi-tokens-phase-07-ci.md</a>,
+retired in kerbside, for the grounding).</p>
 <ul>
 <li>SF: a <code>cluster_ci_tests</code> functional test
   (<code>deploy/shakenfist_ci/cluster_ci_tests/test_vdi_tokens.py</code>)
@@ -16915,8 +16916,9 @@ the grounding).</p>
 </ul>
 <h3 id="phase-8-documentation">Phase 8: Documentation<a class="headerlink" href="#phase-8-documentation" title="Permanent link">&para;</a></h3>
 <p>Done. The detailed plan of record for this phase is
-<code>PLAN-kerbside-vdi-tokens-phase-08-docs.md</code> (authored in the kerbside repo
-alongside phases 5–7). The four repos' doc PRs are independent.</p>
+<a href="https://github.com/shakenfist/kerbside/blob/531218dda7b11a465fc8aa40af6a2034d1d88f94/docs/plans/PLAN-kerbside-vdi-tokens-phase-08-docs.md">PLAN-kerbside-vdi-tokens-phase-08-docs.md</a>,
+retired in kerbside, where it was authored alongside phases 5–7. The
+four repos' doc PRs are independent.</p>
 <ul>
 <li>SF: user guide (how to open a proxied console), operator
   guide (enabling <code>KERBSIDE_URL</code>, key rotation runbook),
