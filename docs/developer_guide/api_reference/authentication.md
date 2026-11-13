@@ -640,6 +640,74 @@ namespace key.
     A refusal for any other reason does not consume the token, so
     fixing a rule and retrying with a still-valid token works.
 
+## Login
+
+`POST /auth/login` trades an [identity token](/glossary/#identity-token) from
+a trusted issuer for every namespace key the person is entitled to: one for
+each [mapping rule](/glossary/#mapping-rule) whose bound claims the token
+satisfies. It is unauthenticated by nature, for the same reason as the
+exchange above. It is rate limited per source address, with a budget of its
+own separate from both `POST /auth/federated` and `GET /auth/login`, and the
+token is verified against the issuer's `client_id` and not its `audience`.
+
+```json
+{"token": "eyJ..."}
+```
+
+```json
+[
+  {
+    "namespace": "ci",
+    "key_name": "corporate-3fJ2mQ8x",
+    "key": "sfk_...",
+    "expiry": 1763000000.0,
+    "scopes": ["blob.read", "artifact.*"]
+  },
+  {
+    "namespace": "ops",
+    "key_name": "corporate-9kLm2Pq1",
+    "key": "sfk_...",
+    "expiry": 1763000000.0,
+    "scopes": ["instance.*"]
+  }
+]
+```
+
+Each secret is returned exactly once. `expiry` is a Unix timestamp. The list is
+never empty: a token which entitles its holder to nothing is refused. Use a
+member of the list with `POST /auth` as you would any namespace key.
+
+???+ tip "REST API calls"
+
+    * [POST /auth/login](https://openapi.shakenfist.com/#/auth/post_auth_login): Exchange an identity token for every credential it entitles its holder to.
+
+???+ info "What a refusal tells you"
+
+    | Status | Meaning |
+    |--------|---------|
+    | 400 | A required field is missing |
+    | 401 | The login was refused, with no detail |
+    | 413 | The request body exceeds `FEDERATION_MAX_TOKEN_BYTES` |
+    | 429 | Too many attempts from this source address |
+    | 503 | The database was unavailable, the mapping rule states could not be read, or the configured JWKS CA bundle could not be loaded |
+    | 507 | The token satisfies more rules than `FEDERATION_MAX_LOGIN_CREDENTIALS` allows |
+
+    A request with no `Content-Length` is refused with 411 before it reaches
+    the endpoint. Unlike the exchange, a 401 here carries no category at all:
+    an untrusted issuer, an invalid token, a replayed token and a token that
+    matches no rule all answer the same way, and the reason is written to the
+    log only.
+
+???+ warning "A login uses the token once"
+
+    A token may be used to log in once, whatever it matched. A retry is
+    refused with a 401 and mints nothing; ask the identity provider for
+    another token.
+
+A client can detect this from the `human-login` capability in the `auth`
+family of the API capabilities. It is separate from `human-login-metadata`,
+which says only that `GET /auth/login` exists.
+
 ## Metadata
 
 All objects exposed by the REST API may have metadata associated with them. This

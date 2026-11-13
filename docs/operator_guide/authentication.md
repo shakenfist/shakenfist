@@ -395,6 +395,111 @@ caller turns each request into a read per issuer with nothing counting
 them. The exchange, by contrast, bounds its body and does its cheap
 local checks before touching anything.
 
+### Human login mints credentials
+
+`POST /auth/login` is the other half of human login. A person who has
+completed a flow at your identity provider posts the identity token they
+came back with, and receives one namespace key for every mapping rule their
+claims satisfy. Like `GET /auth/login` it needs **no credential**, for the
+same reason.
+
+A person's entitlements are therefore exactly the [mapping rules](#delegating-to-namespace-owners)
+they satisfy, and nothing else: Shaken Fist has no list of users to consult.
+A credential is one namespace deep, so a person entitled to three namespaces
+gets back three keys, and presents whichever one the namespace they are
+addressing needs. Each key is an ordinary namespace key carrying the scopes
+and lifetime its rule grants, and its provenance records that it came from a
+login. Nothing about authorisation changes once a key exists.
+
+**This is an administrative act, and the rules are where it happens.** A
+mapping rule in the `system` namespace is exactly the standing offer of
+administrative credentials described under
+[delegating to namespace owners](#delegating-to-namespace-owners), and for
+human login that means a group membership at your identity provider is
+cluster administration. Nothing here treats `system` specially except to make
+it visible: a key minted into it is audited as an *administrative key minted
+by human login* on the key, and the namespace's event log says *human login
+minted an administrative key*. Those events are worth alerting on. A cluster
+with no rule in `system` never mints into it.
+
+???+ warning "Human login verifies the `client_id`, not the `audience`"
+
+    The `audience` and `client_id` columns on an issuer are stamped into
+    tokens by different parties, and a login is verified against the second.
+
+    `audience` is what a **workload** asks for: a GitHub Actions job requests
+    a token "for" whatever string you tell it to, which is why the guide
+    suggests your API URL. `client_id` is what the identity provider stamps
+    into a **person's** token on its own, because an OpenID Connect identity
+    token's `aud` is the application it was issued to, and that is the client
+    registration you made at the provider. Nobody gets to choose it at login
+    time.
+
+    So if you set `audience` to your API URL, registered a client, and
+    every login is refused, this is why: the token your provider issued
+    names your client, not your API URL, and login checks the former. The
+    reverse also holds. A person's token is not accepted by the workload
+    exchange, and a workload's token is not accepted by login, unless you have
+    deliberately set the two columns to the same string. The fix is to check
+    that `client_id` is the identifier the provider actually issues
+    tokens for, not to change `audience`.
+
+An issuer is login capable only with a `client_id` **and** at least one of an
+`authorization_endpoint` or a `device_authorization_endpoint`, exactly as for
+[`GET /auth/login`](#human-login-metadata); a token from any other issuer is
+refused, even though the workload exchange would accept it. Both endpoints
+share the one predicate, so what the listing advertises is what the login
+accepts.
+
+**Refusals tell the caller nothing.** Every refusal other than the ones below
+answers **401** with the same terse message -- an untrusted issuer, a token
+that fails validation, a token that matches no rule, a replayed token, an
+issuer not configured for login. This is deliberate: the caller is
+anonymous, and distinguishing "no rule matches you" from "your token is bad"
+would turn the endpoint into an oracle for whether a given identity matches
+anything on your cluster. The reason is written to the `sf-api` log at info
+level, prefixed `Login refused:`, which is where you look when somebody
+reports that they cannot log in. A person who has simply not had a rule
+written for them is refused in the same way.
+
+The exceptions are failures that belong to the cluster rather than the
+caller. A **503** means the database could not be reached, the mapping rule
+states could not be read (the login is refused rather than guessed at,
+because guessing wrong would mint from rules an administrator had deleted),
+or the file named by `FEDERATION_JWKS_CA_BUNDLE` could not be loaded.
+
+**Replay.** An identity token may be used to log in once. A retry with the
+same token is refused with a 401 and mints nothing, including after a login
+which failed part way through; the person asks their provider for another
+token.
+
+**The cap.** Each key costs a bcrypt hash, so one login may mint at most
+`FEDERATION_MAX_LOGIN_CREDENTIALS` keys. A person whose claims satisfy more
+rules than that is refused with **507**, not given a truncated set, because
+they could not tell a short set from a complete one. They can do nothing about
+it themselves; you must either narrow your rules or raise the setting. The log
+line names the setting and both counts. Only rules which are active, for this
+issuer, and whose claims match are counted.
+
+**Keys accumulate.** Logging in again mints a fresh set rather than replacing
+the last, because a login on a laptop must not invalidate the credentials a
+session on a workstation is still using. An expired key stops working
+immediately, but it is not removed immediately: the cluster daemon soft
+deletes it `NAMESPACE_KEY_REAP_GRACE` seconds after it expired, and it is then
+hard deleted once it has been soft deleted for `CLEANER_DELAY` seconds. With
+the defaults that is roughly two hours after expiry, on top of the rule's key
+lifetime, because both settings default to an hour. A person who logs in often
+leaves up to `FEDERATION_MAX_LOGIN_CREDENTIALS` keys per login for the whole of
+that window, which is worth knowing when you size a cluster for many users. See
+[key expiry and reaping](#key-expiry-and-reaping).
+
+Requests are rate limited per source address like the others, on a counter
+of their own, so a burst of logins does not throttle CI and the reverse. As for
+the exchange and the listing, setting `FEDERATION_RATE_LIMIT_PER_MINUTE` to
+`0` disables the limit, and a login is the most expensive of the three
+unauthenticated routes: a JWKS fetch and then a bcrypt hash per credential.
+A limited caller gets a **429**.
+
 ### Delegating to namespace owners
 
 A **mapping rule** is owned by the namespace it mints into, and
@@ -545,8 +650,9 @@ exchange answers 503 rather than assuming the request is fine.
 | `FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait for an issuer's JWKS endpoint. The fetch happens while holding that issuer's refetch lock, so this is also the longest one unreachable provider can pin an API worker |
 | `FEDERATION_DISCOVERY_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait when fetching an issuer's discovery document. Separate from the JWKS timeout because discovery only runs when an administrator configures an issuer, where a slow provider costs that administrator one request, while the JWKS fetch can pin an API worker per anonymous exchange. Applied three times: to the connect, to each read, and as a deadline over the body once the response starts, so one fetch is bounded at roughly twice this value. Must be at least 1 |
 | `FEDERATION_DISCOVERY_MAX_BYTES` | 65536 | Largest discovery document accepted, in bytes. The body is read up to this limit and refused beyond it, rather than trusting the provider's `Content-Length`, so a login page or a misbehaving proxy cannot hand us an unbounded response. A real document is a few kilobytes |
-| `FEDERATION_MAX_TOKEN_BYTES` | 16384 | Largest exchange request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no `Content-Length` is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit |
-| `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Attempts allowed per source address per minute, counted separately for the exchange and for `GET /auth/login`. `0` disables rate limiting entirely, on both |
+| `FEDERATION_MAX_TOKEN_BYTES` | 16384 | Largest exchange or login request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no `Content-Length` is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit |
+| `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Attempts allowed per source address per minute, counted separately for the exchange, for `GET /auth/login` and for `POST /auth/login`. `0` disables rate limiting entirely, on all three, including the per-issuer read that the listing does on every request |
+| `FEDERATION_MAX_LOGIN_CREDENTIALS` | 16 | The most namespace keys one `POST /auth/login` may mint, minimum 1. Each key costs a bcrypt hash, so without a cap one valid identity token commands as much deliberately slow work as the cluster has matching mapping rules. A login matching more rules than this is refused with 507 rather than truncated. Raising it raises the work one token can command; `FEDERATION_RATE_LIMIT_PER_MINUTE` bounds how often a source may try, and `0` removes that bound for every unauthenticated endpoint in this family |
 | `FEDERATION_JWKS_CA_BUNDLE` | *(empty)* | Path to a PEM bundle of extra certificate authorities to trust when fetching an issuer's JWKS. Empty means the system trust store alone |
 
 ### When an issuer rotates its signing keys
