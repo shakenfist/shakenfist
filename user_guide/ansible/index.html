@@ -16878,11 +16878,11 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 </tr>
 <tr>
 <td>networks<br/><em>list of strings</em></td>
-<td>A simpler format for specifying the networks an instance is attached to, following the same behaviour as the <code>-n</code> flag in the command line client: a list of network UUIDs.</td>
+<td>A simpler format for specifying the networks an instance is attached to, following the same behaviour as the <code>-n</code> flag in the command line client: a list of network references, each a name or a UUID. A name is resolved to its UUID before the instance is compared, so naming a network does not make the instance look changed on a later run. A reference which does not resolve to a network is an error: the module reports it when it compares an existing instance, and otherwise the server refuses it when the instance is created.</td>
 </tr>
 <tr>
 <td>networkspecs<br/><em>list of strings</em></td>
-<td>A more verbose format for specifying the networks an instance is attached to that models the <code>-N</code> flag in the command line client, for example <code>network_uuid=...,address=10.0.0.5</code>.</td>
+<td>A more verbose format for specifying the networks an instance is attached to that models the <code>-N</code> flag in the command line client, for example <code>network_uuid=...,address=10.0.0.5</code>. As with <code>networks</code>, the network reference may be a name or a UUID.</td>
 </tr>
 <tr>
 <td>ram<br/><em>integer</em></td>

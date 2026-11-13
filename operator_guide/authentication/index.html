@@ -16609,7 +16609,7 @@ for the cluster rather than with an individual namespace owner.</p>
 <tr>
 <td><code>issuer_url</code></td>
 <td>Yes</td>
-<td>Compared to a token's <code>iss</code> claim <strong>exactly</strong>: no normalisation, no trailing-slash tolerance</td>
+<td>Compared to a token's <code>iss</code> claim <strong>exactly</strong>: no normalisation, no trailing-slash tolerance. Must be <code>https</code></td>
 </tr>
 <tr>
 <td><code>audience</code></td>
@@ -16619,7 +16619,7 @@ for the cluster rather than with an individual namespace owner.</p>
 <tr>
 <td><code>jwks_uri</code></td>
 <td>No</td>
-<td>Where the signing keys are published. Always taken from here, never from the token. Left out, it is <a href="#discovery">discovered</a> from the provider</td>
+<td>Where the signing keys are published. Always taken from here, never from the token. Must be <code>https</code>. Left out, it is <a href="#discovery">discovered</a> from the provider</td>
 </tr>
 <tr>
 <td><code>client_id</code></td>
@@ -16649,6 +16649,17 @@ wrong place.</p>
 here is a way to accept tokens from somewhere else entirely, so if
 your tokens are refused with an untrusted-issuer message, check for a
 trailing slash before checking anything else.</p>
+<p>Both URLs must begin with <code>https://</code>, in lower case, and anything
+else is refused with a 400 on create and on update. (<code>HTTPS://</code> is
+refused too: an <code>issuer_url</code> spelled that way could never equal a real
+token's <code>iss</code>.) For <code>jwks_uri</code> the reason is direct: a JWKS
+fetched over HTTP can be substituted by anyone on the path, which
+turns signature verification into theatre. For <code>issuer_url</code> it is one
+step further away -- the value is compared against a token's <code>iss</code>
+claim rather than fetched -- but it names the identity whose keys the
+cluster is about to trust, and OIDC discovery builds its request from
+that same field, so the scheme is checked once here rather than again
+in everything that reads it.</p>
 <details class="warning" open="open">
 <summary>Rules reference issuers by name</summary>
 <p>Deleting an issuer does not delete the mapping rules that name it;
