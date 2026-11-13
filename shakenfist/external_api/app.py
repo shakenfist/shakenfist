@@ -537,7 +537,10 @@ API_CAPABILITIES = {
         # them. It is also what makes the abort terminal state safe to emit,
         # because an operation can only reach abort if the client which
         # created it declared a dependency, and a client which declared one
-        # read this token first.
+        # read this token first. The dispatcher evaluates the edges, so a
+        # server which advertises the token also aborts a dependent whose
+        # depends_on dependency failed, and a client waiting on such an
+        # operation must treat abort as terminal.
         #
         # This node advertises the token, but sf-database is what writes an
         # edge to MariaDB, so during an upgrade the database tier has to go

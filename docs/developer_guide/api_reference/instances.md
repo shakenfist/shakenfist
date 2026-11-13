@@ -1001,13 +1001,57 @@ you cannot read; the three cases are deliberately indistinguishable. A server
 advertises that it knows these parameters with the `agentoperation-dependencies`
 capability token, which clients should check for before sending them.
 
-!!! note "Not yet evaluated"
+The edges are stored and returned in the operation's `depends_on` and
+`runs_after` fields, and they are evaluated when the operation reaches the head
+of its instance's queue, not before. An operation which declared no edges is
+dispatched exactly as one without. Otherwise:
 
-    The edges are stored and returned in the operation's `depends_on` and
-    `runs_after` fields, but nothing evaluates them yet. An operation created
-    with edges is dispatched exactly as one created without. See
-    [the database operator guide](../../operator_guide/database.md) for how
-    they are stored.
+* A `depends_on` dependency which is still queued or executing holds the
+  operation at the head of the queue, and the operations behind it, until it
+  finishes. One which completed lets the operation run, once any settle delay
+  has elapsed. One which errored, was aborted, expired, was deleted or no longer
+  exists moves the operation to the `abort` state without running it, and the
+  operation's `dependency_failure` field says which dependency, and in what
+  state, caused that. The operation is also aborted if the wait outlasts
+  `AGENT_OPERATION_DEPENDENCY_WAIT` (300 seconds by default) rather than
+  holding its instance's queue for however long the dependency takes.
+* A `runs_after` dependency orders the operation and nothing more. Any finished
+  state, including a failed one, lets it run, and a dependency which is absent
+  or which outlasts the same wait is logged and then ignored. A `runs_after`
+  edge never aborts an operation and never sets `dependency_failure`.
+
+`dependency_failure` is `null` unless the operation was aborted by a
+`depends_on` edge, and then holds a dictionary with three keys: `op_type`
+(always `agentoperation`), `op_uuid` (the dependency's UUID) and `state` (the
+dependency's state when it was given up on). `state` is one of the dependency's
+own states, or the string `missing` for a dependency which no longer exists, so
+that a dependency which failed can be told from one which is gone. An operation
+aborted for outlasting the wait budget carries the dependency's state at that
+moment, which may be `queued` or `executing`, so `state` alone does not say that
+the dependency failed. See
+[the database operator guide](../../operator_guide/database.md) for how the
+edges are stored.
+
+Two things about this are easy to build the wrong assumption on, and are
+properties of the design rather than defects.
+
+**A dependent can read as `queued` after its dependency has failed.** Edges are
+evaluated at dispatch, so an operation which has not yet reached the head of its
+instance's queue reads as `queued` through the API even when a `depends_on`
+dependency has already failed. It moves to `abort` when it reaches the head, not
+when the dependency fails, which may be some time later if other operations are
+ahead of it. A client which needs to know sooner should read the dependency's
+state itself rather than wait for the dependent to say.
+
+**A finished dependency is eventually deleted.** A dependency which completed,
+was aborted or expired is hard-deleted `CLEANER_DELAY` (3600 seconds by default)
+after it finished. One which errored never is. A dependent which reaches the
+head of its queue after that finds its `depends_on` dependency absent, and
+absence is treated as failure: the deleted row cannot say whether the dependency
+succeeded, and a fate-sharing edge should fail safe. It is aborted with a
+`dependency_failure` state of `missing`. A caller who needs to avoid that keeps
+the dependent's deadline under `CLEANER_DELAY`, so it cannot still be queued
+when the dependency is swept.
 
 ### agentdependency
 
@@ -1016,11 +1060,18 @@ list. It is a JSON dictionary with the following fields:
 
 * op_uuid (string, required): the UUID of the agent operation this one waits
   for. It must already exist, and must be in a namespace you can read.
-* settle_seconds (number): wait this many seconds after the named operation
-  finished before treating this edge as satisfied, for a caller whose next step
-  needs the guest to settle after whatever the dependency changed. Omit it to be
-  satisfied immediately. It may not be negative, and is capped by the same
-  operator ceiling as `deadline_seconds`, `AGENT_OPERATION_MAX_DEADLINE`.
+* settle_seconds (number): wait this long before treating this edge as
+  satisfied, for a caller whose next step needs the guest to settle after
+  whatever the dependency changed. Omit it to be satisfied immediately. The
+  delay is not exact. It is measured by the dispatcher, which looks at a
+  waiting operation every `DISPATCH_CHECK_INTERVAL` (5 seconds), from the first
+  pass which found the operation blocked on a dependency, so it can be satisfied
+  up to one interval after the dependency finished, and a dependency which was
+  still running when that first pass happened has already used some of the
+  delay by the time it finishes. It may not be negative, and may not exceed the
+  operator's dependency wait budget, `AGENT_OPERATION_DEPENDENCY_WAIT` (300
+  seconds by default), because a longer delay could never elapse before the
+  budget aborted the operation. A request over the ceiling is refused with a 400.
 
 ### Fetching information about an Instance's Agent Operations
 

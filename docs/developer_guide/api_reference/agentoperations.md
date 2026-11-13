@@ -4,6 +4,13 @@ Since v0.7, when an instance is running the Shaken Fist agent, you can queue age
 operations to run on that instance. These operations consist of a series of commands
 which are executed in return, with results for each being gathered as they execute.
 
+An operation which declared a `depends_on` edge also carries `dependency_failure`,
+which is `null` unless that edge caused it to be aborted. It then holds
+`op_type`, `op_uuid` and `state` for the dependency responsible, where `state` is
+the dependency's state or the string `missing` if it no longer exists. See
+[declaring dependencies between agent operations](/developer_guide/api_reference/instances/#declaring-dependencies-between-agent-operations)
+for when that happens.
+
 An operation also carries timing fields: `deadline` and `progress_timeout` are the
 caller's intent, and `last_progress`, `attempts` and `expiry_reason` are the
 server's bookkeeping. `expiry_reason` is `null` unless the operation reached the
@@ -59,6 +66,7 @@ agent operations for a given instance, refer to the [instances API documentation
             }
         ],
         "deadline": 1787428090.5,
+        "dependency_failure": null,
         "depends_on": [],
         "expiry_reason": null,
         "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",

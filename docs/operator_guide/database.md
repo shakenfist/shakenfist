@@ -1422,7 +1422,7 @@ dedicated attribute tables:
 | `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
 | `network_interface_attributes` | NetworkInterface | uuid, floating_address |
 | `network_attributes` | Network | uuid, floating_gateway, hosteddns (JSON dict) |
-| `agent_operation_attributes` | AgentOperation | uuid, results (JSON dict), last_progress (nullable), attempts, expiry_reason (nullable), dependency_failure (nullable JSON dict) |
+| `agent_operation_attributes` | AgentOperation | uuid, results (JSON dict), last_progress (nullable), attempts, expiry_reason (nullable), dependency_failure (nullable JSON dict), dependency_wait_started (nullable) |
 | `instance_attributes` | Instance | uuid, placement (JSON), power_state (JSON), ports (JSON), enforced_deletes (JSON), block_devices (JSON), agent_state (JSON), agent_attributes (JSON), agent_operations (JSON), kvm_pid, error_message, vsock_cids (JSON dict) |
 
 Node attributes consolidate observed state, roles, daemons and versions
@@ -1486,9 +1486,13 @@ is `null` when the caller asked for no settle delay. A reader should still
 treat an absent `settle_seconds` as `null`, since a row this API did not
 write -- a hand-edited one -- can lack the key. `dependency_failure` is NULL
 unless a `depends_on` dependency failed and caused this operation to be
-aborted. Nothing evaluates an edge or writes `dependency_failure` yet: an
-operation created with edges is dispatched exactly as one created without.
-See
+aborted, and it is the sidechannel dispatcher which writes it when the
+operation reaches the head of its instance's queue. `dependency_wait_started`
+is NULL for an operation which was never blocked on a dependency, and
+otherwise the wall-clock time of the first dispatcher pass which found it
+blocked. It is written once and never updated, because it anchors the
+`AGENT_OPERATION_DEPENDENCY_WAIT` budget and a second write would restart it,
+and it is not part of the API view. See
 [the API reference](../developer_guide/api_reference/instances.md#agentdependency)
 for the shape a caller sends and for what the two columns mean.
 

@@ -387,10 +387,9 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
     # ------------------------------------------------------------------
     # Dependency edges.
     #
-    # Nothing evaluates an edge yet, so what these pin is the API
-    # contract: what is stored, what is refused, and -- the part a later
-    # reader is most likely to "tidy" -- that every refusal says the same
-    # thing.
+    # What these pin is the API contract, not evaluation: what is
+    # stored, what is refused, and -- the part a later reader is most
+    # likely to "tidy" -- that every refusal says the same thing.
 
     def _edge(self, operation, **extra):
         edge = {'op_uuid': str(operation.uuid)}

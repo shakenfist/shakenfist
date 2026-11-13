@@ -45,10 +45,12 @@ have not yet aged out.
   Operation itself failed, and `expired`, which means a timing budget
   the caller set ran out. Like `expired`, and unlike `error`, an aborted
   operation is swept for hard deletion, because `abort` is one of
-  `constants.FINAL_OBJECT_STATES`. Nothing moves an operation into this
-  state yet: an operation records the dependencies it was created with,
-  but those are not evaluated when it is dispatched, so the state is
-  defined and reachable by the state machine rather than produced.
+  `constants.FINAL_OBJECT_STATES`. The sidechannel dispatcher moves an
+  operation into this state, and nothing else does: when an operation
+  reaches the head of its instance's queue the dispatcher evaluates its
+  `depends_on` edges, and aborts it instead of running it if a dependency
+  failed, is gone, or has not finished within
+  `AGENT_OPERATION_DEPENDENCY_WAIT`.
 
 The `executing --> queued` edge is a retry of a stalled attempt, not a
 failure: it fires when the executor made no progress rather than when it

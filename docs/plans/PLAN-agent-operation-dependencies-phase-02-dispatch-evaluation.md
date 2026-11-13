@@ -762,3 +762,17 @@ found a non-existent method, an unshipped decision, a misnamed test
 module and now five false statements. It should be a step of its own in
 the next phase's plan rather than something the management session
 remembers to do.
+
+**Step 2f documented the two ambiguities in the API reference, not in a
+developer guide page.** `docs/developer_guide/agent_operations.md` is
+phase 4's deliverable, so the lazy cascade and the swept dependency sit
+in `docs/developer_guide/api_reference/instances.md` under "Declaring
+dependencies between agent operations", where the dependency parameters
+are documented. **Phase 4 is to move both paragraphs** into the new
+page and leave a link behind, so each stays in exactly one place.
+
+Step 2f also found that decision 6's wording is not what the code does:
+the settle clock is the wait anchor, set at the first dispatcher pass
+which finds the operation blocked on anything, so a dependency still
+running at that pass has already used part of the delay when it
+finishes. The API reference states what the code does.

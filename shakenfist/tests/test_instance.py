@@ -2817,13 +2817,13 @@ class AgentOperationDeadlineTestCase(base.ShakenFistTestCase):
 class AgentOperationDependencyTestCase(base.ShakenFistTestCase):
     """The dependency edges an operation carries.
 
-    Nothing evaluates an edge yet, so these tests are about storage,
-    retrieval and the external view, and about where the type checking
-    lives. The edge lists are validated on the schema model rather than
-    at the API layer, so a bad edge is refused when a row is read back
-    as well as when it is written, and that is what the two refusal
-    tests here demonstrate through an object layer which adds no
-    checking of its own.
+    These tests are about storage, retrieval and the external view, and
+    about where the type checking lives, not about evaluation. The
+    edge lists are validated on the schema model rather than at the
+    API layer, so a bad edge is refused when a row is read back as well
+    as when it is written, and that is what the two refusal tests here
+    demonstrate through an object layer which adds no checking of its
+    own.
     """
 
     def setUp(self):
