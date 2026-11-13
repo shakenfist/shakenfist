@@ -154,13 +154,27 @@ MUTANTS = [
      "                return False, 'dependency is missing'",
      r'test_daemon_sidechannel_dependencies',
      'test_a_missing_dependency_cascades_as_missing'),
-    ('depends_on budget comparison', SIDECHANNEL,
-     "                if time.time() - anchor > budget:\n"
+    # The comparison itself now lives in _wait_budget_spent() and is
+    # mutated below; what this one breaks is the depends_on pending
+    # arm's use of it, so an operation parked behind a dependency which
+    # never finishes holds its instance's queue head forever. The
+    # comment line is part of the anchor because the runs_after walk's
+    # pending arm is otherwise identical, and a mutation set which
+    # silently hits the other walk proves nothing about this one.
+    ('depends_on wait is unbounded', SIDECHANNEL,
+     "                if self._wait_budget_spent(agentop, budget):\n"
      "                    # The analogue of the cluster side's",
-     "                if time.time() - anchor < budget:\n"
+     "                if False:\n"
      "                    # The analogue of the cluster side's",
      r'test_daemon_sidechannel_dependencies',
      'test_a_wait_past_the_budget_cascades'),
+    ('runs_after wait is unbounded', SIDECHANNEL,
+     "                if self._wait_budget_spent(agentop, budget):\n"
+     "                    # Ordering again: a missing runs_after edge already",
+     "                if False:\n"
+     "                    # Ordering again: a missing runs_after edge already",
+     r'test_daemon_sidechannel_dependencies',
+     'test_a_runs_after_wait_past_the_budget_dispatches'),
     ('settle comparison', SIDECHANNEL,
      "        if time.time() - finished >= settle:\n"
      "            return SETTLE_SATISFIED",
@@ -174,20 +188,125 @@ MUTANTS = [
     # no delay at all -- the whole parameter, silently absent, for the
     # commonest shape of dependency there is.
     ('settle anchored on the wait', SIDECHANNEL,
-     "        if time.time() - finished >= settle:",
-     "        if time.time() - anchor >= settle:",
+     "        finished = self._dependency_finished_at(dep, dep_state)",
+     "        finished = agentop.note_dependency_wait_started()",
      r'test_daemon_sidechannel_dependencies',
      'test_a_settle_does_not_run_down_while_the_dependency_does'),
-    # The settle's own exhaustion check, which is measured from the wait
-    # anchor because it bounds how long the queue head is held, not how
-    # long the guest has been quiet.
-    ('settle budget comparison', SIDECHANNEL,
-     "        if time.time() - anchor > budget:\n"
+    # The settle's own exhaustion check. It is measured from the wait
+    # anchor, because that is what bounds how long the queue head is
+    # held, but extended by the declared settle: the two clocks have
+    # different origins, so without the extension a settle inside the
+    # API's ceiling is still unsatisfiable whenever the dependency took
+    # any time at all to finish.
+    ('settle bound drops the settle', SIDECHANNEL,
+     "        if self._wait_budget_spent(agentop, budget + settle):\n"
      "            return SETTLE_EXHAUSTED",
-     "        if time.time() - anchor < budget:\n"
+     "        if self._wait_budget_spent(agentop, budget):\n"
      "            return SETTLE_EXHAUSTED",
      r'test_daemon_sidechannel_dependencies',
-     'test_a_settle_which_outlives_the_budget_cascades'),
+     'test_a_settle_at_the_ceiling_survives_a_slow_dependency'),
+    ('settle budget comparison', SIDECHANNEL,
+     "        anchor = agentop.note_dependency_wait_started()\n"
+     "        return time.time() - anchor > budget",
+     "        anchor = agentop.note_dependency_wait_started()\n"
+     "        return time.time() - anchor < budget",
+     r'test_daemon_sidechannel_dependencies',
+     'test_a_wait_past_the_budget_cascades'),
+    # Writing the anchor before the settle is known not to have elapsed
+    # costs two round trips on a path about to succeed, and falsifies
+    # the column's documented meaning: this operation was never blocked.
+    ('anchor written for a spent settle', SIDECHANNEL,
+     "        finished = self._dependency_finished_at(dep, dep_state)\n"
+     "        if time.time() - finished >= settle:\n"
+     "            return SETTLE_SATISFIED",
+     "        agentop.note_dependency_wait_started()\n"
+     "        finished = self._dependency_finished_at(dep, dep_state)\n"
+     "        if time.time() - finished >= settle:\n"
+     "            return SETTLE_SATISFIED",
+     r'test_daemon_sidechannel_dependencies',
+     'test_an_elapsed_settle_does_not_write_the_anchor'),
+    # A read which failed and a row which is absent are the same None
+    # from mariadb.get_state(), and a depends_on edge acts irreversibly
+    # on absence. Conflating them lets one database blip abort every
+    # queued dependent on the node.
+    ('failed read reads as absent', SIDECHANNEL,
+     "        if not readable:\n"
+     "            return False, None",
+     "        if not readable:\n"
+     "            return True, None",
+     r'test_daemon_sidechannel_dependencies',
+     'test_an_unreadable_dependency_does_not_cascade'),
+    ('unreadable recorded as missing', SIDECHANNEL,
+     "                        agentop, dep, DEPENDENCY_UNREADABLE,\n"
+     "                        event=CASCADE_EVENT_GAVE_UP)\n"
+     "                    return False, 'gave up trying to read a dependency'",
+     "                        agentop, dep, DEPENDENCY_MISSING,\n"
+     "                        event=CASCADE_EVENT_GAVE_UP)\n"
+     "                    return False, 'gave up trying to read a dependency'",
+     r'test_daemon_sidechannel_dependencies',
+     'test_an_unreadable_dependency_past_the_budget_says_unreadable'),
+    ('unreadable runs_after proceeds', SIDECHANNEL,
+     "                return False, 'runs_after dependency state could not be read'",
+     "                continue",
+     r'test_daemon_sidechannel_dependencies',
+     'test_an_unreadable_runs_after_dependency_blocks'),
+    # Fail open on an unrecognised state is the one direction a fate
+    # sharing edge must never fail in, and the failure is silent.
+    ('unknown state satisfies depends_on', SIDECHANNEL,
+     "            if dep_state != AgentOperation.STATE_COMPLETE:",
+     "            if False:",
+     r'test_daemon_sidechannel_dependencies',
+     'test_an_unknown_dependency_state_blocks'),
+    ('unknown state satisfies runs_after', SIDECHANNEL,
+     "            if dep_state not in AgentOperation.TERMINAL_STATES:",
+     "            if False:",
+     r'test_daemon_sidechannel_dependencies',
+     'test_an_unknown_runs_after_state_blocks'),
+    # The derived classification test, which is what stops a state
+    # added later reaching either arm above unnoticed.
+    ('a state classified twice', SIDECHANNEL,
+     "DEPENDENCY_PENDING_STATES = (AgentOperation.STATE_INITIAL,",
+     "DEPENDENCY_PENDING_STATES = (AgentOperation.STATE_ERROR,\n"
+     "                             AgentOperation.STATE_INITIAL,",
+     r'test_daemon_sidechannel_dependencies',
+     'test_every_agent_operation_state_is_classified'),
+    # The only per-pass durable write either walk makes.
+    ('warning not deduplicated', SIDECHANNEL,
+     "        warned = (str(agentop.uuid), str(dep['op_uuid']), message)\n"
+     "        if warned in self.runs_after_warnings:\n"
+     "            return",
+     "        warned = (str(agentop.uuid), str(dep['op_uuid']), message)\n"
+     "        if False:\n"
+     "            return",
+     r'test_daemon_sidechannel_dependencies',
+     'test_a_repeated_runs_after_warning_is_audited_once'),
+    ('warning deduplicated per operation', SIDECHANNEL,
+     "        warned = (str(agentop.uuid), str(dep['op_uuid']), message)",
+     "        warned = (str(agentop.uuid), message)",
+     r'test_daemon_sidechannel_dependencies',
+     'test_a_second_runs_after_edge_warns_on_its_own_account'),
+    # A retry is a new tenant of the queue head. Left in place, the
+    # abandoned attempt's anchor is already past the budget.
+    ('retry keeps the wait anchor', SIDECHANNEL,
+     "    agentop.clear_dependency_wait()",
+     "    pass",
+     r'test_daemon_sidechannel_dependencies',
+     'test_a_requeue_clears_the_wait_anchor'),
+    # The dispatch seam. Evaluation is covered thoroughly in isolation;
+    # these two are the wiring, which is where a one line regression
+    # would not be seen by any test of the walk.
+    ('refused verdict dispatches anyway', SIDECHANNEL,
+     "                        if not dispatchable:",
+     "                        if False:",
+     r'test_daemon_sidechannel',
+     'test_a_refused_verdict_dispatches_nothing'),
+    ('superseded generation evaluates', SIDECHANNEL,
+     "                        if generation != self.dispatcher_generation:\n"
+     "                            # Replaced mid-pass (see above); the operation",
+     "                        if False:\n"
+     "                            # Replaced mid-pass (see above); the operation",
+     r'test_daemon_sidechannel',
+     'test_a_generation_replaced_mid_pass_never_evaluates'),
     # The two runs_after mutants make an ordering edge fate sharing,
     # which is the cluster side's refusal at
     # daemons/queues/workitem.py:175-210 reverted: an ordering hint

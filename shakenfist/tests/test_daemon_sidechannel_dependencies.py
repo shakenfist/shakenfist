@@ -5,6 +5,7 @@ import uuid
 from unittest import mock
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
+from shakenfist import constants
 from shakenfist.config import SFConfig
 from shakenfist.daemons.sidechannel import main as sidechannel
 from shakenfist import instance
@@ -29,7 +30,7 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
     than mocked state reads, because the walk's whole point is that it
     reads a dependency's state row and never the dependency itself --
     the read is the thing under test, so it is the real one. Counting it
-    is done through the mocked mariadb.get_state(), filtered by the
+    is done through the mocked mariadb.get_state_checked(), filtered by the
     dependency's uuid so the operation's own state reads do not inflate
     the count.
     """
@@ -64,12 +65,19 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
 
         self.daemon = sidechannel.Monitor.__new__(sidechannel.Monitor)
         self.daemon.terminal_dependency_cache = {}
+        self.daemon.runs_after_warnings = set()
 
     # Helpers.
-    def _agentop(self, states=None, depends_on=None, runs_after=None):
+    def _agentop(self, states=None, depends_on=None, runs_after=None,
+                 commands=None):
+        # execute by default, because that is what the dependency walk
+        # is usually asked about. A test about retries passes a
+        # retryable command instead: execute is not one, deliberately,
+        # since a second attempt would repeat a side effect the agent
+        # cannot take back.
         op = AgentOperation.new(
             str(uuid.uuid4()), 'unittest', self.instance_uuid,
-            [{'command': 'execute', 'commandline': 'true'}],
+            commands or [{'command': 'execute', 'commandline': 'true'}],
             depends_on=depends_on, runs_after=runs_after)
         # The state machine is enforced, so reaching a state means
         # walking to it rather than assigning it.
@@ -121,7 +129,7 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
             state, time.time() - seconds_ago)
 
     def _reads_of(self, op_uuid):
-        return [c for c in mariadb.get_state.call_args_list
+        return [c for c in mariadb.get_state_checked.call_args_list
                 if str(c.args[1]) == str(op_uuid)]
 
     # An operation which declared nothing.
@@ -134,13 +142,14 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
         # if away from being lost.
         agentop = self._agentop()
 
-        mariadb.get_state.reset_mock()
+        mariadb.get_state_checked.reset_mock()
         dispatchable, reason = self.daemon._dependencies_met(
             self.inst, agentop)
 
         self.assertTrue(dispatchable)
         self.assertIsNone(reason)
-        self.assertEqual([], mariadb.get_state.call_args_list)
+        self.assertEqual(
+            [], mariadb.get_state_checked.call_args_list)
 
     # depends_on, which is fate sharing.
     def test_a_complete_dependency_dispatches(self):
@@ -368,16 +377,18 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
             self.daemon._dependencies_met(self.inst, agentop)[0])
 
     def test_a_settle_which_outlives_the_budget_cascades(self):
-        # The API refuses a settle larger than the budget, so reaching
-        # this means an edge stored before that bound existed. Giving up
-        # is better than blocking on something which can never elapse.
+        # The bound on a settling operation is the budget plus the
+        # declared settle, so reaching this means a hold which outlived
+        # even that: a dependency observed finished after the budget had
+        # already run down, or a settle restarted often enough by a lost
+        # observation to outlast it. Giving up beats blocking forever.
         _, edge = self._dependency(
             states=[AgentOperation.STATE_QUEUED,
                     AgentOperation.STATE_EXECUTING,
                     BaseOperation.STATE_COMPLETE],
             settle_seconds=600)
         agentop = self._agentop(depends_on=[edge])
-        self._anchor(agentop, 301)
+        self._anchor(agentop, 901)
 
         dispatchable, reason = self.daemon._dependencies_met(
             self.inst, agentop)
@@ -514,13 +525,15 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
             self.daemon._dependencies_met(self.inst, agentop)[0])
 
     def test_a_runs_after_settle_which_outlives_the_budget_dispatches(self):
+        # Budget plus settle, as the depends_on case above; this walk
+        # warns and runs where that one aborts.
         _, edge = self._dependency(
             states=[AgentOperation.STATE_QUEUED,
                     AgentOperation.STATE_EXECUTING,
                     BaseOperation.STATE_COMPLETE],
             settle_seconds=600)
         agentop = self._agentop(runs_after=[edge])
-        self._anchor(agentop, 301)
+        self._anchor(agentop, 901)
 
         with mock.patch.object(sidechannel, 'add_event_multi') as mock_event:
             dispatchable, _ = self.daemon._dependencies_met(
@@ -539,7 +552,7 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
                     BaseOperation.STATE_COMPLETE])
         agentop = self._agentop(depends_on=[edge])
 
-        mariadb.get_state.reset_mock()
+        mariadb.get_state_checked.reset_mock()
         self.assertTrue(
             self.daemon._dependencies_met(self.inst, agentop)[0])
         self.assertEqual(1, len(self._reads_of(dep_op.uuid)))
@@ -563,7 +576,7 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
                                                 AgentOperation.STATE_EXECUTING])
         agentop = self._agentop(depends_on=[edge])
 
-        mariadb.get_state.reset_mock()
+        mariadb.get_state_checked.reset_mock()
         self.assertFalse(
             self.daemon._dependencies_met(self.inst, agentop)[0])
         self.assertFalse(
@@ -614,3 +627,425 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(8, self.daemon.dispatcher_generation)
         self.assertEqual({}, self.daemon.terminal_dependency_cache)
+
+    def test_a_new_dispatcher_generation_forgets_its_warnings(self):
+        # The same lifetime as the cache, and for the same reason: a
+        # replacement thread has not warned about anything yet.
+        self.daemon.dispatcher_generation = 7
+        self.daemon.dispatcher_thread = None
+        self.daemon.runs_after_warnings = {('op', 'dep', 'warning')}
+
+        with mock.patch.object(sidechannel.threading, 'Thread'):
+            self.daemon.start_dispatcher()
+
+        self.assertEqual(set(), self.daemon.runs_after_warnings)
+
+    # A read which failed says nothing, and must not be mistaken for an
+    # answer. Both of mariadb.get_state()'s backends return None when
+    # their transport fails, which is the same thing they return for a
+    # dependency which is genuinely gone -- so the walk reads through
+    # get_state_checked() instead, and these pin what it does with a
+    # failure.
+    def _unreadable(self):
+        return mock.patch.object(
+            mariadb, 'get_state_checked', return_value=(False, None))
+
+    def test_an_unreadable_dependency_does_not_cascade(self):
+        # The defect this guards against: an sf-database restart during
+        # one dispatch pass aborting every queued dependent on the node,
+        # permanently, with a dependency_failure naming a dependency
+        # which was alive the whole time.
+        dep_op, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING,
+                    BaseOperation.STATE_COMPLETE])
+        agentop = self._agentop(depends_on=[edge])
+
+        with self._unreadable():
+            dispatchable, reason = self.daemon._dependencies_met(
+                self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertIn('could not be read', reason)
+        self.assertEqual(AgentOperation.STATE_QUEUED, agentop.state.value)
+        self.assertIsNone(agentop.dependency_failure)
+        # And the dependency is readable again next pass, as a blip is.
+        self.assertTrue(
+            self.daemon._dependencies_met(self.inst, agentop)[0])
+        self.assertIsNotNone(dep_op)
+
+    def test_an_unreadable_dependency_past_the_budget_says_unreadable(self):
+        # Bounded like every other hold, and honest about why: a client
+        # which reads unreadable should look at the node's database
+        # connectivity, not at the chain it submitted.
+        _, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING,
+                    BaseOperation.STATE_COMPLETE])
+        agentop = self._agentop(depends_on=[edge])
+        self._anchor(agentop, 301)
+
+        with self._unreadable():
+            dispatchable, reason = self.daemon._dependencies_met(
+                self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertIn('gave up', reason)
+        self.assertEqual(BaseOperation.STATE_ABORT, agentop.state.value)
+        self.assertEqual(sidechannel.DEPENDENCY_UNREADABLE,
+                         agentop.dependency_failure['state'])
+
+    def test_an_unreadable_dependency_is_not_recorded_as_missing(self):
+        # The two sentinels say opposite things, so they must not be
+        # reachable from the same observation.
+        self.assertNotEqual(sidechannel.DEPENDENCY_MISSING,
+                            sidechannel.DEPENDENCY_UNREADABLE)
+
+    def test_an_unreadable_runs_after_dependency_blocks(self):
+        # An ordering edge may be warned past when its dependency is
+        # known to be gone, but not when nothing is known at all:
+        # dispatching then breaks exactly the ordering it asked for.
+        _, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING])
+        agentop = self._agentop(runs_after=[edge])
+
+        with self._unreadable():
+            with mock.patch.object(
+                    sidechannel, 'add_event_multi') as mock_event:
+                dispatchable, reason = self.daemon._dependencies_met(
+                    self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertIn('could not be read', reason)
+        mock_event.assert_not_called()
+
+    def test_an_unreadable_runs_after_past_the_budget_dispatches(self):
+        _, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING])
+        agentop = self._agentop(runs_after=[edge])
+        self._anchor(agentop, 301)
+
+        with self._unreadable():
+            with mock.patch.object(
+                    sidechannel, 'add_event_multi') as mock_event:
+                dispatchable, _ = self.daemon._dependencies_met(
+                    self.inst, agentop)
+
+        self.assertTrue(dispatchable)
+        self.assertIsNone(agentop.dependency_failure)
+        mock_event.assert_called_once()
+        self.assertIn('read', mock_event.call_args.args[2])
+
+    # The two clocks. The budget runs from the wait anchor and the
+    # settle from the dependency's observed finish, so the bound on a
+    # settling operation has to be the budget plus the settle or the
+    # API's ceiling buys nothing.
+    def test_a_settle_at_the_ceiling_survives_a_slow_dependency(self):
+        # Reachable, and the ordinary case rather than a corner: a
+        # dependency which ran for most of the budget and then finished.
+        # Measured against the budget alone this aborts on the first
+        # pass which could have started the settle.
+        dep_op, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING,
+                    BaseOperation.STATE_COMPLETE],
+            settle_seconds=300)
+        agentop = self._agentop(depends_on=[edge])
+        self._anchor(agentop, 301)
+        self._observed(dep_op.uuid, 1)
+
+        dispatchable, reason = self.daemon._dependencies_met(
+            self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertEqual('settling', reason)
+        self.assertEqual(AgentOperation.STATE_QUEUED, agentop.state.value)
+
+        # And it does elapse, rather than merely being deferred.
+        self._observed(dep_op.uuid, 301)
+        self.assertTrue(
+            self.daemon._dependencies_met(self.inst, agentop)[0])
+
+    def test_an_elapsed_settle_does_not_write_the_anchor(self):
+        # The column means "was blocked at least once", and an operation
+        # whose settle is already spent was not blocked by anything. It
+        # is also two database round trips on a path about to succeed.
+        dep_op, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING,
+                    BaseOperation.STATE_COMPLETE],
+            settle_seconds=10)
+        agentop = self._agentop(depends_on=[edge])
+        self._observed(dep_op.uuid, 60)
+
+        self.assertTrue(
+            self.daemon._dependencies_met(self.inst, agentop)[0])
+        self.assertIsNone(self._stored_anchor(agentop))
+
+    # A retry is a new tenant of the queue head, so it is owed the whole
+    # budget rather than what the abandoned attempt left of it.
+    def test_a_requeue_clears_the_wait_anchor(self):
+        agentop = self._agentop(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING],
+            commands=[{'command': 'get-file', 'path': '/etc/hostname'}])
+        self._anchor(agentop, 301)
+
+        requeued = sidechannel.resolve_abandoned_operation(
+            agentop, 'unittest abandoned it', mock.Mock())
+
+        self.assertTrue(requeued)
+        self.assertEqual(AgentOperation.STATE_QUEUED, agentop.state.value)
+        self.assertIsNone(self._stored_anchor(agentop))
+
+    def test_a_requeue_of_an_unblocked_operation_writes_nothing(self):
+        # Most retries are of operations with no edges at all, so the
+        # clear must not cost them a write.
+        agentop = self._agentop(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING],
+            commands=[{'command': 'get-file', 'path': '/etc/hostname'}])
+
+        with mock.patch.object(
+                mariadb, 'update_agent_operation_attributes') as mock_update:
+            agentop.clear_dependency_wait()
+
+        mock_update.assert_not_called()
+
+    def test_a_requeued_operation_is_not_aborted_for_the_old_wait(self):
+        # The defect: the stale anchor is already past the budget, so the
+        # first edge needing a settle whose observation this dispatcher
+        # no longer holds is abandoned on sight.
+        dep_op, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING,
+                    BaseOperation.STATE_COMPLETE],
+            settle_seconds=30)
+        agentop = self._agentop(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING],
+            depends_on=[edge],
+            commands=[{'command': 'get-file', 'path': '/etc/hostname'}])
+        self._anchor(agentop, 301)
+
+        self.assertTrue(sidechannel.resolve_abandoned_operation(
+            agentop, 'unittest abandoned it', mock.Mock()))
+        # A new generation, so nothing remembers the dependency finishing.
+        self.daemon.terminal_dependency_cache = {}
+
+        dispatchable, reason = self.daemon._dependencies_met(
+            self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertEqual('settling', reason)
+        self.assertEqual(AgentOperation.STATE_QUEUED, agentop.state.value)
+        self.assertIsNone(agentop.dependency_failure)
+        self.assertIsNotNone(dep_op)
+
+    # A state the evaluator does not recognise must not satisfy an edge.
+    # The three sets below enumerate AgentOperation's whole vocabulary
+    # today, and the test after them holds them to it, but a fall
+    # through would make a state added later fail open silently.
+    def test_every_agent_operation_state_is_classified(self):
+        classified = (set(sidechannel.DEPENDENCY_FAILED_STATES)
+                      | set(sidechannel.DEPENDENCY_PENDING_STATES)
+                      | {BaseOperation.STATE_COMPLETE})
+        vocabulary = {state for state in AgentOperation.state_targets
+                      if state is not None}
+
+        self.assertEqual(
+            set(), vocabulary - classified,
+            'a state no arm of the dependency walk classifies')
+        self.assertEqual(
+            set(), classified - vocabulary,
+            'the walk classifies a state no operation can hold')
+        self.assertEqual(
+            len(sidechannel.DEPENDENCY_FAILED_STATES)
+            + len(sidechannel.DEPENDENCY_PENDING_STATES) + 1,
+            len(classified), 'a state is classified twice')
+
+    def test_an_unknown_dependency_state_blocks(self):
+        _, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING,
+                    BaseOperation.STATE_COMPLETE])
+        agentop = self._agentop(depends_on=[edge])
+
+        with mock.patch.object(self.daemon, '_dependency_state',
+                               return_value=(True, 'invented-later')):
+            dispatchable, reason = self.daemon._dependencies_met(
+                self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertIn('unknown', reason)
+        self.assertEqual(AgentOperation.STATE_QUEUED, agentop.state.value)
+
+    def test_an_unknown_dependency_state_past_the_budget_cascades(self):
+        _, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING,
+                    BaseOperation.STATE_COMPLETE])
+        agentop = self._agentop(depends_on=[edge])
+        self._anchor(agentop, 301)
+
+        with mock.patch.object(self.daemon, '_dependency_state',
+                               return_value=(True, 'invented-later')):
+            dispatchable, reason = self.daemon._dependencies_met(
+                self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertIn('gave up', reason)
+        self.assertEqual(BaseOperation.STATE_ABORT, agentop.state.value)
+        self.assertEqual('invented-later',
+                         agentop.dependency_failure['state'])
+
+    def test_an_unknown_runs_after_state_blocks(self):
+        _, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING,
+                    BaseOperation.STATE_COMPLETE])
+        agentop = self._agentop(runs_after=[edge])
+
+        with mock.patch.object(self.daemon, '_dependency_state',
+                               return_value=(True, 'invented-later')):
+            dispatchable, reason = self.daemon._dependencies_met(
+                self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertIn('unknown', reason)
+        self.assertIsNone(agentop.dependency_failure)
+
+    # The only per-pass database write either walk makes.
+    def test_a_repeated_runs_after_warning_is_audited_once(self):
+        # The shape which does this: a missing edge in front of a
+        # blocking one, re-walked from the start every pass. Sixty
+        # durable event rows over one budget, left alone.
+        _, blocking = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING])
+        agentop = self._agentop(
+            runs_after=[self._missing_edge(), blocking])
+
+        with mock.patch.object(sidechannel, 'add_event_multi') as mock_event:
+            for _ in range(5):
+                self.assertFalse(
+                    self.daemon._dependencies_met(self.inst, agentop)[0])
+
+        mock_event.assert_called_once()
+
+    def test_a_second_runs_after_edge_warns_on_its_own_account(self):
+        # Deduplicated per edge, not per operation: two gone edges are
+        # two findings an operator should see.
+        agentop = self._agentop(
+            runs_after=[self._missing_edge(), self._missing_edge()])
+
+        with mock.patch.object(sidechannel, 'add_event_multi') as mock_event:
+            self.assertTrue(
+                self.daemon._dependencies_met(self.inst, agentop)[0])
+
+        self.assertEqual(2, mock_event.call_count)
+
+
+class SidechannelDispatchSeamTestCase(base.ShakenFistTestCase):
+    """How _dispatch_loop() uses the verdict _dependencies_met() returns.
+
+    The walk itself is covered above. What is covered here is the seam:
+    a refused verdict must stop the dispatch and the audit event which
+    claims one, and a superseded generation must not reach the walk at
+    all, because the walk writes. Both are one line from being wrong in
+    a way no test of the walk could see.
+
+    One pass is driven by letting check_abort_path() answer True once.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.daemon = sidechannel.Monitor.__new__(sidechannel.Monitor)
+        self.daemon.abort_path = '/a/b/abort'
+        self.daemon.dispatcher_generation = 3
+        self.daemon.dispatcher_last_pass = 0
+        self.daemon.executors = {}
+        self.daemon.executor_attempts = {}
+
+        self.instance_uuid = str(uuid.uuid4())
+        monitor = mock.Mock()
+        monitor.instance_ready = constants.AGENT_READY
+        self.daemon.monitors = {self.instance_uuid: {'object': monitor}}
+
+        self.agentop = mock.Mock()
+        self.agentop.uuid = str(uuid.uuid4())
+        self.inst = mock.Mock()
+        self.inst.uuid = self.instance_uuid
+        self.inst.agent_operation_next.return_value = self.agentop
+
+        for target, kwargs in (
+                ('shakenfist.daemons.sidechannel.main.daemon.'
+                 'check_abort_path', {'side_effect': [True, False]}),
+                ('shakenfist.daemons.sidechannel.main.util_concurrency.'
+                 'set_thread_name', {}),
+                ('shakenfist.daemons.sidechannel.main.instance.Instance.'
+                 'from_db', {'return_value': self.inst}),
+                ('shakenfist.daemons.sidechannel.main.time.sleep', {})):
+            p = mock.patch(target, **kwargs)
+            p.start()
+            self.addCleanup(p.stop)
+
+        for name in ('reap_instance_executors', 'start_instance_executor'):
+            p = mock.patch.object(self.daemon, name)
+            setattr(self, f'mock_{name}', p.start())
+            self.addCleanup(p.stop)
+
+    def test_a_refused_verdict_dispatches_nothing(self):
+        with mock.patch.object(self.daemon, '_dependencies_met',
+                               return_value=(False, 'settling')) as mock_met:
+            self.daemon._dispatch_loop(3)
+
+        mock_met.assert_called_once_with(self.inst, self.agentop)
+        self.mock_start_instance_executor.assert_not_called()
+        # The event claims a dispatch, so a blocked operation must not
+        # emit it: an operator counting these would otherwise read one
+        # dispatch every DISPATCH_CHECK_INTERVAL for a parked operation.
+        self.inst.add_event.assert_not_called()
+
+    def test_a_met_verdict_dispatches(self):
+        with mock.patch.object(self.daemon, '_dependencies_met',
+                               return_value=(True, None)):
+            self.daemon._dispatch_loop(3)
+
+        self.mock_start_instance_executor.assert_called_once_with(
+            self.instance_uuid, self.agentop)
+        self.inst.add_event.assert_called_once()
+        self.assertIn('dispatching', self.inst.add_event.call_args.args[1])
+
+    def test_a_superseded_generation_never_evaluates(self):
+        # The plan's own stated risk. Evaluation writes -- a cascade is
+        # a terminal transition and a first block records the budget
+        # anchor -- so a thread which has been replaced must not reach
+        # it, not merely refrain from dispatching afterwards.
+        self.daemon.dispatcher_generation = 4
+
+        with mock.patch.object(self.daemon, '_dependencies_met') as mock_met:
+            self.daemon._dispatch_loop(3)
+
+        mock_met.assert_not_called()
+        self.mock_start_instance_executor.assert_not_called()
+
+    def test_a_generation_replaced_mid_pass_never_evaluates(self):
+        # The same check, reached the other way: the generation moved
+        # after this pass began, which is the race the second check in
+        # the loop exists for.
+        def supersede(_uuid):
+            self.daemon.dispatcher_generation = 4
+            return self.inst
+
+        with mock.patch(
+                'shakenfist.daemons.sidechannel.main.instance.Instance.'
+                'from_db', side_effect=supersede):
+            with mock.patch.object(
+                    self.daemon, '_dependencies_met') as mock_met:
+                self.daemon._dispatch_loop(3)
+
+        mock_met.assert_not_called()
+        self.mock_start_instance_executor.assert_not_called()

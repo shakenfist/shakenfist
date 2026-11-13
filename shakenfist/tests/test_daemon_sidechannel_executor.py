@@ -69,6 +69,7 @@ class _FakeAgentOp:
         self._deadline_passed = deadline_passed
         self.results = {'0': {'content_blob': 'an-abandoned-blob'}}
         self.results_cleared = False
+        self.dependency_wait_cleared = False
 
     # The real state is a State object read as .value and assigned as a
     # bare string, so the fake accepts a string and reads back as an
@@ -106,6 +107,9 @@ class _FakeAgentOp:
     def clear_results(self):
         self.results = {}
         self.results_cleared = True
+
+    def clear_dependency_wait(self):
+        self.dependency_wait_cleared = True
 
     def record_attempt(self):
         self.attempts += 1
@@ -1512,6 +1516,11 @@ class ExecutorRetryTestCase(base.ShakenFistTestCase):
         # content_blob from an attempt which never finished.
         self.assertTrue(agentop.results_cleared)
         self.assertEqual({}, agentop.results)
+
+        # The retry is a new tenant of its instance's queue head, so it
+        # is owed the whole dependency wait budget rather than what the
+        # abandoned attempt left of it.
+        self.assertTrue(agentop.dependency_wait_cleared)
 
         # One audit event, carrying why and which attempt.
         event.assert_called_once()

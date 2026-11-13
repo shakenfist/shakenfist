@@ -258,9 +258,12 @@ If that happens:
   is counted from the first dispatcher pass which found the operation
   blocked, in wall-clock time, so how often the dispatcher looks does
   not change it. It is also the ceiling on a per-edge `settle_seconds`,
-  because a longer settle could never elapse before the budget aborted
-  the operation, and a caller is refused with a 400 when they ask
-  rather than five minutes later. The wait contains the dependency's
+  because the dispatcher adds a declared settle to the budget once the
+  dependency has been seen to finish: an operation with a settle can
+  hold the queue head for the budget plus the settle, and capping the
+  settle at the budget caps that hold at twice it. A caller over the
+  ceiling is refused with a 400 when they ask rather than five minutes
+  later. The wait contains the dependency's
   own queue time as well as its execution, so a chain several hops deep
   against a busy instance can legitimately exceed the default. The
   trade-off is that a blocked operation keeps its place in its

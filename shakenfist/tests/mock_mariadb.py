@@ -198,6 +198,12 @@ class MockMariaDB():
         self.mariadb_get_state.start()
         self.test_obj.addCleanup(self.mariadb_get_state.stop)
 
+        self.mariadb_get_state_checked = mock.patch(
+            'shakenfist.mariadb.get_state_checked',
+            side_effect=self._mariadb_get_state_checked)
+        self.mariadb_get_state_checked.start()
+        self.test_obj.addCleanup(self.mariadb_get_state_checked.stop)
+
         self.mariadb_set_state = mock.patch(
             'shakenfist.mariadb.set_state',
             side_effect=self._mariadb_set_state)
@@ -1289,6 +1295,17 @@ class MockMariaDB():
             )
         self._trace(f'MockMariaDB.get_state({key}): None')
         return None
+
+    def _mariadb_get_state_checked(
+            self, object_type: ObjectType,
+            object_uuid: str) -> tuple[bool, Optional[State]]:
+        """Mock implementation of mariadb.get_state_checked().
+
+        The real one reports whether the read itself worked. Nothing in
+        this mock can fail a read, so it always answers that it did; a
+        test which wants a failed read patches this.
+        """
+        return True, self._mariadb_get_state(object_type, object_uuid)
 
     def _mariadb_set_state(self, object_type: ObjectType, object_uuid: str,
                            state: State) -> bool:

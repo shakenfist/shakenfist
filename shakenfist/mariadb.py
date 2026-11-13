@@ -4375,6 +4375,16 @@ def _direct_get_state(object_type: ObjectType, object_uuid: str) -> Optional[Sta
 
     This is the direct access version used by the database daemon.
     """
+    return _direct_get_state_checked(object_type, object_uuid)[1]
+
+
+def _direct_get_state_checked(
+        object_type: ObjectType,
+        object_uuid: str) -> tuple[bool, Optional[State]]:
+    """Read state directly from MariaDB, reporting whether the read worked.
+
+    This is the direct access version used by the database daemon.
+    """
     engine = _get_engine()
     table = _get_object_states_table()
 
@@ -4389,16 +4399,16 @@ def _direct_get_state(object_type: ObjectType, object_uuid: str) -> Optional[Sta
             result = conn.execute(stmt).fetchone()
 
             if result is None:
-                return None
+                return True, None
 
-            return State(
+            return True, State(
                 value=result.state_value,
                 update_time=result.update_time,
                 message=result.message
             )
     except OperationalError as e:
         LOG.warning(f'MariaDB read failed for {object_type}/{object_uuid}: {e}')
-        return None
+        return False, None
 
 
 # MariaDB errno values where the server explicitly asks the client to
@@ -4651,6 +4661,18 @@ def _direct_count_objects_by_state(object_type: ObjectType,
 
 def _grpc_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:
     """Read state for an object via the database microservice."""
+    return _grpc_get_state_checked(object_type, object_uuid)[1]
+
+
+def _grpc_get_state_checked(
+        object_type: ObjectType,
+        object_uuid: str) -> tuple[bool, Optional[State]]:
+    """Read state via the microservice, reporting whether the read worked.
+
+    The reply's found flag is what separates a confirmed absent row from
+    a failed call, which is why it is returned rather than folded into a
+    None state as _grpc_get_state() does.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.GetObjectStateRequest(
@@ -4660,8 +4682,8 @@ def _grpc_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State
         )
         reply = _grpc_call(stub.GetObjectState, request)
         if not reply.found:
-            return None
-        return State(
+            return True, None
+        return True, State(
             value=reply.state_value if reply.state_value else None,
             update_time=reply.update_time,
             message=reply.message if reply.message else None
@@ -4669,7 +4691,7 @@ def _grpc_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State
     except grpc.RpcError as e:
         LOG.error(
             f'gRPC GetObjectState failed for {object_type}/{object_uuid}: {e}')
-        return None
+        return False, None
 
 
 def _grpc_set_state(object_type: ObjectType, object_uuid: str, state: State) -> bool:
@@ -5049,6 +5071,32 @@ def get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:
     if _use_database_service():
         return _grpc_get_state(object_type, object_uuid)
     return _direct_get_state(object_type, object_uuid)
+
+
+def get_state_checked(
+        object_type: ObjectType,
+        object_uuid: str) -> tuple[bool, Optional[State]]:
+    """Read state for an object, reporting whether the read itself worked.
+
+    get_state() returns None for two different facts -- there is no
+    state row for this object, and the read failed -- because both
+    backends catch their transport error and return None. A caller which
+    acts irreversibly on absence cannot use that: it would treat an
+    sf-database restart or a wedged subchannel as proof that an object
+    is gone.
+
+    Args:
+        object_type: The type of object.
+        object_uuid: The UUID of the object.
+
+    Returns:
+        (True, State) when a state row was read, (True, None) when the
+        read succeeded and there is no such row, and (False, None) when
+        the read failed and nothing can be concluded about the row.
+    """
+    if _use_database_service():
+        return _grpc_get_state_checked(object_type, object_uuid)
+    return _direct_get_state_checked(object_type, object_uuid)
 
 
 def set_state(object_type: ObjectType, object_uuid: str, state: State) -> bool:

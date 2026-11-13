@@ -1490,9 +1490,11 @@ aborted, and it is the sidechannel dispatcher which writes it when the
 operation reaches the head of its instance's queue. `dependency_wait_started`
 is NULL for an operation which was never blocked on a dependency, and
 otherwise the wall-clock time of the first dispatcher pass which found it
-blocked. It is written once and never updated, because it anchors the
-`AGENT_OPERATION_DEPENDENCY_WAIT` budget and a second write would restart it,
-and it is not part of the API view. See
+blocked. It is never moved forward while one attempt is being evaluated,
+because it anchors the `AGENT_OPERATION_DEPENDENCY_WAIT` budget and a second
+write would restart it, but it is cleared back to NULL when a retry requeues
+the operation, so the next attempt is allowed the whole budget. It is not
+part of the API view. See
 [the API reference](../developer_guide/api_reference/instances.md#agentdependency)
 for the shape a caller sends and for what the two columns mean.
 

@@ -700,15 +700,17 @@ def agent_operation_dependencies(depends_on, runs_after, caller_namespace):
             # properties of the value rather than of the deployment.
             #
             # The ceiling is the dependency wait budget rather than the
-            # timing parameters' one, because a settle is spent inside that
-            # budget: the wait clock starts when an operation is first found
-            # blocked and a settle delay is part of what it is waiting for,
-            # so a settle larger than the budget can never elapse -- the
-            # operation is aborted first, every time. Accepting such a value
-            # would mean the request succeeded and then failed five minutes
-            # later with an abort which reads like a dependency problem
-            # rather than the parameter mistake it is, so it is refused where
-            # the caller is still listening.
+            # timing parameters' one, because a settle delay extends how long
+            # an operation may hold the head of its instance's queue. The
+            # budget bounds the wait, and the dispatcher adds the declared
+            # settle to it once the dependency has been seen to finish, so
+            # the hold is at most the budget plus the settle. Capping the
+            # settle at the budget is what keeps that at twice the budget
+            # instead of at whatever a caller asked for -- and the cost of
+            # one caller's settle is paid by every operation queued behind it
+            # on that instance, which is why it is refused here, where the
+            # caller is still listening, rather than charged to somebody else
+            # minutes later.
             if (dependency.settle_seconds is not None
                     and dependency.settle_seconds
                     > config.AGENT_OPERATION_DEPENDENCY_WAIT):
@@ -1129,9 +1131,10 @@ AGENTDEPENDENCYSPEC_SCHEMA: dict[str, Any] = {
         'settle_seconds': {
             'type': 'number',
             # A duration, so no negative, and the operator ceiling is the
-            # dependency wait budget: a settle is spent inside that budget,
-            # so a larger one could never elapse before the budget aborted
-            # the operation. This has to be the same bound
+            # dependency wait budget, because a settle extends how long an
+            # operation may hold its instance's queue head to the budget plus
+            # the settle, so capping the settle at the budget caps that hold
+            # at twice the budget. This has to be the same bound
             # agent_operation_dependencies() refuses against, because this
             # is what the published specification says and that is what
             # actually answers 400.

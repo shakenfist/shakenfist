@@ -446,11 +446,19 @@ An item that cannot be checked is reported as such, not ticked.
   returns 2 and always has, because the function also holds the
   create-if-absent gate `if current_ver <= 0:`; step 2a found this
   criterion written with the looser pattern, so it could never pass.
-- `dependency_wait_started` has exactly one writer. Check: `grep -rn
+- `dependency_wait_started` has exactly two writers, and both are
+  methods of `AgentOperation`: `note_dependency_wait_started()` sets
+  the anchor and `clear_dependency_wait()` returns it to NULL when a
+  retry requeues the operation. Check: `grep -rn
   'dependency_wait_started' --include=*.py shakenfist/ | grep -v
   tests | grep -v _pb2` shows the schema field, the mariadb layers,
-  the proto conversion and `note_dependency_wait_started` -- and no
-  other assignment.
+  the proto conversion and those two methods -- and no other
+  assignment. This criterion said "exactly one writer" when the phase
+  was planned, which the first review round on the pull request showed
+  to be the wrong invariant rather than a satisfied one: an anchor
+  which is never cleared survives a retry, and the next attempt is
+  then evaluated against a budget the abandoned attempt already
+  spent.
 - The three landmarks appear in this order in the dispatch pass:
   `agent_operation_next(`, the `dispatcher_generation` comparison,
   `_dependencies_met(`, `'dispatching agent operation'`,
@@ -481,7 +489,11 @@ An item that cannot be checked is reported as such, not ticked.
 - `tools/mutate-agent-dependencies.py` kills every mutant, run
   serially, and the report names the test that failed for each.
   Phase 1 left the set at 10; this phase adds 10, so a report of
-  fewer than 20 is a failed criterion.
+  fewer than 20 is a failed criterion. The first review round on the
+  pull request took it to 36. A report which skips a mutant counts as a
+  failure and not a pass: an anchor a later change has moved means the
+  guard is no longer being tested, which is what the script's SKIP is
+  for.
 - `shakenfist/data/database_load_budget.yaml` is unchanged. Check:
   `git diff develop -- shakenfist/data/database_load_budget.yaml` is
   empty. This is the inverse of what the master plan asked for, and
@@ -823,3 +835,123 @@ and fails on the old measurement with exactly the right complaint. The
 mutation set gained the inverse of the defect as a mutant -- anchor the
 settle on the wait -- plus one for the settle's own exhaustion check,
 taking it to 22.
+
+### Review round 1 on the pull request, 2026-11-13 (AEDT)
+
+The automated reviewer raised 3 fix, 2 document, 5 consider and 2
+informational items on `34cfc894`. All three fix items and both
+document items were taken, along with four of the five considers; the
+fifth is recorded under *Future work* below. Three of the items are
+worth recording here because each one is a defect this plan's own
+reasoning led to, rather than a slip in a step.
+
+**A failed state read was indistinguishable from an absent one.**
+Decision 2 reasons that an absent `depends_on` dependency can be
+treated as a failure because only the hard-delete sweep removes a
+state row. That is a fact about the database, and the evaluator was
+applying it to a *read* of the database: both of `mariadb.get_state()`'s
+backends catch their transport error and return `None`, the same answer
+they give for a row which is genuinely gone. So one sf-database
+restart, or one wedged gRPC subchannel, during a dispatch pass would
+have cascaded every queued dependent on that node to `abort` --
+terminal, irreversible, and recorded as `state: 'missing'` about a
+dependency which was alive the whole time. The dispatch loop's own
+docstring records that its thread-local channel can wedge and burn
+ninety seconds, so this was not hypothetical.
+
+The fix is at the source rather than at the caller. `get_state()` keeps
+its signature and a new `get_state_checked()` returns
+`(readable, state)`, which needed no schema or proto change because
+`GetObjectStateReply` already carries the `found` flag the old wrapper
+discarded. An unreadable dependency is now held rather than judged,
+bounded by the same budget as any other hold, and `dependency_failure`
+gained a second non-state sentinel, `unreadable`, so a client can tell
+a node which could not reach its database from a chain which really
+did lose a dependency.
+
+**The lowered settle ceiling had stopped guaranteeing anything.**
+Decision 4 lowered `settle_seconds`' API ceiling to
+`AGENT_OPERATION_DEPENDENCY_WAIT`, arguing that a settle is spent
+inside that budget. That was true while the settle ran from the wait
+anchor. The settle fix in `34cfc894` moved the settle onto the
+dependency's observed finish and left the budget on the anchor, which
+is correct, and in doing so gave the two clocks different origins --
+so the ceiling bought nothing. A dependency observed finished N
+seconds after the anchor left only `budget - N` for the settle, which
+makes a settle at the ceiling, a value the API explicitly accepts,
+certain to be abandoned whenever N was above zero. The commonest shape
+of all -- wait for a dependency to run, then settle -- was the shape it
+failed on, which is the same accusation the settle fix itself answered,
+one layer up.
+
+The bound on a settling operation is now `budget + settle`. The anchor
+still cannot restart, so it still terminates; a declared settle inside
+the ceiling can now always elapse, which is the guarantee decision 4
+exists to provide; and the ceiling's reason changes from "a longer
+settle could never elapse" to "a settle extends how long one caller
+may hold the queue head, so capping it at the budget caps that hold at
+twice the budget". That argument was stated in four places -- the
+option's help, the API refusal, the published schema and the operator
+guide -- and all four were corrected.
+
+**The wait anchor outlived the attempt it belonged to.** Decision 11
+considered the retry interaction and concluded there was none, having
+reasoned about reaching `abort` *from* the retry path. It did not
+reason about a requeued operation re-entering the evaluator: the
+anchor is written once and `resolve_abandoned_operation()` requeues
+without touching it, so the next attempt arrives at the queue head
+with a budget already spent, and the first edge needing a settle whose
+observation this dispatcher no longer holds is abandoned on sight --
+recorded as having given up on a dependency which finished long
+before. `clear_dependency_wait()` now returns the column to NULL on
+requeue, which is also what makes the column's documented meaning
+survive: a retry is a new tenant of the queue head and is owed the
+whole budget.
+
+Two smaller items in the same family were taken rather than deferred,
+because both are failures in the direction a fate-sharing edge must
+never fail in. The walks' final arm was an unconditional fall-through
+to "complete", so a state added to `AgentOperation` later would have
+silently satisfied a `depends_on` edge; it is now named, and
+`test_every_agent_operation_state_is_classified` derives the check
+from `AgentOperation.state_targets` so the next state addition fails a
+test rather than production. And a `runs_after` warning was re-emitted
+on every pass, because both walks restart from their first edge -- some
+sixty durable event rows over one budget, and the only per-pass write
+either walk makes. It is now emitted once per operation, edge and
+message, for the life of a dispatcher generation.
+
+The seam the plan named as its own biggest risk, evaluation sitting
+after the generation check, was held only by a definition-of-done grep
+which stops running once the phase lands.
+`SidechannelDispatchSeamTestCase` now drives one pass of
+`_dispatch_loop()` and asserts it four ways: a refused verdict reaches
+neither `start_instance_executor()` nor the event which claims a
+dispatch, a met verdict reaches both, and a superseded generation --
+whether it was already stale or went stale mid-pass -- never calls
+`_dependencies_met()` at all, because evaluation writes.
+
+The mutation set went from 22 to 36, all killed, with the six files it
+edits verified byte-identical to a copy taken before the run. Three
+existing mutants had to be rewritten rather than merely added to,
+because this round moved the code they were anchored on. Two of those
+rewrites matter beyond the bookkeeping. One would have mutated
+`finished` into a name no longer in scope, which fails to import and
+so scores as a kill without testing anything -- the same dishonest-kill
+shape 2d's save-name collision produced, reached a different way. The
+other, the depends_on pending arm's budget check, moved into
+`_wait_budget_spent()`, and the script reported it as SKIP rather than
+passing: a mutation set whose anchors are allowed to rot reads as
+coverage it no longer has. Both walks' pending arms are now anchored on
+their following comment line, because the two arms are otherwise
+identical and a mutant which silently lands on the other walk proves
+nothing about the one it names.
+
+**Future work.** The reviewer asked for a functional test which submits
+a real `depends_on` chain against a real instance and observes both
+ordering and the cascade. That is worth having and is not in this
+phase: no client can submit an edge yet, so the test would have to
+construct the rows behind the API it is meant to be testing through.
+Phase 3 opens the client path and is where the test belongs; it is
+recorded against that phase rather than filed as an issue, since it is
+scope rather than a defect.

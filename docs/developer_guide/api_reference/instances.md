@@ -1008,24 +1008,38 @@ dispatched exactly as one without. Otherwise:
 
 * A `depends_on` dependency which is still queued or executing holds the
   operation at the head of the queue, and the operations behind it, until it
-  finishes. One which completed lets the operation run, once any settle delay
-  has elapsed. One which errored, was aborted, expired, was deleted or no longer
-  exists moves the operation to the `abort` state without running it, and the
-  operation's `dependency_failure` field says which dependency, and in what
-  state, caused that. The operation is also aborted if the wait outlasts
-  `AGENT_OPERATION_DEPENDENCY_WAIT` (300 seconds by default) rather than
-  holding its instance's queue for however long the dependency takes.
-* A `runs_after` dependency orders the operation and nothing more. Any finished
-  state, including a failed one, lets it run, and a dependency which is absent
-  or which outlasts the same wait is logged and then ignored. A `runs_after`
-  edge never aborts an operation and never sets `dependency_failure`.
+  finishes. One whose state cannot be read at all -- a database outage rather
+  than an answer -- holds the operation the same way, because a read which
+  failed is not evidence that anything has happened. One which completed lets
+  the operation run, once any settle delay has elapsed. One which errored, was
+  aborted, expired, was deleted or no longer exists moves the operation to the
+  `abort` state without running it, and the operation's `dependency_failure`
+  field says which dependency, and in what state, caused that. The operation is
+  also aborted if the wait outlasts `AGENT_OPERATION_DEPENDENCY_WAIT` (300
+  seconds by default) rather than holding its instance's queue for however long
+  the dependency takes. That budget covers the operation's whole wait and not
+  each edge's, so for an operation with several edges the dependency named in
+  `dependency_failure` is whichever one was blocking when the budget ran out,
+  which is not necessarily the one which consumed it.
+* A `runs_after` dependency orders the operation, and never decides its fate.
+  Any finished state, including a failed one, lets it run, and a dependency
+  which is absent, which cannot be read, or which outlasts the same wait is
+  logged and then ignored. Ordering is the only thing it affects, but it affects
+  it fully: a `settle_seconds` on a `runs_after` edge is honoured, and holds the
+  operation at the head of the queue for the delay exactly as a `depends_on`
+  edge would. A `runs_after` edge never aborts an operation and never sets
+  `dependency_failure`.
 
 `dependency_failure` is `null` unless the operation was aborted by a
 `depends_on` edge, and then holds a dictionary with three keys: `op_type`
 (always `agentoperation`), `op_uuid` (the dependency's UUID) and `state` (the
 dependency's state when it was given up on). `state` is one of the dependency's
-own states, or the string `missing` for a dependency which no longer exists, so
-that a dependency which failed can be told from one which is gone. An operation
+own states, or one of two strings which are deliberately not states any
+operation can hold: `missing` for a dependency which no longer exists, so that a
+dependency which failed can be told from one which is gone, and `unreadable` for
+one whose state could not be read before the budget ran out, which is a report
+about the node's database connectivity rather than about the chain you
+submitted. An operation
 aborted for outlasting the wait budget carries the dependency's state at that
 moment, which may be `queued` or `executing`, so `state` alone does not say that
 the dependency failed. See
@@ -1065,12 +1079,19 @@ list. It is a JSON dictionary with the following fields:
   needs the guest to settle after whatever the dependency changed. Omit it to be
   satisfied immediately. The delay runs from the first dispatcher pass which
   observed the dependency finish, and the dispatcher looks at a waiting
-  operation every `DISPATCH_CHECK_INTERVAL` (5 seconds), so the full delay
-  always elapses and the edge can be satisfied up to one interval later than
-  that -- never earlier. It may not be negative, and may not exceed the
-  operator's dependency wait budget, `AGENT_OPERATION_DEPENDENCY_WAIT` (300
-  seconds by default), because a longer delay could never elapse before the
-  budget aborted the operation. A request over the ceiling is refused with a 400.
+  operation every `DISPATCH_CHECK_INTERVAL` (5 seconds), so the edge is never
+  satisfied before the full delay has elapsed, and ordinarily up to one interval
+  after it. It can be satisfied later than that: the observation is held in the
+  dispatcher's memory, so losing it -- the dispatcher thread being replaced, or
+  this dependency being evicted to make room -- restarts the delay from the next
+  observation, and the wait budget is what bounds how far that can go. The delay
+  may not be negative, and may not exceed the operator's dependency wait budget,
+  `AGENT_OPERATION_DEPENDENCY_WAIT` (300 seconds by default). Within that
+  ceiling a declared delay can always elapse, because the budget is extended by
+  the delay once the dependency has been seen to finish -- which also means a
+  settle delay can hold an operation at the head of its queue for the budget
+  plus the delay, rather than for the budget alone. A request over the ceiling
+  is refused with a 400.
 
 ### Fetching information about an Instance's Agent Operations
 

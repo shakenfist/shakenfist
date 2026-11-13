@@ -525,10 +525,13 @@ class AgentOperation(BaseOperation):
         dep is the stored depends_on edge, so it carries op_type and
         op_uuid, and dep_state is the state that dependency was
         observed in. dep_state may be a value no AgentOperation ever
-        holds -- 'missing' for a dependency which no longer exists at
-        all -- which is deliberate: a client has to be able to tell a
-        dependency which failed from one which went away, and both
-        cost the dependent the same fate.
+        holds: 'missing' for a dependency which no longer exists at
+        all, and 'unreadable' for one whose state could not be read
+        before the wait budget ran out. Both are deliberate. A client
+        has to be able to tell a dependency which failed from one which
+        went away, and either of those from a node which could not
+        reach its database, even though all three cost the dependent
+        the same fate.
 
         This is for depends_on only. A runs_after edge is an ordering
         hint rather than a fate-sharing one, so an unsatisfiable
@@ -635,6 +638,33 @@ class AgentOperation(BaseOperation):
         mariadb.update_agent_operation_attributes(
             attrs, fields=['dependency_wait_started'])
         return anchor
+
+    def clear_dependency_wait(self):
+        """Forget that this operation was ever blocked on a dependency.
+
+        A retry returns the operation to the queued state to be
+        dispatched again, which makes it a fresh attempt at the head of
+        its instance's queue. The dependency wait budget bounds how long
+        one attempt may hold that head, so a retry has to start again
+        with it. Left in place, the anchor from the abandoned attempt is
+        already older than the budget by the time the retry is
+        evaluated, and the first edge needing a settle whose observation
+        this dispatcher no longer holds is abandoned on sight -- the
+        operation recorded as having given up waiting for a dependency
+        which finished long before it.
+
+        Written only when there is something to clear, so a retry of an
+        operation which never blocked costs the read it has already
+        made and no write. Most retries are of operations with no edges
+        at all.
+        """
+        attrs = self._attributes()
+        if attrs.dependency_wait_started is None:
+            return
+
+        attrs.dependency_wait_started = None
+        mariadb.update_agent_operation_attributes(
+            attrs, fields=['dependency_wait_started'])
 
     def _attributes(self):
         """Read this operation's mutable attributes, creating the row if absent.
