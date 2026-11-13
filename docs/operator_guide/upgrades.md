@@ -10,6 +10,43 @@ means it is safe to perform a rollout across a cluster without downtime,
 although you might see small transient failures such as single API requests
 failing as processes restart.
 
+That describes an old object read by a new node. The other direction is not
+symmetrical, and it is worth knowing about before you plan a rollout. A node
+which has been upgraded creates objects at the *new* version immediately --
+the cluster minimum governs whether an upgraded object is written back, not
+what a new object is created as -- so for the length of a rollout a
+not-yet-upgraded node may read a row it does not understand. There is no
+downgrade step and never will be, so that read fails, with a log line naming
+the object, the version it is stored at and the version that node
+understands:
+
+```
+Object <uuid> is version 4, but this node only understands version 3 of
+object type agentoperation
+```
+
+The practical consequences:
+
+* Only an object type whose version actually moved in the release you are
+  installing is affected, and only for objects created during the rollout.
+  Most releases bump no object versions at all.
+* The exposure is worst where the writing and reading nodes are reliably
+  different machines. An agent operation, for example, is created by
+  `sf-api` and read by `sf-sidechannel` on the instance's hypervisor, so
+  agent operations created during the rollout fail on hypervisors that have
+  not been upgraded yet.
+* The failure is loud rather than silent: nothing is written at the wrong
+  version, and it works once that node is upgraded. Retry after the
+  rollout.
+* It is not confined to operations on that one object. An object is
+  upgraded as it is loaded, so on a not-yet-upgraded node a listing, or a
+  daemon's periodic sweep, which happens to load one newer object fails as
+  a whole until that node is upgraded.
+
+So the advice is the same advice as always -- do not leave a cluster
+half-upgraded for longer than you have to -- but the reason is now written
+down rather than discovered.
+
 You should note however that "all nodes" includes nodes in non-running states
 such as ERROR and MISSING. The only state which is excluded from the check is
 DELETED. Therefore, in order for online upgrades to work correctly, it is
@@ -287,6 +324,16 @@ upgrade, so run `sf-ctl ensure-mariadb-schema` when you can afford to
 let it finish rather than interrupting it. If it does fail part way
 through, the table's schema version is not advanced and re-running the
 command resumes where it stopped.
+
+Not every migration costs that, and the cheap ones are kept cheap
+deliberately. Widening the columns which hold an object key, for
+example, is metadata-only: 63 characters of `utf8mb4` is 252 bytes,
+under the 256 byte boundary where a `VARCHAR`'s stored length prefix
+grows from one byte to two, so MariaDB accepts the change with
+`ALGORITHM=INSTANT` even on a column inside a primary key. A wider
+ceiling would have crossed that boundary and rebuilt every row of
+those tables under a metadata lock instead, which is why the ceiling
+is 63 and not something rounder.
 
 ### Manual schema verification
 

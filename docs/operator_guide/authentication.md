@@ -159,9 +159,9 @@ Three fields are mandatory, and three more are optional:
 | Field | Required | Notes |
 |-------|----------|-------|
 | `name` | Yes | How rules refer to this issuer. Treat it as durable |
-| `issuer_url` | Yes | Compared to a token's `iss` claim **exactly**: no normalisation, no trailing-slash tolerance |
+| `issuer_url` | Yes | Compared to a token's `iss` claim **exactly**: no normalisation, no trailing-slash tolerance. Must be `https` |
 | `audience` | Yes | Tokens must be minted for this. Usually your cluster's API URL |
-| `jwks_uri` | No | Where the signing keys are published. Always taken from here, never from the token. Left out, it is [discovered](#discovery) from the provider |
+| `jwks_uri` | No | Where the signing keys are published. Always taken from here, never from the token. Must be `https`. Left out, it is [discovered](#discovery) from the provider |
 | `client_id` | No | The OAuth client identifier you registered at the provider for human login. A workload exchange never reads it |
 | `oidc_scopes` | No | The OpenID Connect scopes to request at human login, as one space separated string such as `openid profile groups`. A workload exchange never reads it |
 
@@ -183,6 +183,18 @@ The exact `issuer_url` comparison is deliberate. A loose comparison
 here is a way to accept tokens from somewhere else entirely, so if
 your tokens are refused with an untrusted-issuer message, check for a
 trailing slash before checking anything else.
+
+Both URLs must begin with `https://`, in lower case, and anything
+else is refused with a 400 on create and on update. (`HTTPS://` is
+refused too: an `issuer_url` spelled that way could never equal a real
+token's `iss`.) For `jwks_uri` the reason is direct: a JWKS
+fetched over HTTP can be substituted by anyone on the path, which
+turns signature verification into theatre. For `issuer_url` it is one
+step further away -- the value is compared against a token's `iss`
+claim rather than fetched -- but it names the identity whose keys the
+cluster is about to trust, and OIDC discovery builds its request from
+that same field, so the scheme is checked once here rather than again
+in everything that reads it.
 
 ???+ warning "Rules reference issuers by name"
 

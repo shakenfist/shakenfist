@@ -930,6 +930,48 @@ def _stored_video(video):
     return video
 
 
+def _resolved_network_uuid(client, ref, namespace, cache):
+    """Resolve a network reference to the uuid the server would store.
+
+    The API accepts a network *reference* -- a name or a uuid -- in a
+    networkspec and normalises it to a uuid before storing it
+    (external_api/instance.py resolves it with Network.from_db_by_ref).
+    An existing instance's interface therefore always reports a uuid,
+    whatever the caller wrote, so comparing the caller's spelling
+    against it reported every name-addressed instance as dirty and
+    silently replaced it on every run (issue 4277).
+
+    Resolution is the module doing what the server does, rather than
+    requiring callers to pass uuids: shakenfist/actions' playbooks, and
+    anyone else who names a network, keep working unchanged. The cache
+    is per comparison, so an instance with several interfaces on one
+    network costs one lookup.
+
+    A reference which does not resolve is a specification the create
+    could not satisfy either, so it is refused here with a message
+    naming it rather than reported as a difference and recreated.
+    """
+    if ref in cache:
+        return cache[ref]
+
+    try:
+        if namespace:
+            network = client.get_network(ref, namespace=namespace)
+        else:
+            network = client.get_network(ref)
+    except apiclient.ResourceNotFoundException:
+        raise InstanceCreationException(
+            'network %s does not exist' % ref)
+
+    resolved = (network or {}).get('uuid')
+    if not resolved:
+        raise InstanceCreationException(
+            'network %s does not exist' % ref)
+
+    cache[ref] = resolved
+    return resolved
+
+
 def _check_instance(client, existing, params, log):
     # Faithful port of client-python's commandline/ansible.py _check_instance.
     # Builds the create_instance() args and kwargs and determines whether the
@@ -1015,14 +1057,25 @@ def _check_instance(client, existing, params, log):
         log.append('Instance dirty: the number of interfaces changed')
         dirty = True
     else:
+        # Resolved lazily and only on a mismatch: an interface whose
+        # request already carries the stored uuid needs no lookup, and
+        # this loop only runs when there is an existing instance.
+        resolved_networks = {}
         for idx in range(len(existing_interfaces)):
             existing_iface = existing_interfaces[idx]
             requested_iface = requested_networks[idx]
 
             if existing_iface['network_uuid'] != requested_iface['network_uuid']:
-                log.append('Instance dirty: interface %d changed network' % idx)
-                dirty = True
-                break
+                requested_uuid = _resolved_network_uuid(
+                    client, requested_iface['network_uuid'],
+                    params.get('namespace'), resolved_networks)
+                if existing_iface['network_uuid'] != requested_uuid:
+                    log.append(
+                        'Instance dirty: interface %d changed network from '
+                        '%s to %s' % (idx, existing_iface['network_uuid'],
+                                      requested_uuid))
+                    dirty = True
+                    break
 
             for attr in ['macaddress', 'address', 'model', 'float']:
                 if (attr in requested_iface and

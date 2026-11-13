@@ -223,7 +223,10 @@ class EventObjectTimestampBackfillLiveTestCase(base.ShakenFistTestCase):
         with mock.patch.object(mariadb, '_MIGRATION_BACKFILL_BATCH_SIZE', 2):
             result = mariadb._ensure_event_objects_schema(self.engine)
 
-        self.assertEqual(2, result['end_version'])
+        # Through v2 (this backfill) and on to the target version,
+        # whose last step widens the object key column.
+        self.assertEqual(mariadb.EVENT_OBJECTS_VERSION,
+                         result['end_version'])
         timestamps = self._reference_timestamps()
         for i, event_uuid in enumerate(written):
             self.assertEqual(1_762_300_000.0 + i, timestamps[event_uuid])
@@ -288,7 +291,10 @@ class EventObjectTimestampBackfillLiveTestCase(base.ShakenFistTestCase):
         with mock.patch.object(mariadb, '_MIGRATION_BACKFILL_BATCH_SIZE', 2):
             result = mariadb._ensure_event_objects_schema(self.engine)
 
-        self.assertEqual(2, result['end_version'])
+        # Through v2 (this backfill) and on to the target version,
+        # whose last step widens the object key column.
+        self.assertEqual(mariadb.EVENT_OBJECTS_VERSION,
+                         result['end_version'])
         timestamps = self._reference_timestamps()
         for i, event_uuid in enumerate(written):
             self.assertEqual(1_762_400_000.0 + i, timestamps[event_uuid])

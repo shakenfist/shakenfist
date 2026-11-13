@@ -94,15 +94,14 @@ class NetOp(BaseClusterOperation):
         # so a version-1 record needs no rewriting to become a
         # version-2 one.
         #
-        # The method must exist anyway. BaseObject.upgrade() resolves
-        # each step with a bare getattr(self, step) and no default
-        # (shakenfist/baseobject.py), so a missing step raises
-        # AttributeError rather than the UpgradeException the branch
-        # below that getattr is written to raise. Until this method
-        # existed, loading a version-1 NetOp row crashed instead of
-        # upgrading -- narrow, because cluster operations are
-        # eligible for hard delete thirty seconds after going terminal,
-        # but real during a rolling upgrade.
+        # The method must exist anyway. BaseObject.upgrade()
+        # (shakenfist/baseobject.py) refuses to load a row whose
+        # version has no step to the next, raising UpgradeException --
+        # before issue 3857 it raised AttributeError instead. Either
+        # way, until this method existed a version-1 NetOp row failed
+        # to load rather than upgrading -- narrow, because cluster
+        # operations are eligible for hard delete thirty seconds after
+        # going terminal, but real during a rolling upgrade.
         pass
 
     @classmethod

@@ -2,6 +2,7 @@ import time
 import uuid
 from unittest import mock
 
+import pydantic
 import testtools
 from shakenfist import baseobject
 from shakenfist import exceptions
@@ -389,6 +390,116 @@ class InMemoryOnlyStateTestCase(base.ShakenFistTestCase):
 
         mock_get_state.assert_not_called()
         mock_set_state.assert_not_called()
+
+
+class NewerVersionTestObject(DatabaseBackedObject):
+    object_type = 'newerversiontest'
+    initial_version = 1
+    current_version = 3
+
+    def _upgrade_step_1_to_2(self, static_values):
+        static_values['stepped'] = True
+
+
+class NewerVersionTestData(pydantic.BaseModel):
+    uuid: str
+    version: int
+
+
+class NewerVersionPydanticTestObject(DatabaseBackedObject):
+    object_type = 'newerversionpydantictest'
+    initial_version = 1
+    current_version = 3
+
+    @classmethod
+    def _upgrade_step_1_to_2(cls, values):
+        values['stepped'] = True
+
+
+class UpgradeFromNewerNodeTestCase(base.ShakenFistTestCase):
+    """Reading a row written by an already-upgraded node (issue 3857).
+
+    Half of a rolling upgrade is a node reading rows a newer node
+    wrote: new() writes cls.current_version from the moment a rolled
+    node starts, whatever the cluster minimum is. There is no step
+    which walks a version downwards, so this has to be refused, and
+    said clearly -- it used to raise AttributeError from inside a loop
+    hunting for an upgrade step that cannot exist.
+    """
+
+    def _object(self):
+        return NewerVersionTestObject.__new__(NewerVersionTestObject)
+
+    def test_a_newer_version_is_refused_by_name(self):
+        with testtools.ExpectedException(
+                exceptions.ObjectFromNewerNodeException):
+            self._object().upgrade(
+                {'uuid': 'cf3f8aa6-9e1d-4a23-9f6c-2a0a2f43c0a1',
+                 'version': 4})
+
+    def test_the_refusal_names_both_versions(self):
+        try:
+            self._object().upgrade(
+                {'uuid': 'cf3f8aa6-9e1d-4a23-9f6c-2a0a2f43c0a1',
+                 'version': 4})
+        except exceptions.ObjectFromNewerNodeException as e:
+            self.assertIn('version 4', str(e))
+            self.assertIn('version 3', str(e))
+            self.assertIn('cf3f8aa6-9e1d-4a23-9f6c-2a0a2f43c0a1', str(e))
+            self.assertIn('of object type newerversiontest', str(e))
+        else:
+            self.fail('a newer object version was not refused')
+
+    def test_a_missing_intermediate_step_is_an_upgrade_exception(self):
+        # The guard this fix made reachable: version 2 is below ours, so
+        # it is a genuinely missing step rather than a newer row. It
+        # used to raise AttributeError before the guard could run. The
+        # message is matched because ObjectFromNewerNodeException is an
+        # UpgradeException too, and the type alone cannot tell them apart.
+        with testtools.ExpectedException(
+                exceptions.UpgradeException,
+                'Upgrade step _upgrade_step_2_to_3 is missing'):
+            self._object().upgrade(
+                {'uuid': 'cf3f8aa6-9e1d-4a23-9f6c-2a0a2f43c0a1',
+                 'version': 2})
+
+    def test_an_older_version_with_a_step_still_upgrades(self):
+        static_values = {'uuid': 'cf3f8aa6-9e1d-4a23-9f6c-2a0a2f43c0a1',
+                         'version': 1}
+        with testtools.ExpectedException(exceptions.UpgradeException):
+            # Walks 1 -> 2 with the step this class defines, and only
+            # then runs out of steps at 2 -> 3.
+            self._object().upgrade(static_values)
+        self.assertTrue(static_values['stepped'])
+
+    def test_the_current_version_is_a_no_op(self):
+        # Why the comparison is > rather than >=: a row already at our
+        # version never reaches it, because upgrade() returns early.
+        # The two spellings are therefore indistinguishable, which a
+        # mutation check confirmed.
+        static_values = {'uuid': 'cf3f8aa6-9e1d-4a23-9f6c-2a0a2f43c0a1',
+                         'version': 3}
+        self._object().upgrade(static_values)
+        self.assertEqual(3, static_values['version'])
+        self.assertNotIn('stepped', static_values)
+
+    def test_the_pydantic_path_refuses_a_newer_version(self):
+        data = NewerVersionTestData(
+            uuid='cf3f8aa6-9e1d-4a23-9f6c-2a0a2f43c0a1', version=4)
+        with testtools.ExpectedException(
+                exceptions.ObjectFromNewerNodeException,
+                '.*version 3 of object type newerversionpydantictest'):
+            NewerVersionPydanticTestObject.upgrade_pydantic_data(
+                data, NewerVersionTestData)
+
+    def test_the_pydantic_path_still_reports_a_missing_step(self):
+        data = NewerVersionTestData(
+            uuid='cf3f8aa6-9e1d-4a23-9f6c-2a0a2f43c0a1', version=2)
+        with testtools.ExpectedException(
+                exceptions.UpgradeException,
+                'Upgrade step _upgrade_step_2_to_3 is missing'):
+            NewerVersionPydanticTestObject.upgrade_pydantic_data(
+                data, NewerVersionTestData)
 
 
 class ValidObjectRefTestCase(base.ShakenFistTestCase):

@@ -1,4 +1,5 @@
 import importlib
+from typing import Any
 import uuid
 
 # Note the most exciting constants ever
@@ -10,6 +11,23 @@ TiB = 1024 * 1024 * 1024 * 1024
 
 # How long we wait to acquire an etcd lock by default.
 ETCD_ATTEMPT_TIMEOUT = 60
+
+
+# The longest an object's key may be, and so the narrowest a database
+# column which stores one may be. Almost every object is keyed by its
+# uuid, 36 characters -- but a namespace is keyed by its *name*, and
+# names are longer than that. The two were allowed to drift: the create
+# handler published and enforced a 63 character ceiling while
+# object_states.object_uuid was still VARCHAR(36), so every name between
+# 37 and 63 characters was accepted by the API and then refused by the
+# database with error 1406, answering an opaque 500 and leaving a
+# namespace row behind with no state (issue 4856).
+#
+# Both sides now read this. It lives here, rather than beside either of
+# them, so that shakenfist.mariadb and shakenfist.external_api.auth can
+# share it without importing each other.
+NAMESPACE_NAME_MAX_LENGTH = 63
+OBJECT_KEY_MAX_LENGTH = NAMESPACE_NAME_MAX_LENGTH
 
 
 # Lease length on cluster locks (seconds). Holders refresh every third
@@ -176,7 +194,7 @@ class NoSuchObject(Exception):
     ...
 
 
-def get_object_class(object_type):
+def get_object_class(object_type: str) -> Any:
     cls = OBJECT_NAMES_TO_CLASSES.get(object_type)
     if not cls:
         raise NoSuchObject(object_type)

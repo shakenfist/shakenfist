@@ -57,6 +57,15 @@ class UpgradeException(ObjectException):
     ...
 
 
+class ObjectFromNewerNodeException(UpgradeException):
+    """A stored object's version is higher than this node understands.
+
+    There is no downgrade step and never will be, so this is not a
+    missing upgrade step: it is the old half of a rolling upgrade
+    reading a row an already-upgraded node wrote.
+    """
+
+
 class InvalidObjectPrefilter(ObjectException):
     ...
 

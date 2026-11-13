@@ -5,15 +5,14 @@
 # ``_upgrade_step_N_to_N+1``, defined on either the schema module
 # itself or the matching class in ``shakenfist/operations/``.
 #
-# ``shakenfist.baseobject.DatabaseBackedObject.upgrade()`` resolves each
-# step with a bare ``getattr(self, step)`` and no default, so a missing
-# step raises ``AttributeError`` rather than the documented
-# ``UpgradeException`` -- unreachable code below that getattr was
-# written to raise it. The window is narrow (cluster operations are
-# eligible for hard delete thirty seconds after going terminal, so only a
-# rolling upgrade can present an old row) but real: running the sweep
-# below found exactly one gap this way, NetOp's missing
-# ``_upgrade_step_1_to_2``.
+# ``shakenfist.baseobject.DatabaseBackedObject.upgrade()`` cannot load a
+# row whose version has no step to the next: it raises
+# ``UpgradeException`` (before issue 3857 it raised ``AttributeError``).
+# So a missing step is a row that fails to load. The window is narrow
+# (cluster operations are eligible for hard delete thirty seconds after
+# going terminal, so only a rolling upgrade can present an old row) but
+# real: running the sweep below found exactly one gap this way, NetOp's
+# missing ``_upgrade_step_1_to_2``.
 
 import ast
 import glob
@@ -107,10 +106,9 @@ class UpgradeStepSweepTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             [], missing,
             f'operation schema(s) missing an upgrade step: {missing}. '
-            f'DatabaseBackedObject.upgrade() calls getattr(self, step) '
-            f'with no default, so a missing step raises AttributeError '
-            f'instead of UpgradeException when a rolling upgrade '
-            f'presents an older row.')
+            f'DatabaseBackedObject.upgrade() raises UpgradeException '
+            f'for a missing step, so a rolling upgrade which presents an '
+            f'older row fails to load it.')
 
     def test_the_sweep_finds_a_real_gap(self):
         # Mutation coverage for the sweep itself: prove it actually

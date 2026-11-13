@@ -577,9 +577,9 @@ indistinguishable from a feature with no work to do.
 
 Both of `object_states`' join columns have that problem:
 
-* `object_states.object_uuid` is `sa.String(36)` holding the dashed uuid
-  form, while the static tables use `sa.Uuid`, which is undashed CHAR(32)
-  on MariaDB. Join through `_dashed_uuid_expr()`, never a bare `sa.cast`.
+* `object_states.object_uuid` is a `sa.String` object key holding the
+  dashed uuid form (or, for a namespace, its name), while the static
+  tables use `sa.Uuid`, which is undashed CHAR(32) on MariaDB. Join through `_dashed_uuid_expr()`, never a bare `sa.cast`.
 * `object_states.object_type` is `sa.Enum(ObjectType)`, which SQLAlchemy
   stores by enum *name* (`'NET_OP'`), while the operation and object
   tables carry the enum *value* (`'net_op'`). Bind an `ObjectType`
