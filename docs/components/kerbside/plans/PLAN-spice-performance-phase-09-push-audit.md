@@ -340,6 +340,22 @@ Entries are added as the steps run, per `PLAN-TEMPLATE.md`: the
 date with its timezone, any step run out of order, any decision
 that changed, and the wave exit codes.
 
+- **2026-11-13, AEDT.** The audit merged as `163c56c663` (#720),
+  and the thirteen findings went to the follow-up pull request
+  decision 4 called for, implemented by five sub-agents over
+  disjoint files. Decision 6 said this phase would record no
+  `Merged` cell, on the ground that a phase cannot know its own
+  merge commit; the follow-up can, so the cell now carries it and
+  decision 6 is spent rather than wrong.
+- **2026-11-13, AEDT.** Two corrections the management session
+  made to the sub-agents' work, both in new code. First,
+  `resolve_headline_cc` returned the matrix's only controller even
+  when the caller had explicitly asked for a different one, which
+  is the same guess finding 2 is about, one case along; it now
+  refuses, with a test. Second, four functions in the bench crate
+  had been widened to `pub` so the tests could reach them, and
+  were narrowed to `pub(crate)`, which is what reaching them from
+  the crate's own tests actually needs.
 - **2026-11-12, AEDT.** All six steps ran on 2026-11-12. 9a ran
   first as the gate and passed; 9b, 9c, 9d and 9e then ran in
   parallel as read-only readers; 9f is this record. No step ran
@@ -625,6 +641,62 @@ to the follow-up pull request unless marked otherwise.
 - **Clamping the forwarded capabilities.** Declined by phase 6
   with reasons; this audit does not reopen it, and step 9e agrees
   the landing argues it down convincingly.
+
+### The follow-up pull request
+
+Decision 4 kept this phase from fixing what it found, and the
+findings above went to a pull request of their own, opened after
+the audit merged as `163c56c663` (#720). What landed there:
+
+| Finding | Disposition |
+|---|---|
+| 1. A lost repeat narrows the gate's own threshold | Fixed. `collect` counts the repeats it walks per arm, `aggregate` reports the difference as `absent_repeats`, and `report` warns per cell and arm, including where no repeat was read at all. |
+| 2. `detect_headline_cc` falls back to `ccs[0]` | Fixed. The fallback is gone: `resolve_headline_cc` takes the sole controller of a single-controller matrix, and otherwise refuses and names the controllers, so an unscoped matrix produces no table rather than a mislabelled one. |
+| 3. The throughput medians were never independently recomputed | Closed as far as it can be, which is not by recomputation. See below. |
+| 4. A pre-created TLS directory | Fixed. `require_private_dir` refuses a symlink, a path this user does not own, and a path any other local user can write, on both the work directory and the TLS directory, before either is created and again immediately before the `mkdir`. |
+| 5. The namespace holder leaks on SIGKILL | Fixed. The sleeper's lifetime is the matrix's own worst case, doubled, rather than `infinity`. |
+| 6. A plan reference in documentation | Fixed. The sentence delivers the same verdict without the word. |
+| 7. The reply mask is undocumented | Fixed. `docs/spice/capabilities.md` gains *Capabilities Through the Proxy*, including why the mask is not a security boundary and why masking was declined; `caps.rs`'s module doc keeps the argument and now points at the page. |
+| 8. The rig's loss field has no caller | Kept, with a worked invocation in the header `docs/testing.md` delegates to. |
+| 9. No cross-reference to the bench | Taken as a pointer only, in the page's opening scope sentence rather than in its Ryll section. |
+| 10. The resource-cost axis is unnamed | Fixed, in `caps.rs` and in the new documentation section. |
+| 11. The feature check reads the manifests, not the wheel | Fixed. A third, independent check opens the built wheel and refuses a binary carrying the transcoder's command-line flag or any openh264. The two manifest checks stay. |
+| 12. The mutation script covered seven of nine tests | Fixed and widened: the crate's tests go from nine to nineteen and its mutants from seven to twenty-five, with the warmup-to-steady boundary, the QUIC and TCP arms, the GSO control and the certificate and key readers now defended. |
+| 13. A loss field of `0.0` | Fixed in both scripts, so `0`, `0.0` and `0.00` are one unshaped control. |
+
+Finding 3 cannot be closed the way it was written, and the reason
+is worth recording. The raw per-repeat results the published
+tables were computed from no longer exist: they lived in the
+phase 7 worktree's work directory, which went when that phase's
+branch was cleaned up after merge, and nothing on the host still
+holds them. So the throughput medians cannot now be recomputed
+from the data that produced them, by this audit or by anyone. What
+replaces that is twenty-one fixture tests over the arithmetic
+every published figure passed through, including the throughput
+medians, the spread the gate was measured against, and the
+exclusion rules that decide which repeats reach either. The
+lesson is the cheaper one to apply next time: a measurement
+phase's raw results are an input to its audit, so either the
+audit runs before the worktree is removed or the results are kept
+somewhere that outlives it.
+
+Three judgement calls in that pull request were the management
+session's rather than any finding's:
+
+- **Finding 8, keep rather than remove.** The field has no caller
+  today, which is the whole finding, but *Future work* names this
+  rig as the one to re-run the kernel congestion-control question
+  with, so the capability has a use ahead of it. A worked example
+  costs less than deleting and restoring it.
+- **Finding 9, a pointer and nothing more.** The audit's own
+  argument -- that the measurement page owns the bench and that
+  `docs/testing.md`'s shaped-link material is Ryll's, which the
+  bench is not -- is right, so the page gains one sentence in its
+  scope paragraph and no new section.
+- **Finding 2's shape.** Refusing is better than labelling the
+  rows as unknown scope: an unscoped table still gets quoted once
+  it is pasted into a page, whereas a non-zero exit produces no
+  table to quote.
 
 ### `Future work` with no home
 

@@ -318,7 +318,7 @@ first phase.
 | 6. Push audit of phases 1-5 (kerbside, kerbside-patches and ryll #406) | [PLAN-spice-performance-phase-06-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/) | Complete | 2a34fe7ea9 (#668), 17a31ebf75 (#701) |
 | 7. QUIC client leg: experiments (verdict: no-go, as measured) | [PLAN-spice-performance-phase-07-quic-experiments.md](/components/kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/) | Complete | e0f53fb04a (#716) |
 | 8. QUIC client leg: implementation (abandoned: phase 7's gate said no-go) | | Abandoned | |
-| 9. Push audit of phases 6 and 7 (kerbside) | [PLAN-spice-performance-phase-09-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-09-push-audit/) | Complete | |
+| 9. Push audit of phases 6 and 7 (kerbside) | [PLAN-spice-performance-phase-09-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-09-push-audit/) | Complete | 163c56c663 (#720) |
 
 **Phase 1** sets `TCP_NOTSENT_LOWAT` on the client leg and caps
 the backend leg's receive buffer, with the values made

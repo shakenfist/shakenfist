@@ -44,9 +44,14 @@ Per-target option flags (alternatives to `-o`):
   vhdx:  --subformat, --block-size
 ```
 
-`SIZE` accepts a suffix from `{b,K,M,G,T}` (e.g. `1G`, `512M`). It is
-required unless `-b BACKING` is given, in which case it defaults to the
-backing file's virtual size. A monolithicFlat VMDK cannot have a backing
+`SIZE` accepts a suffix from `{B,K,M,G,T,P,E}` and a decimal fraction
+before any suffix but `B` (e.g. `1G`, `512M`, `1.5M`, `4608.5M`), which
+is qemu-img's grammar. The suffix is case-insensitive, so `1g` is `1G`.
+`B` is one byte, as is `b`, so a fraction with no suffix or a `b` suffix
+is refused, as a fraction of a byte is not a size. A fraction that is
+not a whole number of bytes is rounded to the nearest byte, with a half
+rounding upwards. `SIZE` is required unless `-b BACKING` is given, in
+which case it defaults to the backing file's virtual size. A monolithicFlat VMDK cannot have a backing
 file, so it always needs `SIZE`.
 
 The full flag surface is reported by `instar create --help`.

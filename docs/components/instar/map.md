@@ -193,7 +193,9 @@ BAT walk, skipping interleaved sector-bitmap entries by the
 
 Single fully-allocated extent covering the virtual size. The no_std
 raw parser cannot call `SEEK_HOLE` from inside the guest, so on-disk
-sparseness is not reflected (see below).
+sparseness is not reflected (see below), and the virtual size the
+extent covers is the virtio device's capacity rounded up to the input
+sector size rather than the file's own length (see below as well).
 
 ## Malformed block tables
 
@@ -276,6 +278,13 @@ rationale and the future-work pointer.
 - **Raw source sparseness is not detected** — instar reports raw
   as one fully-allocated extent; `qemu-img map` walks `SEEK_HOLE`.
   See [docs/quirks.md § Raw source sparseness is not detected](/components/instar/quirks/#raw-source-sparseness-is-not-detected).
+- **A raw source's extent is padded to the input sector size** —
+  a 1536-byte raw file maps as one extent of `length: 65536` where
+  `qemu-img map` says 1536, because the guest reads the virtio
+  device's capacity rather than the file's length. `instar info` and
+  the chain-reading operations report 1536 for the same file.
+  Tracked as [#907](https://github.com/shakenfist/instar/issues/907).
+  See [docs/quirks.md § A raw source's virtual size is padded to 64 KiB in `map` and `measure`](/components/instar/quirks/#a-raw-sources-virtual-size-is-padded-to-64-kib-in-map-and-measure).
 - **VHD unallocated blocks are reported as `present: false`** —
   instar reports `present=false, zero=true, data=false` (faithful
   to BAT `0xFFFFFFFF`); qemu-img reports

@@ -33,7 +33,7 @@ The threshold this bench was built to test is whether QUIC's
 interactive p95 is worse than TCP's by more than the bench's own
 run-to-run spread, on either loss level of the 80 ms / 10 Mbit profile.
 
-**It is, and the phase should stop here.** At 1% loss on that profile
+**It is, and the work went no further.** At 1% loss on that profile
 QUIC's interactive p95 is 144.3 ms against TCP's 82.8 ms — 61.6 ms
 worse, against a run-to-run spread of 0.9 ms in the QUIC arm and 0.1 ms
 in the TCP arm. That is not a close call and it is not a noisy one: the
@@ -180,6 +180,21 @@ threshold applied to a cell is the wider of its two arms' spreads.
 
 A difference smaller than that spread is a difference this bench cannot
 resolve, and saying so is a result.
+
+Because the spread is what the threshold is read against, a repeat that
+went missing has to be visible rather than quietly absent. A repeat
+whose results file never arrived is counted and warned about rather than
+dropped, and a cell the harness did not finish -- fewer repeats than
+`REPEATS` asked for -- says so, so a narrowed spread cannot be mistaken
+for a tight one. The two are reported separately, because a repeat that
+started and produced nothing is a different failure from one that never
+started.
+
+`summarise.py` also refuses to guess which arm the gate was. It reads
+that from `cells.txt`, which the harness writes as it goes; summarising
+a directory that has no `cells.txt` and holds more than one congestion
+controller needs `--headline-cc`, because labelling a sensitivity run as
+the gate would invert the scope of every row in the report.
 
 ## Host state
 

@@ -36,7 +36,8 @@ Options:
                              [1, 2147483647]. Echoed for output parity;
                              execution is serial in v1 (see below).
   -s, --buffer-size <SIZE>   Bytes per request (suffixes accepted:
-                             b/k/K/m/M/g/G/t/T/p/P/e/E). Default 4096.
+                             b/B/k/K/m/M/g/G/t/T/p/P/e/E, with a
+                             fraction before any but b/B). Default 4096.
                              Range [1, 2147483647], further capped at
                              2 MiB by instar.
   -S, --step-size <SIZE>     Byte offset advance per request (same
