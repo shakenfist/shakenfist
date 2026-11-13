@@ -15628,6 +15628,15 @@ def delete_trusted_issuer_attributes(issuer_uuid: UUID) -> bool:
 # MappingRule Table Definitions
 # =============================================================================
 
+# A MappingRule as returned by the find accessor: the static row and
+# its attributes row, already joined. A rule's policy -- the issuer it
+# accepts, the claims it binds, the scopes and lifetime of the keys it
+# mints -- is all in the attributes row, so matching one identity
+# against every rule on the cluster would otherwise cost an extra point
+# read per rule.
+MappingRuleRow = tuple[MappingRuleData, MappingRuleAttributesData]
+
+
 # The (namespace, name) UNIQUE index the Pydantic model cannot express:
 # the SQLUniqueIndex marker is single-column, and the compound-index
 # configuration path is multi-column but non-unique. Created by hand
@@ -15871,6 +15880,107 @@ def _direct_get_all_mapping_rules() -> list[MappingRuleData]:
     except OperationalError as e:
         LOG.warning(f'MariaDB list failed for mapping_rules: {e}')
         return []
+
+
+def _direct_find_mapping_rules(
+        issuer: Optional[str]) -> list[MappingRuleRow]:
+    """List mapping rules joined with the policy each one expresses.
+
+    The issuer filter is pushed into SQL, so resolving "every rule
+    which accepts tokens from this provider" is one round trip rather
+    than a listing plus an attributes read per rule. The attributes
+    row holds the whole of the policy, so a caller which matches an
+    identity against the cluster's rules needs it for every rule it
+    considers.
+
+    There is no index on the issuer column. The filter still belongs
+    in SQL: the work is bounded by the number of rules on the cluster
+    either way, and doing it here means one round trip instead of one
+    per rule.
+
+    Args:
+        issuer: The TrustedIssuer name to filter on, or None for every
+            rule on the cluster.
+
+    Returns:
+        A list of (static, attributes) pairs. A rule with no
+        attributes row does not appear -- the inner join drops it,
+        which is the same answer the point reads give for a rule whose
+        policy cannot be read: a rule that says nothing grants
+        nothing. Raises DatabaseUnavailable if the database cannot be
+        read.
+    """
+    engine = _get_engine()
+    table = _get_mapping_rules_table()
+    attrs_table = _get_mapping_rule_attributes_table()
+
+    stmt = sa.select(
+        table.c.uuid,
+        table.c.namespace,
+        table.c.name,
+        table.c.version,
+        attrs_table.c.issuer,
+        attrs_table.c.bound_claims,
+        attrs_table.c.scopes,
+        attrs_table.c.key_ttl,
+        attrs_table.c.key_name_prefix
+    ).select_from(
+        table.join(attrs_table, attrs_table.c.uuid == table.c.uuid)
+    )
+
+    if issuer is not None:
+        stmt = stmt.where(attrs_table.c.issuer == issuer)
+
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(stmt).fetchall()
+    except OperationalError as e:
+        # An empty list would read as "no rule on this cluster accepts
+        # that provider", which is a valid looking answer and
+        # therefore the worst thing to invent during an outage: it is
+        # a refusal the caller cannot tell from a decision. Issue 3522
+        # established this for the analogous namespace key listing on
+        # the same authentication path.
+        LOG.warning(
+            f'MariaDB find failed for mapping_rules (issuer={issuer!r}): {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rules for issuer {issuer} could not be listed: '
+            f'{e}') from e
+
+    results: list[MappingRuleRow] = []
+    for row in rows:
+        try:
+            attributes = MappingRuleAttributesData(
+                uuid=row.uuid,
+                issuer=row.issuer,
+                bound_claims=_require_bound_claims(row.bound_claims, row.uuid),
+                scopes=_require_scopes(row.scopes, row.uuid),
+                key_ttl=row.key_ttl,
+                key_name_prefix=row.key_name_prefix)
+        except (exceptions.CorruptMappingRule, ValueError) as e:
+            # The point reads raise for a damaged row, because there
+            # the damaged rule is the one the caller named and a
+            # refusal is the answer. Here it is one of many, and
+            # raising would let a single unreadable row refuse every
+            # request this accessor serves. Dropping it is the same
+            # direction as the join dropping a rule with no attributes
+            # at all: a rule nobody can read grants nothing, so the
+            # omission can only withhold a credential, never hand one
+            # out.
+            LOG.warning(
+                f'Skipping unreadable mapping rule {row.uuid}: {e}')
+            continue
+
+        results.append((
+            MappingRuleData(
+                uuid=row.uuid,
+                namespace=row.namespace,
+                name=row.name,
+                version=row.version),
+            attributes
+        ))
+
+    return results
 
 
 def _direct_delete_mapping_rule(rule_uuid: UUID) -> bool:
@@ -16158,6 +16268,34 @@ def _grpc_get_all_mapping_rules() -> list[MappingRuleData]:
             f'mapping rules could not be listed: {e}') from e
 
 
+def _grpc_find_mapping_rules(
+        issuer: Optional[str]) -> list[MappingRuleRow]:
+    """List mapping rules joined with their policy, via the service."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.FindMappingRulesRequest()
+        if issuer is not None:
+            # Set conditionally: the field carries presence, so an
+            # unset issuer is "every rule" rather than a filter on the
+            # empty string.
+            request.issuer = issuer
+        reply = _grpc_call(stub.FindMappingRules, request)
+        return [
+            (
+                _mapping_rule_from_proto(r.static_data),
+                _mapping_rule_attrs_from_proto(r.attributes)
+            )
+            for r in reply.rules
+        ]
+    except grpc.RpcError as e:
+        # See the direct path: an empty listing is an answer the caller
+        # cannot distinguish from a decision, so an outage must raise.
+        LOG.error(f'gRPC FindMappingRules failed for {issuer}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rules for issuer {issuer} could not be listed: '
+            f'{e}') from e
+
+
 def _grpc_delete_mapping_rule(rule_uuid: UUID) -> bool:
     try:
         stub = _get_database_stub()
@@ -16294,6 +16432,24 @@ def get_all_mapping_rules() -> list[MappingRuleData]:
     if _use_database_service():
         return _grpc_get_all_mapping_rules()
     return _direct_get_all_mapping_rules()
+
+
+def find_mapping_rules(
+        issuer: Optional[str] = None) -> list[MappingRuleRow]:
+    """Mapping rules joined with the policy each one expresses.
+
+    Args:
+        issuer: The TrustedIssuer name to filter on, applied in SQL.
+            None (the default) returns every rule on the cluster.
+
+    Returns:
+        A list of (static, attributes) pairs. A rule with no
+        attributes row does not appear. Raises DatabaseUnavailable if
+        the rules cannot be read.
+    """
+    if _use_database_service():
+        return _grpc_find_mapping_rules(issuer)
+    return _direct_find_mapping_rules(issuer)
 
 
 def delete_mapping_rule(rule_uuid: UUID) -> bool:

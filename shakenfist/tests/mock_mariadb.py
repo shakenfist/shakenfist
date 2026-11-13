@@ -475,7 +475,8 @@ class MockMariaDB():
                      'create_mapping_rule', 'get_mapping_rule',
                      'get_mapping_rule_by_name',
                      'get_mapping_rules_in_namespace',
-                     'get_all_mapping_rules', 'delete_mapping_rule',
+                     'get_all_mapping_rules', 'find_mapping_rules',
+                     'delete_mapping_rule',
                      'create_mapping_rule_attributes',
                      'get_mapping_rule_attributes',
                      'update_mapping_rule_attributes',
@@ -4573,6 +4574,23 @@ class MockMariaDB():
 
     def _mariadb_get_all_mapping_rules(self):
         return list(self.mapping_rules.values())
+
+    def _mariadb_find_mapping_rules(self, issuer=None):
+        """Mock implementation of mariadb.find_mapping_rules()
+
+        Returns joined (static, attributes) pairs, applying the issuer
+        filter the real accessor pushes into SQL. A rule with no
+        attributes row is dropped, as the inner join drops it.
+        """
+        results = []
+        for data in self.mapping_rules.values():
+            attrs = self.mapping_rule_attributes.get(str(data.uuid))
+            if not attrs:
+                continue
+            if issuer is not None and attrs.issuer != issuer:
+                continue
+            results.append((data, attrs))
+        return results
 
     def _mariadb_delete_mapping_rule(self, rule_uuid):
         return self.mapping_rules.pop(str(rule_uuid), None) is not None

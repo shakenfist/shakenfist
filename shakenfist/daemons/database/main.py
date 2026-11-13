@@ -4517,6 +4517,35 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_details(str(e))
             return database_pb2.GetMappingRulesReply(rules=[])
 
+    def FindMappingRules(
+        self,
+        request: database_pb2.FindMappingRulesRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.FindMappingRulesReply:
+        """List mapping rules joined with the policy they express."""
+        try:
+            self.monitor.counters['find_mapping_rules'].inc()
+            issuer = request.issuer if request.HasField('issuer') else None
+            rows = mariadb._direct_find_mapping_rules(issuer)
+            return database_pb2.FindMappingRulesReply(
+                rules=[
+                    database_pb2.MappingRuleJoinedProto(
+                        static_data=mariadb._mapping_rule_to_proto(
+                            static_data),
+                        attributes=mariadb._mapping_rule_attrs_to_proto(
+                            attributes))
+                    for static_data, attributes in rows
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FindMappingRules failed', e)
+            # An empty listing reads as "no rule accepts that
+            # provider", which the caller cannot tell from a decision,
+            # so the status code is what tells it this was a failure.
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.FindMappingRulesReply(rules=[])
+
     def DeleteMappingRule(
         self,
         request: database_pb2.DeleteMappingRuleRequest,
@@ -6710,7 +6739,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             'delete_trusted_issuer_attributes',
             'create_mapping_rule', 'get_mapping_rule',
             'get_mapping_rule_by_name', 'get_mapping_rules_in_namespace',
-            'get_all_mapping_rules', 'delete_mapping_rule',
+            'get_all_mapping_rules', 'find_mapping_rules',
+            'delete_mapping_rule',
             'create_mapping_rule_attributes',
             'get_mapping_rule_attributes',
             'update_mapping_rule_attributes',

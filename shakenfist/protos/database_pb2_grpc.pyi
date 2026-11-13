@@ -312,6 +312,7 @@ class DatabaseServiceStub:
     GetMappingRuleByName: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetMappingRuleByNameRequest, _database_pb2.GetMappingRuleReply]
     GetMappingRulesInNamespace: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetMappingRulesInNamespaceRequest, _database_pb2.GetMappingRulesReply]
     GetAllMappingRules: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetAllMappingRulesRequest, _database_pb2.GetMappingRulesReply]
+    FindMappingRules: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindMappingRulesRequest, _database_pb2.FindMappingRulesReply]
     DeleteMappingRule: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteMappingRuleRequest, _database_pb2.StatusReply]
     CreateMappingRuleAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateMappingRuleAttributesRequest, _database_pb2.StatusReply]
     """MappingRule Attributes Operations (MariaDB)"""
@@ -746,6 +747,7 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     GetMappingRuleByName: _aio.UnaryUnaryMultiCallable[_database_pb2.GetMappingRuleByNameRequest, _database_pb2.GetMappingRuleReply]  # type: ignore[assignment]
     GetMappingRulesInNamespace: _aio.UnaryUnaryMultiCallable[_database_pb2.GetMappingRulesInNamespaceRequest, _database_pb2.GetMappingRulesReply]  # type: ignore[assignment]
     GetAllMappingRules: _aio.UnaryUnaryMultiCallable[_database_pb2.GetAllMappingRulesRequest, _database_pb2.GetMappingRulesReply]  # type: ignore[assignment]
+    FindMappingRules: _aio.UnaryUnaryMultiCallable[_database_pb2.FindMappingRulesRequest, _database_pb2.FindMappingRulesReply]  # type: ignore[assignment]
     DeleteMappingRule: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteMappingRuleRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     CreateMappingRuleAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateMappingRuleAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """MappingRule Attributes Operations (MariaDB)"""
@@ -2227,6 +2229,13 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.GetAllMappingRulesRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.GetMappingRulesReply, _abc.Awaitable[_database_pb2.GetMappingRulesReply]]: ...
+
+    @_abc_1.abstractmethod
+    def FindMappingRules(
+        self,
+        request: _database_pb2.FindMappingRulesRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.FindMappingRulesReply, _abc.Awaitable[_database_pb2.FindMappingRulesReply]]: ...
 
     @_abc_1.abstractmethod
     def DeleteMappingRule(

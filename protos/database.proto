@@ -295,6 +295,7 @@ service DatabaseService {
   rpc GetMappingRuleByName (GetMappingRuleByNameRequest) returns (GetMappingRuleReply) {}
   rpc GetMappingRulesInNamespace (GetMappingRulesInNamespaceRequest) returns (GetMappingRulesReply) {}
   rpc GetAllMappingRules (GetAllMappingRulesRequest) returns (GetMappingRulesReply) {}
+  rpc FindMappingRules (FindMappingRulesRequest) returns (FindMappingRulesReply) {}
   rpc DeleteMappingRule (DeleteMappingRuleRequest) returns (StatusReply) {}
 
   // MappingRule Attributes Operations (MariaDB)
@@ -2233,6 +2234,28 @@ message GetAllMappingRulesRequest {
 
 message GetMappingRulesReply {
   repeated MappingRuleStaticData rules = 1;
+}
+
+// A rule and the policy it expresses, joined server side. Which issuer
+// a rule accepts, which claims it binds and what the keys it mints may
+// do all live in the attributes row, so matching one identity against
+// every rule on the cluster would otherwise cost a point read per rule
+// on an unauthenticated path. Mirrors NamespaceKeyJoinedProto, which
+// exists for the same reason.
+message MappingRuleJoinedProto {
+  MappingRuleStaticData static_data = 1;
+  MappingRuleAttributesProto attributes = 2;
+}
+
+message FindMappingRulesRequest {
+  // The TrustedIssuer name to filter on, pushed into SQL. Declared
+  // optional so that "every rule on the cluster" is distinguishable
+  // from a filter on the empty string, which no rule can carry.
+  optional string issuer = 1;
+}
+
+message FindMappingRulesReply {
+  repeated MappingRuleJoinedProto rules = 1;
 }
 
 message DeleteMappingRuleRequest {

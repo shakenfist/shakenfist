@@ -632,6 +632,45 @@ class MappingRules(dbo_iter):
                 yield out
 
 
+def rules_with_attributes(
+        issuer: Optional[str] = None
+) -> list[tuple[MappingRule, MappingRuleAttributesData]]:
+    """Mapping rules paired with the policy each one expresses.
+
+    The find accessor returns each static row joined with its
+    attributes row, so a caller which needs the policy gets it for
+    free. The alternative -- iterating MappingRules and calling
+    policy() -- costs an extra point read per rule, which on an
+    unauthenticated path is work an anonymous caller can multiply by
+    the number of rules the cluster happens to hold.
+
+    The issuer filter is applied in SQL, so "every rule which accepts
+    tokens from this provider" does not list the cluster and discard
+    most of it. None returns every rule.
+
+    This deliberately does not filter on object state, and every
+    caller therefore has to. A rule's only removal is a soft delete,
+    so a deleted rule's row survives until the hard delete reaper
+    reaches it, and a soft deleted rule which still mints is an
+    authorisation bypass rather than a stale listing. Resolve it in
+    bulk -- one get_objects_by_state() call for the whole set, the way
+    the expiry sweep does -- rather than reading one state per rule,
+    and treat that call returning None as a failure which refuses
+    rather than as an empty answer, because None means the query
+    failed and no rule is distinguishable from every rule.
+
+    Returns:
+        A list of (rule, attributes) pairs. A rule with no attributes
+        row, or one whose stored policy will not decode, does not
+        appear: such a rule grants nothing, so omitting it can only
+        withhold a credential.
+    """
+    return [
+        (MappingRule.from_static_data(static_data), attrs)
+        for static_data, attrs in mariadb.find_mapping_rules(issuer=issuer)
+    ]
+
+
 def rules_in_namespace(namespace: str) -> list[MappingRule]:
     """Every rule owned by a namespace, whatever its state.
 
