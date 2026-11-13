@@ -16359,40 +16359,41 @@ methodology" below).</p>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                             [1, 2147483647]. Echoed for output parity;
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>                             execution is serial in v1 (see below).
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  -s, --buffer-size &lt;SIZE&gt;   Bytes per request (suffixes accepted:
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>                             b/k/K/m/M/g/G/t/T/p/P/e/E). Default 4096.
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>                             Range [1, 2147483647], further capped at
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>                             2 MiB by instar.
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  -S, --step-size &lt;SIZE&gt;     Byte offset advance per request (same
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>                             suffixes as -s). Default 0, meaning "use
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>                             the buffer size". Range [0, 2147483647].
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>  -o, --offset &lt;SIZE&gt;        The first request's byte offset (same
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>                             suffixes as -s). Default 0.
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>                             Range [0, 9223372036854775807] (i64::MAX).
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>  -w                         Run a write test instead of a read test.
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>                             Destructive -- see "Write tests" below.
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>      --pattern &lt;NUM&gt;        Byte pattern used to fill write buffers.
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>                             Default 0. Range [0, 255]. Silently
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>                             ignored (not an error) on read tests.
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>      --flush-interval &lt;NUM&gt; Issue a flush every N completed requests.
-<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>                             Default 0 (never). Range [0, 2147483647].
-<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>                             Requires -w when nonzero; must be &gt;= depth.
-<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>      --no-drain             Accepted no-op -- v1's serial execution
-<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>                             always drains the (single-entry) queue.
-<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>  -t, --cache &lt;CACHE&gt;        Cache mode. Only 'writeback' (qemu's
-<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>                             default) is supported; other valid qemu
-<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>                             modes are refused as not-yet-supported.
-<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>  -i, --aio &lt;AIO&gt;            AIO backend selector. Every value is
-<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>                             refused; no backend is implemented yet.
-<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>  -n                         Native AIO. Refused; not yet supported.
-<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>  -f, --format &lt;FMT&gt;         Format hint. Ignored -- the input format
-<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>                             is auto-detected, like dd's -f posture.
-<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>  -q                         Suppress the progress indicator. instar
-<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>                             has none; accepted as a no-op.
-<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>  -U, --force-share          Force sharing. instar performs no image
-<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>                             locking; accepted as a no-op.
-<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>      --image-opts           Indicates FILENAME is a complete image
-<a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a>                             specification. Not yet supported.
-<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a>      --output &lt;FORMAT&gt;      human (default) | json
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>                             b/B/k/K/m/M/g/G/t/T/p/P/e/E, with a
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>                             fraction before any but b/B). Default 4096.
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>                             Range [1, 2147483647], further capped at
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>                             2 MiB by instar.
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  -S, --step-size &lt;SIZE&gt;     Byte offset advance per request (same
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>                             suffixes as -s). Default 0, meaning "use
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>                             the buffer size". Range [0, 2147483647].
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>  -o, --offset &lt;SIZE&gt;        The first request's byte offset (same
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>                             suffixes as -s). Default 0.
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>                             Range [0, 9223372036854775807] (i64::MAX).
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>  -w                         Run a write test instead of a read test.
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>                             Destructive -- see "Write tests" below.
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>      --pattern &lt;NUM&gt;        Byte pattern used to fill write buffers.
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>                             Default 0. Range [0, 255]. Silently
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>                             ignored (not an error) on read tests.
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>      --flush-interval &lt;NUM&gt; Issue a flush every N completed requests.
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>                             Default 0 (never). Range [0, 2147483647].
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>                             Requires -w when nonzero; must be &gt;= depth.
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>      --no-drain             Accepted no-op -- v1's serial execution
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>                             always drains the (single-entry) queue.
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>  -t, --cache &lt;CACHE&gt;        Cache mode. Only 'writeback' (qemu's
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>                             default) is supported; other valid qemu
+<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>                             modes are refused as not-yet-supported.
+<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>  -i, --aio &lt;AIO&gt;            AIO backend selector. Every value is
+<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>                             refused; no backend is implemented yet.
+<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>  -n                         Native AIO. Refused; not yet supported.
+<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>  -f, --format &lt;FMT&gt;         Format hint. Ignored -- the input format
+<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>                             is auto-detected, like dd's -f posture.
+<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>  -q                         Suppress the progress indicator. instar
+<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>                             has none; accepted as a no-op.
+<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>  -U, --force-share          Force sharing. instar performs no image
+<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>                             locking; accepted as a no-op.
+<a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a>      --image-opts           Indicates FILENAME is a complete image
+<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a>                             specification. Not yet supported.
+<a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>      --output &lt;FORMAT&gt;      human (default) | json
 </code></pre></div>
 <p><code>FILENAME</code> is the image to benchmark. The full flag surface is
 reported by <code>instar bench --help</code>.</p>

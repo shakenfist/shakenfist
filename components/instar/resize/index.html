@@ -16201,8 +16201,35 @@ metadata mutation, and applies the patches via virtio-block.</p>
 </tr>
 </tbody>
 </table>
-<p>Suffix multipliers: <code>b</code>=512, <code>k</code>/<code>K</code>=1024, <code>M</code>=1024², <code>G</code>=1024³,
-<code>T</code>=1024⁴, <code>P</code>=1024⁵, <code>E</code>=1024⁶. An absent suffix is bytes.</p>
+<p>Suffix multipliers: <code>B</code>/<code>b</code>=1, <code>k</code>/<code>K</code>=1024, <code>M</code>=1024², <code>G</code>=1024³,
+<code>T</code>=1024⁴, <code>P</code>=1024⁵, <code>E</code>=1024⁶. An absent suffix is bytes, and so is
+<code>b</code> — qemu-img's <code>b</code> is one byte, not qemu-io's 512-byte block, so
+<code>4096b</code> is 4096 bytes and shrinks a 1 MiB image.</p>
+<p>A decimal fraction may precede any suffix that scales: <code>+1.5M</code>,
+<code>20.5M</code> and <code>.5G</code> are all accepted, and so is <code>1.M</code>. A fraction with
+no suffix, or with <code>B</code>/<code>b</code>, is refused, because a fraction of a byte
+is not a size. A fraction that is not a whole number of bytes rounds
+to the nearest byte, halves upwards.</p>
+<p>The resolved size must be a whole sector for every format but raw --
+512 bytes for qcow2, vmdk and vhd, and a VHDX's own logical sector
+size, because each records its size in sectors:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>$ instar resize disk.qcow2 33554433
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Error: "resize: the new size must be a multiple of 512"
+</code></pre></div>
+<p>Nothing is written, and <code>qemu-img resize</code> refuses the same request on
+a qcow2 ("The new size must be a multiple of 512"). A raw image takes
+any byte count, as it does under qemu-img: it has no metadata to keep
+aligned, so <code>instar resize -f raw disk.raw 33554433</code> leaves a file of
+exactly 33554433 bytes.</p>
+<p><code>create</code> is deliberately more forgiving than <code>resize</code> here: <code>instar
+create -f vhdx x 33554433</code> succeeds, because qemu's <code>vhdx_co_create_opts</code>
+rounds a requested size up to a sector and instar matches it, while
+<code>instar resize -f vhdx x 33554433</code> fails. The asymmetry is the safer
+pair of the two defaults -- a create has no data to lose, so rounding
+is a courtesy, whereas rounding a resize down would silently discard
+what lies past the rounded size and rounding it up would hand back a
+disk bigger than the one asked for. See the VHDX and VHD create-rounding
+entries in <a href="/components/instar/quirks/">quirks.md</a> for the rounding <code>create</code> applies.</p>
 <p>A subtractive end-spec implies shrink, but <code>--shrink</code> must still be
 passed explicitly — it documents the user's intent to discard data
 beyond the new EOF.</p>
@@ -16263,6 +16290,23 @@ by <code>tests/test_resize.py:TestResizeBaselineMatrix</code>). For vmdk / vpc
 / vhdx — formats <code>qemu-img resize</code> does not support — the
 post-resize state is verified by <code>tests/test_resize.py:TestResize
 Consistency</code> (instar resize → instar info → instar check).</p>
+<p><strong>A qcow2 shrink keeps the size it was given.</strong> The header records
+the requested size, not a cluster-aligned version of it, as qemu does:
+shrinking a 10 MiB image to 5 MiB + 4096 reports a virtual size of
+5246976, which is not a multiple of the 64 KiB cluster. Only whole
+clusters are discarded, so the cluster holding the new last byte stays
+allocated. A size inside the first cluster is a size like any other --
+<code>--shrink</code> to 4096 on a 64 KiB-cluster image gives a 4096-byte disk --
+and only a size of zero is refused.</p>
+<p>The kept cluster's tail is left as it was. Shrinking past the middle of
+a cluster and then growing back exposes the bytes that were above the
+new size again, rather than zeros, because the shrink discards whole
+clusters and writes nothing into the one it keeps. qemu-img does the
+same, measured on 10.0.13: a 10 MiB qcow2 holding <code>0xa5</code> across 6 MiB,
+shrunk to 5246976 and grown back to 10 MiB, reads <code>0xa5</code> for all 61440
+bytes from 5246976 to the end of that cluster under both tools. A grow
+<em>past</em> the old EOF still reads as zeros, which is what the plan's
+zero-check covers.</p>
 <p><strong>Image-size ceiling.</strong> qcow2 grow is bounded only by what the
 filesystem can hold — followup-01's targeted refcount-block
 pre-pass keeps the guest's metadata staging budget O(1) blocks
@@ -16276,17 +16320,17 @@ vhdx have no analogous metadata-staging step and are bounded
 only by filesystem capacity.</p>
 <h2 id="output-format">Output format<a class="headerlink" href="#output-format" title="Permanent link">&para;</a></h2>
 <p>Human (default):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Image resized.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Image resized.
 </code></pre></div>
 <p>(matches <code>qemu-img resize</code> byte-for-byte.) JSON (<code>--output=json</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">"filename"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/path/to/disk.qcow2"</span><span class="p">,</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2"</span><span class="p">,</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">"action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"grow"</span><span class="p">,</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">"old_virtual_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">1048576</span><span class="p">,</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">"new_virtual_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">67108864</span><span class="p">,</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">"new_file_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">262144</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">"filename"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/path/to/disk.qcow2"</span><span class="p">,</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2"</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">"action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"grow"</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nt">"old_virtual_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">1048576</span><span class="p">,</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">"new_virtual_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">67108864</span><span class="p">,</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">"new_file_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">262144</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="p">}</span>
 </code></pre></div>
 <p><code>action</code> is one of <code>grow</code> / <code>shrink</code> / <code>noop</code>. <code>-q</code> (quiet)
 suppresses both forms on success and prints only errors.</p>
@@ -16383,9 +16427,9 @@ entire data region. This is a deliberate divergence — see
  bitmaps). <code>qemu-img resize</code> instead resizes the image,
  dropping/invalidating the bitmaps. instar fails with:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>refusing to resize an image with persistent dirty bitmaps (would
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>discard them); remove the bitmaps first with `instar bitmap
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>--remove` or qemu-img
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>refusing to resize an image with persistent dirty bitmaps (would
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>discard them); remove the bitmaps first with `instar bitmap
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>--remove` or qemu-img
 </code></pre></div>
 <p>The refusal prevents silent bitmap-data loss; remove the bitmaps
   first with <code>instar bitmap --remove</code> (see
@@ -16486,24 +16530,24 @@ baseline comparison, see <code>tests/helpers/info_json.py</code> and the
 <code>tests/test_resize.py</code>.</p>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Grow a qcow2 image by 1 GiB:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>instar resize -f qcow2 disk.qcow2 +1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar resize -f qcow2 disk.qcow2 +1G
 </code></pre></div>
 <p>Grow a raw image to an absolute size with preallocation:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar resize -f raw --preallocation falloc disk.raw 64M
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar resize -f raw --preallocation falloc disk.raw 64M
 </code></pre></div>
 <p>Shrink a qcow2 image, discarding data above the new EOF:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar resize -f qcow2 --shrink disk.qcow2 -512M
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar resize -f qcow2 --shrink disk.qcow2 -512M
 </code></pre></div>
 <p>Grow a VHDX image (qemu-img cannot — <code>Image format driver does
 not support resize</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar resize -f vhdx disk.vhdx 100G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar resize -f vhdx disk.vhdx 100G
 </code></pre></div>
 <p>JSON output for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar resize -f qcow2 --output=json disk.qcow2 16M
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar resize -f qcow2 --output=json disk.qcow2 16M
 </code></pre></div>
 <p>Auto-detect the format from the file's magic bytes (works for
 any of raw / qcow2 / vmdk / vpc / vhdx):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar resize disk.qcow2 +1G
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar resize disk.qcow2 +1G
 </code></pre></div>
 
 

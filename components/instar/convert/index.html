@@ -4727,6 +4727,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-size-of-the-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The size of the output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#differencing-images" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15966,6 +15977,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-size-of-the-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The size of the output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#differencing-images" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16114,6 +16136,18 @@ The default can also be set via <code>convert.sparse</code> in the config file.<
   of <code>qemu-img create -o subformat=fixed,block_state_zero=off</code>; see the
   "VHDX partial last block" section of <a href="/components/instar/quirks/">quirks.md</a>.</li>
 </ul>
+<h2 id="the-size-of-the-output">The size of the output<a class="headerlink" href="#the-size-of-the-output" title="Permanent link">&para;</a></h2>
+<p>The output is as big as the source's virtual size. For a structured
+source that is the size its header records. A raw or otherwise
+unidentified source has no header to ask, so its virtual size is its
+own file length rounded up to a 512-byte sector, which is what
+<code>qemu-img info</code> reports for one and what <code>instar info</code> prints: a
+1536-byte raw file converts to a 1536-byte raw image, and to a qcow2
+whose virtual size is 1536. A file shorter than one sector rounds up,
+so a 100-byte source converts to 512 bytes.</p>
+<p><code>dd</code> is the exception, because its <code>count</code>, <code>skip</code> and <code>seek</code> operands
+describe a window of the source rather than the whole of it; see
+<a href="/components/instar/dd/">dd.md</a>.</p>
 <h2 id="differencing-images">Differencing images<a class="headerlink" href="#differencing-images" title="Permanent link">&para;</a></h2>
 <p>A differencing VHD (footer disk type 4) or VHDX (<code>HasParent</code> set) stores
 only the sectors that differ from a parent image. <code>convert</code> composes such

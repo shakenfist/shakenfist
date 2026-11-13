@@ -10289,6 +10289,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-follow-up-pull-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The follow-up pull request
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#future-work-with-no-home" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16405,6 +16416,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-follow-up-pull-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The follow-up pull request
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#future-work-with-no-home" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16881,6 +16903,22 @@ the others.</p>
 date with its timezone, any step run out of order, any decision
 that changed, and the wave exit codes.</p>
 <ul>
+<li><strong>2026-11-13, AEDT.</strong> The audit merged as <code>163c56c663</code> (#720),
+  and the thirteen findings went to the follow-up pull request
+  decision 4 called for, implemented by five sub-agents over
+  disjoint files. Decision 6 said this phase would record no
+  <code>Merged</code> cell, on the ground that a phase cannot know its own
+  merge commit; the follow-up can, so the cell now carries it and
+  decision 6 is spent rather than wrong.</li>
+<li><strong>2026-11-13, AEDT.</strong> Two corrections the management session
+  made to the sub-agents' work, both in new code. First,
+  <code>resolve_headline_cc</code> returned the matrix's only controller even
+  when the caller had explicitly asked for a different one, which
+  is the same guess finding 2 is about, one case along; it now
+  refuses, with a test. Second, four functions in the bench crate
+  had been widened to <code>pub</code> so the tests could reach them, and
+  were narrowed to <code>pub(crate)</code>, which is what reaching them from
+  the crate's own tests actually needs.</li>
 <li><strong>2026-11-12, AEDT.</strong> All six steps ran on 2026-11-12. 9a ran
   first as the gate and passed; 9b, 9c, 9d and 9e then ran in
   parallel as read-only readers; 9f is this record. No step ran
@@ -17241,6 +17279,105 @@ to the follow-up pull request unless marked otherwise.</p>
 <li><strong>Clamping the forwarded capabilities.</strong> Declined by phase 6
   with reasons; this audit does not reopen it, and step 9e agrees
   the landing argues it down convincingly.</li>
+</ul>
+<h3 id="the-follow-up-pull-request">The follow-up pull request<a class="headerlink" href="#the-follow-up-pull-request" title="Permanent link">&para;</a></h3>
+<p>Decision 4 kept this phase from fixing what it found, and the
+findings above went to a pull request of their own, opened after
+the audit merged as <code>163c56c663</code> (#720). What landed there:</p>
+<table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>Disposition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. A lost repeat narrows the gate's own threshold</td>
+<td>Fixed. <code>collect</code> counts the repeats it walks per arm, <code>aggregate</code> reports the difference as <code>absent_repeats</code>, and <code>report</code> warns per cell and arm, including where no repeat was read at all.</td>
+</tr>
+<tr>
+<td>2. <code>detect_headline_cc</code> falls back to <code>ccs[0]</code></td>
+<td>Fixed. The fallback is gone: <code>resolve_headline_cc</code> takes the sole controller of a single-controller matrix, and otherwise refuses and names the controllers, so an unscoped matrix produces no table rather than a mislabelled one.</td>
+</tr>
+<tr>
+<td>3. The throughput medians were never independently recomputed</td>
+<td>Closed as far as it can be, which is not by recomputation. See below.</td>
+</tr>
+<tr>
+<td>4. A pre-created TLS directory</td>
+<td>Fixed. <code>require_private_dir</code> refuses a symlink, a path this user does not own, and a path any other local user can write, on both the work directory and the TLS directory, before either is created and again immediately before the <code>mkdir</code>.</td>
+</tr>
+<tr>
+<td>5. The namespace holder leaks on SIGKILL</td>
+<td>Fixed. The sleeper's lifetime is the matrix's own worst case, doubled, rather than <code>infinity</code>.</td>
+</tr>
+<tr>
+<td>6. A plan reference in documentation</td>
+<td>Fixed. The sentence delivers the same verdict without the word.</td>
+</tr>
+<tr>
+<td>7. The reply mask is undocumented</td>
+<td>Fixed. <code>docs/spice/capabilities.md</code> gains <em>Capabilities Through the Proxy</em>, including why the mask is not a security boundary and why masking was declined; <code>caps.rs</code>'s module doc keeps the argument and now points at the page.</td>
+</tr>
+<tr>
+<td>8. The rig's loss field has no caller</td>
+<td>Kept, with a worked invocation in the header <code>docs/testing.md</code> delegates to.</td>
+</tr>
+<tr>
+<td>9. No cross-reference to the bench</td>
+<td>Taken as a pointer only, in the page's opening scope sentence rather than in its Ryll section.</td>
+</tr>
+<tr>
+<td>10. The resource-cost axis is unnamed</td>
+<td>Fixed, in <code>caps.rs</code> and in the new documentation section.</td>
+</tr>
+<tr>
+<td>11. The feature check reads the manifests, not the wheel</td>
+<td>Fixed. A third, independent check opens the built wheel and refuses a binary carrying the transcoder's command-line flag or any openh264. The two manifest checks stay.</td>
+</tr>
+<tr>
+<td>12. The mutation script covered seven of nine tests</td>
+<td>Fixed and widened: the crate's tests go from nine to nineteen and its mutants from seven to twenty-five, with the warmup-to-steady boundary, the QUIC and TCP arms, the GSO control and the certificate and key readers now defended.</td>
+</tr>
+<tr>
+<td>13. A loss field of <code>0.0</code></td>
+<td>Fixed in both scripts, so <code>0</code>, <code>0.0</code> and <code>0.00</code> are one unshaped control.</td>
+</tr>
+</tbody>
+</table>
+<p>Finding 3 cannot be closed the way it was written, and the reason
+is worth recording. The raw per-repeat results the published
+tables were computed from no longer exist: they lived in the
+phase 7 worktree's work directory, which went when that phase's
+branch was cleaned up after merge, and nothing on the host still
+holds them. So the throughput medians cannot now be recomputed
+from the data that produced them, by this audit or by anyone. What
+replaces that is twenty-one fixture tests over the arithmetic
+every published figure passed through, including the throughput
+medians, the spread the gate was measured against, and the
+exclusion rules that decide which repeats reach either. The
+lesson is the cheaper one to apply next time: a measurement
+phase's raw results are an input to its audit, so either the
+audit runs before the worktree is removed or the results are kept
+somewhere that outlives it.</p>
+<p>Three judgement calls in that pull request were the management
+session's rather than any finding's:</p>
+<ul>
+<li><strong>Finding 8, keep rather than remove.</strong> The field has no caller
+  today, which is the whole finding, but <em>Future work</em> names this
+  rig as the one to re-run the kernel congestion-control question
+  with, so the capability has a use ahead of it. A worked example
+  costs less than deleting and restoring it.</li>
+<li><strong>Finding 9, a pointer and nothing more.</strong> The audit's own
+  argument -- that the measurement page owns the bench and that
+  <code>docs/testing.md</code>'s shaped-link material is Ryll's, which the
+  bench is not -- is right, so the page gains one sentence in its
+  scope paragraph and no new section.</li>
+<li><strong>Finding 2's shape.</strong> Refusing is better than labelling the
+  rows as unknown scope: an unscoped table still gets quoted once
+  it is pasted into a page, whereas a non-zero exit produces no
+  table to quote.</li>
 </ul>
 <h3 id="future-work-with-no-home"><code>Future work</code> with no home<a class="headerlink" href="#future-work-with-no-home" title="Permanent link">&para;</a></h3>
 <p>Phases 1, 3, 4 and 5 carry no <em>Future work</em> section of their own,

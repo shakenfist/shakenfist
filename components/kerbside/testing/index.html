@@ -16678,7 +16678,10 @@
 <h1 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h1>
 <p>How Kerbside is tested: running the suite locally, the CI lanes, the
 Ryll-based harnesses, the oVirt console probe, the Tempest plugin, and
-the load-test container images.</p>
+the load-test container images. Performance measurement that carries no
+SPICE is not here: the transport bench in <code>tools/quic-bench/</code> is
+documented with its results in
+<a href="/components/kerbside/performance/quic-transport-bench/">performance/quic-transport-bench.md</a>.</p>
 <h2 id="running-the-test-suite">Running the test suite<a class="headerlink" href="#running-the-test-suite" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tox<span class="w"> </span>-e<span class="w"> </span>py3<span class="w">      </span><span class="c1"># unit tests</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tox<span class="w"> </span>-e<span class="w"> </span>flake8<span class="w">   </span><span class="c1"># style checks on changes since HEAD~</span>

@@ -10447,6 +10447,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#capabilities-through-the-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capabilities Through the Proxy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Capabilities Through the Proxy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-reply-mask-is-not-a-security-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Reply Mask Is Not a Security Boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#common-capabilities" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16101,6 +16129,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#capabilities-through-the-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capabilities Through the Proxy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Capabilities Through the Proxy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-reply-mask-is-not-a-security-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Reply Mask Is Not a Security Boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#common-capabilities" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16277,6 +16333,83 @@ Capabilities are organized into:</p>
 <li><strong>Common capabilities</strong>: Apply to all channel types</li>
 <li><strong>Channel-specific capabilities</strong>: Apply only to specific channels</li>
 </ul>
+<h2 id="capabilities-through-the-proxy">Capabilities Through the Proxy<a class="headerlink" href="#capabilities-through-the-proxy" title="Permanent link">&para;</a></h2>
+<p>Kerbside negotiates capabilities twice: as a server, answering the client's
+link, and as a client, linking to the hypervisor backend. The two directions
+are deliberately not symmetric.</p>
+<p><strong>Offered to the client.</strong> The link reply carries the RSA key the client
+encrypts its ticket to, and the ticket is what selects the backend, so the
+reply has to be sent before Kerbside knows which hypervisor the session will
+reach. The capabilities in it are therefore a fixed table per channel type
+(<code>caps::reply_channel_caps</code> in <code>rust/kerbside-proxy/src/caps.rs</code>), taken from
+what spice-server itself advertises for that channel type — the table cites
+the spice-server source for every bit — and reduced to what Kerbside relays.
+The offered set is tabulated per channel in
+<a href="/components/kerbside/proxy-architecture/#link-capabilities">Proxy Architecture</a>, and a client
+whose common capabilities lack MiniHeader or AuthSelection is refused at link
+time, as <a href="/components/kerbside/spice/spice-link-protocol/#capability-handling">the link protocol</a>
+describes.</p>
+<p><strong>Forwarded to the backend.</strong> The channel capabilities the client advertised
+go to the backend verbatim, through <code>caps::backend_channel_caps</code>, which
+<code>backend::run</code> in <code>rust/kerbside-proxy/src/backend.rs</code> calls for every relayed
+channel. That is what lets spice-server pick image compression, stream codecs
+and drawing operations for the client actually connected, rather than for
+whatever the proxy's own SPICE client would ask for. The common capabilities
+are forwarded too, except for the authentication bits, which describe
+Kerbside's own ticket exchange with the backend rather than the client's:
+AuthSpice is set and AuthSASL cleared, since the backend authenticates
+Kerbside and Kerbside only performs SPICE ticket authentication. Forwarding a
+client's AuthSASL would make a SASL-enabled spice-server skip the ticket key
+pair Kerbside's ticket is encrypted to, for which <code>caps.rs</code> cites the
+spice-server source. The experimental transcoding feature is the one
+exception: a transcoded display channel is read by the proxy's renderer
+instead of by the client, so it is dialled with the renderer's capabilities.</p>
+<h3 id="the-reply-mask-is-not-a-security-boundary">The Reply Mask Is Not a Security Boundary<a class="headerlink" href="#the-reply-mask-is-not-a-security-boundary" title="Permanent link">&para;</a></h3>
+<p>The reply table bounds what Kerbside advertises as a server. It does not bound
+what the session can carry. Because the client's channel capabilities reach
+the backend unmasked, a client can negotiate a spice-server feature Kerbside
+never offered, and spice-server will then send the messages that feature
+enables. The display channel is the standing example: the reply does not offer
+SizedStream, but a client that advertises it has it forwarded, and the
+firewall admits the display channel's <code>stream_data_sized</code> (316), which
+only that capability enables. A unit test in <code>caps.rs</code>
+(<code>unoffered_client_cap_still_admits_its_server_message</code>) pins that case, so
+this is checked rather than asserted.</p>
+<p>Masking the forwarded capabilities down to the offered set was considered and
+declined, because it would be wrong on both counts:</p>
+<ul>
+<li><strong>It would break real clients.</strong> A capability is effective only where both
+  ends advertise it, which is exactly why forwarding the client's set is what
+  makes spice-server encode for the client connected. Ryll's own default
+  display set (<code>DEFAULT_DISPLAY</code> in its <code>shakenfist-spice-protocol</code>) asks for
+  SizedStream, Composite, A8Surface, LZ4Compression, MultiCodec and the MJPEG
+  and H.264 codec bits, none of which the reply table offers. Clamping them
+  would drop every guest to a slower software render path and give up LZ4 on
+  static regions — on every session, not some unusual one.</li>
+<li><strong>It would buy no enforcement.</strong> The
+  <a href="/components/kerbside/proxy-architecture/#the-spice-firewall">firewall's</a> L1 allowlist
+  classifies by opcode and never by the negotiated capability set, and on a
+  channel whose grammar it models it is fail-closed: an opcode that grammar
+  does not hold is a violation, which the firewall observes or terminates on
+  according to the configured verdict. A capability cannot talk a message past
+  it. Message <em>bodies</em> are not checked at all, but that is a separate layer
+  and the reply mask would not change it either way.</li>
+</ul>
+<p>Two consequences do follow from the asymmetry, and neither of them is about
+containment.</p>
+<p>The first is the one to watch. Because the client's capabilities reach the
+backend unmasked, spice-server may send an opcode gated behind a capability
+Kerbside never offered, and fail-closed means an opcode the allowlist does not
+model would terminate a <em>legitimate</em> session. That is safe only because the L1
+table is derived from ryll's complete per-channel message-type tables rather
+than from the reply table, so the opcodes an unoffered capability can enable
+are modelled already. If one ever is not, the fix is to model the opcode in
+the table; it is never to widen a verdict so the traffic passes.</p>
+<p>The second is resource cost on the hypervisor. Forwarding a capability
+Kerbside never offered also lets a client turn on backend work — a video
+encoder, for instance — that the proxy did not advertise, so what a session
+costs the hypervisor is set by what the client asks for and not by the reply
+table.</p>
 <h2 id="common-capabilities">Common Capabilities<a class="headerlink" href="#common-capabilities" title="Permanent link">&para;</a></h2>
 <p>These capabilities apply to all SPICE channels.</p>
 <table>
@@ -16598,6 +16731,9 @@ to a specific capability. The bitmap is sent as an array of 32-bit words.</p>
 <li><a href="/components/kerbside/spice/channel-protocols/">Channel Protocols</a> - Per-channel message formats</li>
 <li><a href="/components/kerbside/spice/scancodes/">Keyboard Scancodes</a> - KeyScancode capability usage</li>
 <li><a href="/components/kerbside/spice/compression-protocols/">Compression Protocols</a> - LZ4/GLZ compression details</li>
+<li><a href="/components/kerbside/proxy-architecture/#link-capabilities">Proxy Architecture</a> - The
+  capabilities Kerbside offers per channel, and the opcode allowlist that does
+  the enforcing the reply mask does not</li>
 </ul>
 
 

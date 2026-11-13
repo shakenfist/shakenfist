@@ -16375,9 +16375,14 @@ metadata via virtio-block.</p>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  vpc:   --subformat, --block-size
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  vhdx:  --subformat, --block-size
 </code></pre></div>
-<p><code>SIZE</code> accepts a suffix from <code>{b,K,M,G,T}</code> (e.g. <code>1G</code>, <code>512M</code>). It is
-required unless <code>-b BACKING</code> is given, in which case it defaults to the
-backing file's virtual size. A monolithicFlat VMDK cannot have a backing
+<p><code>SIZE</code> accepts a suffix from <code>{B,K,M,G,T,P,E}</code> and a decimal fraction
+before any suffix but <code>B</code> (e.g. <code>1G</code>, <code>512M</code>, <code>1.5M</code>, <code>4608.5M</code>), which
+is qemu-img's grammar. The suffix is case-insensitive, so <code>1g</code> is <code>1G</code>.
+<code>B</code> is one byte, as is <code>b</code>, so a fraction with no suffix or a <code>b</code> suffix
+is refused, as a fraction of a byte is not a size. A fraction that is
+not a whole number of bytes is rounded to the nearest byte, with a half
+rounding upwards. <code>SIZE</code> is required unless <code>-b BACKING</code> is given, in
+which case it defaults to the backing file's virtual size. A monolithicFlat VMDK cannot have a backing
 file, so it always needs <code>SIZE</code>.</p>
 <p>The full flag surface is reported by <code>instar create --help</code>.</p>
 <h2 id="target-formats">Target formats<a class="headerlink" href="#target-formats" title="Permanent link">&para;</a></h2>

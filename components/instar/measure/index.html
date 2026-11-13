@@ -16286,10 +16286,12 @@ for vmdk, vpc (VHD), and vhdx targets that qemu-img cannot measure.</p>
 <p>Common options:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>  -O, --target-format &lt;FMT&gt;       raw | qcow2 | vmdk | vpc | vhdx
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>                                  Default: raw
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  -s, --size &lt;SIZE&gt;               Hypothetical image size with K/M/G/T suffix
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  -f, --format &lt;FMT&gt;              Source format override (usually auto-detected)
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>      --output &lt;FORMAT&gt;           human (default) | json
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  -o, --options &lt;KEY=VALUE,...&gt;   qemu-img-style options (repeatable)
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  -s, --size &lt;SIZE&gt;               Hypothetical image size, qemu-img's grammar
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                                  (case-insensitive B/K/M/G/T/P/E
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>                                  suffix, fraction allowed)
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  -f, --format &lt;FMT&gt;              Source format override (usually auto-detected)
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>      --output &lt;FORMAT&gt;           human (default) | json
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  -o, --options &lt;KEY=VALUE,...&gt;   qemu-img-style options (repeatable)
 </code></pre></div>
 <p>Per-target option flags (alternatives to <code>-o</code>):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>  qcow2: --cluster-size, --refcount-bits, --extended-l2,
@@ -16431,6 +16433,15 @@ qemu-img's:</p>
 <ul>
 <li><strong>Raw sources with on-disk sparse extents</strong>: instar over-reports <code>required</code>
   because the raw scanner does not use <code>SEEK_HOLE</code>/<code>SEEK_DATA</code>. qemu-img does.</li>
+<li><strong>Raw sources whose length is not a multiple of the input sector
+  size</strong>: instar measures the virtio device's capacity rather than the
+  file's own length, so a 1536-byte raw source measures to <code>-O raw</code> as
+  65536 where qemu-img says 1536. <code>-O qcow2</code> agrees with qemu-img
+  (393216 either way), because the target's cluster rounding swallows
+  the difference. <code>instar info</code> reports 1536 for the same file, so this
+  is instar disagreeing with itself; tracked as
+  <a href="https://github.com/shakenfist/instar/issues/907">#907</a> and pinned by
+  <code>TestMeasureRawVirtualSize</code>.</li>
 <li><strong>QCOW2 sources for some real-world images</strong>: instar's scanner counts
   allocated bytes slightly differently. Likely a compressed-cluster or
   extended-L2 subcluster edge case under investigation.</li>

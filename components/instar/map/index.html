@@ -16597,7 +16597,9 @@ multi-extent sources are refused host-side (see below).</p>
 <h3 id="raw">raw<a class="headerlink" href="#raw" title="Permanent link">&para;</a></h3>
 <p>Single fully-allocated extent covering the virtual size. The no_std
 raw parser cannot call <code>SEEK_HOLE</code> from inside the guest, so on-disk
-sparseness is not reflected (see below).</p>
+sparseness is not reflected (see below), and the virtual size the
+extent covers is the virtio device's capacity rounded up to the input
+sector size rather than the file's own length (see below as well).</p>
 <h2 id="malformed-block-tables">Malformed block tables<a class="headerlink" href="#malformed-block-tables" title="Permanent link">&para;</a></h2>
 <p><code>map</code>'s VHDX walk refuses a payload block whose BAT entry names a
 byte range that is the image's own structure, rather than reporting
@@ -16663,6 +16665,13 @@ rationale and the future-work pointer.</p>
 <li><strong>Raw source sparseness is not detected</strong> — instar reports raw
   as one fully-allocated extent; <code>qemu-img map</code> walks <code>SEEK_HOLE</code>.
   See <a href="/components/instar/quirks/#raw-source-sparseness-is-not-detected">docs/quirks.md § Raw source sparseness is not detected</a>.</li>
+<li><strong>A raw source's extent is padded to the input sector size</strong> —
+  a 1536-byte raw file maps as one extent of <code>length: 65536</code> where
+  <code>qemu-img map</code> says 1536, because the guest reads the virtio
+  device's capacity rather than the file's length. <code>instar info</code> and
+  the chain-reading operations report 1536 for the same file.
+  Tracked as <a href="https://github.com/shakenfist/instar/issues/907">#907</a>.
+  See <a href="/components/instar/quirks/#a-raw-sources-virtual-size-is-padded-to-64-kib-in-map-and-measure">docs/quirks.md § A raw source's virtual size is padded to 64 KiB in <code>map</code> and <code>measure</code></a>.</li>
 <li><strong>VHD unallocated blocks are reported as <code>present: false</code></strong> —
   instar reports <code>present=false, zero=true, data=false</code> (faithful
   to BAT <code>0xFFFFFFFF</code>); qemu-img reports
