@@ -663,3 +663,66 @@ leaking into the ordering-only edge. The field lives on the shared edge
 model, the API validates it on both lists, and the API reference
 documents it for an edge in either list, so ignoring it on `runs_after`
 would silently drop a parameter this project has already published.
+
+**Step 2d** added nine mutants rather than the ten its row lists, the
+empty-lists mutant having been dropped above, for twenty in the set.
+All twenty are killed.
+
+The definition of done's arithmetic survives that change and should
+not be "corrected" by a later reader: phase 1 left the set at ten,
+step 2b added the cascade's terminal guard, and 2d added nine, so the
+phase does add ten and fewer than twenty is still a failure. Step 2d's
+own report claimed both terms of that criterion were wrong. They are
+not.
+
+**Adding a sixth file to the mutation script exposed a latent bug in
+it which destroyed one of them.** The pristine copies were named by
+`os.path.basename(path)`, and a daemon's module is `main.py` whichever
+daemon it is, so `shakenfist/daemons/database/main.py` and
+`shakenfist/daemons/sidechannel/main.py` shared one save file. The
+consequences compound in a way worth recording, because every one of
+them reads as success:
+
+- the save loop wrote the sidechannel module over the database
+  module's only copy;
+- the restore after the first mutant in the database daemon wrote the
+  sidechannel module into `shakenfist/daemons/database/main.py`;
+- every later mutant then failed with a discovery `ImportError`
+  (`rc=100`) rather than a test failure, which the script still counts
+  as a kill, because it checks only that the run failed and that the
+  named test appears in the output -- and it does appear, in the list
+  of tests which could not be imported;
+- the end-of-run restoration check compared **both** `main.py` files
+  against the one surviving copy, so it reported both restored.
+
+The first run therefore printed seven kills and six files restored
+while a source file in the tree had been replaced with a different
+module. This is a tool whose whole purpose is to distinguish a guard
+which holds from a guard which cannot fail, and its own restoration
+report could not fail.
+
+Copies are now named for the whole path, and `main()` refuses to start
+if two entries in `FILES` map to the same save name. That check runs
+before anything is copied, because by the time a collision is
+observable the copy it collided with is already gone. **A new entry in
+`FILES` must map to a distinct save name**, which the guard now
+enforces rather than leaving to whoever adds the seventh file.
+
+Note what this was not: the hazard the script's own header warns about
+is a *concurrent* edit, and there was none. The script destroyed the
+file by itself, on a single serial run, in the course of doing exactly
+what it is for.
+
+The management session re-ran the whole set rather than accepting the
+report, and verified it the ways the script's own output cannot. All
+twenty killed with `rc=1`, which distinguishes a failing test from the
+import failure that masked the corruption. `git diff --name-only HEAD`
+lists only the script, so every mutated file is byte-identical to the
+commit rather than to a copy of itself. The two daemon modules differ
+from each other. No mutation string survives anywhere in the six
+files, the nine new guards were confirmed present by name, and the 40
+tests pass on the restored tree. The collision guard was driven
+directly, by handing a deliberately colliding `FILES` tuple to a
+throwaway directory of placeholder files: it refuses before copying
+anything, and the old basename scheme maps these six paths to five
+names, which is the bug stated as a measurement.
