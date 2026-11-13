@@ -2801,13 +2801,18 @@ message DeleteClusterOperationErrorRequest {
 
 message RecordFederatedExchangeRequest {
   string token_id = 1;      // jti, or a hash of the signature
-  string rule_uuid = 2;     // MappingRule UUID as string
+  // What the token was spent on, as a UUID string: a MappingRule for
+  // a targeted exchange, a TrustedIssuer for a human login, which
+  // claims one token for the whole credential set it mints. The field
+  // keeps its original name because the two are indistinguishable on
+  // the wire and renaming it would break every deployed sf-api.
+  string rule_uuid = 2;
   double expires_at = 3;    // The inbound token's exp
 }
 
 message RecordFederatedExchangeReply {
-  // True if this (token, rule) pair was recorded for the first time,
-  // false if it was already present and this is therefore a replay.
+  // True if this pair was recorded for the first time, false if it was
+  // already present and this is therefore a replay.
   bool recorded = 1;
   // Set only when we could not find out. "Already claimed" is not an
   // error, and the distinction matters: recorded=false means refuse

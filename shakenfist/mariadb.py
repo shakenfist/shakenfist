@@ -2545,16 +2545,29 @@ def _ensure_cluster_operation_errors_schema(
 def _get_federation_replay_table() -> sa.Table:
     """Get or create the federation_replay table definition.
 
-    One row per identity token already exchanged through one mapping
-    rule. The composite primary key on (token_id, rule_uuid) is the
-    whole mechanism: the exchange inserts unconditionally and a
-    duplicate key error *is* the replay detection, so there is no
-    read-then-write window for two concurrent replays to slip through.
+    One row per identity token already spent. The composite primary
+    key on (token_id, rule_uuid) is the whole mechanism: the writer
+    inserts unconditionally and a duplicate key error *is* the replay
+    detection, so there is no read-then-write window for two
+    concurrent replays to slip through.
 
-    Refusal is per (token, rule) rather than per token because
-    exchanging one identity against two rules to reach two namespaces
-    is a legitimate pattern, while re-exchanging it against the same
-    rule is not.
+    The second key component is what the token was spent *on*: a
+    mapping rule for a targeted exchange, a trusted issuer for a human
+    login. The column keeps the name it was created with, because
+    there is no schema difference between the two -- it is a plain
+    uuid with no foreign key -- and a migration to rename it would buy
+    nothing a docstring cannot say.
+
+    Refusal is per (token, thing spent on) rather than per token
+    because exchanging one identity against two rules to reach two
+    namespaces is a legitimate pattern, while re-exchanging it against
+    the same rule is not. A login reaches those same two namespaces in
+    one request, so it claims the token against the issuer once rather
+    than against each rule it matched: per-rule claims would leave a
+    login which failed part way through unable to be retried to
+    completion, since the retry would answer with whichever
+    credentials the first attempt had not already taken and nothing in
+    the answer would say it was short.
 
     ``token_id`` is the token's ``jti`` claim where it has a usable
     one, and a hash of its signature otherwise -- see
@@ -23075,12 +23088,16 @@ def _direct_delete_cluster_operation_error(op_uuid: UUID) -> bool:
 
 def _direct_record_federated_exchange(
         token_id: str, rule_uuid: UUID, expires_at: float) -> bool:
-    """Claim a (token, rule) pair, returning False if already claimed.
+    """Claim one use of a token, returning False if already claimed.
+
+    The second component of the pair is what the token was spent on: a
+    mapping rule for a targeted exchange, a trusted issuer for a human
+    login.
 
     The insert is the check. A duplicate key error means some other
     request -- possibly on another API node, possibly microseconds ago
-    -- already exchanged this token through this rule, and there is no
-    window between deciding and recording for a second attempt to slip
+    -- already spent this token on this thing, and there is no window
+    between deciding and recording for a second attempt to slip
     through.
 
     A database failure raises rather than returning either answer. On
@@ -23413,7 +23430,7 @@ def _grpc_delete_cluster_operation_error(op_uuid: UUID) -> bool:
 
 def _grpc_record_federated_exchange(
         token_id: str, rule_uuid: UUID, expires_at: float) -> bool:
-    """Claim a (token, rule) pair via the database service."""
+    """Claim one use of a token via the database service."""
     try:
         stub = _get_database_stub()
         request = database_pb2.RecordFederatedExchangeRequest(
@@ -24134,18 +24151,26 @@ def delete_cluster_operation_error(op_uuid: 'str | UUID') -> bool:
 
 def record_federated_exchange(
         token_id: str, rule_uuid: 'str | UUID', expires_at: float) -> bool:
-    """Claim a (token, rule) pair for a federated exchange.
+    """Claim one use of an identity token.
+
+    The second component of the pair is what the token was spent on:
+    the mapping rule a targeted exchange named, or the trusted issuer
+    a human login came in through. One row means that thing has been
+    bought with this token already.
 
     Args:
         token_id: The token's identity, from
             ``federation.token_identity``.
-        rule_uuid: The mapping rule being exchanged through.
+        rule_uuid: The uuid of what the token is being spent on -- a
+            mapping rule for an exchange, a trusted issuer for a
+            login. The parameter keeps the column's original name; see
+            ``_get_federation_replay_table``.
         expires_at: The inbound token's ``exp``, which is when this
             row stops being needed.
 
     Returns:
-        True if the pair was recorded, meaning this is the first
-        exchange of this token through this rule. False if it was
+        True if the pair was recorded, meaning this is the first time
+        this token has been spent on this thing. False if it was
         already present, meaning a replay.
 
     Raises:

@@ -9298,7 +9298,12 @@ class RecordFederatedExchangeRequest(_message.Message):
     token_id: _builtins.str
     """jti, or a hash of the signature"""
     rule_uuid: _builtins.str
-    """MappingRule UUID as string"""
+    """What the token was spent on, as a UUID string: a MappingRule for
+    a targeted exchange, a TrustedIssuer for a human login, which
+    claims one token for the whole credential set it mints. The field
+    keeps its original name because the two are indistinguishable on
+    the wire and renaming it would break every deployed sf-api.
+    """
     expires_at: _builtins.float
     """The inbound token's exp"""
     def __init__(
@@ -9324,8 +9329,8 @@ class RecordFederatedExchangeReply(_message.Message):
     ERROR_FIELD_NUMBER: _builtins.int
     OK_FIELD_NUMBER: _builtins.int
     recorded: _builtins.bool
-    """True if this (token, rule) pair was recorded for the first time,
-    false if it was already present and this is therefore a replay.
+    """True if this pair was recorded for the first time, false if it was
+    already present and this is therefore a replay.
     """
     error: _builtins.str
     """Set only when we could not find out. "Already claimed" is not an

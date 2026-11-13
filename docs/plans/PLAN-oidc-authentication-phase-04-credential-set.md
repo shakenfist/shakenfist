@@ -226,9 +226,21 @@ that are login capable: a `client_id`, plus at least one of
 
 `issuer_claiming_url()` (`shakenfist/federation.py:247`), which is
 what `issuer_for_token()` resolves through, accepts any issuer whose
-state is not `STATE_DELETED`. The two sets differ for an issuer in
-`STATE_ERROR` or `STATE_DELETE_WAIT`, and they differ for every
-issuer configured for workloads only.
+state is not `STATE_DELETED`.
+
+**Corrected during execution of step 4c.** This finding first said
+the two sets differ for an issuer in `STATE_ERROR` or
+`STATE_DELETE_WAIT`. Neither state exists for a trusted issuer:
+`state_targets` (`shakenfist/trusted_issuer.py:67`) admits only
+`None -> initial`, `initial -> {created, deleted}` and
+`created -> deleted`, because configuring an issuer is atomic and so
+its state machine has no error state and nothing between created and
+deleted. The two sets really differ in two places. An issuer whose
+static row was written but whose state write did not land reads as a
+state of `None`, which is not `STATE_DELETED`, so it resolves through
+the exchange's predicate while the listing's `ACTIVE_STATES` test
+excludes it. And they differ for every issuer configured for workloads
+only, which is every issuer in existence today.
 
 So a token from an issuer `GET /auth/login` does not advertise would
 otherwise resolve and validate on the login path. Changing
@@ -675,6 +687,61 @@ settled before any step ran.
   conflict with whichever of the three lands first; the resolution is
   the one phase 3 used, rebase and regenerate with `tox -egenprotos`,
   never a hand-edit.
+
+**Steps ran in the planned order**, 4a then 4b then 4c, each committed
+after review before the next began. They share one worktree and
+`pre-commit`'s stash is repository-wide, so running two at once would
+have let one silently revert the other.
+
+**Corrections the management session made to a step's work.**
+
+* 4b wrote the audience override's fallback as `audience or
+  configuration.audience`. The client identifier column has no
+  minimum length (`shakenfist/schema/trusted_issuer_attributes.py:92`
+  declares it `Optional[str]` with `max_length` only), so an empty
+  string is storable, and `or` would have read it as "use the
+  issuer's audience" — verifying a person's identity token against
+  the audience a *workload's* token carries, which is the one
+  widening D2 forbids. Changed to an explicit `is None` test, so an
+  empty value fails the completeness check instead, and pinned with
+  a test that was confirmed to fail against the original.
+
+**Facts this phase's execution proved wrong, corrected at source.**
+
+* **Survey finding 7** claimed the listing's and the exchange's
+  issuer predicates differ for an issuer in `STATE_ERROR` or
+  `STATE_DELETE_WAIT`. A trusted issuer has neither state. Found by
+  4c, corrected in the finding itself, and the endpoint's comment
+  describes the real difference: a static row whose state write did
+  not land reads as `None`, which is not `STATE_DELETED`.
+
+**Design choices taken during execution that the step table left
+open, and kept.**
+
+* The shared login-capable predicate returns the *audience* rather
+  than a boolean (`login_audience()`). The mint then cannot reach
+  `validate_token()` with an unchecked column at all, which is a
+  stronger guarantee than remembering to check first, and it is why
+  `client_id` appears nowhere inside `AuthLoginEndpoint.post` as the
+  definition of done requires.
+* `get_objects_by_state()` returning `None` answers **503**, not a
+  401. D7 required only that it refuse; 503 is the honest code,
+  because the failure is ours and the token is still good. It is
+  taken before the replay claim, so the token is not spent and the
+  retry can succeed.
+* The body-size hook tests membership of a two-path frozenset rather
+  than a `/auth/` prefix. `POST /auth` sends a namespace key and the
+  rest of the family is authenticated with bodies this limit is not
+  sized for, so a prefix test would have applied a JWT-sized cap to
+  routes that are not JWTs.
+* A match whose namespace has been deleted is skipped and logged
+  rather than refusing the whole login, for the same reason a rule
+  that can grant nothing is skipped. If that empties the set the
+  login is refused rather than answered with `200 []`.
+* `refuse_replay()`'s body was factored into a private
+  `_claim_token_use()` shared with the new
+  `refuse_replay_for_login()`. The public function's signature and
+  refusal message are unchanged.
 
 ## Results
 

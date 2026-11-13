@@ -648,8 +648,9 @@ def enforce_rate_limit(source: str) -> None:
             f'minute, limit is {limit}')
 
 
-def refuse_replay(token: str, claims: dict[str, Any], rule: Any) -> None:
-    """Claim this (token, rule) pair, raising TokenReplayed if taken.
+def _claim_token_use(token: str, claims: dict[str, Any],
+                     spent_on: Any) -> bool:
+    """Record that this token was spent on this thing, once.
 
     The claim is an unconditional insert against a composite primary
     key, so the duplicate key error *is* the detection. Nothing reads
@@ -659,6 +660,12 @@ def refuse_replay(token: str, claims: dict[str, Any], rule: Any) -> None:
     The row expires with the token: past its exp the token is refused
     by validation before this check is reached, so the record has
     nothing left to protect.
+
+    ``spent_on`` is whatever the token bought -- the mapping rule a
+    targeted exchange named, or the issuer a login came in through --
+    and only its uuid is stored. Returns False when the pair was
+    already present, which is a replay; the caller says so in the
+    terms its own path uses.
     """
     expires_at = claims.get('exp')
     # bool is a subclass of int, and True would silently become an
@@ -671,8 +678,43 @@ def refuse_replay(token: str, claims: dict[str, Any], rule: Any) -> None:
         raise exceptions.TokenValidationFailed(
             'token has no usable exp claim')
 
-    if not mariadb.record_federated_exchange(
-            token_identity(token, claims), rule.uuid, float(expires_at)):
+    return mariadb.record_federated_exchange(
+        token_identity(token, claims), spent_on.uuid, float(expires_at))
+
+
+def refuse_replay(token: str, claims: dict[str, Any], rule: Any) -> None:
+    """Claim this (token, rule) pair, raising TokenReplayed if taken.
+
+    The grain is per rule because exchanging one identity against two
+    rules to reach two namespaces is a legitimate pattern, while
+    re-exchanging it against the same rule is not. A login claims the
+    whole set at once instead -- see refuse_replay_for_login.
+    """
+    if not _claim_token_use(token, claims, rule):
         raise exceptions.TokenReplayed(
             f'this token has already been exchanged through rule '
             f'{rule.namespace}/{rule.name}')
+
+
+def refuse_replay_for_login(token: str, claims: dict[str, Any],
+                            issuer: TrustedIssuer) -> None:
+    """Claim this (token, issuer) pair, raising TokenReplayed if taken.
+
+    A login is matched against every rule the cluster holds for an
+    issuer and mints one key per match, so there is no single rule to
+    claim the token against. It is claimed against the issuer instead,
+    once for the whole login and before any key is minted.
+
+    Claiming the pairs one at a time would produce the worst
+    available outcome, because the client could not tell: a login
+    which minted three of five keys and then failed could never be
+    retried to completion, since the retry would find three pairs
+    taken and two free and would answer with a set of two, with
+    nothing in it to say the set was short. One claim makes the retry
+    a clean refusal the person can act on by asking their provider for
+    another token.
+    """
+    if not _claim_token_use(token, claims, issuer):
+        raise exceptions.TokenReplayed(
+            f'this token has already been used to log in through '
+            f'{issuer.name}')

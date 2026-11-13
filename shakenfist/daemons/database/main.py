@@ -6429,7 +6429,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.RecordFederatedExchangeRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.RecordFederatedExchangeReply:
-        """Claim a (token, rule) pair for a federated exchange."""
+        """Claim one use of an identity token.
+
+        The pair's second component is what the token was spent on: a
+        mapping rule for a targeted exchange, a trusted issuer for a
+        human login.
+        """
         try:
             self.monitor.counters['record_federated_exchange'].inc()
             recorded = mariadb._direct_record_federated_exchange(

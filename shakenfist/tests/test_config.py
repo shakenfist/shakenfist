@@ -170,6 +170,35 @@ class DiscoverySettingBoundsTestCase(base.ShakenFistTestCase):
         self.assertEqual(1024, config.FEDERATION_DISCOVERY_MAX_BYTES)
 
 
+class LoginCredentialCapBoundsTestCase(base.ShakenFistTestCase):
+    """The human login credential cap may not be zero or negative.
+
+    A cap of zero refuses every login on a cluster which has a
+    matching mapping rule at all, which is not how anybody would
+    choose to turn human login off -- removing the rules, or the
+    issuer's client identifier, is. Refused at load where the operator
+    can still see what they typed.
+    """
+
+    @mock.patch.dict(
+        'os.environ',
+        {'SHAKENFIST_FEDERATION_MAX_LOGIN_CREDENTIALS': '0'})
+    def test_a_zero_cap_is_refused(self):
+        self.assertRaises(ValueError, SFConfig)
+
+    @mock.patch.dict(
+        'os.environ',
+        {'SHAKENFIST_FEDERATION_MAX_LOGIN_CREDENTIALS': '-1'})
+    def test_a_negative_cap_is_refused(self):
+        self.assertRaises(ValueError, SFConfig)
+
+    def test_the_default_bounds_the_work_one_token_commands(self):
+        # Eight keys in eight namespaces is the largest credential set
+        # measured in use, so the default is twice that and no more:
+        # each credential costs a bcrypt hash.
+        self.assertEqual(16, SFConfig().FEDERATION_MAX_LOGIN_CREDENTIALS)
+
+
 class SecretConfigFieldTestCase(base.ShakenFistTestCase):
     """The three configuration values which carry credentials.
 

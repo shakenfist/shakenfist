@@ -660,6 +660,29 @@ class SFConfig(BaseSettings):
             'global limit -- size it accordingly.'
         )
     )
+    FEDERATION_MAX_LOGIN_CREDENTIALS: int = Field(
+        16,
+        # ge=1 because a cap of zero refuses every login on a cluster
+        # which has any matching mapping rule at all, which is not how
+        # anybody would choose to turn human login off -- removing the
+        # rules, or the issuer's client identifier, is.
+        ge=1,
+        description=(
+            'The most namespace keys one human login may mint. A person\'s '
+            'entitlements are every mapping rule their identity satisfies, '
+            'one key per rule, and each key costs a bcrypt hash: with no '
+            'cap, one valid identity token commands as much deliberately '
+            'slow work as the cluster happens to have matching rules. A '
+            'login which matches more rules than this is refused outright '
+            'rather than truncated, because a person cannot tell a short '
+            'credential set from a complete one and would discover the '
+            'difference as a permission denied in whichever namespace fell '
+            'off the end. The default is twice the largest credential set '
+            'measured in use. Raising it raises the work one token can '
+            'command; FEDERATION_RATE_LIMIT_PER_MINUTE bounds how often a '
+            'source may try.'
+        )
+    )
     API_ADVERTISED_HOST: str = Field(
         'localhost',
         description='The DNS name of the REST API host as advertised to users.'
