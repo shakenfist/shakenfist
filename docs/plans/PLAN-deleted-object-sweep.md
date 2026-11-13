@@ -656,7 +656,7 @@ shape of phases 2 and 3, so only their scope is fixed here.
 | 2. A fair, bounded drain | [PLAN-deleted-object-sweep-phase-02-fair-drain.md](PLAN-deleted-object-sweep-phase-02-fair-drain.md) | Complete | dd5723c3db |
 | 3. Cheaper hard deletes | [PLAN-deleted-object-sweep-phase-03-batched-deletes.md](PLAN-deleted-object-sweep-phase-03-batched-deletes.md) | Complete | 1090771e64 |
 | 4. Drain sfcbr and keep it drained | [PLAN-deleted-object-sweep-phase-04-drain.md](PLAN-deleted-object-sweep-phase-04-drain.md) | Complete | 1bd914aa02 |
-| 5. Push audit | [PLAN-deleted-object-sweep-phase-05-push-audit.md](PLAN-deleted-object-sweep-phase-05-push-audit.md) | In progress | — |
+| 5. Push audit | [PLAN-deleted-object-sweep-phase-05-push-audit.md](PLAN-deleted-object-sweep-phase-05-push-audit.md) | Complete | 7d5a3ff028 |
 
 ### Phase 1: measure the sweep
 
@@ -853,6 +853,17 @@ Run 2026-11-11 over the four merge commits in the table above, each as
 phase's own. The full record is in
 [the phase plan](PLAN-deleted-object-sweep-phase-05-push-audit.md)
 under "Findings".
+
+All seven issues the audit filed are resolved, which is what completes
+this plan. The blocking one, #4876, and #4881 were fixed by the
+repository's own issue-fix automation while this phase was still being
+reviewed, and the other five by #4897, which took them as a themed
+batch. One of the audit's claims was overstated: #4877 is smaller than
+filed, because `cluster_operation_targets` already carries an
+`operation_type` column, so only one of its three statements needed a
+subquery. The phase plan's disposition records that, and records that
+five of the seven were fixed twice over because two sessions worked
+them at once with nothing to reserve an issue against the other.
 
 **The question the phase was built around came back clean.** Phase 3
 turned 25 object types' hard deletes into a declaration, and a type

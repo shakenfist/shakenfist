@@ -1059,6 +1059,53 @@ is blocking, so phase 5 and the plan stay `In progress`, and the plan is
 fix is a follow-up pull request after this audit merges, and that pull request
 records this phase's merge commit.
 
+### How the findings resolved
+
+Recorded 2026-11-13, in the pull request which set this phase's `Status` and
+`Merged` cells and the plan's index row.
+
+| Issue | Resolved by |
+|-------|-------------|
+| #4876 | The repository's issue-fix automation, PR #4884 (`9914efa207`), while this phase was still open. It took the suggested fix, `DELETED_OBJECT_SWEEP_EXCLUDED_TYPES = {'node'}` |
+| #4877 | PR #4897 (`4ef08c4b10`). Two of the three builders take the predicate directly; only `cluster_operation_errors` needs a subquery |
+| #4878 | PR #4897. The drain returns a `DrainOutcome` naming the limit which ended it, logged as `stopped_by` with `fill_seconds` and `budget_seconds`, and the sizing arithmetic corrected in the operator guide and both config descriptions |
+| #4879 | PR #4897, all four items |
+| #4880 | PR #4897. The eight live cases move to `shakenfist/tests/hard_delete_cases.py` and now also run against an in-memory sqlite engine built from `mariadb.py`'s own table definitions, so they run on a pull request; the live module still gates a merge |
+| #4881 | The issue-fix automation, PR #4896 (`ccd8f6b701`) |
+| #4882 | PR #4897, all four items: the hard delete moves to `shakenfist/mariadb_hard_delete.py`, the three sweep wrappers share `_sweep_read()`, the settable-seconds clock moves to `shakenfist/tests/fakeclock.py`, and the comment restating the gRPC retry budget names those constants instead of copying their values |
+
+**Five of the seven were fixed twice.** A second session took #4877 to #4882
+as a themed batch while this phase's own follow-up was in review, and PR #4897
+merged first, so the follow-up's five fix commits were dropped rather than
+rebased and it carries only this close-out. The cost was a day's work and a
+reviewer's attention, and nothing reserved the issues against it: the
+`automated-fix-attempted` label guards against the issue-fix automation only,
+and `plan-blockers` records what a plan is waiting on rather than which issues
+an in-flight branch has claimed.
+
+**#4877 was filed larger than it was.** It said the three cluster-operation
+statements key on the uuid "in tables shared by all fourteen
+cluster-operation types", implying none could carry a type predicate.
+`cluster_operation_targets` already has an `operation_type` column, so two of
+the three take the predicate directly and only `cluster_operation_errors`
+needs to reach through `cluster_operations`. The invariant restored is the one
+the issue describes; the work was smaller. Both independent fixes reached that
+reading of it.
+
+**#4882's `FakeClock` item was read as false, and it is not.** Checking it by
+comparing the four classes *named* `FakeClock` found four unrelated
+interfaces -- one `datetime`-based with an `advance()`, one a bare float
+returned from `__call__`, one implementing `time()` and `sleep()` with a
+`max_reads` valve, one replaying a canned list -- and the conclusion drawn was
+that the issue had grepped a name and reported it as duplication. PR #4897
+traced the idea rather than the name, and found four modules which had each
+written the same settable-seconds callable, under three names between them; it
+moved that one idea to `shakenfist/tests/fakeclock.py` and renamed the
+genuinely different stand-ins for what they are. So the lesson is the reverse
+of the one first recorded here: a name is the wrong unit for either judgement,
+because it over-reports duplication and hides it just as easily, and the only
+check is to read the bodies across names.
+
 ## Execution notes
 
 - **Back brief, 2026-11-11.** Michael kept all three points as planned:
