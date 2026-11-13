@@ -259,9 +259,12 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         # shape rather than a new enum value. op_uuid is the one
         # required key and carries the uuid format, which compiles to a
         # real parse, because an agent operation has no name to accept
-        # instead. settle_seconds publishes the same operator ceiling
-        # the timing parameters do, AGENT_OPERATION_MAX_DEADLINE, since
-        # a settle parks the same executor slot while it runs; its
+        # instead. settle_seconds publishes a different operator ceiling
+        # from the timing parameters, AGENT_OPERATION_DEPENDENCY_WAIT,
+        # because a settle is spent inside the dependency wait budget and
+        # a larger one could never elapse before that budget aborted the
+        # operation; 300 here is its default, which is what an
+        # unconfigured test process generates the specification with. Its
         # minimum is 0 because a duration cannot be negative, and unlike
         # the timing parameters 0 is not a sentinel here -- it means
         # what it says. api_base.agent_operation_dependencies() is what
@@ -277,7 +280,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
               'properties': {
                   'op_uuid': {'type': 'string', 'format': 'uuid'},
                   'settle_seconds': {'type': 'number', 'minimum': 0,
-                                     'maximum': 86400},
+                                     'maximum': 300},
               }}}),
         ('/instances/{instance_ref}/agent/put', 'post', 'runs_after',
          {'type': 'array',
@@ -289,7 +292,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
               'properties': {
                   'op_uuid': {'type': 'string', 'format': 'uuid'},
                   'settle_seconds': {'type': 'number', 'minimum': 0,
-                                     'maximum': 86400},
+                                     'maximum': 300},
               }}}),
         ('/instances/{instance_ref}/agent/get', 'post', 'depends_on',
          {'type': 'array',
@@ -301,7 +304,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
               'properties': {
                   'op_uuid': {'type': 'string', 'format': 'uuid'},
                   'settle_seconds': {'type': 'number', 'minimum': 0,
-                                     'maximum': 86400},
+                                     'maximum': 300},
               }}}),
         ('/instances/{instance_ref}/agent/get', 'post', 'runs_after',
          {'type': 'array',
@@ -313,7 +316,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
               'properties': {
                   'op_uuid': {'type': 'string', 'format': 'uuid'},
                   'settle_seconds': {'type': 'number', 'minimum': 0,
-                                     'maximum': 86400},
+                                     'maximum': 300},
               }}}),
         ('/instances/{instance_ref}/agent/execute', 'post', 'depends_on',
          {'type': 'array',
@@ -325,7 +328,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
               'properties': {
                   'op_uuid': {'type': 'string', 'format': 'uuid'},
                   'settle_seconds': {'type': 'number', 'minimum': 0,
-                                     'maximum': 86400},
+                                     'maximum': 300},
               }}}),
         ('/instances/{instance_ref}/agent/execute', 'post', 'runs_after',
          {'type': 'array',
@@ -337,7 +340,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
               'properties': {
                   'op_uuid': {'type': 'string', 'format': 'uuid'},
                   'settle_seconds': {'type': 'number', 'minimum': 0,
-                                     'maximum': 86400},
+                                     'maximum': 300},
               }}}),
         ('/networks', 'post', 'netblock', {'type': 'string'}),
         ('/networks/{network_ref}/events', 'get', 'limit',

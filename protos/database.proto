@@ -2349,6 +2349,12 @@ message DeleteAgentOperationRequest {
 // NULL: no dependency failure reached this operation. That is a
 // different fact from a cascade which recorded no detail, which would
 // be the present value '{}', so the two must not be collapsed.
+//
+// dependency_wait_started uses presence for the same reason: absent
+// means SQL NULL, which here means the operation has never been found
+// blocked on a dependency. An explicit 0.0 would instead claim the
+// wait began at the epoch, and the budget measured from either answer
+// differs by fifty years.
 message AgentOperationAttributesProto {
   string uuid = 1;                  // References agent_operations.uuid
   string results_json = 2;          // JSON-encoded {index: result_dict}
@@ -2356,6 +2362,7 @@ message AgentOperationAttributesProto {
   int64 attempts = 4;               // Dispatch counter for the retry bound
   optional string expiry_reason = 5; // 'deadline' or 'progress'; absent = not expired
   optional string dependency_failure_json = 6; // JSON-encoded dict; absent = no cascade
+  optional double dependency_wait_started = 7; // Epoch seconds; absent = never blocked
 }
 
 message CreateAgentOperationAttributesRequest {

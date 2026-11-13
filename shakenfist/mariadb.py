@@ -495,7 +495,7 @@ NETWORKS_VERSION = 3
 NETWORK_ATTRIBUTES_VERSION = 3
 IPAMS_VERSION = 2
 AGENT_OPERATIONS_VERSION = 4
-AGENT_OPERATION_ATTRIBUTES_VERSION = 5
+AGENT_OPERATION_ATTRIBUTES_VERSION = 6
 INSTANCES_VERSION = 3
 INSTANCE_ATTRIBUTES_VERSION = 3
 OBJECT_METADATA_VERSION = 4
@@ -4501,6 +4501,16 @@ def _direct_get_state(object_type: ObjectType, object_uuid: str) -> Optional[Sta
 
     This is the direct access version used by the database daemon.
     """
+    return _direct_get_state_checked(object_type, object_uuid)[1]
+
+
+def _direct_get_state_checked(
+        object_type: ObjectType,
+        object_uuid: str) -> tuple[bool, Optional[State]]:
+    """Read state directly from MariaDB, reporting whether the read worked.
+
+    This is the direct access version used by the database daemon.
+    """
     engine = _get_engine()
     table = _get_object_states_table()
 
@@ -4515,16 +4525,16 @@ def _direct_get_state(object_type: ObjectType, object_uuid: str) -> Optional[Sta
             result = conn.execute(stmt).fetchone()
 
             if result is None:
-                return None
+                return True, None
 
-            return State(
+            return True, State(
                 value=result.state_value,
                 update_time=result.update_time,
                 message=result.message
             )
     except OperationalError as e:
         LOG.warning(f'MariaDB read failed for {object_type}/{object_uuid}: {e}')
-        return None
+        return False, None
 
 
 # MariaDB errno values where the server explicitly asks the client to
@@ -4777,6 +4787,18 @@ def _direct_count_objects_by_state(object_type: ObjectType,
 
 def _grpc_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:
     """Read state for an object via the database microservice."""
+    return _grpc_get_state_checked(object_type, object_uuid)[1]
+
+
+def _grpc_get_state_checked(
+        object_type: ObjectType,
+        object_uuid: str) -> tuple[bool, Optional[State]]:
+    """Read state via the microservice, reporting whether the read worked.
+
+    The reply's found flag is what separates a confirmed absent row from
+    a failed call, which is why it is returned rather than folded into a
+    None state as _grpc_get_state() does.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.GetObjectStateRequest(
@@ -4786,8 +4808,8 @@ def _grpc_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State
         )
         reply = _grpc_call(stub.GetObjectState, request)
         if not reply.found:
-            return None
-        return State(
+            return True, None
+        return True, State(
             value=reply.state_value if reply.state_value else None,
             update_time=reply.update_time,
             message=reply.message if reply.message else None
@@ -4795,7 +4817,7 @@ def _grpc_get_state(object_type: ObjectType, object_uuid: str) -> Optional[State
     except grpc.RpcError as e:
         LOG.error(
             f'gRPC GetObjectState failed for {object_type}/{object_uuid}: {e}')
-        return None
+        return False, None
 
 
 def _grpc_set_state(object_type: ObjectType, object_uuid: str, state: State) -> bool:
@@ -5175,6 +5197,32 @@ def get_state(object_type: ObjectType, object_uuid: str) -> Optional[State]:
     if _use_database_service():
         return _grpc_get_state(object_type, object_uuid)
     return _direct_get_state(object_type, object_uuid)
+
+
+def get_state_checked(
+        object_type: ObjectType,
+        object_uuid: str) -> tuple[bool, Optional[State]]:
+    """Read state for an object, reporting whether the read itself worked.
+
+    get_state() returns None for two different facts -- there is no
+    state row for this object, and the read failed -- because both
+    backends catch their transport error and return None. A caller which
+    acts irreversibly on absence cannot use that: it would treat an
+    sf-database restart or a wedged subchannel as proof that an object
+    is gone.
+
+    Args:
+        object_type: The type of object.
+        object_uuid: The UUID of the object.
+
+    Returns:
+        (True, State) when a state row was read, (True, None) when the
+        read succeeded and there is no such row, and (False, None) when
+        the read failed and nothing can be concluded about the row.
+    """
+    if _use_database_service():
+        return _grpc_get_state_checked(object_type, object_uuid)
+    return _direct_get_state_checked(object_type, object_uuid)
 
 
 def set_state(object_type: ObjectType, object_uuid: str, state: State) -> bool:
@@ -20117,16 +20165,17 @@ def _ensure_agent_operation_attributes_schema(
 
     if current_ver < AGENT_OPERATION_ATTRIBUTES_VERSION:
         # Add the progress and retry bookkeeping columns (v3), the
-        # expiry_reason discriminator (v4), and dependency_failure
-        # (v5). One block serves every step because every ALTER is IF
-        # NOT EXISTS: a v3 database re-runs the v3 additions as no-ops
-        # on its way to v5.
-        # last_progress, expiry_reason and dependency_failure are
-        # nullable (NULL means no progress observed yet / the operation
-        # has not expired / no dependency failure reached it, which for
-        # dependency_failure is a different fact from a cascade which
-        # recorded no detail); attempts is not, and carries an explicit
-        # DEFAULT 0.
+        # expiry_reason discriminator (v4), dependency_failure (v5)
+        # and dependency_wait_started (v6). One block serves every
+        # step because every ALTER is IF NOT EXISTS: a v3 database
+        # re-runs the v3 additions as no-ops on its way to v6.
+        # last_progress, expiry_reason, dependency_failure and
+        # dependency_wait_started are nullable (NULL means no progress
+        # observed yet / the operation has not expired / no dependency
+        # failure reached it, which for dependency_failure is a
+        # different fact from a cascade which recorded no detail / the
+        # operation has never waited on a dependency); attempts is
+        # not, and carries an explicit DEFAULT 0.
         # MariaDB would fill existing rows with the implicit type
         # default anyway, so the DEFAULT is not rescuing a failing
         # ALTER -- it is there so the value backfilled into existing
@@ -20139,8 +20188,8 @@ def _ensure_agent_operation_attributes_schema(
         LOG.info(
             f'Upgrading {table_name} table to version '
             f'{AGENT_OPERATION_ATTRIBUTES_VERSION} '
-            '(add progress, attempt, expiry reason and dependency '
-            'failure columns)')
+            '(add progress, attempt, expiry reason, dependency '
+            'failure and dependency wait columns)')
         #
         # As in _ensure_agent_operations_schema, a failing ALTER is
         # allowed to propagate rather than being logged and stepped
@@ -20151,7 +20200,8 @@ def _ensure_agent_operation_attributes_schema(
             for column in ('last_progress DOUBLE NULL',
                            'attempts BIGINT NOT NULL DEFAULT 0',
                            'expiry_reason VARCHAR(255) NULL',
-                           'dependency_failure LONGTEXT NULL'):
+                           'dependency_failure LONGTEXT NULL',
+                           'dependency_wait_started DOUBLE NULL'):
                 conn.execute(sa.text(
                     f'ALTER TABLE {table_name} '
                     f'ADD COLUMN IF NOT EXISTS {column}'))
@@ -20314,7 +20364,8 @@ def _direct_create_agent_operation_attributes(
                 # which recorded nothing.
                 dependency_failure=(
                     _json_dumps(data.dependency_failure)
-                    if data.dependency_failure is not None else None))
+                    if data.dependency_failure is not None else None),
+                dependency_wait_started=data.dependency_wait_started)
             conn.execute(stmt)
             conn.commit()
             return True
@@ -20363,6 +20414,7 @@ def _direct_get_agent_operation_attributes(
                 attempts=result.attempts,
                 expiry_reason=result.expiry_reason,
                 dependency_failure=dependency_failure,
+                dependency_wait_started=result.dependency_wait_started,
             )
     except OperationalError as e:
         LOG.warning(
@@ -20389,6 +20441,7 @@ def _agent_operation_attributes_column_values(
         'dependency_failure': (
             _json_dumps(data.dependency_failure)
             if data.dependency_failure is not None else None),
+        'dependency_wait_started': data.dependency_wait_started,
     }
     if not fields:
         return all_values
@@ -20551,7 +20604,8 @@ def _grpc_create_agent_operation_attributes(
                 last_progress=data.last_progress,
                 attempts=data.attempts,
                 expiry_reason=data.expiry_reason,
-                dependency_failure_json=_dependency_failure_json(data)))
+                dependency_failure_json=_dependency_failure_json(data),
+                dependency_wait_started=data.dependency_wait_started))
         reply = _grpc_call(stub.CreateAgentOperationAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -20585,6 +20639,9 @@ def _grpc_get_agent_operation_attributes(
             dependency_failure=(json.loads(d.dependency_failure_json)
                                 if d.HasField('dependency_failure_json')
                                 else None),
+            dependency_wait_started=(
+                d.dependency_wait_started
+                if d.HasField('dependency_wait_started') else None),
         )
     except grpc.RpcError as e:
         LOG.error(
@@ -20610,7 +20667,8 @@ def _grpc_update_agent_operation_attributes(
                 last_progress=data.last_progress,
                 attempts=data.attempts,
                 expiry_reason=data.expiry_reason,
-                dependency_failure_json=_dependency_failure_json(data)),
+                dependency_failure_json=_dependency_failure_json(data),
+                dependency_wait_started=data.dependency_wait_started),
             fields=fields or [])
         reply = _grpc_call(stub.UpdateAgentOperationAttributes, request)
         return bool(reply.success)

@@ -41,6 +41,11 @@ class AgentOperationAttributesData(BaseModel):
         dependency_failure: The op_type, op_uuid and state of the
             failed dependency which aborted this operation. NULL
             unless that happened.
+        dependency_wait_started: Unix timestamp of the first
+            dispatcher pass which found this operation blocked on a
+            dependency. NULL for an operation which was never
+            blocked, and cleared back to NULL when a retry requeues
+            the operation.
     """
 
     model_config = ConfigDict(frozen=False)  # Mutable
@@ -78,9 +83,32 @@ class AgentOperationAttributesData(BaseModel):
     # empty dict would instead mean a cascade which recorded no detail, so
     # the two are not interchangeable.
     #
-    # The column lands with the rest of the dependency schema, but nothing
-    # writes it yet -- the cascade which does is the next piece of work --
-    # and it is deliberately absent from the external view until then,
-    # because a field which can only ever be null is a field a client
-    # learns to ignore.
+    # Written by AgentOperation.cascade_abort_for_dependency() and by
+    # nothing else, and surfaced on the external view, because a reason
+    # which is not on the wire is a reason a client cannot act on (issue
+    # #4075). The state it records is the dependency's own, except for
+    # two values no AgentOperation holds: 'missing' for a dependency
+    # which no longer exists at all, and 'unreadable' for one whose
+    # state could not be read before the wait budget ran out. Neither is
+    # an AgentOperation state value, and both are distinguishable from
+    # every real one on purpose.
     dependency_failure: Optional[dict] = None
+
+    # Wall-clock time of the first dispatcher pass which found this
+    # operation blocked on a dependency, and so the anchor the
+    # dependency wait budget is measured from. Never moved forward
+    # while one attempt is being evaluated: a second write would push
+    # the anchor on every pass which looked at the operation, and a
+    # budget which restarts whenever it is checked is not a budget at
+    # all. NULL for every operation which was never blocked, which is
+    # the ordinary case, and cleared back to NULL when a retry requeues
+    # the operation, because the next attempt is a new tenant of the
+    # queue head and is owed the whole budget rather than what the
+    # abandoned attempt left of it.
+    #
+    # Deliberately absent from the external view. A caller needs the
+    # outcome of a wait -- whether the operation ran or was aborted,
+    # and why -- not the instant the server started counting, which it
+    # cannot act on and which would invite clients to re-derive the
+    # budget for themselves.
+    dependency_wait_started: Optional[float] = None

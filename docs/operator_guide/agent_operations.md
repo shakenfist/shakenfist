@@ -250,3 +250,36 @@ If that happens:
   willing to let one request buy; keep it at least
   `AGENT_OPERATION_DEFAULT_DEADLINE`, or an omitted `deadline_seconds`
   is granted more time than an explicit one may ask for.
+- **`AGENT_OPERATION_DEPENDENCY_WAIT`** (default 300 seconds,
+  `shakenfist/config.py`) is how long an operation which declared a
+  `depends_on` or `runs_after` dependency may sit at the head of its
+  instance's queue waiting for it. Past the budget a `depends_on`
+  operation is moved to `abort` and a `runs_after` one runs anyway. It
+  is counted from the first dispatcher pass which found the operation
+  blocked, in wall-clock time, so how often the dispatcher looks does
+  not change it. It is also the ceiling on a per-edge `settle_seconds`,
+  because the dispatcher adds a declared settle to the budget once the
+  dependency has been seen to finish: an operation with a settle can
+  hold the queue head for the budget plus the settle, and capping the
+  settle at the budget caps that hold at twice it. A caller over the
+  ceiling is refused with a 400 when they ask rather than five minutes
+  later. The wait contains the dependency's
+  own queue time as well as its execution, so a chain several hops deep
+  against a busy instance can legitimately exceed the default. The
+  trade-off is that a blocked operation keeps its place in its
+  instance's strict FIFO queue and holds up everything behind it, so
+  raising the option raises how long one caller's blocked chain can
+  stall another caller's operations against the same instance. Raise
+  it only if your callers chain operations deeply and the aborts are
+  spurious, and lower it if the operations behind a blocked one matter
+  more than the chain. Lowering it is also an API change and not only a
+  scheduling one: this option is the published ceiling on
+  `settle_seconds`, so a lower value refuses settle delays callers could
+  previously submit, and the OpenAPI document a deployment serves
+  changes with it.
+
+  The guarantee that a settle inside that ceiling can always elapse
+  holds for the edge carrying the settle, and only while it is the last
+  thing holding the operation. An operation with another unfinished
+  edge has already spent this budget by the time a long settle elapses,
+  so that edge gives up as soon as it is reached.

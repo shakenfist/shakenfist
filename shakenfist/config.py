@@ -418,6 +418,44 @@ class SFConfig(BaseSettings):
             'the expired state, which is distinct from error.'
         )
     )
+    AGENT_OPERATION_DEPENDENCY_WAIT: int = Field(
+        300,
+        ge=1,
+        description=(
+            'How long in seconds an agent operation may sit at the head of '
+            'its instance\'s queue waiting for an operation it declared a '
+            'dependency on, before it is given up on and moved to the abort '
+            'state. The clock is wall-clock, anchored on the first dispatch '
+            'pass which found the operation blocked and recorded on the '
+            'operation itself, rather than a count of passes -- so how '
+            'often the dispatcher gets around to looking does not change '
+            'how long a caller waits. It is also the ceiling a per-edge '
+            'settle delay is refused against, because the dispatcher adds a '
+            'declared settle to this budget once the dependency has been '
+            'seen to finish: an operation with a settle can therefore hold '
+            'the queue head for this budget plus the settle, and capping '
+            'the settle here caps that hold at twice this value. That '
+            'extension covers the edge being settled while it is the '
+            'last thing holding the operation; an operation with '
+            'another unfinished edge has already spent this budget by '
+            'the time a long settle elapses, so that edge gives up as '
+            'soon as it is reached. Lowering this option is also a '
+            'client visible API change, because it is the published '
+            'ceiling on settle_seconds. A '
+            'dependency wait legitimately '
+            'contains the dependency\'s own queue wait as well as its '
+            'execution, so the default is roughly twice the worst single '
+            'hop latency a production cluster has produced; a chain several '
+            'hops deep against a busy instance can legitimately exceed it '
+            'and will be aborted. Raising it buys those chains room at '
+            'somebody else\'s expense, which is the trade worth '
+            'understanding before changing it: a blocked operation keeps '
+            'its place in its instance\'s queue and blocks the operations '
+            'behind it, so this is also the longest one caller\'s stalled '
+            'chain may hold up operations another caller submitted against '
+            'the same instance.'
+        )
+    )
     # An attempt is counted at the point the operation transitions to
     # executing, which is immediately before its first command is
     # written to the socket. Two consequences worth knowing, neither

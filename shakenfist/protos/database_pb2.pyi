@@ -7513,6 +7513,12 @@ class AgentOperationAttributesProto(_message.Message):
     NULL: no dependency failure reached this operation. That is a
     different fact from a cascade which recorded no detail, which would
     be the present value '{}', so the two must not be collapsed.
+
+    dependency_wait_started uses presence for the same reason: absent
+    means SQL NULL, which here means the operation has never been found
+    blocked on a dependency. An explicit 0.0 would instead claim the
+    wait began at the epoch, and the budget measured from either answer
+    differs by fifty years.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -7523,6 +7529,7 @@ class AgentOperationAttributesProto(_message.Message):
     ATTEMPTS_FIELD_NUMBER: _builtins.int
     EXPIRY_REASON_FIELD_NUMBER: _builtins.int
     DEPENDENCY_FAILURE_JSON_FIELD_NUMBER: _builtins.int
+    DEPENDENCY_WAIT_STARTED_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     """References agent_operations.uuid"""
     results_json: _builtins.str
@@ -7535,6 +7542,8 @@ class AgentOperationAttributesProto(_message.Message):
     """'deadline' or 'progress'; absent = not expired"""
     dependency_failure_json: _builtins.str
     """JSON-encoded dict; absent = no cascade"""
+    dependency_wait_started: _builtins.float
+    """Epoch seconds; absent = never blocked"""
     def __init__(
         self,
         *,
@@ -7544,19 +7553,24 @@ class AgentOperationAttributesProto(_message.Message):
         attempts: _builtins.int = ...,
         expiry_reason: _builtins.str | None = ...,
         dependency_failure_json: _builtins.str | None = ...,
+        dependency_wait_started: _builtins.float | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["_dependency_failure_json", b"_dependency_failure_json", "_expiry_reason", b"_expiry_reason", "_last_progress", b"_last_progress", "dependency_failure_json", b"dependency_failure_json", "expiry_reason", b"expiry_reason", "last_progress", b"last_progress"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_dependency_failure_json", b"_dependency_failure_json", "_dependency_wait_started", b"_dependency_wait_started", "_expiry_reason", b"_expiry_reason", "_last_progress", b"_last_progress", "dependency_failure_json", b"dependency_failure_json", "dependency_wait_started", b"dependency_wait_started", "expiry_reason", b"expiry_reason", "last_progress", b"last_progress"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["_dependency_failure_json", b"_dependency_failure_json", "_expiry_reason", b"_expiry_reason", "_last_progress", b"_last_progress", "attempts", b"attempts", "dependency_failure_json", b"dependency_failure_json", "expiry_reason", b"expiry_reason", "last_progress", b"last_progress", "results_json", b"results_json", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_dependency_failure_json", b"_dependency_failure_json", "_dependency_wait_started", b"_dependency_wait_started", "_expiry_reason", b"_expiry_reason", "_last_progress", b"_last_progress", "attempts", b"attempts", "dependency_failure_json", b"dependency_failure_json", "dependency_wait_started", b"dependency_wait_started", "expiry_reason", b"expiry_reason", "last_progress", b"last_progress", "results_json", b"results_json", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     _WhichOneofReturnType__dependency_failure_json: _TypeAlias = _typing.Literal["dependency_failure_json"]  # noqa: Y015
     _WhichOneofArgType__dependency_failure_json: _TypeAlias = _typing.Literal["_dependency_failure_json", b"_dependency_failure_json"]  # noqa: Y015
+    _WhichOneofReturnType__dependency_wait_started: _TypeAlias = _typing.Literal["dependency_wait_started"]  # noqa: Y015
+    _WhichOneofArgType__dependency_wait_started: _TypeAlias = _typing.Literal["_dependency_wait_started", b"_dependency_wait_started"]  # noqa: Y015
     _WhichOneofReturnType__expiry_reason: _TypeAlias = _typing.Literal["expiry_reason"]  # noqa: Y015
     _WhichOneofArgType__expiry_reason: _TypeAlias = _typing.Literal["_expiry_reason", b"_expiry_reason"]  # noqa: Y015
     _WhichOneofReturnType__last_progress: _TypeAlias = _typing.Literal["last_progress"]  # noqa: Y015
     _WhichOneofArgType__last_progress: _TypeAlias = _typing.Literal["_last_progress", b"_last_progress"]  # noqa: Y015
     @_typing.overload
     def WhichOneof(self, oneof_group: _WhichOneofArgType__dependency_failure_json) -> _WhichOneofReturnType__dependency_failure_json | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__dependency_wait_started) -> _WhichOneofReturnType__dependency_wait_started | None: ...
     @_typing.overload
     def WhichOneof(self, oneof_group: _WhichOneofArgType__expiry_reason) -> _WhichOneofReturnType__expiry_reason | None: ...
     @_typing.overload

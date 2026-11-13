@@ -698,15 +698,28 @@ def agent_operation_dependencies(depends_on, runs_after, caller_namespace):
             # validation is in, so this is the bound's one reliable home. The
             # model refuses a non-finite or negative settle, which are
             # properties of the value rather than of the deployment.
+            #
+            # The ceiling is the dependency wait budget rather than the
+            # timing parameters' one, because a settle delay extends how long
+            # an operation may hold the head of its instance's queue. The
+            # budget bounds the wait, and the dispatcher adds the declared
+            # settle to it once the dependency has been seen to finish, so
+            # the hold is at most the budget plus the settle. Capping the
+            # settle at the budget is what keeps that at twice the budget
+            # instead of at whatever a caller asked for -- and the cost of
+            # one caller's settle is paid by every operation queued behind it
+            # on that instance, which is why it is refused here, where the
+            # caller is still listening, rather than charged to somebody else
+            # minutes later.
             if (dependency.settle_seconds is not None
                     and dependency.settle_seconds
-                    > config.AGENT_OPERATION_MAX_DEADLINE):
+                    > config.AGENT_OPERATION_DEPENDENCY_WAIT):
                 return None, sf_api.error(
                     400,
                     '%s[%d]: settle_seconds must not exceed this '
-                    'deployment\'s AGENT_OPERATION_MAX_DEADLINE of '
+                    'deployment\'s AGENT_OPERATION_DEPENDENCY_WAIT of '
                     '%d seconds'
-                    % (name, index, config.AGENT_OPERATION_MAX_DEADLINE))
+                    % (name, index, config.AGENT_OPERATION_DEPENDENCY_WAIT))
 
             # suppress_failure_audit because this lookup must not write an
             # event: a refused request creates nothing, and an audit event
@@ -1117,12 +1130,16 @@ AGENTDEPENDENCYSPEC_SCHEMA: dict[str, Any] = {
         },
         'settle_seconds': {
             'type': 'number',
-            # A duration, so no negative, and the same operator ceiling the
-            # timing parameters publish -- it already means "the longest a
-            # caller may park an instance's executor slot", which is what a
-            # settle does while it runs.
+            # A duration, so no negative, and the operator ceiling is the
+            # dependency wait budget, because a settle extends how long an
+            # operation may hold its instance's queue head to the budget plus
+            # the settle, so capping the settle at the budget caps that hold
+            # at twice the budget. This has to be the same bound
+            # agent_operation_dependencies() refuses against, because this
+            # is what the published specification says and that is what
+            # actually answers 400.
             'minimum': 0,
-            'maximum': config.AGENT_OPERATION_MAX_DEADLINE,
+            'maximum': config.AGENT_OPERATION_DEPENDENCY_WAIT,
             'description': (
                 'Wait this many seconds after the named operation finished '
                 'before treating this edge as satisfied, for a caller whose '

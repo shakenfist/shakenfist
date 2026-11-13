@@ -4,6 +4,7 @@ from uuid import UUID
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
@@ -19,6 +20,17 @@ from shakenfist.schema.object_types import ObjectType
 
 
 LOG, _ = logs.setup(__name__)
+
+
+# Audit event texts for a dependency cascade. A cascade is not always a
+# failed dependency: a wait or a settle delay which outruns the
+# operator's budget ends an operation whose dependency has not failed
+# and may yet succeed, and an operator keying alerts off the event text
+# should not be told those are the same thing. The stored
+# dependency_failure carries the dependency's live state either way, so
+# a client can always tell them apart.
+CASCADE_EVENT_FAILED = 'operation aborted by failed dependency'
+CASCADE_EVENT_GAVE_UP = 'operation aborted waiting for a dependency'
 
 
 class AgentOperation(BaseOperation):
@@ -259,9 +271,10 @@ class AgentOperation(BaseOperation):
 
     def external_view(self):
         # If this is an external view, then mix back in attributes that users
-        # expect. The attributes row is read once and three values taken
-        # from it, rather than through the per-value properties, so the
-        # view does not cost one database round trip per attribute.
+        # expect. The attributes row is read once and every attribute the
+        # view carries is taken from it, rather than through the per-value
+        # properties, so the view does not cost one database round trip per
+        # attribute.
         attrs = self._attributes()
         retval = self._external_view()
         retval.update({
@@ -276,6 +289,7 @@ class AgentOperation(BaseOperation):
             'last_progress': attrs.last_progress,
             'attempts': attrs.attempts,
             'expiry_reason': attrs.expiry_reason,
+            'dependency_failure': attrs.dependency_failure,
             'error_message': self.error
         })
 
@@ -505,6 +519,180 @@ class AgentOperation(BaseOperation):
 
         self._state_update(dbo.STATE_ERROR, message=message)
 
+    def cascade_abort_for_dependency(self, dep, dep_state,
+                                     event=CASCADE_EVENT_FAILED):
+        """Move this operation to abort because a dependency it needs failed.
+
+        dep is the stored depends_on edge, so it carries op_type and
+        op_uuid, and dep_state is the state that dependency was
+        observed in. dep_state may be a value no AgentOperation ever
+        holds: 'missing' for a dependency which no longer exists at
+        all, and 'unreadable' for one whose state could not be read
+        before the wait budget ran out. Both are deliberate. A client
+        has to be able to tell a dependency which failed from one which
+        went away, and either of those from a node which could not
+        reach its database, even though all three cost the dependent
+        the same fate.
+
+        This is for depends_on only. A runs_after edge is an ordering
+        hint rather than a fate-sharing one, so an unsatisfiable
+        runs_after warns and lets its operation run, and never arrives
+        here.
+
+        Returns True when the cascade was applied and False when the
+        operation had already finished, so a caller can tell a cascade
+        it performed from one it was too late for.
+
+        An operation which is already terminal is left alone, which is
+        the guard expire() and fail() carry and for a sharper reason
+        than theirs. Deadline enforcement can expire an operation out
+        of band at any moment, so this call really does race a
+        finished operation. Writing the reason anyway would leave an
+        operation reading expired on the wire while carrying a
+        dependency_failure claiming a dependency aborted it, and that
+        field exists precisely so a client can branch on it without
+        parsing prose (issue #4075) -- so a client doing exactly what
+        the field was published for would be told something untrue
+        about a finished operation. The state machine's refusal
+        remains the backstop for the window between this check and
+        the write below, but it must not be the primary mechanism:
+        reaching it means the reason has already been persisted.
+
+        That backstop refuses by raising, so it is caught here rather
+        than allowed to propagate. The caller is the dispatcher's
+        evaluation of one operation inside a pass which walks every
+        agent-ready instance on the node, and that pass is wrapped in
+        a broad except -- so an escaping exception would make a race on
+        one operation cost every other instance on the node its
+        dispatch. Caught, the race degrades to exactly what the guard
+        above does, which is what the guard is for.
+
+        The no-op is noisy rather than silent. A cascade which did not
+        land is worth an operator seeing, so it is audited with the
+        state the operation was found in.
+
+        event is the audit event text, because not every cascade is a
+        failed dependency. A wait or a settle delay which outruns the
+        operator's budget aborts an operation whose dependency has not
+        failed and may yet succeed, and an event claiming otherwise is
+        what an operator's alerting would key on. The stored
+        dependency_failure carries the dependency's live state either
+        way, so a client can always tell the two apart.
+        """
+        if self.state.value in self.TERMINAL_STATES:
+            add_event_multi(
+                EVENT_TYPE_AUDIT,
+                [(self.object_type, self.uuid),
+                 (ObjectType.INSTANCE, self.instance_uuid)],
+                'operation finished before its dependency cascade applied',
+                extra={'op_type': dep['op_type'], 'op_uuid': dep['op_uuid'],
+                       'dependency_state': dep_state,
+                       'state': self.state.value})
+            return False
+
+        # The reason is written before the state transition, so a
+        # reader who sees abort can always see why. The order is not
+        # merely tidiness: delete() removes an operation's attribute
+        # rows and only then assigns its state, so there is no later
+        # moment at which the reason could be filled in, and a state
+        # written first would be observable with its explanation
+        # missing. The field mask is not optional, for the reason
+        # record_progress() spells out in its docstring.
+        attrs = self._attributes()
+        attrs.dependency_failure = {
+            'op_type': dep['op_type'],
+            'op_uuid': dep['op_uuid'],
+            'state': dep_state
+        }
+        mariadb.update_agent_operation_attributes(
+            attrs, fields=['dependency_failure'])
+
+        try:
+            self.state = BaseOperation.STATE_ABORT
+        except exceptions.InvalidStateException:
+            # The operation went terminal between the guard above and
+            # here, which is the window the guard cannot close. The
+            # dependency_failure write has already landed, which the
+            # docstring accounts for, so this audits the same no-op the
+            # guard audits: an operator looking for a cascade which did
+            # not take finds the same event either way.
+            add_event_multi(
+                EVENT_TYPE_AUDIT,
+                [(self.object_type, self.uuid),
+                 (ObjectType.INSTANCE, self.instance_uuid)],
+                'operation finished before its dependency cascade applied',
+                extra={'op_type': dep['op_type'], 'op_uuid': dep['op_uuid'],
+                       'dependency_state': dep_state,
+                       'state': self.state.value})
+            return False
+
+        # Against the instance as well as the operation, for the
+        # reason expire() gives: abort is in FINAL_OBJECT_STATES too,
+        # so the operation is swept for hard deletion and an event
+        # held only against it would go with it.
+        add_event_multi(
+            EVENT_TYPE_AUDIT,
+            [(self.object_type, self.uuid),
+             (ObjectType.INSTANCE, self.instance_uuid)],
+            event,
+            extra={'op_type': dep['op_type'], 'op_uuid': dep['op_uuid'],
+                   'state': dep_state})
+        return True
+
+    def note_dependency_wait_started(self):
+        """Record that this operation is blocked on a dependency, and when.
+
+        Returns the instant the dependency wait budget is measured
+        from, whether this call wrote it or an earlier one did, so a
+        caller which has just discovered a block and one which
+        rediscovers it on a later pass both get the same answer.
+
+        The write happens only while the anchor is unset, and that
+        idempotence is a property of this method rather than something
+        each caller has to remember. A blocked operation is
+        re-evaluated on every dispatch pass, so an unconditional write
+        would push the anchor forward a few seconds at a time and
+        leave a budget which can never be exhausted: what is being
+        guarded against is not a lost write but a budget which quietly
+        stops being one.
+        """
+        attrs = self._attributes()
+        if attrs.dependency_wait_started is not None:
+            return attrs.dependency_wait_started
+
+        anchor = time.time()
+        attrs.dependency_wait_started = anchor
+        mariadb.update_agent_operation_attributes(
+            attrs, fields=['dependency_wait_started'])
+        return anchor
+
+    def clear_dependency_wait(self):
+        """Forget that this operation was ever blocked on a dependency.
+
+        A retry returns the operation to the queued state to be
+        dispatched again, which makes it a fresh attempt at the head of
+        its instance's queue. The dependency wait budget bounds how long
+        one attempt may hold that head, so a retry has to start again
+        with it. Left in place, the anchor from the abandoned attempt is
+        already older than the budget by the time the retry is
+        evaluated, and the first edge needing a settle whose observation
+        this dispatcher no longer holds is abandoned on sight -- the
+        operation recorded as having given up waiting for a dependency
+        which finished long before it.
+
+        Written only when there is something to clear, so a retry of an
+        operation which never blocked costs the read it has already
+        made and no write. Most retries are of operations with no edges
+        at all.
+        """
+        attrs = self._attributes()
+        if attrs.dependency_wait_started is None:
+            return
+
+        attrs.dependency_wait_started = None
+        mariadb.update_agent_operation_attributes(
+            attrs, fields=['dependency_wait_started'])
+
     def _attributes(self):
         """Read this operation's mutable attributes, creating the row if absent.
 
@@ -543,6 +731,10 @@ class AgentOperation(BaseOperation):
     @property
     def expiry_reason(self):
         return self._attributes().expiry_reason
+
+    @property
+    def dependency_failure(self):
+        return self._attributes().dependency_failure
 
     def record_attempt(self):
         """Persist that another dispatch attempt of this operation has started.
