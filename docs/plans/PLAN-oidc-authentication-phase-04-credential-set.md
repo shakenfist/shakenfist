@@ -745,4 +745,71 @@ open, and kept.**
 
 ## Results
 
-(to be filled in as the phase executes)
+### Step 4d: the guards are enforced by tests
+
+Twelve mutants, twelve killed, none survived and none killed only by
+the wrong tests. The eight the step table names, plus four variants:
+the off-by-one in the other direction, the empty-override fallback the
+management session corrected in 4b, the issuer state test beside the
+login-capable predicate, and the replay claim removed rather than
+moved.
+
+The spec is JSON at `mutants.json` in this session's scratchpad,
+`/srv/nobackups/claude-tmp/claude-1000/-srv-kasm-profiles-mikal-vscode-src-shakenfist-shakenfist/6f19212c-1716-46e1-9230-cf0f2fb17c2c/scratchpad/step-4d/`,
+which the scratchpad reaper will eventually take; it is reproducible
+from the table below, each row of which is one exact-string
+replacement. Nothing was mutated in the checkout: the tree was copied
+to `tree/` beside the spec and `~/bin/mutation-check` ran there, with
+a 300 second timeout per mutant against a baseline of 10.2s. The test
+command was both modules the change touches, run by the copy's own
+interpreter with bytecode writing off:
+
+```
+./.tox/shared/bin/python -B -m stestr run --no-subunit-trace \
+    'shakenfist\.tests\.(test_federation|external_api\.test_login_mint)'
+```
+
+Each mutant was then re-applied on its own and run against only the
+test named below, so that the kill is the named test's and the failure
+message is the one recorded.
+
+| # | Mutation | Killed by | Failure message |
+|---|---|---|---|
+| 1 | `validate_token()`'s `expected_audience` becomes `configuration.audience`, so the override is ignored | `test_federation.AudienceOverrideTestCase.test_the_issuers_audience_is_refused_when_overridden` | `AssertionError: TokenValidationFailed not raised` |
+| 1b | the explicit `is None` test becomes `audience or configuration.audience`, so an empty override falls back | `test_federation.AudienceOverrideTestCase.test_an_empty_override_refuses_rather_than_falling_back` | `AssertionError: TokenValidationFailed not raised` |
+| 2 | the `if not audience` refusal after `login_audience()` is dropped | `test_login_mint.LoginCapableIssuerTestCase.test_an_issuer_with_no_client_id_is_refused` | `MismatchError: 401 != 200` |
+| 2b | the `TrustedIssuer.ACTIVE_STATES` test beside it is dropped | `test_login_mint.LoginCapableIssuerTestCase.test_an_issuer_with_no_state_row_is_refused` | `MismatchError: 401 != 200` |
+| 3 | `get_objects_by_state()` returning `None` becomes `[]` and the 503 is unreachable | `test_login_mint.DeletedRuleTestCase.test_an_unreadable_state_query_refuses_rather_than_mints` | `MismatchError: 503 != 401` |
+| 4 | the `str(rule.uuid) in actionable` filter is dropped from the rule list | `test_login_mint.DeletedRuleTestCase.test_a_soft_deleted_rule_mints_nothing` | `MismatchError: ['dev', 'ops'] != ['ci', 'dev', 'ops']` |
+| 5 | the cap test `len(matches) > cap` becomes `>=` | `test_login_mint.CredentialCapTestCase.test_a_login_at_the_cap_still_mints` | `MismatchError: 3 != 2` |
+| 5b | the cap test becomes `> cap + 1` | `test_login_mint.CredentialCapTestCase.test_one_more_rule_than_the_cap_refuses` | `MismatchError: 507 != 200` |
+| 6 | the replay claim moves inside the mint loop, guarded by `if out:`, so it is taken after the first mint | `test_login_mint.ReplayRefusalTestCase.test_the_claim_is_taken_before_anything_is_minted` | `AssertionError: Expected 'new' to not have been called. Called 1 times.` |
+| 6b | the replay claim is removed altogether | `test_login_mint.ReplayRefusalTestCase.test_the_same_token_twice_is_refused` | `MismatchError: 401 != 200` |
+| 7 | `matching_rules()` answers `satisfied = {}` on `ClaimMismatch` instead of skipping, so every rule for the issuer matches | `test_federation.MatchingRulesTestCase.test_a_non_matching_rule_does_not_hide_a_matching_one` | `MismatchError: ['ryll'] != ['absent-claim', 'another-repo', 'ryll']` |
+| 8 | the `rule.namespace == 'system'` branch is dropped, so both audit wordings are the ordinary ones | `test_login_mint.SystemNamespaceTestCase.test_a_system_mint_is_audited_as_an_administrative_one` | `administrative key minted by human login` replaced by a fourth `key minted by human login` |
+
+Two things worth recording beyond the verdicts.
+
+**No mutant needed a new test.** Nothing survived, so no test file
+changed, and the only change in this step's commit is this section.
+
+**Every kill names the thing that broke.** Each message above is from
+a run of that test alone against that mutant, and each asserts the
+property the mutant removed rather than a side effect elsewhere.
+Mutants 1, 6 and 7 also break 20 to 35 other tests in the two
+modules, which is collateral from a widened audience, a self-refusing
+login and a universally matching rule set; the named test fails in
+every case and is the one whose message is on the point.
+
+One `expect` did not fire, which is correct rather than a gap.
+`test_an_issuer_with_an_empty_client_id_is_refused` passes under
+mutant 1b, because `login_audience()` turns an empty `client_id` into
+`None` and the endpoint refuses before validation is reached. The
+fallback that mutant breaks is pinned by the federation unit test
+instead, which is exactly the division of labour `validate_token()`'s
+docstring describes: the empty-string refusal is a backstop, and the
+check belongs in the caller.
+
+After the run, `git status --short` in the worktree was empty and
+`diff -r` between the worktree's `shakenfist/` and the mutated copy's
+reported no differences, so no mutation reached the checkout.
