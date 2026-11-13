@@ -29,6 +29,7 @@ from cryptography.x509.oid import NameOID
 from shakenfist import exceptions
 from shakenfist import federation
 from shakenfist.mapping_rule import MappingRule
+from shakenfist.mapping_rule import rules_with_attributes
 from shakenfist.tests import base
 from shakenfist.tests import fake_jwks
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -40,6 +41,9 @@ GITHUB_JWKS = GITHUB + '/.well-known/jwks'
 AUTHENTIK = 'https://auth.example.com'
 AUTHENTIK_JWKS = AUTHENTIK + '/jwks'
 AUDIENCE = 'https://sf.example.com'
+# What a provider stamps in a person's identity token, as opposed to
+# the audience above which is what a workload is told to ask for.
+CLIENT_ID = 'shakenfist'
 
 
 def _keypair():
@@ -287,6 +291,75 @@ class TokenValidationTestCase(FederationTestCase):
                 algorithm.startswith('HS'),
                 'a symmetric algorithm would let the public key sign')
         self.assertNotIn('none', federation.ALLOWED_ALGORITHMS)
+
+
+class AudienceOverrideTestCase(FederationTestCase):
+    """Two kinds of token, two audiences, one validator.
+
+    A workload asks its identity provider for a token stamped with
+    whatever the operator put in the issuer's audience, usually the
+    cluster's API URL. A person cannot: an OpenID Connect identity
+    token's aud carries the client identifier of the relying party it
+    was issued for. One column cannot hold both values, so the human
+    login path passes the client identifier here instead.
+
+    Every test below runs against the one issuer this suite
+    configures, whose audience is AUDIENCE and which has nothing to do
+    with CLIENT_ID, so the accepting and refusing halves of each pair
+    cannot both pass by accident.
+    """
+
+    def test_a_token_stamped_with_the_override_validates(self):
+        claims = federation.validate_token(
+            self._token(audience=CLIENT_ID), self.issuer,
+            audience=CLIENT_ID)
+
+        self.assertEqual(CLIENT_ID, claims['aud'])
+
+    def test_the_issuers_audience_is_refused_when_overridden(self):
+        # The override replaces the issuer's audience rather than
+        # being accepted alongside it. Accepting both would let a
+        # workload's token in at the human door, which is a widening
+        # no test would otherwise notice.
+        with self.assertRaises(exceptions.TokenValidationFailed):
+            federation.validate_token(
+                self._token(audience=AUDIENCE), self.issuer,
+                audience=CLIENT_ID)
+
+    def test_without_an_override_the_issuers_audience_is_what_counts(self):
+        claims = federation.validate_token(
+            self._token(audience=AUDIENCE), self.issuer)
+
+        self.assertEqual(AUDIENCE, claims['aud'])
+
+    def test_a_client_identifier_is_refused_without_the_override(self):
+        with self.assertRaises(exceptions.TokenValidationFailed):
+            federation.validate_token(
+                self._token(audience=CLIENT_ID), self.issuer)
+
+    def test_an_empty_override_refuses_rather_than_falling_back(self):
+        # The client identifier column has no minimum length, so an
+        # issuer can hold an empty one. Treating that as "use the
+        # issuer's audience" would verify a human token against the
+        # workload audience, which is exactly the widening the
+        # override exists to prevent.
+        with self.assertRaises(exceptions.TokenValidationFailed):
+            federation.validate_token(
+                self._token(audience=AUDIENCE), self.issuer, audience='')
+
+    def test_an_override_changes_nothing_else_about_the_decode(self):
+        # The security properties of validation are not per audience.
+        # An expired token, or one signed by the wrong key, is refused
+        # on the human path exactly as it is on the workload one.
+        with self.assertRaises(exceptions.TokenValidationFailed):
+            federation.validate_token(
+                self._token(audience=CLIENT_ID, exp_delta=-1), self.issuer,
+                audience=CLIENT_ID)
+
+        with self.assertRaises(exceptions.TokenValidationFailed):
+            federation.validate_token(
+                self._token(audience=CLIENT_ID, key=_keypair()), self.issuer,
+                audience=CLIENT_ID)
 
 
 class JWKSCachingTestCase(FederationTestCase):
@@ -614,6 +687,185 @@ class ClaimMatchingTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             exceptions.ClaimMismatch, federation.match_claims,
             {'repository': 'shakenfist/ryll'}, {})
+
+
+class MatchingRulesTestCase(FederationTestCase):
+    """Which of the cluster's rules one verified identity satisfies.
+
+    A human login has no rule named in the request, so this is where
+    the set of credentials a person is entitled to is decided. The
+    tests are about what must not happen: another provider's rule
+    matching, a damaged rule refusing a login the cluster's other
+    rules would have granted, and an order that depends on how the
+    database returned the rows.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # A second provider, so "this issuer's rules" is a question
+        # with a wrong answer available.
+        TrustedIssuer.new('authentik', AUTHENTIK, AUTHENTIK_JWKS, AUDIENCE)
+
+        self.claims = {
+            'iss': GITHUB,
+            'repository': 'shakenfist/ryll',
+            'ref': 'refs/heads/develop',
+            'sub': 'repo:shakenfist/ryll:ref:refs/heads/develop'
+        }
+
+    def _rule(self, namespace='ci', name='ryll', issuer='github',
+              bound_claims=None, key_ttl=3600):
+        return MappingRule.new(
+            namespace, name, issuer,
+            bound_claims or {'repository': 'shakenfist/ryll'},
+            ['blob.read'], key_ttl, '%s-%s' % (namespace, name))
+
+    def _pair(self, rule, **damage):
+        """One rule paired with its policy, optionally damaged.
+
+        Rule creation refuses to write a policy which binds no claims,
+        grants no scopes or mints keys with no lifetime, so the only
+        way to hold one is to build it here. That is the point: such a
+        row means something has gone wrong with the database, and a
+        login has to survive one without refusing everybody.
+        """
+        attrs = self.mock_mariadb.mapping_rule_attributes[str(rule.uuid)]
+        if damage:
+            attrs = attrs.model_copy(update=damage)
+        return (rule, attrs)
+
+    def test_a_rule_for_another_issuer_is_not_matched(self):
+        # Deliberately handed every rule on the cluster rather than
+        # the accessor's issuer filtered listing. The filter is an
+        # argument a caller passes; which issuer a rule accepts is an
+        # authorisation question, and the answer must not depend on
+        # the caller having asked for the right subset.
+        self._rule()
+        self._rule(name='elsewhere', issuer='authentik')
+
+        matched, skipped = federation.matching_rules(
+            self.claims, 'github', rules_with_attributes())
+
+        self.assertEqual(['ryll'], [rule.name for rule, _, _ in matched])
+        self.assertEqual(0, skipped)
+
+    def test_a_non_matching_rule_does_not_hide_a_matching_one(self):
+        # Neither a claim whose value differs nor one the token does
+        # not carry is a skip: a login evaluates every rule the
+        # cluster holds, so most of them not matching is the ordinary
+        # case rather than a damaged cluster.
+        self._rule(name='another-repo',
+                   bound_claims={'repository': 'shakenfist/imago'})
+        self._rule(name='absent-claim',
+                   bound_claims={'environment': 'production'})
+        self._rule()
+
+        matched, skipped = federation.matching_rules(
+            self.claims, 'github', rules_with_attributes(issuer='github'))
+
+        self.assertEqual(['ryll'], [rule.name for rule, _, _ in matched])
+        self.assertEqual(0, skipped)
+
+    def test_nothing_matching_is_an_empty_answer_rather_than_a_failure(self):
+        self._rule(bound_claims={'repository': 'shakenfist/imago'})
+
+        self.assertEqual(
+            ([], 0),
+            federation.matching_rules(
+                self.claims, 'github',
+                rules_with_attributes(issuer='github')))
+
+    def test_the_satisfied_claims_are_the_tokens_values(self):
+        # Not the rule's matchers, and not every claim the token
+        # carried: a minted key's provenance should describe the grant
+        # as it was made.
+        self._rule(bound_claims={
+            'repository': 'shakenfist/ryll',
+            'ref': ['refs/heads/develop', 'refs/heads/main']})
+
+        matched, _ = federation.matching_rules(
+            self.claims, 'github', rules_with_attributes(issuer='github'))
+
+        self.assertEqual(
+            {'repository': 'shakenfist/ryll', 'ref': 'refs/heads/develop'},
+            matched[0][2])
+
+    def test_a_rule_which_grants_no_scopes_is_skipped_and_counted(self):
+        # A key with no scopes is not a credential this cluster knows
+        # how to describe, so the rule grants nothing -- but it must
+        # not refuse the rule beside it either.
+        good = self._rule()
+        damaged = self._rule(name='no-scopes')
+
+        matched, skipped = federation.matching_rules(
+            self.claims, 'github',
+            [self._pair(damaged, scopes=[]), self._pair(good)])
+
+        self.assertEqual(['ryll'], [rule.name for rule, _, _ in matched])
+        self.assertEqual(1, skipped)
+
+    def test_a_rule_which_binds_no_claims_is_skipped_and_counted(self):
+        # match_claims() refuses an empty matcher set rather than
+        # treating it as matching every identity, which is the
+        # behaviour being relied on here.
+        self.assertRaises(
+            exceptions.ClaimMismatch, federation.match_claims,
+            self.claims, {})
+
+        good = self._rule()
+        damaged = self._rule(name='no-claims')
+
+        # That refusal must not become a refusal of the whole login,
+        # and the rule must be counted rather than disappearing into
+        # the population of rules this person simply does not match.
+        matched, skipped = federation.matching_rules(
+            self.claims, 'github',
+            [self._pair(damaged, bound_claims={}), self._pair(good)])
+
+        self.assertEqual(['ryll'], [rule.name for rule, _, _ in matched])
+        self.assertEqual(1, skipped)
+
+    def test_a_rule_which_mints_no_lifetime_is_skipped_and_counted(self):
+        good = self._rule()
+        damaged = self._rule(name='no-ttl')
+
+        matched, skipped = federation.matching_rules(
+            self.claims, 'github',
+            [self._pair(damaged, key_ttl=0), self._pair(good)])
+
+        self.assertEqual(['ryll'], [rule.name for rule, _, _ in matched])
+        self.assertEqual(1, skipped)
+
+    def test_the_order_is_namespace_then_rule_name(self):
+        # So that a login which is capped, or which fails part way
+        # through minting, mints the same subset every time.
+        self._rule(namespace='zebra', name='alpha')
+        self._rule(namespace='ci', name='zulu')
+        self._rule(namespace='ci', name='alpha')
+
+        matched, _ = federation.matching_rules(
+            self.claims, 'github', rules_with_attributes(issuer='github'))
+
+        self.assertEqual(
+            [('ci', 'alpha'), ('ci', 'zulu'), ('zebra', 'alpha')],
+            [(rule.namespace, rule.name) for rule, _, _ in matched])
+
+    def test_matching_reads_nothing(self):
+        # The policy arrives with the rule, and matching must not undo
+        # that by reading a rule's attributes back per rule. This is
+        # the property which makes a login cost a bounded number of
+        # round trips whatever the cluster holds.
+        self._rule()
+        self._rule(name='another', bound_claims={'repository': 'other'})
+        pairs = rules_with_attributes(issuer='github')
+
+        with mock.patch.object(MappingRule, '_attributes') as attributes:
+            matched, skipped = federation.matching_rules(
+                self.claims, 'github', pairs)
+
+        self.assertEqual(1, len(matched))
+        self.assertEqual(0, skipped)
+        attributes.assert_not_called()
 
 
 class TokenIdentityTestCase(FederationTestCase):

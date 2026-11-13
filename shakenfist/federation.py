@@ -21,6 +21,8 @@ import threading
 import time
 from typing import Any
 from typing import Optional
+from typing import TYPE_CHECKING
+from typing import TypeAlias
 
 import jwt
 from jwt import PyJWKClient
@@ -29,8 +31,17 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.config import config
+from shakenfist.schema.mapping_rule_attributes import MappingRuleAttributesData
 from shakenfist.trusted_issuer import TrustedIssuer
 from shakenfist.trusted_issuer import TrustedIssuers
+
+
+if TYPE_CHECKING:
+    # Typing only, so that deciding which rules an identity satisfies
+    # does not make this module import the object layer. Nothing here
+    # reads a rule from the database: the caller has already done that,
+    # which is what keeps the expensive reads in one place.
+    from shakenfist.mapping_rule import MappingRule
 
 
 LOG, _ = logs.setup(__name__)
@@ -291,7 +302,8 @@ def issuer_for_token(token: str) -> TrustedIssuer:
         f'no trusted issuer configured for {claimed}')
 
 
-def validate_token(token: str, issuer: TrustedIssuer) -> dict[str, Any]:
+def validate_token(token: str, issuer: TrustedIssuer,
+                   audience: Optional[str] = None) -> dict[str, Any]:
     """Verify a token against an issuer, returning its claims.
 
     Checks the signature against the issuer's published keys, then the
@@ -303,6 +315,39 @@ def validate_token(token: str, issuer: TrustedIssuer) -> dict[str, Any]:
     JWKSTrustAnchorUnusable, which says our JWKS CA bundle is
     unloadable. It is separate precisely so the endpoint can avoid
     reporting our misconfiguration as the caller's bad token.
+
+    audience overrides the issuer's configured audience, and None --
+    the default -- means use the issuer's. The override exists because
+    the two kinds of token this cluster accepts are stamped with
+    different audiences by different parties, and one column cannot
+    hold both. A workload asks its identity provider for a token with
+    whatever audience we told the operator to configure, usually the
+    cluster's API URL. A person cannot: OpenID Connect requires an
+    identity token's aud to contain the client identifier of the
+    relying party it was issued for, and that is what the providers
+    stamp. So a human login verifies aud against the issuer's client
+    identifier, which is a column of its own, and passes it here.
+
+    An override is not an additional accepted audience. Exactly one
+    value is in force per call, so a token stamped for one door is
+    refused at the other -- which is the point of checking aud at all,
+    and is why this is a parameter rather than a list the decode would
+    accept any member of.
+
+    A caller which means to override has to pass a value it has
+    already checked it holds. None means the issuer's audience rather
+    than "no audience will do", so a caller which passes an unchecked
+    optional column is asking for the workload audience without
+    saying so. An empty string is refused rather than falling back,
+    which bounds that mistake to the one case the type cannot express,
+    but the check still belongs in the caller: an issuer with no
+    client identifier is not configured for human login at all, and
+    saying so is more useful than a validation failure.
+
+    Nothing else about the decode changes. The algorithm allowlist, the
+    zero leeway, the unverified iat and the require list are the
+    security properties of this function, and there is deliberately
+    only ever one copy of them.
     """
     # One read of the issuer's row for all three columns this needs.
     # Three separate property reads was three round trips on the one
@@ -316,9 +361,19 @@ def validate_token(token: str, issuer: TrustedIssuer) -> dict[str, Any]:
     signing_key = JWKS_CACHE.signing_key(
         issuer, token, configuration.jwks_uri)
 
-    audience = configuration.audience
+    # The override wins where it is given, and an empty override is
+    # not a fallback. The client identifier column has no minimum
+    # length, so an issuer can hold an empty one; reading that as
+    # "use the issuer's audience" would verify a human token against
+    # the workload audience, which is the one widening this parameter
+    # exists to prevent. An empty value fails the completeness check
+    # below instead. The issuer's column is still what every other
+    # caller uses, so a deployment which has only workload issuers is
+    # unaffected by the parameter existing.
+    expected_audience = (
+        configuration.audience if audience is None else audience)
     issuer_url = configuration.issuer_url
-    if not audience or not issuer_url:
+    if not expected_audience or not issuer_url:
         raise exceptions.TokenValidationFailed(
             f'trusted issuer {issuer.name} is incompletely configured')
 
@@ -327,7 +382,7 @@ def validate_token(token: str, issuer: TrustedIssuer) -> dict[str, Any]:
             token,
             signing_key.key,
             algorithms=ALLOWED_ALGORITHMS,
-            audience=audience,
+            audience=expected_audience,
             issuer=issuer_url,
             leeway=LEEWAY_SECONDS,
             options={
@@ -404,6 +459,110 @@ def match_claims(claims: dict[str, Any],
         satisfied[claim] = claims[claim]
 
     return satisfied
+
+
+# A rule paired with the policy it expresses, as the joined accessor
+# returns them, and the same pair plus the claims which satisfied it.
+RuleWithPolicy: TypeAlias = tuple['MappingRule', MappingRuleAttributesData]
+MatchedRule: TypeAlias = tuple['MappingRule', MappingRuleAttributesData,
+                               dict[str, Any]]
+
+
+def matching_rules(claims: dict[str, Any], issuer_name: str,
+                   rules: list[RuleWithPolicy]
+                   ) -> tuple[list[MatchedRule], int]:
+    """Which of these rules does one verified identity satisfy?
+
+    Takes the claims of an already validated token, the name of the
+    issuer that validated it, and rules already paired with their
+    policy. It reads nothing: the pairs come from the joined accessor,
+    which is what makes matching an identity against the whole
+    cluster's rules a bounded number of round trips rather than one
+    per rule.
+
+    Returns the matches and a count of rules skipped as unusable. Each
+    match is the rule, its policy, and the claims which satisfied it --
+    the token's values rather than the rule's matchers, because a key's
+    provenance should describe the grant as it was made rather than as
+    the rule reads later.
+
+    Matching itself is match_claims(), not a comparison written again
+    here. Exact string equality, or membership of a list of exact
+    strings, with no globbing and no coercion, is the property the
+    whole federation rests on, and it stays in one function so that it
+    cannot be loosened in one place and not the other.
+
+    A rule this identity does not satisfy is an ordinary outcome and
+    not an error. Evaluating every rule the cluster holds means most of
+    them do not match, so ClaimMismatch is a non-match here rather than
+    the refusal it is when a caller named one rule.
+
+    A rule which cannot grant anything -- no bound claims, no scopes,
+    no usable lifetime -- is skipped rather than raised, because one
+    damaged rule must not refuse an identity the cluster's other rules
+    would have granted. The count comes back so the caller can say in
+    its log that the answer was short, which is the only signal an
+    operator gets that a rule they wrote did nothing.
+
+    Binding no claims is counted as damage rather than treated as a
+    non-match, which is the one place this function reaches a verdict
+    before match_claims() does. match_claims() refuses an empty matcher
+    set, for the good reason that matching every identity is the
+    opposite of what an empty set should mean, and rule creation
+    refuses to write one -- so an empty set is a damaged row. Deciding
+    that here keeps the refusal out of the skipped-or-not bookkeeping
+    and means a damaged rule is reported as damaged rather than
+    disappearing into the much larger population of rules this person
+    simply does not match.
+
+    The issuer is checked again even though the accessor filters on it
+    in SQL. The filter is an argument the caller passes, and this
+    decides an authorisation question: handed every rule on the
+    cluster, this must still answer with only the ones which accept
+    tokens from the issuer that signed this one.
+
+    Object state is not considered, exactly as the accessor does not
+    consider it. A rule's only removal is a soft delete, so the caller
+    has to have dropped the rules which are not in an actionable state
+    before calling this -- in bulk, which is why it is not done here.
+
+    The order is by namespace and then rule name, so a login which is
+    capped or which fails part way through mints the same subset every
+    time rather than one that depends on how the database returned the
+    rows.
+    """
+    matched: list[MatchedRule] = []
+    skipped = 0
+
+    for rule, policy in rules:
+        if policy.issuer != issuer_name:
+            continue
+
+        unusable = None
+        if not policy.bound_claims:
+            unusable = 'rule binds no claims'
+        elif not policy.scopes:
+            unusable = 'rule grants no scopes'
+        elif not policy.key_ttl or policy.key_ttl < 0:
+            unusable = 'rule mints keys with no lifetime'
+
+        if unusable:
+            skipped += 1
+            LOG.with_fields({
+                'rule': str(rule.uuid), 'namespace': rule.namespace,
+                'name': rule.name, 'issuer': issuer_name
+            }).warning(f'Skipping unusable mapping rule: {unusable}')
+            continue
+
+        try:
+            satisfied = match_claims(claims, policy.bound_claims)
+        except exceptions.ClaimMismatch:
+            continue
+
+        matched.append((rule, policy, satisfied))
+
+    matched.sort(key=lambda match: (match[0].namespace, match[0].name))
+    return matched, skipped
 
 
 # The rate limiting window, in seconds. Fixed rather than sliding: the
