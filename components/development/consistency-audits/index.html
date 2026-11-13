@@ -10169,6 +10169,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-spice-performance-phase-09-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE performance phase 9: push audit of phases 6 and 7
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-spice-performance/" class="md-nav__link">
         
   
@@ -16250,6 +16278,10 @@ keeps in step with the code (see <a href="#before-and-after-a-change-to-a-check"
 check</a>). Repository visibility
 is among what they query, live rather than hardcoded, because it
 changes.</p>
+<p>The one that asks what a file used to say reaches the network too,
+without belonging to that set: a blob-filtered clone holds no
+historical blobs, so reading one fetches it. What that means for a
+failed read is in the same section.</p>
 <p>The skillsaw pin is deliberate, and so is the assertion next to it.
 <code>llm-context-lint</code> reports what skillsaw calls an error, and skillsaw's
 rule set moves between releases, so an unpinned upgrade would change the
@@ -16580,19 +16612,36 @@ status to the caller, since only the caller knows which statuses are
 answers. <code>check-audit-smoke.py</code>, which runs in CI without a token,
 excuses a <code>tool_failure</code> from the checks that ask GitHub and nothing
 else.</p>
-<p>The scheduled run excuses the same results, and only those
-(<code>github_did_not_answer()</code> in <code>scripts/audit_snapshot.py</code> is the one
-rule both scripts use). For a network check whose tooling could not
-ask GitHub, <em>Fail if any check raised</em> prints a workflow warning and
-does not fail the leg. A failed leg holds back the compliance page for
-the whole fleet, which one transient 502 or rate limit in one
-repository is not worth. The page shows that cell as a check error
-saying what could not be asked, and the criterion's issue is left as it
-was. An outage that lasts is not hidden by this. A token that has
-expired or lost access fails every leg at <em>Check the read token</em>,
-before anything is measured. A tool failure from any other check is
-the runner's own git, skillsaw or <code>review-tracking.py</code> not answering,
-which the next run would meet too, so it still fails the leg.</p>
+<p>The scheduled run excuses slightly more than that, for a reason the
+smoke run does not have. <em>Fail if any check raised</em> prints a workflow
+warning and does not fail the leg for a <code>tool_failure</code> from a check in
+<code>NETWORK_CHECKS</code>, and also for one the raise site marked transient
+(<code>transient_tool_failure()</code> in <code>scripts/audit_snapshot.py</code>). A failed
+leg holds back the compliance page for the whole fleet, which one
+transient 502, reset or rate limit in one repository is not worth. The
+page shows that cell as a check error saying what could not be asked,
+and the criterion's issue is left as it was. An outage that lasts is
+not hidden by this. A token that has expired or lost access fails
+every leg at <em>Check the read token</em>, before anything is measured. A
+tool failure from any other check is the runner's own git, skillsaw or
+<code>review-tracking.py</code> not answering, which the next run would meet too,
+so it still fails the leg.</p>
+<p>The mark exists because a criterion can read a remote without its
+verdict depending on one, and only the raise site knows which of its
+reads did. <code>plan-retirement</code> is the case. Its verdict comes from the
+tree and from this repository's own history, so it is held to the
+byte-for-byte comparison and stays out of <code>NETWORK_CHECKS</code> -- but it
+reads a historical <code>docs/plans/index.md</code> with <code>git show</code>, and the
+scheduled run clones with <code>--filter=blob:none</code>, where that read
+fetches the blob from the promisor remote. So <code>ToolFailure(...,
+transient=True)</code> is raised for that read and for the walk budget it
+can exhaust, and not for the seven other things that can go wrong in
+the same function: a shallow checkout, a failed <code>git log</code>, a tree
+listing, the read cap. Marking the criterion by id instead would
+excuse all of them, so a clone step regressing to <code>--depth 1</code> would
+warn and pass on every leg of every run while the criterion reported
+<code>error</code> fleet-wide -- stage 4's "a broken audit looks like a healthy
+one", exactly.</p>
 <p>The tests call <code>run()</code> directly and assert a verdict, so a check that
 raises unexpectedly still fails them. A test of a tool-failure path
 asserts that <code>run()</code> raises ToolFailure instead, with
@@ -16691,6 +16740,13 @@ so a step added to it reaches both.</p>
 fails until it is there, and
 <a href="#before-and-after-a-change-to-a-check">Before and after a change to a check</a>
 says what the list is for.</p>
+<p>A criterion that reads a remote <em>without</em> its verdict depending on one
+-- a blob out of history in the filtered clone, say -- stays out of
+that list and marks the failures that can be the remote's instead:
+<code>raise ToolFailure(..., transient=True)</code>, or <code>run_tool(...,
+transient=True)</code> for a call whose timeout would be the remote's. Mark
+only those; the same function's local failures have to keep failing
+the leg. The same section says why.</p>
 <p><code>AUDIT_METADATA</code> and <code>ISSUE_TITLES</code> in <code>scripts/audit_common.py</code>, and
 <code>COLUMN_NAMES</code> in <code>scripts/audit-update-docs.py</code>, are views over the
 registry rather than tables to update. There is no longer a way to

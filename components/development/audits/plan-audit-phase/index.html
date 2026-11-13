@@ -10104,6 +10104,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-spice-performance-phase-09-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE performance phase 9: push audit of phases 6 and 7
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-spice-performance/" class="md-nav__link">
         
   
@@ -16115,6 +16143,15 @@ to judge, and the broken links are <code>docs-external-links</code>' finding
 rather than this one's. A plan the check could not find is <em>named</em> in
 the result either way, because a plan silently walked past looks
 exactly like a plan that passed.</p>
+<p>An index that is <em>there</em> and cannot be read is a finding rather than
+an N/A. <code>Repo.read()</code> answers None both for a path with nothing at it
+and for one holding something it will not read -- a directory, a
+dangling link, a link out of the clone, a file over the 2 MB cap --
+and an N/A closes this criterion's open issue as though the repository
+had stopped planning this way. The exception is a <code>docs/plans</code> that is
+itself a link out of the clone, which <code>plan-index</code> already decides is
+not a directory this audit has; an index inside one is absent rather
+than unreadable, and the criteria reading it agree about that.</p>
 <p>A repository whose linked plans are all <em>statusless</em> is not N/A,
 though. It links plans, and every one of them is named in the result;
 reporting it as N/A would say the index links none, which is the

@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/kerbside/plans/PLAN-spice-performance/">
       
       
-        <link rel="prev" href="../PLAN-spice-performance-phase-06-push-audit/">
+        <link rel="prev" href="../PLAN-spice-performance-phase-09-push-audit/">
       
       
         <link rel="next" href="../PLAN-two-tier-ci-phase-01-ovirt-kerbside/">
@@ -10010,6 +10010,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-spice-performance-phase-09-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPICE performance phase 9: push audit of phases 6 and 7
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -16587,8 +16615,8 @@ first phase.</p>
 <tr>
 <td>7. QUIC client leg: experiments (verdict: no-go, as measured)</td>
 <td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/">PLAN-spice-performance-phase-07-quic-experiments.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>e0f53fb04a (#716)</td>
 </tr>
 <tr>
 <td>8. QUIC client leg: implementation (abandoned: phase 7's gate said no-go)</td>
@@ -16597,9 +16625,9 @@ first phase.</p>
 <td></td>
 </tr>
 <tr>
-<td>9. Push audit of phase 7 (kerbside)</td>
-<td></td>
-<td>Not started</td>
+<td>9. Push audit of phases 6 and 7 (kerbside)</td>
+<td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-09-push-audit/">PLAN-spice-performance-phase-09-push-audit.md</a></td>
+<td>Complete</td>
 <td></td>
 </tr>
 </tbody>
@@ -17340,11 +17368,21 @@ implementation would ship the regression. <em>What would change the
 answer</em> in <code>docs/performance/quic-experiment.md</code> names the
 conditions under which this would be worth reopening, and each
 of them needs the bench re-run before any code.</p>
-<p><strong>Phase 9</strong> is the push audit for phase 7 alone, since phase 8
-is abandoned. It audits phase 7's accumulated diff — the rig's
-loss term and the transport bench, all of it in Kerbside, as
-nothing landed in ryll — and cites phase 6 for phases 1-5,
-rather than re-auditing work that has already been audited.</p>
+<p><strong>Phase 9</strong> is the push audit for phases 6 and 7, since phase 8
+is abandoned. It audits two landings, each read as a merge commit
+against its first parent: phase 6's follow-up, 17a31ebf75 (#701),
+and phase 7, e0f53fb04a (#716). All of it is in Kerbside, as
+phase 7 landed nothing in ryll. Phases 1-5 are cited from phase
+6's audit rather than re-audited, as are the kerbside-patches
+landings and ryll #406.
+- <em>Corrected 2026-11-12 by phase 9's survey:</em> this section said
+  the phase audits phase 7 alone. Phase 6's audit merged as #668
+  on 2026-10-31, and the follow-up pull request it called for
+  merged as #701 on 2026-11-07, seven days later, so nothing
+  audited those 736 insertions — most of them in the shipped
+  proxy, including 135 lines in <code>caps.rs</code>, which parses a
+  client's link message. The shared block's accumulated-diff
+  rule exists to catch exactly that, so #701 is in range.</p>
 <!-- shared-block: plan-push-audit-phase v4 -->
 <p>Push audit phase (shared block; do not edit -- the canonical
 copy lives in shakenfist/development at
