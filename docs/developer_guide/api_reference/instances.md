@@ -1060,15 +1060,14 @@ list. It is a JSON dictionary with the following fields:
 
 * op_uuid (string, required): the UUID of the agent operation this one waits
   for. It must already exist, and must be in a namespace you can read.
-* settle_seconds (number): wait this long before treating this edge as
-  satisfied, for a caller whose next step needs the guest to settle after
-  whatever the dependency changed. Omit it to be satisfied immediately. The
-  delay is not exact. It is measured by the dispatcher, which looks at a
-  waiting operation every `DISPATCH_CHECK_INTERVAL` (5 seconds), from the first
-  pass which found the operation blocked on a dependency, so it can be satisfied
-  up to one interval after the dependency finished, and a dependency which was
-  still running when that first pass happened has already used some of the
-  delay by the time it finishes. It may not be negative, and may not exceed the
+* settle_seconds (number): wait this many seconds after the named operation
+  finished before treating this edge as satisfied, for a caller whose next step
+  needs the guest to settle after whatever the dependency changed. Omit it to be
+  satisfied immediately. The delay runs from the first dispatcher pass which
+  observed the dependency finish, and the dispatcher looks at a waiting
+  operation every `DISPATCH_CHECK_INTERVAL` (5 seconds), so the full delay
+  always elapses and the edge can be satisfied up to one interval later than
+  that -- never earlier. It may not be negative, and may not exceed the
   operator's dependency wait budget, `AGENT_OPERATION_DEPENDENCY_WAIT` (300
   seconds by default), because a longer delay could never elapse before the
   budget aborted the operation. A request over the ceiling is refused with a 400.

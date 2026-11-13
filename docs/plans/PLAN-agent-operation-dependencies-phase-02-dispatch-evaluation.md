@@ -284,14 +284,24 @@ checking are exactly right:
    no timestamp the evaluator can read without one.
 
    So the settle clock starts at the first evaluation that observes
-   the dependency terminal, recorded in the same attribute decision 2
-   uses for the wait start. The consequence, which step 2g documents:
-   a settle delay is "this many seconds after we noticed it finished",
-   which is up to one `DISPATCH_CHECK_INTERVAL` (five seconds) later
-   than the dependency actually finished. Phase 1's API documentation
-   says "satisfied this many seconds after the dependency completed",
-   which is now imprecise by up to five seconds and is corrected in
-   step 2g rather than left to be found later.
+   the dependency terminal, which is held in the terminal-dependency
+   cache of decision 7 alongside the state. The consequence, which
+   step 2f documents: a settle delay is "this many seconds after we
+   noticed it finished", which is up to one `DISPATCH_CHECK_INTERVAL`
+   (five seconds) later than the dependency actually finished. Phase
+   1's API documentation says "satisfied this many seconds after the
+   dependency completed", which is now imprecise by up to five seconds
+   and is corrected in step 2f rather than left to be found later.
+
+   **This decision as first written said the clock was "recorded in
+   the same attribute decision 2 uses for the wait start", and that is
+   not possible.** The wait anchor is set on the first pass which
+   finds an operation blocked on anything; the settle has to start
+   when a particular dependency is seen to finish, which is later and
+   is per dependency. One column cannot hold both. Step 2c implemented
+   the attribute reading, which is how the defect reached the tree;
+   the two clocks are now separate and the execution notes record it.
+   It also cited a step 2g, which this phase does not have.
 
 7. **The terminal-dependency cache is a plain dict on the dispatcher
    instance, cleared whenever the generation changes, and bounded.**
@@ -359,10 +369,14 @@ checking are exactly right:
 
 ## Step plan
 
-Steps run **in sequence**. Every step but 2f and 2g writes to the
-shared worktree, 2a is a hard prerequisite of 2b and 2c, and 2e's
-tests exercise what 2b, 2c and 2d build. 2f and 2g could run beside
-2e but are cheap, so the simplicity of one order wins.
+Steps run **in sequence**. All six write to the shared worktree, so
+none of them may run beside another: `pre-commit`'s stash is repository
+wide and this project has already had parallel agents in one worktree
+silently revert each other. 2a is a hard prerequisite of 2b and 2c, and
+2d's mutants exercise what 2b and 2c build, which fixes the order of
+the first four regardless. (An earlier draft of this paragraph said
+"every step but 2f and 2g", which is wrong twice: there is no step 2g,
+and the two documentation steps write to the worktree like the rest.)
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
@@ -771,8 +785,41 @@ dependencies between agent operations", where the dependency parameters
 are documented. **Phase 4 is to move both paragraphs** into the new
 page and leave a link behind, so each stays in exactly one place.
 
-Step 2f also found that decision 6's wording is not what the code does:
-the settle clock is the wait anchor, set at the first dispatcher pass
-which finds the operation blocked on anything, so a dependency still
-running at that pass has already used part of the delay when it
-finishes. The API reference states what the code does.
+**Step 2f found a real defect in step 2c's code, which is fixed rather
+than documented.** Writing down what `settle_seconds` does forced
+someone to state it plainly, and stated plainly it was indefensible:
+the settle clock was the dependency wait anchor, set on the first
+dispatcher pass which found the operation blocked on *anything*. So for
+a dependency still running at that pass -- which is the ordinary case,
+since a dependency worth waiting on usually takes longer than the
+settle after it -- the delay was spent before the dependency finished,
+and a caller who asked for thirty seconds of quiet after a reboot got
+none at all. The parameter was not imprecise. For its commonest shape
+it did nothing.
+
+Decision 6 had asked for the right thing in its first sentence, "the
+settle delay is measured from the dependency's own completion", and
+then specified a mechanism in its second that cannot deliver it. 2c
+implemented the mechanism. Neither the step's tests nor the mutation
+set could catch it, because the test asserted the behaviour the code
+had -- its comment said "measured from the wait anchor rather than from
+the dependency's own completion" -- so the guard and the test agreed
+with each other and the mutant for that comparison died honestly
+against a wrong specification. That is the failure mode mutation
+testing cannot see, and the thing which did see it was being made to
+write the behaviour down for a caller.
+
+The fix separates the two clocks, which decision 6 wrongly put in one
+column. The terminal-dependency cache already records that a dependency
+was seen finished, so it now records when, and the settle runs from
+that. The wait budget still runs from the anchor, because the budget
+bounds how long the queue head is held and it has been held since the
+anchor. A cache entry lost to eviction or a new dispatcher generation
+restarts the settle, which delays an operation rather than releasing it
+early, and the budget still bounds how long that can go on.
+
+`test_a_settle_does_not_run_down_while_the_dependency_does` pins it,
+and fails on the old measurement with exactly the right complaint. The
+mutation set gained the inverse of the defect as a mutant -- anchor the
+settle on the wait -- plus one for the settle's own exhaustion check,
+taking it to 22.

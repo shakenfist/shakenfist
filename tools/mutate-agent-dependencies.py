@@ -162,10 +162,32 @@ MUTANTS = [
      r'test_daemon_sidechannel_dependencies',
      'test_a_wait_past_the_budget_cascades'),
     ('settle comparison', SIDECHANNEL,
-     "        if waited >= settle:\n            return SETTLE_SATISFIED",
-     "        if waited < settle:\n            return SETTLE_SATISFIED",
+     "        if time.time() - finished >= settle:\n"
+     "            return SETTLE_SATISFIED",
+     "        if time.time() - finished < settle:\n"
+     "            return SETTLE_SATISFIED",
      r'test_daemon_sidechannel_dependencies',
      'test_a_settle_delay_blocks_until_it_has_elapsed'),
+    # The settle clock is the dependency's observed finish, not the wait
+    # anchor. Anchoring it on the wait is what this code did first, and
+    # it meant a dependency which outran its own settle delay produced
+    # no delay at all -- the whole parameter, silently absent, for the
+    # commonest shape of dependency there is.
+    ('settle anchored on the wait', SIDECHANNEL,
+     "        if time.time() - finished >= settle:",
+     "        if time.time() - anchor >= settle:",
+     r'test_daemon_sidechannel_dependencies',
+     'test_a_settle_does_not_run_down_while_the_dependency_does'),
+    # The settle's own exhaustion check, which is measured from the wait
+    # anchor because it bounds how long the queue head is held, not how
+    # long the guest has been quiet.
+    ('settle budget comparison', SIDECHANNEL,
+     "        if time.time() - anchor > budget:\n"
+     "            return SETTLE_EXHAUSTED",
+     "        if time.time() - anchor < budget:\n"
+     "            return SETTLE_EXHAUSTED",
+     r'test_daemon_sidechannel_dependencies',
+     'test_a_settle_which_outlives_the_budget_cascades'),
     # The two runs_after mutants make an ordering edge fate sharing,
     # which is the cluster side's refusal at
     # daemons/queues/workitem.py:175-210 reverted: an ordering hint

@@ -109,6 +109,17 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
     def _stored_anchor(self, op):
         return op._attributes().dependency_wait_started
 
+    def _observed(self, op_uuid, seconds_ago,
+                  state=BaseOperation.STATE_COMPLETE):
+        """Backdate when the dispatcher first saw a dependency finish.
+
+        A settle delay runs from this rather than from the wait anchor,
+        so this is what a test moves to make a settle elapse. Seeding it
+        also stands in for the read, which is what the cache is for.
+        """
+        self.daemon.terminal_dependency_cache[str(op_uuid)] = (
+            state, time.time() - seconds_ago)
+
     def _reads_of(self, op_uuid):
         return [c for c in mariadb.get_state.call_args_list
                 if str(c.args[1]) == str(op_uuid)]
@@ -299,17 +310,16 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
         self.assertIsNone(agentop.dependency_failure)
 
     def test_a_settle_delay_blocks_until_it_has_elapsed(self):
-        # Measured from the wait anchor rather than from the
-        # dependency's own completion, because the state row this walk
-        # reads carries no completion time it could use without
-        # hydrating the dependency.
-        _, edge = self._dependency(
+        # Measured from when this dispatcher first observed the
+        # dependency finish, which is the closest it can get to the
+        # dependency's own completion without hydrating it.
+        dep_op, edge = self._dependency(
             states=[AgentOperation.STATE_QUEUED,
                     AgentOperation.STATE_EXECUTING,
                     BaseOperation.STATE_COMPLETE],
             settle_seconds=30)
         agentop = self._agentop(depends_on=[edge])
-        self._anchor(agentop, 10)
+        self._observed(dep_op.uuid, 10)
 
         dispatchable, reason = self.daemon._dependencies_met(
             self.inst, agentop)
@@ -317,13 +327,45 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
         self.assertEqual('settling', reason)
         self.assertIsNone(agentop.dependency_failure)
 
-        self._anchor(agentop, 31)
+        self._observed(dep_op.uuid, 31)
         dispatchable, reason = self.daemon._dependencies_met(
             self.inst, agentop)
 
         self.assertTrue(dispatchable)
         self.assertIsNone(reason)
         self.assertIsNone(agentop.dependency_failure)
+
+    def test_a_settle_does_not_run_down_while_the_dependency_does(self):
+        # The defect this pins. The settle clock was the wait anchor,
+        # set on the first pass which found the operation blocked on
+        # anything at all, so a dependency still executing at that pass
+        # had already spent the whole delay by the time it finished --
+        # and a caller who asked the guest to be left alone for thirty
+        # seconds after a reboot got no delay whatsoever.
+        dep_op, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING],
+            settle_seconds=30)
+        agentop = self._agentop(depends_on=[edge])
+
+        self.assertFalse(
+            self.daemon._dependencies_met(self.inst, agentop)[0])
+
+        # Parked for a long time while the dependency ran, which is the
+        # ordinary case rather than a corner: a dependency worth waiting
+        # on usually takes longer than the settle after it.
+        self._anchor(agentop, 100)
+        dep_op.state = BaseOperation.STATE_COMPLETE
+
+        dispatchable, reason = self.daemon._dependencies_met(
+            self.inst, agentop)
+        self.assertFalse(dispatchable)
+        self.assertEqual('settling', reason)
+
+        # The full delay still has to elapse from the observation.
+        self._observed(dep_op.uuid, 31)
+        self.assertTrue(
+            self.daemon._dependencies_met(self.inst, agentop)[0])
 
     def test_a_settle_which_outlives_the_budget_cascades(self):
         # The API refuses a settle larger than the budget, so reaching
@@ -453,13 +495,13 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
         # An ordering edge's settle delay is honoured: the field is
         # published and validated on both lists, and "not before" plus
         # a settle is still an ordering statement.
-        _, edge = self._dependency(
+        dep_op, edge = self._dependency(
             states=[AgentOperation.STATE_QUEUED,
                     AgentOperation.STATE_EXECUTING,
                     BaseOperation.STATE_COMPLETE],
             settle_seconds=30)
         agentop = self._agentop(runs_after=[edge])
-        self._anchor(agentop, 10)
+        self._observed(dep_op.uuid, 10)
 
         dispatchable, reason = self.daemon._dependencies_met(
             self.inst, agentop)
@@ -467,7 +509,7 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
         self.assertIn('settling', reason)
         self.assertIsNone(agentop.dependency_failure)
 
-        self._anchor(agentop, 31)
+        self._observed(dep_op.uuid, 31)
         self.assertTrue(
             self.daemon._dependencies_met(self.inst, agentop)[0])
 
@@ -506,8 +548,12 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
             self.daemon._dependencies_met(self.inst, agentop)[0])
         self.assertEqual(1, len(self._reads_of(dep_op.uuid)))
         self.assertEqual(
-            {str(dep_op.uuid): BaseOperation.STATE_COMPLETE},
-            self.daemon.terminal_dependency_cache)
+            [str(dep_op.uuid)],
+            list(self.daemon.terminal_dependency_cache.keys()))
+        state, observed = self.daemon.terminal_dependency_cache[
+            str(dep_op.uuid)]
+        self.assertEqual(BaseOperation.STATE_COMPLETE, state)
+        self.assertAlmostEqual(time.time(), observed, delta=30)
 
     def test_a_pending_dependency_is_not_cached(self):
         # Caching a non-terminal observation would mean a blocked

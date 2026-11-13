@@ -2102,12 +2102,18 @@ class Monitor(daemon.Daemon):
         observation is deliberately not cached: re-reading it on every
         pass is the entire mechanism by which a blocked operation
         eventually unblocks.
+
+        The cache entry carries the time of that first terminal
+        observation as well as the state, because it is the closest this
+        evaluator can get to when the dependency finished, and a settle
+        delay has to be measured from that rather than from when the
+        dependent was parked.
         """
         op_uuid = str(dep['op_uuid'])
 
         cached = self.terminal_dependency_cache.get(op_uuid)
         if cached is not None:
-            return cached
+            return cached[0]
 
         state = mariadb.get_state(
             ObjectType(dep['op_type']), op_uuid)
@@ -2131,7 +2137,28 @@ class Monitor(daemon.Daemon):
             oldest = next(iter(cache), None)
             if oldest is not None:
                 cache.pop(oldest, None)
-        cache[op_uuid] = state
+        cache[op_uuid] = (state, time.time())
+
+    def _dependency_finished_at(self, dep, dep_state):
+        """When this dispatcher first observed this dependency finished.
+
+        The state row carries no completion time, and hydrating the
+        dependency to find one is forbidden, so the first pass which saw
+        it terminal is the best available answer -- later than the truth
+        by up to one DISPATCH_CHECK_INTERVAL.
+
+        A missing entry means the cache was evicted, or replaced by a new
+        dispatcher generation, since the state was read. Observing it
+        again now restarts the settle, which delays an operation rather
+        than releasing it early, and the wait budget still bounds how
+        long that can go on.
+        """
+        op_uuid = str(dep['op_uuid'])
+        cached = self.terminal_dependency_cache.get(op_uuid)
+        if cached is None:
+            self._cache_terminal_dependency(op_uuid, dep_state)
+            cached = self.terminal_dependency_cache.get(op_uuid)
+        return cached[1] if cached else time.time()
 
     def _dependencies_met(self, inst, agentop):
         """Decide whether this operation's dependency edges permit dispatch.
@@ -2213,7 +2240,7 @@ class Monitor(daemon.Daemon):
 
             # Everything else is complete, which satisfies the edge --
             # once any settle delay has elapsed.
-            settle = self._settle_verdict(agentop, dep, budget)
+            settle = self._settle_verdict(agentop, dep, dep_state, budget)
             if settle == SETTLE_EXHAUSTED:
                 self._cascade_abort(
                     agentop, dep, dep_state,
@@ -2251,7 +2278,7 @@ class Monitor(daemon.Daemon):
 
             # Any terminal state satisfies an ordering edge, whatever it
             # says about the outcome, subject to the settle delay.
-            settle = self._settle_verdict(agentop, dep, budget)
+            settle = self._settle_verdict(agentop, dep, dep_state, budget)
             if settle == SETTLE_EXHAUSTED:
                 self._warn_runs_after(
                     inst, agentop, dep, dep_state,
@@ -2262,7 +2289,7 @@ class Monitor(daemon.Daemon):
 
         return True, None
 
-    def _settle_verdict(self, agentop, dep, budget):
+    def _settle_verdict(self, agentop, dep, dep_state, budget):
         """Where a satisfied edge's settle delay has got to.
 
         SETTLE_SATISFIED, SETTLE_SETTLING, or SETTLE_EXHAUSTED once the
@@ -2270,27 +2297,39 @@ class Monitor(daemon.Daemon):
         those is reported rather than acted on, because the two walks
         answer it differently.
 
-        The delay is measured from the dependency wait anchor rather
-        than from the dependency's own completion, because the state row
-        this evaluator reads carries no completion time it could use
-        without hydrating the dependency. So a settle means "this long
-        after the dispatcher noticed the dependency finish", which is up
-        to one DISPATCH_CHECK_INTERVAL later than the dependency
-        actually finished.
+        The delay runs from when the dependency was first observed
+        finished, which is what the parameter means: a caller asks for a
+        settle because the guest needs to quiesce after whatever the
+        dependency did, and that cannot start before the dependency
+        does. It is up to one DISPATCH_CHECK_INTERVAL later than the
+        dependency actually finished, which is the one imprecision the
+        no-hydration rule forces.
+
+        It deliberately does not run from the dependency wait anchor.
+        That anchor is set on the first pass which found this operation
+        blocked on anything, so for a dependency still running then, a
+        settle measured from it would have been partly or entirely spent
+        by the time the dependency finished -- and a settle longer than
+        the dependency's remaining runtime would not have delayed
+        anything at all.
+
+        The budget is still measured from the anchor, because the budget
+        is a bound on how long this operation may hold the head of its
+        instance's queue, and it has been holding it since the anchor.
         """
         settle = dep.get('settle_seconds')
         if not settle:
             return SETTLE_SATISFIED
 
         anchor = agentop.note_dependency_wait_started()
-        waited = time.time() - anchor
-        if waited >= settle:
+        finished = self._dependency_finished_at(dep, dep_state)
+        if time.time() - finished >= settle:
             return SETTLE_SATISFIED
 
         # A settle longer than the budget can never elapse. The API
         # refuses one, so reaching this means an edge stored before that
         # bound existed, and giving up is better than blocking forever.
-        if waited > budget:
+        if time.time() - anchor > budget:
             return SETTLE_EXHAUSTED
         return SETTLE_SETTLING
 
