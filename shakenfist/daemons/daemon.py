@@ -23,9 +23,7 @@ from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist import mariadb
 from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
-from shakenfist.exceptions import MissingNodeLockSocket
 from shakenfist.exceptions import ProcessExecutionError
-from shakenfist.exceptions import TruncatedNodeLockResponse
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_user_facing_node_queues
 from shakenfist.operations.baseoperation import get_all_background_node_queues
@@ -287,17 +285,15 @@ def health_check_nodelock():
     try:
         with util_concurrency.NodeLock('_health_check'):
             ...
-    except (ConnectionError, FileNotFoundError, MissingNodeLockSocket,
-            TruncatedNodeLockResponse) as e:
-        # nodelock only unlinks its socket at startup, so while it is
-        # restarting (for example during a deploy) clients see a range of
-        # transient failures rather than one exception type: the stale
-        # socket file refuses connections, the startup unlink races
-        # connect() (FileNotFoundError), an accepted connection can be
-        # reset or aborted or closed without a reply mid-shutdown, and a
-        # not-yet-created socket is missing entirely. They all mean the
-        # same thing here, and any of them escaping bypasses
-        # wait_for_nodelock()'s calm 1Hz retry loop.
+    except util_concurrency.NODELOCK_TRANSPORT_ERRORS as e:
+        # The set of transient failures a nodelock client sees while the
+        # daemon restarts is enumerated once, next to the socket path in
+        # util/concurrency.py. They all mean the same thing here, and any
+        # of them escaping bypasses wait_for_nodelock()'s calm 1Hz retry
+        # loop. Only the acquire can reach this: NodeLock.__exit__ does
+        # not raise a transport error any more (issue 4902), so a daemon
+        # which dies between acquire and release is caught by the next
+        # probe a second later rather than by this one.
         LOG.warning(f'nodelock daemon is unhealthy ({e.__class__.__name__})!')
         return False
 

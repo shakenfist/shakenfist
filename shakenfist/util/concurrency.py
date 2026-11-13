@@ -40,6 +40,34 @@ LOG, _ = logs.setup(__name__)
 PRIVEXEC_SOCKET_PATH = '/srv/shakenfist/.privexec'
 NODELOCK_SOCKET_PATH = '/srv/shakenfist/.nodelock'
 
+# nodelock only unlinks its socket at startup, so while it is restarting (for
+# example during a deploy) clients see a range of transient failures rather
+# than one exception type: the stale socket file refuses connections, the
+# startup unlink races connect() (FileNotFoundError), an accepted connection
+# can be reset or aborted or closed without a reply mid-shutdown, and a
+# not-yet-created socket is missing entirely. A nodelock daemon which is
+# perfectly healthy refuses connections outright as well, once its listen
+# backlog is full -- see daemons/nodelock/main.py. These all mean "we did not
+# get an answer", and nothing more specific than that.
+#
+# UnknownNodeLockReplyException is deliberately not one of them: a reply which
+# parses but carries no known field is a bug in this protocol rather than a
+# daemon which is restarting, and it stays loud in every caller.
+NODELOCK_TRANSPORT_ERRORS = (
+    ConnectionError,
+    FileNotFoundError,
+    MissingNodeLockSocket,
+    TruncatedNodeLockResponse,
+)
+
+# How many times NodeLock.__exit__ asks for the unlock before it gives up, and
+# how long it waits between attempts. The cadence matches __enter__'s acquire
+# retry loop. This is deliberately short: it exists to ride out a momentarily
+# full listen backlog, not to wait out a daemon restart, which drops the lock
+# anyway.
+NODELOCK_UNLOCK_ATTEMPTS = 3
+NODELOCK_UNLOCK_RETRY_INTERVAL = 0.2
+
 
 class Job:
     def __init__(self) -> None:
@@ -415,10 +443,49 @@ class NodeLock():
         exc_val: BaseException | None,
         traceback: TracebackType | None
     ) -> None:
+        """Release the lock, without ever raising a transport error.
+
+        The nodelock daemon holds its lock table as a plain dictionary
+        local to main(), and it deletes the key before it answers an
+        unlock. So a daemon which cannot answer this request has either
+        dropped every lock it held already (it is restarting), or has
+        released this one and lost only the reply. Either way the lock is
+        gone, and raising here failed operations whose work had already
+        completed -- and replaced whatever the body raised with a message
+        about tidying up after it (issue 4902).
+
+        ClusterLock.__exit__ has swallowed its own release failure, for
+        the second of those reasons, for much longer.
+
+        The unlock is retried briefly first, because a refused connection
+        is not proof the daemon is gone: a healthy daemon with a full
+        listen backlog refuses connections too, and in that case the
+        request never arrived. A nodelock has no lease, so a request that
+        never arrives really does leave the lock held until the daemon
+        restarts.
+
+        Only NODELOCK_TRANSPORT_ERRORS is swallowed. Anything else -- an
+        unknown reply, a programming error -- is still raised, because it
+        is a bug rather than a daemon which is not there.
+        """
         request = nodelock_pb2.NodeLockRequest(
             unlock_request=nodelock_pb2.UnlockRequest(
                 requester=self.requester,
                 key=self.name
             )
         )
-        _node_lock_request(request)
+
+        for attempt in range(NODELOCK_UNLOCK_ATTEMPTS):
+            try:
+                _node_lock_request(request)
+                return
+            except NODELOCK_TRANSPORT_ERRORS as e:
+                if attempt + 1 < NODELOCK_UNLOCK_ATTEMPTS:
+                    time.sleep(NODELOCK_UNLOCK_RETRY_INTERVAL)
+                    continue
+
+                self.log.with_fields({
+                    'error': f'{e.__class__.__name__}: {e}',
+                    'attempts': NODELOCK_UNLOCK_ATTEMPTS
+                }).warning('Failed to release node lock, the nodelock daemon '
+                           'did not answer')

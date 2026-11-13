@@ -54,6 +54,10 @@ class HealthCheckNodelockTestCase(base.ShakenFistTestCase):
     def test_unlock_failure_is_unhealthy(self):
         # The unlock in NodeLock.__exit__ is a separate socket request, so
         # nodelock can go away between a successful lock and the unlock.
+        # Since issue 4902 the real __exit__ logs that rather than raising
+        # it -- so this probe now notices such a daemon on its next poll
+        # a second later -- but the handler here stays, because a probe
+        # which raises bypasses wait_for_nodelock()'s retry loop entirely.
         lock = mock.MagicMock()
         lock.__exit__.side_effect = ConnectionRefusedError()
         with mock.patch.object(

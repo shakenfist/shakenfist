@@ -53,6 +53,7 @@ metrics. The headlines:
 - Two records must not claim one lookup key.
 - Put the meter above the expensive thing, not below it.
 - A guard has to sit where the exception is raised.
+- Releasing a lock is not part of the work.
 - Fail closed on a field, not on a formatting accident.
 - Credential-carrying routes are not logged, not redacted.
 - Cluster CI tests only run in the merge queue.

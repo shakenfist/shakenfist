@@ -19,6 +19,7 @@ from shakenfist.exceptions import NotOnNetworkNode
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.network import bridged_vxlan_network
 from shakenfist.tests import base
+from shakenfist.util import concurrency as util_concurrency
 
 
 def _make_network_mock(uuid='11111111-1111-4111-8111-111111111111', vxid=42,
@@ -908,6 +909,34 @@ class BridgedVXLanNetworkApplyDeleteOnHypervisorTestCase(
         bvn._apply_delete_on_hypervisor()
 
         self.mock_execute.assert_not_called()
+
+    @mock.patch('time.sleep')
+    @mock.patch('shakenfist.util.concurrency._node_lock_request')
+    def test_unlock_failure_does_not_fail_completed_teardown(
+            self, mock_request, mock_sleep):
+        # The exact shape of issue 4902: both devices were deleted, the
+        # ``with`` block completed, and only then did the nodelock daemon
+        # go away in a rolling restart, so releasing the lock reset the
+        # connection. The teardown must still report itself done -- a
+        # missing 'deleted network on hypervisor' event is how the
+        # original failure was recognised, and the raised error failed an
+        # instance delete whose work was finished.
+        self.mock_check_for_interface.return_value = True
+        network = self._make_network(vxid=0x123)
+        network.get_lock.side_effect = lambda **kwargs: (
+            util_concurrency.NodeLock(f'network-{network.uuid}'))
+        mock_request.side_effect = (
+            [True] +
+            [ConnectionResetError(104, 'Connection reset by peer')] *
+            util_concurrency.NODELOCK_UNLOCK_ATTEMPTS)
+
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+        bvn._apply_delete_on_hypervisor()
+
+        self.assertEqual(2, self.mock_execute.call_count)
+        self.assertIn(
+            'deleted network on hypervisor',
+            [c.args[1] for c in network.add_event.call_args_list])
 
 
 class BridgedVXLanNetworkApplyDeleteOnNetworkNodeTestCase(
