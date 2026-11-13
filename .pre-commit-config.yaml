@@ -199,7 +199,10 @@ repos:
           plan's own Execution table, so they drift the moment one is updated
           without the other. Recompute them, reject a status cell outside the
           shared vocabulary, and catch a master plan missing from index.md or
-          order.yml.
+          order.yml. Also reject a finished phase row which names a plan file
+          as text when no such file is here: a cross-repository phase plan is
+          cited as an absolute link, because a bare name resolves to nothing
+          once the other repository retires it.
         entry: python3 tools/check-plan-status.py
         language: system
         files: ^(docs/plans/.*\.(md|yml)|PLAN-TEMPLATE\.md)$
