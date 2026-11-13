@@ -2,7 +2,10 @@
 
 How Kerbside is tested: running the suite locally, the CI lanes, the
 Ryll-based harnesses, the oVirt console probe, the Tempest plugin, and
-the load-test container images.
+the load-test container images. Performance measurement that carries no
+SPICE is not here: the transport bench in `tools/quic-bench/` is
+documented with its results in
+[performance/quic-transport-bench.md](/components/kerbside/performance/quic-transport-bench/).
 
 ## Running the test suite
 

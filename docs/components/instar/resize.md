@@ -44,8 +44,41 @@ The SIZE positional accepts three forms, matching `qemu-img resize`:
 | `+1G`    | Additive: `current_virtual_size + 1 GiB`.               |
 | `-512M`  | Subtractive: `current_virtual_size - 512 MiB`.          |
 
-Suffix multipliers: `b`=512, `k`/`K`=1024, `M`=1024², `G`=1024³,
-`T`=1024⁴, `P`=1024⁵, `E`=1024⁶. An absent suffix is bytes.
+Suffix multipliers: `B`/`b`=1, `k`/`K`=1024, `M`=1024², `G`=1024³,
+`T`=1024⁴, `P`=1024⁵, `E`=1024⁶. An absent suffix is bytes, and so is
+`b` — qemu-img's `b` is one byte, not qemu-io's 512-byte block, so
+`4096b` is 4096 bytes and shrinks a 1 MiB image.
+
+A decimal fraction may precede any suffix that scales: `+1.5M`,
+`20.5M` and `.5G` are all accepted, and so is `1.M`. A fraction with
+no suffix, or with `B`/`b`, is refused, because a fraction of a byte
+is not a size. A fraction that is not a whole number of bytes rounds
+to the nearest byte, halves upwards.
+
+The resolved size must be a whole sector for every format but raw --
+512 bytes for qcow2, vmdk and vhd, and a VHDX's own logical sector
+size, because each records its size in sectors:
+
+```
+$ instar resize disk.qcow2 33554433
+Error: "resize: the new size must be a multiple of 512"
+```
+
+Nothing is written, and `qemu-img resize` refuses the same request on
+a qcow2 ("The new size must be a multiple of 512"). A raw image takes
+any byte count, as it does under qemu-img: it has no metadata to keep
+aligned, so `instar resize -f raw disk.raw 33554433` leaves a file of
+exactly 33554433 bytes.
+
+`create` is deliberately more forgiving than `resize` here: `instar
+create -f vhdx x 33554433` succeeds, because qemu's `vhdx_co_create_opts`
+rounds a requested size up to a sector and instar matches it, while
+`instar resize -f vhdx x 33554433` fails. The asymmetry is the safer
+pair of the two defaults -- a create has no data to lose, so rounding
+is a courtesy, whereas rounding a resize down would silently discard
+what lies past the rounded size and rounding it up would hand back a
+disk bigger than the one asked for. See the VHDX and VHD create-rounding
+entries in [quirks.md](/components/instar/quirks/) for the rounding `create` applies.
 
 A subtractive end-spec implies shrink, but `--shrink` must still be
 passed explicitly — it documents the user's intent to discard data
@@ -69,6 +102,25 @@ by `tests/test_resize.py:TestResizeBaselineMatrix`). For vmdk / vpc
 / vhdx — formats `qemu-img resize` does not support — the
 post-resize state is verified by `tests/test_resize.py:TestResize
 Consistency` (instar resize → instar info → instar check).
+
+**A qcow2 shrink keeps the size it was given.** The header records
+the requested size, not a cluster-aligned version of it, as qemu does:
+shrinking a 10 MiB image to 5 MiB + 4096 reports a virtual size of
+5246976, which is not a multiple of the 64 KiB cluster. Only whole
+clusters are discarded, so the cluster holding the new last byte stays
+allocated. A size inside the first cluster is a size like any other --
+`--shrink` to 4096 on a 64 KiB-cluster image gives a 4096-byte disk --
+and only a size of zero is refused.
+
+The kept cluster's tail is left as it was. Shrinking past the middle of
+a cluster and then growing back exposes the bytes that were above the
+new size again, rather than zeros, because the shrink discards whole
+clusters and writes nothing into the one it keeps. qemu-img does the
+same, measured on 10.0.13: a 10 MiB qcow2 holding `0xa5` across 6 MiB,
+shrunk to 5246976 and grown back to 10 MiB, reads `0xa5` for all 61440
+bytes from 5246976 to the end of that cluster under both tools. A grow
+*past* the old EOF still reads as zeros, which is what the plan's
+zero-check covers.
 
 **Image-size ceiling.** qcow2 grow is bounded only by what the
 filesystem can hold — followup-01's targeted refcount-block

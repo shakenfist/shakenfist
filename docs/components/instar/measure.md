@@ -19,7 +19,9 @@ Common options:
 ```
   -O, --target-format <FMT>       raw | qcow2 | vmdk | vpc | vhdx
                                   Default: raw
-  -s, --size <SIZE>               Hypothetical image size with K/M/G/T suffix
+  -s, --size <SIZE>               Hypothetical image size, qemu-img's grammar
+                                  (case-insensitive B/K/M/G/T/P/E
+                                  suffix, fraction allowed)
   -f, --format <FMT>              Source format override (usually auto-detected)
       --output <FORMAT>           human (default) | json
   -o, --options <KEY=VALUE,...>   qemu-img-style options (repeatable)
@@ -166,6 +168,15 @@ qemu-img's:
 
 - **Raw sources with on-disk sparse extents**: instar over-reports `required`
   because the raw scanner does not use `SEEK_HOLE`/`SEEK_DATA`. qemu-img does.
+- **Raw sources whose length is not a multiple of the input sector
+  size**: instar measures the virtio device's capacity rather than the
+  file's own length, so a 1536-byte raw source measures to `-O raw` as
+  65536 where qemu-img says 1536. `-O qcow2` agrees with qemu-img
+  (393216 either way), because the target's cluster rounding swallows
+  the difference. `instar info` reports 1536 for the same file, so this
+  is instar disagreeing with itself; tracked as
+  [#907](https://github.com/shakenfist/instar/issues/907) and pinned by
+  `TestMeasureRawVirtualSize`.
 - **QCOW2 sources for some real-world images**: instar's scanner counts
   allocated bytes slightly differently. Likely a compressed-cluster or
   extended-L2 subcluster edge case under investigation.

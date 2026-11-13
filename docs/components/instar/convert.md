@@ -121,6 +121,21 @@ The default can also be set via `convert.sparse` in the config file.
   of `qemu-img create -o subformat=fixed,block_state_zero=off`; see the
   "VHDX partial last block" section of [quirks.md](/components/instar/quirks/).
 
+## The size of the output
+
+The output is as big as the source's virtual size. For a structured
+source that is the size its header records. A raw or otherwise
+unidentified source has no header to ask, so its virtual size is its
+own file length rounded up to a 512-byte sector, which is what
+`qemu-img info` reports for one and what `instar info` prints: a
+1536-byte raw file converts to a 1536-byte raw image, and to a qcow2
+whose virtual size is 1536. A file shorter than one sector rounds up,
+so a 100-byte source converts to 512 bytes.
+
+`dd` is the exception, because its `count`, `skip` and `seek` operands
+describe a window of the source rather than the whole of it; see
+[dd.md](/components/instar/dd/).
+
 ## Differencing images
 
 A differencing VHD (footer disk type 4) or VHDX (`HasParent` set) stores

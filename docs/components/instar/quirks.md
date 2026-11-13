@@ -175,6 +175,60 @@ For the QCOW2 v2 test file:
 
 **With `--ignore-quirks` flag**: instar reports the actual file size.
 
+## The size grammar on the command line
+
+**Classification: Safe Quirk**
+
+Every size instar takes on the command line -- `create`'s `SIZE`,
+`resize`'s `[+-]SIZE`, `measure --size`, `bench`'s buffer, step and
+offset, `map`'s window, `dd`'s `bs`, `count` and `skip` -- is parsed
+with qemu's grammar: an integer, an optional decimal fraction, and an
+optional one-character multiplier from `B` (one byte), `K`, `M`, `G`,
+`T`, `P`, `E`. **The multiplier is case-insensitive**, here and in
+qemu-img: `qemu_size_suffix_mul` upper-cases the byte before it
+matches, so `1m` and `1M` are the same megabyte and the per-command
+pages enumerate one case only for brevity. A fraction needs a
+multiplier that scales, so `1.5M` is 1572864 and `1.5` and `1.5b` are
+refused; a fraction that is not a whole number of bytes rounds to the
+nearest byte, halves upwards.
+
+The fraction is carried through an `f64`, scaled to 64.64 fixed point
+and then multiplied by the suffix -- which is what qemu's `do_strtosz`
+does, so it is a parity requirement and not a shortcut. A double's
+53-bit mantissa runs out before a 64-bit fixed-point fraction does, so
+a fraction at the top of the range is not the exact value: 1.1 EiB is
+1268213655067531673.6 bytes exactly, and both tools answer
+1268213655067531680. Computing the fraction exactly with integer long
+division would make instar disagree with the oracle, so the inexactness
+is pinned rather than fixed
+(`qemu_img_size_fractions_carry_the_same_double_qemu_carries`).
+
+Two things differ from qemu-img 10.0.13, both deliberate:
+
+* **A hexadecimal size is refused.** `qemu-img create -f qcow2 h 0x10`
+  creates a 16-byte (512-byte, rounded) image; `instar create` answers
+  `invalid memory size: '0x10'`. qemu's own behaviour here moved
+  between versions -- qemu 7.0.0 accepted a multiplier on a hex number
+  with a deprecation warning, and 10.0.13 refuses `0x10M` outright --
+  so matching it means picking a version's behaviour and measuring the
+  boundary across the pinned builds. Nothing instar does needs a hex
+  size, and the refusal is a clear message rather than a wrong answer.
+
+* **A trailing space is tolerated.** instar's parsers trim their input,
+  so `1.5M ` is a size; qemu-img refuses it, because its parser
+  requires the suffix to be the last character. Leading whitespace and
+  a leading `+` are accepted by both.
+
+qemu's rules were read from `do_strtosz` and `suffix_mul` in
+`util/cutils.c` (`instar-testdata/qemu-sources/7.0.0`) and then
+measured against qemu-img 10.0.13, which is the oracle the suite
+cross-validates against. The measurement reads a parsed size back
+exactly by resizing a raw file, whose length is whatever was asked for;
+`create` would round it up to 512 and hide the last byte. An
+exbibyte-scale size needs no exbibyte of filesystem: `qemu-img create`
+echoes the size it parsed (`size=1268213655067531680`) before it tries
+to allocate it.
+
 ## Human-Readable Size Formatting
 
 **Classification: Safe Quirk**
@@ -1182,6 +1236,40 @@ produce a leading partial extent that qemu-img would not.
 Functionally equivalent for downstream consumers that
 care about byte ranges; visually different in human
 output.
+
+## A raw source's virtual size is padded to 64 KiB in `map` and `measure`
+
+**Classification: Safe Quirk** (a wrong number, not a wrong read; tracked)
+
+A raw or otherwise unidentified image has no header stating a virtual
+size, so the guest reports the capacity of the virtio device the VMM
+handed it, and that capacity is counted in input sectors -- 64 KiB by
+default. `qemu-img` reports such an image's own file length rounded up
+to a 512-byte sector instead, and so do `instar info` and the backing
+chain discovery that `convert`, `dd`, `compare`, `rebase`, `commit` and
+`bench` read (#821): a 1536-byte raw file is 1536 bytes to all of them.
+
+`map` and `measure` do not go through chain discovery. Each hands the
+image to its own guest operation, which still sees only the padded
+capacity, so for a raw source whose length is not a multiple of the
+input sector size:
+
+```
+$ instar map --output=json a.raw        # 1536-byte file
+[{ "start": 0, "length": 65536, ... }]  # qemu-img: "length": 1536
+$ instar measure -O raw a.raw
+required size: 65536                    # qemu-img: 1536
+```
+
+Fixing it at the root means telling the guest the image's byte length
+rather than letting it infer one from the device geometry, which is a
+call-table change every operation shares; tracked as
+[#907](https://github.com/shakenfist/instar/issues/907). Until then the
+padded answers are pinned by tests that name the divergence
+(`TestMapRawVirtualSize`, `TestMeasureRawVirtualSize`) so the day they
+change is a deliberate one. A size that is already a multiple of the
+input sector size, which every fixture in the matrix uses, is
+unaffected.
 
 ## create subcommand quirks
 
@@ -3062,7 +3150,10 @@ always in `--unsafe-quirks` mode for ISO specifically, while every
 other detect-only format is refused unconditionally in every mode.
 This is intentional (see the phase-1 plan's post-1a management review
 decision) and is pinned by tests asserting the exact ISO pass-through
-byte sizes (`convert` 393216, `dd` 376832).
+byte size, 376832 for `convert` and for `dd` alike: the container
+length, with no padding. Before issue #821 was fixed, `convert`
+wrote 393216 here, padding the ISO out to a 64 KiB boundary that
+neither `dd` nor qemu-img adds.
 
 ### DMG pass-through as raw in the in-place ops (accepted behaviour)
 

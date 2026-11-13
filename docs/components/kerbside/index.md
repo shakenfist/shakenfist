@@ -266,7 +266,8 @@ channel message formats:
 
 - [Capabilities](/components/kerbside/spice/capabilities/) - Channel capability negotiation
   including common, display, audio, and input capabilities with recommended
-  settings
+  settings, what Kerbside offers and forwards on each leg of a proxied
+  channel, and why the reply mask is not a security boundary
 
 - [Channel Protocols](/components/kerbside/spice/channel-protocols/) - Detailed message formats
   for each SPICE channel:

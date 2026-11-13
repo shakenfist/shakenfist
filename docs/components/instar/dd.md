@@ -51,19 +51,31 @@ Operands:
 ### Size suffixes for `bs`, `count`, and `skip`
 
 `bs`, `count`, and `skip` are parsed with the same 1024-based suffix
-parser used by `qemu-img`:
+parser used by `qemu-img`. The multiplier is case-insensitive:
 
 | Suffix | Multiplier |
 |--------|-----------|
-| `b` | 512 |
+| `b`, `B` | 1 (one byte) |
 | `k`, `K` | 1024 (KiB) |
-| `M`, `m` | 1 048 576 (MiB) |
-| `G`, `g` | 1 073 741 824 (GiB) |
-| `T`, `t` | 1 099 511 627 776 (TiB) |
-| `P`, `p` | 1 125 899 906 842 624 (PiB) |
-| `E`, `e` | 1 152 921 504 606 846 976 (EiB) |
+| `m`, `M` | 1 048 576 (MiB) |
+| `g`, `G` | 1 073 741 824 (GiB) |
+| `t`, `T` | 1 099 511 627 776 (TiB) |
+| `p`, `P` | 1 125 899 906 842 624 (PiB) |
+| `e`, `E` | 1 152 921 504 606 846 976 (EiB) |
 
-No suffix means the value is in bytes.
+No suffix means the value is in bytes, and so does `b` -- qemu-img's
+`b` is a single byte, not qemu-io's 512-byte block, so `bs=1b` is a
+one-byte block size rather than a 512-byte one. instar read `b` as 512
+until #900 was fixed, so a `bs`, `count` or `skip` written against the
+old behaviour means 512 times less than it did.
+
+A decimal fraction may precede any suffix that scales: `bs=0.5k` is
+512 and `count=1.5M` is 1572864. A fraction with no suffix, or with
+`b`/`B`, is refused, because a fraction of a byte is not a size, and a
+fraction that is not a whole number of bytes rounds to the nearest
+byte, halves upwards. See
+[docs/quirks.md § The size grammar on the command line](/components/instar/quirks/#the-size-grammar-on-the-command-line)
+for the full grammar and the two places it differs from qemu-img.
 
 Tokens without an `=` separator or with an unrecognised key are
 rejected:
