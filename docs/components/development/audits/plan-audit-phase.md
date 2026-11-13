@@ -111,6 +111,16 @@ rather than this one's. A plan the check could not find is *named* in
 the result either way, because a plan silently walked past looks
 exactly like a plan that passed.
 
+An index that is *there* and cannot be read is a finding rather than
+an N/A. `Repo.read()` answers None both for a path with nothing at it
+and for one holding something it will not read -- a directory, a
+dangling link, a link out of the clone, a file over the 2 MB cap --
+and an N/A closes this criterion's open issue as though the repository
+had stopped planning this way. The exception is a `docs/plans` that is
+itself a link out of the clone, which `plan-index` already decides is
+not a directory this audit has; an index inside one is absent rather
+than unreadable, and the criteria reading it agree about that.
+
 A repository whose linked plans are all *statusless* is not N/A,
 though. It links plans, and every one of them is named in the result;
 reporting it as N/A would say the index links none, which is the
