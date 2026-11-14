@@ -357,7 +357,9 @@ table entirely (decision D8).
 | 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete | `b02ec6e5e` (#3843), `921573c47` (#3888) |
 | 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete | `c27ad9bf2` (#3930), `a5014b6ba` (#3949) |
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Complete | `c273627a2` (#3952), `948055063` (#4008), `8fc8ba961` (#4139), `2b767a9b1` (#4154) |
-| 5. Caller migration and hard ceiling | [PLAN-scheduler-reservations-phase-05-callers.md](PLAN-scheduler-reservations-phase-05-callers.md) | In progress | — |
+| 5. Caller migration and hard ceiling | [PLAN-scheduler-reservations-phase-05-callers.md](PLAN-scheduler-reservations-phase-05-callers.md) | Complete | `660d4f65e7` (#4800) |
+| 5a. The calibration re-run | [PLAN-scheduler-reservations-phase-05a-hard-ceiling.md](PLAN-scheduler-reservations-phase-05a-hard-ceiling.md) | Complete | — |
+| 5b. The hard ceiling | PLAN-scheduler-reservations-phase-05b-hard-ceiling.md | Blocked | — |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
 | 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
@@ -375,6 +377,15 @@ pull request. Every SHA is the merge commit of the pull request named
 beside it, so `<sha>^1..<sha>` is the whole of what that pull
 request put on `develop`. A phase which has not landed reads
 `—`.
+
+Phase 5a is the one row where `Complete` and `—` sit together, and it
+is not a contradiction of that rule but the ordinary consequence of
+it: the pull request which lands a phase cannot record the merge
+commit that lands it, so every phase here was filled in afterwards.
+5a's cell is the next close-out's to write — phase 5b's first commit,
+or phase 9's if 5b has not started by then — and until it is written
+the push audit's range for 5a is its pull request rather than this
+table.
 
 Several phases took more than one pull request, because the
 plan's habit is to land the work and then close the phase out in
@@ -530,6 +541,69 @@ is here.
   conductor's own documentation of claims, which does not exist.
   The phase is not blocked on it and the writing of that
   documentation passes to the successor plan.
+
+- **Phase 5** landed three of its four steps as #4800 (merge
+  `660d4f65e7`, 2026-11-05) and held the fourth deliberately. Steps
+  1, 2 and 4 -- the shared `Instance.place_on_candidates()` walk,
+  the de-Schedulered admin capacity view, and their documentation --
+  are on `develop`. Step 3, the advisory->hard flip of
+  `CLAIM_ENFORCEMENT_HARD`, was **not** implemented: plan-blocker
+  b13 was still waiting at execution time. Its own plan says that
+  step lands as a later commit on the phase branch, which is no
+  longer possible because the branch merged and was deleted, so the
+  flip moved to **phase 5a** rather than being dropped. Complete
+  here means "what this phase put on `develop`", which is what the
+  `Merged` column records; the flip's status is phase 5a's row.
+  Two refinements its execution forced are in its Execution notes:
+  D4's "reads no instance state" was imprecise about the metrics
+  snapshot, and its DoD item 5 named a cluster-CI test which is not
+  locally runnable.
+
+- **Phase 5a** was inserted on 2026-11-07 to carry phase 5's step 3.
+  Its survey found seven of that step's premises wrong or stale, two
+  of them load-bearing: there is no claim stage to split out of
+  `TRANSIENT_CAPACITY_STAGES`, because `CAPACITY_GUARD_STAGE` is the
+  single stage every guard denial publishes, so one has to be
+  created; and the create path refuses only after walking every
+  candidate, holding a dict of per-candidate denials rather than one
+  exception, so the 403 is well defined only because the claim guard
+  runs before either node guard and is node-independent. It also
+  found `claim_uuid` unpopulated on the denial path, which D16's
+  refusal body needs. Phase 4c's three entry conditions are all met
+  -- two by different mechanisms than it named -- the claim
+  population is finally real, and `CLAIM_EXACT_MIN_RUNS = 5` means
+  some dimensions are claimed at exactly their peak with no
+  headroom, which the phase measures as its own gated arm. Its
+  decision rule for the flip is pre-registered before the window is
+  read.
+
+  **The window was read on 2026-11-13 and the rule says Hold**, so
+  the phase is Complete on its reading rather than on the flip, and
+  `CLAIM_ENFORCEMENT_HARD` is still `False`. Five of D2's six rows
+  pass and the aggregate over-limit rate fell 47x, from 33.4 a day to
+  0.71, against the 10x it required. The row written as a structural
+  0 reads 5: in five namespaces one instance was larger than the
+  whole claim it was charged to. That is mis-assignment and not
+  mis-measurement -- a combination claim is sized for the largest
+  *pending* job and charged for whichever job GitHub dispatched, and
+  five times the job that arrived was `kerbside / sf-e2e`, whose
+  12-cpu nested VM cannot fit the 6- or 10-cpu claim made for a
+  smaller lane however long it waits. Phase 5a's *Outcome* holds the
+  reading; the defect is `shakenfist/private-ci#311`, against the
+  plan which owns the sizing code.
+
+- **Phase 5b** carries phase 5a's steps 4, 5 and 6 -- the
+  `CLAIM_ENFORCEMENT_HARD` flip, the cluster CI assertion inversion
+  and the eight documentation lines -- which did not start because
+  the gate did not open. It has no plan file yet and needs no new
+  survey of the enforcement contract: those three step briefs are
+  written in phase 5a, as are D5's discriminator and D6's
+  classification, both confirmed by Michael on 2026-11-07. What it
+  does need is a **fresh** seven-day window read against D2
+  unchanged, which cannot begin until private-ci's per-job binding
+  phase has landed and deployed on `maui`. Recorded as plan-blocker
+  b21; nothing in this repository can clear it, and the flip is not
+  to be read again against the window phase 5a already spent.
 
 - **Phase 6** was executed out of order, ahead of phases 4c and 5,
   and completed on 2026-09-01. It merged as #3972 (the validator
@@ -902,6 +976,35 @@ node is missing from `per_node`). The rewrite must keep both,
 and 7a's functional tests in `test_nodes.py` fail if it does not.
 7a deliberately left the endpoint's `Scheduler()` construction
 alone so that the migration stays this phase's (7a's H7).
+
+*Correction (2026-11-07), from the phase 5a survey:* this stub's
+caller work landed as #4800 and the flip did not, so the flip is
+now **phase 5a**
+([PLAN-scheduler-reservations-phase-05a-hard-ceiling.md](PLAN-scheduler-reservations-phase-05a-hard-ceiling.md)),
+and phase 5's own step 3 row is superseded rather than live. Three
+of the things that row says are no longer true. There is no claim
+stage to split out of `TRANSIENT_CAPACITY_STAGES`:
+`CAPACITY_GUARD_STAGE` is the one stage every guard denial
+publishes, node, cluster and claim alike, so the split means
+introducing a stage rather than editing a frozenset. Those sets
+have moved to `shakenfist/constants.py` and not
+`external_api/base.py`, because a preflight abort records the same
+classification on the instance (issue 4568) and `instance.py`
+cannot import the API layer. And the create path refuses only
+after the walk has tried every candidate, holding a dict of
+per-candidate denials rather than one exception -- what makes a
+403 well defined there is that the claim guard runs before either
+node guard and is namespace-denominated, so it refuses on every
+candidate or on none. Every line number in that row has also
+drifted, because step 1 of the same phase moved the code.
+
+*Correction (2026-11-14), from phase 5a's reading:* phase 5a spent
+its window and **held** the flip, so the flip is now **phase 5b** and
+5a owns the reading which gated it. Nothing above changes -- the
+premises 5a corrected are still the corrected ones -- but 5b needs no
+fresh survey of the enforcement contract, only a fresh measurement
+window: its three step briefs are written in 5a's step plan and its
+two contract decisions were confirmed before the gate was read.
 
 What survives for phase 6 is real but weaker: `cpu_load_1`
 measures activity rather than occupancy, so a node packed with

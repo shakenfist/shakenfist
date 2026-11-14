@@ -27918,11 +27918,22 @@ class AdmitPlacementResult(TypedDict):
     # and an over-claim placement is admitted.
     claim_over_limit: bool
     claim_dimensions: list[CapacityDimensionDetailDict]
-    # The claim this admission was charged against, in dashed uuid form,
-    # so an event recorded on the namespace can name which claim it was.
-    # Empty when no claim was drawn down at all -- an unclaimed
-    # namespace, or a move, which charges nothing on the namespace side.
-    # Read the name for absence, never a zero.
+    # Which claim this placement was weighed against, in dashed uuid
+    # form, so an event or a refusal recorded on the namespace can name
+    # which claim it was. On an admission that is the claim the drawdown
+    # was charged to; on a denial at the 'claim' stage it is the claim
+    # that refused, which charges nothing -- the transaction rolled
+    # back -- but is still the claim an operator has to grow.
+    #
+    # Empty when no claim is named: an unclaimed namespace, a move
+    # (which charges nothing on the namespace side), or a denial at the
+    # 'node' or 'cluster' stage. That last one does not mean no claim
+    # was involved -- a claimed namespace's claim is drawn down as
+    # statement 2 of the transaction, before either node guard can
+    # refuse, and rolls back with it -- only that the claim was not the
+    # constraint, so naming it would tell an operator to grow the wrong
+    # thing. A 'claim' failing_stage therefore never carries an empty
+    # uuid. Read the name for absence, never a zero.
     claim_uuid: str
     # Which absent row made this admission unguarded:
     # UNGUARDED_NEVER_RECONCILED, UNGUARDED_NODE_NOT_SIZED, or '' when
@@ -28122,11 +28133,40 @@ class _AdmissionDenied(Exception):
     why. Raised inside the ``engine.begin()`` block, which rolls the
     transaction back on the way out; the per-dimension detail is then
     assembled from a fresh read.
+
+    A claim refusal also carries the uuid of the claim it was refused
+    against, which is an *identity* and not a measurement -- so unlike
+    the per-dimension numbers it is taken from the row the guarded
+    UPDATE actually named rather than from the read that follows the
+    rollback. The two differ in ways that matter: a follow-up read
+    reports whichever claim is active now, which after a
+    delete-and-create is a different claim from the one that refused,
+    and reports none at all if the claim expired in between -- leaving a
+    refusal at the claim stage unable to name any claim. Riding the
+    exception costs no query (the raising branch holds the uuid as a
+    local) and makes "a claim refusal names its claim" true by
+    construction.
+
+    That split source has a consequence worth knowing before anything
+    publishes both halves as one object: the uuid comes from the row
+    the ``UPDATE`` named and ``dimensions`` comes from the read after
+    the rollback, so a delete-and-create in between leaves the reply
+    naming one claim beside another claim's ``limit``, ``used`` and
+    ``shortfall``, and a claim deleted or expired in between leaves
+    ``failing_stage == 'claim'`` with a uuid and an *empty*
+    ``dimensions`` list. The identity is the half to trust; a consumer
+    of the numbers has to tolerate their absence.
+
+    Empty for every other stage. At the node and cluster stages that
+    does not mean no claim was involved: a claimed namespace is drawn
+    down first and rolled back with the transaction, so the claim was
+    consulted and was not the constraint.
     """
 
-    def __init__(self, stage: str) -> None:
+    def __init__(self, stage: str, claim_uuid: str = '') -> None:
         super().__init__(stage)
         self.stage = stage
+        self.claim_uuid = claim_uuid
 
 
 class _PlacementRowMissing(Exception):
@@ -29085,7 +29125,7 @@ def _direct_admit_instance_placement(
                              claims.c.used_disk_gb + disk_gb),
                             (claims.c.updated_at,
                              sa.func.now()))).rowcount == 0:
-                    raise _AdmissionDenied('claim')
+                    raise _AdmissionDenied('claim', str(claim_uuid))
             elif probe.cluster_present:
                 where = [cluster.c.id == 1]
                 if cluster_guarded:
@@ -29286,6 +29326,12 @@ def _direct_admit_instance_placement(
             _admit, f'admit_instance_placement({instance_uuid})')
     except _AdmissionDenied as denial:
         result['failing_stage'] = denial.stage
+        # Which claim refused, so a refusal published to the caller can
+        # name the claim to grow rather than only the namespace. Empty
+        # for a node or cluster denial: a claimed namespace was drawn
+        # down before that refusal and rolled back with it, so the
+        # claim was consulted but was not the constraint.
+        result['claim_uuid'] = denial.claim_uuid
         result['dimensions'] = _admission_denial_dimensions(
             denial.stage, namespace, node_key, cpus, memory_mb, disk_gb,
             demand_add, target_load)
@@ -29748,10 +29794,15 @@ def admit_instance_placement(
     accounting of D16: the placement *was* admitted, and the namespace's
     claim is now over its limits in the named dimensions. They are
     separate from ``failing_stage``/``dimensions``, which describe a
-    refusal. ``claim_uuid`` names the claim that was charged -- whether
-    or not it went over -- so an event recorded against the namespace
-    can say which claim it was about; it is empty, never a zero uuid,
-    when no claim was drawn down at all.
+    refusal. ``claim_uuid`` names the claim this placement was weighed
+    against -- the one charged on an admission, whether or not it went
+    over, and the one that refused when ``failing_stage`` is
+    ``'claim'`` -- so an event recorded against the namespace can say
+    which claim it was about. It is empty, never a zero uuid, when no
+    claim is named: an unclaimed namespace, a move, or a refusal at the
+    node or cluster stage -- where a claimed namespace's drawdown was
+    rolled back with the transaction and the claim was not the
+    constraint, rather than no claim having been consulted.
 
     ``success`` says the RPC ran; ``admitted`` says what it decided.
     A caller that treats a failed RPC as a denial would walk to the next

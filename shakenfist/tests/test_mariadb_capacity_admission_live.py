@@ -874,12 +874,17 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         # independent of the node guard: the node here has a capacity
         # row, so this says nothing about the fail-open -- the unit
         # suite covers that half.
-        self._add_claim(limit_cpus=8, used_cpus=6)
+        claim_uuid = self._add_claim(limit_cpus=8, used_cpus=6)
         with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
             result = self._admit(self.node_b, cpus=4)
 
         self.assertFalse(result['admitted'])
         self.assertEqual('claim', result['failing_stage'])
+        # And it names the claim that refused. Every other assertion on
+        # that field runs against a mocked engine, so this is the only
+        # place the real column type's rendering is proven on the denial
+        # path rather than on the admitted one.
+        self.assertEqual(str(claim_uuid), result['claim_uuid'])
         detail = {d['dimension']: d for d in result['dimensions']}
         self.assertEqual(8.0, detail['cpus']['limit'])
         self.assertTrue(detail['cpus']['exceeded'])
