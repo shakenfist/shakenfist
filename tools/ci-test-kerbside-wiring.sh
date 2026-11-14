@@ -946,7 +946,7 @@ PYEOF
             fail "kerbside_source accepted the public FQDN ${clash}, which an allsf host is named by"
         fi
         assert_output_has 'is identified by'
-        assert_output_has 'fatal: [localhost]'
+        assert_output_has 'failed: [localhost] (item=localhost)'
     done
 
     local distinct
