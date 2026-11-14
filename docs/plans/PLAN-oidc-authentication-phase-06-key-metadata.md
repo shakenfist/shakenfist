@@ -518,6 +518,37 @@ step:
   membership guards in the key create and update handlers. `post` has
   no such guard; they are in `put` and `delete`.
 
+**Step 6a, 2026-11-15 (AEDT).** Three departures from the row, all
+kept after review:
+
+* **`state` is not in the projection**, though the row asks for it.
+  `NamespaceKey.state` reads `mariadb.get_state()` per object
+  (`shakenfist/baseobject.py:624-636`) and `keys_with_attributes()`
+  builds its keys from static data with no state join, so serving a
+  state would cost one point read per key -- which is the N+1 D6
+  forbids and the Definition of done asserts does not happen. The
+  expiry the view does carry is what an operator was reading the state
+  to infer. `uuid` is free and is served.
+* **The single-key `GET` includes expired keys**, which the row does
+  not say. Otherwise a key the detailed listing shows would 404 on its
+  own route.
+* **Two registrations the new parameter forces**, both of which live
+  in test files although 6a was briefed to write no tests: the
+  capability snapshot in
+  `shakenfist/tests/external_api/test_root.py`, and a `BOOLEAN_READS`
+  row in `shakenfist/tests/external_api/test_boolean_sweep.py`, which
+  fails the moment a boolean is declared without one. The sub-agent's
+  edit to the second was refused by its own permission settings, so
+  the management session wrote it, checked that it is not vacuous --
+  the fixture namespace holds one key, so the two arms of `detail`
+  produce different responses -- and corrected that group's comment
+  from three routes to four.
+
+Two things 6b inherits from this: there is no `state` field to assert
+on, and the bare listing no longer reads the clock through
+`shakenfist.namespace.time.time`, so a test must set real past and
+future expiries rather than mock that attribute.
+
 ## Results
 
 *To be filled in during execution.*

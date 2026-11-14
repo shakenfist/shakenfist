@@ -404,8 +404,22 @@ class NamespaceKey(dbo):
     def external_view(self) -> dict[str, Any]:
         """The operator visible view of a key.
 
-        Deliberately without the hash and the nonce: a key's external
-        view is safe to hand to anyone who can see the namespace.
+        Deliberately without the hash and the nonce. That does not make
+        it publishable to everyone who can see the namespace, though,
+        because ``provenance`` names the person a login minted the key
+        for -- their subject identifier, the identifier of the token
+        they presented, and the claims it satisfied. The audience which
+        can read a namespace's keys is the namespace itself, the system
+        namespace, and every namespace the target has granted full
+        trust to, and the minting path states the rule this view cannot
+        enforce: who logged in is recorded in provenance, which an
+        administrator reads, rather than in the key's name, which
+        everyone who can list the namespace's keys can see (see
+        ``external_api/auth.py``).
+
+        So an API response is built from a caller sensitive projection
+        rather than from this. This is the whole view, for a reader
+        entitled to the whole of it.
         """
         retval = self._external_view()
         retval.update({

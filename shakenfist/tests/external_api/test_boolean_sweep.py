@@ -124,7 +124,7 @@ BOOLEAN_READS = {
     # the API which is deserialised rather than checked: `all` here is
     # `fields.Boolean(load_default=False)` passed through
     # `@use_kwargs`, so marshmallow hands the handler a real bool and
-    # the class cannot reach these three routes. Swept anyway, because
+    # the class cannot reach these four routes. Swept anyway, because
     # "cannot reach" is a property of a declaration somebody could
     # change.
     ('ArtifactOutstandingOperationsEndpoint', 'get', 'all'): {
@@ -153,6 +153,19 @@ BOOLEAN_READS = {
                           'get_cluster_operations',
                 'returns': []},
         'read': 'kwarg:outstanding_only',
+        'verdict': 'agrees',
+    },
+
+    # `detail` on the key listing is the same shape, and its observable
+    # is the response itself: a falsy spelling must answer with key
+    # names, and a truthy one with an object per key. The fixture
+    # namespace holds one key, which is what keeps the two arms
+    # distinguishable.
+    ('AuthNamespaceKeysEndpoint', 'get', 'detail'): {
+        'method': 'get',
+        'url': '/auth/namespaces/scratch/keys',
+        'query': {},
+        'read': 'body',
         'verdict': 'agrees',
     },
 
