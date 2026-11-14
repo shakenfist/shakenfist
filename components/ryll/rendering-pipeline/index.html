@@ -16249,11 +16249,13 @@ holds the rectangles written since the consumer last called
   the damage alone and <code>take_damage()</code> leaves the dirty flag alone,
   so a whole-frame consumer (the encoder) and a damage consumer can
   share a surface.</li>
-<li>If the <code>EventBus</code> mirror lags and misses events, it marks every
+<li>If the <code>EventBus</code> mirror lags and misses events, it resyncs its
+  surface list from the forwarder's <code>SurfaceLedger</code>, so a missed
+  surface create or destroy is repaired at once, and marks every
   surface fully damaged so damage consumers resend whole surfaces.
   That keeps a consumer from trusting a partial damage region, but it
-  does not restore the missed pixels or a missed surface create or
-  destroy: the picture recovers only as the guest redraws.</li>
+  does not restore the missed pixels: those recover only as the guest
+  redraws.</li>
 </ul>
 <h2 id="multi-monitor-support">Multi-Monitor Support<a class="headerlink" href="#multi-monitor-support" title="Permanent link">&para;</a></h2>
 <p>Ryll supports multiple monitors via the <code>--monitors N</code> CLI option.

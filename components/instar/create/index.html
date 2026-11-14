@@ -16714,7 +16714,12 @@ have the two disagree by the footer's 512 bytes. Detection reports
 <code>raw</code> for anything it does not recognise as well as for a genuinely
 raw file, so without this rule a raw parent whose last 512 bytes
 happen to begin with <code>conectix</code> would be sized from those bytes even
-under <code>-F qcow2</code>. <code>-u</code> asserts nothing about the
+under <code>-F qcow2</code>. Those bytes have to earn the promotion in any case:
+the fallback verifies the footer's checksum, so a planted cookie no
+longer makes a file a VHD parent, and no identity field is copied out
+of it (see
+<a href="/components/instar/quirks/#a-conectix-block-is-not-a-vhd-footer-on-its-own">A <code>conectix</code> block is not a VHD footer on its own</a>).
+<code>-u</code> asserts nothing about the
 format (it only says "do not fail if the backing file is
 inaccessible"), so the fallback still applies: <code>create -f qcow2 -b
 fixed.vhd -u child.qcow2</code> sizes the parent from its VHD footer, while
@@ -16885,8 +16890,9 @@ applied during JSON comparison, see <code>tests/helpers/info_json.py</code>.</p>
 <p>Create a 1 GiB qcow2 with default options:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar create -f qcow2 disk.qcow2 1G
 </code></pre></div>
-<p>Same but with a 4 KiB cluster size and extended L2:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar create -f qcow2 -o cluster_size=4k,extended_l2=on disk.qcow2 1G
+<p>Same but with extended L2, which needs a cluster size of at least 16 KiB
+so that its 32 subclusters are 512 bytes or more:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar create -f qcow2 -o cluster_size=16k,extended_l2=on disk.qcow2 1G
 </code></pre></div>
 <p>Create a vmdk with the stream-optimised subformat:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar create -f vmdk -o subformat=streamOptimized disk.vmdk 1G

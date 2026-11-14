@@ -6365,6 +6365,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-conectix-block-is-not-a-vhd-footer-on-its-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A conectix block is not a VHD footer on its own
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vhd-fixed-subformat-carries-footer-only-metadata" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -21289,6 +21300,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-conectix-block-is-not-a-vhd-footer-on-its-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A conectix block is not a VHD footer on its own
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vhd-fixed-subformat-carries-footer-only-metadata" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -24776,7 +24798,9 @@ supported formats:</p>
 <li><strong>VMDK</strong>: Validates header version (1-3), capacity &gt; 0, grain size power of 2,
   descriptor offset within file bounds</li>
 <li><strong>VHDX</strong>: Validates file signature and region table signature at offset 0x30000</li>
-<li><strong>VHD</strong>: Validates footer cookie and disk type (2=fixed, 3=dynamic, 4=diff)</li>
+<li><strong>VHD</strong>: Validates footer cookie, footer checksum and disk type (2=fixed,
+  3=dynamic, 4=diff). See
+  <a href="#a-conectix-block-is-not-a-vhd-footer-on-its-own">A <code>conectix</code> block is not a VHD footer on its own</a></li>
 </ul>
 <p>Images with structural problems are marked with <code>FLAG_HAS_CORRUPTIONS</code> and
 report specific error counts. Images that pass validation are marked <code>FLAG_VALID</code>.</p>
@@ -25597,6 +25621,92 @@ has no block-state switch. <code>measure -O vhdx</code> accept-ignores
 number — a fixed target is dense either way, and qemu-img cannot
 measure VHDX at all. Writing not-present entries for a dynamic
 <code>block_state_zero=off</code> is future work.</p>
+<h3 id="a-conectix-block-is-not-a-vhd-footer-on-its-own">A <code>conectix</code> block is not a VHD footer on its own<a class="headerlink" href="#a-conectix-block-is-not-a-vhd-footer-on-its-own" title="Permanent link">&para;</a></h3>
+<p>A VHD footer is identified by its <code>conectix</code> cookie and by its own
+checksum: the one's complement of its other 508 bytes, stored at footer
+offset 64. instar verifies both wherever it is about to <em>act</em> on a
+footer's fields — chain reads, <code>info</code>, <code>resize</code>, and the last-sector
+probe that promotes an apparently-raw file to vpc — because the cookie
+is eight bytes of payload that any file can hold by accident or by
+design, while the checksum is the only field in a footer that constrains
+the rest of it.</p>
+<p>The two probes differ, as qemu's do. A cookie at offset 0 makes a file a
+VHD by probe whatever its checksum says, and the reader then refuses it:
+calling it raw instead would not be a refusal but a verdict every
+operation acts on. (Measured, on an earlier revision that did exactly
+that: <code>convert</code> of such a dynamic VHD exited 0 and wrote the VHD's own
+footer, dynamic header and BAT out as disk content.) The last-sector
+probe verifies before promoting, because a fixed VHD keeps no copy at
+offset 0 and a planted tail is the only evidence there is.</p>
+<p>Consequences, measured against qemu-img 10.0.13 and libvhdi 20240509:</p>
+<table>
+<thead>
+<tr>
+<th>Image</th>
+<th>instar</th>
+<th>qemu-img</th>
+<th>libvhdi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>dynamic VHD, footer copy at 0 fails its checksum</td>
+<td>refused ("Incorrect header checksum")</td>
+<td>refused ("Incorrect header checksum")</td>
+<td>sound</td>
+</tr>
+<tr>
+<td>differencing VHD, footer copy at 0 fails its checksum</td>
+<td>refused ("Incorrect header checksum")</td>
+<td>cannot read differencing VHD</td>
+<td>sound</td>
+</tr>
+<tr>
+<td>fixed VHD, trailing footer fails its checksum</td>
+<td>reported as <code>unknown</code>, i.e. not a VHD</td>
+<td>reported as <code>raw</code></td>
+<td>sound</td>
+</tr>
+<tr>
+<td>a raw file whose last sector begins with <code>conectix</code></td>
+<td>stays raw</td>
+<td>stays raw</td>
+<td>—</td>
+</tr>
+<tr>
+<td>dynamic VHD, <em>trailing</em> footer fails its checksum (copy at 0 is sound)</td>
+<td>opens</td>
+<td>opens</td>
+<td>sound</td>
+</tr>
+<tr>
+<td>differencing VHD, <em>trailing</em> footer fails its checksum (copy at 0 is sound)</td>
+<td>opens</td>
+<td>cannot read differencing VHD</td>
+<td>sound</td>
+</tr>
+</tbody>
+</table>
+<p>A VHD whose footer copy at offset 0 carries the cookie and a bad
+checksum is refused rather than read from the trailing footer instead.
+The fallback to the tail exists for a fixed VHD, which keeps no copy at
+offset 0 at all; using it for a <em>bad</em> copy would open an image qemu will
+not touch, with the image's two footers disagreeing about its geometry.</p>
+<p><code>check</code> is the exception, and deliberately: it parses a footer without
+verifying it, so that it can decode a corrupt one and report
+<code>VHD footer checksum mismatch</code> as a finding. A reader that refuses the
+image cannot tell the user what is wrong with it.</p>
+<p>libvhdi disagrees with both: <code>vhdiinfo</code> reports a VHD whose footer
+checksum is wrong as a sound disk, whichever footer it is. For a footer
+qemu-img does read, qemu-img is the one instar follows. For a
+differencing VHD neither oracle backs the refusal: qemu-img cannot read
+one at all, and libvhdi, instar's oracle for differencing VHD, reads the
+bad copy as sound. instar refuses it anyway, for the same reason as the
+dynamic case: the copy at offset 0 is where every field a reader acts
+on comes from, including the parent identity, and a differencing child
+is the one image where those fields choose which <em>other</em> file is read.
+<code>TestVhdFooterCopyChecksum</code> in <code>tests/test_differencing.py</code> pins all of
+it.</p>
 <h3 id="vhd-fixed-subformat-carries-footer-only-metadata">VHD fixed subformat carries footer-only metadata<a class="headerlink" href="#vhd-fixed-subformat-carries-footer-only-metadata" title="Permanent link">&para;</a></h3>
 <p><code>instar create -f vpc -o subformat=fixed FILENAME SIZE</code> produces
 a file of <code>SIZE + 512</code> bytes — zero data plus a 512-byte footer
@@ -28976,6 +29086,49 @@ clusters one to one. The offset rule applies to zero and unallocated
 entries with an allocated offset as well as to normal ones. instar's
 message omits the host offset that qemu prints, because the refusal
 carries only the virtual offset.</p>
+<p>Two more shapes are refused the same way, from the other half of
+qemu's <code>qcow2_get_host_offset</code> — the half that is not the subcluster
+classifier, which is why transcribing the classifier did not pick them
+up. Neither is a data-file rule: both apply to every qcow2 image
+(<a href="https://github.com/shakenfist/instar/issues/812">issue #812</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Shape</th>
+<th>instar and qemu-img</th>
+<th>What instar did before</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A host cluster offset that is not a multiple of the cluster size</td>
+<td>refused: <code>Cluster allocation offset unaligned</code></td>
+<td><code>map</code> printed the offset, <code>measure</code> counted the cluster, <code>convert</code> failed with the generic text</td>
+</tr>
+<tr>
+<td>The all-zeroes flag (bit 0) in a v2 image, where the flag does not exist</td>
+<td>refused: <code>Zero cluster entry found in pre-v3 image</code></td>
+<td>the cluster read as zeros, though its own host offset held data</td>
+</tr>
+</tbody>
+</table>
+<p>The second rule applies only to an entry that classifies as a zero
+cluster, which is where qemu's own check sits. In a <em>compressed</em> entry
+the low bits are part of the compressed size rather than the all-zeroes
+flag, and real v2 images are full of them: the suite's 2007
+<code>debian_etch_sparc_small.qcow2</code> carries <code>0x40800000000505e7</code> and two
+more like it. Reading bit 0 before the cluster type would refuse an
+image qemu-img converts without complaint.</p>
+<p>Measured with qemu-img 10.0.13. For the unaligned offset, <code>qemu-img
+map</code>, <code>measure</code> and <code>convert</code> all fail with <code>EIO</code> and <code>qemu-img check</code>
+reports <code>Data cluster is not properly aligned; L2 entry corrupted</code>
+(exit 2); <code>instar map</code> reported <code>"offset": 328192</code> and exit 0 for the
+same entry. For the pre-v3 zero flag, qemu-img's read path fails while
+<code>qemu-img check</code> reports no error at all, and instar's <code>check</code> likewise
+leaves it alone: the rule belongs to the read path, and <code>check</code>
+follows qemu-img.</p>
+<p><code>qemu-img info</code> opens both images and reports them, and so does
+<code>instar info</code>: neither reads an L2 entry to answer.</p>
 <h2 id="future-additions">Future Additions<a class="headerlink" href="#future-additions" title="Permanent link">&para;</a></h2>
 <p>Additional quirks will be documented here as they are discovered during
 compatibility testing.</p>

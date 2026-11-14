@@ -16371,7 +16371,7 @@ minted by Shaken Fist entirely offline. See
 <tr>
 <td>SF_CONSOLE_TOKEN_AUDIENCE</td>
 <td>String (default empty)</td>
-<td>The <code>aud</code> claim Kerbside requires on a Shaken Fist console token. Empty derives it as <code>https://&lt;PUBLIC_FQDN&gt;</code> (see PUBLIC_FQDN above). This value must equal Shaken Fist's own <code>KERBSIDE_URL</code> exactly — it is simultaneously the token audience and the base of the exchange URL — so set it explicitly whenever the public URL differs in scheme, port, or path. Note that <code>KERBSIDE_URL</code> is Shaken Fist cluster config, distinct from this Kerbside proxy setting.</td>
+<td>The <code>aud</code> claim Kerbside requires on a Shaken Fist console token. Empty derives it as <code>https://&lt;PUBLIC_FQDN&gt;</code> (see PUBLIC_FQDN above). This value must equal Shaken Fist's own <code>KERBSIDE_URL</code> exactly — it is simultaneously the token audience and the base of the exchange URL — so set it explicitly whenever the public URL differs in scheme, port, or path. A trailing slash is the one difference that does not count: Shaken Fist strips it before minting, so Kerbside strips it here too. Note that <code>KERBSIDE_URL</code> is Shaken Fist cluster config, distinct from this Kerbside proxy setting.</td>
 </tr>
 </tbody>
 </table>

@@ -12742,6 +12742,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#keys-or-clicks-went-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys or clicks went missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#no-audio" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16457,6 +16468,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#keys-or-clicks-went-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys or clicks went missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#no-audio" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16683,11 +16705,15 @@ its "Local Resources" tab.</p>
   to the guest's size.</li>
 <li><strong>Clipboard</strong>: text, both ways, between the client and the guest (the guest
   needs vdagent). Line endings are converted between the client's CRLF and
-  the guest's LF. A client's clipboard reaches the guest when it connects.
-  Text the guest copied before the client connected is not offered to it;
-  text copied afterwards is. Text the client copies that is longer than
-  100 MiB, the most ryll can send a guest's vdagent in one message, is not
-  shared, and a warning is logged. Rich formats and files are not shared.</li>
+  the LF ryll uses internally, and again to CRLF for a guest whose agent
+  asks for it, such as a Windows guest. A client's clipboard reaches the
+  guest when it connects. Text the guest copied before the client connected
+  is not offered to it; text copied afterwards is. Text the client copies
+  that is longer than 100 MiB, the most ryll can send a guest's vdagent in
+  one message, is not shared, and a warning is logged. For a guest that
+  wants CRLF the limit applies to the converted text, so text with many
+  short lines can be refused below 100 MiB; the guest's paste then gets
+  nothing. Rich formats and files are not shared.</li>
 <li><strong>Audio</strong>: the guest's audio plays on the client. ryll offers Opus and then
   16-bit 48 kHz stereo PCM, and uses the first one the client accepts. Opus
   is SPICE's own packets passed through, a few tens of kbit/s. PCM is about
@@ -16773,9 +16799,10 @@ not replayed. When SPICE is back the client is sent the whole desktop at full
 brightness. Text on the clipboard is kept and reaches the guest once it is
 back.</p>
 <p>ryll exits, disconnecting the client, when the first SPICE attempt never
-reaches a session, when the three retries are used up, when the <code>.vv</code> file's
-ticket is single-use or has expired so there can be no retry, and on
-Ctrl+C. The exit status:</p>
+reaches a session, when the three retries are used up, when the server ends
+the session on purpose with the main channel's <code>DISCONNECTING</code>, when the
+<code>.vv</code> file's ticket is single-use or has expired so there can be no retry,
+and on Ctrl+C. The exit status:</p>
 <table>
 <thead>
 <tr>
@@ -16795,6 +16822,10 @@ Ctrl+C. The exit status:</p>
 <tr>
 <td>The retries used up</td>
 <td>1</td>
+</tr>
+<tr>
+<td>The server ended the session on purpose (<code>DISCONNECTING</code>)</td>
+<td>0</td>
 </tr>
 <tr>
 <td>The ticket is single-use or expired when the session is lost</td>
@@ -16974,6 +17005,19 @@ whole class of problem.</p>
 </code></pre></div>
 <p>If the retries fail, ryll exits and logs why: <code>rdp: not reconnecting to SPICE:
 ...</code>.</p>
+<p>What the client sends while the frame is dark has no session to go to and is
+dropped. When a session returns, ryll logs how many were dropped during that
+outage (<code>rdp: dropped N input events while the SPICE session was down</code>), and
+at exit it logs the total over the whole run, which also covers an outage still
+under way when ryll stopped.</p>
+<h3 id="keys-or-clicks-went-missing">Keys or clicks went missing<a class="headerlink" href="#keys-or-clicks-went-missing" title="Permanent link">&para;</a></h3>
+<p>Each <code>RDP client disconnected</code> line carries <code>dropped_input</code>: how many of that
+client's input events were dropped over the connection, because the SPICE
+session's input queue was full, no session was being served, or the keys and
+buttons it still held could not be released when it left. As they happen, a
+full or closed queue is logged once per run at warning level and a missing
+session only at debug, so a non-zero count here is the place to see how many
+there were.</p>
 <h3 id="no-audio">No audio<a class="headerlink" href="#no-audio" title="Permanent link">&para;</a></h3>
 <p>The client has to ask for it (<code>/sound</code> in FreeRDP). If ryll logs <code>the SPICE
 server sends raw PCM but the client chose Opus, which ryll does not encode;

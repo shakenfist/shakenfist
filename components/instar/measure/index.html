@@ -16371,7 +16371,9 @@ values are overridden by matching <code>-o</code> keys when both are specified.<
 <h3 id="qcow2">qcow2<a class="headerlink" href="#qcow2" title="Permanent link">&para;</a></h3>
 <p>Honoured:
 - <code>cluster_size</code>, <code>compat</code> (0.10|1.1), <code>refcount_bits</code>
-- <code>extended_l2</code> (on|off), <code>lazy_refcounts</code> (on|off)
+- <code>extended_l2</code> (on|off; requires <code>cluster_size &gt;= 16k</code>, as <code>create</code>
+  does -- a target nothing can create is not one to measure),
+  <code>lazy_refcounts</code> (on|off)
 - <code>compression_type</code> (zlib|zstd), <code>preallocation</code> (off|metadata|falloc|full)</p>
 <p>Rejected (future work):
 - <code>backing_file</code>, <code>backing_fmt</code>, <code>data_file</code>, <code>data_file_raw</code>, <code>encrypt.*</code></p>

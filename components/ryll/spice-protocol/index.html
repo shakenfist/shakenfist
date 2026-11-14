@@ -12717,6 +12717,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#clipboard-line-endings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clipboard line endings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#guest-agent-message-reassembly" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16361,6 +16372,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#clipboard-line-endings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clipboard line endings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#guest-agent-message-reassembly" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16588,6 +16610,13 @@ sit in the crate layout.</p>
         S-&gt;&gt;R: Display, cursor and audio messages
         R-&gt;&gt;S: Keyboard and pointer events
     end</code></pre>
+<p>Ryll sends <code>ATTACH_CHANNELS</code> from its <code>INIT</code> handler, as spice-gtk does,
+without waiting for anything else from the server. spice-server runs a
+network test of three <code>PING</code>s straight after <code>INIT</code>, and ryll used to wait
+for the first of them before asking, so a server that sent no <code>PING</code> was
+never asked and the connection hung. Once the main channel has linked, the
+server has 15 seconds in all to send <code>INIT</code> and <code>CHANNELS_LIST</code>. Past that,
+the connection fails with an error naming the message that never came.</p>
 <h3 id="link-capabilities">Link capabilities<a class="headerlink" href="#link-capabilities" title="Permanent link">&para;</a></h3>
 <p>The link message carries two capability arrays, common and
 per-channel, each a list of 32-bit words (word <code>n</code> holds bits
@@ -16831,6 +16860,18 @@ the agent's and drops any size it was still holding. Otherwise a
 guest that booted without its agent would, when the agent started, be
 resized to the window's size from before the fit, away from the size
 it chose.</p>
+<h4 id="clipboard-line-endings">Clipboard line endings<a class="headerlink" href="#clipboard-line-endings" title="Permanent link">&para;</a></h4>
+<p>The guest agent says which line ending its clipboard text uses by
+announcing <code>VD_AGENT_CAP_GUEST_LINEEND_LF</code> or
+<code>VD_AGENT_CAP_GUEST_LINEEND_CRLF</code> (a Windows guest announces CRLF), and
+leaves any conversion to the client. Clipboard text on ryll's host side
+always uses LF, in every mode. For a guest that announced CRLF, the main
+channel turns each LF into CRLF on the way to the guest, leaving a CRLF
+that is already there alone, and turns each CRLF back into LF on the way
+out. A lone CR is passed through in both directions. spice-gtk does the
+same with <code>spice_unix2dos</code> and <code>spice_dos2unix</code>. Text for any other guest
+passes through unchanged. The guest's announcement is forgotten when its
+agent disconnects, so a new agent starts from LF until it announces again.</p>
 <h4 id="guest-agent-message-reassembly">Guest agent message reassembly<a class="headerlink" href="#guest-agent-message-reassembly" title="Permanent link">&para;</a></h4>
 <p>The other direction is split the same way. A guest agent message is a
 20-byte <code>VDAgentMessage</code> header followed by <code>size</code> bytes of body, and

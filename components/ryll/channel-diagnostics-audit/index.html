@@ -16347,8 +16347,8 @@ channel's snapshot changes.</p>
 </tr>
 <tr>
 <td>inputs</td>
-<td>16</td>
-<td>motion_count, recent_events</td>
+<td>18</td>
+<td>motion_count, recent_events, recent_motion</td>
 <td>complete</td>
 </tr>
 <tr>
@@ -16557,9 +16557,12 @@ cover flow control and the request/reply cycle; for deeper agent
 traffic inspection, decode the <code>AGENT_DATA</code> payloads in the bug
 report's <code>traffic.pcap</code>.</p>
 <h3 id="inputs">inputs<a class="headerlink" href="#inputs" title="Permanent link">&para;</a></h3>
-<p>Inputs has <code>motion_count</code>, <code>button_state</code>, <code>secs_since_last_key</code>, a
-<code>recent_events</code> ring that records the last N input events with
-timestamps, and the four per-opcode baseline fields. No
+<p>Inputs has <code>motion_count</code>, <code>button_state</code>, <code>secs_since_last_key</code>, two
+rings of recent input with timestamps — <code>recent_events</code> for keys,
+buttons and modifiers, and <code>recent_motion</code> for pointer moves — and the
+four per-opcode baseline fields. The rings are separate because motion
+arrives fast enough to evict every click and key from a shared one
+within two seconds (#432). No
 channel-specific gaps identified.</p>
 <h3 id="cursor">cursor<a class="headerlink" href="#cursor" title="Permanent link">&para;</a></h3>
 <p>Cursor has <code>cache_entries</code> (current number of cached cursors),

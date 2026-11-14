@@ -16495,6 +16495,13 @@ socket), supervises SPICE reconnects, and hands the session to the
 <td>available (text both ways through the RDP clipboard channel, CRLF and LF converted, via one <code>MemoryClipboard</code> for the run; the control socket's clipboard verbs share it. Rich formats and files are not shared)</td>
 </tr>
 <tr>
+<td>Clipboard text converted to CRLF for a guest whose agent announces <code>VD_AGENT_CAP_GUEST_LINEEND_CRLF</code>, and back to LF on the way out</td>
+<td>available</td>
+<td>available (on the control socket's clipboard verbs)</td>
+<td>available (on the control socket's clipboard verbs)</td>
+<td>available (the guest side of the conversion; the RDP side's own CRLF handling is above)</td>
+</tr>
+<tr>
 <td><strong>Paste-as-keystrokes</strong></td>
 <td></td>
 <td></td>
@@ -17182,10 +17189,10 @@ socket), supervises SPICE reconnects, and hands the session to the
 </tr>
 <tr>
 <td>SPICE auto-reconnect</td>
-<td>available (the GUI retries with the same rules before showing its disconnect dialog, <code>ryll/src/app/reconnect.rs</code>)</td>
+<td>available (the GUI retries with the same rules before showing its disconnect dialog, <code>ryll/src/app/reconnect.rs</code>; a session the server ended with <code>DISCONNECTING</code> is not retried and gets its own dialog)</td>
 <td>missing (ryll's <code>run_headless()</code> runs the session once and exits when it ends)</td>
 <td>missing (<code>run_web</code> in <code>ryll/src/main.rs</code> runs the session once; a lost SPICE session is not retried)</td>
-<td>available (retries after 1, 4 and 16 s, honouring a single-use or expired <code>.vv</code> ticket; the client and the listener stay up throughout)</td>
+<td>available (retries after 1, 4 and 16 s, honouring a single-use or expired <code>.vv</code> ticket; the client and the listener stay up throughout; a session the server ended with <code>DISCONNECTING</code> is not retried, and ryll exits)</td>
 </tr>
 </tbody>
 </table>

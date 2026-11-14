@@ -16698,7 +16698,7 @@ the exception: it deploys Kerbside inside one OpenStack cloud.</p>
 <tr>
 <td><a href="/components/kerbside/deployment/ansible/">Ansible role</a></td>
 <td>The <code>kerbside</code> role in Kerbside's own <code>shakenfist.kerbside</code> ansible collection (<code>ansible/</code>, published to Ansible Galaxy with each release), on co-located or dedicated hosts, for any source type, with a bring-your-own-Kerbside path for a Kerbside it does not deploy</td>
-<td>Shaken Fist, Proxmox and static; oVirt and OpenStack once <a href="https://github.com/shakenfist/kerbside/issues/602">#602</a> is fixed</td>
+<td>Any: the role installs the client libraries each configured source type's driver imports</td>
 <td>A rootless test of the role's entry points (<code>tools/ci-test-ansible-role.sh</code>) and a lint, release-build and <code>galaxy-importer</code> check in the sanity job. <code>sf-e2e</code>, smoke tier and nightly, deploys a pull request's Kerbside through its own role, co-located on a Shaken Fist node, and checks a second deploy restarts nothing</td>
 </tr>
 <tr>

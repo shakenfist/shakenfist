@@ -16644,6 +16644,16 @@ kinds, and the message for each keeps qemu's wording:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>map: Compressed cluster entry found in image with external data file at virtual offset N (0x...)
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>map: External data file host cluster offset does not match guest cluster offset at virtual offset N (0x...)
 </code></pre></div>
+<ul>
+<li>An entry that breaks one of qemu's two host-offset corruption rules,
+  which apply to every qcow2 image rather than only to one with a data
+  file: a host cluster offset that is not a multiple of the cluster
+  size, or the all-zeroes flag in a v2 image, where the flag does not
+  exist.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>map: Cluster allocation offset unaligned at virtual offset N (0x...)
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>map: Zero cluster entry found in pre-v3 image at virtual offset N (0x...)
+</code></pre></div>
 <p>The offset is the virtual offset of the cluster the entry describes.
 Exit 1; as on any other failure, the extents before the refused entry
 stay on stdout. <code>measure</code> refuses the same entries, and the reading
@@ -16653,7 +16663,7 @@ operations refuse them when a read reaches one. See
 <p>The guest names each extent's state, and the host renders only the
 states it knows. An extent in any other state is refused rather than
 printed as data:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>map: the guest reported an extent at offset N in an unrecognised state 'S'; refusing to render it as data
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>map: the guest reported an extent at offset N in an unrecognised state 'S'; refusing to render it as data
 </code></pre></div>
 <p>Exit 1. As on any other failure, the extents before the refused one stay
 on stdout, so in JSON mode the array is left unterminated: a consumer
@@ -16744,19 +16754,19 @@ sources for the same VHD-unallocated reason.</p>
 </ul>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Default human output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar map disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar map disk.qcow2
 </code></pre></div>
 <p>JSON for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar map --output=json disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar map --output=json disk.qcow2
 </code></pre></div>
 <p>Window slice — emit only the extents covering bytes <code>[1 MiB, 5 MiB)</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar map --start-offset=1M --max-length=4M disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>instar map --start-offset=1M --max-length=4M disk.qcow2
 </code></pre></div>
 <p>Format hint (skip auto-detection):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>instar map -f vmdk disk.vmdk
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>instar map -f vmdk disk.vmdk
 </code></pre></div>
 <p>Stream into <code>jq</code> to extract just the data extents:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>instar map --output=json disk.qcow2 | jq '.[] | select(.data == true)'
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>instar map --output=json disk.qcow2 | jq '.[] | select(.data == true)'
 </code></pre></div>
 
 

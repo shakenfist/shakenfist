@@ -19028,7 +19028,7 @@ deliberately broken emitter is not guarding what its name says it
 guards. See the VHD and VHDX notes in
 <a href="/components/instar/chain-config/#format-specific-notes">chain-config.md</a> for the
 composing path being guarded.</p>
-<p>There are <strong>153 cases</strong>, in twelve groups.</p>
+<p>There are <strong>165 cases</strong>, in fifteen groups.</p>
 <p>Forty-seven cover the writer. Twenty-four mutate a library crate
 (<code>create</code>, <code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip
 test. Two of those twenty-four guard the region table and metadata table
@@ -19313,6 +19313,48 @@ classic <code>measure</code> walk and the extended <code>map</code> walk, caught
 test of the metadata walkers. The last two are the host's half: the
 <code>vmm</code> decoder no longer captures the refusal, or the run loops no longer
 see it, and the reason falls back to the generic failure text.</p>
+<p>Then <strong>2 host-offset refusal cases</strong>, guarding the host's half of the
+fix for issue #812. qemu applies two further rules when it turns any
+L2 entry into a host offset, in <code>qcow2_get_host_offset</code> rather than in
+its subcluster classifier: a host cluster offset that is not a multiple
+of the cluster size, and the all-zeroes flag in an image whose version
+predates it. Neither is a data-file rule, so the host renders them from
+their own function behind the same entry point, and both cases break
+that path rather than the rules themselves: the <code>vmm</code> decoder no longer
+captures the refusal, or <code>l2_entry_refused</code> no longer reports it, so a
+refusal the guest raised reaches the user as the generic failure text.
+That is #665 again, which is why the data-file pair above exists, and
+the pair here keeps the third refusal from drifting out of the same
+guard. The rules' own guest-side half is checked by the <code>qcow2</code> crate's
+unit tests and is not yet mutated here.</p>
+<p>Then <strong>6 VHDX metadata cases</strong>, guarding the rules that decide whether
+a VHDX metadata table and its parent locator are sound (#576, #662).
+Three are the metadata table's: a recognised item listed twice
+accepted, an item's extent taken from its declared Length even when
+that is shorter than the bytes the reader reads, and the overlap check
+itself removed. The overlap check is only as good as the extents it is
+given, which is why the two rules that decide them are cases of their
+own. The other three are <code>VhdxParentLocator::usable</code>: a locator with
+more entries than the parser retains refused (a bound of instar's, not
+a fault of the image), a locator whose <code>key_value_count</code> exceeds its
+own item accepted, and a foreign <code>LocatorType</code> accepted. All six are
+caught by <code>vhdx</code> crate unit tests. Writing the overlap case found that
+the test it names had been passing for the wrong reason: it laid the
+locator over File Parameters, so the image was refused for an invalid
+block size whether or not the overlap was checked.</p>
+<p>Then <strong>4 VHD footer-copy cases</strong>, guarding the refusal of a VHD whose
+footer copy at offset 0 fails its checksum (#583). Detection probes a
+cookie at offset 0 as a VHD, as qemu does, and the reader refuses; the
+cases break each link in turn. One gates header detection on the
+checksum again, which made every operation treat the file as raw and
+had <code>convert</code> exit 0 writing the VHD's own structures out as disk
+content; a <code>shared</code> unit test catches it. One stops the host capturing
+<code>info</code>'s refusal marker, caught by a host unit test of the rendered
+wording. The other two go through the real binary: <code>info</code> no longer
+verifying the copy, and the host exiting 0 when <code>info</code> sends no result,
+which is what <code>instar info</code> did for every refusal before this group
+existed. Both are caught by
+<code>TestVhdFooterCopyChecksum.test_a_differencing_child_is_refused</code>.</p>
 <p>The last group is <strong>4 partial-last-block cases</strong>, guarding how <code>check</code>
 sizes a VHDX's partial last block (#797) and how many BAT entries a
 VHDX without a parent has (#626). When the virtual size is not a

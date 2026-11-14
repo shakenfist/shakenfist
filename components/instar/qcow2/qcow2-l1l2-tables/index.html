@@ -16554,6 +16554,15 @@ extended L2 the bitmap refines it; see <a href="#subcluster-types">Subcluster Ty
 <p>When incompatible feature bit 4 (EXTL2) is set, L2 entries are 128 bits
 (16 bytes) instead of 64 bits, enabling subcluster allocation.</p>
 <p>Each cluster is divided into 32 subclusters, each tracked independently.</p>
+<p>The cluster size must be at least 16 KiB, so that a subcluster is at
+least 512 bytes. instar refuses an extended-L2 header below that, as
+qemu does at open ("Unsupported subcluster size: 128" for a 4 KiB
+cluster) and in <code>qemu-img create</code> ("Extended L2 entries are only
+supported with cluster sizes of at least 16384 bytes"). Only a crafted
+image carries such a header, and reading one is not merely a parity
+question: a <code>Normal</code> subcluster run starts on a subcluster boundary,
+and the AES-CBC and XTS read paths need 512-byte-aligned runs, which
+is exactly what the floor guarantees.</p>
 <h3 id="extended-l2-entry-format-128-bits">Extended L2 Entry Format (128 bits)<a class="headerlink" href="#extended-l2-entry-format-128-bits" title="Permanent link">&para;</a></h3>
 <p><strong>First 64 bits:</strong> Standard L2 entry (bit 0 unused)</p>
 <p><strong>Second 64 bits:</strong> Subcluster bitmap</p>
