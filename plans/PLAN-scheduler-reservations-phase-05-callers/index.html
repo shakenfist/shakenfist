@@ -16242,7 +16242,7 @@ management session reviews each against the files, not the summary.</p>
 <td>high</td>
 <td>opus</td>
 <td>worktree</td>
-<td><strong>GATED ON PLAN-BLOCKER b13 — do not start until the calibration re-run has landed.</strong> Flip the namespace claim ceiling from advisory to hard. (a) Set <code>CLAIM_ENFORCEMENT_HARD = True</code> in <code>shakenfist/mariadb.py:27461</code>. (b) In <code>shakenfist/instance.py</code>, where <code>_event_claim_over_limit()</code> fires today (the <code>result['admitted'] and result['claim_over_limit']</code> branch, ~<code>instance.py:1182</code>), the SQL guard now <em>refuses</em> over-claim placements when <code>enforce</code> is set, so an enforced over-claim surfaces as a <code>CapacityAdmissionDenied</code> with the claim stage instead. Confirm the mariadb layer (<code>admit_instance_placement</code>, ~<code>mariadb.py:28541-28640</code>) returns the claim denial with <code>claim_uuid</code>, per-dimension <code>limit</code>, <code>used</code> and <code>shortfall</code>, and that <code>place_instance()</code> raises it. (c) In <code>external_api/instance.py</code>, map a claim-stage <code>CapacityAdmissionDenied</code> to HTTP 403 with a structured body {claim, per-dimension limit, drawdown, shortfall} (D16/D6), distinct from the 507 <code>capacity_error</code> node-capacity path. (d) Split the claim stage out of <code>TRANSIENT_CAPACITY_STAGES</code> in <code>external_api/base.py:135-148</code> so a claim refusal carries no <code>Retry-After</code>. Add unit tests: an over-claim create returns 403 with the body, and the claim stage is absent from the transient set. Update the advisory wording in <code>docs/operator_guide/scheduler.md</code>, <code>docs/operator_guide/database.md</code>, the glossary and the release notes from "advisory this release" to enforced (grep the 10 lines phase 8 recorded in its Outcome, item 12).</td>
+<td><strong>SUPERSEDED on 2026-11-07 by <a href="../PLAN-scheduler-reservations-phase-05a-hard-ceiling/">phase 5a</a>, which carries this step. Read that plan and not this row: its survey found seven of the premises below wrong or stale, and the line numbers drifted when step 1 of this phase moved the code.</strong> <strong>GATED ON PLAN-BLOCKER b13 — do not start until the calibration re-run has landed.</strong> Flip the namespace claim ceiling from advisory to hard. (a) Set <code>CLAIM_ENFORCEMENT_HARD = True</code> in <code>shakenfist/mariadb.py:27461</code>. (b) In <code>shakenfist/instance.py</code>, where <code>_event_claim_over_limit()</code> fires today (the <code>result['admitted'] and result['claim_over_limit']</code> branch, ~<code>instance.py:1182</code>), the SQL guard now <em>refuses</em> over-claim placements when <code>enforce</code> is set, so an enforced over-claim surfaces as a <code>CapacityAdmissionDenied</code> with the claim stage instead. Confirm the mariadb layer (<code>admit_instance_placement</code>, ~<code>mariadb.py:28541-28640</code>) returns the claim denial with <code>claim_uuid</code>, per-dimension <code>limit</code>, <code>used</code> and <code>shortfall</code>, and that <code>place_instance()</code> raises it. (c) In <code>external_api/instance.py</code>, map a claim-stage <code>CapacityAdmissionDenied</code> to HTTP 403 with a structured body {claim, per-dimension limit, drawdown, shortfall} (D16/D6), distinct from the 507 <code>capacity_error</code> node-capacity path. (d) Split the claim stage out of <code>TRANSIENT_CAPACITY_STAGES</code> in <code>external_api/base.py:135-148</code> so a claim refusal carries no <code>Retry-After</code>. Add unit tests: an over-claim create returns 403 with the body, and the claim stage is absent from the transient set. Update the advisory wording in <code>docs/operator_guide/scheduler.md</code>, <code>docs/operator_guide/database.md</code>, the glossary and the release notes from "advisory this release" to enforced (grep the 10 lines phase 8 recorded in its Outcome, item 12).</td>
 </tr>
 <tr>
 <td>4</td>
@@ -16331,11 +16331,15 @@ sub-agent and reviewed and committed in the management session.</p>
 <li>Step 1 — shared walk: <code>036f255758</code>.</li>
 <li>Step 2 — admin capacity view: <code>6da5a5ef83</code>.</li>
 <li>Step 4 — docs: <code>2464830e3a</code>.</li>
-<li>Step 3 — hard-ceiling flip: <strong>deferred</strong>, gated on b13. It lands as a
-  separate commit on this branch once the calibration re-run has
-  produced the observation record D16 gates on. Until then the ceiling
-  stays advisory (<code>CLAIM_ENFORCEMENT_HARD = False</code>) and every doc keeps
-  its "advisory this release" wording.</li>
+<li>Step 3 — hard-ceiling flip: <strong>deferred</strong>, gated on b13, and on
+  2026-11-07 <strong>moved to
+  <a href="../PLAN-scheduler-reservations-phase-05a-hard-ceiling/">phase 5a</a></strong>.
+  This note used to say the step lands as a separate commit on this
+  branch; that is no longer possible, because the branch merged as
+  #4800 and was deleted. Until phase 5a's flip lands the ceiling stays
+  advisory (<code>CLAIM_ENFORCEMENT_HARD = False</code>) and every doc keeps its
+  "advisory this release" wording. This phase is Complete against what
+  it put on <code>develop</code>; the flip's status is phase 5a's row.</li>
 </ul>
 <p>Refinements the steps forced:</p>
 <ul>
