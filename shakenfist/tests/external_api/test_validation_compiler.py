@@ -227,8 +227,8 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
         self.assertEqual(32, constrained)
 
         # And the thirteen semantic format declarations, named rather
-        # than merely counted: this is F3's table, which is the list
-        # each validator's width was established against. A new one
+        # than merely counted: this is the table each validator's width
+        # was established against. A new one
         # arriving here has not had that reading done for it, so it
         # fails until someone does it and adds the row.
         self.assertEqual(
@@ -806,8 +806,8 @@ class ObjectFragmentCompilationTestCase(base.ShakenFistTestCase):
         An optional compiled field is allow_none=True because a JSON
         null reaches the handler as None today and several handlers
         read that as "not supplied" -- and the shipped client sends
-        five documented keys that way on every instance create (census
-        finding N1). A nested field which refused one would be a rule
+        five documented keys that way on every instance create. A
+        nested field which refused one would be a rule
         this module invented rather than one any declaration states.
 
         The fragment itself is nullable for the same reason: `disk`
@@ -895,7 +895,7 @@ class ObjectFragmentCompilationTestCase(base.ShakenFistTestCase):
 
 
 class ExactIntegerTestCase(base.ShakenFistTestCase):
-    """1.5 is not an integer (decision D46, finding F8).
+    """1.5 is not an integer (decision D46).
 
     The compiled path is check-only (decision D14): validate_request()
     runs schema.validate() for its findings and discards the
@@ -1026,7 +1026,7 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
                 [], self._findings('diskspec', {'type': kind}), kind)
 
     def test_the_diskspec_a_shipped_client_actually_sends(self):
-        """Census finding N1, asserted rather than trusted.
+        """What a shipped client sends, asserted rather than trusted.
 
         The CLI's `-d` sends bus and type as an explicit JSON null on
         every call (commandline/instance.py:454) and the ansible
@@ -1052,17 +1052,17 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
 
     def test_each_diskspec_key_refuses_its_own_bad_value(self):
         for (supplied, expected) in [
-                # Finding F5's second row: a non-numeric size reaches
-                # int() in instance._safe_int_cast and scheduler.py and
-                # is a recorded 500 today.
+                # A non-numeric size reaches int() in
+                # instance._safe_int_cast and scheduler.py and is a
+                # recorded 500 today.
                 ({'size': 'banana'}, ('spec.size', 'Not a valid integer.')),
                 ({'size': 8.5}, ('spec.size', 'Not a valid integer.')),
                 # D45's bound. A negative size corrupts the capacity
                 # ledger rather than failing anything.
                 ({'size': -5},
                  ('spec.size', 'Must be greater than or equal to 0.')),
-                # F5's first row: a non-string base is an AttributeError
-                # in util_general.noneish.
+                # A non-string base is an AttributeError in
+                # util_general.noneish.
                 ({'base': 5}, ('spec.base', 'Not a valid string.')),
                 ({'bus': 'banana'},
                  ('spec.bus',
@@ -1150,9 +1150,9 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
             'networkspec', {'network_uuid': 'barry_net'}))
 
     def test_the_networkspec_a_shipped_client_actually_sends(self):
-        """Census finding N1 again, and here it is not an edge case:
-        the CLI sends `'macaddress': None` on *every* create and every
-        add-interface (commandline/instance.py:473 and :998), and
+        """What a shipped client sends again, and here it is not an
+        edge case: the CLI sends `'macaddress': None` on *every* create
+        and every add-interface (commandline/instance.py:473 and :998), and
         guest_ci_tests/test_cloudinit.py:85 sends an explicit null
         address. The pattern on macaddress does not fire on a null
         because marshmallow runs no validator on one."""
@@ -1219,8 +1219,8 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
 
     def test_each_networkspec_key_refuses_its_own_bad_value(self):
         for (supplied, expected) in [
-                # F5's third row: a non-string network_uuid is an
-                # AttributeError in util_network.valid_uuid4.
+                # A non-string network_uuid is an AttributeError in
+                # util_network.valid_uuid4.
                 ({'network_uuid': 5},
                  ('spec.network_uuid', 'Not a valid string.')),
                 ({'network_uuid': {'name': 'barry_net'}},
@@ -1228,12 +1228,12 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
                 ({'network_uuid': 'barry_net', 'macaddress': 'banana'},
                  ('spec.macaddress',
                   'String does not match expected pattern.')),
-                # F5's fourth row: a non-string address is an
-                # AttributeError in util_general.noneish, from
+                # A non-string address is an AttributeError in
+                # util_general.noneish, from
                 # external_api/instance.py:369.
                 ({'network_uuid': 'barry_net', 'address': 5},
                  ('spec.address', 'Not a valid string.')),
-                # F5's fifth row: pydantic, building the
+                # A non-string model is pydantic, building the
                 # NetworkInterface.
                 ({'network_uuid': 'barry_net', 'model': 5},
                  ('spec.model', 'Not a valid string.'))]:
@@ -1255,7 +1255,7 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
         explicit null*, so `{"network_uuid": null}` is refused with the
         same message an omitted `network_uuid` gets.
 
-        That closes finding F7's reachable path. The value was reaching
+        That closes the arbitrary-network path. The value was reaching
         Network.from_db_by_ref(None, namespace), which builds an
         ObjectFilterCriteria whose null name reads as *no* name filter,
         so the query returns every active network in the namespace and
@@ -1359,8 +1359,9 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
                  ('spec.memory', 'Not a valid integer.')),
                 ({'memory': 16384.5},
                  ('spec.memory', 'Not a valid integer.')),
-                # The videospec row of finding F6, and the starkest of
-                # them: {"model": 5, "memory": "lots", "vdi": 7} is
+                # The videospec was the starkest of the values
+                # accepted in silence: {"model": 5, "memory": "lots",
+                # "vdi": 7} is
                 # stored verbatim today and surfaces as an
                 # AttributeError in a console request much later.
                 ({'vdi': 7}, ('spec.vdi', 'Not a valid string.')),

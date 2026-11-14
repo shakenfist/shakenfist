@@ -713,7 +713,8 @@ class InstancesEndpoint(api_base.Resource):
             # 'tags' must be a list and 'affinity' a dict in one of two
             # recognised shapes -- and every other key may hold any
             # non-empty JSON value at all, which is not a shape a
-            # properties block can describe. Census finding F4.
+            # properties block can describe. The survey of the
+            # structured declarations left it out for that reason.
             ('metadata', 'body', 'dict',
              'Any metadata to be set for the instance at creation time. See '
              'https://shakenfist.com/developer_guide/api_reference/instances/ for '
@@ -1146,9 +1147,9 @@ class InstancesEndpoint(api_base.Resource):
             # self.video['vdi'].startswith('spice') in a console
             # request, and video_model and video_memory are rendered
             # raw into the domain XML at libvirt.tmpl:206 as
-            # type='None' and vram='None'. That is finding F6's
-            # videospec row, so a guard which does not see a null does
-            # not close it.
+            # type='None' and vram='None'. A videospec value of any
+            # type at all was accepted in silence before this guard,
+            # so a guard which does not see a null does not close it.
             #
             # `is None` rather than a truthiness test: null is what the
             # reference promises about, and refusing '' or 0 as well

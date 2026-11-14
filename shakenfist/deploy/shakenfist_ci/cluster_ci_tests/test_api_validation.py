@@ -572,7 +572,7 @@ class TestDNSValueRefused(base.BaseNamespacedTestCase):
 
 
 class TestNullNetworkUuidRefusedOnHotplug(base.BaseNamespacedTestCase):
-    """PLAN-api-input-validation-phase-07-structured.md, finding F7.
+    """A null network_uuid must not resolve to an arbitrary network.
 
     The sharpest of the phase's contract changes, and issue #4223's
     symptom. `_netdesc_safety_checks` checked that `network_uuid` was
@@ -661,8 +661,8 @@ class TestNullNetworkUuidRefusedOnHotplug(base.BaseNamespacedTestCase):
 
         # The half a status code cannot prove. The interfaces are
         # compared by uuid rather than whole: an interface's version and
-        # metadata are free to move underneath this test, and what F7 is
-        # about is whether a new object exists.
+        # metadata are free to move underneath this test, and what this
+        # is about is whether a new object exists.
         after = self.test_client.get_instance_interfaces(inst['uuid'])
         self.addDetail(
             'after',
@@ -670,9 +670,9 @@ class TestNullNetworkUuidRefusedOnHotplug(base.BaseNamespacedTestCase):
         self.assertEqual(
             sorted(i['uuid'] for i in before),
             sorted(i['uuid'] for i in after),
-            'The refused hotplug changed the instance\'s interfaces, which '
-            'is finding F7 exactly: the request was refused and the object '
-            'was created anyway')
+            'The refused hotplug changed the instance\'s interfaces, '
+            'which is the defect exactly: the request was refused and the '
+            'object was created anyway')
 
 
 class TestEveryDocumentedSpecKeyStillBoots(base.BaseNamespacedTestCase):

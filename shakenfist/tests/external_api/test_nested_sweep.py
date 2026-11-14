@@ -7,10 +7,10 @@ The four structured declarations -- ``disk``, ``network`` and
 ``POST /instances/{ref}/interfaces`` -- are typed, so a diskspec, a
 networkspec and a videospec are described to the validation layer
 rather than handed to the handler unexamined. That moved the contract
-for twenty nested values, which
-``docs/plans/PLAN-api-input-validation-phase-07-structured.md``
-measured as its findings F5 and F6 (the F and D codes in the row notes
-below are that plan's). This file pins the result.
+for twenty nested values: eleven which were a recorded 500, and nine
+which were accepted in silence. This file pins the result. The D codes
+in the row notes are the decisions of the plan which moved them,
+``docs/plans/PLAN-api-input-validation-phase-07-structured.md``.
 
 Three things make a row here worth having, and each is a habit learned
 the hard way:
@@ -35,9 +35,9 @@ the hard way:
   instance create answers 507 for a request which survived every
   guard, hotplug answers 200 *and creates an interface*. So an
   accepted row there is checked by counting interfaces, not by reading
-  a status code -- which is the regression guard finding F7 needed and
-  did not have, since its symptom was an interface on an arbitrary
-  network rather than a bad status.
+  a status code -- which is the regression guard a null
+  ``network_uuid`` needed and did not have, since its symptom was an
+  interface on an arbitrary network rather than a bad status.
 
 The table carries two answers per row, and the difference between them
 is decision D42. The ``enforce`` column is what a caller sees today.
@@ -147,7 +147,7 @@ ACCEPTED_ON_HOTPLUG = Answer(200, False, None)
 #: What a caller used to get for a nested value the handler could not
 #: cope with: a bare ``server error`` (no 500 body carries exception
 #: detail), an exception record under /srv/shakenfist/exceptions/, and
-#: nothing naming the key which caused it. Eleven rows of finding F5
+#: nothing naming the key which caused it. Eleven of the rows below
 #: answered this before the nested schemas existed, and the warn column
 #: is where most still do -- the six non-string network_uuid rows answer
 #: a 404 there since the issue #4223 fix, whose guard sits in
@@ -189,10 +189,10 @@ Case = namedtuple(
 # One row per (spec, key, sent value). `body` is an overlay onto the
 # route's minimal valid request, so each row says only what it changes.
 #
-# The notes name the finding a row closes in the structured-schemas
-# plan named in the module docstring. F5 is the eleven nested values
-# which were a recorded 500; F6 is the nine which were accepted in
-# silence; D4x names a decision the row is the measurement of. A row
+# The notes say what each row closes. "A recorded 500" is one of the
+# eleven nested values which faulted before the nested schemas existed;
+# "accepted in silence" is one of the nine which reached placement
+# unexamined; D4x names a decision the row is the measurement of. A row
 # whose note says `width` is one the schema deliberately still accepts,
 # and the reason is on the row: a schema narrower than its handler is a
 # breaking change wearing the clothes of a correctness fix.
@@ -218,16 +218,16 @@ CASES = [
     Case('disk.base.int', CREATE, 'diskspec', 'base',
          {'disk': [{'size': 8, 'base': 5}]},
          refused('disk[0].base: Not a valid string.'), FAULTED,
-         "F5 row 1: AttributeError: 'int' object has no attribute 'lower' "
-         'in util_general.noneish'),
+         "a recorded 500: AttributeError: 'int' object has no attribute "
+         "'lower' in util_general.noneish"),
     Case('disk.base.bool', CREATE, 'diskspec', 'base',
          {'disk': [{'size': 8, 'base': True}]},
          refused('disk[0].base: Not a valid string.'), FAULTED,
-         'F5 row 1, the bool arm'),
+         'a recorded 500, the bool arm'),
     Case('disk.base.list', CREATE, 'diskspec', 'base',
          {'disk': [{'size': 8, 'base': ['a']}]},
          refused('disk[0].base: Not a valid string.'), FAULTED,
-         'F5 row 1, the list arm'),
+         'a recorded 500, the list arm'),
     Case('disk.base.url', CREATE, 'diskspec', 'base',
          {'disk': [{'size': 8, 'base': 'http://example.com/i.qcow2'}]},
          ACCEPTED, ACCEPTED,
@@ -237,8 +237,8 @@ CASES = [
     Case('disk.base.null', CREATE, 'diskspec', 'base',
          {'disk': [{'size': 8, 'base': None}]},
          ACCEPTED, ACCEPTED,
-         'width, census N1: the shipped CLI and the ansible collection both '
-         'send an explicit null base on an ordinary request'),
+         'width: the shipped CLI and the ansible collection both send an '
+         'explicit null base on an ordinary request'),
     Case('disk.base.shortcut', CREATE, 'diskspec', 'base',
          {'disk': [{'size': 8, 'base': 'debian:12'}]},
          ACCEPTED, ACCEPTED,
@@ -293,20 +293,20 @@ CASES = [
     Case('disk.size.badstring', CREATE, 'diskspec', 'size',
          {'disk': [{'size': 'banana'}]},
          refused('disk[0].size: Not a valid integer.'), FAULTED,
-         'F5 row 2: ValueError from int() in instance._safe_int_cast'),
+         'a recorded 500: ValueError from int() in instance._safe_int_cast'),
     Case('disk.size.dict', CREATE, 'diskspec', 'size',
          {'disk': [{'size': {'gb': 8}}]},
          refused('disk[0].size: Not a valid integer.'), FAULTED,
-         'F5 row 2, the TypeError arm'),
+         'a recorded 500, the TypeError arm'),
     Case('disk.size.negative', CREATE, 'diskspec', 'size',
          {'disk': [{'size': -5}]},
          refused('disk[0].size: Must be greater than or equal to 0.'),
          refused('disk size must not be negative'),
-         'F6 row 1, and the whole argument for D45\'s minimum: a negative '
-         'size corrupts the capacity ledger at scheduler.py:473. Accepted '
-         'at warn until issue 4248 added the handler guard -- the ledger '
-         'corruption is cross-namespace, so the rollback must not hand it '
-         'back. Moves at warn'),
+         "accepted in silence, and the whole argument for D45's minimum: a "
+         'negative size corrupts the capacity ledger at scheduler.py:473. '
+         'Accepted at warn until issue 4248 added the handler guard -- the '
+         'ledger corruption is cross-namespace, so the rollback must not hand '
+         'it back. Moves at warn'),
     Case('disk.size.negative_string', CREATE, 'diskspec', 'size',
          {'disk': [{'size': '-5'}]},
          refused('disk[0].size: Must be greater than or equal to 0.'),
@@ -318,8 +318,9 @@ CASES = [
     Case('disk.size.fractional', CREATE, 'diskspec', 'size',
          {'disk': [{'size': 8.5}]},
          refused('disk[0].size: Not a valid integer.'), ACCEPTED,
-         'F6 row 2 and D46: under a check-only layer a field which accepts '
-         '8.5 as an integer hands the handler 8.5 and has validated nothing'),
+         'accepted in silence and D46: under a check-only layer a field which '
+         'accepts 8.5 as an integer hands the handler 8.5 and has validated '
+         'nothing'),
     Case('disk.size.integral_float', CREATE, 'diskspec', 'size',
          {'disk': [{'size': 8.0}]},
          ACCEPTED, ACCEPTED,
@@ -328,12 +329,12 @@ CASES = [
     Case('disk.size.bool', CREATE, 'diskspec', 'size',
          {'disk': [{'size': True}]},
          refused('disk[0].size: Not a valid integer.'), ACCEPTED,
-         'F6 row 2, the bool arm -- int(True) is 1, which is exactly the '
-         'silent coercion D46 refuses'),
+         'accepted in silence, the bool arm -- int(True) is 1, which is '
+         'exactly the silent coercion D46 refuses'),
     Case('disk.size.numeric_string', CREATE, 'diskspec', 'size',
          {'disk': [{'size': '20'}]},
          ACCEPTED, ACCEPTED,
-         'width, D46 and census N3: "20" reaches int("20") and works end to '
+         'width, and D46: "20" reaches int("20") and works end to '
          'end today, so refusing it would be a validator narrower than its '
          'handler. Definition-of-done item 5 is wrong about this row'),
     Case('disk.size.zero_with_base', CREATE, 'diskspec', 'size',
@@ -349,7 +350,7 @@ CASES = [
     Case('disk.size.null_with_base', CREATE, 'diskspec', 'size',
          {'disk': [{'size': None, 'base': 'http://example.com/i.qcow2'}]},
          ACCEPTED, ACCEPTED,
-         'width, census N1: the ansible collection sends size: None on its '
+         'width: the ansible collection sends size: None on its '
          'diskspecs: path and apiclient.py deliberately leaves it uncoerced'),
 
     # ---------------------------------------------------------------
@@ -362,7 +363,7 @@ CASES = [
     Case('disk.bus.null', CREATE, 'diskspec', 'bus',
          {'disk': [{'size': 8, 'bus': None}]},
          ACCEPTED, ACCEPTED,
-         'width, census N1: the CLI sends bus: None on every -d disk'),
+         'width: the CLI sends bus: None on every -d disk'),
     Case('disk.bus.nonsense', CREATE, 'diskspec', 'bus',
          {'disk': [{'size': 8, 'bus': 'banana'}]},
          refused('disk[0].bus: Must be one of: sata, scsi, usb, virtio, '
@@ -403,19 +404,20 @@ CASES = [
     Case('disk.type.null', CREATE, 'diskspec', 'type',
          {'disk': [{'size': 8, 'type': None}]},
          ACCEPTED, ACCEPTED,
-         'width, census N1'),
+         'width: a null type is what the CLI and the collection send'),
     Case('disk.type.nonsense', CREATE, 'diskspec', 'type',
          {'disk': [{'size': 8, 'type': 'nonsense'}]},
          refused('disk[0].type: Must be one of: disk, cdrom.'), ACCEPTED,
-         'F6 row 4, and D50\'s first deliberate narrowing: only cdrom is '
-         'special cased, so libvirt\'s floppy and lun were accepted and '
-         'behaved as plain disks -- a silently wrong result, not a working '
-         'one'),
+         'accepted in silence, and D50\'s first deliberate narrowing: '
+         'only cdrom is special cased, so libvirt\'s floppy and lun were '
+         'accepted and behaved as plain disks -- a silently wrong result, '
+         'not a working one'),
     Case('disk.type.int', CREATE, 'diskspec', 'type',
          {'disk': [{'size': 8, 'type': 5}]},
          refused('disk[0].type: Not a valid string.'), ACCEPTED,
-         'F6 row 4, the non-string arm: the type check runs before the enum, '
-         'so the message names the type rather than listing the enum'),
+         'accepted in silence, the non-string arm: the type check runs '
+         'before the enum, so the message names the type rather than '
+         'listing the enum'),
 
     # ---------------------------------------------------------------
     # diskspec: the shape itself
@@ -423,9 +425,9 @@ CASES = [
     Case('disk.unknown_key', CREATE, 'diskspec', None,
          {'disk': [{'size': 8, 'wombat': 1}]},
          refused('disk[0].wombat: Unknown field.'), ACCEPTED,
-         'F6 row 5 and D41: the original complaint of issue #936, filed in '
-         '2020 -- a caller who typed siz instead of size got a default '
-         'sized disk and no indication anything was wrong'),
+         'accepted in silence and D41: the original complaint of issue #936, '
+         'filed in 2020 -- a caller who typed siz instead of size got a '
+         'default sized disk and no indication anything was wrong'),
     Case('disk.schema_key', CREATE, 'diskspec', None,
          {'disk': [{'size': 8, '_schema': 1}]},
          refused('disk[0]._schema: Unknown field.'), ACCEPTED,
@@ -450,9 +452,9 @@ CASES = [
                  'base'),
          refused('disk specification must specify at least one of size or '
                  'base'),
-         'F6 row 3 and D45, moves at warn: a diskspec asking for nothing is '
-         'refused. Swagger 2.0 has no anyOf, so this is a handler guard and '
-         'therefore holds at every mode -- which is the point'),
+         'accepted in silence and D45, moves at warn: a diskspec asking for '
+         'nothing is refused. Swagger 2.0 has no anyOf, so this is a handler '
+         'guard and therefore holds at every mode -- which is the point'),
     Case('disk.size_null_only', CREATE, 'diskspec', None,
          {'disk': [{'size': None}]},
          refused('disk specification must specify at least one of size or '
@@ -491,8 +493,8 @@ CASES = [
     Case('disk.bus_and_type_null', CREATE, 'diskspec', None,
          {'disk': [{'size': 8, 'bus': None, 'type': None}]},
          ACCEPTED, ACCEPTED,
-         'width, census N1: an enum and a null are not in conflict, because '
-         'marshmallow runs no validator on a null'),
+         'width: an enum and a null are not in conflict, because '
+         'marshmallow runs no validator on one'),
     Case('disk.second_element', CREATE, 'diskspec', None,
          {'disk': [{'size': 8}, {'size': 'banana'}]},
          refused('disk[1].size: Not a valid integer.'), FAULTED,
@@ -510,7 +512,7 @@ CASES = [
          {'disk': {'size': 8}},
          refused('disk: Not a valid list.'),
          refused('disk specification should contain JSON objects'),
-         'F1: the outer shape was already checked with a good message, and '
+         'the outer shape was already checked with a good message, and '
          'this phase does not change it'),
 
     # ---------------------------------------------------------------
@@ -520,27 +522,27 @@ CASES = [
          {'network': [{'network_uuid': 5}]},
          refused('network[0].network_uuid: Not a valid string.'),
          refused('network 5 not found', status=404),
-         "F5 row 3, moves at warn: this was AttributeError: 'int' object "
-         "has no attribute 'replace' in util_general.valid_uuid4 (item 3 "
-         'of issue #4167). The issue #4223 fix made from_db_by_ref answer '
-         '"not found" for any non-string ref, and that guard is below the '
-         'validation layer, so a rollback keeps it'),
+         "a recorded 500, moves at warn: this was AttributeError: 'int' "
+         "object has no attribute 'replace' in util_general.valid_uuid4 "
+         '(item 3 of issue #4167). The issue #4223 fix made from_db_by_ref '
+         'answer "not found" for any non-string ref, and that guard is '
+         'below the validation layer, so a rollback keeps it'),
     Case('net.uuid.dict', CREATE, 'networkspec', 'network_uuid',
          {'network': [{'network_uuid': {'a': 1}}]},
          refused('network[0].network_uuid: Not a valid string.'),
          refused("network {'a': 1} not found", status=404),
-         'F5 row 3, the dict arm, moves at warn (issue #4223)'),
+         'a recorded 500, the dict arm, moves at warn (issue #4223)'),
     Case('net.uuid.bool', CREATE, 'networkspec', 'network_uuid',
          {'network': [{'network_uuid': True}]},
          refused('network[0].network_uuid: Not a valid string.'),
          refused('network True not found', status=404),
-         'F5 row 3, the bool arm, moves at warn (issue #4223)'),
+         'a recorded 500, the bool arm, moves at warn (issue #4223)'),
     Case('net.uuid.null', CREATE, 'networkspec', 'network_uuid',
          {'network': [{'network_uuid': None}]},
          refused('network[0].network_uuid: Missing data for required '
                  'field.'),
          refused('network specification is missing network_uuid'),
-         'F7 and D44, moves at warn: before the phase this was a 507, having '
+         'D44, moves at warn: before the phase this was a 507, having '
          'resolved an arbitrary network in the namespace. Issue #4223 stays '
          'open -- the lookup is still wrong for the next caller who reaches '
          'it another way -- so step 4 added a value test to the handler '
@@ -569,13 +571,13 @@ CASES = [
     Case('net.address.int', CREATE, 'networkspec', 'address',
          {'network': [{'network_uuid': NETWORK, 'address': 5}]},
          refused('network[0].address: Not a valid string.'), FAULTED,
-         'F5 row 4: AttributeError in util_general.noneish at '
+         'a recorded 500: AttributeError in util_general.noneish at '
          'external_api/instance.py:369, above is_in_range -- the '
          'attribution the census corrected'),
     Case('net.address.list', CREATE, 'networkspec', 'address',
          {'network': [{'network_uuid': NETWORK, 'address': ['10.9.8.5']}]},
          refused('network[0].address: Not a valid string.'), FAULTED,
-         'F5 row 4, the list arm'),
+         'a recorded 500, the list arm'),
     Case('net.address.literal_none', CREATE, 'networkspec', 'address',
          {'network': [{'network_uuid': NETWORK, 'address': 'none'}]},
          ACCEPTED, ACCEPTED,
@@ -607,7 +609,7 @@ CASES = [
     Case('net.model.int', CREATE, 'networkspec', 'model',
          {'network': [{'network_uuid': NETWORK, 'model': 5}]},
          refused('network[0].model: Not a valid string.'), FAULTED,
-         'F5 row 5: pydantic, building the NetworkInterface'),
+         'a recorded 500: pydantic, building the NetworkInterface'),
     Case('net.model.nonsense', CREATE, 'networkspec', 'model',
          {'network': [{'network_uuid': NETWORK, 'model': 'nonsense'}]},
          ACCEPTED, ACCEPTED,
@@ -642,8 +644,9 @@ CASES = [
          {'network': [{'network_uuid': NETWORK, 'macaddress': 5}]},
          refused('network[0].macaddress: Not a valid string.'),
          refused('network specification requests a malformed MAC address'),
-         'not an F5 row: a non-string MAC was already guarded, because '
-         'valid_macaddr does a fullmatch rather than an attribute access'),
+         'never a recorded 500: a non-string MAC was already guarded, '
+         'because valid_macaddr does a fullmatch rather than an attribute '
+         'access'),
     Case('net.macaddress.valid', CREATE, 'networkspec', 'macaddress',
          {'network': [{'network_uuid': NETWORK,
                        'macaddress': '02:00:00:55:66:77'}]},
@@ -652,8 +655,8 @@ CASES = [
     Case('net.macaddress.null', CREATE, 'networkspec', 'macaddress',
          {'network': [{'network_uuid': NETWORK, 'macaddress': None}]},
          ACCEPTED, ACCEPTED,
-         'width, census N1: the shipped CLI sends a null macaddress on every '
-         'single call'),
+         'width: the shipped CLI sends a null macaddress on every single '
+         'call'),
     Case('net.float.yes', CREATE, 'networkspec', 'float',
          {'network': [{'network_uuid': NETWORK, 'float': 'yes'}]},
          ACCEPTED, ACCEPTED,
@@ -680,13 +683,13 @@ CASES = [
     Case('net.float.int', CREATE, 'networkspec', 'float',
          {'network': [{'network_uuid': NETWORK, 'float': 5}]},
          refused('network[0].float: Not a valid boolean.'), ACCEPTED,
-         'F6 row 7: a documented boolean accepted anything truthy, so 5 '
-         'floated the instance'),
+         'accepted in silence: a documented boolean accepted anything truthy, '
+         'so 5 floated the instance'),
     Case('net.unknown_key', CREATE, 'networkspec', None,
          {'network': [{'network_uuid': NETWORK, 'wombat': 1}]},
          refused('network[0].wombat: Unknown field.'), ACCEPTED,
-         'F6 row 8 and D41: the census found no first-party caller sending '
-         'an undocumented netdesc key -- iface_uuid is written by the '
+         'accepted in silence and D41: the census found no first-party caller '
+         'sending an undocumented netdesc key -- iface_uuid is written by the '
          'handler after every caller check and never appears in a response '
          'body a caller could echo back'),
     Case('net.element_not_a_mapping', CREATE, 'networkspec', None,
@@ -698,7 +701,7 @@ CASES = [
          {'network': {'network_uuid': NETWORK}},
          refused('network: Not a valid list.'),
          refused('network specification should contain JSON objects'),
-         'F1: unchanged by this phase'),
+         'the outer shape, unchanged by this phase'),
 
     # ---------------------------------------------------------------
     # networkspec on interface hotplug. The same shape, declared as a
@@ -710,8 +713,8 @@ CASES = [
          {'network': {'network_uuid': 5}},
          refused('network.network_uuid: Not a valid string.'),
          refused('network 5 not found', status=404),
-         'F5 row 3 on the hotplug route: same guard, same construction, same '
-         'answer, and the finding names network.network_uuid rather than '
+         'a recorded 500 on the hotplug route: same guard, same construction, '
+         'same answer, and the finding names network.network_uuid rather than '
          'network[0].network_uuid because here the netdesc is the parameter. '
          'Moves at warn (issue #4223): the from_db_by_ref non-string guard '
          'answers "not found" where valid_uuid4 used to fault'),
@@ -719,21 +722,22 @@ CASES = [
          {'network': {'network_uuid': {'a': 1}}},
          refused('network.network_uuid: Not a valid string.'),
          refused("network {'a': 1} not found", status=404),
-         'F5 row 3, the dict arm, moves at warn (issue #4223)'),
+         'a recorded 500, the dict arm, moves at warn (issue #4223)'),
     Case('hotplug.uuid.bool', HOTPLUG, 'networkspec', 'network_uuid',
          {'network': {'network_uuid': True}},
          refused('network.network_uuid: Not a valid string.'),
          refused('network True not found', status=404),
-         'F5 row 3, the bool arm, moves at warn (issue #4223)'),
+         'a recorded 500, the bool arm, moves at warn (issue #4223)'),
     Case('hotplug.uuid.null', HOTPLUG, 'networkspec', 'network_uuid',
          {'network': {'network_uuid': None}},
          refused('network.network_uuid: Missing data for required field.'),
          refused('network specification is missing network_uuid'),
-         'F7 at its worst, moves at warn: before the phase this answered '
-         '200 and created an interface on whichever network the namespace '
-         'query happened to return. The runner asserts the interface count, '
-         'because a status code is a weak guard for that and an object which '
-         'exists afterwards is not'),
+         'the arbitrary-network resolution at its worst, moves at warn: '
+         'before the phase this answered 200 and created an interface on '
+         'whichever network the namespace query happened to return. The '
+         'runner asserts the interface count, because a status code is a '
+         'weak guard for that and an object which exists afterwards is '
+         'not'),
     Case('hotplug.uuid.missing', HOTPLUG, 'networkspec', 'network_uuid',
          {'network': {}},
          refused('network.network_uuid: Missing data for required field.'),
@@ -750,11 +754,11 @@ CASES = [
     Case('hotplug.address.int', HOTPLUG, 'networkspec', 'address',
          {'network': {'network_uuid': NETWORK, 'address': 5}},
          refused('network.address: Not a valid string.'), FAULTED,
-         'F5 row 4 on the hotplug route'),
+         'a recorded 500 on the hotplug route'),
     Case('hotplug.address.list', HOTPLUG, 'networkspec', 'address',
          {'network': {'network_uuid': NETWORK, 'address': ['10.9.8.5']}},
          refused('network.address: Not a valid string.'), FAULTED,
-         'F5 row 4, the list arm'),
+         'a recorded 500, the list arm'),
     Case('hotplug.address.literal_none', HOTPLUG, 'networkspec', 'address',
          {'network': {'network_uuid': NETWORK, 'address': 'none'}},
          ACCEPTED, ACCEPTED,
@@ -763,14 +767,14 @@ CASES = [
          {'network': {'network_uuid': NETWORK, 'macaddress': None,
                       'address': None}},
          ACCEPTED, ACCEPTED,
-         'width, census N1: the shipped CLI\'s add-interface sends a null '
-         'macaddress on every call. Since the issue 4252 fix both nulls '
+         'width: the shipped CLI\'s add-interface sends a null macaddress '
+         'on every call. Since the issue 4252 fix both nulls '
          'read as "not supplied", so this row is allocated a MAC *and* an '
          'address'),
     Case('hotplug.model.int', HOTPLUG, 'networkspec', 'model',
          {'network': {'network_uuid': NETWORK, 'model': 5}},
          refused('network.model: Not a valid string.'), FAULTED,
-         'F5 row 5 on the hotplug route'),
+         'a recorded 500 on the hotplug route'),
     Case('hotplug.model.nonsense', HOTPLUG, 'networkspec', 'model',
          {'network': {'network_uuid': NETWORK, 'model': 'nonsense'}},
          ACCEPTED, ACCEPTED,
@@ -804,14 +808,14 @@ CASES = [
     Case('hotplug.float.int', HOTPLUG, 'networkspec', 'float',
          {'network': {'network_uuid': NETWORK, 'float': 5}},
          refused('network.float: Not a valid boolean.'), ACCEPTED,
-         'F6 row 7 on the hotplug route -- and at warn it is a *created '
-         'interface*, which is what an accepted-in-silence row costs when '
-         'there is no scheduler to refuse it afterwards'),
+         'accepted in silence on the hotplug route -- and at warn it is a '
+         '*created interface*, which is what an accepted-in-silence row costs '
+         'when there is no scheduler to refuse it afterwards'),
     Case('hotplug.unknown_key', HOTPLUG, 'networkspec', None,
          {'network': {'network_uuid': NETWORK, 'wombat': 1}},
          refused('network.wombat: Unknown field.'), ACCEPTED,
-         'F6 row 8 on the hotplug route, and the same point: at warn the '
-         'typo is discarded and an interface is created anyway'),
+         'accepted in silence on the hotplug route, and the same point: at '
+         'warn the typo is discarded and an interface is created anyway'),
     Case('hotplug.not_a_mapping', HOTPLUG, 'networkspec', None,
          {'network': 'wombat'},
          refused('network: Not a valid mapping type.'),
@@ -821,7 +825,8 @@ CASES = [
          'parameter that has no such field'),
 
     # ---------------------------------------------------------------
-    # videospec. The starkest of F6's rows: instance.py:833 checked
+    # videospec. The starkest of the accepted-in-silence rows:
+    # instance.py:833 checked
     # that model and memory were *present* and nothing else, so
     # {"model": 5, "memory": "lots", "vdi": 7} was stored verbatim and
     # surfaced much later and somewhere else -- an AttributeError in a
@@ -832,14 +837,15 @@ CASES = [
          refused('video.vdi: Must be one of: vnc, spice, spiceconcurrent, '
                  'spicedebug.'),
          ACCEPTED,
-         'F6 row 9 and D43: the one key in this vocabulary where publishing '
-         'the enum genuinely is the enforcement, because nothing else '
-         'refuses a value outside it'),
+         'accepted in silence and D43: the one key in this vocabulary where '
+         'publishing the enum genuinely is the enforcement, because nothing '
+         'else refuses a value outside it'),
     Case('video.vdi.int', CREATE, 'videospec', 'vdi',
          {'video': {'model': 'cirrus', 'memory': 16384, 'vdi': 7}},
          refused('video.vdi: Not a valid string.'), ACCEPTED,
-         'F6 row 9: instance.py:1715 does vdi.startswith("spice"), which is '
-         'an AttributeError on a non-string, in the console endpoint'),
+         'accepted in silence: instance.py:1715 does '
+         'vdi.startswith("spice"), which is an AttributeError on a '
+         'non-string, in the console endpoint'),
     Case('video.vdi.valid', CREATE, 'videospec', 'vdi',
          {'video': {'model': 'cirrus', 'memory': 16384,
                     'vdi': 'spiceconcurrent'}},
@@ -868,17 +874,18 @@ CASES = [
     Case('video.memory.badstring', CREATE, 'videospec', 'memory',
          {'video': {'model': 'cirrus', 'memory': 'lots'}},
          refused('video.memory: Not a valid integer.'), ACCEPTED,
-         'F6 row 9 and D49: typed at last'),
+         'accepted in silence and D49: typed at last'),
     Case('video.memory.fractional', CREATE, 'videospec', 'memory',
          {'video': {'model': 'cirrus', 'memory': 8.5}},
          refused('video.memory: Not a valid integer.'), ACCEPTED,
-         'D46 at depth: this is the nested integer F8 warned would inherit '
-         'the lie the moment the phase declared one'),
+         'D46 at depth: a check-only layer hands the handler the 8.5 it '
+         'called an integer, so a nested integer inherits that lie '
+         'the moment the phase declares one'),
     Case('video.model.int', CREATE, 'videospec', 'model',
          {'video': {'model': 5, 'memory': 16384}},
          refused('video.model: Not a valid string.'), ACCEPTED,
-         'F6 row 9: a non-string model was stored verbatim and rendered raw '
-         'into the domain XML'),
+         'accepted in silence: a non-string model was stored verbatim and '
+         'rendered raw into the domain XML'),
     Case('video.model.qxl', CREATE, 'videospec', 'model',
          {'video': {'model': 'qxl', 'memory': 16384}},
          ACCEPTED, ACCEPTED,
@@ -899,9 +906,10 @@ CASES = [
          {'video': {'model': None, 'memory': 16384}},
          refused('video specification requires "model"'),
          refused('video specification requires "model"'),
-         'F6 row 9, moves at warn: the handler tested presence, so a null '
-         'model passed its guard, was stored verbatim and was rendered raw '
-         'into the domain XML at libvirt.tmpl:206 as type=\'None\'. A value '
+         'accepted in silence, moves at warn: the handler tested '
+         'presence, so a null model passed its guard, was stored verbatim '
+         'and was rendered raw into the domain XML at libvirt.tmpl:206 as '
+         'type=\'None\'. A value '
          'test refuses it, and being a handler guard it refuses it at every '
          'mode -- a rollback must not hand back an instance which cannot '
          'start'),
@@ -909,13 +917,13 @@ CASES = [
          {'video': {'model': 'cirrus', 'memory': None}},
          refused('video specification requires "memory"'),
          refused('video specification requires "memory"'),
-         'F6 row 9, moves at warn: the same fact about memory, which '
-         'rendered as vram=\'None\''),
+         'accepted in silence, moves at warn: the same fact about memory, '
+         "which rendered as vram='None'"),
     Case('video.unknown_key', CREATE, 'videospec', None,
          {'video': {'model': 'vga', 'memory': 16384, 'wombat': 1}},
          refused('video.wombat: Unknown field.'), ACCEPTED,
-         'F6 row 9 and D41: an unknown video key was stored on the instance, '
-         'echoed back by external_view, and acted on nowhere'),
+         'accepted in silence and D41: an unknown video key was stored on the '
+         'instance, echoed back by external_view, and acted on nowhere'),
     Case('video.not_a_mapping', CREATE, 'videospec', None,
          {'video': [{'model': 'vga'}]},
          refused('video: Not a valid mapping type.'),
@@ -996,8 +1004,9 @@ class _NestedSweepMixin:
 
         Returns ``(answer, interfaces_created)``. The second half is
         what makes a hotplug row evidence rather than a status code:
-        finding F7's symptom was an interface on an arbitrary network,
-        which a 200 alone cannot distinguish from a correct one, and
+        a null reference's symptom was an interface on an arbitrary
+        network, which a 200 alone cannot distinguish from a correct
+        one, and
         which a refusal that quietly created one anyway would hide.
         """
         overlay = self._resolve(case.body)
@@ -1082,9 +1091,7 @@ class _NestedSweepMixin:
         self.assertEqual(
             [], mismatches,
             'the nested sweep no longer agrees with the table in '
-            'shakenfist/tests/external_api/test_nested_sweep.py, published '
-            'as findings F5 and F6 of '
-            'docs/plans/PLAN-api-input-validation-phase-07-structured.md:\n'
+            'shakenfist/tests/external_api/test_nested_sweep.py:\n'
             + '\n'.join(mismatches))
 
     def test_a_static_address_row_survives_a_crowded_network(self):
@@ -1239,7 +1246,7 @@ class _NestedSweepMixin:
         networkspec is the one shape with two declarations, and the
         hotplug one is where an accepted value costs a created object
         rather than a 507. A table which swept only instance create
-        would be blind to exactly the failure F7 was.
+        would be blind to exactly the arbitrary-network failure.
         """
         routes = {c.route for c in CASES if c.spec == 'networkspec'}
         self.assertEqual({CREATE, HOTPLUG}, routes)
@@ -1255,7 +1262,8 @@ class _NestedSweepMixin:
 class NestedSweepEnforceTestCase(_NestedSweepMixin, SweepFixtureTestCase):
     """What a caller sees today, at the shipped default.
 
-    Every row of findings F5 and F6, at its new answer.
+    Every row which faulted or was accepted in silence, at its new
+    answer.
     """
 
     mode = 'enforce'
@@ -1267,14 +1275,14 @@ class NestedSweepWarnTestCase(_NestedSweepMixin, SweepFixtureTestCase):
 
     An operator who sets ``API_VALIDATION_MODE=warn`` because this
     phase broke their fleet must get back the behaviour they had before
-    it -- finding F5's recorded 500s included, which are ugly but are
-    what they had. ``check()`` still runs and still logs every finding,
+    it -- the recorded 500s included, which are ugly but are what they
+    had. ``check()`` still runs and still logs every finding,
     so the observability is unchanged; it simply does not act on one.
 
     Sixteen rows deliberately do not roll back, and this class asserts
     that they do not. They are the five handler guards: a null
-    ``network_uuid`` on either route (F7, which used to
-    be a 200 and an interface on an arbitrary network), the six shapes
+    ``network_uuid`` on either route (which used to be a 200 and an
+    interface on an arbitrary network), the six shapes
     of diskspec which ask for neither a size nor a base, a
     ``videospec`` whose ``model`` or ``memory`` is an explicit null
     (which used to be stored and to reach the hypervisor), a

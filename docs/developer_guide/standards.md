@@ -64,12 +64,17 @@ Memory is measured in MiB in Shaken Fist. All references to memory size are stor
   checker, carries `# audit-ok: phase-reference-file` once near the top,
   with a sentence saying why
 - Two more citation shapes are reported in Python without failing the
-  commit: a decision cited by its shorthand (`D13`) and a pointer to a
-  `PLAN-*.md` file. The same hook finds them, with a `tokenize` walk
-  over comments and string literals and an `ast` walk over `def` and
-  `class` names, so that `D13` is read as a citation in prose and as
-  somebody's variable in code. Several hundred are in the tree, which is
-  why they are advisory: fix the ones in the files you touch, and run
+  commit: a numbered part of a plan cited by its bare label and a
+  pointer to a `PLAN-*.md` file. A label is a letter and one or two
+  digits -- `D13` for a master plan's decision, `P7` where a phase plan
+  numbers its own decisions, `F5` or `N1` for a survey's findings and
+  its census -- matched case-sensitively, because `p90` is a percentile,
+  and at two digits at most, because `# noqa: F401` cites nothing. The
+  same hook finds them, with a `tokenize` walk over comments and string
+  literals and an `ast` walk over `def` and `class` names, so that `D13`
+  is read as a citation in prose and as somebody's variable in code.
+  Several hundred are in the tree, which is why they are advisory: fix
+  the ones in the files you touch, and run
   `python3 tools/check-plan-phase-references.py --advisory` to see all of
   them. Two survive the rule and carry
   `# audit-ok: plan-reference` on the line, or

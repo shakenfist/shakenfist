@@ -2,10 +2,8 @@
 
 """The five semantic format validators, and the issue they close.
 
-Step 4 of PLAN-api-input-validation-phase-06-required.md. Finding F3 of
-that plan says that of the nine semantic type tokens the API publishes,
-exactly one -- `macaddr` -- validated anything, and `macaddr` is
-declared nowhere. The other eight rendered a `format` string into the
+Of the nine semantic type tokens the API publishes, exactly one --
+`macaddr` -- validated anything, and `macaddr` is declared nowhere. The other eight rendered a `format` string into the
 OpenAPI document and compiled to a bare `fields.String`, so the
 published specification promised a base64 body, a CIDR netblock or a
 UUID and the server accepted any string at all.

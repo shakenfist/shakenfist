@@ -359,6 +359,42 @@ class PlanCitationAdvisoryFixtureTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, len(problems))
         self.assertIn('thing.py:2', problems[0])
 
+    def test_a_phase_plan_decision_label_is_reported(self):
+        # A phase plan numbers its own decisions P1..Pn to avoid
+        # colliding with the master plan's D numbers, and the citation
+        # is the same defect: the reader of the code has not read either
+        # plan.
+        problems = self._problems(
+            'shakenfist/thing.py',
+            '# A node with no capacity row admits unguarded (P7).\n')
+        self.assertEqual(1, len(problems))
+        self.assertIn("'P7'", problems[0])
+
+    def test_a_survey_finding_label_is_reported(self):
+        for citation, label in (('finding F5', "'F5'"),
+                                ('census finding N1', "'N1'")):
+            problems = self._problems(
+                'shakenfist/thing.py',
+                '# The shape this closes, per %s.\n' % citation)
+            self.assertEqual(1, len(problems), citation)
+            self.assertIn(label, problems[0])
+
+    def test_a_lint_code_is_not_a_citation(self):
+        # Three digits is the shape of a lint code, not of a label: a
+        # plan does not reach its hundredth decision, and `# noqa: F401`
+        # is a citation of nothing.
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            'import sqlalchemy  # noqa: F401\n'))
+
+    def test_a_lower_case_label_is_not_a_citation(self):
+        # The label shapes are matched case-sensitively, because the
+        # lower-case spellings are ordinary words: a p90 is a
+        # percentile, and an f5 is somebody's field.
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# The queue wait p90 sits under the daemon interval.\n'))
+
     def test_a_plan_filename_is_reported(self):
         problems = self._problems(
             'shakenfist/thing.py',

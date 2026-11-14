@@ -290,8 +290,8 @@ check "_schema literal key" "disk.schema_key"
 
 # ---------------------------------------------------------------------
 # 7. D44's mechanism: a required nested field goes back to accepting a
-#    null, which is how finding F7 stayed reachable through a typed
-#    schema.
+#    null, which is how a null network_uuid stayed able to resolve to an
+#    arbitrary network through a typed schema.
 # ---------------------------------------------------------------------
 run "a required nested property accepts null again (D44)"
 mutate "${VALIDATION}" \
@@ -302,7 +302,7 @@ check "nested required null" "net.uuid.null"
 # ---------------------------------------------------------------------
 # 8. _ExactInteger goes back to marshmallow's truncating Integer.
 # ---------------------------------------------------------------------
-run "integer fields truncate again (D46, finding F8)"
+run "integer fields truncate again (D46)"
 mutate "${VALIDATION}" \
     "    'integer': _ExactInteger," \
     "    'integer': fields.Integer," || exit 1

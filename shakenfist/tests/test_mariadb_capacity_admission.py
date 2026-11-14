@@ -269,7 +269,7 @@ class AdmitBranchSelectionTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertTrue(result['admitted'])
         updates = router.statements('UPDATE')
         self.assertTrue(any('UPDATE namespace_claims' in u for u in updates))
-        # P4/D14: the claim was accounted against the cluster row when it
+        # D14: the claim was accounted against the cluster row when it
         # was created, so drawing it down again here would double count.
         self.assertFalse(any('UPDATE cluster_capacity' in u
                              for u in updates))
@@ -477,7 +477,7 @@ class AdmitAdvisoryClaimTestCase(_PlacementMixin, base.ShakenFistTestCase):
 
 
 class AdmitGuardTestCase(_PlacementMixin, base.ShakenFistTestCase):
-    """The node guard, the enforce flag and the P7 fail-open."""
+    """The node guard, the enforce flag and the unguarded fail-open."""
 
     def _call(self, **kwargs):
         args = {
@@ -573,7 +573,7 @@ class AdmitGuardTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertNotIn('<=', cluster_update.split('WHERE', 1)[1])
 
     def test_missing_node_row_admits_unguarded(self):
-        # P7: mid-upgrade a node can have no capacity row. Fail closed
+        # Mid-upgrade a node can have no capacity row. Fail closed
         # here would make the whole cluster refuse creates.
         router = _PlacementRouter(node_row=None)
         result = self._run(router)
@@ -603,7 +603,7 @@ class AdmitGuardTestCase(_PlacementMixin, base.ShakenFistTestCase):
 
     def test_a_missing_node_row_alone_is_the_node_not_sized(self):
         # The singleton exists, so the reconciler has run and declined
-        # to size this one node. That is P7's designed behaviour.
+        # to size this one node. That is the designed fail-open.
         router = _PlacementRouter(node_row=None)
         result = self._run(router)
 
@@ -637,7 +637,7 @@ class AdmitGuardTestCase(_PlacementMixin, base.ShakenFistTestCase):
         # trips is the node branch's. The reason still has to come from
         # the probe: this cluster has no singleton, and reporting the
         # narrower "one unsized node" for it would hide issue 4087
-        # behind P7's ordinary mid-upgrade state.
+        # behind the ordinary mid-upgrade state.
         router = _PlacementRouter(node_row=None, cluster_row=None)
         result = self._run(router, old_node_uuid=str(NODE2))
 
@@ -796,8 +796,8 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
         # clause passed on demand and the node refused on something
         # else. Charging the placement's 10.0 would push 4.5 over 12.0
         # and report a refusal the clause never made -- which would
-        # then make the denial look demand_only and fire the P9 waiver
-        # for a denial the waiver must not touch.
+        # then make the denial look demand_only and fire the
+        # demand-only waiver for a denial it must not touch.
         router = _PlacementRouter(
             node_row=_capacity_row(expected_demand=0.5),
             rowcounts={'node_claim': 0})
@@ -932,7 +932,7 @@ class AdmitMoveTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertEqual([], result['clamps'])
 
     def test_absent_old_node_row_is_not_a_clamp(self):
-        # P7's fail-open again: no row at all is not the same condition
+        # The fail-open again: no row at all is not the same condition
         # as a row whose counters are already too low.
         router = _PlacementRouter(rowcounts={'node_decrement': 0,
                                              'node_clamp': 0})
@@ -1426,7 +1426,7 @@ class SnapshotIsolationInvariantTestCase(_PlacementMixin,
 
 
 class FlooredDecrementTestCase(base.ShakenFistTestCase):
-    """_floored_node_decrement's three outcomes (P6)."""
+    """_floored_node_decrement's three outcomes."""
 
     def _run(self, guarded_rowcount, clamp_rowcount, row='default'):
         # The clamp path is guarded UPDATE (miss), pre-clamp SELECT,
@@ -2118,7 +2118,7 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
         # Every daemon except sf-database reaches this table over gRPC,
         # so a MariaDB-side failure inside the database tier has to be
         # forwarded or it arrives at the scheduler as an empty table --
-        # which is a normal state (P7) and would be read as one.
+        # which is a normal state and would be read as one.
         with mock.patch(
                 'shakenfist.mariadb._direct_get_scheduler_node_capacity',
                 return_value=mariadb.SchedulerNodeCapacityRead(

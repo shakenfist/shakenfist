@@ -373,8 +373,9 @@ class CreateNamespaceClaimTestCase(_ClaimMixin, base.ShakenFistTestCase):
         self.assertFalse(detail['memory_mb']['exceeded'])
 
     def test_a_missing_singleton_refuses_rather_than_failing_open(self):
-        # Deliberately the opposite of P7's decision for a placement: an
-        # unguarded claim is a promise against totals nothing computed.
+        # Deliberately the opposite of the fail-open a placement gets:
+        # an unguarded claim is a promise against totals nothing
+        # computed.
         router = _ClaimRouter(cluster_row=None)
         result = self._run(router)
 

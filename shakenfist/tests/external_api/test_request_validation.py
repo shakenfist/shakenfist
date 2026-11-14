@@ -1369,7 +1369,7 @@ class InstanceCreateBodyTestCase(AuthenticatedStackTestCase):
         return response, recorded
 
     def test_a_fractional_cpu_count_is_a_bad_request(self):
-        """Finding F8, end to end.
+        """A fractional integer, end to end.
 
         Before decision D46 this answered 500: marshmallow's
         fields.Integer accepted 1.5 because int(1.5) succeeds, the

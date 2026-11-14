@@ -284,7 +284,7 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         #         instances this suite places
         # node_b  a second capacity row, the move target
         # node_c  an active hypervisor with metrics but no capacity row
-        #         (the P7 mid-upgrade case)
+        #         (the mid-upgrade fail-open case)
         self.node_a, self.node_b, self.node_c = (uuid4() for _ in range(3))
         self.instance = uuid4()
         self.other_instance = uuid4()
@@ -454,7 +454,7 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertEqual(0.0, detail['demand']['expected_demand'])
         # No allocation dimension is at fault, which is exactly the case
         # a bare "denied" reply could not explain -- and it is what
-        # makes the denial waivable by the P9 re-walk.
+        # makes the denial waivable by the demand-only re-walk.
         self.assertFalse(detail['cpus']['exceeded'])
         self.assertTrue(exceptions.CapacityAdmissionDenied(
             result['failing_stage'], result['dimensions']).demand_only)
@@ -586,7 +586,7 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
             'admitted'])
 
     def test_enforce_false_admits_over_the_limit_and_still_counts(self):
-        # P5: the cleaner and the startup-task reconciliation record
+        # The cleaner and the startup-task reconciliation record
         # where a libvirt domain already is, which a guard cannot refuse
         # -- but refusing to record it would leave the ledger wrong.
         result = self._admit(self.node_a, cpus=100, memory_mb=100000,
@@ -601,7 +601,7 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
                          [r.source_uuid for r in self._references()])
 
     def test_a_node_with_no_capacity_row_admits_unguarded(self):
-        # P7: mid-upgrade, fail open loudly rather than refusing every
+        # Mid-upgrade, fail open loudly rather than refusing every
         # create until the reconciler's next pass.
         result = self._admit(self.node_c, cpus=1000)
 
@@ -1146,7 +1146,7 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertEqual(8, self._capacity(self.node_a).used_cpus)
         self.assertEqual(8, self._cluster().unclaimed_used_cpus)
         self.assertEqual([], self._references())
-        # P8: the placement attribute is deliberately not cleared.
+        # The placement attribute is deliberately not cleared.
         self.assertEqual({'node': str(self.node_a),
                           'placement_attempts': 1}, self._placement())
 
@@ -1331,7 +1331,7 @@ class PlacementAdmissionConcurrencyLiveTestCase(_LiveCapacityFixture):
     * a randomised admit/release/move soak from several threads,
       followed by a reconcile pass which must report zero drift. That
       last one is the "guard and reconciler agree by construction"
-      claim of decision P2, tested rather than asserted in prose.
+      claim, tested rather than asserted in prose.
 
     CI's schema_enum_widening job runs it against Debian 13's MariaDB
     11.8, where innodb_snapshot_isolation is ON (issue #3759).
@@ -1839,7 +1839,7 @@ class PlacementAdmissionConcurrencyLiveTestCase(_LiveCapacityFixture):
     # ------------------------------------------------------------------
 
     def test_randomised_cycling_leaves_the_reconciler_nothing_to_fix(self):
-        """The P2 claim -- guard and reconciler agree by construction.
+        """Guard and reconciler agree by construction.
 
         The guard denominates in the allocation ledger precisely because
         that is what the reconciler recomputes from ground truth, so

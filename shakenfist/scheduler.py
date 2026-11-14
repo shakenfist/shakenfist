@@ -245,7 +245,7 @@ class PlacementSnapshot:
         """A node's committed counters, or None if it has no row.
 
         A node with no row is unguarded at admission and must not be
-        refused on a ledger which does not exist (P7), so it is never
+        refused on a ledger which does not exist, so it is never
         given one here either -- not even a zeroed one, which would read
         as a node with no headroom at all. Such a node is still charged
         on the measured figures, which is all a filter has to go on
@@ -610,7 +610,7 @@ def _capacity_by_node():
     burst of concurrent creates -- precisely the case a cached
     snapshot gets wrong -- is what reading them is for. Only
     hypervisors the reconciler considers schedulable have a row, so
-    an absent node is not an error (P7).
+    an absent node is not an error.
 
     An unreadable table returns empty rather than raising, which
     degrades a caller to whatever measurement it also holds. That
@@ -671,7 +671,7 @@ def _summarize_resources(metrics, metrics_unavailable):
     # flag below costs nothing here and lets that caller tell the
     # two apart instead of discarding every sample from a failed
     # read alongside every sample from a cluster the reconciler
-    # simply has not reached yet (P7).
+    # simply has not reached yet.
     #
     # cluster_capacity is the cluster-wide ledger, published for the
     # same reason: it is the singleton row itself, the one both
@@ -766,7 +766,7 @@ def _summarize_resources(metrics, metrics_unavailable):
         hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
         measured_cpus = metrics[n].get('cpu_total_instance_vcpus', 0)
         # A node the reconciler has not given a capacity row -- one
-        # mid-upgrade, or one it declined to size (P7) -- is charged
+        # mid-upgrade, or one it declined to size -- is charged
         # nothing, because it is also guarded by nothing: admission
         # will let it through. The flag says which of those a zero
         # is, so "why is this node's committed total zero?" is
@@ -1116,7 +1116,7 @@ class Scheduler:
         # committed leaves the candidate list here rather than surviving
         # to attract, and then be refused, an entire burst. A node with
         # no row is guarded by nothing and must not be refused on a
-        # ledger which does not exist (P7).
+        # ledger which does not exist.
         row = snapshot.capacity_row(node)
         if row:
             committed_mb = row['used_memory_mb']
@@ -1509,7 +1509,7 @@ class Scheduler:
         #
         # A failed read is published before the stage runs, and only
         # then: an empty-but-readable table is the ordinary state of
-        # a cluster the reconciler has not reached yet (P7), so
+        # a cluster the reconciler has not reached yet, so
         # eventing on emptiness would fire on every create there and
         # say nothing. Nothing below behaves differently either way
         # -- the counters this decision cannot see simply do not

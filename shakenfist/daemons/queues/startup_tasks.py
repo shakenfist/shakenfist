@@ -187,7 +187,7 @@ def restore_instances():
     # wrote. These are ground-truth writes -- the placement attribute is
     # the authority and is deliberately left exactly as it is, right down
     # to the placement_attempts count -- so they do not enforce the
-    # capacity guard (P5).
+    # capacity guard.
     desired = {str(inst.uuid): inst for inst in instances}
     n = Node.from_db(config.NODE_NAME)
     node_uuid = str(n.uuid)
@@ -316,7 +316,8 @@ def _reconcile_placement(inst, node_uuid, old_node_uuid):
     delete-all-then-insert guarantees the end state -- a row and a
     charge on the authoritative node -- even when that node has no row
     yet (a pre-cutover placement the seeding migration missed, or a row
-    lost to the P1 rollback floor); a local release would repair our
+    lost to a rollback onto a build which predates the reference
+    cutover); a local release would repair our
     side and leave the instance charged nowhere. The cost is a
     transient overcount: when the authoritative node already holds its
     row (the common case), it was already charged, and this admission

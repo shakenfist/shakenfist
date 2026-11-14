@@ -1155,7 +1155,7 @@ class SummaryClusterCapacityTestCase(SchedulerTestCase):
 
 
 class CapacityCounterTestCase(SchedulerTestCase):
-    """The pre-filter reads the counters the guard will draw down (P2).
+    """The pre-filter reads the counters the guard will draw down.
 
     Admission is the guarded UPDATE against ``scheduler_node_capacity``
     which ``place_instance()`` makes. ``find_candidates()`` is a cheap
@@ -1202,7 +1202,7 @@ class CapacityCounterTestCase(SchedulerTestCase):
             self._node_uuids_set('node3', 'node4'), set(nodes))
 
     def test_prefilter_keeps_a_node_with_no_capacity_row(self):
-        # A node the reconciler has not sized (P7) is guarded by
+        # A node the reconciler has not sized is guarded by
         # nothing: admission will let it through unguarded, so the
         # pre-filter must not refuse it on a ledger which does not
         # exist. Only the measurement applies there.
@@ -1339,7 +1339,7 @@ class CapacityCounterTestCase(SchedulerTestCase):
 
     def test_summarize_resources_reports_capacity_degraded_false_when_readable(self):
         # The counterpart to the case above: a readable table -- whether
-        # populated or empty (P7) -- publishes the flag as False, so a
+        # populated or empty -- publishes the flag as False, so a
         # reader can trust a False here to mean the read genuinely
         # succeeded rather than the field simply being absent.
         self.mock_mariadb.set_node_metrics_same(self._baseline())
@@ -1351,7 +1351,7 @@ class CapacityCounterTestCase(SchedulerTestCase):
         self.assertFalse(resources['total']['capacity_degraded'])
 
     def test_summarize_resources_reports_a_node_with_no_row(self):
-        # A node the reconciler has not sized yet (P7) is guarded by
+        # A node the reconciler has not sized yet is guarded by
         # nothing, so it is charged nothing -- but the response says
         # which kind of zero that is.
         self.mock_mariadb.set_node_metrics_same(self._baseline())
@@ -1404,9 +1404,9 @@ class DegradedCapacityReadTestCase(SchedulerTestCase):
     the instance's event trail said so.
 
     The other half matters just as much. A cluster the reconciler has
-    not reached yet has an empty table, which is an ordinary state (P7:
-    a node with no row admits unguarded rather than refusing every
-    create mid-upgrade), so an implementation which evented on
+    not reached yet has an empty table, which is an ordinary state -- a
+    node with no row admits unguarded rather than refusing every create
+    mid-upgrade -- so an implementation which evented on
     emptiness would fire on every single create there.
     """
 
@@ -2322,8 +2322,8 @@ class WeightedAffinityMappingTestCase(SchedulerTestCase):
     def test_mixed_magnitudes_diverge_and_that_is_intended(self):
         # {'a': 100, 'b': 1} maps to prefer_with_tag ['a', 'b'], so a
         # node carrying only b ties with a node carrying only a, where
-        # the weighted form ranked them 1 against 100. F4 discards the
-        # magnitude deliberately, so this divergence is asserted rather
+        # the weighted form ranked them 1 against 100. The binary
+        # mapping discards the magnitude deliberately, so this divergence is asserted rather
         # than left as an unstated exception -- a test demanding
         # identical ordering in every case would be a gate the mapping
         # could only pass by not existing.
@@ -2435,7 +2435,7 @@ class WeightedAffinityMappingTestCase(SchedulerTestCase):
 
 class HasSufficientCPUPredicateTestCase(SchedulerTestCase):
     """Unit coverage of _has_sufficient_cpu(), the sufficient_idle_cpu stage
-    predicate (F6). Before this the predicate was not named by any test in
+    predicate. Before this the predicate was not named by any test in
     this file.
 
     Pins both sides of the capacity-row boundary (the strictly
@@ -2498,7 +2498,7 @@ class HasSufficientCPUPredicateTestCase(SchedulerTestCase):
         }, reason)
 
     def test_a_node_with_no_capacity_row_is_bounded_by_its_live_hard_max(self):
-        """An unguarded node (P7) is limited, just not by a ledger.
+        """An unguarded node is limited, just not by a ledger.
 
         ``find_candidates()`` level coverage that such a node stays a
         candidate already exists (``test_prefilter_keeps_a_node_with_no_
@@ -2692,7 +2692,7 @@ class CpuCeilingAgreementTestCase(SchedulerTestCase):
 
 class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
     """Unit coverage of _has_sufficient_ram(), the sufficient_idle_memory
-    stage predicate (F6).
+    stage predicate.
 
     Covers all four of its distinct refusal shapes -- insufficient
     measured memory, a missing memory_max metric, the KSM overcommit
@@ -2811,7 +2811,8 @@ class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
 
     def test_a_node_with_no_capacity_row_is_not_refused_on_a_missing_ledger(
             self):
-        """P7, for memory. The CPU predicate has this covered; RAM did not.
+        """A missing capacity row, for memory. The CPU predicate has this
+        covered; RAM did not.
 
         Same figures as the refusal above -- a 100 MB request where a row
         recording 901 of 1000 MB committed would refuse -- but with no row
@@ -2837,7 +2838,7 @@ class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
 
 class HasSufficientDiskPredicateTestCase(SchedulerTestCase):
     """Unit coverage of _has_sufficient_disk(), the sufficient_free_disk
-    stage predicate (F6). Pins both sides of the disk_free_gb boundary and
+    stage predicate. Pins both sides of the disk_free_gb boundary and
     the reason dict shape published on refusal.
     """
 
@@ -2887,12 +2888,12 @@ class HasSufficientDiskPredicateTestCase(SchedulerTestCase):
 
 class HasIdleDiskBandwidthPredicateTestCase(SchedulerTestCase):
     """Unit coverage of _has_idle_disk_bandwidth(), the sufficient_idle_disk
-    stage predicate (F6).
+    stage predicate.
 
     D25: this is the *only* coverage the predicate gets. DISK_BUSY_PER_SECOND_METRIC
     is a measured value the resources daemon republishes on a 60 second
     cadence, it is not carried in /admin/resources at all, so no functional
-    test can force it or observe why it did or did not fire (F5). Pins
+    test can force it or observe why it did or did not fire. Pins
     both sides of the 1200 ms/s threshold from both directions and the
     reason dict shape the sufficient_idle_disk audit event publishes.
     """

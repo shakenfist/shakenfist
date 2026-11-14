@@ -2871,7 +2871,7 @@ message ReapFederationReply {
 message ReconcileSchedulerCapacityRequest {
   double demand_per_vcpu = 1;      // Expected load per placed vCPU
   int64 demand_decay_seconds = 2;  // Linear decay window for placements
-  double disk_overcommit = 3;      // Multiplier on the disk limit's free-space headroom term (P3)
+  double disk_overcommit = 3;      // Multiplier on the disk limit's free-space headroom term
 }
 
 // One scheduler_node_capacity row after the pass. The delta_used_*
@@ -2942,7 +2942,7 @@ message AdmitInstancePlacementRequest {
   double demand_add = 8;
   double target_load = 9;
   // False for the ground-truth writers (the cleaner's placement rewrites
-  // and the queues daemon's reference reconciliation, per P5): they
+  // and the queues daemon's reference reconciliation): they
   // record where a libvirt domain already is, which a guard cannot
   // refuse. Every counter update still happens, only the guard clauses
   // are dropped.
@@ -2987,7 +2987,7 @@ message CapacityDimensionDetail {
   optional double shortfall = 8;
 }
 
-// One counter a floored decrement had to clamp at zero (P6): the ledger
+// One counter a floored decrement had to clamp at zero: the ledger
 // held less than the allocation being released, so the two had already
 // diverged. counter names which ledger row -- 'namespace_claim',
 // 'cluster_unclaimed', or the dashed uuid of a scheduler_node_capacity
@@ -3010,11 +3010,11 @@ message AdmitInstancePlacementReply {
   string error = 2;
   bool admitted = 3;
   // The target node (or the cluster singleton) had no capacity row, so
-  // the placement was made without a guard (P7). The reconciler creates
+  // the placement was made without a guard. The reconciler creates
   // the row on its next pass; the caller logs this loudly.
   bool unguarded = 4;
   // A floored decrement of the old node's counters hit zero rather than
-  // subtracting cleanly (P6) -- a release racing the reconciler. The
+  // subtracting cleanly -- a release racing the reconciler. The
   // counters are still correct after the next reconcile pass.
   bool clamped = 5;
   string failing_stage = 6;   // '', 'cluster', 'claim' or 'node'
@@ -3052,7 +3052,7 @@ message AdmitInstancePlacementReply {
   string claim_uuid = 14;   // Dashed uuid form, or empty
   // Which absent row made this admission unguarded, because the two
   // are different conditions wearing the same missing row and only
-  // one of them is the normal state P7 was written for.
+  // one of them is the ordinary mid-upgrade state.
   //
   // 'never_reconciled' means the cluster_capacity singleton does not
   // exist, so the reconciler has never completed a pass and *nothing*
@@ -3062,7 +3062,7 @@ message AdmitInstancePlacementReply {
   //
   // 'node_not_sized' means the singleton exists but this one node has
   // no row: mid-upgrade, or a node whose limits the reconciler
-  // declined to guess. That is P7's designed behaviour and is
+  // declined to guess. That is the designed fail-open and is
   // corrected by the next pass.
   //
   // Empty when unguarded is false. Read unguarded for the fact and
@@ -3105,7 +3105,7 @@ message ReleaseInstancePlacementReply {
   //
   // They describe exactly one node, named by counters_node_uuid. That
   // is empty -- and these four are zero -- when nothing was released,
-  // when the node has no capacity row (P7's fail-open case), or when
+  // when the node has no capacity row and admitted unguarded, or when
   // the release spanned more than one node: a release of a historical
   // duplicate has no single row that describes it, and reporting one of
   // them would be a number nobody could interpret. Read

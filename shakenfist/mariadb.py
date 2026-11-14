@@ -27831,8 +27831,8 @@ CAPACITY_DIMENSIONS = ('cpus', 'memory_mb', 'disk_gb')
 # _direct_admit_instance_placement().
 CLAIM_ENFORCEMENT_HARD = False
 
-# Why an admission was made without a guard. P7 fails open when a
-# capacity row is missing, but "missing" covers two conditions which
+# Why an admission was made without a guard. Admission fails open when
+# a capacity row is missing, but "missing" covers two conditions which
 # want telling apart by anyone reading an instance's events.
 #
 # The cluster_capacity singleton is absent, so the reconciler has never
@@ -27841,8 +27841,8 @@ CLAIM_ENFORCEMENT_HARD = False
 # past its own limit before any row exists to refuse them (issue 4087).
 UNGUARDED_NEVER_RECONCILED = 'never_reconciled'
 # The singleton exists but this one node has no row: mid-upgrade, or a
-# node whose limits the reconciler declined to guess. This is P7's
-# designed behaviour, corrected by the next reconcile pass.
+# node whose limits the reconciler declined to guess. That is the
+# designed fail-open, corrected by the next reconcile pass.
 UNGUARDED_NODE_NOT_SIZED = 'node_not_sized'
 
 
@@ -27928,7 +27928,7 @@ class AdmitPlacementResult(TypedDict):
     # UNGUARDED_NEVER_RECONCILED, UNGUARDED_NODE_NOT_SIZED, or '' when
     # the admission was guarded. Read unguarded for the fact and this
     # for the reason; the two conditions wear the same missing row and
-    # only one of them is the normal state P7 was written for.
+    # only one of them is the ordinary mid-upgrade state.
     unguarded_reason: str
 
 
@@ -27950,7 +27950,7 @@ class ReleasePlacementResult(TypedDict):
     # both halves of the placement ledger read the same way. They
     # describe the one node named by counters_node_uuid; that name is
     # empty -- and these four are zero -- when nothing was released,
-    # when the node has no capacity row (P7), or when the release
+    # when the node has no capacity row, or when the release
     # spanned more than one node. Read the name, never a zero, to tell
     # "not reported" from "the node now holds nothing".
     counters_node_uuid: str
@@ -27979,7 +27979,7 @@ class SchedulerNodeCapacityRead(NamedTuple):
     ``rows`` is empty both for a table the reconciler has not populated
     yet and for one which could not be read at all, so the two are told
     apart by ``degraded`` and never by the rows themselves. The first is
-    an ordinary state -- a node without a row admits unguarded (P7) --
+    an ordinary state -- a node without a row admits unguarded --
     and the second is a cluster flying blind, so a caller which
     conflates them cannot report either honestly.
 
@@ -28198,19 +28198,19 @@ def _capacity_dimension(
     exists for exactly one caller: the D13 demand dimension. It is
     keyword-only because it cannot be got wrong quietly -- the value
     decides which dimensions report ``exceeded``, and a wrong one there
-    changes whether the P9 waiver fires (below), so it must never be
-    supplied by landing in the right argument position by accident. The three
-    allocation dimensions are guarded as ``used + requested <= limit``,
-    but the demand clause compares only the node's
-    existing state (``cpu_load_1 + expected_demand <= target_load x
+    changes whether the demand-only waiver fires (below), so it must
+    never be supplied by landing in the right argument position by
+    accident. The three allocation dimensions are guarded as
+    ``used + requested <= limit``, but the demand clause compares only
+    the node's existing state (``cpu_load_1 + expected_demand <= target_load x
     cpu_schedulable``) and does not charge the incoming placement --
     that is what makes it satisfiable at every node size. Reporting
     demand as ``used + requested > limit`` anyway would mark a denial
     the clause did not make, and because
     ``CapacityAdmissionDenied.demand_only`` is derived from the
-    ``exceeded`` set, that would in turn change whether the P9 waiver
-    fires. ``requested`` is still reported, because an operator reading
-    the event wants to know what the placement would have added.
+    ``exceeded`` set, that would in turn change whether the demand-only
+    waiver fires. ``requested`` is still reported, because an operator
+    reading the event wants to know what the placement would have added.
 
     ``cpu_load_1`` and ``expected_demand`` are the demand dimension's
     two terms, reported alongside their sum because they mean different
@@ -28347,7 +28347,7 @@ def _demand_guard_clause(
 
     ``measured cpu_load_1 + expected_demand <= target_load x
     cpu_schedulable``, with both measured inputs read from the typed
-    node_metrics columns inside the admission transaction (P2). The
+    node_metrics columns inside the admission transaction. The
     scheduler's own measurement-denominated filters remain cheap
     pre-filters in find_candidates(); this is the clause that makes the
     decision atomic with the drawdown.
@@ -28374,7 +28374,7 @@ def _demand_guard_clause(
     daemon has not yet published typed columns (mid-upgrade) has no
     schedulable-thread count to compute a bound from, and refusing every
     placement on it would be a worse failure than one reconcile period
-    of yesterday's behaviour -- the same reasoning as P7's fail-open for
+    of yesterday's behaviour -- the same reasoning as the fail-open for
     a missing capacity row. A NULL cpu_load_1 with a known thread count
     is different: there the bound is computable, so the load term simply
     coalesces to zero.
@@ -28401,7 +28401,7 @@ def _demand_guard_clause(
 def _floored_node_decrement(
         conn: sa.Connection, node_key: UUID, cpus: int, memory_mb: int,
         disk_gb: int) -> tuple[bool, Optional[CapacityClampDetailDict]]:
-    """Decrement a node's used_* counters, floored at zero (P6).
+    """Decrement a node's used_* counters, floored at zero.
 
     First the guarded form (``used >= x`` per dimension), which is the
     ordinary case and leaves the counters exactly right. On a miss --
@@ -28416,8 +28416,8 @@ def _floored_node_decrement(
     over-credit a node whose contribution had already decayed.
 
     Returns ``(touched, clamp_detail)``. ``touched`` is False when there
-    is no capacity row for the node at all, which is P7's fail-open case
-    rather than a clamp. ``clamp_detail`` names this node and carries
+    is no capacity row for the node at all, which is the unguarded
+    fail-open rather than a clamp. ``clamp_detail`` names this node and carries
     the per-dimension drift when the clamp form had to run, and is None
     on a clean decrement -- so the caller can report *which* counter
     drifted and by how much rather than a bare boolean (issue 4050).
@@ -28630,7 +28630,7 @@ class _AdmissionProbe(NamedTuple):
 
 
 def _probe_admission_rows(namespace: str, node_key: UUID) -> _AdmissionProbe:
-    """Read an admission's branch select and presence probes (P4, P7).
+    """Read an admission's branch select and presence probes.
 
     Runs on its own connection, outside the write transaction, for the
     reason in the block comment above. Re-run on every retry attempt, so
@@ -28652,7 +28652,7 @@ def _probe_admission_rows(namespace: str, node_key: UUID) -> _AdmissionProbe:
       its next candidate, and a node whose capacity row just vanished is
       not a node this placement wanted anyway. Absent-then-created
       admits unguarded and says so in the reply, which is exactly what
-      P7 already does for a node the reconciler has not sized.
+      an admission already does for a node the reconciler has not sized.
     * The cluster singleton probe, identically: a spurious
       single-candidate denial, or one unguarded admission the reconciler
       trues up within a pass.
@@ -28880,7 +28880,7 @@ def _direct_admit_instance_placement(
 
     The steps are:
 
-    1. Branch select (P4) and presence probes (P7), **outside** the
+    1. Branch select and presence probes, **outside** the
        transaction: a namespace with an active, unexpired claim draws
        the claim down; every other namespace draws down the cluster
        singleton's unclaimed guard per D14. These are plain reads and
@@ -28890,7 +28890,7 @@ def _direct_admit_instance_placement(
     2. The cluster or claim guarded UPDATE, which is therefore the first
        statement the transaction issues.
     3. The target node's guarded UPDATE, including the D13 demand clause.
-    4. On a move, the old node's floored decrement (P6). A move never
+    4. On a move, the old node's floored decrement. A move never
        changes namespace, so there is no cluster-row wash to do.
     5. The placement attribute write, masked to that one column.
     6. The placement reference rewrite: delete every instance_location
@@ -28902,10 +28902,10 @@ def _direct_admit_instance_placement(
 
     A guarded UPDATE matching no row aborts the transaction and returns
     ``admitted=False`` with the failing stage and per-dimension detail.
-    ``enforce=False`` (P5) keeps every counter update but reduces each
+    ``enforce=False`` keeps every counter update but reduces each
     WHERE to its key equality, for the ground-truth writers that record
     where a libvirt domain already is -- a guard cannot refuse reality.
-    A node with no capacity row admits unguarded and says so (P7).
+    A node with no capacity row admits unguarded and says so.
 
     The three guards are flagged independently (D6). The claim guard is
     off this release because D16 makes claim ceilings advisory for one
@@ -28992,7 +28992,7 @@ def _direct_admit_instance_placement(
             outcome['unguarded'] = True
 
         # Three guards, three flags (D6). The node and cluster guards
-        # share P7's fail-open above, because it is a statement about
+        # share the fail-open above, because it is a statement about
         # *this node's* limits being absent from the totals they test.
         # The claim guard does not: a claim's limits are
         # namespace-denominated and node-independent, so a missing node
@@ -29115,7 +29115,8 @@ def _direct_admit_instance_placement(
                     raise _AdmissionDenied('cluster')
             else:
                 # The reconciler has never run, so there is no singleton
-                # to draw down. Same fail-open reasoning as P7.
+                # to draw down. Same fail-open reasoning as a node
+                # with no capacity row.
                 outcome['unguarded'] = True
 
             # (3) and (4): the two scheduler_node_capacity rows, in uuid
@@ -29267,8 +29268,8 @@ def _direct_admit_instance_placement(
         # An absent singleton means the reconciler has never completed a
         # pass, so nothing in this cluster is guarded and every node
         # fails open at once (issue 4087). An absent node row under a
-        # present singleton is the single node P7 was written for,
-        # corrected by the next pass. The reason is derived from the
+        # present singleton is a single unsized node, corrected by the
+        # next pass. The reason is derived from the
         # probe rather than from which branch fired, because a move and
         # a claimed namespace both skip the cluster branch entirely and
         # would otherwise report the narrower reason for the wider
@@ -29307,7 +29308,7 @@ def _direct_admit_instance_placement(
 def _direct_release_instance_placement(
         instance_uuid: str, namespace: str, node_uuid: str, cpus: int,
         memory_mb: int, disk_gb: int) -> ReleasePlacementResult:
-    """Give an instance's capacity back and drop its placement rows (P6).
+    """Give an instance's capacity back and drop its placement rows.
 
     One transaction in D1's canonical order (the namespace side, then
     the node side), so release cannot deadlock against admission. Every
@@ -29335,7 +29336,7 @@ def _direct_release_instance_placement(
     behind ``_delete_globally()``'s release, and what stops a repeated
     delete of an errored instance from handing its capacity out twice.
 
-    The ``placement`` attribute is deliberately not cleared (P8):
+    The ``placement`` attribute is deliberately not cleared:
     ``enqueue_delete()`` and the event history both read it after
     deletion, and the reconciler's ledger already excludes instances in
     state ``deleted``.
@@ -29405,7 +29406,7 @@ def _direct_release_instance_placement(
             # already holds the lock on, which is what the ER_CHECKREAD
             # invariant permits. Only rows _floored_node_decrement()
             # reported touching are read, so a node with no capacity row
-            # (P7) is never selected on an unlocked key.
+            # is never selected on an unlocked key.
             #
             # Reported only when exactly one node was decremented. A
             # release spanning two nodes -- a historical duplicate,
@@ -29811,9 +29812,9 @@ def release_instance_placement(
     named in the vocabulary ``admit_instance_placement()`` reports its
     post-drawdown ones so both halves of the ledger read alike.
     ``counters_node_uuid`` names the node they describe and is empty
-    when they were not reported -- nothing released, no capacity row
-    (P7), or a release spanning more than one node. Test that name
-    rather than a zero counter.
+    when they were not reported -- nothing released, no capacity row, or
+    a release spanning more than one node. Test that name rather than a
+    zero counter.
     """
     if _use_database_service():
         return _grpc_release_instance_placement(
@@ -29835,7 +29836,7 @@ def get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
     cluster's counters, rather than the cluster having none. Only
     hypervisors the reconciler considers schedulable have a row, so an
     absent node is not an error: it is a node whose capacity the
-    reconciler declined to guess (P7), which admits unguarded.
+    reconciler declined to guess, which admits unguarded.
     """
     if _use_database_service():
         return _grpc_get_scheduler_node_capacity()
@@ -30315,7 +30316,7 @@ def _direct_create_namespace_claim(
        is what the ER_CHECKREAD invariant permits.
 
     **A missing cluster_capacity singleton refuses rather than failing
-    open**, which is deliberately the opposite of P7's decision for an
+    open**, which is deliberately the opposite of the fail-open for an
     instance placement, because the two are not the same bet. Admitting
     an instance unguarded records where a machine already is, and the
     reconciler agrees with the counters within one pass. Creating a claim

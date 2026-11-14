@@ -2911,9 +2911,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 request.disk_gb, request.demand_add, request.target_load,
                 request.enforce, request.placement_json)
             if result['unguarded']:
-                # P7 fail-open. Counted separately so the soak can tell a
-                # guard which is passing everything from a guard which is
-                # not evaluating at all.
+                # An admission with no capacity row to guard it.
+                # Counted separately so the soak can tell a guard which
+                # is passing everything from a guard which is not
+                # evaluating at all.
                 self.monitor.counters[
                     'admit_instance_placement_unguarded'].inc()
                 if (result['unguarded_reason']
@@ -6850,8 +6851,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             'reconcile_scheduler_capacity',
             'admit_instance_placement', 'release_instance_placement',
             'get_scheduler_node_capacity', 'get_cluster_capacity',
-            # Placement admissions which ran without a capacity guard
-            # (P7): a node or cluster with no capacity row fails open, so
+            # Placement admissions which ran without a capacity guard:
+            # a node or cluster with no capacity row fails open, so
             # this counter is how "the guard is working" is told apart
             # from "the guard is not running at all". A node the
             # reconciler never sizes admits unguarded indefinitely, not
