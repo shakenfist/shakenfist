@@ -388,7 +388,7 @@ concurrently with anything else in this repository's worktree. 6d and
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
-| 6a | high | opus | none | Read decisions D1-D8 and survey items 1, 4, 6 and 7 of this plan first. Add a module-level `_key_detail(key, attrs, caller_is_system)` helper in `shakenfist/external_api/auth.py` near `AuthNamespaceKeysEndpoint` (line 637), returning `{'namespace', 'key_name', 'expiry', 'scopes', 'uuid', 'state'}` and adding `'provenance'` **only** when `caller_is_system`. `key_name` not `name` (D3). Never include `attrs.key` or `attrs.nonce`. Add `get` to `AuthNamespaceKeyEndpoint` (line 690), mirroring the decorator stack on its `put`; 404 for a name that is not present, matching the `put` path's test at line 722. Add a `detail` boolean argument to `AuthNamespaceKeysEndpoint.get` (line 649): falsy keeps today's exact bare list, truthy returns `_key_detail` per key with `include_expired=True` (D4). Both read `namespace_key.keys_with_attributes(namespace, include_expired=...)` directly — **not** `namespace_from_db.keys`, and **not** `NamespaceKeys`, which does a point read per key (`namespace_key.py:467-472`). Decide `caller_is_system` from `request_namespace() == 'system'`; do not use `caller_is_admin`, which also requires the `cluster-admin` scope and would make the field vanish for an administrator holding a correctly scoped key. Then: move the bare-name listing in `AuthNamespaceKeysEndpoint.get` and in `Namespace.external_view()` (`shakenfist/namespace.py:469-486`) off `.keys` to `keys_with_attributes()` (D8), changing no response; add `'namespace-key-metadata'` to the `auth` family in `shakenfist/external_api/app.py` (the list at line 470) with a comment in the style of the `human-login` entry, saying what D7 says; correct `external_view()`'s docstring (`shakenfist/namespace_key.py:407-408`) so it no longer claims the view is safe for anyone who can see the namespace, naming provenance as the reason and `auth.py`'s minting comment as the rule. Update the `swag_from` blocks for both endpoints. Commit subject: "Serve a namespace key's metadata." |
+| 6a | high | opus | none | Read decisions D1-D8 and survey items 1, 4, 6 and 7 of this plan first. Add a module-level `_key_detail(key, attrs, caller_is_system)` helper in `shakenfist/external_api/auth.py` near `AuthNamespaceKeysEndpoint` (line 637), returning `{'namespace', 'key_name', 'expiry', 'scopes', 'uuid', 'state'}` and adding `'provenance'` **only** when `caller_is_system`. `key_name` not `name` (D3). Never include `attrs.key` or `attrs.nonce`. Add `get` to `AuthNamespaceKeyEndpoint` (line 690) with the decorator stack `delete` uses -- `@requires_namespace_ownership`, `@arg_is_namespace`, `@api_base.log_token_use` -- and **not** the one on `put`, which adds `@api_base.caller_is_admin` and would make the read administrator-only, leaving the projection with nobody to project for. 404 for a name that is not present, the way `put` and `delete` test membership. Add a `detail` boolean argument to `AuthNamespaceKeysEndpoint.get` (line 649): falsy keeps today's exact bare list, truthy returns `_key_detail` per key with `include_expired=True` (D4). Both read `namespace_key.keys_with_attributes(namespace, include_expired=...)` directly — **not** `namespace_from_db.keys`, and **not** `NamespaceKeys`, which does a point read per key (`namespace_key.py:467-472`). Decide `caller_is_system` from `request_namespace() == 'system'`; do not use `caller_is_admin`, which also requires the `cluster-admin` scope and would make the field vanish for an administrator holding a correctly scoped key. Then: move the bare-name listing in `AuthNamespaceKeysEndpoint.get` and in `Namespace.external_view()` (`shakenfist/namespace.py:469-486`) off `.keys` to `keys_with_attributes()` (D8), changing no response; add `'namespace-key-metadata'` to the `auth` family in `shakenfist/external_api/app.py` (the list at line 470) with a comment in the style of the `human-login` entry, saying what D7 says; correct `external_view()`'s docstring (`shakenfist/namespace_key.py:407-408`) so it no longer claims the view is safe for anyone who can see the namespace, naming provenance as the reason and `auth.py`'s minting comment as the rule. Update the `swag_from` blocks for both endpoints. Commit subject: "Serve a namespace key's metadata." |
 | 6b | medium | sonnet | none | Unit tests for 6a, in `shakenfist/tests/external_api/`. Follow the structure of `test_login_mint.py` from phase 4. Required cases: the bare listing is byte-identical to before for a namespace with an expired key and two live ones; the detailed listing includes the expired key and each entry carries its expiry; a `system` caller sees `provenance` and a namespace-owning caller does not, asserted on **the same key** so the pair cannot both pass by accident; a caller in a namespace that the target merely trusts also does not see it; the single-key `GET` 404s for an absent name and for a name in another namespace; no response from either read contains the key hash or the nonce, asserted by searching the serialised body for the known hash and nonce values rather than by checking field names; and a call-count test, with several keys configured, asserting `keys_with_attributes` is called once and `mariadb.get_state` is not called at all (D6). Run `tox -epy3`; totals with `./.tox/shared/bin/stestr last --no-subunit-trace`. Commit subject: "Test the key metadata reads." |
 | 6c | medium | sonnet | none | Mutation-test 6a's guards. Write the mutations as a runnable script under this session's scratchpad, named in your report, and **never mutate the checkout in place** — copy the tree, mutate the copy, run each mutant under `timeout 600`, and count a timeout as killed. Required mutants, each of which must be killed by a named test from 6b: drop the `caller_is_system` condition so `provenance` is always included; invert it; change `caller_is_system` to compare against `caller_is_admin` instead; add `attrs.key` to the projection; make `detail` default to truthy; make the detailed listing pass `include_expired=False`; make the single-key `GET` return a key from any namespace. Record the kill table in this plan's Results section, one row per mutant with the test that caught it and the assertion message. A surviving mutant is a finding, not a note: report it rather than adjusting the mutant. Commit subject: "Mutation test the key metadata disclosure rule." |
 | 6d | medium | sonnet | none | Documentation. Remove the three interim notes listed in survey item 8 — `docs/operator_guide/authentication.md:40-51` (keep the `NAMESPACE_KEY_REAP_GRACE` forensic-window advice, which stands on its own; remove only the clause that the fields are unreadable and the #3672 pointer), `docs/developer_guide/authentication.md:157-161`, and rewrite the three `get_namespace_keynames` examples in `docs/developer_guide/api_reference/authentication.md` (lines 214, 235, 280) against whichever client methods step 6e adds. Document both reads in the API reference, the `detail` parameter, the capability token, and — in the operator guide, in the section that currently carries the limitation — that `provenance` is a `system`-only field and why, cross-referencing rather than restating the provenance paragraph phase 4 added at `docs/operator_guide/authentication.md`. Do not add a settings row: this phase adds no configuration. Leave `docs/developer_guide/ci_api_coverage.md` alone. Commit subject: "Document reading a key's metadata." |
@@ -437,8 +437,8 @@ Run from the phase worktree unless stated.
       called while listing a namespace with several keys.
 * [ ] `namespace_from_db.keys` is no longer read by either listing:
       `grep -n "\.keys\.get('nonced_keys'" shakenfist/external_api/auth.py`
-      returns only the two write-path guards at the key create and
-      update handlers, and
+      returns only the two write-path guards, in the key update and
+      key delete handlers, and
       `grep -n "nonced_keys" shakenfist/namespace.py` no longer matches
       inside `external_view`.
 * [ ] `external_view()`'s docstring no longer claims the view is safe
@@ -497,7 +497,26 @@ ask now and expensive to redo later.
 
 ## Execution notes
 
-*To be filled in during execution.*
+**Back brief, 2026-11-15 (AEDT).** All four gates answered as planned:
+`provenance` to `system` only (D2), both reads (D1), expired keys
+included in the detailed listing (D4), and the client half landing in
+this phase as a separate `client-python` pull request (D9). No decision
+changed, so no step's brief was rewritten on their account.
+
+**Two corrections to this plan before 6a ran.** Both were found by
+checking the step brief's own premises against the tree, not by the
+step:
+
+* 6a's brief said the new single-key `GET` should mirror the decorator
+  stack on `AuthNamespaceKeyEndpoint.put`. That stack carries
+  `@api_base.caller_is_admin`, which would have made the read
+  administrator-only and left D2's caller-sensitive projection with
+  nothing to decide. The brief now names `delete`'s stack, which is
+  also the collection `get`'s: `@requires_namespace_ownership`,
+  `@arg_is_namespace`, `@api_base.log_token_use`.
+* The Definition of done placed the two surviving `nonced_keys`
+  membership guards in the key create and update handlers. `post` has
+  no such guard; they are in `put` and `delete`.
 
 ## Results
 
