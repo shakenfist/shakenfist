@@ -3021,10 +3021,14 @@ message AdmitInstancePlacementReply {
   // which charges nothing -- the transaction rolled back -- but is
   // still the claim that has to grow.
   //
-  // Empty -- never a zero uuid -- when no claim was weighed: an
-  // unclaimed namespace charges the cluster singleton instead, a move
-  // charges nothing on the namespace side at all, and a denial at the
-  // 'node' or 'cluster' stage consulted no claim. Read the name for
+  // Empty -- never a zero uuid -- when no claim is named. An
+  // unclaimed namespace charges the cluster singleton instead, and a
+  // move charges nothing on the namespace side at all. A denial at the
+  // 'node' or 'cluster' stage names no claim for a different reason: a
+  // claimed namespace's claim is drawn down first, and that drawdown
+  // rolls back with the rest of the transaction, so the claim was
+  // consulted and simply was not the constraint -- naming it would
+  // tell an operator to grow the wrong thing. Read the name for
   // absence, so a reply from an sf-database predating this field reads
   // as "not reported" rather than as a real value.
   string claim_uuid = 14;   // Dashed uuid form, or empty

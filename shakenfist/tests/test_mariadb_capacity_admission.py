@@ -827,14 +827,25 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
         # does not fail a test about its arguments.
         tree = ast.parse(textwrap.dedent(
             inspect.getsource(mariadb._direct_admit_instance_placement)))
+
+        def _stage_of(node):
+            # Either call form, because this test is about the arguments
+            # a raise carries and must not fail a rewrite that only
+            # moves them.
+            if node.args and isinstance(node.args[0], ast.Constant):
+                return node.args[0].value
+            for keyword in node.keywords:
+                if (keyword.arg == 'stage'
+                        and isinstance(keyword.value, ast.Constant)):
+                    return keyword.value.value
+            return None
+
         claim_raises = [
             node for node in ast.walk(tree)
             if isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
             and node.func.id == '_AdmissionDenied'
-            and node.args
-            and isinstance(node.args[0], ast.Constant)
-            and node.args[0].value == 'claim']
+            and _stage_of(node) == 'claim']
 
         self.assertEqual(
             1, len(claim_raises),
@@ -842,9 +853,11 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
             'must name the claim that refused')
         for node in claim_raises:
             self.assertEqual(
-                2, len(node.args),
-                'a claim-stage denial was raised without the uuid of '
-                'the claim that refused')
+                2, len(node.args) + len(node.keywords),
+                'a claim-stage denial was raised with the stage alone '
+                'and no uuid for the claim that refused; either '
+                "_AdmissionDenied('claim', uuid) or claim_uuid=uuid "
+                'satisfies this')
 
     def test_node_denial_reports_the_demand_dimension_too(self):
         # A node guard can refuse on the D13 clause with every
@@ -954,7 +967,7 @@ class MockDoubleClaimDenialTestCase(base.ShakenFistTestCase):
         args.update(kwargs)
         return self.db._mariadb_admit_instance_placement(**args)
 
-    def test_a_forced_claim_denial_names_the_charged_claim(self):
+    def test_a_forced_claim_denial_names_the_claim_that_refused(self):
         claim = self.db.set_namespace_claim(
             'ci-1', limit_cpus=2, limit_memory_mb=16384, limit_disk_gb=100,
             claim_uuid=CLAIM1)

@@ -3323,10 +3323,12 @@ class MockMariaDB():
         if claim is not None:
             # Which claim was drawn down, so a caller recording an
             # exceedance against the namespace can name it. Reported
-            # whether or not the claim went over, and left empty when no
-            # claim was weighed at all (an unclaimed namespace, a move,
-            # or a denial at the node stage) exactly as the real reply
-            # leaves it. A claim-stage denial names its claim above.
+            # whether or not the claim went over, and left unnamed
+            # exactly where the real reply leaves it unnamed: an
+            # unclaimed namespace, a move, or a denial at the node
+            # stage, where the drawdown rolls back and the claim was
+            # not the constraint. A claim-stage denial names its claim
+            # above.
             result['claim_uuid'] = claim['uuid']
             for dimension, requested in (('cpus', cpus),
                                          ('memory_mb', memory_mb),

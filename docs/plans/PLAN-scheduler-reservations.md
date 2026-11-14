@@ -378,6 +378,15 @@ beside it, so `<sha>^1..<sha>` is the whole of what that pull
 request put on `develop`. A phase which has not landed reads
 `—`.
 
+Phase 5a is the one row where `Complete` and `—` sit together, and it
+is not a contradiction of that rule but the ordinary consequence of
+it: the pull request which lands a phase cannot record the merge
+commit that lands it, so every phase here was filled in afterwards.
+5a's cell is the next close-out's to write — phase 5b's first commit,
+or phase 9's if 5b has not started by then — and until it is written
+the push audit's range for 5a is its pull request rather than this
+table.
+
 Several phases took more than one pull request, because the
 plan's habit is to land the work and then close the phase out in
 a later documentation change. Two pull requests therefore appear

@@ -27744,11 +27744,15 @@ class AdmitPlacementResult(TypedDict):
     # that refused, which charges nothing -- the transaction rolled
     # back -- but is still the claim an operator has to grow.
     #
-    # Empty when no claim was weighed at all: an unclaimed namespace, a
-    # move (which charges nothing on the namespace side), or a denial at
-    # the 'node' or 'cluster' stage, where no claim was consulted. A
-    # 'claim' failing_stage therefore never carries an empty uuid.
-    # Read the name for absence, never a zero.
+    # Empty when no claim is named: an unclaimed namespace, a move
+    # (which charges nothing on the namespace side), or a denial at the
+    # 'node' or 'cluster' stage. That last one does not mean no claim
+    # was involved -- a claimed namespace's claim is drawn down as
+    # statement 2 of the transaction, before either node guard can
+    # refuse, and rolls back with it -- only that the claim was not the
+    # constraint, so naming it would tell an operator to grow the wrong
+    # thing. A 'claim' failing_stage therefore never carries an empty
+    # uuid. Read the name for absence, never a zero.
     claim_uuid: str
     # Which absent row made this admission unguarded:
     # UNGUARDED_NEVER_RECONCILED, UNGUARDED_NODE_NOT_SIZED, or '' when
@@ -27960,8 +27964,22 @@ class _AdmissionDenied(Exception):
     refusal at the claim stage unable to name any claim. Riding the
     exception costs no query (the raising branch holds the uuid as a
     local) and makes "a claim refusal names its claim" true by
-    construction. Empty for every other stage, because nothing there
-    was refused against a claim.
+    construction.
+
+    That split source has a consequence worth knowing before anything
+    publishes both halves as one object: the uuid comes from the row
+    the ``UPDATE`` named and ``dimensions`` comes from the read after
+    the rollback, so a delete-and-create in between leaves the reply
+    naming one claim beside another claim's ``limit``, ``used`` and
+    ``shortfall``, and a claim deleted or expired in between leaves
+    ``failing_stage == 'claim'`` with a uuid and an *empty*
+    ``dimensions`` list. The identity is the half to trust; a consumer
+    of the numbers has to tolerate their absence.
+
+    Empty for every other stage. At the node and cluster stages that
+    does not mean no claim was involved: a claimed namespace is drawn
+    down first and rolled back with the transaction, so the claim was
+    consulted and was not the constraint.
     """
 
     def __init__(self, stage: str, claim_uuid: str = '') -> None:
@@ -29129,8 +29147,9 @@ def _direct_admit_instance_placement(
         result['failing_stage'] = denial.stage
         # Which claim refused, so a refusal published to the caller can
         # name the claim to grow rather than only the namespace. Empty
-        # for a node or cluster denial, which were refused against no
-        # claim at all.
+        # for a node or cluster denial: a claimed namespace was drawn
+        # down before that refusal and rolled back with it, so the
+        # claim was consulted but was not the constraint.
         result['claim_uuid'] = denial.claim_uuid
         result['dimensions'] = _admission_denial_dimensions(
             denial.stage, namespace, node_key, cpus, memory_mb, disk_gb,
@@ -29599,8 +29618,10 @@ def admit_instance_placement(
     over, and the one that refused when ``failing_stage`` is
     ``'claim'`` -- so an event recorded against the namespace can say
     which claim it was about. It is empty, never a zero uuid, when no
-    claim was weighed at all: an unclaimed namespace, a move, or a
-    refusal at the node or cluster stage.
+    claim is named: an unclaimed namespace, a move, or a refusal at the
+    node or cluster stage -- where a claimed namespace's drawdown was
+    rolled back with the transaction and the claim was not the
+    constraint, rather than no claim having been consulted.
 
     ``success`` says the RPC ran; ``admitted`` says what it decided.
     A caller that treats a failed RPC as a denial would walk to the next
