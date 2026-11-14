@@ -535,6 +535,83 @@ Falsifiable; the management session runs each.
     against `660d4f65e7` (#4800) with a note that step 3 moved
     here, and `index.md`'s count agrees with the table.
 
+## Outcome
+
+**Complete on the reading. The flip did not run, and is phase 5b.**
+This phase's deliverable was a decision rather than an edit: D2
+pre-registered what the calibration window had to show before
+`CLAIM_ENFORCEMENT_HARD` could become `True`, and the window was read
+on 2026-11-13 against that table as written. It says **Hold**. Steps
+1, 2 and 3 landed. Steps 4, 5 and 6 -- the flip, the cluster CI
+inversion and the documentation -- did not start, and are carried by
+phase 5b rather than dropped.
+
+The row that failed is the structural one. Five namespaces admitted a
+single instance larger than the whole claim, where D2 requires none,
+and the cause is mis-assignment rather than mis-measurement: 4c's two
+measurement defects are both gone, the conductor's cost rows record
+these namespaces' peaks exactly, and the ledger agreed with the
+reconstruction on 2956 runs. A combination claim is sized for the
+largest *pending* job and then charged for whichever job GitHub
+dispatched, which held for 65.3% of the window's claims and is
+harmless until the job that arrives holds one instance bigger than
+the claim it landed on. Five times it did, every one
+`kerbside / sf-e2e`'s 12-cpu nested VM on a 6- or 10-cpu claim. Under
+enforcement those five are permanent refusals -- a 12-cpu VM cannot
+fit a 6-cpu claim however long it waits, and no operator action short
+of changing the declaration helps -- so the cost of flipping today is
+a 13.5% chance per `sf-e2e` run, not the 0.71/day the aggregate
+suggests.
+
+What the aggregate did belongs beside that, because it is what the
+advisory window was for: over-limit admissions fell from 33.4 a day
+to 0.71 against the 10x D2 asked for, and the namespaces involved
+from 101 to 5. The sizing work phases 4c and private-ci 3a-3d did was
+not wasted, and is not what holds the flip.
+
+The defect is filed as `shakenfist/private-ci#311`. Michael decided
+on 2026-11-13 that it is fixed by per-job binding tokens -- binding
+each runner to the job its claim was sized for -- as a new lettered
+phase under phase 3b of that repository's
+`PLAN-claim-coverage-and-sizing.md`, in preference to giving `sf-e2e`
+its own size token as phase 3a did for cloud jobs, to sizing
+combination claims from every pool job, or to accepting it as a
+declaration change on the kerbside lanes. Binding removes the
+mis-assignment class; the others fix this instance of it. **Phase 5b
+may not start until that phase has landed, deployed on `maui`, and a
+fresh seven-day window has been read against D2 unchanged.** Nothing
+in this repository can clear that, and it is recorded as plan-blocker
+b21.
+
+Two surfaces this reading touched belong to other plans and are left
+to them, as *Observations* records: the cluster's advertised memory
+total is still moving, which produced a refusal reading
+`memory_mb (limit 10396, used 0, requested 49152)` against a cluster
+far larger than 10 GB, and that is
+`PLAN-transient-capacity-refusals.md` and
+`PLAN-placeable-capacity.md`'s ground, not this phase's.
+
+### Definition of done
+
+Each item was run, not read. Items 4 to 9 are the gated ones and are
+reported as not run rather than ticked; they move to phase 5b with
+the steps that would have satisfied them.
+
+| # | Result | How it was checked |
+|---|--------|--------------------|
+| 1 | **pass** | *Observations* records the start pinned at 2026-11-05 07:47:02 AEDT and the close at 2026-11-12 07:47:02, exactly seven days. It was not pinned from a merge date, and not from the `claim_events.exact_dimensions` discriminator step 1's brief named either: that column pins phase 3d's deploy of 2026-10-24, which step 1 found and recorded at the step row before using the deployed `provisioner.py`'s mtime and the md5 of its two sizing functions instead |
+| 2 | **pass** | All six of D2's measures are reported in *Observations* in 4c's units, each with the tool that produced it (`conductor.db`'s `claim_events` and `workflow_costs` from a read-only copy, Loki, private-ci's `tools/measure-claim-accuracy.py`, and `sf-client` for the live census), and the verdict is recorded as Hold with the arithmetic shown row by row |
+| 3 | **pass** | `grep -n claim_uuid shakenfist/mariadb.py` shows `raise _AdmissionDenied('claim', str(claim_uuid))` at `:28929` and `result['claim_uuid'] = denial.claim_uuid` at `:29134`, as well as the admitted path's. `test_a_claim_stage_denial_can_never_carry_an_empty_claim_uuid` fails if the uuid is dropped from the raise, which was mutation tested rather than assumed: two tests die and the tree restored byte-identical |
+| 4 | **not run** | Gated on step 2 recording Flip. `CLAIM_ENFORCEMENT_HARD` is still `False`, which is the correct state after a Hold. Moves to phase 5b |
+| 5 | **not run** | Gated. `CAPACITY_CLAIM_STAGE` is not introduced, because nothing publishes it until step 4 flips the constant. Moves to phase 5b |
+| 6 | **not run** | Gated. No 403 path exists to test. Moves to phase 5b |
+| 7 | **not run** | Gated. The eight pages F6 lists still say the ceiling is advisory, which remains true of the shipped system. Moves to phase 5b |
+| 8 | **not run** | Gated. The tests which condition their assertions on `CLAIM_ENFORCEMENT_HARD` being `False` are still correct. Moves to phase 5b |
+| 9 | **not run** | Gated. Nothing changed in `cluster_ci_tests/`, so there is nothing for a merge run to prove. Moves to phase 5b |
+| 10 | **pass** | `tox -e py3 -- 'shakenfist\.tests\.(test_mariadb_capacity_admission\.|external_api\.test_capacity_error\.)'` exits 0 with no failures, run on the branch rebased onto `develop` |
+| 11 | **pass** | `pre-commit run --all-files` passes every configured hook, including the plan-status and documentation-link audits |
+| 12 | **pass** | The master plan's Execution table reads Complete for phase 5 against `660d4f65e7` (#4800), its phase status note records that step 3 moved here, and `index.md`'s count agrees with the table after this phase's own row and 5b's were set |
+
 ## Back brief
 
 Before executing any step, back-brief the operator on the plan

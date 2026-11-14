@@ -358,7 +358,8 @@ table entirely (decision D8).
 | 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete | `c27ad9bf2` (#3930), `a5014b6ba` (#3949) |
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Complete | `c273627a2` (#3952), `948055063` (#4008), `8fc8ba961` (#4139), `2b767a9b1` (#4154) |
 | 5. Caller migration and hard ceiling | [PLAN-scheduler-reservations-phase-05-callers.md](PLAN-scheduler-reservations-phase-05-callers.md) | Complete | `660d4f65e7` (#4800) |
-| 5a. The calibration re-run and the hard ceiling | [PLAN-scheduler-reservations-phase-05a-hard-ceiling.md](PLAN-scheduler-reservations-phase-05a-hard-ceiling.md) | In progress | — |
+| 5a. The calibration re-run | [PLAN-scheduler-reservations-phase-05a-hard-ceiling.md](PLAN-scheduler-reservations-phase-05a-hard-ceiling.md) | Complete | — |
+| 5b. The hard ceiling | PLAN-scheduler-reservations-phase-05b-hard-ceiling.md | Blocked | — |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
 | 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
@@ -566,6 +567,34 @@ is here.
   headroom, which the phase measures as its own gated arm. Its
   decision rule for the flip is pre-registered before the window is
   read.
+
+  **The window was read on 2026-11-13 and the rule says Hold**, so
+  the phase is Complete on its reading rather than on the flip, and
+  `CLAIM_ENFORCEMENT_HARD` is still `False`. Five of D2's six rows
+  pass and the aggregate over-limit rate fell 47x, from 33.4 a day to
+  0.71, against the 10x it required. The row written as a structural
+  0 reads 5: in five namespaces one instance was larger than the
+  whole claim it was charged to. That is mis-assignment and not
+  mis-measurement -- a combination claim is sized for the largest
+  *pending* job and charged for whichever job GitHub dispatched, and
+  five times the job that arrived was `kerbside / sf-e2e`, whose
+  12-cpu nested VM cannot fit the 6- or 10-cpu claim made for a
+  smaller lane however long it waits. Phase 5a's *Outcome* holds the
+  reading; the defect is `shakenfist/private-ci#311`, against the
+  plan which owns the sizing code.
+
+- **Phase 5b** carries phase 5a's steps 4, 5 and 6 -- the
+  `CLAIM_ENFORCEMENT_HARD` flip, the cluster CI assertion inversion
+  and the eight documentation lines -- which did not start because
+  the gate did not open. It has no plan file yet and needs no new
+  survey of the enforcement contract: those three step briefs are
+  written in phase 5a, as are D5's discriminator and D6's
+  classification, both confirmed by Michael on 2026-11-07. What it
+  does need is a **fresh** seven-day window read against D2
+  unchanged, which cannot begin until private-ci's per-job binding
+  phase has landed and deployed on `maui`. Recorded as plan-blocker
+  b21; nothing in this repository can clear it, and the flip is not
+  to be read again against the window phase 5a already spent.
 
 - **Phase 6** was executed out of order, ahead of phases 4c and 5,
   and completed on 2026-09-01. It merged as #3972 (the validator
@@ -959,6 +988,14 @@ per-candidate denials rather than one exception -- what makes a
 node guard and is namespace-denominated, so it refuses on every
 candidate or on none. Every line number in that row has also
 drifted, because step 1 of the same phase moved the code.
+
+*Correction (2026-11-14), from phase 5a's reading:* phase 5a spent
+its window and **held** the flip, so the flip is now **phase 5b** and
+5a owns the reading which gated it. Nothing above changes -- the
+premises 5a corrected are still the corrected ones -- but 5b needs no
+fresh survey of the enforcement contract, only a fresh measurement
+window: its three step briefs are written in 5a's step plan and its
+two contract decisions were confirmed before the gate was read.
 
 What survives for phase 6 is real but weaker: `cpu_load_1`
 measures activity rather than occupancy, so a node packed with
