@@ -15984,6 +15984,15 @@ MariaDB database credentials -- the username and password an operator configures
 for the database tier. Defined in <code>docs/operator_guide/database.md</code>. The
 platform's own credential concept is the <a href="#namespace-key">namespace key</a>, from
 which callers derive access tokens.</p>
+<p><strong id="credential-set">credential set</strong> -- The list of <a href="#namespace-key">namespace keys</a>
+returned by <code>POST /auth/login</code>: one per <a href="#mapping-rule">mapping rule</a> the
+person's <a href="#identity-token">identity token</a> satisfies, each naming one namespace
+and carrying its own scopes and expiry. A credential is one namespace deep, so a
+person entitled to several namespaces holds several keys and presents whichever
+the namespace they are addressing needs. Defined in
+<code>shakenfist/external_api/auth.py</code> (<code>AuthLoginEndpoint</code>) and
+<code>docs/operator_guide/authentication.md#human-login-mints-credentials</code>. Not to
+be confused with a single key minted by the targeted exchange.</p>
 <p><strong id="dbo">DatabaseBackedObject / DBO</strong> -- The base class that gives an object type
 its UUID identity, state machine, attributes, and events. Most user-visible
 object types (instances, artifacts, blobs, networks, uploads, nodes) derive from

@@ -17302,14 +17302,14 @@ not land anywhere else.</p>
 <td>3. OIDC discovery</td>
 <td>shakenfist</td>
 <td><a href="../PLAN-oidc-authentication-phase-03-discovery/">PLAN-oidc-authentication-phase-03-discovery.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>d884dd56c1</code> (#4891)</td>
 </tr>
 <tr>
 <td>4. Minting the entitled set of credentials at login</td>
 <td>shakenfist</td>
-<td>TBD</td>
-<td>Not started</td>
+<td><a href="../PLAN-oidc-authentication-phase-04-credential-set/">PLAN-oidc-authentication-phase-04-credential-set.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -17448,6 +17448,25 @@ audit in
 <a href="../PLAN-oidc-authentication-phase-00-decisions/">phase 0</a> is
 what sized this phase, and it also fixes its boundary: each
 minted credential still names exactly one namespace.</p>
+<p>One thing this section did not say, found by phase 4's
+survey and written here because an implementer who reads
+only this section would build a login that cannot work
+against a real provider: <strong>the audience a human's token
+carries is not the audience an issuer's <code>audience</code> column
+holds.</strong> OpenID Connect Core 1.0 §2 requires an identity
+token's <code>aud</code> to contain the relying party's <code>client_id</code>,
+and that is what Keycloak and Authentik stamp. The
+<code>audience</code> column is documented to an operator as their
+cluster's API URL
+(<code>docs/operator_guide/authentication.md:163</code>), which is
+right for a workload, because a workload asks its provider
+for a token stamped with whatever audience we tell it to
+ask for. A person cannot. So the login path verifies <code>aud</code>
+against <code>client_id</code> while the workload exchange keeps
+verifying against <code>audience</code>, which is phase 4's decision
+D2. Open question 4 settled that the audience is per-issuer
+rather than per-cluster and stopped there, because at the
+time the only tokens were workload tokens.</p>
 <p><strong>Phase 5 — admin as a claim, declined.</strong> Half of it was
 done already: <code>caller_is_admin</code> requires the <code>cluster-admin</code>
 scope as well as the <code>system</code> namespace
@@ -17745,9 +17764,14 @@ attached has skipped the part that mattered.</p>
   refused with a 422 instead of truncated. That closes the
   symptom on the issuer routes and leaves the class open: every
   other over-declared <code>str</code> field in the schema still accepts
-  values its column will not hold. The issue body is written
-  and ready to file; it was not filed from the session that
-  wrote it.</p>
+  values its column will not hold. Filed as
+  <a href="https://github.com/shakenfist/shakenfist/issues/4901">#4901</a>,
+  which carries the sweep the body originally left open: across
+  all 47 schema models, four fields declare more than their
+  column holds — these three, plus <code>BlobHash.hash_value</code> at 256
+  against a <code>VARCHAR(255)</code>, which is latent rather than live
+  because the longest digest anything stores is sha512's 128
+  hex characters.</p>
 </li>
 <li>
 <p><strong>A refresh cannot update a <code>jwks_uri</code> that discovery

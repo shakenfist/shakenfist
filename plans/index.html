@@ -16250,9 +16250,9 @@ numbers here it cannot recompute.</p>
 <tr>
 <td>2026-06-01</td>
 <td><a href="PLAN-oidc-authentication/">OIDC authentication</a></td>
-<td>Federated login against an external OIDC provider. Phases 1 and 2 were superseded by the auth federation plan, which built the verification half of a relying party; discovery and the whole client half are still unbuilt. Phase 0 settled the two questions everything else waited on: a human session exchanges the IdP's token for a namespace key, and a credential stays one namespace deep with the multiplicity held by the client. Phase 3 builds discovery, and its survey found that the two fields no discovery document can supply -- the client identifier registered at the provider, and the OIDC scope list to request -- are absent from the issuer object entirely, so they land with it, as does the unauthenticated endpoint that serves them to a caller who has not logged in yet</td>
+<td>Federated login against an external OIDC provider. Phases 1 and 2 were superseded by the auth federation plan, which built the verification half of a relying party; discovery and the whole client half are still unbuilt. Phase 0 settled the two questions everything else waited on: a human session exchanges the IdP's token for a namespace key, and a credential stays one namespace deep with the multiplicity held by the client. Phase 3 built discovery, the two fields no discovery document can supply -- the client identifier registered at the provider and the OIDC scope list to request -- and the unauthenticated endpoint that serves them to a caller who has not logged in yet. Phase 4 mints the entitled credential set at login, and its survey found that a human login cannot validate against an issuer's configured audience at all: an OpenID Connect identity token's audience is the client identifier, not the cluster API URL the operator guide tells an operator to put there, so an operator following that guide would configure human logins that can never succeed</td>
 <td>In progress</td>
-<td>1 of 11</td>
+<td>2 of 11</td>
 </tr>
 <tr>
 <td>2026-06-02</td>

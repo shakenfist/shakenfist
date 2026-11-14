@@ -15558,6 +15558,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#human-login-mints-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Human login mints credentials
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#delegating-to-namespace-owners" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16342,6 +16353,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#human-login-mints-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Human login mints credentials
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#delegating-to-namespace-owners" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16859,6 +16881,118 @@ on every request and caches nothing, so with the limit off an anonymous
 caller turns each request into a read per issuer with nothing counting
 them. The exchange, by contrast, bounds its body and does its cheap
 local checks before touching anything.</p>
+<h3 id="human-login-mints-credentials">Human login mints credentials<a class="headerlink" href="#human-login-mints-credentials" title="Permanent link">&para;</a></h3>
+<p><code>POST /auth/login</code> is the other half of human login. A person who has
+completed a flow at your identity provider posts the identity token they
+came back with, and receives one namespace key for every mapping rule their
+claims satisfy. Like <code>GET /auth/login</code> it needs <strong>no credential</strong>, for the
+same reason.</p>
+<p>A person's entitlements are therefore exactly the <a href="#delegating-to-namespace-owners">mapping rules</a>
+they satisfy, and nothing else: Shaken Fist has no list of users to consult.
+A credential is one namespace deep, so a person entitled to three namespaces
+gets back three keys, and presents whichever one the namespace they are
+addressing needs. Each key is an ordinary namespace key carrying the scopes
+and lifetime its rule grants, and its provenance records that it came from a
+login. Nothing about authorisation changes once a key exists.</p>
+<p><strong>This is an administrative act, and the rules are where it happens.</strong> A
+mapping rule in the <code>system</code> namespace is exactly the standing offer of
+administrative credentials described under
+<a href="#delegating-to-namespace-owners">delegating to namespace owners</a>, and for
+human login that means a group membership at your identity provider is
+cluster administration. Nothing here treats <code>system</code> specially except to make
+it visible: a key minted into it is audited as an <em>administrative key minted
+by human login</em> on the key, and the namespace's event log says <em>human login
+minted an administrative key</em>. Those events are worth alerting on. A cluster
+with no rule in <code>system</code> never mints into it.</p>
+<details class="warning" open="open">
+<summary>Human login verifies the <code>client_id</code>, not the <code>audience</code></summary>
+<p>The <code>audience</code> and <code>client_id</code> columns on an issuer are stamped into
+tokens by different parties, and a login is verified against the second.</p>
+<p><code>audience</code> is what a <strong>workload</strong> asks for: a GitHub Actions job requests
+a token "for" whatever string you tell it to, which is why the guide
+suggests your API URL. <code>client_id</code> is what the identity provider stamps
+into a <strong>person's</strong> token on its own, because an OpenID Connect identity
+token's <code>aud</code> is the application it was issued to, and that is the client
+registration you made at the provider. Nobody gets to choose it at login
+time.</p>
+<p>So if you set <code>audience</code> to your API URL, registered a client, and
+every login is refused, this is why: the token your provider issued
+names your client, not your API URL, and login checks the former. The
+reverse also holds. A person's token is not accepted by the workload
+exchange, and a workload's token is not accepted by login, unless you have
+deliberately set the two columns to the same string. The fix is to check
+that <code>client_id</code> is the identifier the provider actually issues
+tokens for, not to change <code>audience</code>.</p>
+</details>
+<p>An issuer is login capable only with a <code>client_id</code> <strong>and</strong> at least one of an
+<code>authorization_endpoint</code> or a <code>device_authorization_endpoint</code>, exactly as for
+<a href="#human-login-metadata"><code>GET /auth/login</code></a>; a token from any other issuer is
+refused, even though the workload exchange would accept it. Both endpoints
+share the one predicate, so what the listing advertises is what the login
+accepts.</p>
+<p><strong>Refusals tell the caller nothing.</strong> Every refusal other than the ones below
+answers <strong>401</strong> with the same terse message -- an untrusted issuer, a token
+that fails validation, a token that matches no rule, a replayed token, an
+issuer not configured for login. This is deliberate: the caller is
+anonymous, and distinguishing "no rule matches you" from "your token is bad"
+would turn the endpoint into an oracle for whether a given identity matches
+anything on your cluster. The reason is written to the <code>sf-api</code> log at info
+level, prefixed <code>Login refused:</code>, which is where you look when somebody
+reports that they cannot log in. A person who has simply not had a rule
+written for them is refused in the same way.</p>
+<p>The exceptions are failures that belong to the cluster rather than the
+caller. A <strong>503</strong> means the database could not be reached, the mapping rule
+states could not be read (the login is refused rather than guessed at,
+because guessing wrong would mint from rules an administrator had deleted),
+or the file named by <code>FEDERATION_JWKS_CA_BUNDLE</code> could not be loaded.</p>
+<p><strong>Replay.</strong> An identity token may be used to log in once. A retry with the
+same token is refused with a 401 and mints nothing, including after a login
+which failed part way through; the person asks their provider for another
+token.</p>
+<p><strong>The cap.</strong> Each key costs a bcrypt hash, so one login may mint at most
+<code>FEDERATION_MAX_LOGIN_CREDENTIALS</code> keys. A person whose claims satisfy more
+rules than that is refused with <strong>507</strong>, not given a truncated set, because
+they could not tell a short set from a complete one. They can do nothing about
+it themselves; you must either narrow your rules or raise the setting. The log
+line names the setting and both counts. Only rules which are active, for this
+issuer, and whose claims match are counted.</p>
+<p><strong>Keys accumulate.</strong> Logging in again mints a fresh set rather than replacing
+the last, because a login on a laptop must not invalidate the credentials a
+session on a workstation is still using. An expired key stops working
+immediately, but it is not removed immediately: the cluster daemon soft
+deletes it <code>NAMESPACE_KEY_REAP_GRACE</code> seconds after it expired, and it is then
+hard deleted once it has been soft deleted for <code>CLEANER_DELAY</code> seconds. With
+the defaults that is roughly two hours after expiry, on top of the rule's key
+lifetime, because both settings default to an hour. A person who logs in often
+leaves up to <code>FEDERATION_MAX_LOGIN_CREDENTIALS</code> keys per login for the whole of
+that window, which is worth knowing when you size a cluster for many users. See
+<a href="#key-expiry-and-reaping">key expiry and reaping</a>.</p>
+<p><strong>A minted key records who it was minted for.</strong> The key's provenance
+carries the person's subject identifier, the token's <code>jti</code>, and the claims
+that actually matched -- and provenance is part of a key's external view,
+which is readable by anyone who can list keys in that namespace. So every
+namespace a person is entitled to can see that they logged in and when. That
+is deliberate, because it is what makes a federated grant auditable, and it
+is why the key's <em>name</em> carries a random discriminator instead of the
+person's identity. But it means the claims you bind are published to every
+namespace the rule mints into: bind <code>email</code> or <code>preferred_username</code> and you
+have put that address in front of every one of those namespace owners. Bind
+the narrowest claim that expresses the entitlement, usually a group.</p>
+<p>Requests are rate limited per source address like the others, on a counter
+of their own, so a burst of logins does not throttle CI and the reverse. As for
+the exchange and the listing, setting <code>FEDERATION_RATE_LIMIT_PER_MINUTE</code> to
+<code>0</code> disables the limit, and a login is the most expensive of the three
+unauthenticated routes: a JWKS fetch and then a bcrypt hash per credential.</p>
+<p>"Source address" means the address <code>sf-api</code> itself sees, which is the
+caveat in <a href="#abuse-resistance">abuse resistance</a> and it bites harder here
+than on the exchange. Behind a reverse proxy or NAT that does not preserve
+the client address, every person on the site shares one budget rather than
+holding one each, and the symptom is everybody getting 429s together at the
+start of the working day while nothing is wrong with any of their tokens.
+The three counters are separate budgets but take their size from the one
+<code>FEDERATION_RATE_LIMIT_PER_MINUTE</code> value, so raising it for logins raises
+it for the exchange too.
+A limited caller gets a <strong>429</strong>.</p>
 <h3 id="delegating-to-namespace-owners">Delegating to namespace owners<a class="headerlink" href="#delegating-to-namespace-owners" title="Permanent link">&para;</a></h3>
 <p>A <strong>mapping rule</strong> is owned by the namespace it mints into, and
 creating one requires ownership of that namespace -- the same gate as
@@ -17014,12 +17148,17 @@ exchange answers 503 rather than assuming the request is fine.</p>
 <tr>
 <td><code>FEDERATION_MAX_TOKEN_BYTES</code></td>
 <td>16384</td>
-<td>Largest exchange request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no <code>Content-Length</code> is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit</td>
+<td>Largest exchange or login request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no <code>Content-Length</code> is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit</td>
 </tr>
 <tr>
 <td><code>FEDERATION_RATE_LIMIT_PER_MINUTE</code></td>
 <td>60</td>
-<td>Attempts allowed per source address per minute, counted separately for the exchange and for <code>GET /auth/login</code>. <code>0</code> disables rate limiting entirely, on both</td>
+<td>Attempts allowed per source address per minute, counted separately for the exchange, for <code>GET /auth/login</code> and for <code>POST /auth/login</code> -- three budgets, but one value sizing all three, so raising it for one raises it for the others. <code>0</code> disables rate limiting entirely, on all three, including the per-issuer read that the listing does on every request</td>
+</tr>
+<tr>
+<td><code>FEDERATION_MAX_LOGIN_CREDENTIALS</code></td>
+<td>16</td>
+<td>The most namespace keys one <code>POST /auth/login</code> may mint, minimum 1. Each key costs a bcrypt hash, so without a cap one valid identity token commands as much deliberately slow work as the cluster has matching mapping rules. A login matching more rules than this is refused with 507 rather than truncated. Raising it raises the work one token can command; <code>FEDERATION_RATE_LIMIT_PER_MINUTE</code> bounds how often a source may try, and <code>0</code> removes that bound for every unauthenticated endpoint in this family. The two multiply, which is the number to size <code>sf-api</code> against: at both defaults one source address can command up to 960 bcrypt hashes a minute, each needing a fresh unreplayed token</td>
 </tr>
 <tr>
 <td><code>FEDERATION_JWKS_CA_BUNDLE</code></td>

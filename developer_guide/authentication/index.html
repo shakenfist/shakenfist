@@ -15124,6 +15124,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-login" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The login
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#configuring-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16475,6 +16486,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-login" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The login
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#configuring-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -17059,6 +17081,57 @@ unauthenticated <code>GET /auth/login</code> listing a client reads before it ho
 any Shaken Fist credential. That endpoint builds each entry field by
 field rather than from the issuer's own view of itself, so that a field
 added to the object later is not published without somebody deciding to.</p>
+<h3 id="the-login">The login<a class="headerlink" href="#the-login" title="Permanent link">&para;</a></h3>
+<p><code>POST /auth/login</code> takes <code>{token}</code> and nothing else, and returns a list
+of keys: one per mapping rule for the token's issuer whose bound claims
+the identity satisfies, each as <code>{namespace, key_name, key, expiry,
+scopes}</code>. A person has no way to know which namespace or rule they are
+entitled to, so they cannot be asked to name one the way the exchange
+does. A credential stays one namespace deep, which is why the answer is a
+set of single-namespace keys and not one key naming several.</p>
+<p>It runs the exchange's checks in the exchange's order, for the same
+reason, with the set-wide steps where the exchange has targeted ones: size,
+arguments, the rate limit (on a budget of its own, keyed <code>login-mint:</code>),
+issuer resolution with no network, the login-capable test, validation, the
+rule read, claim matching, the refusal when nothing matched, the cap
+<code>FEDERATION_MAX_LOGIN_CREDENTIALS</code>, the replay claim, and only then
+minting.</p>
+<p>Validation is the same function. <code>federation.validate_token()</code> is called
+with the issuer and an <code>audience</code> argument, and there is still exactly one
+copy of token validation in the repository. The exchange passes nothing and
+verifies against the issuer's <code>audience</code>; the login passes the issuer's
+<code>client_id</code>. The reason is that the two kinds of token are stamped by
+different parties: a workload asks for whatever audience it is told to, while
+an OpenID Connect identity token's <code>aud</code> is the relying party it was issued
+to. The override replaces the audience and does not add to it, so a token
+stamped for one door is refused at the other. <code>login_audience()</code> returns the
+value rather than a boolean so that the mint cannot reach validation with an
+unchecked column: passing <code>None</code> there would mean "use the issuer's
+audience", which would verify a person against the workload's.</p>
+<p>The same function, <code>login_audience()</code>, decides whether <code>GET /auth/login</code>
+advertises an issuer and whether the login accepts a token from one, so the
+two cannot drift apart. Rules are read in two queries rather than two per
+rule, because a per-rule read on an unauthenticated path is work an anonymous
+caller multiplies by however many rules there are. If the query for which
+rules are active fails, the login is refused with a 503, because neither
+available reading of the failure is safe: treating it as "nothing is active"
+silently refuses a login the cluster's rules would have granted, and treating
+it as "do not filter" mints from rules an administrator deleted. A mapping
+rule's only removal is a soft delete, so the second is an authorisation
+bypass rather than a stale answer.</p>
+<p>The replay claim differs from the exchange's. A login claims the token once,
+against the issuer and not against a rule, and before any key is minted.
+Claiming rule by rule would let a login that failed part way be retried into a
+set that was silently short. Minting is not transactional, so a failure
+midway leaves a partial set and a spent token.</p>
+<p>Keys are named <code>&lt;key_name_prefix&gt;-&lt;eight random characters&gt;</code> and never from
+the person's identity, because creating a key under an existing name rotates
+it, and a second login must not invalidate the first. Their provenance has
+<code>source: login</code>. A key in <code>system</code> is audited with its own wording on the key
+and the namespace.</p>
+<p>Every refusal other than a 503 or the cap's 507 answers 401 with one string,
+and logs the reason, so the endpoint is not an oracle for whether an identity
+matches a rule.</p>
 <h3 id="configuring-it">Configuring it<a class="headerlink" href="#configuring-it" title="Permanent link">&para;</a></h3>
 <p>Configuring an issuer and writing a mapping rule are operator tasks, and
 the worked end to end example -- registering GitHub as an issuer, writing
