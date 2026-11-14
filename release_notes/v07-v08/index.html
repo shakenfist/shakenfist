@@ -16823,9 +16823,12 @@
   the request never leaves the host. The deploy also refuses: a
   <code>kerbside_system_key</code> the database host cannot see, or which
   equals <code>system_key</code> (set it once where both tiers read it, such as
-  <code>group_vars/all</code>); a <code>kerbside_public_fqdn</code> equal to a host name in <code>allsf</code>
-  (give the proxy a distinct name, such as <code>console.&lt;host&gt;</code>, or the host's
-  address); a newline in <code>kerbside_public_fqdn</code>, <code>kerbside_sql_url</code> or
+  <code>group_vars/all</code>); a <code>kerbside_public_fqdn</code> equal to a name an <code>allsf</code>
+  host's certificate carries -- its inventory name or its <code>node_name</code>,
+  whatever the case -- which would let the proxy's key satisfy that
+  hypervisor's pinned host subject (give the proxy a distinct name, such as
+  <code>console.&lt;host&gt;</code>, or the host's address, which no certificate is issued
+  for); a newline in <code>kerbside_public_fqdn</code>, <code>kerbside_sql_url</code> or
   <code>kerbside_auth_secret_seed</code>, which would inject a directive into
   <code>kerbside.ini</code>; a newline, double quote, <code>$</code>, backtick or backslash in
   <code>kerbside_url</code>, which would inject into <code>/etc/sf/config</code> -- that one is
