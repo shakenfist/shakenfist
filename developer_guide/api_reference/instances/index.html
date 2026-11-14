@@ -17323,6 +17323,46 @@ returns an iterator of binary chunks ready for you to process or write to a file
 <a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
 </code></pre></div>
 </details>
+<h2 id="typing-at-the-console">Typing at the console<a class="headerlink" href="#typing-at-the-console" title="Permanent link">&para;</a></h2>
+<p>Since v0.9, Shaken Fist can type at an instance's console. This is for
+appliances configured through an interactive first boot wizard on the VGA
+console, which have no agent and no cloud-init: paired with the screen
+captures above, the read-the-prompt, send-the-answer loop is scriptable over
+the API alone, where before it needed a VNC connection to the hypervisor and
+OCR of the framebuffer.</p>
+<details class="tip" open="open">
+<summary>REST API calls</summary>
+<ul>
+<li><a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__console_keys">POST ​/instances​/{instance_ref}​/console​/keys</a>: Send keystrokes to the console of an instance.</li>
+</ul>
+</details>
+<p>The request carries exactly one of <code>text</code>, which is typed one keystroke per
+character, or <code>keys</code>, which is a list of key names and chords. <code>hold_ms</code> is
+libvirt's holdtime, which qemu also uses to delay the following keystroke, so
+it is how a slow console is paced rather than something the caller sleeps for.
+The response is the number of keystrokes sent.</p>
+<p>The keystrokes go to the guest's emulated keyboard via libvirt's <code>send-key</code>,
+in the Linux keycode set. The name tables are in
+<code>shakenfist/util/keymap.py</code>, because the python libvirt bindings do not expose
+the ones <code>virsh send-key</code> uses. See the
+<a href="/user_guide/consoles/#typing-at-the-console">user guide</a> for the key names
+and the bounds.</p>
+<p>This endpoint requires the <code>instance.console</code> scope, the same as the VDI
+console routes, rather than <code>instance.write</code>: typing at the console is
+interactive control of the guest.</p>
+<p>The python API client has no verb for this yet, so until it does the
+endpoint is called directly. <code>_request_url</code> is private, and is named here
+because it is the only way to reach a route the client does not wrap:</p>
+<details class="example">
+<summary>Python API client: answer a console prompt</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">_request_url</span><span class="p">(</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>    <span class="s1">'POST'</span><span class="p">,</span> <span class="s1">'/instances/</span><span class="si">%s</span><span class="s1">/console/keys'</span> <span class="o">%</span> <span class="n">instance_ref</span><span class="p">,</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>    <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s1">'text'</span><span class="p">:</span> <span class="s1">'admin</span><span class="se">\n</span><span class="s1">'</span><span class="p">,</span> <span class="s1">'hold_ms'</span><span class="p">:</span> <span class="mi">10</span><span class="p">})</span>
+</code></pre></div>
+</details>
 <h2 id="object-references">Object References<a class="headerlink" href="#object-references" title="Permanent link">&para;</a></h2>
 <p>Instance API responses include <code>references_to</code> and <code>references_from</code> fields that
 show the relationships between instances and other objects in the system. These
@@ -17332,32 +17372,32 @@ empty for instances). The <code>references_from</code> field shows what blobs th
 references (e.g., disk blobs, NVRAM template blobs).</p>
 <details class="example">
 <summary>Example references_from output for an instance</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="nt">"references_from"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">    </span><span class="nt">"disk"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">        </span><span class="p">{</span>
-<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">            </span><span class="nt">"source_object_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"instance"</span><span class="p">,</span>
-<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">            </span><span class="nt">"source_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"d51aa352-368c-484c-9e4c-4542927b4277"</span><span class="p">,</span>
-<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="w">            </span><span class="nt">"relationship"</span><span class="p">:</span><span class="w"> </span><span class="s2">"disk"</span><span class="p">,</span>
-<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="w">            </span><span class="nt">"relationship_value"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0"</span><span class="p">,</span>
-<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a><span class="w">            </span><span class="nt">"target_object_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"blob"</span><span class="p">,</span>
-<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a><span class="w">            </span><span class="nt">"target_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"5117f778-b214-4184-8358-f2c7376b76db"</span><span class="p">,</span>
-<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a><span class="w">            </span><span class="nt">"created"</span><span class="p">:</span><span class="w"> </span><span class="mf">1683995934.357137</span><span class="p">,</span>
-<a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a><span class="w">            </span><span class="nt">"last_active"</span><span class="p">:</span><span class="w"> </span><span class="mf">1684054381.217045</span>
-<a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a><span class="w">        </span><span class="p">}</span>
-<a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a><span class="w">    </span><span class="p">],</span>
-<a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a><span class="w">    </span><span class="nt">"nvram_template"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a><span class="w">        </span><span class="p">{</span>
-<a id="__codelineno-24-16" name="__codelineno-24-16" href="#__codelineno-24-16"></a><span class="w">            </span><span class="nt">"source_object_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"instance"</span><span class="p">,</span>
-<a id="__codelineno-24-17" name="__codelineno-24-17" href="#__codelineno-24-17"></a><span class="w">            </span><span class="nt">"source_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"d51aa352-368c-484c-9e4c-4542927b4277"</span><span class="p">,</span>
-<a id="__codelineno-24-18" name="__codelineno-24-18" href="#__codelineno-24-18"></a><span class="w">            </span><span class="nt">"relationship"</span><span class="p">:</span><span class="w"> </span><span class="s2">"nvram_template"</span><span class="p">,</span>
-<a id="__codelineno-24-19" name="__codelineno-24-19" href="#__codelineno-24-19"></a><span class="w">            </span><span class="nt">"relationship_value"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
-<a id="__codelineno-24-20" name="__codelineno-24-20" href="#__codelineno-24-20"></a><span class="w">            </span><span class="nt">"target_object_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"blob"</span><span class="p">,</span>
-<a id="__codelineno-24-21" name="__codelineno-24-21" href="#__codelineno-24-21"></a><span class="w">            </span><span class="nt">"target_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"abc123-def456-ghi789"</span><span class="p">,</span>
-<a id="__codelineno-24-22" name="__codelineno-24-22" href="#__codelineno-24-22"></a><span class="w">            </span><span class="nt">"created"</span><span class="p">:</span><span class="w"> </span><span class="mf">1683995934.357137</span><span class="p">,</span>
-<a id="__codelineno-24-23" name="__codelineno-24-23" href="#__codelineno-24-23"></a><span class="w">            </span><span class="nt">"last_active"</span><span class="p">:</span><span class="w"> </span><span class="mf">1684054381.217045</span>
-<a id="__codelineno-24-24" name="__codelineno-24-24" href="#__codelineno-24-24"></a><span class="w">        </span><span class="p">}</span>
-<a id="__codelineno-24-25" name="__codelineno-24-25" href="#__codelineno-24-25"></a><span class="w">    </span><span class="p">]</span>
-<a id="__codelineno-24-26" name="__codelineno-24-26" href="#__codelineno-24-26"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nt">"references_from"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">    </span><span class="nt">"disk"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">        </span><span class="p">{</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">            </span><span class="nt">"source_object_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"instance"</span><span class="p">,</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">            </span><span class="nt">"source_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"d51aa352-368c-484c-9e4c-4542927b4277"</span><span class="p">,</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">            </span><span class="nt">"relationship"</span><span class="p">:</span><span class="w"> </span><span class="s2">"disk"</span><span class="p">,</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="w">            </span><span class="nt">"relationship_value"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0"</span><span class="p">,</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="w">            </span><span class="nt">"target_object_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"blob"</span><span class="p">,</span>
+<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a><span class="w">            </span><span class="nt">"target_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"5117f778-b214-4184-8358-f2c7376b76db"</span><span class="p">,</span>
+<a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a><span class="w">            </span><span class="nt">"created"</span><span class="p">:</span><span class="w"> </span><span class="mf">1683995934.357137</span><span class="p">,</span>
+<a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a><span class="w">            </span><span class="nt">"last_active"</span><span class="p">:</span><span class="w"> </span><span class="mf">1684054381.217045</span>
+<a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a><span class="w">        </span><span class="p">}</span>
+<a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a><span class="w">    </span><span class="p">],</span>
+<a id="__codelineno-25-14" name="__codelineno-25-14" href="#__codelineno-25-14"></a><span class="w">    </span><span class="nt">"nvram_template"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-25-15" name="__codelineno-25-15" href="#__codelineno-25-15"></a><span class="w">        </span><span class="p">{</span>
+<a id="__codelineno-25-16" name="__codelineno-25-16" href="#__codelineno-25-16"></a><span class="w">            </span><span class="nt">"source_object_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"instance"</span><span class="p">,</span>
+<a id="__codelineno-25-17" name="__codelineno-25-17" href="#__codelineno-25-17"></a><span class="w">            </span><span class="nt">"source_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"d51aa352-368c-484c-9e4c-4542927b4277"</span><span class="p">,</span>
+<a id="__codelineno-25-18" name="__codelineno-25-18" href="#__codelineno-25-18"></a><span class="w">            </span><span class="nt">"relationship"</span><span class="p">:</span><span class="w"> </span><span class="s2">"nvram_template"</span><span class="p">,</span>
+<a id="__codelineno-25-19" name="__codelineno-25-19" href="#__codelineno-25-19"></a><span class="w">            </span><span class="nt">"relationship_value"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<a id="__codelineno-25-20" name="__codelineno-25-20" href="#__codelineno-25-20"></a><span class="w">            </span><span class="nt">"target_object_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"blob"</span><span class="p">,</span>
+<a id="__codelineno-25-21" name="__codelineno-25-21" href="#__codelineno-25-21"></a><span class="w">            </span><span class="nt">"target_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"abc123-def456-ghi789"</span><span class="p">,</span>
+<a id="__codelineno-25-22" name="__codelineno-25-22" href="#__codelineno-25-22"></a><span class="w">            </span><span class="nt">"created"</span><span class="p">:</span><span class="w"> </span><span class="mf">1683995934.357137</span><span class="p">,</span>
+<a id="__codelineno-25-23" name="__codelineno-25-23" href="#__codelineno-25-23"></a><span class="w">            </span><span class="nt">"last_active"</span><span class="p">:</span><span class="w"> </span><span class="mf">1684054381.217045</span>
+<a id="__codelineno-25-24" name="__codelineno-25-24" href="#__codelineno-25-24"></a><span class="w">        </span><span class="p">}</span>
+<a id="__codelineno-25-25" name="__codelineno-25-25" href="#__codelineno-25-25"></a><span class="w">    </span><span class="p">]</span>
+<a id="__codelineno-25-26" name="__codelineno-25-26" href="#__codelineno-25-26"></a><span class="p">}</span>
 </code></pre></div>
 </details>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
@@ -17386,29 +17426,29 @@ future instances.</p>
 </details>
 <details class="example">
 <summary>Python API client: set metadata on an instance</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">set_instance_metadata_item</span><span class="p">(</span><span class="n">instance_uuid</span><span class="p">,</span> <span class="s1">'foo'</span><span class="p">,</span> <span class="s1">'bar'</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">set_instance_metadata_item</span><span class="p">(</span><span class="n">instance_uuid</span><span class="p">,</span> <span class="s1">'foo'</span><span class="p">,</span> <span class="s1">'bar'</span><span class="p">)</span>
 </code></pre></div>
 </details>
 <details class="example">
 <summary>Python API client: get metadata for an instance</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
-<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>
-<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_metadata</span><span class="p">(</span><span class="n">instance_uuid</span><span class="p">)</span>
-<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
-</code></pre></div>
-</details>
-<details class="example">
-<summary>Python API client: delete metadata for an instance</summary>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
 <a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>
 <a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">delete_instance_metadata_item</span><span class="p">(</span><span class="n">instance_uuid</span><span class="p">,</span> <span class="s1">'foo'</span><span class="p">)</span>
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_metadata</span><span class="p">(</span><span class="n">instance_uuid</span><span class="p">)</span>
+<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: delete metadata for an instance</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="n">sf_client</span><span class="o">.</span><span class="n">delete_instance_metadata_item</span><span class="p">(</span><span class="n">instance_uuid</span><span class="p">,</span> <span class="s1">'foo'</span><span class="p">)</span>
 </code></pre></div>
 </details>
 <h2 id="cluster-operations">Cluster operations<a class="headerlink" href="#cluster-operations" title="Permanent link">&para;</a></h2>
@@ -17429,22 +17469,22 @@ describes the <code>has_pending_operations</code> field.</p>
 </details>
 <details class="example">
 <summary>Python API client: get queued cluster operations for an instance</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
-<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>
-<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="n">ops</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_clusteroperations</span><span class="p">(</span><span class="n">inst_uuid</span><span class="p">)</span>
-<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ops</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
-</code></pre></div>
-</details>
-<details class="example">
-<summary>Python API client: get all cluster operations for an instance</summary>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
 <a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>
 <a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="n">ops</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_clusteroperations</span><span class="p">(</span><span class="n">inst_uuid</span><span class="p">,</span> <span class="nb">all</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="n">ops</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_clusteroperations</span><span class="p">(</span><span class="n">inst_uuid</span><span class="p">)</span>
 <a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ops</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</code></pre></div>
+</details>
+<details class="example">
+<summary>Python API client: get all cluster operations for an instance</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="n">ops</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_clusteroperations</span><span class="p">(</span><span class="n">inst_uuid</span><span class="p">,</span> <span class="nb">all</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ops</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
 </details>
 

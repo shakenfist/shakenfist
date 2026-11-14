@@ -14337,6 +14337,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#typing-at-the-console" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Typing at the console
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -16062,6 +16073,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#typing-at-the-console" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Typing at the console
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -16206,6 +16228,37 @@ instance was a physical machine.</p>
 like this:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>screenshot<span class="w"> </span>...uuid...
 </code></pre></div>
+<h2 id="typing-at-the-console">Typing at the console<a class="headerlink" href="#typing-at-the-console" title="Permanent link">&para;</a></h2>
+<p>Some appliances are configured only through an interactive first boot wizard
+on the console, and have no agent and no cloud-init. For those,
+<code>POST /instances/&lt;ref&gt;/console/keys</code> types at the guest's emulated keyboard,
+which is the other half of the loop the screen captures above start: read the
+screen, send the answer, read the screen again.</p>
+<p>The request sends either <code>text</code>, which is typed one keystroke per character,
+or <code>keys</code>, which is a list of key names:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span><span class="nt">"text"</span><span class="p">:</span><span class="w"> </span><span class="s2">"admin\n"</span><span class="p">}</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="p">{</span><span class="nt">"keys"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"f2"</span><span class="p">,</span><span class="w"> </span><span class="s2">"down"</span><span class="p">,</span><span class="w"> </span><span class="s2">"down"</span><span class="p">,</span><span class="w"> </span><span class="s2">"enter"</span><span class="p">]}</span>
+</code></pre></div>
+<p>A newline in <code>text</code> is the enter key and a tab is the tab key, so a whole
+answer and its confirmation can be one request. A name in <code>keys</code> may be a
+chord of names joined with <code>+</code>, such as <code>ctrl+alt+delete</code>, and <code>virsh</code>'s
+<code>KEY_</code> prefix is accepted as well as the bare name. The names Shaken Fist
+knows are the character keys, <code>esc</code> (or <code>escape</code>), <code>backspace</code>, <code>tab</code>,
+<code>enter</code> (or <code>return</code>), <code>space</code>, <code>capslock</code>, <code>grave</code>, <code>backslash</code>, the
+<code>ctrl</code>, <code>alt</code> and <code>shift</code> modifiers (optionally prefixed <code>left</code> or
+<code>right</code>), the arrow keys, <code>home</code>, <code>end</code>, <code>pageup</code>, <code>pagedown</code>, <code>insert</code>,
+<code>delete</code>, and <code>f1</code> through <code>f12</code>. A name outside that set is refused with a
+400 naming it.</p>
+<p><code>hold_ms</code> is how long each keystroke is held down, in milliseconds. qemu also
+delays the following keystroke by it, which is how a console too slow to keep
+up is paced; it defaults to 0 and is capped at 100. At most 256 keystrokes may
+be sent in one request, because the request blocks until the last one has been
+delivered.</p>
+<p>This is the same privilege as the VDI console: a token must carry
+<code>instance.console</code>, not merely <code>instance.write</code>, and the instance must be
+running. The keystrokes themselves are never written to an event or a log,
+because a wizard asks for passwords; the audit event records only how many
+were sent.</p>
 
 
 
