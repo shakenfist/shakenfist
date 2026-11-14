@@ -26,6 +26,102 @@
   directly passes, and so does extending the fleet preset, which
   enables it.
 
+### The central runner
+
+Everything above describes the arrangement the criterion checks: a
+copy of `renovate.yml` in each repository, running Renovate over that
+repository alone. The fleet is moving to a single workflow that runs
+Renovate over every repository from one place, and that workflow is
+already in this repository as `.github/workflows/renovate-fleet.yml`.
+It has no schedule yet, and runs only when it is dispatched by hand,
+with a Renovate `dryRun` mode and an autodiscover filter as inputs, so
+a pass can be read-only or confined to one repository. A schedule here
+while every repository still runs its own hourly copy would have two
+Renovate instances working the same repository, racing on branch
+creation to produce duplicate or half-written pull requests, and the
+runner's concurrency group cannot prevent that because the two runs
+are different workflows in different repositories. Turning the
+schedule on is therefore a step of the cutover rather than part of
+adding the workflow. It will be hourly at minute 23 rather than on the
+hour, because GitHub delays and sometimes drops scheduled events at
+the top of the hour and a dropped run here would delay every
+repository at once. It installs Renovate from npm in a step that holds no
+secret, exactly as the template does, for the reasons given under
+[Renovate without Docker](#renovate-without-docker) and in the
+template README.
+
+Its global configuration is `renovate-runner.json` at the root of this
+repository. That file decides two things. Which repositories are
+discovered: autodiscovery over `shakenfist/*`, with `requireConfig`
+set to `required`, so Renovate manages a repository that carries a
+Renovate configuration and ignores one that does not, and with
+onboarding off, so it opens no pull request to add a configuration
+where there is none. And one temporary `packageRules` entry that
+disables every dependency in `.github/workflows/renovate.yml` and
+`templates/renovate/renovate.yml`. Matching the files rather than the
+packages covers everything in them at once, whichever of the Renovate
+pin, the actions or the container action a given copy carries, and the
+rule is to be removed when the per-repository copies are. The file is
+validated by its own hook in default mode, which accepts global
+options, while every other Renovate configuration is validated with
+`--no-global`; `scripts/tests/test_hooks.py` holds each configuration
+in the tree to exactly one of the two.
+
+The job runs on an ephemeral VM, `[self-hosted, vm, debian-13, s]`,
+and names the `renovate-write` environment, not the static pool the
+per-repository copies use. `RENOVATE_TOKEN` pushes branches to every
+repository the runner manages, and the static runners share one user
+and one home directory between jobs, so code another job ran could
+leave a `.pth` file or a `~/.gitconfig` hook there for this job to run
+with that token. A VM starts from the image and is thrown away after
+one job, which is the same reasoning `consistency-audit.yml` applies
+to its token-holding jobs. The environment is where that token is meant to be
+held, with deployment restricted to `main`, so that a branch which has
+edited the workflow cannot dispatch itself and run with the
+organisation's push credential. That restriction is a repository
+setting rather than anything in the tree, and naming an environment
+does not create it: a workflow referencing one that does not exist
+gets an environment created for it, with no protection rules and no
+secrets. So the protection is real only once somebody has configured
+it, which is a thing to verify out of band before the cutover rather
+than something this file can promise. The workflow's own check of the
+ref is the weaker half of the pair -- a branch can edit a condition
+out of its own copy -- and it makes a branch dispatch show as skipped
+rather than failed. The cost is that a VM pays the whole
+install on every run, with no cache to reuse.
+
+Before Renovate starts, every run probes the token with
+`scripts/renovate-check-push.py`. For each unarchived repository in
+the organisation whose default branch carries a `renovate.json` it
+asks GitHub whether the token has push permission, and the job fails
+naming every repository where it does not, not only the first. The
+probe derives the set the way `requireConfig` does, so it stays right
+as repositories are added and retired. It reads `renovate.json` alone,
+though Renovate accepts other file names, because this criterion is
+what requires `renovate.json`. It also refuses to pass on a managed set
+smaller than the floor it is given, because a token that quietly lost
+sight of most of the organisation would otherwise shrink the set and
+the probe and autodiscovery would agree on the smaller fleet. Without
+the probe, a repository the token cannot write is one Renovate reads
+and plans updates for, then fails to act on every hour with nothing
+but a line in a log to say so.
+
+What the probe cannot see is whether the token may write a workflow
+file. Push permission is not the same capability: a classic personal
+access token needs the `workflow` scope and a fine-grained one needs
+Workflows: write, and without it GitHub refuses a push whose diff
+touches `.github/workflows/`. Much of what Renovate proposes in this
+fleet is exactly that -- action references, and the Renovate pin a
+custom manager reads from a version comment -- so the probe can report
+that the token reaches every repository while every workflow branch
+still fails. The cutover's canary is what establishes that capability,
+by watching a workflow-file update land.
+
+The per-repository copies of `renovate.yml` are still present and
+still running. Disabling them, deleting them, and changing this
+criterion to match are later work, not part of adding the runner, and
+"What we check" above is accurate for as long as they exist.
+
 ### Renovate without Docker
 
 `renovatebot/github-action` runs Renovate as a container. The static

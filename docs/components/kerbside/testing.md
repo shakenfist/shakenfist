@@ -392,8 +392,19 @@ There are two mechanisms and they are not interchangeable:
   what was done about it; an undocumented entry is indistinguishable
   from a mistake.
 
-The history is clean as scanned, so neither file carries an entry
-today and `.gitleaksignore` does not exist yet.
+The history is clean as scanned: `.gitleaksignore` does not exist,
+because no credential has ever had to be accepted, and the
+`.gitleaks.toml` allowlist holds nothing but the invented secrets
+`tools/ci-test-ansible-role.sh` plants to prove the ansible role leaks
+none of them. Those are listed in full rather than one at a time,
+because which of them `generic-api-key` reports turns on its entropy
+threshold and gitleaks' stopword list rather than on anything visible
+in the value — it catches two of the nine, and not the two with the
+highest entropy. `kerbside/tests/unit/test_gitleaks_config.py` holds
+the allowlist equal to the script's fixtures and fails on an entry
+that no longer occurs anywhere in the tree, so adding a fixture is
+caught by the unit suite rather than by this lane, and a stale entry
+cannot sit there quietly blinding the scan.
 
 One known gap: the SPICE console token minted by
 `kerbside/consoletoken.py` is 48 characters of unadorned base62, which

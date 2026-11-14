@@ -89,7 +89,9 @@ values are overridden by matching `-o` keys when both are specified.
 
 Honoured:
 - `cluster_size`, `compat` (0.10|1.1), `refcount_bits`
-- `extended_l2` (on|off), `lazy_refcounts` (on|off)
+- `extended_l2` (on|off; requires `cluster_size >= 16k`, as `create`
+  does -- a target nothing can create is not one to measure),
+  `lazy_refcounts` (on|off)
 - `compression_type` (zlib|zstd), `preallocation` (off|metadata|falloc|full)
 
 Rejected (future work):

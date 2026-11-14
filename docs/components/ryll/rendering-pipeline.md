@@ -102,11 +102,13 @@ holds the rectangles written since the consumer last called
   the damage alone and `take_damage()` leaves the dirty flag alone,
   so a whole-frame consumer (the encoder) and a damage consumer can
   share a surface.
-- If the `EventBus` mirror lags and misses events, it marks every
+- If the `EventBus` mirror lags and misses events, it resyncs its
+  surface list from the forwarder's `SurfaceLedger`, so a missed
+  surface create or destroy is repaired at once, and marks every
   surface fully damaged so damage consumers resend whole surfaces.
   That keeps a consumer from trusting a partial damage region, but it
-  does not restore the missed pixels or a missed surface create or
-  destroy: the picture recovers only as the guest redraws.
+  does not restore the missed pixels: those recover only as the guest
+  redraws.
 
 ## Multi-Monitor Support
 

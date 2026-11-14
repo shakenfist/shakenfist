@@ -539,7 +539,7 @@ connection ended in `disconnect_kind`:
 | `disconnect_kind` | Meaning |
 |---|---|
 | `ServerClosed` | A read returned no bytes: the server closed the socket cleanly |
-| `ServerAnnounced` | The server sent the main channel's `DISCONNECTING` |
+| `ServerAnnounced` | The server sent the main channel's `DISCONNECTING`; the main channel's end after one is reported this way too, however it ended |
 | `KeepaliveTimeout` | The main channel heard nothing for its keepalive timeout, and ryll gave up |
 | `Error` | The channel failed; `error_message` says how (a reset, for example) |
 | `ConnectFailed` | A connection attempt failed |
