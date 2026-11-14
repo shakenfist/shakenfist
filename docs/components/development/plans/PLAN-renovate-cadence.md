@@ -279,7 +279,16 @@ Out of scope:
    path with a `RENOVATE_DRY_RUN=lookup` run and the write path
    separately, because a lookup dry run creates no branch and opens
    no pull request, so an under-scoped token passes it. Both happen
-   before any per-repository workflow is disabled.
+   before any per-repository workflow is disabled. *Mostly
+   answered* by cutover step 1 (2026-11-14, with the secret scopes
+   read on 2026-11-15): the token pushes to all 23 managed
+   repositories, and it lives in an organisation secret with
+   `selected` visibility plus an environment copy on this
+   repository, with no repository-level copy anywhere in the 23.
+   Phase 2's Record holds the detail, including the one managed
+   repository the organisation list is missing. Whether the runner
+   reads Dependabot alerts is still unconfirmed, because neither dry
+   run logs it at INFO, and that half is carried to phase 3.
 2. **Which timezone do schedules use?** Renovate reads schedules in
    UTC unless `timezone` is set, and today's `after 9pm` is UTC.
    *Answered* on 2026-11-11: the operator chose `Australia/Sydney`,
@@ -1550,6 +1559,167 @@ open question 1 -- what `RENOVATE_TOKEN` actually is and what it can
 reach -- is recorded here too, since the probe is the first thing in
 this plan that establishes it rather than assuming it.
 
+**Cutover step 1: the fleet is discovered exactly, and a pass costs
+under ten minutes** (2026-11-14). Two dispatches, both read-only.
+Run 43543283195 with `dry_run: lookup` took 9m22s for the job and
+7m34s for Renovate itself; run 43557260170 with `dry_run: full`,
+which computes every branch and pull request without writing any of
+them, took 10m05s and 8m12s. Either leaves a wide margin under the
+50-minute `timeout-minutes`, so the number set in 2a stands. Nothing
+here settles the cadence, though: a dry run writes nothing, so 8m12s
+is a floor rather than the cost of a real pass, and the queue delay
+recorded under *Execution notes* sits outside `timeout-minutes`
+entirely. The Situation's measurement of the hourly cron still holds,
+and has drifted slightly down: re-read on 2026-11-15, the last 100
+scheduled runs of `renovate.yml` in `development`, `actions`,
+`shakenfist` and `ryll` span 23 to 24 days each, every one succeeding
+and none cancelled, which is about four of the 24 hourly crons a day
+where the Situation measured five. Step 4's watch day is what
+measures the cadence.
+
+The probe ran first on both, with the job's own `RENOVATE_TOKEN`
+rather than an operator token, and reported:
+
+```
+40 repositories in shakenfist, 23 of them managed by Renovate
+  shakenfist/actions
+  shakenfist/agent-python
+  shakenfist/andris
+  shakenfist/client-python
+  shakenfist/client-python-k3s
+  shakenfist/client-python-ova
+  shakenfist/clingwrap
+  shakenfist/cloudgood
+  shakenfist/development
+  shakenfist/divergulent
+  shakenfist/hunkydory
+  shakenfist/images
+  shakenfist/instar
+  shakenfist/kerbside
+  shakenfist/kerbside-client
+  shakenfist/kerbside-patches
+  shakenfist/library-utilities
+  shakenfist/occystrap
+  shakenfist/ryll
+  shakenfist/sfui
+  shakenfist/shakenfist
+  shakenfist/uncalibrated-sextant
+  shakenfist/visual-digest-rust
+the token can push to all 23 repositories
+```
+
+The 23 are the 23 in *Cutover* above, name for name, with nothing to
+explain. Both runs predate step 2's canary and step 3, so every
+per-repository `renovate.yml` was still enabled when the probe
+reported, which is the second clause of the definition-of-done item
+and the reason the probe runs before anything is disabled. The two
+counts reconcile as 40 in the organisation, 10 of them archived, 30
+autodiscovered by Renovate, 7 of those without a Renovate
+configuration, 23 managed. Renovate logged each of the 7 as
+`disabled-no-config` and onboarded none of them, so `requireConfig`
+and `onboarding: false` behave as decision 5 intended. The probe's
+own line is the weak part of that chain rather than its arithmetic:
+the 40 it prints is the raw organisation listing, taken before the
+archived filter in `managed_repositories()`
+(`scripts/renovate-check-push.py:191`), so it invites a comparison
+with Renovate's 30 that needs this paragraph to resolve. Filed as
+issue #401 rather than fixed here, so that the probe's own log stops
+needing a plan document to read.
+
+**The global rule reaches every repository's resolved config, and
+will close four pull requests** (2026-11-14, run 43557260170). The
+`full` pass proposed no new branch anywhere -- the per-repository
+copies have been running hourly and are current -- but it would
+retire four pull requests that are already open:
+
+| Repository | PR | Title |
+|---|---|---|
+| `actions` | 251 | Update dependency renovate to v44.227.4 |
+| `andris` | 81 | Update dependency renovate to v44.227.4 |
+| `client-python-k3s` | 171 | Update renovatebot/github-action action to v46.3.13 |
+| `kerbside-client` | 24 | Update dependency renovate to v44.227.4 |
+
+Each of the four changes `.github/workflows/renovate.yml` and nothing
+else, which is exactly the file the temporary `packageRules` entry
+disables. That is the proof decision 4 wanted, and a stronger one
+than an absence of output: a global entry matched by `matchFileNames`
+reaches each repository's resolved configuration, demonstrated by
+Renovate retiring work it had already started on the strength of it.
+
+The demonstration is positive for those four repositories and no
+more. The other 19 had no pending `renovate.yml` update for the rule
+to act on, so the run is consistent with the rule applying there
+without evidencing it, and the 23 `Would ensure Dependency Dashboard`
+lines show that each repository's configuration resolved rather than
+that this entry matched in each. The first real pass, or a
+debug-level log, is what would.
+
+The four closures are intended and are recorded here so that whoever
+finds them closed can see why. They update a workflow phase 3
+deletes, so merging them would be churn. The canary in step 2 is
+filtered to this repository and will not touch them; step 3 or step 4
+is where they close. It also means the dependency dashboards in all
+23 repositories would be rewritten by the central runner on its first
+real pass, which the `full` pass shows as 23 `Would ensure Dependency
+Dashboard` lines.
+
+**`RENOVATE_TOKEN` lives in two places, and one managed repository
+can see neither** (2026-11-15). Open question 1 asked where the token
+lives and recorded that answering it needs `admin:org`, which the
+planning session did not have. It is available now. There is an
+organisation secret named `RENOVATE_TOKEN` with `selected`
+visibility over 22 repositories, and an environment secret of the
+same name on this repository's `renovate-write` environment, created
+2026-11-13T04:27:19Z. No repository-level `RENOVATE_TOKEN` exists in
+any of the 23 -- each was checked -- so phase 3's choice resolves to
+restricting the organisation secret's repository list, with nothing
+to delete per repository. Which of the two copies the fleet runner's
+job received is not determinable from the run: both hold a working
+token, and neither of GitHub's two secrets pages -- the concept page
+and the how-to -- states a precedence between an environment secret
+and an organisation secret of the same name, which is the same gap
+*Two claims about the environment were wrong* records one level down.
+
+The 22 are not the 23. `uncalibrated-sextant` is managed by Renovate,
+is not on the organisation secret's list, and has no repository
+secrets of its own, so `secrets.RENOVATE_TOKEN` is empty there. Its
+hourly `renovate.yml` has failed every scheduled run it has ever had
+-- 12 of 12, from 2026-11-11T15:40:59Z, which is its whole run
+history -- each ending `FATAL: Initialization error`
+with `"You must configure a GitHub token"`. The other 22 each
+succeeded on all of their last 10 scheduled runs. That correlation is
+also the clearest evidence available that the per-repository
+workflows read the organisation secret rather than something else:
+every repository on the list works, and the one repository off it has
+never worked. The cutover fixes it as a side effect, since the fleet
+runner uses this repository's token and the probe reports it can push
+to all 23, so the first real central pass would have been the first
+dependency update `uncalibrated-sextant` ever had. It was fixed on
+its own terms instead, on 2026-11-15 with the operator's approval:
+the repository was added to the organisation secret's selected list
+with the single-repository endpoint, taking it from 22 to 23, and the
+selected set is now exactly the 23 Renovate manages. The run was not
+forced, so its own cron is what proves it.
+
+What is left is why it happened, and it is why issue #402 stays open:
+nothing checks the organisation secret's selected list against the
+set of repositories carrying a `renovate.json`. The probe is the
+closest thing and cannot do it, because it reads `permissions.push`
+for the token it already holds and cannot see secret visibility. The
+next repository onboarded without being added to the list fails the
+same way, silently. Both candidate homes for the check -- the
+consistency audit's `renovate` criterion, or the probe itself --
+need `admin:org`, which neither has today.
+
+**Open question 1's read path is still open after both dry runs**
+(2026-11-14). Neither pass mentions Dependabot or vulnerability alerts
+at the default INFO log level, in either mode, so neither confirms nor
+denies that the central runner reads them. Absence of a log line is
+not absence of the fetch, and nothing here should be read as either.
+Answering it needs debug logging, which the workflow does not expose
+as an input; it is carried to phase 3 rather than left looking
+settled.
+
 #### Execution notes
 
 Dates are Australian Eastern Daylight Time (UTC+11).
@@ -1557,8 +1727,10 @@ Dates are Australian Eastern Daylight Time (UTC+11).
 **The back brief's four answers** (2026-11-13). Decision 2 stands: the
 runner is an ephemeral VM in the `renovate-write` environment, with
 the operator creating the environment himself, since it is a
-repository setting rather than a file in a pull request. The workflow
-references it and is inert until it exists.
+repository setting rather than a file in a pull request. Naming it in
+the workflow does not create that protection -- see *Two claims about
+the environment were wrong* below -- so the restriction binds only
+once the operator has configured it.
 
 **Phase 2 lands in two pull requests, not one** (2026-11-13). GitHub
 offers `workflow_dispatch` only for a workflow that exists on the
@@ -1659,6 +1831,27 @@ configuration under `--no-global`, so the hook fails from the moment
 rather than worked around: renaming the file to dodge the hook's
 derived pattern would have left the fleet's most privileged
 configuration the one file nobody validates.
+
+**The VM runner pool was drained under step 1** (2026-11-14). The
+first dispatch queued at 01:54 and did not start until 04:21, because
+sfcbr was drained for maintenance and nothing with the `vm` label was
+answering. Three unrelated jobs were queued behind the same shortage
+-- `Secret scan`, `Mermaid lint` and `Prune and import review marks`
+-- so the cause was the pool rather than the labels or the
+environment, and `secret-scan.yml` and `prune-reviews.yml` have used
+the identical label set for months. The queued dispatch ran itself
+when the pool returned; no retry was needed. Worth knowing for the
+watch day in step 4: a drained pool does not fail the runner, it
+delays it silently, and `timeout-minutes` does not cover queue time.
+
+**The runner's Renovate version moved between step 1's two runs**
+(2026-11-14). `lookup` ran 44.222.2 and `full` ran 44.227.4, because
+#398 merged `ac1b8a6` between them, bumping
+`PINNED_RENOVATE_VERSION` in `renovate-fleet.yml`. That is this
+repository's own hourly copy finding the new file within hours of the
+merge, which incidentally confirms the custom manager matches the
+fleet runner as well as the template, but it means the two durations
+differ in version as well as in mode.
 
 #### Risks and mitigations
 
