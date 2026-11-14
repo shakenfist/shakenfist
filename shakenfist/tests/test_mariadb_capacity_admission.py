@@ -16,7 +16,9 @@ uuid forms actually have to match and the driver's rowcount semantics
 actually matter -- is test_mariadb_capacity_admission_live.py.
 """
 
+import ast
 import inspect
+import textwrap
 from types import SimpleNamespace
 from unittest import mock
 from uuid import UUID
@@ -30,6 +32,7 @@ from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.protos import database_pb2
 from shakenfist.tests import base
+from shakenfist.tests import mock_mariadb as mock_mariadb_fixture
 
 
 MYSQL_DIALECT = sa.dialects.mysql.dialect()
@@ -740,6 +743,122 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertEqual(6.0, detail['cpus']['used'])
         self.assertTrue(detail['cpus']['exceeded'])
 
+    def test_a_claim_denial_names_the_claim_it_was_refused_against(self):
+        # A refusal an operator can act on has to say which claim to
+        # grow, not merely which namespace overspent: a namespace whose
+        # claim was grown by delete-and-create leaves a trail spanning
+        # several claims, and the namespace name alone cannot pick one
+        # out. The guard is flipped on here because that is the only way
+        # to reach the stage the way a real refusal will.
+        with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
+            router = _PlacementRouter(
+                claim=_claim_row(limit_cpus=8, used_cpus=6),
+                rowcounts={'claim_update': 0})
+            result = self._run(router)
+
+        self.assertEqual('claim', result['failing_stage'])
+        self.assertEqual(str(CLAIM1), result['claim_uuid'])
+        # Nothing was charged -- the transaction rolled back -- so the
+        # uuid is an identity and not an accounting entry.
+        self.assertFalse(result['claim_over_limit'])
+        self.assertEqual([], result['claim_dimensions'])
+
+    def test_a_node_denial_names_no_claim(self):
+        # The discriminating case: the namespace *does* hold a claim, so
+        # a reply that reported it here would tell an operator to grow a
+        # claim that was never the constraint. The node refused, and the
+        # claim is not what has to change.
+        router = _PlacementRouter(
+            claim=_claim_row(), node_row=_capacity_row(used_cpus=47),
+            rowcounts={'node_claim': 0})
+        result = self._run(router)
+
+        self.assertEqual('node', result['failing_stage'])
+        self.assertEqual('', result['claim_uuid'])
+
+    def test_a_cluster_denial_names_no_claim(self):
+        # An unclaimed namespace refused by D14's unclaimed guard has no
+        # claim to name at all.
+        router = _PlacementRouter(
+            claim=None, rowcounts={'cluster_update': 0},
+            cluster_row=_cluster_row(
+                total_cpus=20, claimed_cpus=0, unclaimed_used_cpus=18))
+        result = self._run(router)
+
+        self.assertEqual('cluster', result['failing_stage'])
+        self.assertEqual('', result['claim_uuid'])
+
+    def test_a_claim_stage_denial_can_never_carry_an_empty_claim_uuid(self):
+        # The contradiction this invariant forbids: a refusal that says
+        # it was the claim which refused, and then cannot say which
+        # claim. Asserted two ways, because each catches a different
+        # regression.
+        #
+        # First over every denial shape the primitive can produce, so a
+        # future stage that forgets to carry the uuid fails here.
+        scenarios = {
+            'claim': _PlacementRouter(
+                claim=_claim_row(limit_cpus=8, used_cpus=6),
+                rowcounts={'claim_update': 0}),
+            'cluster': _PlacementRouter(
+                claim=None, rowcounts={'cluster_update': 0}),
+            'node': _PlacementRouter(
+                claim=_claim_row(), rowcounts={'node_claim': 0}),
+        }
+        for stage, router in scenarios.items():
+            with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
+                result = self._run(router)
+            self.assertEqual(stage, result['failing_stage'])
+            if stage == 'claim':
+                self.assertNotEqual(
+                    '', result['claim_uuid'],
+                    'a claim-stage denial must name the claim that '
+                    'refused')
+            else:
+                self.assertEqual(
+                    '', result['claim_uuid'],
+                    f'a {stage} denial was refused against no claim')
+
+        # And then at every raise site, because the assertions above can
+        # only test the denial shapes this test happens to build: a
+        # second claim-stage raise added later would refuse with no claim
+        # named and nothing here would notice. Read from the syntax tree
+        # rather than matching the source line, so re-wrapping the raise
+        # does not fail a test about its arguments.
+        tree = ast.parse(textwrap.dedent(
+            inspect.getsource(mariadb._direct_admit_instance_placement)))
+
+        def _stage_of(node):
+            # Either call form, because this test is about the arguments
+            # a raise carries and must not fail a rewrite that only
+            # moves them.
+            if node.args and isinstance(node.args[0], ast.Constant):
+                return node.args[0].value
+            for keyword in node.keywords:
+                if (keyword.arg == 'stage'
+                        and isinstance(keyword.value, ast.Constant)):
+                    return keyword.value.value
+            return None
+
+        claim_raises = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == '_AdmissionDenied'
+            and _stage_of(node) == 'claim']
+
+        self.assertEqual(
+            1, len(claim_raises),
+            'the number of claim-stage denial sites changed; each one '
+            'must name the claim that refused')
+        for node in claim_raises:
+            self.assertEqual(
+                2, len(node.args) + len(node.keywords),
+                'a claim-stage denial was raised with the stage alone '
+                'and no uuid for the claim that refused; either '
+                "_AdmissionDenied('claim', uuid) or claim_uuid=uuid "
+                'satisfies this')
+
     def test_node_denial_reports_the_demand_dimension_too(self):
         # A node guard can refuse on the D13 clause with every
         # allocation dimension fitting, and a denial with no exceeded
@@ -822,6 +941,73 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
         result = self._run(router)
         self.assertTrue(result['success'])
         self.assertEqual('', result['error'])
+
+
+class MockDoubleClaimDenialTestCase(base.ShakenFistTestCase):
+    """The double's denial reply carries claim_uuid, as the real one does.
+
+    Callers are written against mock_mariadb, so a field the primitive
+    reports and the double does not is a field no caller-side test can
+    exercise -- which is how the admitted path's claim_uuid came to be
+    the only one populated in the first place.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.db = mock_mariadb_fixture.MockMariaDB(self, node_count=1)
+        # The double only tests this row for presence.
+        self.db.instance_attributes[str(INST1)] = SimpleNamespace()
+
+    def _admit(self, **kwargs):
+        args = {
+            'instance_uuid': str(INST1), 'namespace': 'ci-1',
+            'node_uuid': str(NODE1), 'cpus': 4, 'memory_mb': 4096,
+            'disk_gb': 20, 'placement_json': PLACEMENT_JSON,
+        }
+        args.update(kwargs)
+        return self.db._mariadb_admit_instance_placement(**args)
+
+    def test_a_forced_claim_denial_names_the_claim_that_refused(self):
+        claim = self.db.set_namespace_claim(
+            'ci-1', limit_cpus=2, limit_memory_mb=16384, limit_disk_gb=100,
+            claim_uuid=CLAIM1)
+        self.db.set_node_capacity(
+            NODE1, limit_cpus=48, limit_memory_mb=196608, limit_disk_gb=500)
+
+        with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
+            result = self._admit()
+
+        self.assertEqual('claim', result['failing_stage'])
+        self.assertEqual(claim['uuid'], result['claim_uuid'])
+        # The denial charged nothing, exactly as the rollback does.
+        self.assertEqual(0, claim['used_cpus'])
+
+    def test_a_node_denial_names_no_claim(self):
+        self.db.set_namespace_claim(
+            'ci-1', limit_cpus=48, limit_memory_mb=196608,
+            limit_disk_gb=500, claim_uuid=CLAIM1)
+        self.db.set_node_capacity(
+            NODE1, limit_cpus=2, limit_memory_mb=196608, limit_disk_gb=500)
+
+        with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
+            result = self._admit()
+
+        self.assertEqual('node', result['failing_stage'])
+        self.assertEqual('', result['claim_uuid'])
+
+    def test_an_admission_still_names_the_claim_it_charged(self):
+        # The property the double already had, kept: adding the denial
+        # case must not have moved the assignment off the admitted path.
+        claim = self.db.set_namespace_claim(
+            'ci-1', limit_cpus=48, limit_memory_mb=196608,
+            limit_disk_gb=500, claim_uuid=CLAIM1)
+        self.db.set_node_capacity(
+            NODE1, limit_cpus=48, limit_memory_mb=196608, limit_disk_gb=500)
+
+        result = self._admit()
+
+        self.assertTrue(result['admitted'])
+        self.assertEqual(claim['uuid'], result['claim_uuid'])
 
 
 class AdmitMoveTestCase(_PlacementMixin, base.ShakenFistTestCase):
@@ -1698,8 +1884,25 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
         'node_used_cpus': 0, 'node_used_memory_mb': 0,
         'node_used_disk_gb': 0, 'node_expected_demand': 0.0,
         'claim_over_limit': False, 'claim_dimensions': [],
-        # A denial rolled its transaction back, so nothing was charged.
+        # The node refused, so no claim was consulted and there is none
+        # to name. See CLAIM_DENIED for the stage that does name one.
         'claim_uuid': '',
+        'unguarded_reason': '',
+    }
+    CLAIM_DENIED = {
+        'success': True, 'error': '', 'admitted': False, 'unguarded': False,
+        'clamped': False, 'clamps': [], 'failing_stage': 'claim',
+        'dimensions': [
+            {'dimension': 'cpus', 'limit': 8.0, 'used': 6.0,
+             'requested': 4.0, 'exceeded': True, 'shortfall': 2.0},
+        ],
+        'node_used_cpus': 0, 'node_used_memory_mb': 0,
+        'node_used_disk_gb': 0, 'node_expected_demand': 0.0,
+        # Nothing was charged -- the transaction rolled back -- so this
+        # is not the advisory accounting; it is which claim refused, and
+        # therefore which claim an operator has to grow.
+        'claim_over_limit': False, 'claim_dimensions': [],
+        'claim_uuid': str(CLAIM1),
         'unguarded_reason': '',
     }
     OVER_CLAIM = {
@@ -1755,6 +1958,15 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
     def test_denied_round_trip_preserves_the_dimension_detail(self):
         unpacked, _ = self._unpack(self._admit_reply(self.DENIED))
         self.assertEqual(self.DENIED, unpacked)
+
+    def test_a_claim_denial_round_trip_names_the_claim(self):
+        # The reply builder sets claim_uuid for every outcome rather
+        # than only the admitted one, so the denial path needed no wire
+        # change -- which is worth a test rather than a note, because a
+        # future refactor that moved the assignment under an
+        # ``if admitted`` would be invisible otherwise.
+        unpacked, _ = self._unpack(self._admit_reply(self.CLAIM_DENIED))
+        self.assertEqual(self.CLAIM_DENIED, unpacked)
 
     def test_a_reply_without_the_breakdown_reads_as_absent_not_zero(self):
         # Mixed-version window: an sf-database predating the optional
