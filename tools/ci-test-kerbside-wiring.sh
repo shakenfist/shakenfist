@@ -21,19 +21,21 @@
 # refuses an empty key, a CA which is not a PEM, a loopback api_url on a host
 # which is not a Shaken Fist node, a cleartext api_url which does not point at
 # this host (while accepting one which names this node's own inventory
-# address), a PKI directory equal to or inside the SPICE one, and a
-# kerbside_url the two sides see differently; that the cluster shape play
-# refuses a kerbside_url which ends in a slash, or which Shaken Fist's nodes
-# see differently, before any host is changed; that the validation play checks
-# every Kerbside host with the variables that host sees, and that a refusal on
-# any host ends the run; that without the collection it names the install
-# command when there is a Kerbside host, and does nothing when there is none;
-# that it accepts a release in the
-# range requirements.yml pins, refuses one outside it, and accepts a checkout
-# with a warning; that kerbside_extra_sources follow this cluster's source;
-# that the Deploy play's source carries the CA byte for byte; that internal_ca
-# issues the proxy certificate with an IP SAN for an address and a DNS SAN for
-# a name; and that the secrets never reach the ansible output.
+# address), a PKI directory equal to or inside the SPICE one, a public FQDN
+# which is an allsf host's inventory name or node_name whatever its case
+# (while accepting one of that host's addresses), and a kerbside_url the two
+# sides see differently; that the cluster shape play refuses a kerbside_url
+# which ends in a slash, or which Shaken Fist's nodes see differently, before
+# any host is changed; that the validation play checks every Kerbside host
+# with the variables that host sees, and that a refusal on any host ends the
+# run; that without the collection it names the install command when there is
+# a Kerbside host, and does nothing when there is none; that it accepts a
+# release in the range requirements.yml pins, refuses one outside it, and
+# accepts a checkout with a warning; that kerbside_extra_sources follow this
+# cluster's source; that the Deploy play's source carries the CA byte for
+# byte; that internal_ca issues the proxy certificate with an IP SAN for an
+# address and a DNS SAN for a name; and that the secrets never reach the
+# ansible output.
 #
 # No host is changed: the plays are extracted from site.yml by name and run
 # against an inventory whose hosts are all this machine, with every play which
@@ -924,14 +926,37 @@ PYEOF
         '"kerbside_colocated": true, "kerbside_pki_dir": "/etc/pki/libvirt-spice-kerbside"')" \
         "${WORK}/kerbside-source.yml" || fail 'kerbside_source refused a PKI directory beside the SPICE one'
 
-    CURRENT_CASE='case 6: kerbside_source refuses a public FQDN equal to a Shaken Fist host name'
-    printf 'localhost ansible_connection=local\n[allsf]\nlocalhost\n' > "${WORK}/inv-allsf.ini"
-    if run "${WITHOUT}" -i "${WORK}/inv-allsf.ini" \
-        -e "$(source_vars fqdn-clash '"kerbside_public_fqdn": "localhost"')" "${WORK}/kerbside-source.yml"; then
-        fail 'kerbside_source accepted a public FQDN equal to a host name'
-    fi
-    assert_output_has 'the name of a host in'
-    assert_output_has 'fatal: [localhost]: FAILED!'
+    # The proxy certificate's CN is kerbside_public_fqdn, signed by the CA
+    # which signs the hypervisors' SPICE certificates, so it may not be a name
+    # one of those certificates carries: the host's inventory name, which is
+    # its certificate's CN, or its node_name, which is the subject Kerbside
+    # synthesizes for a node that publishes none. The inventory below is an
+    # allsf host whose names differ, which is the inventory the check on the
+    # inventory name alone missed (#4817). An address is not refused: nothing
+    # issues a certificate for one, and it is the remedy the message
+    # recommends on a single-host cluster.
+    printf 'localhost ansible_connection=local node_name=sf1.example.com node_mesh_ip=10.0.0.1\n[allsf]\nlocalhost\n' \
+        > "${WORK}/inv-allsf.ini"
+    local clash
+    for clash in localhost LocalHost sf1.example.com SF1.Example.com; do
+        CURRENT_CASE="case 6: kerbside_source refuses the public FQDN ${clash}, a Shaken Fist certificate subject"
+        if run "${WITHOUT}" -i "${WORK}/inv-allsf.ini" \
+            -e "$(source_vars fqdn-clash "\"kerbside_public_fqdn\": \"${clash}\"")" \
+            "${WORK}/kerbside-source.yml"; then
+            fail "kerbside_source accepted the public FQDN ${clash}, which an allsf host is named by"
+        fi
+        assert_output_has 'is identified by'
+        assert_output_has 'failed: [localhost] (item=localhost)'
+    done
+
+    local distinct
+    for distinct in console.sf1.example.com 10.0.0.1; do
+        CURRENT_CASE="case 6: kerbside_source accepts the public FQDN ${distinct}, which no certificate carries"
+        run "${WITHOUT}" -i "${WORK}/inv-allsf.ini" \
+            -e "$(source_vars fqdn-distinct "\"kerbside_public_fqdn\": \"${distinct}\"")" \
+            "${WORK}/kerbside-source.yml" \
+            || fail "kerbside_source refused the public FQDN ${distinct}, which no allsf certificate carries"
+    done
 }
 
 case_7_site_validation_runs() {

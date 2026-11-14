@@ -262,9 +262,14 @@ a load balancer's job), so adding a `kerbside` group to such a cluster means
 either giving `api_url` an `https://` endpoint or setting
 `kerbside_allow_insecure_api_url: true`; this is checked on every deploy, not
 just the first, so an existing cluster meets it at upgrade time.
-`kerbside_public_fqdn` must also not be the name of a host in `allsf`, and on
-a Kerbside host which is also a Shaken Fist node `kerbside_pki_dir` must not
-be `/etc/pki/libvirt-spice`, or a directory inside it, which holds that node's
+The proxy certificate comes from the same CA as the hypervisors' SPICE
+certificates, so `kerbside_public_fqdn` must also not be a name one of those
+certificates carries: an `allsf` host's inventory name, which is that host's
+certificate CN, or its `node_name`, which Kerbside can synthesize a subject
+from. Case is ignored in that comparison, and one of those hosts' addresses
+is not a name any certificate is issued for, so it is accepted. On a Kerbside
+host which is also a Shaken Fist node `kerbside_pki_dir` must not be
+`/etc/pki/libvirt-spice`, or a directory inside it, which holds that node's
 SPICE certificate. Each Kerbside host is checked with its own variables, so a
 `host_vars` override is checked too. The playbook builds this cluster's console
 source for Kerbside itself, and `kerbside_extra_sources` adds sources for other

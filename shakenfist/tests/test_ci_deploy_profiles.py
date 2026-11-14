@@ -286,6 +286,25 @@ class CiDeployProfilesTestCase(base.ShakenFistTestCase):
                 fqdn, urllib.parse.urlsplit(url).hostname,
                 "%s: kerbside_url's host is not kerbside_public_fqdn." % name)
 
+    def test_kerbside_public_fqdn_is_not_a_node_name(self):
+        # kerbside_source refuses a kerbside_public_fqdn equal to a name an
+        # allsf host's certificate carries -- its inventory name, or its
+        # node_name, which Kerbside can synthesize a subject from -- because
+        # the proxy certificate's CN would then satisfy that hypervisor's
+        # pinned host subject. Every CI node is in allsf, and actions names
+        # each node's node_name after the host, so the FQDN must differ from
+        # every node name. A node's address is deliberately not refused, and
+        # is what the lane uses.
+        for name, topology, profile, group in self._kerbside_profiles():
+            fqdn = str(self._effective(profile, group, 'kerbside_public_fqdn', '')).strip().lower()
+            names = sorted(node['name'].lower() for node in TOPOLOGY_FACTS[topology]['nodes'])
+            self.assertNotIn(
+                fqdn, names,
+                '%s: kerbside_public_fqdn is %s, which is the name of a node in this topology '
+                '(%s). kerbside_source would refuse the deploy in its validation play, before '
+                "any host is changed. Use a name of Kerbside's own, or the host's address."
+                % (name, fqdn, ', '.join(names)))
+
     def test_kerbside_url_has_no_trailing_slash(self):
         # sf-api strips a trailing slash before minting the audience, and
         # Kerbside takes kerbside_url verbatim, so the cluster shape play
