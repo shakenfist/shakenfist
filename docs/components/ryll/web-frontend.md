@@ -376,10 +376,22 @@ session, look for:
 
     inputs: N consecutive pointer moves dropped ...
 
-That is the ack window wedged — the server acknowledges only the
-pointer messages it consumes, so a client sending the form the
-server did not negotiate fills the window once and drops
-everything after it.
+That is the ack window wedged: the server has stopped
+acknowledging pointer messages, so ryll drops every move after the
+window fills. The rest of the line says which of two causes the
+session points at:
+
+- **The server is still sending on other channels.** It is alive
+  but ignoring the pointer form ryll sends. The server acknowledges
+  only the pointer messages it consumes, so a client sending the
+  form the server did not negotiate fills the window once and drops
+  everything after it. The line names the message ryll sends
+  (`MOUSE_POSITION` in client mode, `MOUSE_MOTION` in server mode);
+  compare it with the negotiated mode above.
+- **Nothing has arrived on any channel since the last ack.** The
+  server itself appears to have stalled, for instance on a guest
+  display it is blocked on, and the mouse mode is not the likely
+  cause. Expect the display to be frozen too.
 
 In server mode specifically, expect the guest pointer and your own
 to drift apart over a session. The browser reports absolute

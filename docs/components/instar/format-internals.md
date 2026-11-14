@@ -109,6 +109,33 @@ cookie/checksum/version, BAT offset and entry bounds checking, overlap
 detection via 1-bit-per-block bitmap, fragmentation tracking, fixed VHD
 size validation, and footer copy consistency (start vs end of file).
 
+Reads apply a placement rule to BAT entries, as the VHDX reader does
+below. A block — its 512-byte sector bitmap followed by its payload — is
+refused when its byte range overlaps a region the image declares for its
+own metadata: the footer copy at offset 0, the dynamic header the footer
+locates, or the BAT the dynamic header locates. All four BAT consumers
+apply it, so `convert`, `dd`, `compare`, `bench` and `rebase` (through
+`block_lookup` and `differencing_block_lookup`), `map` (`map_extents`)
+and `measure` (`scan_allocation`) give one answer about one image rather
+than three. A BAT entry of 0, for instance, puts a block's bitmap on the
+footer copy and its payload on the dynamic header, and instar used to
+serve the image's own `cxsparse` dynamic header to the guest as data.
+
+This is deliberately stricter than qemu, which reads such a block out
+(measured with qemu-img 10.0.13: `qemu-img convert` of a VHD whose first
+BAT entry is 0 yields the image's own header bytes as guest payload). It
+is the rule instar already applied to a VHD *locator*, whose data is
+refused for overlapping the footer or the dynamic header, and to a VHDX
+payload block; a VHD block is the one of the three that reaches the
+guest as payload.
+
+The trailing footer is not one of the regions: it is located by the
+file's length rather than declared by the image, and the guest knows
+that length only as a sector count rounded up past end-of-file, so a
+range computed from it would refuse legitimate blocks in an image whose
+sector size is above 512. Reads are bounded by the input capacity
+regardless.
+
 ## vhdx
 
 Microsoft VHDX Virtual Hard Disk v2 (Hyper-V). Supported:
@@ -133,6 +160,28 @@ region plus the virtual size.
 VHDX uses CRC-32C (Castagnoli) checksums, GUID-identified metadata,
 64-bit BAT entries with interleaved sector bitmap entries, and 1MB-aligned
 structures. All on-disk fields are little-endian.
+
+The metadata table must not declare two items that overlap each other
+(SPEC(VHDX) 2.6.1.2: an item "MUST NOT overlap with any other region in
+the file"), and an image whose table does is refused. Overlapping items
+have no single meaning: which item's bytes a reader uses depends on the
+reader, so the same file can describe two different disks. Neither
+oracle refuses them — libvhdi reads a clean overlap of two items as a
+sound image, and qemu-img cannot open a differencing VHDX at all — so
+this rule follows the specification rather than an implementation. It
+covers the items instar reads, each over the length the table declares
+for it; items instar does not recognise, and a GUID listed twice, are
+not checked.
+
+A differencing image's parent locator is honoured only when its
+`LocatorType` GUID is the one SPEC(VHDX) 2.6.2.6 defines, and only when
+the locator item itself carries no structural defect. A locator
+declaring any other type is a file stating that it is not a VHDX parent
+locator, and instar used to read the parent path out of it anyway and
+report it as the file `convert` would open; libvhdi refuses the whole
+image for it ("unsupported type indicator"). instar reports no parent
+instead, which every composing operation then refuses by name, as it
+does for a differencing image with no parent behind it.
 
 The check operation performs full structural validation: file identifier
 signature check, dual header CRC-32C validation with active header

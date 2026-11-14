@@ -214,11 +214,15 @@ of CI time is recorded alongside it, but it is not the target,
 because the runs API's 1,000-run cap gives each repository a
 different window. Three changes do this:
 
-1. **Run one Renovate instead of seventeen.** A single scheduled
+1. **Run one Renovate instead of 23.** A single scheduled
    workflow in this repository runs Renovate across the
    organisation. The per-repository `renovate.yml` copies go away,
-   and with them about 111 of the 227 monthly pull requests and the
-   roughly 85 daily Renovate runs on `static`.
+   and with them the roughly 85 daily Renovate runs on `static`
+   and the pull requests that bump each copy's own Renovate pin:
+   204 in the 30 days to 2026-11-11, where the Situation's window
+   saw 111 for the container action the copies ran then. The copy
+   count was seventeen when this plan was written; phase 2's
+   survey, item 3, counted 23 on 2026-11-12.
 2. **Put the fleet policy in one shared preset**, so that each
    repository's `renovate.json` holds only what is particular to it
    (lockstep groups, Python constraints, range strategy). The
@@ -307,8 +311,8 @@ Out of scope:
 
 | Phase | Status | Merged |
 |-------|--------|--------|
-| 1. Shared preset and its validation | In progress | |
-| 2. Central runner and cutover | Not started | |
+| 1. Shared preset and its validation | Complete | `47086db` |
+| 2. Central runner and cutover | In progress | |
 | 3. Fleet sweep and audit change | Not started | |
 | 4. Re-measure | Not started | |
 | 5. Push audit | Not started | |
@@ -1168,133 +1172,616 @@ Planning effort: high. This phase is the only one with live,
 fleet-wide effect, and the cutover order is what prevents duplicate
 pull requests.
 
-**Scope.** Add `.github/workflows/renovate-fleet.yml` to this
-repository on `[self-hosted, static]`, hourly, with
-`concurrency: renovate-fleet` and no cancel-in-progress (the reasoning
-in the template's comment carries over). Schedule it off the hour
-(for example `cron: '23 * * * *'`), not at the template's `0 * * *
-*`: the Situation section shows GitHub delaying and dropping
-top-of-hour events, and one runner instead of seventeen means a
-dropped run now delays every repository at once. An off-hour minute
-is GitHub's documented mitigation, not a guarantee, which is why the
-watch below counts the runs. Raise `timeout-minutes` to match a
-serial pass over about 20 repositories; measure a dry run first
-rather than guessing.
+#### Scope
 
-The runner's own configuration is a global (self-hosted) Renovate
-configuration file, `renovate-runner.json` at the root of this
-repository, passed to the action through its `configurationFile`
-input; the workflow therefore checks out this repository's default
-branch and nothing else. The file holds `autodiscover: true`, an
-`autodiscoverFilter` of `["shakenfist/*"]`, `requireConfig:
-"required"`, `onboarding: false` and the temporary package rule
-below. Together the first four mean a repository is managed only if
-it carries a `renovate.json`, and the runner never opens an
-onboarding pull request in a repository that does not. The workflow
-sets only the token, the log level, and two `workflow_dispatch`
-inputs the cutover uses: a dry-run mode passed as
-`RENOVATE_DRY_RUN`, and a narrower filter passed as
-`RENOVATE_AUTODISCOVER_FILTER`. Confirm in the Renovate version the
-action runs that an environment variable takes precedence over the
-file, which is the documented order, before relying on the filter
-input. Add `renovate-runner.json` to the validator hook's `files:`
-from step 1b, and break it on purpose to prove the hook reads it.
-Flagged uncertainty: `renovate-config-validator` validates files
-passed as arguments as repository configuration, and global-only
-options such as `autodiscoverFilter` may be reported as invalid
-there; if they are, validate the file as global configuration
-instead (the validator reads the file named by
-`RENOVATE_CONFIG_FILE` as global), and record which invocation the
-hook uses.
+In scope: `.github/workflows/renovate-fleet.yml` in this repository,
+its global configuration file `renovate-runner.json`, the validator
+hook change that makes a global file checkable at all, the two
+preset rules that have to learn about the new workflow, and the
+cutover of all 23 managed repositories in the order below.
 
-The workflow holds the one copy of a token that can push to every
-repository, so it gets least privilege: top-level `permissions:
-contents: read` (Renovate acts through `RENOVATE_TOKEN`, not
-`GITHUB_TOKEN`), only `schedule` and `workflow_dispatch` triggers,
-and no checkout of any ref but this repository's default branch.
-The runner label matters as much: `[self-hosted, static]` also runs
-`ci.yml`'s `lint-and-test` on pull-request code, so if `static`
-runners are persistent rather than ephemeral, a pull request's job
-could leave something behind (a modified tool cache, a background
-process) for the next Renovate job to pick up along with the token.
-The per-repository copies already carry that exposure, but this
-phase puts the token's whole reach behind one job. Find out whether
-`static` runners are ephemeral and record the answer here; if they
-are not, run `renovate-fleet.yml` on a dedicated label, or record
-the residual risk as accepted, before the cutover.
+Out of scope: deleting any repository's `.github/workflows/renovate.yml`
+or moving its `renovate.json` onto the preset, which is phase 3;
+re-measuring pull request volume, which is phase 4; and changing any
+schedule the preset already sets, which phase 1 settled.
 
-`renovate-runner.json` also carries a temporary
-`packageRules` entry, `matchFileNames:
-[".github/workflows/renovate.yml", "templates/renovate/renovate.yml"]`
-with `enabled: false`. Between this phase and phase 3 the disabled
-per-repository workflow files are still in the tree, and without the
-rule every `renovatebot/github-action` release would open about 16
-pull requests bumping workflows that no longer run -- the churn this
-plan exists to remove. The second path is this repository's
-template, which its `renovate.json` scans through the `templates/`
-file pattern. The rule names files rather than disabling the
-`renovatebot/github-action` package, because `renovate-fleet.yml`
-uses that action too and must keep being bumped. Phase 3 deletes the
-rule once no managed repository carries either file. A global
-`packageRules` entry is a default that each repository's resolved
-configuration (the preset, then its own `renovate.json`) is merged
-on top of: the arrays are concatenated, and a later rule that
-matches the same dependency and sets `enabled` would win. No rule in
-the fleet does that today, and cutover step 1 checks that the
-temporary rule actually takes effect rather than assuming it.
+#### What the survey found
 
-`renovate-fleet.yml` is the most privileged workflow in the fleet,
-and the action that receives the token should not wait a month for
-a fix that carries no advisory. This repository's own
-`renovate.json` therefore gives `renovatebot/github-action` in
-`.github/workflows/renovate-fleet.yml` (`matchFileNames` and
-`matchPackageNames` together) its own `groupName` and the weekly
-schedule, overriding the preset's CI-tooling group. That rule is
-local because the file exists only here. It costs about four pull
-requests a month, at the action's current release rate.
+The master plan's phase 2 section was written on 2026-10-03, before
+the fleet left `renovatebot/github-action` on 2026-10-15 and before
+phase 1 shipped the preset. Six of its claims had moved. All of them
+are corrected at their source in the commit that adds this plan, so
+the prose above no longer disagrees with the tree.
 
-Cutover, in this order:
+1. **The central runner cannot use `renovatebot/github-action`.**
+   The section passed the runner's configuration "to the action
+   through its `configurationFile` input", named the action as the
+   dependency the temporary rule suppresses, and gave it a local
+   weekly override. Phase 1's survey item 1 already recorded that
+   `templates/renovate/renovate.yml` stopped using the action on
+   2026-10-15 and installs the npm `renovate` package instead.
+   `docs/audits/renovate.md` gives the reason, and it applies to
+   this workflow with full force: "The static runner pool is
+   gaining ephemeral pods on a Kubernetes cluster, and they have no
+   Docker daemon, so the action fails on every run a pod takes."
+   Three repositories still run the action (`agent-python`,
+   `client-python`, `client-python-k3s`) and are non-compliant for
+   it, so the action survives in the fleet but not as anything this
+   phase should adopt.
 
-1. Dry run the central workflow with `RENOVATE_DRY_RUN=lookup` from
-   `workflow_dispatch`. Confirm it discovers the expected
-   repositories, that the token can reach each one and read its
-   Dependabot alerts (open question 1), and that the
-   `renovatebot/github-action` dependency in each repository's
-   `renovate.yml`, and in this repository's template, is reported as
-   disabled by the temporary rule. This proves the read path only.
-2. Prove the write path before anything is disabled fleet-wide. The
-   workflow's first step, before Renovate starts, calls `GET
-   /repos/shakenfist/<repo>` with `RENOVATE_TOKEN` for every
-   repository the dry run discovered and fails the job, naming the
-   repository, if `permissions.push` is not true; record the result
-   here. Then canary on `development`: `gh workflow disable
-   renovate.yml` here (its copy is in the `renovate` concurrency
-   group rather than `renovate-fleet`, so nothing else stops it
-   racing the central runner), tick one held update on this
-   repository's dependency dashboard, and dispatch the central
-   workflow for real with the filter input set to
-   `shakenfist/development`. Confirm it pushed that update's branch,
-   opened or updated its pull request, and rewrote the dashboard.
-3. `gh workflow disable renovate.yml` in every other managed
-   repository. Record the full list, `development` included, in this
-   section, so the rollback is mechanical.
-4. Enable the central runner's schedule and watch a full day:
-   dependency dashboards update, no duplicate branches appear, and
-   any open Renovate pull requests are adopted rather than reopened.
-   Record here how many times `renovate-fleet.yml` ran that day,
-   each run's duration, and the longest gap between runs, against
-   the Situation's median of 4 hours 47 minutes and longest of 9
-   hours 35 minutes. A pass that approaches 60 minutes reduces the
-   cadence silently: GitHub keeps one pending run per concurrency
-   group and cancels the older one, so superseded runs count
-   against the success criterion that the runner runs at least as
-   often as the copies did. If the central runner is not clearly
-   better, stop and investigate before phase 3: the plan's promise
-   on security latency rests on Renovate actually running.
+2. **The runner-label question is already answered, and the answer
+   is no.** The section asked whether `static` runners are ephemeral
+   and said to record the answer. This repository recorded it in
+   `.github/workflows/consistency-audit.yml`, which runs its
+   issue-writing job on `[self-hosted, vm, debian-13, s]` rather
+   than `static` because the static runners "share one user and one
+   home directory between jobs, so code a leg runs could leave a
+   `.pth` file or a `~/.gitconfig` hook there for this job to run
+   with `AUDIT_TOKEN`. A VM starts from the image and is thrown away
+   after one job." `RENOVATE_TOKEN` pushes branches to every
+   repository, so it is strictly more powerful than `AUDIT_TOKEN`,
+   which can write none of them.
+
+3. **The discovery surface is 23 repositories, and it adds nothing
+   silently.** The section sized the timeout for "about 20". Counted
+   on 2026-11-12 across the 30 unarchived repositories in the
+   organisation: exactly 23 carry both `renovate.json` and
+   `.github/workflows/renovate.yml`, and the other seven
+   (`divergulent-reviews`, `homebrew-tap`, `performance`,
+   `private-ci`, `reproducables`, `sonobouy`,
+   `uefi-latency-guest`) carry neither. Because `requireConfig:
+   "required"` manages only a repository with a config, and because
+   the config and the workflow coincide exactly, `autodiscover` over
+   `shakenfist/*` discovers precisely the set that Renovate already
+   runs in. The cutover list is therefore knowable now rather than
+   from the dry run, and it is in *Cutover* below. Two of the 23,
+   `images` and `private-ci`, are N/A for the `renovate` audit
+   criterion while still being managed; `private-ci` is one of the
+   seven without a config, so the managed N/A is `images` alone.
+
+4. **`renovate-runner.json` needs no `files:` edit, and the hook
+   rejects it.** The section said to add the file to the validator
+   hook's `files:` and break it on purpose. Phase 1 made that
+   pattern derived rather than a list --
+   `^(.*/)?(\.renovaterc|\.?renovate[^/]*\.json[c5]?)$` -- so the
+   file is picked up with no edit at all, which is what phase 1
+   intended. The consequence the section only flagged as a
+   possibility is real and was measured on 2026-11-12: with a
+   `renovate-runner.json` holding `autodiscover`,
+   `autodiscoverFilter`, `requireConfig` and `onboarding` in the
+   tree, `pre-commit run renovate-config-validator --all-files`
+   exits 1 and reports all four as "a global option reserved only
+   for Renovate's global configuration", because phase 1 passes
+   `--no-global` and the hook validates every match as repository
+   configuration. One hook cannot check both kinds of file, so
+   decision 3 splits it.
+
+5. **The preset's Node-major rule does not cover the new
+   workflow.** `renovate-fleet.json`'s fifth rule disables major
+   `node` updates with `matchFileNames` naming
+   `.github/workflows/renovate.yml` and
+   `templates/renovate/renovate.yml` only. A
+   `renovate-fleet.yml` that sets up Node is read by the same
+   `github-actions` manager as a dep named `node`, so the moment
+   this phase adds the file, major Node updates become proposable
+   against the fleet's own runner, and merging one stops Renovate
+   with "Unsupported node environment detected" for every
+   repository at once. Confirmed against the pinned version:
+   `renovate@44.227.4` declares `engines.node` of `^24.11.0 ||
+   ^26.13.0`, so Node 25 is genuinely refused. The preset's
+   Renovate-major `prBodyNotes` entry points the reader at the same
+   two files and so becomes incomplete in the same commit.
+
+6. **Four mechanical claims hold, and one is a no-op.** Checked
+   against `renovate@44.227.4` in the pre-commit hook's own
+   installation. `dryRun` is `globalOnly` with
+   `allowedValues: ["extract", "lookup", "full"]`, so
+   `RENOVATE_DRY_RUN=lookup` is valid. Global parsing merges the
+   environment over the file
+   (`dist/workers/global/config/parse/index.js:81`), and
+   `autodiscoverFilter` carries no `mergeable` flag, so the
+   `workflow_dispatch` filter input replaces the file's value
+   rather than concatenating with it -- which is what makes a
+   single-repository canary possible. `packageRules` *is*
+   `mergeable: true`, so the section's claim that the global rule
+   concatenates with each repository's resolved rules, parent
+   first, is right, and a later rule setting `enabled` would win.
+   `requireConfig: "required"` is already Renovate's default, so
+   setting it documents rather than changes behaviour.
+
+Five stale figures elsewhere in the plan are corrected with this
+phase rather than left for a later one to trip over. The Success
+criteria and the phase 4 section both still said the target was
+"down from 227", which phase 1's survey item 2 superseded by
+measuring 417 org-wide `Update` pull requests in 30 days; the
+Mission was corrected then and these two were missed. The Mission's
+first change, and two counts in phase 3, still said seventeen
+copies of `renovate.yml`, which was true on 2026-10-03 and is 23
+today by item 3 above. The Situation's own dated statements of the
+same number are left alone: they are accurate history, and phase 1
+set the convention of pointing forward from them rather than
+rewriting them.
+
+#### Decisions
+
+1. **Run Renovate from npm, the way the template does.** Survey
+   item 1 leaves no choice: an action that needs a Docker daemon
+   fails on every run that lands on a Kubernetes pod. The workflow
+   therefore follows `templates/renovate/renovate.yml` --
+   `actions/setup-node`, `npm install --ignore-scripts` of a pinned
+   `renovate`, `npm rebuild re2`, and the binary invoked directly
+   -- with the global config named by `RENOVATE_CONFIG_FILE`
+   instead of an action input. The install step holds no token, as
+   in the template, so an install script in Renovate's dependency
+   tree cannot reach `RENOVATE_TOKEN`.
+
+2. **The job runs on an ephemeral VM in a protected environment,
+   not on `[self-hosted, static]`.** This is the decision most
+   worth arguing with, so the argument is in *Risks* as well. The
+   case for it is survey item 2: this repository has already
+   decided that a job holding a fleet-write token does not run on a
+   pool that shares a home directory between jobs, and it decided
+   that for a token that can write nothing. The case against is
+   that the 23 per-repository copies run on `static` today, so
+   `static` is not a regression, and that an ephemeral VM pays the
+   Node and npm install on every hourly run with no cache to reuse.
+   The deciding consideration is that this phase is the last cheap
+   moment: after cutover there is one workflow holding one token
+   with organisation-wide push, dispatchable by anyone who can
+   dispatch a workflow, and moving it later means re-proving the
+   cutover. The environment also buys the `main`-only deployment
+   rule that `audit-write` relies on, which matters more here than
+   there: a branch that edits this workflow must not be able to
+   dispatch it with the organisation's push token. Named
+   `renovate-write`, deploying only from `main`.
+
+3. **Keep the name `renovate-runner.json` and split the validator
+   hook in two.** The alternative is to name the file so phase 1's
+   pattern misses it, which buys a green hook by making the fleet's
+   most privileged configuration the one file nobody validates --
+   the exact failure phase 1's derived pattern was written to
+   prevent. So the hook becomes two entries on the same pinned
+   repository: the existing one, with the runner config excluded,
+   keeping `--no-global` so that a *repository* config holding a
+   global option is still rejected; and a second naming only the
+   runner config, in default mode, where global options are
+   accepted. `RenovateConfigHookTest` then stops asserting that one
+   hook matches every config and asserts the stronger invariant:
+   every Renovate configuration in the tree is validated by exactly
+   one of the two, neither both nor neither. That keeps the
+   property derived rather than listed, so the next config added is
+   still covered without anyone remembering this.
+
+4. **The preset learns about `renovate-fleet.yml` in the same pull
+   request that adds it.** Survey item 5 is a defect this phase
+   creates, so this phase fixes it: `.github/workflows/renovate-fleet.yml`
+   joins the Node-major rule's `matchFileNames`, and the
+   Renovate-major `prBodyNotes` entry names it as the file whose
+   `node-version` has to move with the pin. Both are preset edits,
+   so they are live fleet-wide on merge, and both are tested.
+
+5. **Hourly, at minute 23.** Unchanged from the section, and the
+   reasoning stands: the Situation measured GitHub delaying and
+   dropping top-of-hour scheduled events, and one runner means a
+   dropped run delays all 23 repositories at once.
+
+6. **The cutover list is the 23 repositories measured in survey
+   item 3**, written into *Cutover* below rather than derived from
+   the dry run. The dry run still has to agree with it; a
+   disagreement is a finding, not a correction to make silently.
+
+7. **The temporary disable rule stays file-based, for a rewritten
+   reason.** The section justified `matchFileNames` over disabling
+   the `renovatebot/github-action` package by saying
+   `renovate-fleet.yml` uses that action too. It will not. The rule
+   is still right, and now for a better reason: between this phase
+   and phase 3 the disabled `renovate.yml` files remain in 23
+   trees, each pinning a `renovate` version that the
+   `custom.regex` manager bumps and three also pinning the action,
+   so a package-based rule would have to name three different
+   dependencies to suppress churn in files that no longer run,
+   while one `matchFileNames` entry covers every dependency in
+   them. The file list is the two the preset already names.
+
+8. **No local weekly override for the central pin.** The section
+   gave `renovatebot/github-action` in `renovate-fleet.yml` a local
+   `groupName` and weekly schedule, to keep the most privileged
+   workflow off the monthly window. Survey item 6's manager check
+   makes most of that unnecessary: the npm `renovate` pin is found
+   by `custom.regex`, not `github-actions`, so the preset's
+   CI-tooling group never matched it and it is already weekly. What
+   is left on the monthly window is `actions/checkout` and
+   `actions/setup-node` in this one file, so a local rule gives
+   just those two the weekly schedule, scoped by `matchFileNames`
+   to `.github/workflows/renovate-fleet.yml`. That rule is local
+   because the file exists only here.
+
+#### Steps
+
+Steps 2a to 2d write files and are sub-agent work. The cutover is
+not: every one of its actions changes a live system in other
+people's repositories, so it is run by the management session with
+the operator watching, in the order under *Cutover*.
+
+| Step | Effort | Model | Isolation | Brief for sub-agent |
+|------|--------|-------|-----------|---------------------|
+| 2a | high | opus | none | Write `.github/workflows/renovate-fleet.yml` and `renovate-runner.json`. Model the workflow on `templates/renovate/renovate.yml`, which runs a pinned npm `renovate` rather than `renovatebot/github-action` (decision 1), keeping its comments where they still apply and rewriting them where they do not -- the concurrency comment carries over, `RENOVATE_AUTODISCOVER_FILTER: ${{ github.repository }}` does not. Triggers are `schedule` with `cron: '23 * * * *'` and `workflow_dispatch` only; top-level `permissions: contents: read`; `concurrency: {group: renovate-fleet, cancel-in-progress: false}`; `runs-on: [self-hosted, vm, debian-13, s]` with `environment: renovate-write` (decision 2); `timeout-minutes` set high enough for a serial pass over 23 repositories, with a comment saying the number is provisional until the dry run measures it. Two `workflow_dispatch` inputs, passed as `RENOVATE_DRY_RUN` and `RENOVATE_AUTODISCOVER_FILTER`: survey item 6 confirms `dryRun` accepts `extract`/`lookup`/`full` and that the environment overrides the file for `autodiscoverFilter`, so the filter input narrows rather than widens. The checkout is this repository at the default branch and nothing else; `persist-credentials: false`, since Renovate clones with `RENOVATE_TOKEN` into `RENOVATE_BASE_DIR`. Install Renovate in a step holding no token, exactly as the template does, pinned behind a `# renovate: datasource=npm depName=renovate` comment so `customManagers:githubActionsVersions` bumps it. Before Renovate starts, add the write-path probe cutover step 2 needs: a script in `tools/` (not inline, per the repository's convention on workflow steps longer than a few lines) that calls `GET /repos/shakenfist/<repo>` with `RENOVATE_TOKEN` for each of the 23 repositories and fails naming the repository if `permissions.push` is not true. `renovate-runner.json` holds `$schema`, `autodiscover: true`, `autodiscoverFilter: ["shakenfist/*"]`, `requireConfig: "required"` (already the default; set to document it), `onboarding: false`, and the one temporary `packageRules` entry from decision 7. Do not edit `.pre-commit-config.yaml` -- step 2b owns it, and the hook fails on this file until it lands, so report that rather than working around it. |
+| 2b | medium | sonnet | none | Split the `renovate-config-validator` hook in `.pre-commit-config.yaml` per decision 3, and move `scripts/tests/test_hooks.py`'s `RenovateConfigHookTest` onto the stronger invariant. The existing entry keeps `args: ['--no-global']` and gains an `exclude:` for the runner config; a second entry on the same `rev` names only that file and passes no `--no-global`. Give each a distinct `name:` and `alias:` so `pre-commit run <alias>` reaches either. Keep the file's convention of a comment saying why, and say why there are two: a repository config holding a global option must still fail, and the runner config is not a repository config. The test currently asserts that one hook's pattern matches every Renovate configuration in the tree; rewrite it to assert that each is matched by exactly one of the two hooks, keeping the derivation (the set comes from `git ls-files`, not a list) and the guard that the derived set is non-empty. Prove both halves: break `renovate-runner.json` with an unknown top-level key and confirm the global-mode hook fails naming that file; put `autodiscover: true` into `renovate.json` and confirm the repository-mode hook still rejects it. Paste both outputs into your report and restore the files; do not commit either broken state. |
+| 2c | medium | sonnet | none | Teach `renovate-fleet.json` about the new workflow (decision 4) and add the local rule from decision 8, then test all three. In the preset: add `.github/workflows/renovate-fleet.yml` to the Node-major disable rule's `matchFileNames`, and extend the Renovate-major `prBodyNotes` entry so it names that file as the one whose `node-version` moves with the pin, without losing the two files it already names -- phase 3 removes those, not this phase. In this repository's own `renovate.json`: a rule scoped by `matchFileNames` to `.github/workflows/renovate-fleet.yml` and `matchPackageNames` to `actions/checkout` and `actions/setup-node`, giving them the weekly schedule, with a description saying why the npm pin needs no such rule (it is found by `custom.regex`, which the CI-tooling group's `matchManagers` never matched). Extend `RenovateFleetPresetTest` in `scripts/tests/test_packaging.py` with a test per change, using the existing `_rule(**match)` helper; the Node rule's test must assert the full `matchFileNames` set rather than membership, so dropping one file fails it. Then mutation-test: break each of the three additions in turn, confirm a test fails and names the right thing, keep the script under this session's scratchpad, and report the count. Restore from copies, never `git checkout <dir>`, and run each mutant under `timeout`. |
+| 2d | medium | sonnet | none | Document the central runner. `docs/audits/renovate.md` is the fleet's Renovate specification and currently describes a per-repository workflow as the arrangement; add a section for the central runner that says what it is, where its global config lives, why it runs on a VM in a protected environment, and that the per-repository copies are disabled but not yet deleted, which phase 3 does. Do not rewrite the "What we check" bullets: the criterion still checks the per-repository files, which still exist, and changing it belongs to phase 3. `templates/renovate/README.md` gets a short note that the template is on its way out and why it is still there. Keep the fact in one place and point at it from the other, as phase 1 did: no fact about the runner stated differently on two pages. `AGENTS.md` and `ARCHITECTURE.md` only if a convention or the shape of the system changed -- a new fleet-wide workflow is arguably the latter, so make the judgement and say which way you went. |
+
+#### Cutover
+
+Operator-gated, in this order. Nothing here is a sub-agent step,
+and nothing in it is done without an explicit yes.
+
+1. **Dry run, read path only.** Dispatch with
+   `RENOVATE_DRY_RUN=lookup`. Confirm it discovers exactly the 23
+   repositories below, that it reads each one's Dependabot alerts
+   (open question 1), and that every dependency in a
+   `renovate.yml` is reported as disabled by the temporary rule --
+   which is also the check that a global `packageRules` entry
+   reaches each repository's resolved config at all. Record the
+   run's duration: it sizes `timeout-minutes` and tells us whether
+   an hourly cadence is achievable at all.
+2. **Write path, before anything is disabled.** The probe step from
+   2a fails the job naming any repository whose `permissions.push`
+   is not true; record its result here. Then canary on this
+   repository alone: `gh workflow disable renovate.yml` here, tick
+   one held update on this repository's dependency dashboard, and
+   dispatch the central workflow for real with the filter input set
+   to `shakenfist/development`. Confirm it pushed the branch,
+   opened or updated the pull request, and rewrote the dashboard.
+   Tick an update to a workflow file specifically, because pushing one
+   needs a capability the probe cannot see: push permission is not the
+   `workflow` scope, and most of what this fleet's Renovate proposes
+   touches `.github/workflows/`. A canary that only moved a
+   requirements pin would leave that untested.
+3. **Disable the rest.** `gh workflow disable renovate.yml` in each
+   of the other 22. The full list, `development` included, is here
+   so that the rollback is mechanical: `actions`, `agent-python`,
+   `andris`, `client-python`, `client-python-k3s`,
+   `client-python-ova`, `clingwrap`, `cloudgood`, `development`,
+   `divergulent`, `hunkydory`, `images`, `instar`, `kerbside`,
+   `kerbside-client`, `kerbside-patches`, `library-utilities`,
+   `occystrap`, `ryll`, `sfui`, `shakenfist`,
+   `uncalibrated-sextant`, `visual-digest-rust`.
+4. **Turn the schedule on, and watch a full day.** The workflow
+   lands with `workflow_dispatch` only, so this step is a pull
+   request of its own adding the `schedule` block its header comment
+   records, and it comes after step 3 because a schedule with the
+   copies still enabled is the duplicate pull request race. Then
+   watch: dependency dashboards update, no duplicate branches appear,
+   and open Renovate pull requests are adopted rather than reopened. Record how many times
+   `renovate-fleet.yml` ran that day, each run's duration, and the
+   longest gap, against the Situation's median of 4 hours 47
+   minutes and longest of 9 hours 35 minutes. A pass approaching 60
+   minutes reduces the cadence silently, because GitHub keeps one
+   pending run per concurrency group and cancels the older one. If
+   the central runner is not clearly better, stop and investigate
+   before phase 3: this plan's promise on security latency rests on
+   Renovate actually running.
 
 Rollback is `gh workflow enable` per repository and disabling the
 central workflow. Nothing in this phase deletes a file elsewhere in
 the fleet.
+
+#### Record
+
+**Both validator modes were proved against a broken file, not
+read** (2026-11-13). With an unknown key added to
+`renovate-runner.json`, the global-mode hook fails and names the
+file:
+
+```
+Validate Renovate global configuration...................................Failed
+- hook id: renovate-config-validator
+- exit code: 1
+
+INFO: Validating renovate-runner.json as global config
+ERROR: Found errors in configuration
+       "file": "renovate-runner.json",
+       "errors": [
+         {
+           "topic": "Configuration Error",
+           "message": "Invalid configuration option: notARealRenovateKey"
+         }
+       ]
+```
+
+And with `"autodiscover": true` placed in the root `renovate.json`,
+the repository-mode hook still rejects it, which is the property
+`--no-global` was added for and the one the split had to preserve:
+
+```
+Validate Renovate repository configuration...............................Failed
+- hook id: renovate-config-validator
+- exit code: 1
+
+INFO: Validating renovate.json as repo config
+ WARN: Found errors in configuration
+       "file": "renovate.json",
+       "warnings": [
+         {
+           "topic": "Configuration Error",
+           "message": "The \"autodiscover\" option is a global option
+             reserved only for Renovate's global configuration and
+             cannot be configured within a repository's config file."
+         }
+       ]
+```
+
+Both files were restored from copies and verified byte-identical
+afterwards.
+
+**Mutation testing, 29 mutants and 29 killed** (2026-11-13). Each
+step kept a runnable script under this session's scratchpad rather
+than improvising: `step-2a/mutate.py` for the push probe (12,
+including the two defects its first run found -- an assertion reading
+the wrong stream, and the bytecode cache serving a previous
+same-length mutant), `step-2b/mutate.py` for the hook split (4: the
+exclude removed, the global pattern widened, the global hook deleted,
+and the global hook given `--no-global`), and `step-2c/mutate.py` for
+the preset and the local rule (10: three file drops from the Node
+rule, three from the note, and four ways of breaking the local rule).
+The management session killed three more by hand, one per step, to
+check the scripts rather than trust them: disabling the probe's
+empty-set guard fails `test_a_token_that_finds_nothing_to_manage_fails`
+with "the token can push to all 0 repositories", removing the hook's
+`exclude:` makes the runner config matched by both hooks, and dropping
+`renovate-fleet.yml` from the Node rule fails the whole-set assertion.
+No mutant timed out.
+
+**The probe answers its own question, but not open question 1 yet**
+(2026-11-13). Run read-only against the organisation with an operator
+token rather than `RENOVATE_TOKEN`, it reported 23 of the
+organisation's repositories as managed and named exactly the 23 in
+*Cutover* above, then reported the token could push to all of them.
+That confirms the derivation and the 23, and says nothing about what
+`RENOVATE_TOKEN` is or can reach: the probe's first real run, in
+cutover step 1, is what answers that.
+
+The cutover's four steps each produce a measurement that phase 3 and
+phase 4 depend on, so they are recorded here as they happen: the dry
+run's discovered repository list and duration, the push-permission
+probe's output, the canary's branch and pull request, and the
+watch day's run count, durations and longest gap. The answer to
+open question 1 -- what `RENOVATE_TOKEN` actually is and what it can
+reach -- is recorded here too, since the probe is the first thing in
+this plan that establishes it rather than assuming it.
+
+#### Execution notes
+
+Dates are Australian Eastern Daylight Time (UTC+11).
+
+**The back brief's four answers** (2026-11-13). Decision 2 stands: the
+runner is an ephemeral VM in the `renovate-write` environment, with
+the operator creating the environment himself, since it is a
+repository setting rather than a file in a pull request. The workflow
+references it and is inert until it exists.
+
+**Phase 2 lands in two pull requests, not one** (2026-11-13). GitHub
+offers `workflow_dispatch` only for a workflow that exists on the
+default branch, so none of the four cutover steps can run from the
+phase branch. This pull request is steps 2a to 2d; the cutover runs
+against `main` afterwards and its measurements land as a second pull
+request on this phase. Four Definition of done items -- the dry run's
+discovered list, the probe's output, the canary and the watch day --
+are therefore unreachable in the first pull request and are checked
+in the second.
+
+**The probe derives its repository set rather than reading the dry
+run's** (2026-11-13, step 2a). The phase's cutover text said the
+probe checks "every repository the dry run discovered", which it
+cannot know: the probe runs before Renovate, on every run. It
+instead applies the rule `requireConfig: "required"` applies --
+every unarchived repository in the organisation whose default branch
+carries a `renovate.json` -- so it stays correct as repositories are
+added and retired, where a list of 23 names would be a second copy
+of the fleet. It reads only `renovate.json` of the longer list
+Renovate accepts, and says so: covering that list partway would buy
+confidence it has not earned, and the `renovate` audit criterion is
+what keeps a repository from configuring Renovate another way
+unnoticed.
+
+**Two departures from the template in `renovate-fleet.yml`**
+(2026-11-13, step 2a). The Rust and `hashin` setup steps are
+unconditional, where the per-repository template guards each with
+`hashFiles()`. The condition asks whether the workspace holds a
+`Cargo.lock` or a `requirements*.txt`, and the repositories this
+workflow manages are not in the workspace at all -- Renovate clones
+them later -- so the guards would never fire and lock file refreshes
+would fail at cutover for the fleet's Rust and hashed-requirements
+repositories. The cost is a rustup install and a venv on every
+hourly run. The probe also lives in `scripts/` rather than the
+`tools/` the phase text named, because every Python file in this
+repository is in `scripts/` and every shell script in `tools/`.
+
+**`timeout-minutes` is bounded by the cadence, not the work**
+(2026-11-13, step 2a). 50 minutes, because GitHub keeps one pending
+run per concurrency group: a pass that regularly ran past the hour
+would quietly halve the schedule rather than fail anything, and
+timing out under the hour makes it loud. The number is provisional
+until the cutover's dry run measures a full pass.
+
+**The first review round caught a live-on-merge defect** (2026-11-13).
+The workflow was written with its hourly `cron` in place, so merging it
+would have started real fleet-wide runs at the next scheduled tick
+while all 23 per-repository copies were still running -- the duplicate
+pull request race this phase exists to avoid, which the runner's own
+concurrency group cannot prevent because the racing instances are
+different workflows in different repositories. The cause was in the
+planning, not the implementation: rewriting this phase's Cutover
+section dropped the master plan's original "enable the central
+runner's schedule" step, so nothing remained to turn the schedule on
+and it shipped already on. The workflow now lands with
+`workflow_dispatch` only, the block to add is recorded in its header
+comment, and cutover step 4 turns it on in a pull request of its own.
+
+**Two claims about the environment were wrong** (2026-11-13). This
+phase said the workflow was inert until `renovate-write` existed.
+GitHub's documentation says the opposite: "Running a workflow that
+references an environment that does not exist will create an
+environment with the referenced name", and that environment "will not
+have any protection rules or secrets configured". Naming an
+environment therefore protects nothing by itself, and the main-only
+deployment rule binds only once an administrator has configured it.
+Whether a job naming an environment still inherits a repository-level
+secret of the same name is not documented either way, so nothing in
+this plan or the spec asserts it. Both pages now say the protection is
+verified out of band before the cutover.
+
+**The probe cannot see the capability that matters most**
+(2026-11-13). `permissions.push` is not the `workflow` scope, and most
+of what this fleet's Renovate proposes touches `.github/workflows/`,
+so the probe can report that the token reaches all 23 repositories
+while every workflow-file branch is refused. It is documented rather
+than probed, and cutover step 2's canary now ticks a workflow-file
+update specifically, which is what establishes the capability.
+
+**The local weekly rule covers majors too** (2026-11-13, step 2c).
+The rule decision 8 asks for gives `actions/checkout` and
+`actions/setup-node` in `renovate-fleet.yml` the weekly window, and it
+is not narrowed by update type, so it also takes those two actions out
+of the preset's first-of-the-month major window: a local rule is
+concatenated after the preset's and the later match wins. Kept rather
+than narrowed, because it is the same thing decision 8 wants for the
+same reason -- the most privileged workflow in the fleet should not be
+the slowest to pick up a fix -- and neither action is automerged, so a
+major still waits for a human. Nothing else in the fleet is affected,
+because the rule names a file that exists only here.
+
+**The validator hook fails between 2a and 2b, by design**
+(2026-11-13). `renovate-runner.json` is a global configuration and
+phase 1's hook validates every Renovate file as a repository
+configuration under `--no-global`, so the hook fails from the moment
+2a creates the file until 2b splits it in two. Measured and recorded
+rather than worked around: renaming the file to dodge the hook's
+derived pattern would have left the fleet's most privileged
+configuration the one file nobody validates.
+
+#### Risks and mitigations
+
+* **The VM image may not have what Renovate needs.** The
+  `audit-write` job's comment says the image "has git and python3
+  but not gh", and says nothing about Node. `actions/setup-node`
+  supplies Node, and the template's own steps supply npm, Rust when
+  a repository has a `Cargo.lock`, and `hashin` when it has a
+  `requirements*.txt`, so a VM should be able to do everything a
+  static runner does -- but it pays the whole install on every run.
+  The dry run in cutover step 1 measures it. If an hourly cadence
+  cannot be met on a VM, the fallback is a dedicated runner label
+  rather than the shared-home static pool, and if neither is
+  available the residual risk is recorded and accepted explicitly
+  rather than by default. Checked by the management session against
+  the dry run's duration, before step 3 disables anything.
+* **A pass longer than an hour halves the cadence in silence.** One
+  pending run per concurrency group means a slow pass drops runs
+  without failing anything. The watch day counts runs rather than
+  assuming them, and the success criterion is comparative: at least
+  as often as the per-repository copies managed.
+* **The token may not reach every repository.** Disabling 23
+  workflows and then discovering the central runner cannot write to
+  one of them leaves that repository unmanaged and quiet about it.
+  The probe runs in the job, on every run and not just at cutover,
+  and fails naming the repository; cutover step 2 runs it before
+  step 3 disables anything.
+* **The preset edits in 2c are live on merge.** They are
+  fleet-wide the moment the pull request lands, like everything in
+  `renovate-fleet.json`, and before the central runner is turned
+  on. Both edits are conservative in that direction: adding a file
+  to a disable rule can only remove update paths, and a
+  `prBodyNotes` change only alters prose in a pull request body.
+* **A branch could dispatch the organisation's push token.** The
+  `renovate-write` environment deploying only from `main` is what
+  prevents a branch that has edited this workflow from running it
+  with `RENOVATE_TOKEN`; the workflow's own `if` on the ref is
+  defence in depth, as `consistency-audit.yml` describes.
+
+#### Definition of done
+
+Every item is checked by the management session against the files
+and the commands, not against a sub-agent's summary.
+
+* `.github/workflows/renovate-fleet.yml` exists, triggers on
+  `workflow_dispatch` and **nothing else**, carries top-level
+  `permissions: contents: read`, names the `renovate-write`
+  environment, runs on an ephemeral VM label, and contains no `uses:`
+  of `renovatebot/github-action`. The absence of a `schedule` is the
+  point: it is what stops the runner working the same repositories as
+  the copies that are still running, and the minute-23 block to add
+  at cutover is recorded in the workflow's header comment.
+  `scripts/tests/test_renovate_fleet_workflow.py` asserts each of
+  these, including that no third-party action beside the token runs
+  on a ref that can move.
+* The workflow installs Renovate in a step whose `env:` does not
+  mention `RENOVATE_TOKEN`, and the step that holds the token runs
+  only what that step installed.
+* `renovate-runner.json` exists with `autodiscover`,
+  `autodiscoverFilter`, `requireConfig`, `onboarding` and the one
+  temporary `packageRules` entry, and no other key.
+* `pre-commit run --all-files` passes with both validator hooks
+  present, and the `Record` holds two failing runs: the global-mode
+  hook failing on a broken `renovate-runner.json` and naming it,
+  and the repository-mode hook rejecting a global option placed in
+  `renovate.json`. A hook that passed on either is the outcome
+  these two items exist to exclude.
+* Every file matching `^(.*/)?(\.renovaterc|\.?renovate[^/]*\.json[c5]?)$`
+  in `git ls-files` is validated by exactly one of the two hooks,
+  asserted by a test that derives the file set rather than listing
+  it.
+* `renovate-fleet.json`'s Node-major rule names all three
+  workflow files, and a test asserts the whole set, so removing one
+  fails it. The Renovate-major `prBodyNotes` entry names
+  `renovate-fleet.yml` without having dropped the two files it
+  already named.
+* This repository's `renovate.json` gives `actions/checkout` and
+  `actions/setup-node` in `renovate-fleet.yml` the weekly schedule,
+  and no rule in it restates anything the preset holds.
+* `python3 -m unittest discover -s scripts/tests -t scripts` passes
+  with more tests than before, and `python3 scripts/audit-check.py
+  --repo-path . --repo-name development` reports no verdict worse
+  than it does on `main` today, which is `renovate` compliant and
+  the two pre-existing failures `plan-source-references` and
+  `review-coverage`.
+* Mutation testing covers each of 2c's three preset and config
+  changes, every mutant is killed, and the run names the expected
+  string. The script's path and the count are in the commit
+  message.
+* The dry run's discovered repository list is recorded and equals
+  the 23 in *Cutover*, or the difference is explained there.
+* The push-permission probe's output is recorded for all 23
+  repositories, and it ran before any workflow was disabled.
+* No fact about the central runner is stated differently in
+  `docs/audits/renovate.md` and `templates/renovate/README.md`, and
+  neither page claims the per-repository workflow has been deleted,
+  because phase 3 deletes it.
+* The watch day's run count, durations and longest gap are
+  recorded, and the comparison against the per-repository copies'
+  median of 4 hours 47 minutes is stated as met or not met.
+
+#### Back brief
+
+Before step 2a, back brief the operator on decision 2, the runner
+label, which is the one with a real counter-argument and the one
+that cannot be changed cheaply afterwards. The argument against it
+is that the 23 copies run on `[self-hosted, static]` today, so
+`static` is no worse than the status quo, and that an ephemeral VM
+pays a full Node and npm install every hour with nothing cached.
+The argument for it is that this repository has already ruled that
+a job holding a fleet-write token does not run on a pool sharing a
+home directory, for a token that can write nothing, and that after
+cutover this workflow is the single point through which every
+repository in the organisation is written to. Confirm also that the
+`renovate-write` environment may be created, since that is a
+repository setting rather than a file in a pull request.
+
+Then stop again before cutover step 3, the only irreversible-feeling
+step in the phase: 22 repositories stop running Renovate for
+themselves, and the central runner has to be known good first.
+Report the dry run's discovered list against the 23, the probe's
+output, the canary's result and the measured pass duration, and get
+agreement before disabling anything beyond this repository.
 
 ### Phase 3: fleet sweep and audit change
 
@@ -1344,7 +1831,7 @@ The audit change lands first, and the
 `Renovate` issues it files at the next weekly run are the sweep's
 work queue. That is deliberate: it is the fleet's issue-driven
 `consistency-fix` pattern, and a transitional check that accepted
-both forms would spare about 17 issues at the price of letting the
+both forms would spare about 23 issues at the price of letting the
 sweep stall unnoticed. Before the audit change merges, preview its
 verdicts against fresh clones of the fleet with `audit-check.py`
 and `audit-manage-issues.py --dry-run`, as
@@ -1388,7 +1875,7 @@ only by `renovate-fleet.yml`. If it is an organisation secret
 (open question 1), restrict its repository access to
 `shakenfist/development`; if it is a set of per-repository secrets,
 delete the others. Either way, record which, so the credential's
-exposure drops from 17 repositories to one.
+exposure drops from 23 repositories to one.
 
 ### Phase 4: re-measure
 
@@ -1400,7 +1887,8 @@ package and by the Situation table's rows, Renovate share of CI time
 including merge-queue runs, and Renovate runs on `static` per day
 with the longest gap between them. Record before and after here, and
 say whether the Mission's target -- 100 or fewer Renovate pull
-requests in 30 days, down from 227 -- was met, and if not, which row
+requests in 30 days, against the baseline this phase
+re-establishes -- was met, and if not, which row
 of the Mission's derivation missed its estimate. Record also the
 latency of any `[SECURITY]` pull request opened in the window,
 measured from the advisory's publication, and whether any
@@ -1657,7 +2145,9 @@ because the following statements will be true:
   measured in phase 4.
 * Phase 4 records the before and after numbers, and Renovate opened
   100 or fewer pull requests across the organisation in its 30-day
-  window, down from 227.
+  window, measured against a baseline taken with the same method
+  (417 org-wide in the 30 days to 2026-11-11, by phase 1's survey
+  item 2, which superseded the Situation's 227).
 * The central runner runs at least as often as the per-repository
   copies did, and phase 4 records its daily run count and longest
   gap.

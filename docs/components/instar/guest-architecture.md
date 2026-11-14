@@ -130,8 +130,10 @@ provides a modular architecture with:
  sizes — which can differ from the floor geometry of the same byte
  count, issue #413 — and the VHD-spec floor CHS for verbatim sizes
  qemu-img would never declare). Used by info, check, convert, and compare
- operations. Also exposes `VhdState::scan_allocation` plus the pure
- helper `count_allocated_in_bat` for the measure subcommand.
+ operations. Also exposes `VhdState::scan_allocation` for the measure
+ subcommand, which counts the BAT entry by entry and refuses an
+ allocated block placed on the image's own metadata, as the reader
+ does, so measure never counts bytes the reader would refuse.
 - **crates/vhdx/** - Shared VHDX format crate: CRC-32C (Castagnoli)
  checksum implementation, dual header parsing with sequence number
  selection, region table parsing with CRC validation, GUID-based

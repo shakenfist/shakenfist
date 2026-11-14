@@ -23,7 +23,7 @@ channel's snapshot changes.
 |---|---|---|---|
 | display | 55 | rich: per-stream counters, decoder backends, decode rings, STREAM_REPORT, destroyed-streams ring | no per-opcode maps — deliberate, see below |
 | main | 24 | mm_time tracking, session_id, keepalive_timeout_fired, agent request/reply stats | complete |
-| inputs | 16 | motion_count, recent_events | complete |
+| inputs | 18 | motion_count, recent_events, recent_motion | complete |
 | cursor | 18 | cache_entries, cache_contents, ack-window state | complete |
 | playback | 35 | full session / decode / device pipeline, output device and stream-failure state | complete |
 | usbredir | 18 | caps handshake, redirected-device list, connect/disconnect totals | complete |
@@ -170,9 +170,12 @@ report's `traffic.pcap`.
 
 ### inputs
 
-Inputs has `motion_count`, `button_state`, `secs_since_last_key`, a
-`recent_events` ring that records the last N input events with
-timestamps, and the four per-opcode baseline fields. No
+Inputs has `motion_count`, `button_state`, `secs_since_last_key`, two
+rings of recent input with timestamps — `recent_events` for keys,
+buttons and modifiers, and `recent_motion` for pointer moves — and the
+four per-opcode baseline fields. The rings are separate because motion
+arrives fast enough to evict every click and key from a shared one
+within two seconds (#432). No
 channel-specific gaps identified.
 
 ### cursor
