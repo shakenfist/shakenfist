@@ -301,7 +301,7 @@ Audit log for console access and protocol events.
 | timestamp | datetime | Event time with microsecond precision (PK part) |
 | node | string | Proxy node that recorded the event |
 | pid | string | Worker process ID |
-| message | text | Event description |
+| message | text | Event description, with control characters (and backslash) written as escapes so that one event is always one row and one log line |
 
 ### sf_token_jtis
 

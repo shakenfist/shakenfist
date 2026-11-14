@@ -33,7 +33,7 @@ discrepancies, the source code in `config.py` is authoritative.
 
 | Configuration Option | Type | Description |
 |---------------------|------|-------------|
-| CACERT_PATH | String (default /etc/pki/CA/ca-cert.pem) | The path to the TLS CA certificate. |
+| CACERT_PATH | String (default /etc/pki/CA/ca-cert.pem) | The path to the TLS CA certificate. Every `.vv` file the API issues embeds it as `ca=`. If it is unset, the `.vv` carries no `ca=` key and the client falls back to its own trust store. It is also the CA bundle the proxy validates hypervisor certificates against, so a deployment which runs the proxy must not clear it. |
 | PROXY_HOST_SUBJECT | String | The TLS Host-Subject that matches the one set for VDI proxy certificates. |
 | PROXY_HOST_CERT_PATH | String (default /etc/pki/CA/certs/proxy.pem) | The path to the TLS certificate for the proxy. |
 | PROXY_HOST_CERT_KEY_PATH | String (default /etc/pki/CA/certs/proxy-key.pem) | The path to the file containing the key for the proxy TLS certificate. |

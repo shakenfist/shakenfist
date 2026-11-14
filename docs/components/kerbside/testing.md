@@ -19,6 +19,14 @@ tox -e bindep   # OS dependency check
 `py3`, `flake8` and `cover` are the default `envlist`, so a bare `tox`
 runs all three.
 
+The `.vv` escaping is checked against a model of GKeyFile, the parser
+virt-viewer reads it with, everywhere. One test also checks it against
+GKeyFile itself, and skips unless the GLib introspection bindings
+(PyGObject) are importable. They are not a test dependency and the CI
+unit lane does not have them, so CI skips it. The `py3` tox environment
+uses system site packages, so installing the distribution's `python3-gi`
+is enough to run it locally.
+
 Test locations:
 
 - Unit tests: `kerbside/tests/unit/`
@@ -175,6 +183,83 @@ Two behaviours only matter when driving CI by hand: on a
 skips cleanly via a job-level `if:` (it does not report red), and
 instance readiness in the `shakenfist/actions` provisioning playbook
 gates on cloud-init completion, not just an open SSH port.
+
+### Bound runners
+
+Three jobs are bound to a runner of their own: `sf-e2e` in
+`sf-e2e-functional.yml`, and `ovirt_matrix` and `openstack_matrix` in
+`functional-tests.yml`. Each of them builds a nested instance larger
+than the smallest capacity claim its runner pool can produce, so a
+runner claimed for a smaller lane sharing that pool is not big enough
+to hold it.
+
+A bound job names `bound-<image>`, `bound-<size>` and a `bind-` token
+unique to its run, attempt and matrix row, and **no plain `vm`, image
+or size label**. That omission is the whole mechanism. GitHub gives a
+job to any runner whose label set is a *superset* of the job's, so a
+bound runner that also carried `vm`, `debian-13` and `l` could still
+be taken by an unbound `[self-hosted, vm, debian-13, l]` job — and
+three of those exist, in `direct-qemu-functional.yml`,
+`proxmox-functional.yml` and `demo-compose.yml`. With the pool labels
+dropped, no unbound job's labels are a subset of a bound runner's, so
+nothing else can be scheduled onto it.
+
+The `bind-` token is what the provisioner keys the capacity claim off.
+It sizes the claim for that one job rather than for the largest job
+pending in a shared pool, and it is unique per run and attempt, so a
+re-run of failed jobs claims afresh instead of colliding with the dead
+attempt's. A runner whose bound job never arrives — cancelled while
+the runner was still booting, or superseded by `cancel-in-progress` —
+is surplus for its own token and is reaped like any other idle runner.
+
+Binding trades a scheduling delay for a hard dependency on the
+provisioner, and that is the operational cost of it. A bound job whose
+runner never appears does not fail — it sits in queue, because
+`timeout-minutes` bounds execution once a runner picks the job up and
+not the wait beforehand, so GitHub holds it pending for about 24 hours
+and then cancels it. For the two nightly matrices that is a quiet
+non-run. For `sf-e2e` it blocks merges, because `Can enqueue: sf-e2e`
+is one of the required checks on the `develop` ruleset and a required
+check that never reports blocks the pull request forever — the same
+trap the `check_paths` filter jobs exist to avoid. The causes are a
+provisioner that has not been deployed, a label spelled differently on
+the two sides, a claim that could not be satisfied, or two bound jobs
+rendering one token. Diagnose it in that order: check that the run's
+`bind-` token appears as a registered runner label on the repository,
+then the claim log in private-ci. The provisioning side must be
+deployed before a new bound job merges, not after.
+
+Two invariants hold the mechanism up, and both are invisible in a
+workflow file: no job's label set may be a subset of a bound runner's,
+and no two bound jobs may render the same token in one run — which,
+because the token carries the matrix entry name rather than the job id,
+means bound matrix entries must be named distinctly across bound jobs.
+The job id is not available for this: GitHub job ids conventionally
+carry underscores and the provisioner's token grammar admits only
+lowercase letters, digits and hyphens, so `${{ github.job }}` yields a
+token that is rejected and a job that never gets a runner.
+`tools/check-bound-runners.py` asserts both invariants, along with the
+token grammar and the actionlint declarations, over every workflow in
+the tree; it runs as a unit test, so `tox -epy3` and the `sanity_checks`
+gate both enforce it. It compares labels the way GitHub schedules them
+— without regard to case, and counting the `self-hosted`, `Linux` and
+`X64` labels every self-hosted runner advertises whether or not it was
+asked to — because a job naming only those is a subset of every bound
+runner in the fleet.
+
+The token grammar in that script is a copy of the provisioner's, in
+private-ci's `conductor/binding.py`, and nothing detects drift between
+the two: if the provisioner's grammar changes without this one
+following, the checker passes tokens the provisioner now rejects and
+the symptom is a job queued for a day. A change to either is a change
+to both, in the same window.
+
+Adding a bound job means declaring its `bound-` labels in
+`.github/actionlint.yaml`, which actionlint requires of any
+self-hosted label; the `bind-` token is a `${{ }}` expression, which
+actionlint does not check. The provisioning side of the mechanism is
+in `shakenfist/private-ci`, in `docs/capacity-claims.md` under
+"Binding a job to its runner".
 
 ### Gate jobs and required checks
 
