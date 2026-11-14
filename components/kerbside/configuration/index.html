@@ -16218,7 +16218,7 @@ discrepancies, the source code in <code>config.py</code> is authoritative.</p>
 <tr>
 <td>CACERT_PATH</td>
 <td>String (default /etc/pki/CA/ca-cert.pem)</td>
-<td>The path to the TLS CA certificate.</td>
+<td>The path to the TLS CA certificate. Every <code>.vv</code> file the API issues embeds it as <code>ca=</code>. If it is unset, the <code>.vv</code> carries no <code>ca=</code> key and the client falls back to its own trust store. It is also the CA bundle the proxy validates hypervisor certificates against, so a deployment which runs the proxy must not clear it.</td>
 </tr>
 <tr>
 <td>PROXY_HOST_SUBJECT</td>
