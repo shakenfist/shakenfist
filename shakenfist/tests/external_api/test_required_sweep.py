@@ -241,6 +241,18 @@ RECIPES = {
         'control': 401,
         'unauthenticated': True,
     },
+    ('AuthLoginEndpoint', 'post'): {
+        # 401, for the same reason the exchange's control is: the token
+        # is not a real one from a real issuer, so the login is refused
+        # at the issuer lookup. Minting a real identity would be a
+        # fixture of its own and would not change what the single
+        # argument guard ahead of that lookup does, which is what this
+        # sweep is asking about.
+        'url': '/auth/login',
+        'body': {'token': 'not-a-real-token'},
+        'control': 401,
+        'unauthenticated': True,
+    },
     ('AuthIssuerEndpoint', 'put'): {
         'url': '/auth/issuers/sweepissuer',
         'body': {'issuer_url': 'https://issuer.example.com',
@@ -502,6 +514,8 @@ SWEEP = {
     ('AuthFederatedEndpoint', 'post', 'rule'):
         (400, False, 'guarded'),
     ('AuthFederatedEndpoint', 'post', 'token'):
+        (400, False, 'guarded'),
+    ('AuthLoginEndpoint', 'post', 'token'):
         (400, False, 'guarded'),
     ('AuthIssuerEndpoint', 'put', 'audience'):
         (400, False, 'guarded'),
@@ -954,7 +968,7 @@ class RequiredSweepTestCase(SweepFixtureTestCase):
     keeps the same observability), it just does not act on one, so a
     request reaches its handler exactly as it did before enforcement
     and the table below still describes real handler behaviour. That
-    also makes every one of the 75 rows, not merely the ``guarded`` and
+    also makes every one of the 76 rows, not merely the ``guarded`` and
     ``faults`` ones, evidence that ``warn`` reproduces the
     pre-enforcement answers.
 
@@ -980,7 +994,7 @@ class RequiredSweepTestCase(SweepFixtureTestCase):
             set(), set(RECIPES) - declared,
             'a recipe names a handler which declares nothing required')
 
-    def test_the_census_still_finds_seventy_five(self):
+    def test_the_census_still_finds_seventy_six(self):
         """Finding F1's premise, re-asked here.
 
         D32 and D35 both rest on the shape of this census rather than
@@ -1001,11 +1015,12 @@ class RequiredSweepTestCase(SweepFixtureTestCase):
         issuer routes, which is the first time a declaration has left
         this census because the server genuinely stopped requiring it;
         the two rows it took with it are commented where they were in
-        the table above.
+        the table above. It is back to 76 with the arrival of human
+        login, whose one required body parameter is the identity token.
         """
         rows = required_declarations()
-        self.assertEqual(75, len(rows))
-        self.assertEqual(74, len([r for r in rows if r[4]]))
+        self.assertEqual(76, len(rows))
+        self.assertEqual(75, len([r for r in rows if r[4]]))
         self.assertEqual(0, len([r for r in rows if not r[4] and r[5]]))
         self.assertEqual(1, len([r for r in rows if not r[5]]))
         self.assertEqual(

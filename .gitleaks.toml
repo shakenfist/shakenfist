@@ -93,6 +93,15 @@ regexes = [
   # them.
   '''ryll-ci-8fJ2mQ''',
 
+  # The key names in the human login examples, picked up by the same
+  # rule for the same reason as the line above. A login answers with a
+  # whole credential set, so the examples show two of them, and each
+  # name carries the random discriminator a minted name really has --
+  # the server appends one so that logging in again adds a credential
+  # rather than rotating the one a different session is still using.
+  # An example without it would teach a format nothing produces.
+  '''corporate-(3fJ2mQ8x|9kLm2Pq1)''',
+
   # base64 of "$2b$12$fakehash", a stand-in for a bcrypt hash in the
   # namespace key unit tests. Not a hash of anything, and a hash rather
   # than a secret even if it were.

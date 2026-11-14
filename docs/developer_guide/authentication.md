@@ -564,6 +564,65 @@ any Shaken Fist credential. That endpoint builds each entry field by
 field rather than from the issuer's own view of itself, so that a field
 added to the object later is not published without somebody deciding to.
 
+### The login
+
+`POST /auth/login` takes `{token}` and nothing else, and returns a list
+of keys: one per mapping rule for the token's issuer whose bound claims
+the identity satisfies, each as `{namespace, key_name, key, expiry,
+scopes}`. A person has no way to know which namespace or rule they are
+entitled to, so they cannot be asked to name one the way the exchange
+does. A credential stays one namespace deep, which is why the answer is a
+set of single-namespace keys and not one key naming several.
+
+It runs the exchange's checks in the exchange's order, for the same
+reason, with the set-wide steps where the exchange has targeted ones: size,
+arguments, the rate limit (on a budget of its own, keyed `login-mint:`),
+issuer resolution with no network, the login-capable test, validation, the
+rule read, claim matching, the refusal when nothing matched, the cap
+`FEDERATION_MAX_LOGIN_CREDENTIALS`, the replay claim, and only then
+minting.
+
+Validation is the same function. `federation.validate_token()` is called
+with the issuer and an `audience` argument, and there is still exactly one
+copy of token validation in the repository. The exchange passes nothing and
+verifies against the issuer's `audience`; the login passes the issuer's
+`client_id`. The reason is that the two kinds of token are stamped by
+different parties: a workload asks for whatever audience it is told to, while
+an OpenID Connect identity token's `aud` is the relying party it was issued
+to. The override replaces the audience and does not add to it, so a token
+stamped for one door is refused at the other. `login_audience()` returns the
+value rather than a boolean so that the mint cannot reach validation with an
+unchecked column: passing `None` there would mean "use the issuer's
+audience", which would verify a person against the workload's.
+
+The same function, `login_audience()`, decides whether `GET /auth/login`
+advertises an issuer and whether the login accepts a token from one, so the
+two cannot drift apart. Rules are read in two queries rather than two per
+rule, because a per-rule read on an unauthenticated path is work an anonymous
+caller multiplies by however many rules there are. If the query for which
+rules are active fails, the login is refused with a 503, because neither
+available reading of the failure is safe: treating it as "nothing is active"
+silently refuses a login the cluster's rules would have granted, and treating
+it as "do not filter" mints from rules an administrator deleted. A mapping
+rule's only removal is a soft delete, so the second is an authorisation
+bypass rather than a stale answer.
+
+The replay claim differs from the exchange's. A login claims the token once,
+against the issuer and not against a rule, and before any key is minted.
+Claiming rule by rule would let a login that failed part way be retried into a
+set that was silently short. Minting is not transactional, so a failure
+midway leaves a partial set and a spent token.
+
+Keys are named `<key_name_prefix>-<eight random characters>` and never from
+the person's identity, because creating a key under an existing name rotates
+it, and a second login must not invalidate the first. Their provenance has
+`source: login`. A key in `system` is audited with its own wording on the key
+and the namespace.
+
+Every refusal other than a 503 or the cap's 507 answers 401 with one string,
+and logs the reason, so the endpoint is not an oracle for whether an identity
+matches a rule.
+
 ### Configuring it
 
 Configuring an issuer and writing a mapping rule are operator tasks, and

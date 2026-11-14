@@ -45,6 +45,17 @@ EXPECTED_PUBLIC = {
     # audience, no uuid and no state -- and is rate limited per source
     # like the exchange above.
     ('AuthLoginEndpoint', 'get'),
+    # Takes a person's identity token and answers with every namespace
+    # key their claims entitle them to. Unauthenticated for the same
+    # reason the exchange is -- somebody who is logging in holds no
+    # Shaken Fist credential -- and in place of one it checks the
+    # token's signature against the issuer's published keys, verifies
+    # its audience against the client registration rather than the
+    # workload audience, and mints only against mapping rules an
+    # administrator wrote whose claims the identity satisfies. The set
+    # is capped, the token is single use, and the budget is this
+    # endpoint's own.
+    ('AuthLoginEndpoint', 'post'),
 }
 
 HTTP_METHODS = ('get', 'post', 'put', 'delete', 'patch')

@@ -217,12 +217,26 @@ _handles_credentials = api_base.handles_credentials
 REDACTED_BODY = api_base.REDACTED_BODY
 
 
-# Registered before log_request_info on purpose. /auth/federated is the
-# only unauthenticated route which takes a body, and the endpoint's own
-# size check cannot protect it: by the time a flask_restful method runs,
-# log_request has already called get_json(force=True) and parsed the
-# whole thing. The refusal has to happen here, ahead of every reader of
-# the body, or it is not a refusal at all.
+# The unauthenticated routes which take a body, each of which carries
+# exactly one identity token, so one limit sized for a token covers
+# both. /auth/federated trades a workload's token for the one key its
+# mapping rule names; /auth/login trades a person's for every key their
+# identity is entitled to. GET /auth/login is the same path with no
+# body, which the content-length branch below handles.
+#
+# A set rather than a prefix test on '/auth/'. POST /auth sends a
+# namespace key, and the rest of the family is behind authentication
+# with bodies this limit is not sized for -- a mapping rule's bound
+# claims, for instance. Naming the two routes means a route added to
+# the family later does not silently inherit a cap chosen for a JWT.
+FEDERATED_BODY_PATHS = frozenset({'/auth/federated', '/auth/login'})
+
+
+# Registered before log_request_info on purpose. These endpoints' own
+# size checks cannot protect them: by the time a flask_restful method
+# runs, log_request has already called get_json(force=True) and parsed
+# the whole thing. The refusal has to happen here, ahead of every
+# reader of the body, or it is not a refusal at all.
 #
 # A body with no declared length is refused rather than measured.
 # content_length is None for chunked transfer encoding, so treating
@@ -230,7 +244,7 @@ REDACTED_BODY = api_base.REDACTED_BODY
 # setting a header. 411 is the honest answer: send a Content-Length.
 @app.before_request
 def limit_federated_body_size():
-    if flask.request.path != '/auth/federated':
+    if flask.request.path not in FEDERATED_BODY_PATHS:
         return
 
     if flask.request.content_length is None:
@@ -480,6 +494,17 @@ API_CAPABILITIES = {
         # issuers are login capable, and an empty list from it is a
         # different answer to a 404 from a server which predates it.
         'human-login-metadata',
+        # human-login says that POST /auth/login exists: that this
+        # server will take a person's identity token and answer with
+        # every namespace key their claims entitle them to, rather than
+        # requiring one targeted exchange per namespace against a
+        # mapping rule the person has no way to name. Separate from
+        # human-login-metadata because the two arrived separately and a
+        # client meeting only the metadata half can still run a flow
+        # and then fall back to the targeted exchange, where a client
+        # which assumed the mint from the issuer list would post a
+        # token to a route that 404s.
+        'human-login',
         # namespace-claims advertises the claim CRUD surface. A client
         # cannot feature-detect it any other way, so a client that
         # checks this capability can degrade to unclaimed behaviour

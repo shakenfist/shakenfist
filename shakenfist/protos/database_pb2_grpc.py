@@ -909,6 +909,11 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.GetAllMappingRulesRequest.SerializeToString,
                 response_deserializer=database__pb2.GetMappingRulesReply.FromString,
                 _registered_method=True)
+        self.FindMappingRules = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/FindMappingRules',
+                request_serializer=database__pb2.FindMappingRulesRequest.SerializeToString,
+                response_deserializer=database__pb2.FindMappingRulesReply.FromString,
+                _registered_method=True)
         self.DeleteMappingRule = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteMappingRule',
                 request_serializer=database__pb2.DeleteMappingRuleRequest.SerializeToString,
@@ -2359,6 +2364,12 @@ class DatabaseServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def FindMappingRules(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DeleteMappingRule(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -3679,6 +3690,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetAllMappingRules,
                     request_deserializer=database__pb2.GetAllMappingRulesRequest.FromString,
                     response_serializer=database__pb2.GetMappingRulesReply.SerializeToString,
+            ),
+            'FindMappingRules': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindMappingRules,
+                    request_deserializer=database__pb2.FindMappingRulesRequest.FromString,
+                    response_serializer=database__pb2.FindMappingRulesReply.SerializeToString,
             ),
             'DeleteMappingRule': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteMappingRule,
@@ -8716,6 +8732,33 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/GetAllMappingRules',
             database__pb2.GetAllMappingRulesRequest.SerializeToString,
             database__pb2.GetMappingRulesReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FindMappingRules(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/FindMappingRules',
+            database__pb2.FindMappingRulesRequest.SerializeToString,
+            database__pb2.FindMappingRulesReply.FromString,
             options,
             channel_credentials,
             insecure,

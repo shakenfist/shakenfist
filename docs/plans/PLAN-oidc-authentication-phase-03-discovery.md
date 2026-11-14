@@ -863,6 +863,14 @@ as they happen.
   examined the same surface independently and reached the same
   conclusion, recorded as its item 11.
 
+  Resolved that way. Michael dismissed the alert on the forge as
+  "won't fix" on 2026-11-12, before the pull request was
+  enqueued, so CodeQL was green at the point it landed. One
+  detail for whoever meets this next: the alert renumbered from
+  #132 to #133 when a later review round moved the line it sits
+  on, so a dismissal taken while the branch is still moving is
+  superseded by a fresh alert rather than carried forward.
+
   The automated review's other items were taken as follows. Three
   `fix` items: discovered values were length unbounded, so a
   provider's document could reach a column too small for it; the

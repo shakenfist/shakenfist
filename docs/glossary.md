@@ -92,6 +92,16 @@ for the database tier. Defined in `docs/operator_guide/database.md`. The
 platform's own credential concept is the [namespace key](#namespace-key), from
 which callers derive access tokens.
 
+**credential set**{#credential-set} -- The list of [namespace keys](#namespace-key)
+returned by `POST /auth/login`: one per [mapping rule](#mapping-rule) the
+person's [identity token](#identity-token) satisfies, each naming one namespace
+and carrying its own scopes and expiry. A credential is one namespace deep, so a
+person entitled to several namespaces holds several keys and presents whichever
+the namespace they are addressing needs. Defined in
+`shakenfist/external_api/auth.py` (`AuthLoginEndpoint`) and
+`docs/operator_guide/authentication.md#human-login-mints-credentials`. Not to
+be confused with a single key minted by the targeted exchange.
+
 **DatabaseBackedObject / DBO**{#dbo} -- The base class that gives an object type
 its UUID identity, state machine, attributes, and events. Most user-visible
 object types (instances, artifacts, blobs, networks, uploads, nodes) derive from

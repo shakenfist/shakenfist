@@ -49,7 +49,8 @@ EXPECTED_CAPABILITIES = {
     'auth': [
         'trusted-issuers', 'generated-key-secrets', 'scope-enforcement',
         'mapping-rules', 'federated-exchange', 'issuer-discovery',
-        'human-login-metadata', 'namespace-claims', 'namespace-events',
+        'human-login-metadata', 'human-login',
+        'namespace-claims', 'namespace-events',
         'namespace-claim-events'],
     'blobs': [
         'blob-metadata', 'blob-search-by-hash', 'blob-data-limit',

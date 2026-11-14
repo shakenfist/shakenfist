@@ -17,6 +17,7 @@ from shakenfist.mapping_rule import MappingRule
 from shakenfist.mapping_rule import MappingRules
 from shakenfist.mapping_rule import RuleValidationError
 from shakenfist.mapping_rule import rules_in_namespace
+from shakenfist.mapping_rule import rules_with_attributes
 from shakenfist.mapping_rule import validate_bound_claims
 from shakenfist.mapping_rule import validate_key_ttl
 from shakenfist.mapping_rule import validate_scopes
@@ -514,3 +515,91 @@ class NamespaceCascadeTestCase(base.ShakenFistTestCase):
         self.assertEqual(2, mock_batch.call_count)
         self.assertEqual([], rules_in_namespace('ci'))
         self.assertNotIn(str(key.uuid), self.mock_mariadb.namespace_key_objects)
+
+
+class RulesWithAttributesTestCase(base.ShakenFistTestCase):
+    """The joined listing of rules and the policies they express.
+
+    Matching one identity against the cluster's rules needs the policy
+    of every rule it considers, and reading that policy per rule is an
+    extra round trip per rule on a path an anonymous caller can reach.
+    The listing therefore arrives joined -- and deliberately
+    unfiltered by object state, which is a property its callers have
+    to know about rather than one they may assume away.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+        TrustedIssuer.new(
+            'github', GITHUB, GITHUB_JWKS, 'https://sf.example.com')
+        TrustedIssuer.new(
+            'keycloak', 'https://kc.example.com',
+            'https://kc.example.com/jwks', 'https://sf.example.com')
+
+    def _new(self, namespace='ci', name='ryll', issuer='github'):
+        return MappingRule.new(
+            namespace, name, issuer, dict(CLAIMS), list(SCOPES), 3600,
+            'ryll-ci')
+
+    def test_the_policy_arrives_with_the_rule(self):
+        self._new()
+
+        with mock.patch(
+                'shakenfist.mariadb.get_mapping_rule_attributes') as read:
+            listed = rules_with_attributes(issuer='github')
+
+        self.assertEqual(1, len(listed))
+        rule, attrs = listed[0]
+        self.assertEqual('ci', rule.namespace)
+        self.assertEqual('ryll', rule.name)
+        self.assertEqual('github', attrs.issuer)
+        self.assertEqual(CLAIMS, attrs.bound_claims)
+        self.assertEqual(SCOPES, attrs.scopes)
+        self.assertEqual(3600, attrs.key_ttl)
+        self.assertEqual('ryll-ci', attrs.key_name_prefix)
+
+        # The point of the joined read: no attributes read per rule.
+        read.assert_not_called()
+
+    def test_only_the_named_issuers_rules_are_listed(self):
+        self._new()
+        self._new(name='elsewhere', issuer='keycloak')
+
+        self.assertEqual(
+            ['ryll'],
+            [rule.name for rule, _ in rules_with_attributes(issuer='github')])
+
+    def test_no_issuer_lists_every_rule(self):
+        self._new()
+        self._new(name='elsewhere', issuer='keycloak')
+
+        self.assertEqual(
+            {'ryll', 'elsewhere'},
+            {rule.name for rule, _ in rules_with_attributes()})
+
+    def test_object_state_is_deliberately_not_filtered(self):
+        # A soft deleted rule is still listed, because the accessor
+        # does not read state and its callers must. A caller which
+        # forgets mints keys from a rule its owner deleted, so this
+        # pins the contract the docstring describes rather than
+        # asserting a behaviour anyone wants on its own.
+        self._new()
+        self._new(name='gone').delete()
+
+        self.assertEqual(
+            {'ryll', 'gone'},
+            {rule.name for rule, _ in rules_with_attributes(issuer='github')})
+
+    def test_a_rule_whose_policy_row_is_gone_is_not_listed(self):
+        # The join drops it. A rule with no policy says nothing about
+        # which identities it accepts, so it must not arrive as a rule
+        # with an absent policy for a caller to interpret.
+        self._new()
+        orphan = self._new(name='orphan')
+        del self.mock_mariadb.mapping_rule_attributes[str(orphan.uuid)]
+
+        self.assertEqual(
+            ['ryll'],
+            [rule.name for rule, _ in rules_with_attributes(issuer='github')])

@@ -7184,6 +7184,83 @@ class GetMappingRulesReply(_message.Message):
 Global___GetMappingRulesReply: _TypeAlias = GetMappingRulesReply  # noqa: Y015
 
 @_typing.final
+class MappingRuleJoinedProto(_message.Message):
+    """A rule and the policy it expresses, joined server side. Which issuer
+    a rule accepts, which claims it binds and what the keys it mints may
+    do all live in the attributes row, so matching one identity against
+    every rule on the cluster would otherwise cost a point read per rule
+    on an unauthenticated path. Mirrors NamespaceKeyJoinedProto, which
+    exists for the same reason.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    STATIC_DATA_FIELD_NUMBER: _builtins.int
+    ATTRIBUTES_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def static_data(self) -> Global___MappingRuleStaticData: ...
+    @_builtins.property
+    def attributes(self) -> Global___MappingRuleAttributesProto: ...
+    def __init__(
+        self,
+        *,
+        static_data: Global___MappingRuleStaticData | None = ...,
+        attributes: Global___MappingRuleAttributesProto | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["attributes", b"attributes", "static_data", b"static_data"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["attributes", b"attributes", "static_data", b"static_data"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___MappingRuleJoinedProto: _TypeAlias = MappingRuleJoinedProto  # noqa: Y015
+
+@_typing.final
+class FindMappingRulesRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    ISSUER_FIELD_NUMBER: _builtins.int
+    issuer: _builtins.str
+    """The TrustedIssuer name to filter on, pushed into SQL. Declared
+    optional so that "every rule on the cluster" is distinguishable
+    from a filter on the empty string, which no rule can carry.
+    """
+    def __init__(
+        self,
+        *,
+        issuer: _builtins.str | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_issuer", b"_issuer", "issuer", b"issuer"]  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_issuer", b"_issuer", "issuer", b"issuer"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    _WhichOneofReturnType__issuer: _TypeAlias = _typing.Literal["issuer"]  # noqa: Y015
+    _WhichOneofArgType__issuer: _TypeAlias = _typing.Literal["_issuer", b"_issuer"]  # noqa: Y015
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__issuer) -> _WhichOneofReturnType__issuer | None: ...
+
+Global___FindMappingRulesRequest: _TypeAlias = FindMappingRulesRequest  # noqa: Y015
+
+@_typing.final
+class FindMappingRulesReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    RULES_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def rules(self) -> _containers.RepeatedCompositeFieldContainer[Global___MappingRuleJoinedProto]: ...
+    def __init__(
+        self,
+        *,
+        rules: _abc.Iterable[Global___MappingRuleJoinedProto] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["rules", b"rules"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___FindMappingRulesReply: _TypeAlias = FindMappingRulesReply  # noqa: Y015
+
+@_typing.final
 class DeleteMappingRuleRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
@@ -9221,7 +9298,12 @@ class RecordFederatedExchangeRequest(_message.Message):
     token_id: _builtins.str
     """jti, or a hash of the signature"""
     rule_uuid: _builtins.str
-    """MappingRule UUID as string"""
+    """What the token was spent on, as a UUID string: a MappingRule for
+    a targeted exchange, a TrustedIssuer for a human login, which
+    claims one token for the whole credential set it mints. The field
+    keeps its original name because the two are indistinguishable on
+    the wire and renaming it would break every deployed sf-api.
+    """
     expires_at: _builtins.float
     """The inbound token's exp"""
     def __init__(
@@ -9247,8 +9329,8 @@ class RecordFederatedExchangeReply(_message.Message):
     ERROR_FIELD_NUMBER: _builtins.int
     OK_FIELD_NUMBER: _builtins.int
     recorded: _builtins.bool
-    """True if this (token, rule) pair was recorded for the first time,
-    false if it was already present and this is therefore a replay.
+    """True if this pair was recorded for the first time, false if it was
+    already present and this is therefore a replay.
     """
     error: _builtins.str
     """Set only when we could not find out. "Already claimed" is not an

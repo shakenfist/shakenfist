@@ -25,6 +25,7 @@ from shakenfist import exceptions
 from shakenfist import federation
 from shakenfist import instance
 from shakenfist import locks
+from shakenfist import mariadb
 from shakenfist import oidc_discovery
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -38,6 +39,7 @@ from shakenfist.mapping_rule import MappingRule
 from shakenfist.mapping_rule import MappingRules
 from shakenfist.mapping_rule import MAX_KEY_TTL_SECONDS
 from shakenfist.mapping_rule import RuleValidationError
+from shakenfist.mapping_rule import rules_with_attributes
 from shakenfist.namespace import Namespace
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.namespace import revoke_inbound_trust
@@ -46,6 +48,7 @@ from shakenfist.namespace_claim import ClaimRefused
 from shakenfist.namespace_claim import NamespaceClaim
 from shakenfist.namespace_claim import NamespaceClaims
 from shakenfist.namespace_key import NamespaceKey
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.sqlalchemy import stored_max_length
 from shakenfist.schema.trusted_issuer_attributes import \
     TrustedIssuerAttributesData
@@ -2401,6 +2404,31 @@ federated_example = """{
 """
 
 
+# A credential set, as a human login answers with: one entry per
+# mapping rule the person's identity satisfied. The expiry and the
+# scopes travel with each secret because nothing else serves them -- a
+# client caching the set has to know when each member lapses and what
+# it is good for, and it cannot infer the expiry from the rule's
+# key_ttl because reading a rule takes a credential.
+login_mint_example = """[
+    {
+        "namespace": "ci",
+        "key_name": "corporate-3fJ2mQ8x",
+        "key": "sfk_...",
+        "expiry": 1763000000.0,
+        "scopes": ["blob.read", "artifact.*"]
+    },
+    {
+        "namespace": "ops",
+        "key_name": "corporate-9kLm2Pq1",
+        "key": "sfk_...",
+        "expiry": 1763000000.0,
+        "scopes": ["instance.*"]
+    }
+]
+"""
+
+
 def _federated_refusal(rule, reason, detail, namespace=None):
     """Refuse an exchange, auditing it to the rule's owner if we can.
 
@@ -2713,6 +2741,86 @@ login_example = """[
 """
 
 
+def login_audience(attrs):
+    """The audience a human identity token from this issuer must carry.
+
+    None means a person cannot be logged in through this issuer at
+    all, which is what "login capable" means and which is narrower
+    than "trusted". A flow posts a client identifier to one of two
+    endpoints, so an issuer missing either half cannot be logged in
+    through, and an issuer configured to verify a workload's tokens
+    has no client registration at the provider -- which is every
+    issuer in existence today.
+
+    One function answers two questions on purpose, and that is the
+    point of it. The issuer listing has to decide whether to offer an
+    issuer; the mint has to decide whether to accept a token from one,
+    and then which audience to verify. Two copies of the predicate
+    would differ eventually, and the direction they would differ in is
+    a token from an issuer the listing never advertised being accepted
+    anyway -- issuer_claiming_url() resolves any issuer which is not
+    deleted, because that is the right answer for the workload
+    exchange.
+
+    Returning the value rather than a boolean is what stops the mint
+    reaching validate_token() with an unchecked column. client_id is
+    optional with no minimum length, so an issuer can hold NULL or an
+    empty string; passing None as the audience override means "use the
+    issuer's audience", which would verify a person's identity token
+    against the audience a *workload's* token is stamped with. An
+    empty string is refused by validation rather than falling back,
+    but that is a backstop and not the check: an issuer with no client
+    identifier is not configured for human login at all, and saying
+    that is more useful than a validation failure.
+
+    Object state is deliberately not considered. The listing resolves
+    it with one filter on its iterator and the mint resolves it on the
+    one issuer it holds, and reading it again here would cost the
+    listing a second state read per issuer on a path an anonymous
+    caller can reach.
+    """
+    if not attrs:
+        return None
+    if not (attrs.authorization_endpoint or
+            attrs.device_authorization_endpoint):
+        return None
+    return attrs.client_id or None
+
+
+def _login_refusal(detail, fields=None):
+    """Refuse a login: logged rather than evented, and terse in answer.
+
+    The rule _federated_refusal() applies -- event a refusal where
+    there is an owner to tell, log it where there is not -- lands on
+    the logging side for every refusal a login can reach. /auth/login
+    is unauthenticated and a login names no rule, so there is nobody
+    to charge: an untrusted issuer, a rejected token and a replayed
+    token all belong to nobody in particular, and eventing them into a
+    namespace's audit log would hand an anonymous caller a way to
+    write unbounded rows there.
+
+    A claim mismatch is not evented either, and that is a deliberate
+    loss of signal worth being explicit about. A login evaluates every
+    rule the cluster holds, so a person entitled to one namespace
+    misses in every other one, and eventing those near misses would
+    write a row into every namespace on the cluster on every login.
+    The probing a namespace owner would want to see is visible on the
+    targeted exchange instead, which is where a caller naming one rule
+    is doing something a stranger would not.
+
+    Every refusal here answers with the same string. The exchange can
+    afford a category because its caller named a namespace and a rule
+    and is debugging their own workflow; this caller is anonymous, and
+    telling one holder of a valid token "no rule matches you" where
+    another is told "your token is rejected" makes the endpoint an
+    oracle for whether a given identity matches any rule on the
+    cluster. The detail goes to the log, where the operator who can
+    act on it is the only reader.
+    """
+    LOG.with_fields(fields or {}).info(f'Login refused: {detail}')
+    return sf_api.error(401, 'login refused')
+
+
 class AuthLoginEndpoint(api_base.Resource):
     # Unauthenticated by nature, for the same reason /auth/federated
     # is: a person who is about to log in holds no Shaken Fist
@@ -2795,15 +2903,14 @@ class AuthLoginEndpoint(api_base.Resource):
                 # client could do with this issuer.
                 continue
 
-            # Login capable, which is narrower than trusted. A flow
-            # posts a client identifier to one of two endpoints, so an
-            # issuer missing either half cannot be logged in through,
-            # and offering it would only produce a failure a person
-            # cannot act on.
-            if not attrs.client_id:
-                continue
-            if not (attrs.authorization_endpoint or
-                    attrs.device_authorization_endpoint):
+            # Login capable, which is narrower than trusted: an issuer
+            # missing a client registration or an endpoint a flow can
+            # begin at cannot be logged in through, and offering it
+            # would only produce a failure a person cannot act on. The
+            # predicate is shared with the mint below rather than
+            # written here, so that what this advertises and what that
+            # accepts cannot drift apart.
+            if not login_audience(attrs):
                 continue
 
             # Built explicitly rather than from external_view(), and
@@ -2841,5 +2948,381 @@ class AuthLoginEndpoint(api_base.Resource):
                     entry[field] = value
 
             out.append(entry)
+
+        return out
+
+    # Unauthenticated for the same reason the GET above is, and for
+    # the same reason /auth/federated is: the caller holds no Shaken
+    # Fist credential, only an identity from somewhere this cluster has
+    # been told to believe. What stands in place of authentication is a
+    # signature check against the issuer's published keys plus the
+    # mapping rules whose claims the identity satisfies.
+    @api_base.public
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Exchange an identity token for every credential it '
+                'entitles its holder to.',
+        [
+            ('token', 'body', 'string',
+             'A signed identity token from a trusted issuer.', True)
+        ],
+        [(200, 'One minted key per mapping rule the identity satisfies. '
+               'Each secret is returned once and never again.',
+          login_mint_example),
+         (400, 'A required field is missing.', None),
+         (401, 'The login was refused.', None),
+         (413, 'The request body is too large.', None),
+         (429, 'Too many login attempts from this source.', None),
+         (503, 'The database is unavailable, so the login could not be '
+               'checked for replay or the cluster\'s mapping rules '
+               'could not be read, or the JWKS CA bundle this '
+               'deployment is configured with could not be loaded.',
+          None),
+         (507, 'The identity satisfies more mapping rules than one '
+               'login is allowed to mint credentials for.', None)],
+        requires_auth=False))
+    def post(self, token=None):
+        """Mint every credential this identity is entitled to.
+
+        A person's entitlements are the mapping rules their claims
+        satisfy, and a credential is one namespace deep, so what this
+        answers with is a *set* of single-namespace keys rather than
+        one key naming several namespaces. The client holds the set and
+        presents whichever member the namespace it is addressing needs.
+
+        Each key in the set is an ordinary namespace key, and at use it
+        is no different from one an operator created by hand except for
+        its provenance. So nothing downstream of here learns that a
+        person logged in: authorisation stays exactly where it was, in
+        the namespace a token names and the scopes the key carries.
+        """
+        # The order below is a security property rather than a style,
+        # and it is the exchange's order with set-wide steps where that
+        # has targeted ones. Each step is cheaper than the one after
+        # it, and the expensive ones -- a JWKS fetch, up to
+        # FEDERATION_MAX_LOGIN_CREDENTIALS bcrypt hashes -- sit behind
+        # checks an anonymous caller cannot pass by guessing.
+
+        # 1. Size. As on the exchange, the refusal which actually
+        #    protects us is app.py's limit_federated_body_size hook,
+        #    because by the time this method runs log_request has
+        #    already parsed the body. This copy is a backstop for
+        #    callers which reach the method without the app's request
+        #    hooks, and is deliberately the same limit.
+        if (flask.request.content_length or 0) > \
+                config.FEDERATION_MAX_TOKEN_BYTES:
+            return sf_api.error(413, 'request body too large')
+
+        if not token or not isinstance(token, str):
+            return sf_api.error(400, 'no token specified')
+
+        # 2. Rate limit per source address, on a budget of this
+        #    endpoint's own. A login is the most expensive of the three
+        #    public auth routes -- a JWKS fetch and then a bcrypt hash
+        #    per credential -- so a counter shared with the exchange or
+        #    with the issuer listing would mean a burst of one
+        #    throttling the others, in both directions. The prefix is
+        #    eleven characters, which leaves the 64 character column
+        #    room for the longest IPv6 address.
+        source = flask.request.remote_addr or 'unknown'
+        try:
+            federation.enforce_rate_limit('login-mint:%s' % source)
+        except exceptions.RateLimited as e:
+            LOG.with_fields({'source': source}).info(
+                f'Login rate limited: {e}')
+            return sf_api.error(429, 'too many login attempts',
+                                suppress_traceback=True)
+
+        # 3. Resolve the issuer from the unverified iss. No network
+        #    yet: a made-up issuer must not be able to make us dial
+        #    out.
+        try:
+            issuer = federation.issuer_for_token(token)
+        except exceptions.UntrustedIssuer as e:
+            return _login_refusal(str(e))
+
+        # 4. Login capable, which is narrower than what step 3
+        #    resolved. issuer_claiming_url() accepts any issuer whose
+        #    state is not deleted, which is the right answer for the
+        #    workload exchange and not the question here.
+        #
+        #    The state test catches the one issuer that difference
+        #    actually admits. Configuring an issuer is atomic, so its
+        #    state machine has no error state and nothing between
+        #    created and deleted -- but a static row whose state write
+        #    failed reads as a state of None, which is not deleted, so
+        #    it resolves. Such an issuer was never finished being
+        #    configured, and the listing does not offer it either.
+        #
+        #    The read is here rather than inside the shared predicate
+        #    because the listing resolves state with one filter on its
+        #    iterator, and asking twice would cost it a round trip per
+        #    issuer on a path an anonymous caller can reach. What the
+        #    predicate decides is the half the two endpoints would
+        #    otherwise disagree on in a way nobody would notice: an
+        #    issuer configured for workloads only has no client
+        #    registration at the provider, is not advertised for login,
+        #    and without this would be logged in through regardless.
+        if issuer.state.value not in TrustedIssuer.ACTIVE_STATES:
+            return _login_refusal(
+                f'issuer {issuer.name} is in state {issuer.state.value}',
+                fields={'issuer': issuer.name})
+
+        audience = login_audience(issuer.configuration())
+        if not audience:
+            return _login_refusal(
+                f'issuer {issuer.name} is not configured for human login',
+                fields={'issuer': issuer.name})
+
+        # 5 and 6. Signature, then audience, issuer and lifetime, in
+        #    the one copy of token validation this repository has. The
+        #    audience is the issuer's client identifier rather than its
+        #    audience column, because an OpenID Connect identity
+        #    token's aud is the relying party it was issued for and a
+        #    workload's is whatever the workload was told to ask for.
+        #    One column cannot hold both, so there are two doors: a
+        #    workload's token is refused here and a person's is refused
+        #    at the exchange, unless an operator has deliberately made
+        #    the two columns equal, which is their business.
+        try:
+            claims = federation.validate_token(
+                token, issuer, audience=audience)
+        except exceptions.JWKSTrustAnchorUnusable as e:
+            # Ours, not theirs. FEDERATION_JWKS_CA_BUNDLE points at a
+            # file sf-api cannot load, so the token was never examined
+            # and calling it rejected would be a lie which sends the
+            # person to their identity provider over our
+            # misconfiguration.
+            LOG.with_fields({'issuer': issuer.name}).error(
+                f'Login is misconfigured: {e}')
+            return sf_api.error(503, 'login is unavailable, please retry',
+                                suppress_traceback=True)
+        except exceptions.TokenValidationFailed as e:
+            return _login_refusal(str(e), fields={'issuer': issuer.name})
+
+        # 7. Every rule this issuer's tokens can satisfy, read in two
+        #    queries rather than two per rule. The accessor joins each
+        #    rule's policy and pushes the issuer filter into SQL; the
+        #    state filter is one bulk question for the whole set. The
+        #    per-rule shape of both was measured and removed elsewhere,
+        #    and it would be worse here: this is an unauthenticated
+        #    path, so a per-rule read is work an anonymous caller
+        #    multiplies by however many rules the cluster holds.
+        #
+        #    Deliberately after validation. A caller holding no valid
+        #    token cannot use this endpoint to make the cluster read
+        #    its rule set.
+        rules = rules_with_attributes(issuer=issuer.name)
+
+        actionable = mariadb.get_objects_by_state(
+            ObjectType.MAPPING_RULE, sorted(MappingRule.ACTIVE_STATES))
+        if actionable is None:
+            # None means the query failed and [] means no rule is in an
+            # actionable state, and nothing here may confuse the two.
+            # Reading a failure as an empty answer mints nothing, which
+            # is safe; reading it as "do not filter by state" would
+            # mint from soft deleted rules, and a mapping rule's only
+            # delete is a soft one -- so that is an authorisation
+            # bypass rather than a stale answer. Refused outright,
+            # because this cannot be decided without the answer and
+            # both of the available guesses authorise something.
+            LOG.with_fields({'issuer': issuer.name}).error(
+                'Could not read mapping rule states, refusing login')
+            return sf_api.error(503, 'login is unavailable, please retry',
+                                suppress_traceback=True)
+        actionable = set(actionable)
+
+        rules = [(rule, policy) for rule, policy in rules
+                 if str(rule.uuid) in actionable]
+
+        # 8. Which of them does this identity satisfy? Claim matching
+        #    is federation's, exact and ungloblike, and a rule which
+        #    cannot grant anything is skipped and counted there rather
+        #    than refusing a login the cluster's other rules would have
+        #    granted.
+        #
+        #    Each skip is already logged where it is decided, with the
+        #    uuid of the rule that caused it, which is what an operator
+        #    needs to go and fix one. Logging the count again here
+        #    would write a second line about the same rules on every
+        #    login for as long as one stays damaged, and say less. The
+        #    count is still carried into a refusal below, where it
+        #    explains an answer rather than repeating a warning.
+        matches, skipped = federation.matching_rules(
+            claims, issuer.name, rules)
+
+        # 9. No match is a refusal, not a 200 carrying an empty list. A
+        #    client receiving an empty set would have to treat "you are
+        #    authenticated and entitled to nothing" as a state of its
+        #    own, and it cannot tell that from "this cluster has not
+        #    finished being configured".
+        if not matches:
+            return _login_refusal(
+                f'no rule for issuer {issuer.name} matches this identity',
+                fields={'issuer': issuer.name, 'skipped': skipped})
+
+        # 10. The cap, which refuses the whole login rather than
+        #     truncating the set. A person cannot tell a short set from
+        #     a complete one, and would discover the difference as a
+        #     permission denied in whichever namespace fell off the end.
+        #
+        #     507 rather than 409, by this API's own taxonomy above
+        #     CLAIM_REFUSAL_STATUS: 409 is for a request conflicting
+        #     with durable state, where the caller has to change
+        #     something before it can succeed, and 507 is for
+        #     exhaustion, where no change to the request will help
+        #     until something is released. A person who satisfies more
+        #     rules than the cap allows can change nothing at all; what
+        #     has to change is the cluster's rules or its cap. It is not
+        #     transient either, so 503 would be a lie.
+        #
+        #     The counts and the setting name go to the log, which is
+        #     where the operator who can act on them reads. The answer
+        #     names neither.
+        cap = config.FEDERATION_MAX_LOGIN_CREDENTIALS
+        if len(matches) > cap:
+            LOG.with_fields({
+                'issuer': issuer.name, 'matched': len(matches), 'cap': cap,
+                'setting': 'FEDERATION_MAX_LOGIN_CREDENTIALS'
+            }).warning('Login refused: more entitlements than the cap allows')
+            return sf_api.error(
+                507, 'this identity is entitled to more credentials than one '
+                     'login may mint')
+
+        # 11. Refuse a replay of this token, once for the whole login
+        #     and keyed on the issuer rather than on a rule. Reaching
+        #     several namespaces with one identity is the legitimate
+        #     pattern the replay table's grain exists for, and a login
+        #     is that pattern performed in a single request -- so
+        #     claiming the pairs one at a time would make a retry after
+        #     a partial failure answer with whichever credentials the
+        #     first attempt had not taken, with nothing in the answer
+        #     to say it was short. One claim makes the retry a clean
+        #     refusal.
+        #
+        #     Last gate before minting, which is what makes it
+        #     effective: two concurrent presentations of one token
+        #     cannot both get past this line. Minting is not
+        #     transactional, so a failure part way through leaves a
+        #     partial set and a spent token -- the same trade the
+        #     exchange makes, and the right way round to be wrong,
+        #     because the alternative is a window in which one token
+        #     mints twice. The person asks their provider for another
+        #     token.
+        try:
+            federation.refuse_replay_for_login(token, claims, issuer)
+        except exceptions.TokenReplayed as e:
+            return _login_refusal(str(e), fields={'issuer': issuer.name})
+        except exceptions.TokenValidationFailed as e:
+            return _login_refusal(str(e), fields={'issuer': issuer.name})
+
+        # 12. Mint. One key per matching rule, each with the scopes and
+        #     lifetime that rule grants.
+        out = []
+        for rule, policy, satisfied in matches:
+            namespace_from_db = Namespace.from_db(
+                rule.namespace, suppress_failure_audit=True)
+            if not namespace_from_db or \
+                    namespace_from_db.state.value == dbo.STATE_DELETED:
+                # The rule outlived its namespace, which Namespace hard
+                # delete is supposed to prevent. Skipped rather than
+                # refusing the login, for the reason a rule which can
+                # grant nothing is skipped: one broken rule must not
+                # cost a person the credentials the cluster's other
+                # rules would have granted them.
+                LOG.with_fields({
+                    'rule': str(rule.uuid), 'namespace': rule.namespace
+                }).error('Login skipped a rule whose namespace is gone')
+                continue
+
+            # The name carries a random discriminator, exactly as the
+            # exchange's does, and never the person's identity.
+            # NamespaceKey.new() rotates an existing key of the same
+            # name -- new hash, new nonce, same uuid -- so a name
+            # derived from the subject would mean that logging in on a
+            # laptop invalidated the credential a session on a
+            # workstation was still using. The discriminator is what
+            # makes a second login additive. Who logged in is recorded
+            # in provenance, which an administrator reads, rather than
+            # in the name, which everyone who can list the namespace's
+            # keys can see.
+            key_name = '%s-%s' % (
+                policy.key_name_prefix, sf_random.random_id()[:8])
+            secret = credentials.generate()
+            expiry = time.time() + policy.key_ttl
+
+            minted = NamespaceKey.new(
+                rule.namespace, key_name, secret,
+                expiry=expiry,
+                scopes=list(policy.scopes),
+                provenance={
+                    # 'login' rather than 'federated', so that an
+                    # operator can tell a person's credential from a
+                    # workload's without reading the rest of it.
+                    'source': 'login',
+                    'rule': str(rule.uuid),
+                    'rule_name': rule.name,
+                    'issuer': issuer.name,
+                    # The claims which were actually satisfied, not the
+                    # rule's matchers: an audit should describe the
+                    # grant as it was made, not as the rule reads today.
+                    'claims': satisfied,
+                    'jti': claims.get('jti'),
+                    'sub': claims.get('sub')
+                })
+
+            # A key in system gets its own wording, because the audit
+            # log is where an administrative credential has to be
+            # legible as one. A mapping rule in system is a standing
+            # offer of administrative credentials to whoever satisfies
+            # its claims, which turns a group membership at an identity
+            # provider into cluster administration. That is a thing an
+            # administrator deliberately wrote and this endpoint does
+            # not second guess it -- there is no allow list of
+            # namespaces here and no special case keyed on a name,
+            # because the authorisation decision belongs entirely to
+            # the rules. So it is made loud rather than forbidden.
+            if rule.namespace == 'system':
+                key_event = 'administrative key minted by human login'
+                namespace_event = 'human login minted an administrative key'
+            else:
+                key_event = 'key minted by human login'
+                namespace_event = 'human login minted a key'
+
+            minted.add_event(
+                EVENT_TYPE_AUDIT, key_event,
+                extra={'rule': str(rule.uuid), 'issuer': issuer.name,
+                       'claims': satisfied, 'scopes': list(policy.scopes)})
+            namespace_from_db.add_event(
+                EVENT_TYPE_AUDIT, namespace_event,
+                extra={'key_name': key_name, 'rule': rule.name,
+                       'issuer': issuer.name, 'claims': satisfied})
+
+            # Each secret is returned here and never again: nothing
+            # stores it, only its bcrypt hash. The expiry and the
+            # scopes travel with it because a client cannot cache a
+            # credential set without them and there is no read which
+            # serves them; disclosing them costs nothing, since the
+            # caller has just been handed the secret they describe.
+            out.append({
+                'namespace': rule.namespace,
+                'key_name': key_name,
+                'key': secret,
+                'expiry': expiry,
+                'scopes': list(policy.scopes)
+            })
+
+        if not out:
+            # Every match named a namespace which has gone. An empty
+            # set is not an answer a client can use, for the reason a
+            # login which matched nothing is refused rather than
+            # answered with one.
+            return _login_refusal(
+                f'every rule matching this identity from issuer '
+                f'{issuer.name} names a namespace which is gone',
+                fields={'issuer': issuer.name})
+
+        LOG.with_fields({
+            'issuer': issuer.name, 'minted': len(out), 'skipped': skipped
+        }).info('Human login minted a credential set')
 
         return out
