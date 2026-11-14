@@ -162,3 +162,42 @@ like this:
 sf-client instance screenshot ...uuid...
 ```
 
+
+## Typing at the console
+
+Some appliances are configured only through an interactive first boot wizard
+on the console, and have no agent and no cloud-init. For those,
+`POST /instances/<ref>/console/keys` types at the guest's emulated keyboard,
+which is the other half of the loop the screen captures above start: read the
+screen, send the answer, read the screen again.
+
+The request sends either `text`, which is typed one keystroke per character,
+or `keys`, which is a list of key names:
+
+```json
+{"text": "admin\n"}
+{"keys": ["f2", "down", "down", "enter"]}
+```
+
+A newline in `text` is the enter key and a tab is the tab key, so a whole
+answer and its confirmation can be one request. A name in `keys` may be a
+chord of names joined with `+`, such as `ctrl+alt+delete`, and `virsh`'s
+`KEY_` prefix is accepted as well as the bare name. The names Shaken Fist
+knows are the character keys, `esc` (or `escape`), `backspace`, `tab`,
+`enter` (or `return`), `space`, `capslock`, `grave`, `backslash`, the
+`ctrl`, `alt` and `shift` modifiers (optionally prefixed `left` or
+`right`), the arrow keys, `home`, `end`, `pageup`, `pagedown`, `insert`,
+`delete`, and `f1` through `f12`. A name outside that set is refused with a
+400 naming it.
+
+`hold_ms` is how long each keystroke is held down, in milliseconds. qemu also
+delays the following keystroke by it, which is how a console too slow to keep
+up is paced; it defaults to 0 and is capped at 100. At most 256 keystrokes may
+be sent in one request, because the request blocks until the last one has been
+delivered.
+
+This is the same privilege as the VDI console: a token must carry
+`instance.console`, not merely `instance.write`, and the instance must be
+running. The keystrokes themselves are never written to an event or a log,
+because a wizard asks for passwords; the audit event records only how many
+were sent.

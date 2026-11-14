@@ -63,7 +63,8 @@ EXPECTED_CAPABILITIES = {
     'instances': [
         'pure-affinity', 'spice-vdi-console', 'vdi-console-helper',
         'vdi-console-proxy', 'instance-put-blob', 'instance-execute',
-        'instance-get', 'instance-screenshot', 'get-instance-namespace',
+        'instance-get', 'instance-screenshot', 'instance-console-keys',
+        'get-instance-namespace',
         'hot-plug-interface', 'include-queued-agent-operations',
         'instance-clusteroperations', 'agentoperation-deadlines',
         'agentoperation-dependencies', 'placement-query'],

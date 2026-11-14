@@ -3426,6 +3426,20 @@ class Instance(dbowo):
 
         return blob_uuid
 
+    def send_console_keys(self, chords, hold_ms):
+        with util_libvirt.LibvirtConnection() as lc:
+            try:
+                lc.send_keys(self.uuid, chords, hold_ms)
+            except exceptions.NoDomainException:
+                raise exceptions.InvalidLifecycleState(
+                    'instance is not running, cannot send console keystrokes')
+
+        # The keystrokes themselves are deliberately not recorded: a
+        # first boot wizard asks for passwords, and an event is a durable,
+        # queryable record on the instance.
+        self.add_event(EVENT_TYPE_AUDIT, 'sent keystrokes to instance console',
+                       extra={'chords': len(chords), 'hold_ms': hold_ms})
+
     def hot_plug_interface(self, n, ni):
         # Attach the interface device via libvirt. The network reconcile
         # (create-on-hypervisor + ensure_mesh) and the wait for it are the

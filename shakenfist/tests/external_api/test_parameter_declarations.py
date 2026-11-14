@@ -735,8 +735,8 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             checked += 1
 
         self.assertEqual(
-            57, checked,
-            'expected 57 handlers behind a ref resolving decorator, found '
+            58, checked,
+            'expected 58 handlers behind a ref resolving decorator, found '
             '%d. If the count changed on purpose, update it here.' % checked)
 
     def test_artifact_uuid_is_not_a_parameter(self):
@@ -830,8 +830,8 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             checked += 1
 
         self.assertEqual(
-            13, checked,
-            'expected 13 handlers behind requires_instance_active, found '
+            14, checked,
+            'expected 14 handlers behind requires_instance_active, found '
             '%d. If the count changed on purpose, update it here.'
             % checked)
 

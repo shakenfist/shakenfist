@@ -432,6 +432,31 @@ class EnforcementTestCase(base.ShakenFistTestCase):
             self.assertEqual(403, resp.status_code, path)
             self.assertIn('not scoped', resp.get_json()['error'])
 
+    def test_instance_write_does_not_grant_console_keystrokes(self):
+        # Typing at the console drives the guest exactly as the SPICE
+        # credentials above do, so it takes the console verb rather than
+        # riding on instance.write -- otherwise a credential granted to
+        # create instances could drive somebody else's first boot wizard.
+        token = self._scoped_key('banana', 'builder', 'sekrit',
+                                 ['instance.write'])
+        resp = self.client.post(
+            '/instances/whatever/console/keys',
+            headers={'Authorization': token},
+            data=json.dumps({'text': 'a'}))
+        self.assertEqual(403, resp.status_code)
+        self.assertIn('not scoped', resp.get_json()['error'])
+
+        # The control, so this fails for the scope rather than for the
+        # instance not existing: with the console verb granted the
+        # request reaches the lookup and 404s.
+        token = self._scoped_key('banana', 'operator', 'sekrit2',
+                                 ['instance.console'])
+        resp = self.client.post(
+            '/instances/whatever/console/keys',
+            headers={'Authorization': token},
+            data=json.dumps({'text': 'a'}))
+        self.assertEqual(404, resp.status_code)
+
     def test_instance_write_does_not_grant_in_guest_execution(self):
         token = self._scoped_key('banana', 'builder', 'sekrit',
                                  ['instance.write'])
