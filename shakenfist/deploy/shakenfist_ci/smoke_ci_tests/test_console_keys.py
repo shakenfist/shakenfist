@@ -1,4 +1,5 @@
 import json
+import time
 
 from testtools import content
 
@@ -90,10 +91,24 @@ class TestConsoleKeys(base.BaseNamespacedTestCase):
 
         # The audit trail says keystrokes were sent and how many, and
         # deliberately does not say what they were: a first boot wizard
-        # asks for passwords, and an event is a durable record.
-        events = self.test_client.get_instance_events(inst['uuid'])
-        sends = [e for e in events
-                 if e.get('message') == 'sent keystrokes to instance console']
+        # asks for passwords, and an event is a durable record. Events are
+        # eventually consistent -- the 200 above does not mean the audit
+        # event has reached sf-eventlog yet -- so poll for it, as the
+        # cluster event tests do, rather than reading once. Filter to audit
+        # events so a busy boot's mutate events cannot push it off the
+        # default page.
+        events = []
+        sends = []
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            events = self.test_client.get_instance_events(
+                inst['uuid'], event_type='audit')
+            sends = [
+                e for e in events
+                if e.get('message') == 'sent keystrokes to instance console']
+            if sends:
+                break
+            time.sleep(1)
         self.assertNotEqual([], sends, 'No console keystroke event: %s'
                             % json.dumps(events, indent=4, sort_keys=True))
         rendered = json.dumps(sends)
