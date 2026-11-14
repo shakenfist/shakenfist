@@ -92,7 +92,7 @@ what you use into the same virtual environment as Kerbside:
 | You use | Install | Without it |
 |---------|---------|------------|
 | A `shakenfist` source | `shakenfist-client` 0.8.3 or later | The source is marked errored and ignored, and the daemon logs why. Older versions cannot fetch signing keys, which leaves token exchange unavailable for that source. |
-| An `ovirt` source | `ovirt-engine-sdk-python` | The source is marked errored and ignored, and the daemon logs why. |
+| An `ovirt` source | `ovirt-engine-sdk-python` 4.6.1 or later | The source is marked errored and ignored, and the daemon logs why. |
 | An `openstack` source (token exchange) | `openstacksdk`, `keystoneauth1` and `python-keystoneclient` | The API answers 500 to the token exchange request and logs the import failure. |
 | Interactive login, whatever your sources | `keystoneauth1` and `python-keystoneclient` | The API answers 500 to login and logs the import failure. |
 | A `proxmox` source | Nothing: it uses `requests`, which Kerbside already needs | |

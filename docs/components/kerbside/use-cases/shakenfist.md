@@ -193,7 +193,10 @@ and `KERBSIDE_TOKEN_DURATION`, the lifetime of a minted token.
 `KERBSIDE_URL` is simultaneously the exchange URL base and the
 `aud` claim of every token, and it must equal Kerbside's
 `SF_CONSOLE_TOKEN_AUDIENCE` byte for byte — scheme, port, and
-trailing path included. `sf-api` reads `KERBSIDE_URL` into its
+trailing path included. A trailing slash is the exception, and
+only because both sides strip one: Shaken Fist mints the audience
+from `KERBSIDE_URL.rstrip('/')`, and Kerbside compares the
+stripped form of its own setting. `sf-api` reads `KERBSIDE_URL` into its
 configuration at process start, so restart it after changing
 the value.
 

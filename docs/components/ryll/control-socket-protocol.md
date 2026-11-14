@@ -694,7 +694,11 @@ sequence differing from its last copy only in those ways should vary
 the text some other way. Empty text is stored, and `clipboard_get`
 returns it, but is never offered to the guest, which keeps its own
 clipboard. Setting the clipboard does not raise `clipboard_changed`,
-which reports only text from the guest.
+which reports only text from the guest. A guest whose agent asks for
+CRLF line endings, such as a Windows guest, is sent the text with each
+LF made CRLF; if that makes it longer than 100 MiB, the guest's paste
+is answered with no data and a warning is logged, although
+`clipboard_set` itself succeeded.
 
 Params:
 

@@ -80,7 +80,7 @@ minted by Shaken Fist entirely offline. See
 
 | Configuration Option | Type | Description |
 |---------------------|------|-------------|
-| SF_CONSOLE_TOKEN_AUDIENCE | String (default empty) | The `aud` claim Kerbside requires on a Shaken Fist console token. Empty derives it as `https://<PUBLIC_FQDN>` (see PUBLIC_FQDN above). This value must equal Shaken Fist's own `KERBSIDE_URL` exactly — it is simultaneously the token audience and the base of the exchange URL — so set it explicitly whenever the public URL differs in scheme, port, or path. Note that `KERBSIDE_URL` is Shaken Fist cluster config, distinct from this Kerbside proxy setting. |
+| SF_CONSOLE_TOKEN_AUDIENCE | String (default empty) | The `aud` claim Kerbside requires on a Shaken Fist console token. Empty derives it as `https://<PUBLIC_FQDN>` (see PUBLIC_FQDN above). This value must equal Shaken Fist's own `KERBSIDE_URL` exactly — it is simultaneously the token audience and the base of the exchange URL — so set it explicitly whenever the public URL differs in scheme, port, or path. A trailing slash is the one difference that does not count: Shaken Fist strips it before minting, so Kerbside strips it here too. Note that `KERBSIDE_URL` is Shaken Fist cluster config, distinct from this Kerbside proxy setting. |
 
 ## Control-plane gRPC service
 

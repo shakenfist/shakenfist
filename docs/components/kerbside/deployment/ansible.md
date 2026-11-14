@@ -45,14 +45,14 @@ Each row is what the role's tasks do, in
 |-------|--------------------|
 | OS packages | Installs Kerbside's build dependencies with apt, so the hosts must be Debian family. |
 | User | A `kerbside` system user and group, with no login shell. Its home, `/srv/kerbside`, is owned by root. |
-| Virtual environment | `/srv/kerbside/venv`, holding Kerbside, `kerbside-proxy`, gunicorn and, only when a source is of type `shakenfist`, `shakenfist-client`. It installs with `uv pip install --reinstall`, so a rebuilt wheel with an unchanged version is picked up. |
-| `kerbside.ini` | Rendered from the role's template, with the fifteen settings listed in [Settings the role does not write](#settings-the-role-does-not-write) and no others, and checked before it replaces the running file. `root:kerbside`, 0640. |
+| Virtual environment | `/srv/kerbside/venv`, holding Kerbside, `kerbside-proxy`, gunicorn and the client library each configured source type's driver imports -- `shakenfist-client` for a `shakenfist` source, `ovirt-engine-sdk-python` for an `ovirt` one, `openstacksdk`, `keystoneauth1` and `python-keystoneclient` for an `openstack` one, and nothing for `proxmox` or `static`. It installs with `uv pip install --reinstall`, so a rebuilt wheel with an unchanged version is picked up. The deploy fails if a client did not install, rather than leaving a source to be marked errored later. |
+| `kerbside.ini` | Rendered from the role's template: the fifteen settings in [Settings the role writes](#settings-the-role-writes), then whatever `kerbside_extra_settings` adds, and checked before it replaces the running file. `root:kerbside`, 0640. |
 | `sources.yaml` | Your sources, written as given, and checked by Kerbside's rules for each type before it replaces the running file. `root:kerbside`, 0640. |
 | Certificates | Nothing is issued. The role reads the proxy's certificate, key and CA from `/etc/kerbside/pki`, or from paths you name, and fails if any of the three is missing. It computes the proxy's certificate subject from the certificate itself. |
 | systemd units | `kerbside-api.service`, gunicorn on `0.0.0.0:13002` in plain HTTP, and `kerbside-daemon.service`, the daemon with the SPICE proxy as its child. Both run as `kerbside` and are wanted by `multi-user.target`. |
 | Database schema | `kerbside db upgrade`, once, on the first host, as the `kerbside` user. It checks that the migration read `kerbside.ini` and reached the database. |
 | Restarts | Only when the installed code, the configuration it writes, the units, or the proxy's certificate, its key or the CA changed since the last deploy that reached readiness. |
-| Readiness | Waits for the API to answer `GET /`, and for every `shakenfist` source, for Kerbside to fetch that cluster's console token signing keys during this deploy. |
+| Readiness | Waits for the API to answer `GET /`, and for every `shakenfist` source, for Kerbside to fetch that cluster's console token signing keys during this deploy -- then checks that each fetched set could verify a token minted now, which a fetch alone does not prove. |
 
 The [By hand](/components/kerbside/deployment/manual/#what-it-deploys) page gives the same layout
 as a table of paths, owners and modes, with the reasons for each.
@@ -73,11 +73,6 @@ What it leaves to you:
   only way in. If the proxy is on another host, firewall the API port
   (`kerbside_api_port`, 13002 by default) to it instead. Kerbside
   ships no proxy configuration.
-- **Client libraries for other sources.** The role installs
-  `shakenfist-client` and no other client library
-  ([#602](https://github.com/shakenfist/kerbside/issues/602)).
-- **Any setting the role does not write.** See
-  [Settings the role does not write](#settings-the-role-does-not-write).
 - **The firewall.** [network-ports.md](/components/kerbside/network-ports/) lists
   every port Kerbside listens on and dials.
 
@@ -113,10 +108,10 @@ describes. The cluster's `KERBSIDE_URL` and the role's
 `kerbside_url` must be the same string, byte for byte, and `validate`
 refuses a `shakenfist` source without one.
 
-### Settings the role does not write
+### Settings the role writes
 
-The role renders `kerbside.ini` from a fixed set of fifteen settings,
-and nothing else:
+The role writes these fifteen settings into `kerbside.ini` from its
+own variables:
 
 - `sql_url`, `auth_secret_seed` and `sources_path`;
 - `public_fqdn` and `node_name`, the host's inventory name;
@@ -126,90 +121,72 @@ and nothing else:
 - `public_secure_port`, `public_insecure_port`, `vdi_secure_port`,
   `vdi_insecure_port` and `prometheus_metrics_port`.
 
-The file says that local changes are overwritten on the next deploy,
-and they are. So a role-deployed Kerbside cannot be given a Keystone
-login, `firewall_mode`, `log_verbose`, its token durations,
-`prometheus_metrics_address` or any other setting in
-[configuration.md](/components/kerbside/configuration/) through `kerbside.ini`.
-[#629](https://github.com/shakenfist/kerbside/issues/629) tracks
-adding them to the role.
+Each comes from a role variable the rest of the role reads too — the
+ports it opens, the certificate it renders a subject from, the
+audience it requires on a Shaken Fist console token — so `validate`
+refuses any attempt to set one of these another way.
 
-Until then, an environment variable works. Kerbside copies each key
-of `kerbside.ini` into an environment variable named `KERBSIDE_` plus
-the key in upper case, but only when that variable is not already
-set, so a variable in the service's environment wins over the file.
-`keystone_auth_url` becomes `KERBSIDE_KEYSTONE_AUTH_URL`. A systemd
-drop-in can set such variables, and the role writes the unit files
-themselves but not their drop-in directories, so a redeploy keeps it.
+Every other setting in [configuration.md](/components/kerbside/configuration/) goes
+in `kerbside_extra_settings`, a mapping of INI key to value rendered
+after those fifteen:
 
-Put the settings in a file only root can read:
-
-```bash
-install -o root -g root -m 0600 /dev/null /etc/kerbside/kerbside.env
+```yaml
+kerbside_extra_settings:
+  log_verbose: true
+  console_token_duration: 120
+  firewall_mode: enforcing
+  keystone_auth_url: https://keystone.example.com:5000/v3
+  keystone_service_auth_user: kerbside
+  keystone_service_auth_password: "{{ vault_kerbside_keystone_password }}"
+  keystone_service_auth_project: service
+  keystone_access_group: kerbside
+  keystone_admin_group: kerbside-admins
 ```
 
-For a Keystone login, that file holds the `keystone_*` settings
-[configuration.md](/components/kerbside/configuration/#keystone-settings) describes:
+The values are `no_log`, so none of them reaches the ansible output,
+and `kerbside.ini` is `root:kerbside` 0640 as always. `no_log` redacts
+a value wherever it appears, so a short one — `true`, a port, a
+duration — can make an unrelated line of ansible's output read
+`VALUE_SPECIFIED_IN_NO_LOG_PARAMETER`. That is cosmetic, and the
+alternative is printing a service password. A name Kerbside has no
+setting for is refused before the rendered file replaces the one
+Kerbside is running with, because Kerbside ignores an unknown setting
+rather than refusing it: a misspelled name would otherwise do nothing,
+and say nothing.
 
-```ini
-KERBSIDE_KEYSTONE_AUTH_URL=https://keystone.example.com:5000/v3
-KERBSIDE_KEYSTONE_SERVICE_AUTH_USER=kerbside
-KERBSIDE_KEYSTONE_SERVICE_AUTH_PASSWORD=CHANGEME
-KERBSIDE_KEYSTONE_SERVICE_AUTH_PROJECT=service
-KERBSIDE_KEYSTONE_SERVICE_AUTH_USER_DOMAIN_ID=default
-KERBSIDE_KEYSTONE_SERVICE_AUTH_PROJECT_DOMAIN_ID=default
-KERBSIDE_KEYSTONE_ACCESS_GROUP=kerbside
-KERBSIDE_KEYSTONE_ADMIN_GROUP=kerbside-admins
-# For a Keystone whose certificate a private CA issued:
-# KERBSIDE_KEYSTONE_AUTH_VERIFY=/etc/kerbside/keystone-ca.pem
-```
+Each value is written as one INI line, so it must be one line of
+text, a number or a boolean. `validate` refuses a null (usually a
+vault variable which did not resolve), a list or a mapping (which
+would be written as its Python repr), and text with a line break in
+it (which would be written as more than one line). A setting which
+takes several values, such as `firewall_permitted_channels`, takes
+them as one line, the way [configuration.md](/components/kerbside/configuration/)
+spells it.
 
-Then give both units a drop-in that reads it, as
-`/etc/systemd/system/kerbside-api.service.d/settings.conf` and
-`/etc/systemd/system/kerbside-daemon.service.d/settings.conf`:
+`kerbside.ini` is one of the files whose contents decide whether
+Kerbside restarts, so changing a setting here restarts Kerbside on the
+next deploy — which ends every live SPICE session on that host.
 
-```ini
-[Service]
-EnvironmentFile=/etc/kerbside/kerbside.env
-```
+A Keystone login is any `keystone_*` setting, and the role installs
+`keystoneauth1` and `python-keystoneclient` when it sees one
+([Client libraries for console sources](/components/kerbside/installation/#client-libraries-for-console-sources)).
+Interactive login is Keystone-only
+([#300](https://github.com/shakenfist/kerbside/issues/300)).
 
-systemd reads the file as root before it starts the service as
-`kerbside`, so the file can stay 0600. Use `EnvironmentFile=` rather
-than writing the values into the drop-in: `systemctl show` prints a
-unit's own environment settings to any local user, and the service
-password would be among them.
-
-Apply it by hand, because the role will not:
-
-```bash
-systemctl daemon-reload
-systemctl restart kerbside-daemon kerbside-api
-```
-
-The role decides whether to restart Kerbside from what it deploys
-itself, which does not include a drop-in or the file it names, so a
-change to either takes effect only when you restart the units.
-Restarting the daemon ends every live SPICE session on the host.
-
-Three more things to know:
-
-- Use this only for settings the role does not write. The role's own
-  database migration and readiness check run outside the units, so
-  they would not see a variable that overrides one of the fifteen.
-- A Keystone login also needs `keystoneauth1` and
-  `python-keystoneclient` in the virtual environment
-  ([Client libraries for console sources](/components/kerbside/installation/#client-libraries-for-console-sources)),
-  which the role does not install
-  ([#602](https://github.com/shakenfist/kerbside/issues/602)). Install
-  them into it yourself, as root:
-  `VIRTUAL_ENV=/srv/kerbside/venv /srv/kerbside/venv/bin/uv pip install keystoneauth1 python-keystoneclient`.
-  The role's install names its own packages and removes nothing else,
-  so a redeploy keeps them. Its restart decision hashes the
-  virtual environment's package list, so the next deploy restarts
-  Kerbside once.
-- Nothing tests any of this. No CI lane deploys a drop-in, and the
-  steps above are read from Kerbside's configuration loader and the
-  role's tasks, not run.
+An environment variable still beats the file: Kerbside copies each INI
+key into `KERBSIDE_<KEY>` only when that variable is not already set.
+So a systemd drop-in with `EnvironmentFile=` pointing at a root-owned
+0600 file can override even a setting the role owns, and the role
+writes the units but not their `.d/` directories, so a redeploy keeps
+it. Use `EnvironmentFile=` rather than `Environment=`, which
+`systemctl show` prints to any local user. The role neither writes
+such a drop-in nor notices a change to one, so you apply it with
+`systemctl daemon-reload` and a restart by hand, and the role's own
+migration and readiness check — which run outside the units — do not
+see it. A login configured that way also needs its client libraries
+installed into the virtual environment by hand, because the role sees
+no `keystone_*` setting to install them for. Prefer
+`kerbside_extra_settings`.
 
 ## Status and limitations
 
@@ -226,9 +203,9 @@ Fist node, and checks that a second deploy restarts nothing.
 
 | Not covered | Why |
 |-------------|-----|
-| oVirt and OpenStack sources do not work | The role validates and renders all five source types, but installs no client library but `shakenfist-client` ([#602](https://github.com/shakenfist/kerbside/issues/602)). An `ovirt` source is marked errored and ignored, and an `openstack` source's token exchange answers 500. Today the role deploys a Kerbside for Shaken Fist, Proxmox and static sources, which need no other client library. |
+| No lane deploys an `ovirt` or `openstack` source through the role | The role installs each type's client libraries and the rootless test proves which ones it asks for, but no lane deploys such a source against a real engine or Keystone, so nothing proves end to end that a role-deployed Kerbside serves one. `ovirt-engine-sdk-python` is also built from source here, which the rootless test's stub installer does not exercise. |
 | No lane deploys a `proxmox` source through the role | The role validates and renders a `proxmox` source, a unit test checks its required fields, and the rootless test renders one. No lane starts a role-deployed Kerbside with one. [`proxmox-functional.yml`](/components/kerbside/testing/#the-proxmox-end-to-end-lane) does prove a proxied SPICE session against a real single-node Proxmox VE 9, but it deploys Kerbside on the runner rather than through the role, and no lane has run either against a multi-node PVE cluster. |
-| No setting beyond the fifteen | `kerbside.ini` is rendered from a fixed set, with no way to add to it, so there is no Keystone login, firewall mode or verbose logging through the role ([#629](https://github.com/shakenfist/kerbside/issues/629)). The drop-in in [Settings the role does not write](#settings-the-role-does-not-write) works around it, and is untested. |
+| No lane deploys an extra setting | The rootless test renders `kerbside_extra_settings` into `kerbside.ini` and proves a bad name is refused, but no lane starts a Kerbside configured through one, so nothing proves end to end that a Keystone login deployed this way works. Interactive login has no lane of its own either ([#300](https://github.com/shakenfist/kerbside/issues/300)). |
 | Kerbside is started only with a Shaken Fist source, co-located | `sf-e2e` is the only lane that runs `register` against a real database and systemd, and it deploys one `shakenfist` source on a Shaken Fist node. The rootless test renders every source type, but skips the migration and the units. No lane starts a role-deployed Kerbside with a `static` source, or on a host of its own. |
 | Only through Shaken Fist's `site.yml` | `sf-e2e` calls the role from Shaken Fist's playbook. No lane calls it from a playbook of its own, as the second route above does. |
 | One Kerbside host | No lane runs two Kerbside hosts sharing a database. Shaken Fist's [Load balancing](https://shakenfist.com/operator_guide/kerbside/#load-balancing) describes the shape, and says it is untested. |

@@ -468,13 +468,16 @@ events sent after it subscribed, so anything that needs the
 session-init events must subscribe before the session is spawned.
 
 If the mirror task lags the bus it has missed events and its pixels
-can no longer be trusted, so it logs a warning and marks every surface
-fully damaged (`SurfaceMirror::mark_all_damaged`); a damage consumer
-then resends whole surfaces. That keeps a consumer from trusting a
-partial damage region, but it does not restore the missed pixels or a
-missed surface create or destroy: the picture recovers only as the
-guest redraws. The bus closes once the forwarder and
-every cloned sender have been dropped.
+can no longer be trusted, so it logs a warning and calls
+`SurfaceMirror::resync`. The forwarder drains the renderer's queue,
+which loses nothing, and records every surface create, destroy and
+auto-create in a `SurfaceLedger` before it broadcasts the event. The
+resync makes the mirror's surface list match that ledger, keeping the
+pixels of any surface that is already right. Then it marks every
+surface fully damaged, so a damage consumer resends whole surfaces.
+The missed pixels are not restored: they recover only as the guest
+redraws. The bus closes once the forwarder and every cloned sender
+have been dropped.
 
 ### `SurfaceMirror`
 

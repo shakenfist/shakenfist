@@ -145,11 +145,15 @@ its "Local Resources" tab.
   to the guest's size.
 - **Clipboard**: text, both ways, between the client and the guest (the guest
   needs vdagent). Line endings are converted between the client's CRLF and
-  the guest's LF. A client's clipboard reaches the guest when it connects.
-  Text the guest copied before the client connected is not offered to it;
-  text copied afterwards is. Text the client copies that is longer than
-  100 MiB, the most ryll can send a guest's vdagent in one message, is not
-  shared, and a warning is logged. Rich formats and files are not shared.
+  the LF ryll uses internally, and again to CRLF for a guest whose agent
+  asks for it, such as a Windows guest. A client's clipboard reaches the
+  guest when it connects. Text the guest copied before the client connected
+  is not offered to it; text copied afterwards is. Text the client copies
+  that is longer than 100 MiB, the most ryll can send a guest's vdagent in
+  one message, is not shared, and a warning is logged. For a guest that
+  wants CRLF the limit applies to the converted text, so text with many
+  short lines can be refused below 100 MiB; the guest's paste then gets
+  nothing. Rich formats and files are not shared.
 - **Audio**: the guest's audio plays on the client. ryll offers Opus and then
   16-bit 48 kHz stereo PCM, and uses the first one the client accepts. Opus
   is SPICE's own packets passed through, a few tens of kbit/s. PCM is about
@@ -247,15 +251,17 @@ brightness. Text on the clipboard is kept and reaches the guest once it is
 back.
 
 ryll exits, disconnecting the client, when the first SPICE attempt never
-reaches a session, when the three retries are used up, when the `.vv` file's
-ticket is single-use or has expired so there can be no retry, and on
-Ctrl+C. The exit status:
+reaches a session, when the three retries are used up, when the server ends
+the session on purpose with the main channel's `DISCONNECTING`, when the
+`.vv` file's ticket is single-use or has expired so there can be no retry,
+and on Ctrl+C. The exit status:
 
 | Ended by | Status |
 |----------|--------|
 | Ctrl+C (SIGINT) | 0 |
 | The first SPICE attempt never reached a session | 1, with that attempt's error |
 | The retries used up | 1 |
+| The server ended the session on purpose (`DISCONNECTING`) | 0 |
 | The ticket is single-use or expired when the session is lost | 1 if the lost session ended with an error, otherwise 0 |
 
 [session-lifecycle.md](/components/ryll/session-lifecycle/#rdp-mode) has the details,
@@ -431,6 +437,22 @@ The SPICE connection was lost, and ryll is retrying. The log says so:
 
 If the retries fail, ryll exits and logs why: `rdp: not reconnecting to SPICE:
 ...`.
+
+What the client sends while the frame is dark has no session to go to and is
+dropped. When a session returns, ryll logs how many were dropped during that
+outage (`rdp: dropped N input events while the SPICE session was down`), and
+at exit it logs the total over the whole run, which also covers an outage still
+under way when ryll stopped.
+
+### Keys or clicks went missing
+
+Each `RDP client disconnected` line carries `dropped_input`: how many of that
+client's input events were dropped over the connection, because the SPICE
+session's input queue was full, no session was being served, or the keys and
+buttons it still held could not be released when it left. As they happen, a
+full or closed queue is logged once per run at warning level and a missing
+session only at debug, so a non-zero count here is the place to see how many
+there were.
 
 ### No audio
 
