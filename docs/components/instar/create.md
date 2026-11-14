@@ -374,7 +374,12 @@ have the two disagree by the footer's 512 bytes. Detection reports
 `raw` for anything it does not recognise as well as for a genuinely
 raw file, so without this rule a raw parent whose last 512 bytes
 happen to begin with `conectix` would be sized from those bytes even
-under `-F qcow2`. `-u` asserts nothing about the
+under `-F qcow2`. Those bytes have to earn the promotion in any case:
+the fallback verifies the footer's checksum, so a planted cookie no
+longer makes a file a VHD parent, and no identity field is copied out
+of it (see
+[A `conectix` block is not a VHD footer on its own](/components/instar/quirks/#a-conectix-block-is-not-a-vhd-footer-on-its-own)).
+`-u` asserts nothing about the
 format (it only says "do not fail if the backing file is
 inaccessible"), so the fallback still applies: `create -f qcow2 -b
 fixed.vhd -u child.qcow2` sizes the parent from its VHD footer, while
@@ -534,10 +539,11 @@ Create a 1 GiB qcow2 with default options:
 instar create -f qcow2 disk.qcow2 1G
 ```
 
-Same but with a 4 KiB cluster size and extended L2:
+Same but with extended L2, which needs a cluster size of at least 16 KiB
+so that its 32 subclusters are 512 bytes or more:
 
 ```
-instar create -f qcow2 -o cluster_size=4k,extended_l2=on disk.qcow2 1G
+instar create -f qcow2 -o cluster_size=16k,extended_l2=on disk.qcow2 1G
 ```
 
 Create a vmdk with the stream-optimised subformat:

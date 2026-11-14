@@ -250,6 +250,17 @@ kinds, and the message for each keeps qemu's wording:
   map: External data file host cluster offset does not match guest cluster offset at virtual offset N (0x...)
   ```
 
+- An entry that breaks one of qemu's two host-offset corruption rules,
+  which apply to every qcow2 image rather than only to one with a data
+  file: a host cluster offset that is not a multiple of the cluster
+  size, or the all-zeroes flag in a v2 image, where the flag does not
+  exist.
+
+  ```
+  map: Cluster allocation offset unaligned at virtual offset N (0x...)
+  map: Zero cluster entry found in pre-v3 image at virtual offset N (0x...)
+  ```
+
 The offset is the virtual offset of the cluster the entry describes.
 Exit 1; as on any other failure, the extents before the refused entry
 stay on stdout. `measure` refuses the same entries, and the reading

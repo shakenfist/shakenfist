@@ -2561,7 +2561,7 @@ guards. See the VHD and VHDX notes in
 [chain-config.md](/components/instar/chain-config/#format-specific-notes) for the
 composing path being guarded.
 
-There are **153 cases**, in twelve groups.
+There are **165 cases**, in fifteen groups.
 
 Forty-seven cover the writer. Twenty-four mutate a library crate
 (`create`, `vhd`, `vhdx`) and are caught by a Rust unit or round-trip
@@ -2863,6 +2863,51 @@ classic `measure` walk and the extended `map` walk, caught by a unit
 test of the metadata walkers. The last two are the host's half: the
 `vmm` decoder no longer captures the refusal, or the run loops no longer
 see it, and the reason falls back to the generic failure text.
+
+Then **2 host-offset refusal cases**, guarding the host's half of the
+fix for issue #812. qemu applies two further rules when it turns any
+L2 entry into a host offset, in `qcow2_get_host_offset` rather than in
+its subcluster classifier: a host cluster offset that is not a multiple
+of the cluster size, and the all-zeroes flag in an image whose version
+predates it. Neither is a data-file rule, so the host renders them from
+their own function behind the same entry point, and both cases break
+that path rather than the rules themselves: the `vmm` decoder no longer
+captures the refusal, or `l2_entry_refused` no longer reports it, so a
+refusal the guest raised reaches the user as the generic failure text.
+That is #665 again, which is why the data-file pair above exists, and
+the pair here keeps the third refusal from drifting out of the same
+guard. The rules' own guest-side half is checked by the `qcow2` crate's
+unit tests and is not yet mutated here.
+
+Then **6 VHDX metadata cases**, guarding the rules that decide whether
+a VHDX metadata table and its parent locator are sound (#576, #662).
+Three are the metadata table's: a recognised item listed twice
+accepted, an item's extent taken from its declared Length even when
+that is shorter than the bytes the reader reads, and the overlap check
+itself removed. The overlap check is only as good as the extents it is
+given, which is why the two rules that decide them are cases of their
+own. The other three are `VhdxParentLocator::usable`: a locator with
+more entries than the parser retains refused (a bound of instar's, not
+a fault of the image), a locator whose `key_value_count` exceeds its
+own item accepted, and a foreign `LocatorType` accepted. All six are
+caught by `vhdx` crate unit tests. Writing the overlap case found that
+the test it names had been passing for the wrong reason: it laid the
+locator over File Parameters, so the image was refused for an invalid
+block size whether or not the overlap was checked.
+
+Then **4 VHD footer-copy cases**, guarding the refusal of a VHD whose
+footer copy at offset 0 fails its checksum (#583). Detection probes a
+cookie at offset 0 as a VHD, as qemu does, and the reader refuses; the
+cases break each link in turn. One gates header detection on the
+checksum again, which made every operation treat the file as raw and
+had `convert` exit 0 writing the VHD's own structures out as disk
+content; a `shared` unit test catches it. One stops the host capturing
+`info`'s refusal marker, caught by a host unit test of the rendered
+wording. The other two go through the real binary: `info` no longer
+verifying the copy, and the host exiting 0 when `info` sends no result,
+which is what `instar info` did for every refusal before this group
+existed. Both are caught by
+`TestVhdFooterCopyChecksum.test_a_differencing_child_is_refused`.
 
 The last group is **4 partial-last-block cases**, guarding how `check`
 sizes a VHDX's partial last block (#797) and how many BAT entries a

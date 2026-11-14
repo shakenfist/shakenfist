@@ -30,6 +30,14 @@ sequenceDiagram
     end
 ```
 
+Ryll sends `ATTACH_CHANNELS` from its `INIT` handler, as spice-gtk does,
+without waiting for anything else from the server. spice-server runs a
+network test of three `PING`s straight after `INIT`, and ryll used to wait
+for the first of them before asking, so a server that sent no `PING` was
+never asked and the connection hung. Once the main channel has linked, the
+server has 15 seconds in all to send `INIT` and `CHANNELS_LIST`. Past that,
+the connection fails with an error naming the message that never came.
+
 ### Link capabilities
 
 The link message carries two capability arrays, common and
@@ -221,6 +229,20 @@ the agent's and drops any size it was still holding. Otherwise a
 guest that booted without its agent would, when the agent started, be
 resized to the window's size from before the fit, away from the size
 it chose.
+
+#### Clipboard line endings
+
+The guest agent says which line ending its clipboard text uses by
+announcing `VD_AGENT_CAP_GUEST_LINEEND_LF` or
+`VD_AGENT_CAP_GUEST_LINEEND_CRLF` (a Windows guest announces CRLF), and
+leaves any conversion to the client. Clipboard text on ryll's host side
+always uses LF, in every mode. For a guest that announced CRLF, the main
+channel turns each LF into CRLF on the way to the guest, leaving a CRLF
+that is already there alone, and turns each CRLF back into LF on the way
+out. A lone CR is passed through in both directions. spice-gtk does the
+same with `spice_unix2dos` and `spice_dos2unix`. Text for any other guest
+passes through unchanged. The guest's announcement is forgotten when its
+agent disconnects, so a new agent starts from LF until it announces again.
 
 #### Guest agent message reassembly
 

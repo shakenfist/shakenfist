@@ -213,6 +213,50 @@ disconnected" (no-op). It is set to `true` when the
 GUI-tick poll calls `reconnect()` from a `Pending` state
 and cleared on the next event (success or failure).
 
+### When the server ends the session on purpose
+
+A server can end the session by sending the main channel's
+`DISCONNECTING`. spice-server never sends it, so it is not a network
+fault. A server where the newest client wins, such as andris, sends it
+to the client it has just replaced, after a `NOTIFY` naming the client
+that took over. Reconnecting automatically would take the session
+straight back from that client, which may then retry in turn, so
+neither could keep the desktop.
+
+So a `DISCONNECTING` sends the GUI straight to
+`Modal(ServerEnded { notice, ticket })` (`RyllApp::handle_server_ended`),
+with no retry. `notice` is the text of a main-channel server `NOTIFY`
+that arrived within five seconds before it, if there was one, on one
+line and cut to 500 characters; the modal quotes it as what the server
+said rather than as its reason, and scrolls a long body rather than let
+it push the buttons out of reach. A new session forgets the notice, so
+it cannot explain a later session's end. The modal offers a Reconnect button, since pressing it is
+a deliberate takeover, unless `ticket` records that the ticket policy
+forbids any further link (`ReconnectPolicy::forbid_retry`). Then it
+says the ticket was single-use or has expired instead.
+
+The end is sticky for the session. The display and inputs channels the
+server closes after `DISCONNECTING` are ignored, even under a ticket
+policy that would otherwise swap in its own modal
+(`ReconnectState::on_disconnect`). Those channels can also close first,
+because ryll reads each channel on its own task. In that case the GUI
+has already entered `Pending`, and a `DISCONNECTING` that arrives
+during the one-second first backoff still cancels the retry
+(`ReconnectState::on_server_ended`). An existing modal is left alone:
+it already stops the retries. A connection attempt still linking its
+secondary channels when the server ends the session fails too, and that
+failure leaves the modal in place as well
+(`ReconnectState::on_connect_failed`), rather than replace it with a
+"Could not connect" modal offering to take the session back.
+
+The main channel reports the `DISCONNECTING` as soon as it arrives, but
+by a send that gives up on a stalled frontend, as every main-channel
+event but the session's end does (the read loop must keep answering
+PINGs). So once it has seen one, the main channel also reports its own
+end, by the send that does not give up, as `ServerAnnounced` rather than
+as a close, a reset or a keepalive timeout. The no-retry decision never
+rests on the event that can be dropped.
+
 ### Connection attempts that fail before a session exists
 
 `run_connection` returns an error only when it could not set a session
@@ -246,7 +290,7 @@ two ways:
 
 ### Modal variants and console.vv ticket keys
 
-The `Modal` variant carries one of four discriminants:
+The `Modal` variant carries one of five discriminants:
 
 - `Generic { latest_error }` — auto-reconnect budget
   exhausted on a reusable ticket. Buttons: Reconnect, Close.
@@ -262,6 +306,9 @@ The `Modal` variant carries one of four discriminants:
   Reconnect failed before it reached a session (see above).
   Buttons: Reconnect, Close, whatever the ticket policy says,
   since nothing was consumed that ryll knows of.
+- `ServerEnded { notice, ticket }` — the server sent
+  `DISCONNECTING` (see above). Buttons: Close always; Reconnect
+  only when the ticket policy allows a further link.
 
 `ReconnectPolicy::forbid_retry(now_wall)` consults the two
 ticket-related `Config` fields and says why retry would be
@@ -344,6 +391,12 @@ SPICE in 4s (retry 2 of 3)") and, at the end, why ryll gave up.
   attempt's error.
 - The retries are used up. This always exits non-zero, even if the last
   attempt ended without an error of its own.
+- The server ends the session on purpose with the main channel's
+  `DISCONNECTING`, for instance because another client took it over (see
+  [When the server ends the session on
+  purpose](#when-the-server-ends-the-session-on-purpose)). No retry is
+  made, and ryll exits 0: it was told to go, which is not a failure. That
+  holds on the first attempt too, even if no session had begun.
 - The ticket is single-use or expired when the session is lost, or expires
   during a wait. No retry is made. The exit status follows the lost
   session's result: non-zero if it ended with an error, zero if it ended
