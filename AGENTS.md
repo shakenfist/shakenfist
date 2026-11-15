@@ -202,6 +202,13 @@ metrics. The headlines:
   directly. See
   [docs/developer_guide/ci.md](docs/developer_guide/ci.md#creating-instances-in-the-functional-suite).
 
+- **A unit test holds on to what it allocates at its own peril.** The
+  suite now bounds a `stestr` run's memory and fails the test which
+  grew the worker, so an allocation still referenced from the test
+  instance when the test returns is a failure rather than something the
+  next test inherits. See
+  [docs/developer_guide/standards.md](docs/developer_guide/standards.md#a-test-run-is-bounded-and-growth-is-attributed).
+
 - **An unlanded plan may already own the code you are changing.** A fix
   landed across a partially implemented plan has to be unpicked later,
   which is why the automated fixer reads `docs/plans/` before writing
