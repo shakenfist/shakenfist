@@ -398,7 +398,7 @@ class CleanerTestCase(CleanerBaseTestCase):
     @mock.patch('os.unlink')
     def test_update_power_states_does_not_enforce_capacity(
             self, mock_unlink, mock_listdir, mock_time, mock_exists):
-        """The cleaner's placement writes are ground truth (P5).
+        """The cleaner's placement writes are ground truth.
 
         It records where a libvirt domain already is, so the capacity
         guard must not be able to refuse it -- refusing would leave the

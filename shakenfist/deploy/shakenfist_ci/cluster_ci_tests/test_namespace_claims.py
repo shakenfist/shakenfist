@@ -97,8 +97,8 @@ from shakenfist_client import apiclient
 
 # The advisory audit event Instance._event_claim_over_limit() writes when
 # a placement pushes a namespace past what it claimed. Matched exactly:
-# it is deliberately distinct from the P5 event ("placement recorded
-# despite exceeding capacity guard"), which is a ground-truth write
+# it is deliberately distinct from the over-limit event ("placement
+# recorded despite exceeding capacity guard"), which is a ground-truth write
 # exceeding a *node* guard, and a test which matched loosely would not
 # be able to tell the two apart.
 CLAIM_OVER_LIMIT_MESSAGE = 'placement admitted over namespace capacity claim'

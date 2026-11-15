@@ -40,7 +40,7 @@ class FakeInstance:
         self._state_value = state_value
         self._reject = reject
         # Nodes whose capacity guard refuses this instance, as the
-        # admission RPC would (P2/D7). ``deny`` refuses on a real
+        # admission RPC would. ``deny`` refuses on a real
         # dimension in every mode; ``deny_demand`` refuses on the D13
         # demand term alone, so it admits when the walker's second pass
         # waives that clause.

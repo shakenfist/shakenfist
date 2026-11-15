@@ -859,7 +859,7 @@ class Monitor(daemon.Daemon):
         after every process start, however short the period is. The
         capacity reconciler is the only thing which creates
         scheduler_node_capacity rows, and admission fails open on a
-        node which has none (P7), so a five minute process-local timer
+        node which has none, so a five minute process-local timer
         meant every placement in a new cluster's first minutes was
         admitted against nothing -- and the reconciler's first pass
         then wrote the resulting over-limit usage onto the row it
@@ -944,7 +944,7 @@ class Monitor(daemon.Daemon):
         """Make the capacity reconcile due now if placement is not guarded.
 
         A node with no scheduler_node_capacity row is admitted against
-        nothing at all (P7), so every placement onto it fails open.
+        nothing at all, so every placement onto it fails open.
         Anchoring the reconcile covers the case which produced issue
         4087 -- a fresh cluster, whose stamp is missing, waiting out a
         five minute process-local timer -- but a stamp is a proxy for

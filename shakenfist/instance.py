@@ -377,7 +377,7 @@ class Instance(dbowo):
     # which refused this instance's last placement attempt. It lives on
     # that attribute because that is the record of placement attempts --
     # it already carries placement_attempts -- and because the attribute
-    # is never cleared (P8), so the annotation outlives the delete a
+    # is never cleared, so the annotation outlives the delete a
     # refusal enqueues and is still there when a client reads the
     # errored instance.
     REFUSAL_STAGE_KEY = 'refusal_stage'
@@ -1262,8 +1262,8 @@ class Instance(dbowo):
 
         When ``enforce`` is False the guard must not refuse -- these are
         the ground-truth writers recording where a libvirt domain
-        already is (P5) -- but P5 also wants a loud event when such a
-        write pushes a node past its limits, and the reply of a
+        already is -- but such a write must still be loud when it
+        pushes a node past its limits, and the reply of a
         non-enforced admission cannot say whether it did: it carries the
         post-admit counters but not the limits they were compared
         against. So the guarded call is made first and used as the
@@ -1277,7 +1277,7 @@ class Instance(dbowo):
         recording, would be an audit trail which lies.
 
         The probe waives the D13 demand clause: demand is a spreader,
-        never a capacity bound (P9), so a demand-only refusal is not an
+        never a capacity bound, so a demand-only refusal is not an
         over-limit condition and must not emit the event -- on the small
         or busy clusters where demand runs hot, it would fire on routine
         ground-truth writes and cost each one a second RPC. (When
@@ -1309,11 +1309,11 @@ class Instance(dbowo):
         # D16's advisory claim accounting, deliberately read from
         # ``result`` *after* the rebinding above so it comes from
         # whichever reply actually recorded the placement -- which is the
-        # same reasoning the P5 event's placement documents. On the
-        # probe-then-force path the probe's denial rolled its transaction
-        # back, so it charged no claim and can carry no exceedance;
-        # eventing from it would announce a claim drawdown that was
-        # undone. And ``admitted`` gates both replies, because a
+        # same reasoning the over-limit event's placement documents.
+        # On the probe-then-force path the probe's denial rolled its
+        # transaction back, so it charged no claim and can carry no
+        # exceedance; eventing from it would announce a claim drawdown
+        # that was undone. And ``admitted`` gates both replies, because a
         # placement which was not recorded consumed nothing. This is not
         # conditional on ``enforce``: a ground-truth write into an
         # over-claim namespace is exactly as interesting as a scheduled
@@ -1324,7 +1324,7 @@ class Instance(dbowo):
         return result
 
     def _event_admission_over_limit(self, location, result):
-        """Record that a ground-truth placement write exceeded a guard (P5)."""
+        """Record that a ground-truth placement write exceeded a guard."""
         self.log.with_fields({
             'node': location,
             'failing_stage': result['failing_stage'],
@@ -1430,7 +1430,7 @@ class Instance(dbowo):
         recorded without the capacity it consumes, and two concurrent
         placements cannot both take the last slot on a node.
 
-        ``enforce`` (P5) is True for the scheduler-driven callers, where
+        ``enforce`` is True for the scheduler-driven callers, where
         a denial is a genuine reschedule and raises
         CapacityAdmissionDenied so the caller can walk to its next
         candidate. It is False for the ground-truth writers -- the
@@ -1556,7 +1556,7 @@ class Instance(dbowo):
                 })
 
             if result['unguarded']:
-                # P7: a node whose capacity row the reconciler has not
+                # A node whose capacity row the reconciler has not
                 # created yet admits without a guard rather than
                 # refusing every create mid-upgrade. The reason says
                 # which of the two fail-opens this was: one unsized
@@ -1822,7 +1822,7 @@ class Instance(dbowo):
         self.deallocate_instance_ports()
 
         # Give this instance's capacity back and drop its placement
-        # references (P6). This is where the reconciler's ground truth
+        # references. This is where the reconciler's ground truth
         # stops counting the instance -- it excludes instances in state
         # deleted, which is set at the end of this method -- so the
         # explicit decrement belongs here rather than at hard delete.
@@ -1859,7 +1859,7 @@ class Instance(dbowo):
         self._delete_globally()
 
     def _release_placement(self, node_uuid=''):
-        """Return this instance's capacity and drop its placement rows (P6).
+        """Return this instance's capacity and drop its placement rows.
 
         An empty ``node_uuid`` releases wherever the instance's
         placement references point, which is what the sweep in
@@ -1867,7 +1867,7 @@ class Instance(dbowo):
         A named node *filters* those references rather than replacing
         them, so a repeat call is a no-op in either form -- which matters
         here, because the node name comes from the ``placement``
-        attribute, which is never cleared (P8), and an instance which
+        attribute, which is never cleared, and an instance which
         ends in state ``error`` passes delete()'s re-entrancy guard on
         every subsequent delete attempt.
         """
@@ -1933,7 +1933,7 @@ class Instance(dbowo):
             # node_uuid on purpose -- it knows the instance rather than
             # its node -- and an event naming no node is unreadable. The
             # counters are reported only when the reply named a node for
-            # them: an absent capacity row (P7) or a release spanning
+            # them: an absent capacity row or a release spanning
             # two nodes reports zeroes that would otherwise read as "the
             # node now holds nothing".
             extra = {

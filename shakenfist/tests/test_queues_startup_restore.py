@@ -273,7 +273,7 @@ class RestorePowersOnWhatWasRunningTestCase(base.ShakenFistTestCase):
 
         # The instances after it are still restored, and the placement
         # reconciliation still runs, without enforcing the capacity
-        # guard (P5).
+        # guard.
         self.assertEqual(1, second.power_on_calls)
         self.assertEqual(2, admit.call_count)
         for call in admit.call_args_list:
@@ -360,7 +360,7 @@ class RestorePlacementReconciliationTestCase(base.ShakenFistTestCase):
     could leave an instance recorded on two nodes at once. Every write
     now goes through the admission and release RPCs, whose
     delete-all-then-insert makes duplicate placement rows unproducible,
-    and none of them enforce the capacity guard (P5): this path records
+    and none of them enforce the capacity guard: this path records
     where libvirt domains already are.
     """
 

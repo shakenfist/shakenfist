@@ -81,7 +81,7 @@ def _handler_defaults(fn):
     """Which of a handler's parameters have a default, and which it takes.
 
     Lifted from the census script in the plan's appendix, which is the
-    enumeration finding F1 counted. Keeping the same shape means this
+    enumeration the census counted. Keeping the same shape means this
     file and that script cannot disagree about which declarations are
     in scope.
     """
@@ -177,11 +177,11 @@ def required_declarations():
 # swept anyway, because "the count of rows equals the count the census
 # script reports" is how the plan holds the table complete.
 #
-# Finding F1 names ``namespace`` on ``AuthFederatedEndpoint.post`` as
+# The census names ``namespace`` on ``AuthFederatedEndpoint.post`` as
 # this case. That is wrong: that handler's signature is
 # ``post(self, token=None, namespace=None, rule=None)``, so the
-# parameter has a default like the other 74. The counts F1 reports are
-# right; the example is not.
+# parameter has a default like the other 74. The counts the census
+# reports are right; the example is not.
 RAW_BODY_DECLARATION = ('UploadDataEndpoint', 'post', 'body')
 
 
@@ -995,7 +995,7 @@ class RequiredSweepTestCase(SweepFixtureTestCase):
             'a recipe names a handler which declares nothing required')
 
     def test_the_census_still_finds_seventy_six(self):
-        """Finding F1's premise, re-asked here.
+        """The census's premise, re-asked here.
 
         D32 and D35 both rest on the shape of this census rather than
         on its exact total, but a number that has moved means the table

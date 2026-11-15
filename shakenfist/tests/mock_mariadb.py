@@ -3131,7 +3131,7 @@ class MockMariaDB():
             for node_uuid, row in self.node_capacity.items()], degraded=False)
 
     def _decrement_node_capacity(self, node_uuid, cpus, memory_mb, disk_gb):
-        """Floored decrement of one node's counters, as the RPC does (P6).
+        """Floored decrement of one node's counters, as the RPC does.
 
         Returns the clamp detail dict if any dimension had to be clamped
         at zero -- which means the ledger and ground truth had already
@@ -3143,7 +3143,7 @@ class MockMariaDB():
             row, str(node_uuid), cpus, memory_mb, disk_gb)
 
     def _decrement_namespace_claim(self, namespace, cpus, memory_mb, disk_gb):
-        """Floored decrement of a namespace's claim, as the RPC does (P6).
+        """Floored decrement of a namespace's claim, as the RPC does.
 
         An unclaimed namespace has nothing to decrement here: the real
         implementation credits the cluster's unclaimed sums instead,
@@ -3185,8 +3185,8 @@ class MockMariaDB():
         """Mock implementation of mariadb.admit_instance_placement()
 
         The counters are a simple in-memory ledger, but the reply shape,
-        the fail-open behaviour of a node with no capacity row (P7), the
-        move's floored decrement of the old node (P6) and -- most
+        the fail-open behaviour of a node with no capacity row, the
+        move's floored decrement of the old node and -- most
         importantly for the callers under test -- the atomic combination
         of the placement attribute write with the delete-all-then-insert
         of the INSTANCE_LOCATION reference rows all match the real
@@ -3305,7 +3305,7 @@ class MockMariaDB():
                 # size asks and the charge lands for the next decision.
                 # Charging it here would refuse placements the real guard
                 # admits, and -- because demand_only is derived from the
-                # exceeded set -- would make the P9 waiver tests in
+                # exceeded set -- would make the demand-waiver tests in
                 # test_external_api.py exercise a walk the real code
                 # never takes.
                 dimensions.append(mariadb._capacity_dimension(
@@ -3437,8 +3437,8 @@ class MockMariaDB():
 
         # The post-release counters, reported only when exactly one node
         # was decremented -- the real implementation says why, and a
-        # node with no seeded capacity row is P7's fail-open case there
-        # as it is here.
+        # node with no seeded capacity row fails open there as it does
+        # here.
         if len(decremented) == 1:
             row = self.node_capacity[str(decremented[0])]
             result['counters_node_uuid'] = str(decremented[0])

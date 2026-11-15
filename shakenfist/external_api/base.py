@@ -861,8 +861,8 @@ DISKSPEC_SCHEMA: dict[str, Any] = {
             # dispatched at external_api/instance.py:690 and may be a
             # plain URL, an sf:// blob, upload or snapshot reference, a
             # label: reference or the bare name of an artifact, so no
-            # one format describes it. `string` is what finding F5's
-            # first row asks for: a non-string reaches
+            # one format describes it. `string` is still the type the
+            # value needs: a non-string base reaches
             # util_general.noneish and is an AttributeError, a recorded
             # 500 for a caller's mistake.
             'description': (

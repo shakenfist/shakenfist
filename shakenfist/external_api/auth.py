@@ -1753,7 +1753,6 @@ class AuthNamespaceRulesEndpoint(api_base.Resource):
             # identity. This endpoint refusing it at write time is the
             # only place that failure is ever visible, and the messages
             # it writes name the claim and the type it was given.
-            # Census finding F3.
             ('bound_claims', 'body', 'dict',
              'Claim name to matcher. A matcher is an exact string, or a '
              'list of acceptable strings. Matching is exact: no globbing, '
@@ -1841,8 +1840,7 @@ class AuthNamespaceRuleEndpoint(api_base.Resource):
             # above: the hand written matcher guards are both wider and
             # more precise than a properties block, and they are the
             # only thing standing between a malformed matcher and a
-            # rule which silently matches nobody (D47, census finding
-            # F3).
+            # rule which silently matches nobody (D47).
             ('bound_claims', 'body', 'dict',
              'Claim name to matcher, as for creation.', True),
             ('scopes', 'body', 'arrayofstring',

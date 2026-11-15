@@ -40,18 +40,22 @@ nothing could see them.
 
 Python sources get a second, advisory pass in advisory_problems(), for
 two shapes that are plan history just as much as the four above: a
-decision cited by its shorthand (`D13`), and that plan filename. Several
-hundred of both are already in the tree, across scores of files, so
-reporting them as failures would block every commit which touched one.
-They are printed and the exit status stays zero, so that they are fixed
-in the files a change touches rather than in one unreviewable sweep.
+numbered part of a plan cited by its bare label, and that plan filename.
+A label is a letter and a number: `D13` for a master plan's decision,
+`P7` where a phase plan numbers its own decisions to avoid colliding
+with them, and `F5` or `N1` for a survey's findings and its census.
+Several hundred of both shapes are already in the tree, across scores of
+files, so reporting them as failures would block every commit which
+touched one. They are printed and the exit status stays zero, so that
+they are fixed in the files a change touches rather than in one
+unreviewable sweep.
 
 That pass reads the file's prose rather than its lines: a `tokenize`
 walk over comments and string literals, and an `ast` walk over `def`
 and `class` names, where the same citation appears as `test_d14_shape`
 with no space for the line patterns to match on. Reading only prose and
-names is what makes the `D<n>` shape usable at all -- in code it is
-somebody's variable.
+names is what makes a bare label usable as a shape at all -- in code a
+`D13` is somebody's variable.
 
 Two kinds of citation survive the rule and so carry a marker rather
 than a carve-out in the pattern: a pointer to work that is not built
@@ -126,11 +130,24 @@ SOURCE_MAX_BYTES = 2 * 1024 * 1024
 # behaviour may legitimately name the plan which will build it; that is
 # a reading of intent no pattern makes, which is exactly what makes it
 # advisory here rather than exempt.
-ADVISORY_SHAPES_RE = re.compile(r'\bD\d+\b|\bPLAN-[\w.-]*\.md')
+#
+# The four label letters are the ones the plans use: `D` for a master
+# plan's decision, `P` where a phase plan numbers its own decisions to
+# avoid colliding with the master's, and `F` and `N` for a survey's
+# findings and the census which corrects them. The match is
+# case-sensitive on purpose, because the lower-case spellings are not
+# labels: a `p90` is a percentile and an `f5` is a field. Two digits at
+# most, because no plan numbers a hundredth decision and three digits is
+# a lint code: `# noqa: F401` is not a citation of anything.
+ADVISORY_SHAPES_RE = re.compile(
+    r'\b[DFNP]\d{1,2}\b|\bPLAN-[\w.-]*\.md')
 
 # The same citations written as an identifier, where no space can fall
 # between the noun and the number: `test_phase_5_refuses`,
-# `_decision_3_limit`, `test_d14_unclaimed_shape`.
+# `_decision_3_limit`, `test_d14_unclaimed_shape`. Only the `D` label
+# is read from a name, not the other three: an identifier lower-cases
+# the letter, and `wait_p90` or `row_f5` is then a percentile or an
+# index rather than a citation.
 ADVISORY_NAME_RE = re.compile(
     r'(?:^|_)(?:phases?|decisions?)_\d+(?:_|$)'
     r'|(?:^|_)steps?_\d+[a-z](?:_|$)'

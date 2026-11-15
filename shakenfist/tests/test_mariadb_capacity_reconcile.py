@@ -115,10 +115,9 @@ class DiskLimitTestCase(base.ShakenFistTestCase):
     """_derive_disk_limit_gb() mirrors _has_sufficient_disk.
 
     disk_overcommit=1.0 is passed throughout unless the case is
-    specifically about the ratio (decision P3,
-    docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md), so
-    it reproduces the pre-ratio arithmetic these cases were written
-    against.
+    specifically about the ratio, which multiplies the free-headroom
+    term rather than a physical total, so these cases reproduce the
+    pre-ratio arithmetic they were written against.
     """
 
     def test_matches_scheduler_free_space_check(self):

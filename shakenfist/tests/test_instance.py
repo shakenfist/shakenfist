@@ -3706,7 +3706,7 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertEqual([self.node3], self._placed_on())
 
     def test_enforce_false_records_over_limit_placements(self):
-        # P5: the cleaner and the startup reconciliation record where a
+        # The cleaner and the startup reconciliation record where a
         # libvirt domain already is, and a guard cannot refuse reality.
         row = self.mock_mariadb.set_node_capacity(
             self.node2, limit_cpus=1, limit_memory_mb=16384,
@@ -3731,7 +3731,7 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
             'placement recorded despite exceeding capacity guard', messages)
 
     def test_a_demand_only_refusal_is_not_evented_as_over_limit(self):
-        # P9: demand is a spreader, never a capacity bound, so a
+        # Demand is a spreader, never a capacity bound, so a
         # ground-truth write refused on demand alone is not an
         # over-limit condition. The probe waives the demand clause, so
         # the write admits first time (one RPC, no loud event).
@@ -4030,7 +4030,7 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertEqual([], self._placed_on())
 
     def test_an_unguarded_placement_is_loud(self):
-        # P7: no capacity row for this node yet, mid-upgrade.
+        # No capacity row for this node yet, mid-upgrade.
         with mock.patch.object(self.inst, 'add_event') as add_event:
             self.inst.place_instance(self.node2)
 
@@ -4160,7 +4160,7 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, row['used_disk_gb'])
         self.assertEqual([], self._placed_on())
 
-        # P8: where the instance was is still readable after delete.
+        # Where the instance was is still readable after delete.
         self.assertEqual(self.node2, self.inst.placement['node'])
 
     #
@@ -4265,7 +4265,7 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
             {k: placed[k] for k in ('cpus', 'memory_mb', 'disk_gb')})
 
     def test_a_release_with_no_capacity_row_reports_no_counters(self):
-        # P7's fail-open case: this node has no capacity row, so there
+        # The fail-open case: this node has no capacity row, so there
         # are no counters to report and a zero would read as "the node
         # now holds nothing" rather than "nobody looked".
         with mock.patch.object(self.inst, 'add_event') as add_event:
@@ -4333,7 +4333,7 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
 
     def test_repeated_delete_of_an_errored_instance_releases_once(self):
         # _delete_globally() names the release node from the placement
-        # attribute, which is never cleared (P8), and an instance which
+        # attribute, which is never cleared, and an instance which
         # ends in state error rather than deleted passes the delete
         # path's re-entrancy guard on every subsequent attempt. Release
         # is reference-gated for exactly this reason: the second pass
@@ -4394,8 +4394,9 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertFalse(r.called)
 
     #
-    # Issue 4051: the tolerated capacity conditions (P5, P7 and the two
-    # clamp sites) log WARNING in the daemon log, so their event echoes
+    # Issue 4051: the tolerated capacity conditions (a non-enforcing
+    # ground-truth write, a missing capacity row and the two clamp
+    # sites) log WARNING in the daemon log, so their event echoes
     # must not land in the log stream at ERROR beside them. Only the
     # genuine failures echo as errors, matching their .error()
     # daemon-log lines. Issue 4132 moved a failed placement release on
@@ -4415,7 +4416,7 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         return calls[0].kwargs.get('log_as_error', False)
 
     def test_an_over_limit_recording_does_not_echo_as_an_error(self):
-        # P5 is designed behaviour: a guard cannot refuse reality.
+        # Designed behaviour: a guard cannot refuse reality.
         self.mock_mariadb.set_node_capacity(
             self.node2, limit_cpus=1, limit_memory_mb=16384,
             limit_disk_gb=100)
@@ -4425,7 +4426,7 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
             add_event, 'placement recorded despite exceeding capacity guard'))
 
     def test_an_unguarded_placement_does_not_echo_as_an_error(self):
-        # P7 is designed behaviour: a node with no capacity row yet
+        # Designed behaviour: a node with no capacity row yet
         # admits unguarded mid-upgrade rather than refusing every
         # create.
         with mock.patch.object(self.inst, 'add_event') as add_event:

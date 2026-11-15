@@ -860,7 +860,7 @@ class ExternalApiCreateAdmissionWalkTestCase(ExternalApiTestCase):
             1, self.mock_mariadb.node_capacity[self.NODE_B]['used_cpus'])
 
     def test_a_node_with_no_capacity_row_still_admits(self):
-        # P7: mid-upgrade a node the reconciler has not sized admits
+        # Mid-upgrade a node the reconciler has not sized admits
         # unguarded rather than the cluster refusing every create.
         self._full(self.NODE_A)
 
@@ -910,8 +910,9 @@ class ExternalApiCreateAdmissionWalkTestCase(ExternalApiTestCase):
         # demand against that budget and ignores the size of the
         # placement asking; when the placement's charge (8 x 0.6 =
         # 4.8) went on the left-hand side, this refused
-        # and only the P9 waiver rescued it -- a second walk, and a
-        # spreader that never spread, for a node that was never busy.
+        # and only the demand-only waiver rescued it -- a second walk,
+        # and a spreader that never spread, for a node that was never
+        # busy.
         self.mock_mariadb.set_node_capacity(
             self.NODE_A, limit_cpus=16, limit_memory_mb=65536,
             limit_disk_gb=500, expected_demand=0.0, demand_limit=1.5)

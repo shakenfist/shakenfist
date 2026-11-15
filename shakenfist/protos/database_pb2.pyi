@@ -9502,7 +9502,7 @@ class ReconcileSchedulerCapacityRequest(_message.Message):
     demand_decay_seconds: _builtins.int
     """Linear decay window for placements"""
     disk_overcommit: _builtins.float
-    """Multiplier on the disk limit's free-space headroom term (P3)"""
+    """Multiplier on the disk limit's free-space headroom term"""
     def __init__(
         self,
         *,
@@ -9706,7 +9706,7 @@ class AdmitInstancePlacementRequest(_message.Message):
     target_load: _builtins.float
     enforce: _builtins.bool
     """False for the ground-truth writers (the cleaner's placement rewrites
-    and the queues daemon's reference reconciliation, per P5): they
+    and the queues daemon's reference reconciliation): they
     record where a libvirt domain already is, which a guard cannot
     refuse. Every counter update still happens, only the guard clauses
     are dropped.
@@ -9821,7 +9821,7 @@ Global___CapacityDimensionDetail: _TypeAlias = CapacityDimensionDetail  # noqa: 
 
 @_typing.final
 class CapacityClampDetail(_message.Message):
-    """One counter a floored decrement had to clamp at zero (P6): the ledger
+    """One counter a floored decrement had to clamp at zero: the ledger
     held less than the allocation being released, so the two had already
     diverged. counter names which ledger row -- 'namespace_claim',
     'cluster_unclaimed', or the dashed uuid of a scheduler_node_capacity
@@ -9886,12 +9886,12 @@ class AdmitInstancePlacementReply(_message.Message):
     admitted: _builtins.bool
     unguarded: _builtins.bool
     """The target node (or the cluster singleton) had no capacity row, so
-    the placement was made without a guard (P7). The reconciler creates
+    the placement was made without a guard. The reconciler creates
     the row on its next pass; the caller logs this loudly.
     """
     clamped: _builtins.bool
     """A floored decrement of the old node's counters hit zero rather than
-    subtracting cleanly (P6) -- a release racing the reconciler. The
+    subtracting cleanly -- a release racing the reconciler. The
     counters are still correct after the next reconcile pass.
     """
     failing_stage: _builtins.str
@@ -9933,7 +9933,7 @@ class AdmitInstancePlacementReply(_message.Message):
     unguarded_reason: _builtins.str
     """Which absent row made this admission unguarded, because the two
     are different conditions wearing the same missing row and only
-    one of them is the normal state P7 was written for.
+    one of them is the ordinary mid-upgrade state.
 
     'never_reconciled' means the cluster_capacity singleton does not
     exist, so the reconciler has never completed a pass and *nothing*
@@ -9943,7 +9943,7 @@ class AdmitInstancePlacementReply(_message.Message):
 
     'node_not_sized' means the singleton exists but this one node has
     no row: mid-upgrade, or a node whose limits the reconciler
-    declined to guess. That is P7's designed behaviour and is
+    declined to guess. That is the designed fail-open and is
     corrected by the next pass.
 
     Empty when unguarded is false. Read unguarded for the fact and
@@ -10062,7 +10062,7 @@ class ReleaseInstancePlacementReply(_message.Message):
 
     They describe exactly one node, named by counters_node_uuid. That
     is empty -- and these four are zero -- when nothing was released,
-    when the node has no capacity row (P7's fail-open case), or when
+    when the node has no capacity row and admitted unguarded, or when
     the release spanned more than one node: a release of a historical
     duplicate has no single row that describes it, and reporting one of
     them would be a number nobody could interpret. Read

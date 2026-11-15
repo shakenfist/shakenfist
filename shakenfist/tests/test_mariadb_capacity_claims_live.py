@@ -603,7 +603,7 @@ class NamespaceClaimCrudLiveTestCase(_LiveClaimFixture):
         self.assertTrue(result['created'], result['error'])
 
     def test_a_cluster_with_no_singleton_refuses(self):
-        # Deliberately the opposite of the placement path's P7 fail-open.
+        # Deliberately the opposite of the placement path's fail-open.
         table = mariadb._get_cluster_capacity_table()
         with self.engine.connect() as conn:
             conn.execute(sa.delete(table))

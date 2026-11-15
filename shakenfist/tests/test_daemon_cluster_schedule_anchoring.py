@@ -255,7 +255,7 @@ class ForcedCapacityReconcileTestCase(base.ShakenFistTestCase):
     """The maintenance-pass check that placement is being guarded at all.
 
     A node with no scheduler_node_capacity row has its placements
-    admitted against nothing at all (P7), which is issue 4087.
+    admitted against nothing at all, which is issue 4087.
     Anchoring handles the fresh-cluster case by way of a missing stamp;
     this handles every other way a node can end up unguarded while a
     stamp says a pass ran recently -- an empty table, and a populated
