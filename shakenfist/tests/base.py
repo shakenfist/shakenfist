@@ -6,6 +6,7 @@ from pydantic import SecretStr
 import testtools
 
 from shakenfist.config import config
+from shakenfist.tests import memory
 
 
 class ShakenFistTestCase(testtools.TestCase):
@@ -64,6 +65,14 @@ class ShakenFistTestCase(testtools.TestCase):
     def setUp(self):
         super().setUp()
 
+        # Fail the test which grows the worker rather than leaving the
+        # growth to be carried by whichever test the worker runs next
+        # (issue #4928). Registered before any other cleanup so that
+        # LIFO ordering samples last, after everything this test holds
+        # has been released. See shakenfist/tests/memory.py.
+        self.addCleanup(self._assert_memory_within_bounds,
+                        memory.resident_bytes())
+
         # Logging is configured in shakenfist/tests/__init__.py to write to
         # stdout, which stestr captures and only displays for failing tests.
 
@@ -83,6 +92,11 @@ class ShakenFistTestCase(testtools.TestCase):
             return_value=None)
         self.mock_record_exception = self.mock_record_exception_patcher.start()
         self.addCleanup(self.mock_record_exception_patcher.stop)
+
+    def _assert_memory_within_bounds(self, before):
+        problem = memory.problem_since(before)
+        if problem:
+            self.fail(problem)
 
     def set_validation_mode(self, mode):
         """Run the rest of this test with API_VALIDATION_MODE at `mode`.
