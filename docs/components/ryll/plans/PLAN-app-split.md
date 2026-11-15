@@ -216,8 +216,8 @@ with web mode).
 |-------|------|--------|--------|
 | 1. Reuse survey and shared draw dispatch | [PLAN-app-split-phase-01-reuse.md](/components/ryll/plans/PLAN-app-split-phase-01-reuse/) | Complete | acc7a12 (#483) |
 | 2. Module directory and pure state | [PLAN-app-split-phase-02-pure-state.md](/components/ryll/plans/PLAN-app-split-phase-02-pure-state/) | Complete | b245380 (#501) |
-| 3. Events and bug-report flow | [PLAN-app-split-phase-03-events.md](/components/ryll/plans/PLAN-app-split-phase-03-events/) | In progress | |
-| 4. Split `ui` into per-panel files | PLAN-app-split-phase-04-panels.md | Not started | |
+| 3. Events and bug-report flow | [PLAN-app-split-phase-03-events.md](/components/ryll/plans/PLAN-app-split-phase-03-events/) | Complete | 79fc466 (#714), cdecf94 (#717) |
+| 4. Split `ui` into per-panel files | [PLAN-app-split-phase-04-panels.md](/components/ryll/plans/PLAN-app-split-phase-04-panels/) | In progress | |
 | 5. Panel state sub-structs | PLAN-app-split-phase-05-substructs.md | Not started | |
 | 6. Function-length lint | PLAN-app-split-phase-06-lint.md | Not started | |
 | 7. Push audit | This file, below | Not started | |
@@ -301,16 +301,31 @@ finds nothing.
 
 ### Phase 4: Split `ui` into per-panel files
 
-Reduce `eframe::App::ui` to a sequence of calls, one per panel,
-each a `fn draw_*(&mut self, ui: &mut egui::Ui)` in `app/ui/`:
-`stats_bar.rs`, `traffic_panel.rs`, `notifications_panel.rs`,
-`usb_panel.rs`, `webdav_panel.rs`, `dialogs.rs` (bug report, paste
-error, protocol gaps, reconnect modal), `region_select.rs`,
-`cursor.rs`, and `keys.rs` for the global hotkey handling at the
-top of `ui`. Still a move, not a redesign: panels keep reaching
-into `self` as they do today. Panel draw order matters to egui
-(the stats panel must precede `CentralPanel`); preserve it and
-say so in a comment where `ui` calls them.
+Reduce `eframe::App::ui` to a sequence of calls, one per block,
+each a method in `app/ui/`: `stats_bar.rs`, `traffic_panel.rs`,
+`notifications_panel.rs`, `usb_panel.rs`, `webdav_panel.rs`,
+`surface.rs` (the central panel, which draws the remote surface),
+`dialogs.rs` (bug report, paste error, protocol gaps, reconnect
+modal), `region_select.rs`, `cursor.rs`, and `keys.rs` for the
+input gate and the global hotkey handling at the top of `ui`.
+Still a move, not a redesign: panels keep reaching into `self` as
+they do today.
+
+Two things this section got wrong before phase 4 was planned, both
+corrected here rather than only in the phase plan. There is no one
+signature: egui 0.35 gives `Panel::show` the root `&mut Ui` but
+leaves `Window::show` taking `&Context`, so six of the blocks take
+`ui: &mut egui::Ui` and the rest -- every window, the hotkeys, the
+region overlay, the cursor overlay -- take only
+`ctx: &egui::Context`. And the file list above omitted the central
+panel, which is 149 of the 1,691 lines; `surface.rs` is its home.
+The full block-by-block inventory is survey finding 1 of the phase
+plan.
+
+Panel draw order matters to egui (the stats panel must precede
+`CentralPanel`, which is how egui reserves its space) and window
+order is z-order; preserve both and say so in a comment where `ui`
+calls them.
 
 ### Phase 5: Panel state sub-structs
 
