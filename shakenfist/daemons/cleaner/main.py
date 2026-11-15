@@ -15,6 +15,7 @@ from shakenfist.blob import observe_local_blobs
 from shakenfist.config import config
 from shakenfist.daemons.cleaner import scheduled_tasks
 from shakenfist.daemons import daemon
+from shakenfist.util import caller_identity
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
 
@@ -22,8 +23,15 @@ from shakenfist.util import general as util_general
 LOG, _ = logs.setup(__name__)
 
 
-def _resilient_job(job_func, *args):
+def _resilient_job(task, job_func, *args):
     """Wrap a scheduled task so a failure cannot starve the scheduler.
+
+    ``task`` names the pass in database_requests_total, so that a
+    scheduled task's database load is separable from the rest of the
+    cleaner's (issue 4399). It is a literal rather than
+    job_func.__name__ because the server counts only a name in
+    caller_identity.KNOWN_TASKS, and a rename must fail the test which
+    pins the two together rather than silently lose the label.
 
     schedule.Job.run() only sets last_run and reschedules after job_func
     returns, so a job which raises is left permanently overdue: it sorts
@@ -34,7 +42,8 @@ def _resilient_job(job_func, *args):
     """
     def wrapper():
         try:
-            job_func(*args)
+            with caller_identity.caller_task(task):
+                job_func(*args)
         except Exception as e:
             util_exceptions.ignore_exception(
                 f'cleaner scheduled task {job_func.__name__}', e)
@@ -226,10 +235,13 @@ class Monitor(daemon.Daemon):
 
     def _run_inner(self):
         schedule.every(1).minutes.do(_resilient_job(
-            scheduled_tasks.update_power_states, self.pet_watchdog))
+            'update_power_states', scheduled_tasks.update_power_states,
+            self.pet_watchdog))
         schedule.every(5).minutes.do(_resilient_job(
+            'remove_stale_uploads',
             scheduled_tasks.remove_stale_uploads_for_this_node))
-        schedule.every(5).minutes.do(_resilient_job(observe_local_blobs))
+        schedule.every(5).minutes.do(_resilient_job(
+            'observe_local_blobs', observe_local_blobs))
 
         last_defer_message = 0
 
@@ -267,19 +279,22 @@ class Monitor(daemon.Daemon):
 
             with util_general.RecordedOperation('maintain blobs', n,
                                                 threshold=1):
-                self._maintain_blobs()
+                with caller_identity.caller_task('maintain_blobs'):
+                    self._maintain_blobs()
 
             if time.time() - last_missing_blob_check > 300:
                 with util_general.RecordedOperation('find missing blobs', n,
                                                     threshold=1):
-                    self._find_missing_blobs()
+                    with caller_identity.caller_task('find_missing_blobs'):
+                        self._find_missing_blobs()
                     last_missing_blob_check = time.time()
 
             # Cleanup libvirt logs, but less frequently
             if time.time() - last_libvirt_log_clean > 1800:
                 with util_general.RecordedOperation('libvirt log cleanup', n,
                                                     threshold=1):
-                    scheduled_tasks.clear_old_libvirt_logs()
+                    with caller_identity.caller_task('libvirt_log_cleanup'):
+                        scheduled_tasks.clear_old_libvirt_logs()
                     last_libvirt_log_clean = time.time()
 
             self.idle(60)

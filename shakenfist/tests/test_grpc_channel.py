@@ -217,6 +217,32 @@ class CallerMetadataInterceptorTestCase(base.ShakenFistTestCase):
         self.assertEqual(30, captured['timeout'])
         self.assertEqual('/svc/Method', captured['method'])
 
+    def test_appends_the_task_when_the_thread_is_in_one(self):
+        caller_identity.set_caller_identity('cleaner')
+
+        def continuation(details, request):
+            return list(details.metadata)
+
+        interceptor = grpc_channel._CallerMetadataInterceptor()
+        with caller_identity.caller_task('maintain_blobs'):
+            md = dict(interceptor.intercept_unary_unary(
+                continuation, self._details(), 'req'))
+
+        self.assertEqual('cleaner', md['caller-daemon'])
+        self.assertEqual('maintain_blobs', md['caller-task'])
+
+    def test_no_task_key_when_the_thread_is_not_in_one(self):
+        # Most callers are in no pass at all, and an absent key is what
+        # the server reads as "no task", so they stay as they were.
+        def continuation(details, request):
+            return list(details.metadata)
+
+        interceptor = grpc_channel._CallerMetadataInterceptor()
+        md = dict(interceptor.intercept_unary_unary(
+            continuation, self._details(), 'req'))
+
+        self.assertNotIn('caller-task', md)
+
     def test_preserves_existing_metadata(self):
         def continuation(details, request):
             return list(details.metadata)

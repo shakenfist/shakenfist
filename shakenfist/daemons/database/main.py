@@ -69,6 +69,7 @@ from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import json as util_json
 from shakenfist.util.caller_identity import KNOWN_CALLERS
+from shakenfist.util.caller_identity import KNOWN_TASKS
 from shakenfist.util.caller_identity import set_caller_identity
 
 
@@ -6582,12 +6583,13 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
 # Per-caller request attribution. This is additive: the existing unlabelled
 # database_<op>_total counters (and every dashboard/alert on them) are left
 # untouched. A single server interceptor increments this one labelled counter
-# so we can answer "which daemon drives operation X". See
+# so we can answer "which daemon drives operation X", and -- where the
+# caller named the pass it was in -- which of that daemon's loops. See
 # PLAN-database-load-reduction-phase-04-attribution.md.
 DATABASE_REQUESTS = Counter(
     'database_requests_total',
-    'sf-database gRPC requests, by operation and calling daemon.',
-    ['operation', 'caller_daemon']
+    'sf-database gRPC requests, by operation, calling daemon and task.',
+    ['operation', 'caller_daemon', 'caller_task']
 )
 
 
@@ -6621,8 +6623,25 @@ def _caller_from_metadata(metadata: Any) -> str:
     return 'unknown'
 
 
+def _task_from_metadata(metadata: Any) -> str:
+    """Read caller-task from invocation metadata, defaulting to empty.
+
+    Allowlisted against KNOWN_TASKS for the same reason the caller is
+    allowlisted above: the value arrives over an unauthenticated port, so
+    an unrecognised one becomes '' rather than a prometheus child of its
+    own. Most callers send no task at all, and an empty label value is
+    absent as far as Prometheus is concerned, so a query which sums over
+    (operation, caller_daemon) reads exactly what it read before.
+    """
+    for key, value in (metadata or ()):
+        if key == 'caller-task':
+            task = str(value)
+            return task if task in KNOWN_TASKS else ''
+    return ''
+
+
 class _CallerMetricsInterceptor(grpc.ServerInterceptor):  # type: ignore[type-arg]  # noqa: E501
-    """Count every RPC by operation and calling daemon.
+    """Count every RPC by operation, calling daemon and task.
 
     Additive and best-effort: it touches no handler and, on any failure,
     proceeds with the call rather than disrupting it. Health-check RPCs are
@@ -6634,10 +6653,11 @@ class _CallerMetricsInterceptor(grpc.ServerInterceptor):  # type: ignore[type-ar
         try:
             method = handler_call_details.method or ''
             if not method.startswith('/grpc.health.v1.Health/'):
+                metadata = handler_call_details.invocation_metadata
                 DATABASE_REQUESTS.labels(
                     operation=_method_to_operation(method),
-                    caller_daemon=_caller_from_metadata(
-                        handler_call_details.invocation_metadata)
+                    caller_daemon=_caller_from_metadata(metadata),
+                    caller_task=_task_from_metadata(metadata)
                 ).inc()
         except Exception:
             pass

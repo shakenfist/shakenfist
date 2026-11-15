@@ -25,10 +25,25 @@ class ServerMetricsInterceptorTestCase(base.ShakenFistTestCase):
         self.assertEqual('unknown', main._caller_from_metadata([]))
         self.assertEqual('unknown', main._caller_from_metadata(None))
 
+    def test_task_from_metadata(self):
+        self.assertEqual(
+            'maintain_blobs',
+            main._task_from_metadata([('caller-task', 'maintain_blobs')]))
+        # No task is the common case, and is not an error.
+        self.assertEqual('', main._task_from_metadata([]))
+        self.assertEqual('', main._task_from_metadata(None))
+
+    def test_an_unknown_task_is_not_a_label_of_its_own(self):
+        # The port is unauthenticated, so an unrecognised value must not
+        # mint a prometheus child: that is an unbounded cardinality leak
+        # in the exposition every load check parses.
+        self.assertEqual(
+            '', main._task_from_metadata([('caller-task', 'forged')]))
+
     def test_counts_and_calls_through(self):
         interceptor = main._CallerMetricsInterceptor()
         child = main.DATABASE_REQUESTS.labels(
-            operation='GetNode', caller_daemon='net')
+            operation='GetNode', caller_daemon='net', caller_task='')
         before = child._value.get()
         sentinel = object()
 
@@ -40,10 +55,32 @@ class ServerMetricsInterceptorTestCase(base.ShakenFistTestCase):
         self.assertIs(sentinel, result)
         self.assertEqual(before + 1, child._value.get())
 
+    def test_counts_a_named_task_separately(self):
+        # The point of the label: two passes of the same daemon making
+        # the same call are separable (issue 4399).
+        interceptor = main._CallerMetricsInterceptor()
+        tasked = main.DATABASE_REQUESTS.labels(
+            operation='GetObjectState', caller_daemon='cleaner',
+            caller_task='observe_local_blobs')
+        untasked = main.DATABASE_REQUESTS.labels(
+            operation='GetObjectState', caller_daemon='cleaner',
+            caller_task='')
+        before_tasked = tasked._value.get()
+        before_untasked = untasked._value.get()
+
+        interceptor.intercept_service(
+            lambda hcd: None,
+            self._hcd('/shakenfist.protos.DatabaseService/GetObjectState',
+                      [('caller-daemon', 'cleaner'),
+                       ('caller-task', 'observe_local_blobs')]))
+
+        self.assertEqual(before_tasked + 1, tasked._value.get())
+        self.assertEqual(before_untasked, untasked._value.get())
+
     def test_missing_metadata_counts_as_unknown(self):
         interceptor = main._CallerMetricsInterceptor()
         child = main.DATABASE_REQUESTS.labels(
-            operation='GetBlob', caller_daemon='unknown')
+            operation='GetBlob', caller_daemon='unknown', caller_task='')
         before = child._value.get()
 
         interceptor.intercept_service(

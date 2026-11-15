@@ -384,7 +384,9 @@ class ObserveLocalBlobsTestCase(base.ShakenFistTestCase):
 
         with mock.patch('shakenfist.blob.config',
                         FakeConfig(STORAGE_PATH=tempdir.name)):
-            blob.observe_local_blobs()
+            with mock.patch('shakenfist.mariadb.get_objects_by_state',
+                            return_value=[blob_uuid]):
+                blob.observe_local_blobs()
 
         mock_from_db.assert_called_once_with(
             blob_uuid, suppress_failure_audit=True)
@@ -430,7 +432,9 @@ class ObserveLocalBlobsUsageTestCase(base.ShakenFistTestCase):
         with mock.patch('shakenfist.blob.config',
                         FakeConfig(STORAGE_PATH=self.storage_path,
                                    NODE_NAME='sf-1')):
-            self.assertEqual(2, blob.observe_local_blobs())
+            with mock.patch('shakenfist.mariadb.get_objects_by_state',
+                            return_value=[self.RECORDED, self.NEW]):
+                self.assertEqual(2, blob.observe_local_blobs())
 
     @mock.patch('shakenfist.mariadb.get_node_blob_uuids')
     def test_only_new_locations_count_as_usage(self, mock_node_blobs):
@@ -439,9 +443,9 @@ class ObserveLocalBlobsUsageTestCase(base.ShakenFistTestCase):
 
         mock_node_blobs.assert_called_once_with('sf-1')
         self.blobs[self.RECORDED].observe.assert_called_once_with(
-            already_recorded=True)
+            already_recorded=True, known_state=blob.Blob.STATE_CREATED)
         self.blobs[self.NEW].observe.assert_called_once_with(
-            already_recorded=False)
+            already_recorded=False, known_state=blob.Blob.STATE_CREATED)
 
     @mock.patch('shakenfist.mariadb.get_node_blob_uuids',
                 side_effect=exceptions.DatabaseUnavailable('nope'))
@@ -450,7 +454,149 @@ class ObserveLocalBlobsUsageTestCase(base.ShakenFistTestCase):
         self._observe()
 
         for b in self.blobs.values():
-            b.observe.assert_called_once_with(already_recorded=False)
+            b.observe.assert_called_once_with(
+                already_recorded=False, known_state=blob.Blob.STATE_CREATED)
+
+
+class ObserveLocalBlobsStateReadsTestCase(base.ShakenFistTestCase):
+    """The pass reads state once, not twice per local blob (issue 4399).
+
+    observe_local_blobs() runs every five minutes on every node and used
+    to read each local blob's state individually -- once to decide
+    whether to observe it, and once more inside observe() to decide
+    whether to promote it from initial -- which made it the largest
+    single source of GetObjectState on the cluster and grew with the
+    node's blob store rather than with any workload.
+    """
+
+    UUIDS = ['12345678-1234-4321-8234-12345678901%d' % i for i in range(3)]
+
+    def setUp(self):
+        super().setUp()
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
+        self.storage_path = tempdir.name
+
+        for blob_uuid in self.UUIDS:
+            shard = os.path.join(self.storage_path, 'blobs', blob_uuid[:2])
+            os.makedirs(shard, exist_ok=True)
+            with open(os.path.join(shard, blob_uuid), 'w') as f:
+                f.write('...')
+
+        self.blobs = {}
+        for blob_uuid in self.UUIDS:
+            self.blobs[blob_uuid] = mock.MagicMock()
+
+        patcher = mock.patch(
+            'shakenfist.blob.Blob.from_db',
+            side_effect=lambda u, **kwargs: self.blobs[u])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        patcher = mock.patch('shakenfist.mariadb.get_node_blob_uuids',
+                             return_value=[])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        patcher = mock.patch('shakenfist.mariadb.get_state')
+        self.get_state = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _observe(self, by_state):
+        with mock.patch('shakenfist.blob.config',
+                        FakeConfig(STORAGE_PATH=self.storage_path,
+                                   NODE_NAME='sf-1')):
+            with mock.patch('shakenfist.mariadb.get_objects_by_state',
+                            return_value=by_state) as mock_by_state:
+                observed = blob.observe_local_blobs()
+        return observed, mock_by_state
+
+    def test_one_bulk_state_query_for_the_whole_pass(self):
+        observed, mock_by_state = self._observe(list(self.UUIDS))
+
+        self.assertEqual(3, observed)
+        mock_by_state.assert_called_once_with(
+            ObjectType.BLOB, [blob.Blob.STATE_CREATED])
+        # Not once per blob, and not once at all: the pass knows every
+        # blob it observes is created, and tells observe() so.
+        self.assertEqual(0, self.get_state.call_count)
+        for b in self.blobs.values():
+            b.observe.assert_called_once_with(
+                already_recorded=False, known_state=blob.Blob.STATE_CREATED)
+
+    def test_a_blob_which_is_not_created_is_not_observed(self):
+        # The gate this replaced: a local file whose blob is in initial,
+        # deleted or error is left alone, and is not even hydrated.
+        observed, _ = self._observe([self.UUIDS[0]])
+
+        self.assertEqual(1, observed)
+        self.blobs[self.UUIDS[0]].observe.assert_called_once()
+        for blob_uuid in self.UUIDS[1:]:
+            self.blobs[blob_uuid].observe.assert_not_called()
+
+    def test_a_failed_bulk_read_skips_the_pass(self):
+        # Which is what the per-blob reads did under the same outage: a
+        # state which could not be read did not equal created, so nothing
+        # was observed. None is the read that did not happen, and is not
+        # the same answer as [].
+        observed, _ = self._observe(None)
+
+        self.assertEqual(0, observed)
+        for b in self.blobs.values():
+            b.observe.assert_not_called()
+
+
+class BlobObserveKnownStateTestCase(base.ShakenFistTestCase):
+    """observe(known_state=...) must not read the state it was given."""
+
+    @mock.patch('shakenfist.baseobject.get_minimum_object_version',
+                return_value=blob.Blob.current_version)
+    def setUp(self, mock_get_min):
+        super().setUp()
+        self.blob = blob.Blob(BlobData(
+            uuid='12345678-1234-4321-8234-123456789012',
+            modified=1234567890.0,
+            fetched_at=1234567891.0,
+            version=blob.Blob.current_version
+        ))
+
+    @mock.patch('shakenfist.blob.Blob.add_node_location')
+    @mock.patch('shakenfist.mariadb.get_state')
+    def test_known_state_makes_no_state_read(self, mock_get_state, mock_add):
+        with mock.patch.object(blob.Blob, 'info',
+                               new_callable=mock.PropertyMock) as mock_info:
+            mock_info.return_value = {'virtual size': 1}
+            self.blob.observe(known_state=blob.Blob.STATE_CREATED)
+
+        mock_add.assert_called_once_with(already_recorded=False)
+        self.assertEqual(0, mock_get_state.call_count)
+
+    @mock.patch('shakenfist.blob.Blob.add_node_location')
+    @mock.patch('shakenfist.mariadb.get_state',
+                return_value=State(value='created', update_time=1.0))
+    def test_without_known_state_the_state_is_read(self, mock_get_state,
+                                                   mock_add):
+        with mock.patch.object(blob.Blob, 'info',
+                               new_callable=mock.PropertyMock) as mock_info:
+            mock_info.return_value = {'virtual size': 1}
+            self.blob.observe()
+
+        self.assertEqual(1, mock_get_state.call_count)
+
+    @mock.patch('shakenfist.blob.Blob.add_node_location')
+    @mock.patch('shakenfist.mariadb.get_state')
+    def test_an_initial_blob_is_still_promoted(self, mock_get_state, mock_add):
+        # The promotion is the only reason observe() needs the state, so
+        # a caller which passes initial must still get it.
+        with mock.patch.object(blob.Blob, 'info',
+                               new_callable=mock.PropertyMock) as mock_info:
+            mock_info.return_value = {'virtual size': 1}
+            with mock.patch.object(
+                    blob.Blob, 'state',
+                    new_callable=mock.PropertyMock) as mock_state:
+                self.blob.observe(known_state=blob.Blob.STATE_INITIAL)
+
+        mock_state.assert_called_once_with(blob.Blob.STATE_CREATED)
 
 
 class BlobAddLocationTestCase(base.ShakenFistTestCase):

@@ -63,3 +63,100 @@ class KnownCallersTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             set(), claimed - caller_identity.KNOWN_CALLERS,
             'a process claims an identity the server will discard')
+
+
+class CallerTaskTestCase(base.ShakenFistTestCase):
+    """The per-thread task label."""
+
+    def test_default_is_empty(self):
+        self.assertEqual('', caller_identity.get_caller_task())
+
+    def test_set_inside_the_context_and_restored_after(self):
+        with caller_identity.caller_task('maintain_blobs'):
+            self.assertEqual(
+                'maintain_blobs', caller_identity.get_caller_task())
+        self.assertEqual('', caller_identity.get_caller_task())
+
+    def test_restored_when_the_pass_raises(self):
+        try:
+            with caller_identity.caller_task('maintain_blobs'):
+                raise ValueError('a pass which failed')
+        except ValueError:
+            pass
+        self.assertEqual('', caller_identity.get_caller_task())
+
+    def test_nesting_restores_the_outer_task(self):
+        with caller_identity.caller_task('maintain_blobs'):
+            with caller_identity.caller_task('find_missing_blobs'):
+                self.assertEqual(
+                    'find_missing_blobs', caller_identity.get_caller_task())
+            self.assertEqual(
+                'maintain_blobs', caller_identity.get_caller_task())
+
+    def test_another_thread_is_not_labelled(self):
+        # The reason this is thread local: a daemon which calls the
+        # database from another thread must not inherit the label of
+        # whatever the main loop is doing.
+        import threading
+
+        seen = []
+        with caller_identity.caller_task('update_power_states'):
+            thread = threading.Thread(
+                target=lambda: seen.append(
+                    caller_identity.get_caller_task()))
+            thread.start()
+            thread.join()
+
+        self.assertEqual([''], seen)
+
+
+class KnownTasksTestCase(base.ShakenFistTestCase):
+    """Every task the tree names must be one the server will count."""
+
+    def test_every_task_the_tree_names_is_known(self):
+        # Read the names out of the source rather than restating them
+        # here, exactly as the caller test above does: a name the server
+        # does not know is silently discarded, which is the one failure
+        # mode this label has.
+        import pathlib
+        import re
+
+        root = pathlib.Path(caller_identity.__file__).parent.parent
+        named = set()
+        for path in root.glob('**/*.py'):
+            if 'tests' in path.parts:
+                continue
+            source = path.read_text()
+            for match in re.finditer(
+                    r"caller_task\(\s*'([a-z_]+)'", source):
+                named.add(match.group(1))
+            for match in re.finditer(
+                    r"_resilient_job\(\s*\n?\s*'([a-z_]+)'", source):
+                named.add(match.group(1))
+
+        # Guard against the scan matching nothing and passing vacuously.
+        self.assertIn('maintain_blobs', named)
+        self.assertIn('update_power_states', named)
+        self.assertGreaterEqual(len(named), 6)
+
+        self.assertEqual(
+            set(), named - caller_identity.KNOWN_TASKS,
+            'a pass names a task the server will discard')
+
+    def test_no_known_task_is_unused(self):
+        # A task in the allowlist which nothing names is a label value
+        # which can never appear, which is how an allowlist rots.
+        import pathlib
+
+        root = pathlib.Path(caller_identity.__file__).parent.parent
+        sources = []
+        for path in root.glob('**/*.py'):
+            if 'tests' in path.parts or path.name == 'caller_identity.py':
+                continue
+            sources.append(path.read_text())
+        body = '\n'.join(sources)
+
+        for task in caller_identity.KNOWN_TASKS:
+            self.assertIn(
+                "'%s'" % task, body,
+                'KNOWN_TASKS names a task no pass claims')
