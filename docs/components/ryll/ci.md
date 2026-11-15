@@ -41,7 +41,90 @@ enqueue` status check:
 | `gitleaks` | self-hosted `s` | Secret scanning over full history |
 | `shellcheck` | self-hosted `s` | `tools/run-shellcheck.sh`, then `tools/audit/test-audit-range.sh`, `tools/test-report-fuzz-failure.sh`, `tools/test-report-fuzz-run.sh` and `tools/test-fuzz-targets.sh` |
 | `bidi and zero-width` | self-hosted `s` | `tools/check-bidi.sh` |
-| `skillsaw` | self-hosted `s` | `pre-commit run skillsaw` over the agent context |
+| `skillsaw` | self-hosted `s` | `pre-commit run skillsaw` over the agent context, then `tools/test-wave0-scan.sh` |
+
+Every job in that table except `gitleaks` is fork-guarded: a pull
+request from a fork does not run it. The `vm` runners the smoke tier
+uses are conductor-provisioned ephemeral VMs, and the conductor's
+cloud-init writes `/srv/github/id_ci` — the key to every node in the
+CI mesh — and `~/.shakenfist` onto each one, owned by the user job
+steps run as, on a runner with passwordless sudo. Being ephemeral does
+not help: a fresh VM per job stops persistence and cross-job
+contamination, not theft, because both secrets are written again onto
+every fresh runner.
+
+Each of those jobs runs something a fork can edit — the Makefile and
+dependencies' `build.rs` for the three build lanes, `tools/*.sh` for
+`shellcheck` and `bidi and zero-width`, `.pre-commit-config.yaml` and
+`.skillsaw.yaml` (whose `custom-rules` skillsaw imports as Python) for
+`skillsaw`, and `.cargo/config.toml`, whose `[alias]` and `[build]`
+keys cargo honours, for `cargo audit` and `cargo deny`. `gitleaks` is
+the exception because it reads the fork's content purely as data: it
+installs its own binary and scans files without executing any of them,
+so it is both safe to run and the one CI signal a fork pull request
+still gets. It does read its configuration from the tree it scans, so
+on a fork pull request `.gitleaks.toml` and `.gitleaksignore` are first
+replaced with the base branch's; a fork that needs an ignore entry has
+to have it added on `develop`. That swap leaves three other ways to
+hide a credential, so a fork pull request's `gitleaks` job scans the
+pull request's own commits a second time with each one closed:
+
+- An inline `gitleaks:allow` comment silences the finding on its line
+  whatever the configuration says. The second scan reads every file
+  through a textconv that renames the comment, so it suppresses
+  nothing, and prose that only mentions it, with no credential on the
+  line, is still not a finding. (Debian's gitleaks 8.16 has no
+  `--ignore-gitleaks-allow`; `tools/wave0-scan.sh` uses that flag.)
+- A `.gitattributes` marking a file `-diff`, or a NUL byte in the
+  file, makes `git log -p` print `Binary files differ` instead of its
+  patch. The textconv is attached in `.git/info/attributes`, which
+  outranks every `.gitattributes`, and git diffs a file with a
+  textconv as text.
+- `git log -p` prints no patch for a merge commit, so content that
+  exists only in a merge resolution would reach no scan. The second
+  scan diffs each merge against its first parent.
+
+The range starts at the merge ref's first parent rather than the
+event's `base.sha`, which is stale when a run is repeated after
+`develop` has moved, and a step before both checks that the checkout
+really is that merge ref.
+
+A merge of `develop` into the fork's branch, diffed against its first
+parent, shows everything `develop` brought across as added by that
+merge. So a finding attributed to a merge commit may be content
+`develop` already carries, which `.gitleaksignore` cannot match: its
+fingerprints name the commit that added the line. Check the line on
+`develop` first. If it is ours and already accepted, add the
+merge-attributed fingerprint gitleaks printed to `develop`'s
+`.gitleaksignore`, or ask the contributor to rebase rather than merge.
+
+`Check paths` and the three gates are unguarded too, because they run
+nothing from the tree: `Check paths` checks out only on `merge_group`,
+and reads a pull request's changed files from the API.
+
+The guard is defence in depth, not the boundary. A pull request's
+workflows run from the pull request's own copy of `ci.yml`, so a fork
+can delete the guard in the same pull request that carries the hostile
+code. What stops that is GitHub's fork workflow approval — on this
+repository it requires approval for all external contributors, not
+only first-time ones — together with the reviewer reading the diff to
+`.github/` before approving. If that setting is ever relaxed, the guard
+stops being worth much. The daily configuration export does not
+capture it, so check it directly; this should print
+`all_external_contributors`:
+
+```sh
+gh api repos/shakenfist/ryll/actions/permissions/fork-pr-contributor-approval \
+  --jq .approval_policy
+```
+
+The trade-off is that a fork pull request is otherwise untested by CI,
+and `Can enqueue`'s jq treats a skipped dependency as success, so the
+gate goes green having run almost nothing. `MERGE-TEMPLATE.md`'s Wave 0
+is what closes that gap: `tools/wave0-scan.sh` runs the same scanners
+locally, from `develop`'s copies, before CI is approved, and is
+documented there as the gate on that approval rather than something
+that happens alongside it.
 
 The **merge tier** runs on `merge_group` and gates `Can merge`:
 
@@ -602,7 +685,9 @@ on `workflow_dispatch`. The pull request trigger exists so that a
 change to the lane runs before it merges: a workflow cannot be
 dispatched or scheduled until it is on `develop`. Pull requests
 that touch the RDP code do not run it, to keep `l` runners free; run
-`make rdp-smoke` locally for those.
+`make rdp-smoke` locally for those. Like the smoke tier it is fork-guarded:
+its `vm` runner holds the same CI mesh key, and a fork reaches the
+lane just by editing the workflow.
 
 The criterion for moving it into `ci.yml`'s smoke tier, set before
 the record exists so that it cannot drift to whatever is convenient
@@ -698,12 +783,17 @@ To find out what happened:
 * go to **Actions → CI** and look for the run whose branch is
   `gh-readonly-queue/develop/pr-<your PR>-<sha>`.
 
-An ejection means one of two things. Either your change really
+An ejection usually means one of two things. Either your change really
 does break a platform the smoke tier cannot see — the usual
 suspects are the msvc Windows builds and anything that only
 compiles on aarch64 — or the merge tier hit infrastructure
 flakiness. Push a fix and merge again, or just re-queue the
 unchanged pull request if you believe it was flaky.
+
+For a pull request from a fork there is a third: the merge group is
+the first CI build its code ever gets, because the smoke tier is
+fork-guarded. An ejection there may be an ordinary build failure the
+smoke tier never had the chance to report.
 
 A queued entry is also rebuilt when `develop` moves underneath
 it, which the `prune-reviews` bot does after most merges. With
