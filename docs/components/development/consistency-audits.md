@@ -179,10 +179,15 @@ stop checking secret scanning without saying so, so a token that
 cannot see them fails every leg instead.
 
 `AUDIT_READ_TOKEN` is a repository secret on this repository, and a
-fine-grained token always has an expiry date. When it lapses, every leg
-fails at "Check the read token" and `report-failure` files its issue
-pointing at the run. Mint a replacement with the permissions above and
-replace the secret, then dispatch a run of `main` to confirm it.
+fine-grained token always has an expiry date. The current one expires
+at 2027-10-24 21:29:44 UTC (2027-10-25 AEDT). `AUDIT_TOKEN` expires
+on 2027-10-25 AEDT as well, though the token list shows it only as a
+date, so the two share a local day rather than an instant. One
+rotation covers both; update both dates here when they are replaced.
+When `AUDIT_READ_TOKEN` lapses, every leg fails at "Check the read
+token" and `report-failure` files its issue pointing at the run. Mint
+a replacement with the permissions above and replace the secret,
+then dispatch a run of `main` to confirm it.
 
 `AUDIT_TOKEN` is also a fine-grained personal access token, with the
 `shakenfist` organisation as its resource owner, access to all
@@ -201,9 +206,11 @@ open issues the page links to; the page itself is pushed by
 `scripts/commit-audit-docs.sh` with the job's own `GITHUB_TOKEN`,
 which `actions/checkout` leaves in the clone and the job's
 `contents: write` permission lets push to this repository alone. The
-same lifetime limit applies. When it lapses, `manage-issues` fails
-and `report-failure` files its issue, and `update-docs` still pushes
-the page but renders each issue link it could not look up as `?`.
+same lifetime limit applies: the current token expires on 2027-10-25
+AEDT, the local day `AUDIT_READ_TOKEN` does. When it lapses,
+`manage-issues` fails and `report-failure` files its issue, and
+`update-docs` still pushes the page but renders each issue link it
+could not look up as `?`.
 
 `AUDIT_TOKEN` is not a repository secret. It is an environment secret
 in the `audit-write` environment, whose deployment branch policy

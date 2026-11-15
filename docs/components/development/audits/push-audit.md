@@ -16,10 +16,13 @@ Repositories that carry a pre-push audit runbook must:
 * embed the current **`comment-proportion`** shared block in its
   code-quality review section;
 * embed the current **`source-file-size`** shared block alongside it
-  -- the advisory guidance on how long a source file gets before its
-  size is itself worth raising in review, framed as the cost of
-  re-reading a whole file rather than as taste, because where review
-  is tracked per file every change discards the review of all of it;
+  -- the guidance on how long a source file gets before its size is
+  itself worth raising in review, framed as the cost of re-reading a
+  whole file rather than as taste, because where review is tracked
+  per file every change discards the review of all of it, and the
+  ratchet rule that a file over 1,500 lines may not grow, nor any
+  file cross 1,500, without a reviewed edit to the repository's
+  baseline;
 * embed the current **`plan-references-in-code`** shared block
   alongside those -- code, comments and configuration describe the
   software as it is, so they cite no plan phase, step or decision
@@ -106,6 +109,27 @@ documentation reviewer that "`README.md` reflects any new features",
 which is the exact feedback loop that bloats READMEs.
 
 ### Recently enforced
+
+**`source-file-size` moved to v2** under
+[PLAN-size-ratchet.md](/components/development/plans/PLAN-size-ratchet/). v1 said
+neither of its thresholds was a gate. v2 keeps the 800 and 1,500
+figures, the exemptions, splitting at seams and never trading
+comments for length, and still has no cap and forces no split,
+but a file over 1,500 lines may no longer grow, and no file may
+cross 1,500, without a reviewed edit to the repository's baseline
+of oversize files. `templates/source-size-ratchet/` checks that on
+every commit where a repository has adopted it, and the push
+auditor applies it by hand where one has not; adopting the ratchet
+is not something this audit checks. v2 also has the auditor read
+the files a diff touches rather than only the diff, raise growth
+of any file already over 800 lines however small the branch's own
+addition, review a raised baseline entry as a decision whose
+reason belongs in the pull request description, and treat a diff
+that shrinks a baselined file by deleting rationale comments as a
+finding. v1 was advisory for argued reasons, and the plan's
+mission section says why a ratchet does not fall foul of them.
+Every repository carrying v1 is non-compliant from the next run,
+and the fix is a verbatim copy of the v2 block.
 
 **`plan-references-in-code` became a required block on 2026-09-24.**
 It extends to code the rule `plan-phase-references` already applies

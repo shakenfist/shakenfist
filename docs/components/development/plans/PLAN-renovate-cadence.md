@@ -338,20 +338,29 @@ The order matters in two places:
   then deletes the disabled files and moves each `renovate.json`
   onto the preset in a single pull request per repository, so the
   sweep costs one CI run per repository rather than two.
-* **This plan's phase 3 must land before
-  `PLAN-workflow-ref-trust.md` step 3b.** Phase 1 only publishes the
-  preset; apart from this repository, nothing extends it until phase
-  3's sweep. A line added to the preset before then reaches one
-  repository, and the fleet's digest pull requests would arrive one
-  per release per repository -- the churn this plan removes. Once
-  the sweep has merged, that plan's switch to digest pinning is a
-  one-line addition to the preset rather than a second fleet sweep,
-  and its digest updates fall into the monthly CI-tooling group.
-  development#209 has merged, so the in-repository record of the
-  dependency is that plan's coordination paragraph, which this plan's
-  pull request rewrote to name phase 3. (The operator's
-  `plan-blockers` tool carries a matching note, but it lives outside
-  this repository.)
+* **`PLAN-workflow-ref-trust.md`'s digest pinning lands in the
+  preset before this plan's phase 3, not after it.** This paragraph
+  said the opposite until 2026-11-13, reasoning that a line added
+  to the preset before the sweep reaches one repository while the
+  fleet's digest pull requests would arrive one per release per
+  repository. The second half does not follow from the first: that
+  churn is prevented by the monthly CI-tooling group, which lives
+  in this same preset, rather than by the ordering. What the
+  ordering decides is where the change gets reviewed. Before the
+  sweep it changes one repository, and this plan's own sweep pull
+  request then carries the *policy* into each repository
+  reviewably, alongside everything else that repository receives.
+  The pin diff is not in that pull request: it arrives afterwards,
+  as one grouped Renovate pull request per repository on the next
+  monthly window, which is also the volume to expect from the
+  sweep -- roughly one grouped pull request per repository, not one
+  per action per release. After the sweep the
+  same one-line edit changes every repository's behaviour with no
+  pull request in any of them -- which is what the comment above
+  `RENOVATE_FLEET_PRESET` in `scripts/audit/checks/packaging.py`
+  warns about. The matching reasoning is in that plan's phase 3.
+  (The operator's `plan-blockers` tool carries a matching note, but
+  it lives outside this repository.)
 
 Only phase 1 carries a step table. Phases 2 to 4 get theirs when
 each is planned, from the scope written here, because what phase 1

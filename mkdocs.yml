@@ -176,6 +176,7 @@ nav:
                 - "Plan references in code": components/development/plans/PLAN-plan-references-in-code.md
                 - "Plan retirement": components/development/plans/PLAN-plan-retirement.md
                 - "Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation": components/development/plans/PLAN-scope-coverage.md
+                - "Plan: a ratchet on source size": components/development/plans/PLAN-size-ratchet.md
                 - "Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md": components/development/plans/PLAN-llm-doc-structure.md
                 - "Plan: give the pre-push audit a trigger": components/development/plans/PLAN-push-audit-phase.md
                 - "Plan: onboarding hunkydory, and what TypeScript means for the fleet": components/development/plans/PLAN-typescript-onboarding.md
