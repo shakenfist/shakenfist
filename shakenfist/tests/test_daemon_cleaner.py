@@ -21,6 +21,7 @@ from shakenfist.daemons.cleaner import main as cleaner_main
 from shakenfist.daemons.cleaner import scheduled_tasks as cleaner_st
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
+from shakenfist.util import caller_identity
 
 
 # Module-level storage for test instance UUIDs that the fake libvirt uses
@@ -2334,8 +2335,10 @@ class ResilientJobTestCase(base.ShakenFistTestCase):
             ran.append('healthy')
 
         sched = schedule.Scheduler()
-        sched.every(5).minutes.do(cleaner_main._resilient_job(failing))
-        sched.every(1).minutes.do(cleaner_main._resilient_job(healthy))
+        sched.every(5).minutes.do(
+            cleaner_main._resilient_job('maintain_blobs', failing))
+        sched.every(1).minutes.do(
+            cleaner_main._resilient_job('maintain_blobs', healthy))
 
         # Force both jobs due, with the failing job sorting first --
         # exactly the wedged state from the issue.
@@ -2356,8 +2359,24 @@ class ResilientJobTestCase(base.ShakenFistTestCase):
 
     def test_resilient_job_passes_arguments(self):
         recorded = []
-        cleaner_main._resilient_job(recorded.append, 'petted')()
+        cleaner_main._resilient_job(
+            'update_power_states', recorded.append, 'petted')()
         self.assertEqual(['petted'], recorded)
+
+    def test_resilient_job_labels_its_database_calls(self):
+        # The scheduled task's database load has to be separable from
+        # the rest of the cleaner's (issue 4399), and the label must not
+        # outlive the pass -- including when the pass raises.
+        seen = []
+
+        def job():
+            seen.append(caller_identity.get_caller_task())
+            raise ValueError('a pass which failed')
+
+        cleaner_main._resilient_job('observe_local_blobs', job)()
+
+        self.assertEqual(['observe_local_blobs'], seen)
+        self.assertEqual('', caller_identity.get_caller_task())
 
 
 class CleanerIOErrorPausedInstanceTestCase(CleanerTestCase):

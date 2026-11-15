@@ -27,6 +27,7 @@ from typing import Optional
 import grpc
 
 from shakenfist.util.caller_identity import get_caller_daemon
+from shakenfist.util.caller_identity import get_caller_task
 
 
 _DEFAULT_OPTIONS: list[tuple[str, Any]] = [
@@ -172,6 +173,13 @@ class _CallerMetadataInterceptor(
             metadata = list(client_call_details.metadata or [])
             metadata.append(('caller-daemon', get_caller_daemon()))
             metadata.append(('caller-node', _caller_node()))
+            # Only when the calling thread is inside a named pass. An
+            # absent key and an empty value mean the same thing to the
+            # server, and not sending it keeps the untasked callers --
+            # which is most of them -- exactly as they were on the wire.
+            task = get_caller_task()
+            if task:
+                metadata.append(('caller-task', task))
             client_call_details = _ClientCallDetails(
                 client_call_details.method,
                 client_call_details.timeout,

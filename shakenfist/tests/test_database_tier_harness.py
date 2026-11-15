@@ -657,6 +657,35 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
             config.SFConfig.model_fields['RESOURCES_METRICS_PORT'].default,
             harness.RESOURCES_METRICS_PORT)
 
+    def test_the_cleaner_task_list_matches_the_server(self):
+        # The functional check on caller_task asserts that every task the
+        # tier reports for the cleaner is a known pass. That assertion is
+        # only as good as this list, and a drift would make it fail a
+        # healthy cluster on the day a pass is renamed -- or, worse, pass
+        # on one where the label stopped arriving. Read as the set
+        # literal in the source, because the suite cannot be imported
+        # here: it imports the CI client package.
+        from shakenfist.util import caller_identity
+
+        tree = _parse('shakenfist', 'deploy', 'shakenfist_ci',
+                      'database_tier.py')
+        found = None
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Assign):
+                continue
+            if not any(getattr(target, 'id', None) == 'CLEANER_TASKS'
+                       for target in node.targets):
+                continue
+            for child in ast.walk(node.value):
+                if isinstance(child, ast.Set):
+                    found = ast.literal_eval(child)
+                    break
+
+        self.assertIsNotNone(
+            found, 'CLEANER_TASKS is no longer a set literal in '
+                   'database_tier.py, so this test is not reading it')
+        self.assertEqual(caller_identity.KNOWN_TASKS, found)
+
     def test_the_resources_daemon_still_publishes_that_gauge(self):
         # The load check reads the cluster's shape from this gauge, and
         # nothing about a renamed or removed metric raises: the scrape

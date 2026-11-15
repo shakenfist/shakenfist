@@ -58,6 +58,23 @@ ARTIFACT_SEED_COUNT = 3
 ARTIFACT_LIST_COUNT = 20
 INSTANCE_WALK_CEILING_PER_GET = 2
 
+# The cleaner's maintenance passes, which name themselves in the
+# caller_task label (issue 4399). Duplicated from
+# caller_identity.KNOWN_TASKS rather than imported, like every other
+# constant in this module, because this suite imports nothing from the
+# server package; test_database_tier_harness.py pins the two together.
+#
+# maintain_blobs is the one the assertion waits for: it runs on every
+# cleaner pass, about once a minute, and always reads the active blob
+# list and this node's blob locations, so it cannot be absent on a
+# healthy cluster. The window covers two passes.
+CLEANER_TASKS = frozenset({
+    'find_missing_blobs', 'libvirt_log_cleanup', 'maintain_blobs',
+    'observe_local_blobs', 'remove_stale_uploads', 'update_power_states',
+})
+CLEANER_TASK_WAIT_SECONDS = 150
+CLEANER_TASK_POLL_SECONDS = 10
+
 # A metrics scrape is a plain HTTP GET against a daemon's port, so a
 # single failure is not evidence about the property under test.
 SCRAPE_ATTEMPTS = 3
@@ -125,6 +142,31 @@ def scrape_operation_requests(mesh_ip, operation, caller_daemon):
             continue
         total += value
     return total
+
+
+def scrape_caller_tasks(mesh_ip, caller_daemon):
+    """Every (operation, caller_task) counter for one caller on one node.
+
+    The other scrapers here sum over the task label because every
+    consumer of the budget does; this one is the opposite, and is what a
+    check on the attribution itself needs. A sample with an empty task
+    is a call made outside any named pass, which is most of them, so it
+    is not a pair and is skipped.
+    """
+    url = 'http://%s:%d/metrics' % (mesh_ip, METRICS_PORT)
+    resp = requests.get(url, timeout=METRICS_TIMEOUT)
+    resp.raise_for_status()
+
+    totals = {}
+    for labels, value in lb.parse_request_samples(resp.text):
+        if labels.get('caller_daemon') != caller_daemon:
+            continue
+        task = labels.get('caller_task')
+        if not task:
+            continue
+        key = (labels.get('operation'), task)
+        totals[key] = totals.get(key, 0.0) + value
+    return totals
 
 
 class DatabaseTierTestsMixin:
@@ -264,6 +306,69 @@ class DatabaseTierTestsMixin:
             'attributed to the api daemon, but the counter did not move. '
             'The API is reaching MariaDB without going through the database '
             'tier. delta=%s' % (CALL_COUNT, delta))
+
+    def test_cleaner_passes_name_themselves_on_their_database_calls(self):
+        # caller_daemon says which daemon made a call but not which of
+        # its loops, and the cleaner runs six separate maintenance
+        # passes: a rise in its GetObjectState rate could not be
+        # attributed to one of them without reading source (issue 4399).
+        # The passes now stamp a caller-task on their calls, which no
+        # unit test can check end to end -- the metadata key has to be
+        # lowercase on the wire, and the server drops any task value it
+        # does not recognise, so a drift between the two sides shows up
+        # only on a deployed cluster as a label which is silently empty.
+        database_nodes = self._database_nodes()
+
+        def _tasks():
+            seen = {}
+            for node in database_nodes:
+                last = None
+                for attempt in range(SCRAPE_ATTEMPTS):
+                    try:
+                        for key, value in scrape_caller_tasks(
+                                node['ip'], 'cleaner').items():
+                            seen[key] = seen.get(key, 0.0) + value
+                        break
+                    except Exception as e:
+                        last = e
+                        if attempt < SCRAPE_ATTEMPTS - 1:
+                            time.sleep(SCRAPE_RETRY_SECONDS)
+                else:
+                    self.fail(
+                        'Failed to scrape database metrics from %s (%s) '
+                        'after %d attempts: %s'
+                        % (node['name'], node['ip'], SCRAPE_ATTEMPTS, last))
+            return seen
+
+        deadline = time.time() + CLEANER_TASK_WAIT_SECONDS
+        tasks = _tasks()
+        while not tasks and time.time() < deadline:
+            time.sleep(CLEANER_TASK_POLL_SECONDS)
+            tasks = _tasks()
+
+        self.addDetail(
+            'cleaner_tasks',
+            content.text_content(json.dumps(
+                {'%s/%s' % key: value for key, value in tasks.items()},
+                indent=2, sort_keys=True)))
+
+        named = {task for _, task in tasks}
+        self.assertIn(
+            'maintain_blobs', named,
+            'No sf-database call in the last %d seconds was attributed to '
+            'the cleaner\'s maintain_blobs pass, which runs about once a '
+            'minute and always reads the blob lists. Either the client is '
+            'not sending caller-task or the server is discarding it. '
+            'Tasks seen: %s'
+            % (CLEANER_TASK_WAIT_SECONDS, sorted(named)))
+
+        # A task the server does not recognise becomes an empty label
+        # rather than a label of its own, so anything here which is not
+        # a known pass means the two allowlists have drifted.
+        self.assertEqual(
+            set(), named - CLEANER_TASKS,
+            'The cleaner reported a task which is not one of its known '
+            'passes: %s' % sorted(named - CLEANER_TASKS))
 
     def test_instance_get_fetches_the_attributes_row_once(self):
         # Every MariaDB backed instance attribute lives in one

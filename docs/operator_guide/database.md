@@ -362,6 +362,24 @@ callers overall:
 topk(15, sum by (caller_daemon, operation) (rate(database_requests_total[5m])))
 ```
 
+A daemon is not always a fine enough grain. The cleaner, for instance, runs
+six separate maintenance passes, and knowing that its `GetObjectState` rate
+had doubled said nothing about which pass had grown (issue 4399). Those
+passes name themselves in a third label, `caller_task`, so one query
+separates them:
+
+```promql
+sum by (caller_task) (
+  rate(database_requests_total{caller_daemon="cleaner",
+                               operation="GetObjectState"}[1h]))
+```
+
+Only the cleaner's passes are labelled today; every other caller sends no
+task and reports an empty `caller_task`, which Prometheus treats exactly as
+it treats an absent label. So a query which sums over `(operation,
+caller_daemon)` — including the shipped recording rules, `sf-ctl
+database-load` and the budget check — reads what it always did.
+
 The existing `database_<op>_total` counters are unchanged — this metric is
 additive — so summing `database_requests_total` by `operation` should track
 the matching `database_<op>_total` rate (the `operation` label is the

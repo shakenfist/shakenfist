@@ -621,12 +621,23 @@ class Blob(dbo):
     def drop_node_location(self, node: str = config.NODE_NAME) -> None:
         self.remove_location(node)
 
-    def observe(self, already_recorded: bool = False) -> None:
+    def observe(self, already_recorded: bool = False,
+                known_state: Optional[str] = None) -> None:
+        """Record that this blob is present on this node.
+
+        The promotion below is the only thing here which needs the
+        state, so a caller which already knows it passes it as
+        ``known_state`` rather than paying a GetObjectState per blob --
+        which is what observe_local_blobs() does, every five minutes,
+        for every blob on the node (issue 4399).
+        """
         self.add_node_location(already_recorded=already_recorded)
 
         # Observing a blob can move it from initial to created, but it should not
         # move it from deleted to created.
-        if self.state.value == self.STATE_INITIAL:
+        if known_state is None:
+            known_state = self.state.value
+        if known_state == self.STATE_INITIAL:
             self.state = self.STATE_CREATED
 
         if not self.info:
@@ -1327,6 +1338,27 @@ def observe_local_blobs() -> int:
             'treating every local blob as newly located this pass')
         recorded = set()
 
+    # One read per pass rather than one per blob, for the same reason as
+    # the location read above. This pass used to read each local blob's
+    # state individually -- once here and once more inside observe() --
+    # which made it the largest single source of GetObjectState on the
+    # cluster, growing with the node's blob store rather than with any
+    # workload (issue 4399). The reply is the same shape as the one the
+    # cleaner's blob maintenance already asks for every minute, so this
+    # is not a new class of unbounded read; see
+    # docs/plans/PLAN-grpc-bounded-replies.md.
+    #
+    # A failed read skips the pass, which is what the per-blob reads did
+    # under the same outage: an unreadable state could not equal created,
+    # so nothing was observed. Locations already recorded are untouched.
+    created = mariadb.get_objects_by_state(
+        ObjectType.BLOB, [Blob.STATE_CREATED])
+    if created is None:
+        LOG.warning('Could not read the list of created blobs, skipping '
+                    'blob observation this pass')
+        return 0
+    created_blob_uuids = set(created)
+
     observed_count = 0
     try:
         p = pathlib.Path(blob_path)
@@ -1343,11 +1375,17 @@ def observe_local_blobs() -> int:
             if not util_general.valid_uuid4(blob_uuid):
                 continue
 
+            # Checked before the hydration below, so a blob which is
+            # not in created costs nothing at all this pass.
+            if blob_uuid not in created_blob_uuids:
+                continue
+
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)
-            if b and b.state.value == Blob.STATE_CREATED:
+            if b:
                 # Calling observe() updates the BLOB_LOCATION reference
                 # in MariaDB (with last_active timestamp)
-                b.observe(already_recorded=(blob_uuid in recorded))
+                b.observe(already_recorded=(blob_uuid in recorded),
+                          known_state=Blob.STATE_CREATED)
                 observed_count += 1
 
     except FileNotFoundError:
