@@ -16466,6 +16466,27 @@ budget that was ample at ~20 concurrent qemu processes and blows at
 ~20 again is a contention change worth understanding, not a number
 that wants doubling. Raising 300 to 600 reflexively buys one more
 round of the same ejection.</p>
+<p><strong>Never make a LUKS image at runtime in a test.</strong> Before it writes a
+LUKS header, qemu-img times a key derivation to choose the
+iteration count. On some builds, Debian 12's qemu-img 7.2 among them,
+that timing reads zero CPU time about one time in three, and the create
+fails with <code>Unable to get accurate CPU usage</code>. Setting
+<code>encrypt.iter-time</code> does not help, because the timing runs either way.
+A fixture built like this ejected three unrelated pull requests from
+the merge queue
+(<a href="https://github.com/shakenfist/instar/issues/905">#905</a>). Use the
+prebuilt <code>qcow2-luks</code> image, <code>self.get_image('qcow2-luks')</code>, and skip
+when it is missing, as <code>TestCompareLuksQcow2</code> does. Copy it into the
+temporary directory first if the code under test could write to it.
+Opening an existing LUKS image with <code>--object secret</code> does no timing
+and is fine.</p>
+<p><code>tools/ci/check-no-runtime-luks-create.sh</code> enforces this, as a
+pre-commit hook and in the <code>ci-tooling</code> job. It rejects any
+<code>encrypt.format=luks</code> or <code>luksFormat</code> in a Python or shell file under
+<code>tests/</code>, whatever the command around it, so a test that only mentions
+the option has to be exempted by name in the script, with its reason;
+<code>tests/test_measure.py</code>, which passes it to <code>instar measure</code> to check
+the refusal, is the one exemption.</p>
 <h2 id="test-categories">Test Categories<a class="headerlink" href="#test-categories" title="Permanent link">&para;</a></h2>
 <h3 id="safe-images-test_info_safepy">Safe Images (<code>test_info_safe.py</code>)<a class="headerlink" href="#safe-images-test_info_safepy" title="Permanent link">&para;</a></h3>
 <p>Tests against known-safe disk images. These run <code>qemu-img</code> directly and

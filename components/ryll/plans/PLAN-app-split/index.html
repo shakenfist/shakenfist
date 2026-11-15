@@ -16865,13 +16865,13 @@ with web mode).</p>
 <tr>
 <td>3. Events and bug-report flow</td>
 <td><a href="/components/ryll/plans/PLAN-app-split-phase-03-events/">PLAN-app-split-phase-03-events.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>79fc466 (#714), cdecf94 (#717)</td>
 </tr>
 <tr>
 <td>4. Split <code>ui</code> into per-panel files</td>
-<td>PLAN-app-split-phase-04-panels.md</td>
-<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-app-split-phase-04-panels/">PLAN-app-split-phase-04-panels.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16965,16 +16965,29 @@ but serve <code>process_events</code>, so they move with it in phase 3.</p>
 repointed the rest. <code>git grep -n 'app\.rs' -- ':!docs/plans/'</code>
 finds nothing.</p>
 <h3 id="phase-4-split-ui-into-per-panel-files">Phase 4: Split <code>ui</code> into per-panel files<a class="headerlink" href="#phase-4-split-ui-into-per-panel-files" title="Permanent link">&para;</a></h3>
-<p>Reduce <code>eframe::App::ui</code> to a sequence of calls, one per panel,
-each a <code>fn draw_*(&amp;mut self, ui: &amp;mut egui::Ui)</code> in <code>app/ui/</code>:
-<code>stats_bar.rs</code>, <code>traffic_panel.rs</code>, <code>notifications_panel.rs</code>,
-<code>usb_panel.rs</code>, <code>webdav_panel.rs</code>, <code>dialogs.rs</code> (bug report, paste
-error, protocol gaps, reconnect modal), <code>region_select.rs</code>,
-<code>cursor.rs</code>, and <code>keys.rs</code> for the global hotkey handling at the
-top of <code>ui</code>. Still a move, not a redesign: panels keep reaching
-into <code>self</code> as they do today. Panel draw order matters to egui
-(the stats panel must precede <code>CentralPanel</code>); preserve it and
-say so in a comment where <code>ui</code> calls them.</p>
+<p>Reduce <code>eframe::App::ui</code> to a sequence of calls, one per block,
+each a method in <code>app/ui/</code>: <code>stats_bar.rs</code>, <code>traffic_panel.rs</code>,
+<code>notifications_panel.rs</code>, <code>usb_panel.rs</code>, <code>webdav_panel.rs</code>,
+<code>surface.rs</code> (the central panel, which draws the remote surface),
+<code>dialogs.rs</code> (bug report, paste error, protocol gaps, reconnect
+modal), <code>region_select.rs</code>, <code>cursor.rs</code>, and <code>keys.rs</code> for the
+input gate and the global hotkey handling at the top of <code>ui</code>.
+Still a move, not a redesign: panels keep reaching into <code>self</code> as
+they do today.</p>
+<p>Two things this section got wrong before phase 4 was planned, both
+corrected here rather than only in the phase plan. There is no one
+signature: egui 0.35 gives <code>Panel::show</code> the root <code>&amp;mut Ui</code> but
+leaves <code>Window::show</code> taking <code>&amp;Context</code>, so six of the blocks take
+<code>ui: &amp;mut egui::Ui</code> and the rest -- every window, the hotkeys, the
+region overlay, the cursor overlay -- take only
+<code>ctx: &amp;egui::Context</code>. And the file list above omitted the central
+panel, which is 149 of the 1,691 lines; <code>surface.rs</code> is its home.
+The full block-by-block inventory is survey finding 1 of the phase
+plan.</p>
+<p>Panel draw order matters to egui (the stats panel must precede
+<code>CentralPanel</code>, which is how egui reserves its space) and window
+order is z-order; preserve both and say so in a comment where <code>ui</code>
+calls them.</p>
 <h3 id="phase-5-panel-state-sub-structs">Phase 5: Panel state sub-structs<a class="headerlink" href="#phase-5-panel-state-sub-structs" title="Permanent link">&para;</a></h3>
 <p>One panel at a time, move its field cluster out of <code>RyllApp</code> into
 a struct owned by its <code>app/ui/*.rs</code> module, with a <code>show</code> method
