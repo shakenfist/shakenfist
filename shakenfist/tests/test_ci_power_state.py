@@ -26,6 +26,8 @@ import sys
 import types
 from unittest import mock
 
+import fixtures
+
 from shakenfist.tests import base as test_base
 
 
@@ -276,6 +278,86 @@ class AwaitInstanceEventTestCase(test_base.ShakenFistTestCase):
         self.harness._await_instance_event('uuid1', 'poweron')
 
         self.harness._await_instance_create.assert_called_once_with('uuid1')
+
+
+class AwaitInstanceEventExtraTestCase(test_base.ShakenFistTestCase):
+    """The wait outlasts the eventlog drainer rather than reading once.
+
+    Issue 4919: an event emitted before the instance reached 'created'
+    was not yet readable when the CI test looked, because add_event()
+    only spools it locally. The helper must keep reading until the event
+    arrives, and must not return early on an event which matches the
+    message but lacks the field.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.system_client = mock.MagicMock()
+        self.harness = _NodeLookupHarness(self.system_client)
+        # base.py's own reference to the time module is replaced, not the
+        # module's attributes, so the clock everything else reads is real.
+        self.clock = self.useFixture(
+            fixtures.MockPatchObject(ci_base, 'time')).mock
+        self.clock.time.return_value = 0
+        self.sleep = self.clock.sleep
+
+    def test_a_late_event_is_waited_for(self):
+        self.system_client.get_instance_events.side_effect = [
+            [],
+            [{'message': 'poweron', 'extra': None}],
+            [{'message': 'poweron', 'extra': None},
+             {'message': 'poweron', 'extra': {'libvirt_returned_at': 12.5}}],
+        ]
+
+        self.assertEqual(
+            [12.5],
+            self.harness._await_instance_event_extra(
+                'uuid1', 'poweron', 'libvirt_returned_at'))
+        self.assertEqual(
+            3, self.system_client.get_instance_events.call_count)
+        self.assertEqual(2, self.sleep.call_count)
+
+    def test_other_messages_do_not_satisfy_the_wait(self):
+        self.system_client.get_instance_events.side_effect = [
+            [{'message': 'poweroff', 'extra': {'libvirt_returned_at': 1.0}}],
+            [{'message': 'poweron', 'extra': {'libvirt_returned_at': 2.0}}],
+        ]
+
+        self.assertEqual(
+            [2.0],
+            self.harness._await_instance_event_extra(
+                'uuid1', 'poweron', 'libvirt_returned_at'))
+
+    def test_every_carrier_is_returned_so_the_caller_can_count(self):
+        self.system_client.get_instance_events.return_value = [
+            {'message': 'poweroff', 'extra': {'libvirt_returned_at': 1.0}},
+            {'message': 'poweroff', 'extra': {}},
+            {'message': 'poweroff', 'extra': {'libvirt_returned_at': 3.0}},
+        ]
+
+        self.assertEqual(
+            [1.0, 3.0],
+            self.harness._await_instance_event_extra(
+                'uuid1', 'poweroff', 'libvirt_returned_at'))
+        self.sleep.assert_not_called()
+
+    def test_gives_up_empty_at_the_deadline(self):
+        self.system_client.get_instance_events.return_value = []
+        # The deadline is taken at 0, so it is 30; the reads are at 29.5
+        # and 30. A read exactly at the deadline still happens, and none
+        # follows it.
+        self.clock.time.side_effect = [0, 29.5, 30]
+        # A wait which ignored the deadline would otherwise spin forever
+        # on the mocked sleep rather than fail.
+        self.sleep.side_effect = [
+            None, AssertionError('slept again after the deadline')]
+
+        self.assertEqual(
+            [],
+            self.harness._await_instance_event_extra(
+                'uuid1', 'poweron', 'libvirt_returned_at'))
+        self.assertEqual(
+            2, self.system_client.get_instance_events.call_count)
 
 
 # Realistic `virsh dominfo` output, trimmed to the lines _domain_autostart()

@@ -567,7 +567,9 @@ class TestNodes(base.BaseNamespacedTestCase):
         self.assertEqual(node['uuid'], inst['node'])
 
         # 'created' is set immediately after power_on(), so the poweron
-        # event exists once this returns.
+        # event has been emitted once this returns -- but not necessarily
+        # shipped to sf-eventlog yet, which _libvirt_returned_at() waits
+        # out.
         self._await_instance_create(inst['uuid'])
         started_at = self._libvirt_returned_at(inst['uuid'], 'poweron')
         per_node = self._await_measurement_after(
@@ -584,7 +586,8 @@ class TestNodes(base.BaseNamespacedTestCase):
                        indent=4, sort_keys=True)))
 
         # self.system_client uses ASYNC_PAUSE, so this blocks until the
-        # instance's state is 'deleted', which is after power_off().
+        # instance's state is 'deleted', which is after power_off() has
+        # emitted its event (shipped later, as for poweron above).
         self.system_client.delete_instance(inst['uuid'])
         stopped_at = self._libvirt_returned_at(inst['uuid'], 'poweroff')
 
@@ -616,12 +619,14 @@ class TestNodes(base.BaseNamespacedTestCase):
         and stopped once, and although deleting it calls power_off() more
         than once, only the call which actually stopped the domain records
         the field.
+
+        The event was emitted before the state change the caller waited
+        on, but events reach sf-eventlog through each daemon's spool and
+        drainer, so it can still be unreadable; reading once failed here
+        with an empty list (issue 4919).
         """
-        returned = [
-            (e.get('extra') or {}).get('libvirt_returned_at')
-            for e in self.system_client.get_instance_events(instance_uuid)
-            if e.get('message') == message]
-        returned = [r for r in returned if r is not None]
+        returned = self._await_instance_event_extra(
+            instance_uuid, message, 'libvirt_returned_at')
         self.assertEqual(
             1, len(returned),
             'Instance %s should have exactly one %s event carrying '
