@@ -15,9 +15,11 @@ from pydantic import IPvAnyAddress
 from shakenfist.network import network
 from shakenfist.config import BaseSettings
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.managed_executables import managedexecutable
 from shakenfist.tests.mock_mariadb import MockMariaDB
+from shakenfist.util import network as util_network
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -995,3 +997,82 @@ class DnsMasqTestCase(testtools.TestCase):
             with open(os.path.join(dir, 'leases')) as f:
                 leases = f.read()
             self.assertTrue('1a:91:64:d2:15:39' in leases)
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.util.concurrency.execute')
+    def test_remove_lease(self, mock_execute, mock_event):
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+
+        d = dnsmasq.DnsMasq.new(n)
+        d.remove_lease('10.0.0.10', '02:00:00:07:18:fa')
+
+        mock_execute.assert_called_with(
+            'dhcp_release %s 10.0.0.10 02:00:00:07:18:fa' % d.interface,
+            netns=n.uuid)
+        self.assertIn(
+            'released a DHCP lease',
+            [call[0][3] for call in mock_event.call_args_list])
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.util.concurrency.execute')
+    def test_remove_lease_without_a_namespace(self, mock_execute, mock_event):
+        # A lease removal enqueued before a host reboot can be dequeued after
+        # it, before sf-net has rebuilt the network namespace. ip netns exec
+        # cannot enter a namespace which is not there, and there is no dnsmasq
+        # in it holding the lease either, so that exit code is tolerated
+        # instead of becoming a cluster operation error (#4921).
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+
+        mock_execute.side_effect = ProcessExecutionError(
+            stdout='', stderr='Cannot open network namespace "%s": No such '
+                              'file or directory\n' % network_uuid,
+            exit_code=util_network.NETNS_MISSING_EXIT_CODE,
+            cmd='dhcp_release veth-5b8fc5-i 10.0.0.10 02:00:00:07:18:fa')
+
+        d = dnsmasq.DnsMasq.new(n)
+        d.remove_lease('10.0.0.10', '02:00:00:07:18:fa')
+
+        messages = [call[0][3] for call in mock_event.call_args_list]
+        self.assertIn(
+            'namespace absent while releasing a DHCP lease, nothing to remove',
+            messages)
+        self.assertNotIn('released a DHCP lease', messages)
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.util.concurrency.execute')
+    def test_remove_lease_failing_for_another_reason_raises(
+            self, mock_execute, mock_event):
+        # Only a missing namespace is tolerated. A dhcp_release which failed
+        # for any other reason is a real failure and must still reach the
+        # operation dispatcher.
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network(
+            'bobnet', network_uuid, netblock='10.0.0.0/8')
+        n = network.Network.from_db(network_uuid)
+
+        mock_execute.side_effect = ProcessExecutionError(
+            stdout='', stderr='dhcp_release: unknown interface\n', exit_code=1,
+            cmd='dhcp_release veth-5b8fc5-i 10.0.0.10 02:00:00:07:18:fa')
+
+        d = dnsmasq.DnsMasq.new(n)
+        self.assertRaises(
+            ProcessExecutionError, d.remove_lease,
+            '10.0.0.10', '02:00:00:07:18:fa')
+        self.assertNotIn(
+            'released a DHCP lease',
+            [call[0][3] for call in mock_event.call_args_list])

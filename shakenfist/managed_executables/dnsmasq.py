@@ -11,11 +11,13 @@ from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.managed_executables import managedexecutable
 from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import network as util_network
 
 
 class DnsMasq(managedexecutable.ManagedExecutable):
@@ -272,9 +274,41 @@ class DnsMasq(managedexecutable.ManagedExecutable):
             'ipv4': ipv4,
             'macaddr': macaddr
         })
-        util_concurrency.execute(
-            'dhcp_release %(interface)s %(ipv4)s %(macaddr)s' % subst,
-            netns=self.network.uuid)
+
+        # dhcp_release runs inside the network's namespace, and a lease removal
+        # can arrive when that namespace is not there: enqueued before a host
+        # reboot and dequeued after it, before sf-net has rebuilt it. That is
+        # the post-reboot half of the race
+        # BridgedVXLanNetwork._apply_unroute_address() already tolerates, and
+        # the same reasoning applies -- the end state this method exists to
+        # reach is "the lease is not held", and a namespace with no dnsmasq in
+        # it already satisfies that. Untolerated, the ProcessExecutionError
+        # reaches net_macaddr_ip_op.dispatch_task(), which writes a traceback
+        # to syslog and records a cluster operation error for a benign startup
+        # race, and makes the lease removal an instance delete waits on fail
+        # with NetworkOperationFailed (#4921). The guard sits where the
+        # exception is raised rather than on the os.path.exists() pre-check
+        # restart() uses, because the namespace can also go away between such
+        # a check and the exec. ip netns exec reports a missing namespace with
+        # an exit code of its own, so a dhcp_release which failed for any
+        # other reason still raises.
+        try:
+            util_concurrency.execute(
+                'dhcp_release %(interface)s %(ipv4)s %(macaddr)s' % subst,
+                netns=self.network.uuid)
+        except ProcessExecutionError as e:
+            if e.exit_code != util_network.NETNS_MISSING_EXIT_CODE:
+                raise
+            self.add_event(
+                EVENT_TYPE_AUDIT,
+                'namespace absent while releasing a DHCP lease, '
+                'nothing to remove',
+                extra={
+                    'macaddr': macaddr,
+                    'ipv4': ipv4
+                })
+            return
+
         self.add_event(EVENT_TYPE_AUDIT, 'released a DHCP lease',
                        extra={
                            'macaddr': macaddr,
