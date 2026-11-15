@@ -3650,6 +3650,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-size-ratchet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a ratchet on source size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-llm-doc-structure/" class="md-nav__link">
         
   
@@ -16376,21 +16404,60 @@ re-synced, so a schedule or a rule changed after a repository was
 onboarded stayed behind; extended, a change reaches the fleet once.</p>
 <p>The preset holds the author and assignee Renovate uses, the dependency
 dashboard, rollback pull requests, a three day <code>minimumReleaseAge</code>,
-the <code>pre-commit</code> manager, <code>customManagers:githubActionsVersions</code>, the
-<code>Australia/Sydney</code> timezone, and the cadence: ordinary updates
-<code>on saturday</code>, majors and the CI tooling group <code>on the first day of the
-month</code>, with at most 2 pull requests an hour and 10 open at once
-(Renovate's own defaults, written down rather than inherited). Minor,
-patch and digest updates are never merged automatically. The CI
-tooling group puts GitHub Actions and pre-commit hook revisions, every
-update type, digests included, into one monthly pull request. The two
-rules that keep <code>node-version</code> and the pinned Renovate in step, and the
-<code>shellcheck-py/shellcheck-py</code> versioning rule, are in it too. It sets
-no <code>vulnerabilityAlerts</code>: Renovate's defaults already drop the
-schedule, <code>minimumReleaseAge</code> and grouping for a security fix, so a
-fix for a vulnerability Dependabot reports arrives at once rather than
-waiting for Saturday. One rule is an exception to that. A <code>packageRules</code>
-entry with <code>enabled: false</code> suppresses even a vulnerability fix, and
+the <code>pre-commit</code> manager, <code>customManagers:githubActionsVersions</code>,
+<code>helpers:pinGitHubActionDigests</code>, the <code>Australia/Sydney</code> timezone, and
+the cadence: ordinary updates <code>on saturday</code>, majors and the CI tooling
+group <code>on the first day of the month</code>, with at most 2 pull requests an
+hour and 10 open at once (Renovate's own defaults, written down rather
+than inherited). Minor, patch and digest updates are never merged
+automatically. The CI tooling group puts GitHub Actions and pre-commit
+hook revisions, every update type, digests included, into one monthly
+pull request. The two rules that keep <code>node-version</code> and the pinned
+Renovate in step, and the <code>shellcheck-py/shellcheck-py</code> versioning
+rule, are in it too.</p>
+<p><code>helpers:pinGitHubActionDigests</code> makes Renovate rewrite a third-party
+<code>uses:</code> reference to a full commit sha with a trailing comment naming
+the ref it replaced, and then keep that sha current. A tag is a
+pointer its owner can move, so a workflow that trusts one runs
+whatever the tag points at on the morning it runs; a sha is the only
+reference that cannot change underneath. The CI tooling group matches
+by manager and sets no <code>matchUpdateTypes</code>, so the pins are expected to
+arrive inside it, costing one monthly pull request rather than one per
+release; the first pin pull request is what confirms that a pin obeys
+that schedule. Pinning reaches whatever a repository's
+<code>github-actions</code> manager scans, which in this repository means
+<code>templates/</code> as well as <code>.github/</code>, so a template and its deployed
+twin are pinned in the same pull request.</p>
+<p>Pinning does not reach what the central runner's own global
+configuration disables. <code>renovate-runner.json</code> switches off every
+dependency in <code>.github/workflows/renovate.yml</code> and
+<code>templates/renovate/renovate.yml</code>, so the fleet runner proposes
+nothing for either file; both are pinned today only because each
+repository still runs its own hourly Renovate, which reads
+<code>renovate.json</code> and sees them. When those copies are disabled, that
+rule has to lose the <code>templates/renovate/renovate.yml</code> path or the
+pins in the template stop being maintained -- the template outlives
+the deployed copies the rest of the rule is there for.</p>
+<p>The fleet's own actions are the exception, carried as a <code>packageRules</code>
+entry. <code>shakenfist/**</code> references are not pinned: every repository
+consumes them at <code>@main</code> on purpose, so that a fix to a shared
+composite action or reusable workflow reaches the fleet without a pull
+request in each repository, and that branch is protected by a ruleset
+requiring review instead of by a sha. The exception names both the
+<code>action</code> and <code>workflow</code> dep types, because Renovate calls a job-level
+reusable workflow a <code>workflow</code> while every other <code>uses:</code> reference is
+an <code>action</code>. Both names, and the helper's own definition, are read
+from Renovate's source at the version this fleet runs, 44.227.4:
+<code>lib/config/presets/internal/helpers.preset.ts:118-126</code> for the
+helper, and
+<code>lib/modules/manager/github-actions/extract.ts:78</code> and <code>:111</code> for the
+dep type a reference is given.</p>
+<p>The preset sets no <code>vulnerabilityAlerts</code>: Renovate's defaults
+already drop the schedule, <code>minimumReleaseAge</code> and grouping for a
+security fix, so a fix for a vulnerability Dependabot reports arrives
+at once rather than waiting for Saturday. One rule is an exception to
+that. A <code>packageRules</code> entry with <code>enabled: false</code> suppresses even a
+vulnerability fix, and
 the preset's Node-major disable rule is one, so Node majors in the
 Renovate workflows are the one update type the immediate security path
 does not reach.</p>

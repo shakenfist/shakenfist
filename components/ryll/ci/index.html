@@ -3472,6 +3472,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-size-ratchet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a ratchet on source size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-llm-doc-structure/" class="md-nav__link">
         
   
@@ -16549,10 +16577,85 @@ enqueue</code> status check:</p>
 <tr>
 <td><code>skillsaw</code></td>
 <td>self-hosted <code>s</code></td>
-<td><code>pre-commit run skillsaw</code> over the agent context</td>
+<td><code>pre-commit run skillsaw</code> over the agent context, then <code>tools/test-wave0-scan.sh</code></td>
 </tr>
 </tbody>
 </table>
+<p>Every job in that table except <code>gitleaks</code> is fork-guarded: a pull
+request from a fork does not run it. The <code>vm</code> runners the smoke tier
+uses are conductor-provisioned ephemeral VMs, and the conductor's
+cloud-init writes <code>/srv/github/id_ci</code> — the key to every node in the
+CI mesh — and <code>~/.shakenfist</code> onto each one, owned by the user job
+steps run as, on a runner with passwordless sudo. Being ephemeral does
+not help: a fresh VM per job stops persistence and cross-job
+contamination, not theft, because both secrets are written again onto
+every fresh runner.</p>
+<p>Each of those jobs runs something a fork can edit — the Makefile and
+dependencies' <code>build.rs</code> for the three build lanes, <code>tools/*.sh</code> for
+<code>shellcheck</code> and <code>bidi and zero-width</code>, <code>.pre-commit-config.yaml</code> and
+<code>.skillsaw.yaml</code> (whose <code>custom-rules</code> skillsaw imports as Python) for
+<code>skillsaw</code>, and <code>.cargo/config.toml</code>, whose <code>[alias]</code> and <code>[build]</code>
+keys cargo honours, for <code>cargo audit</code> and <code>cargo deny</code>. <code>gitleaks</code> is
+the exception because it reads the fork's content purely as data: it
+installs its own binary and scans files without executing any of them,
+so it is both safe to run and the one CI signal a fork pull request
+still gets. It does read its configuration from the tree it scans, so
+on a fork pull request <code>.gitleaks.toml</code> and <code>.gitleaksignore</code> are first
+replaced with the base branch's; a fork that needs an ignore entry has
+to have it added on <code>develop</code>. That swap leaves three other ways to
+hide a credential, so a fork pull request's <code>gitleaks</code> job scans the
+pull request's own commits a second time with each one closed:</p>
+<ul>
+<li>An inline <code>gitleaks:allow</code> comment silences the finding on its line
+  whatever the configuration says. The second scan reads every file
+  through a textconv that renames the comment, so it suppresses
+  nothing, and prose that only mentions it, with no credential on the
+  line, is still not a finding. (Debian's gitleaks 8.16 has no
+  <code>--ignore-gitleaks-allow</code>; <code>tools/wave0-scan.sh</code> uses that flag.)</li>
+<li>A <code>.gitattributes</code> marking a file <code>-diff</code>, or a NUL byte in the
+  file, makes <code>git log -p</code> print <code>Binary files differ</code> instead of its
+  patch. The textconv is attached in <code>.git/info/attributes</code>, which
+  outranks every <code>.gitattributes</code>, and git diffs a file with a
+  textconv as text.</li>
+<li><code>git log -p</code> prints no patch for a merge commit, so content that
+  exists only in a merge resolution would reach no scan. The second
+  scan diffs each merge against its first parent.</li>
+</ul>
+<p>The range starts at the merge ref's first parent rather than the
+event's <code>base.sha</code>, which is stale when a run is repeated after
+<code>develop</code> has moved, and a step before both checks that the checkout
+really is that merge ref.</p>
+<p>A merge of <code>develop</code> into the fork's branch, diffed against its first
+parent, shows everything <code>develop</code> brought across as added by that
+merge. So a finding attributed to a merge commit may be content
+<code>develop</code> already carries, which <code>.gitleaksignore</code> cannot match: its
+fingerprints name the commit that added the line. Check the line on
+<code>develop</code> first. If it is ours and already accepted, add the
+merge-attributed fingerprint gitleaks printed to <code>develop</code>'s
+<code>.gitleaksignore</code>, or ask the contributor to rebase rather than merge.</p>
+<p><code>Check paths</code> and the three gates are unguarded too, because they run
+nothing from the tree: <code>Check paths</code> checks out only on <code>merge_group</code>,
+and reads a pull request's changed files from the API.</p>
+<p>The guard is defence in depth, not the boundary. A pull request's
+workflows run from the pull request's own copy of <code>ci.yml</code>, so a fork
+can delete the guard in the same pull request that carries the hostile
+code. What stops that is GitHub's fork workflow approval — on this
+repository it requires approval for all external contributors, not
+only first-time ones — together with the reviewer reading the diff to
+<code>.github/</code> before approving. If that setting is ever relaxed, the guard
+stops being worth much. The daily configuration export does not
+capture it, so check it directly; this should print
+<code>all_external_contributors</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/ryll/actions/permissions/fork-pr-contributor-approval<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--jq<span class="w"> </span>.approval_policy
+</code></pre></div>
+<p>The trade-off is that a fork pull request is otherwise untested by CI,
+and <code>Can enqueue</code>'s jq treats a skipped dependency as success, so the
+gate goes green having run almost nothing. <code>MERGE-TEMPLATE.md</code>'s Wave 0
+is what closes that gap: <code>tools/wave0-scan.sh</code> runs the same scanners
+locally, from <code>develop</code>'s copies, before CI is approved, and is
+documented there as the gate on that approval rather than something
+that happens alongside it.</p>
 <p>The <strong>merge tier</strong> runs on <code>merge_group</code> and gates <code>Can merge</code>:</p>
 <table>
 <thead>
@@ -16955,8 +17058,8 @@ local operation, and this is third-party code driving a browser
 over repository content.</p>
 <p>To run it locally, which the pre-push audit's documentation
 review should:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tools/mermaid-lint.sh<span class="w">            </span><span class="c1"># every tracked markdown file</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tools/mermaid-lint.sh<span class="w"> </span>docs/x.md<span class="w">  </span><span class="c1"># just this one</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tools/mermaid-lint.sh<span class="w">            </span><span class="c1"># every tracked markdown file</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>tools/mermaid-lint.sh<span class="w"> </span>docs/x.md<span class="w">  </span><span class="c1"># just this one</span>
 </code></pre></div>
 <p>Check the exit status directly rather than piping the script
 into <code>tail</code> or <code>grep</code>, which reports the filter's status and
@@ -17059,7 +17162,7 @@ anywhere but its launch line.</p>
 <p>To run it locally, which takes about half a minute once the image
 and the build are warm (the checks themselves take under twenty
 seconds with KVM, and barely longer without):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>make<span class="w"> </span>rdp-smoke
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>make<span class="w"> </span>rdp-smoke
 </code></pre></div>
 <p>It boots its own QEMU on a port it picks inside the container, so
 it does not disturb a <code>make test-qemu</code> guest or anything listening
@@ -17074,7 +17177,9 @@ on <code>workflow_dispatch</code>. The pull request trigger exists so that a
 change to the lane runs before it merges: a workflow cannot be
 dispatched or scheduled until it is on <code>develop</code>. Pull requests
 that touch the RDP code do not run it, to keep <code>l</code> runners free; run
-<code>make rdp-smoke</code> locally for those.</p>
+<code>make rdp-smoke</code> locally for those. Like the smoke tier it is fork-guarded:
+its <code>vm</code> runner holds the same CI mesh key, and a fork reaches the
+lane just by editing the workflow.</p>
 <p>The criterion for moving it into <code>ci.yml</code>'s smoke tier, set before
 the record exists so that it cannot drift to whatever is convenient
 later: <strong>fourteen consecutive green nightly runs, with no rerun
@@ -17098,10 +17203,10 @@ jobs that do:</p>
 failed or was skipped, and then evaluates a jq expression over
 the <code>needs</code> context that maps each dependency to "success or
 skipped" and requires all of them:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>jq<span class="w"> </span><span class="s1">'. | to_entries</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="s1">      | map([.value.result == "success",</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="s1">             .value.result == "skipped"] | any)</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="s1">      | all'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>jq<span class="w"> </span><span class="s1">'. | to_entries</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="s1">      | map([.value.result == "success",</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="s1">             .value.result == "skipped"] | any)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="s1">      | all'</span>
 </code></pre></div>
 <p>Treating a skipped dependency as success is what makes the
 review-only fast path work — see below. A failed or cancelled
@@ -17157,12 +17262,16 @@ it was removed from the merge queue.</p>
 <li>go to <strong>Actions → CI</strong> and look for the run whose branch is
   <code>gh-readonly-queue/develop/pr-&lt;your PR&gt;-&lt;sha&gt;</code>.</li>
 </ul>
-<p>An ejection means one of two things. Either your change really
+<p>An ejection usually means one of two things. Either your change really
 does break a platform the smoke tier cannot see — the usual
 suspects are the msvc Windows builds and anything that only
 compiles on aarch64 — or the merge tier hit infrastructure
 flakiness. Push a fix and merge again, or just re-queue the
 unchanged pull request if you believe it was flaky.</p>
+<p>For a pull request from a fork there is a third: the merge group is
+the first CI build its code ever gets, because the smoke tier is
+fork-guarded. An ejection there may be an ordinary build failure the
+smoke tier never had the chance to report.</p>
 <p>A queued entry is also rebuilt when <code>develop</code> moves underneath
 it, which the <code>prune-reviews</code> bot does after most merges. With
 one entry at a time this is usually invisible, but it is the
@@ -17270,12 +17379,12 @@ by <code>export-repo-config.yml</code>, which runs daily and on demand.</p>
 <h2 id="reproducing-ci-locally">Reproducing CI locally<a class="headerlink" href="#reproducing-ci-locally" title="Permanent link">&para;</a></h2>
 <p>Every Linux x86_64 job runs inside the devcontainer via the
 Makefile, so the local commands are the ones CI runs:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>make<span class="w"> </span>lint<span class="w">            </span><span class="c1"># rustfmt + clippy, as the Lint job</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>make<span class="w"> </span>check-windows<span class="w">   </span><span class="c1"># the Windows cross-check</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>make<span class="w"> </span><span class="nb">test</span><span class="w">            </span><span class="c1"># the unit test suite</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>make<span class="w"> </span>web-smoke<span class="w">       </span><span class="c1"># --web startup and shutdown</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>make<span class="w"> </span>web-smoke-tls<span class="w">   </span><span class="c1"># the same, with TLS</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>make<span class="w"> </span>rdp-smoke<span class="w">       </span><span class="c1"># the RDP smoke lane (rdp-smoke.yml)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>make<span class="w"> </span>lint<span class="w">            </span><span class="c1"># rustfmt + clippy, as the Lint job</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>make<span class="w"> </span>check-windows<span class="w">   </span><span class="c1"># the Windows cross-check</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>make<span class="w"> </span><span class="nb">test</span><span class="w">            </span><span class="c1"># the unit test suite</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>make<span class="w"> </span>web-smoke<span class="w">       </span><span class="c1"># --web startup and shutdown</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>make<span class="w"> </span>web-smoke-tls<span class="w">   </span><span class="c1"># the same, with TLS</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>make<span class="w"> </span>rdp-smoke<span class="w">       </span><span class="c1"># the RDP smoke lane (rdp-smoke.yml)</span>
 </code></pre></div>
 <p>The merge tier cannot be reproduced locally — we own no macOS,
 Windows, or aarch64 Linux hardware, which is also why those jobs
@@ -17360,16 +17469,16 @@ queues behind it.</p>
 <p>Use the job-level form rather than the workflow-level one, so
 that unrelated jobs in the same workflow do not cancel each
 other:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">jobs</span><span class="p">:</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">my-job</span><span class="p">:</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">self-hosted</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">vm</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">debian-12</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">s</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">concurrency</span><span class="p">:</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.workflow }}-${{ github.ref }}-my-job</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">jobs</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">my-job</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">self-hosted</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">vm</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">debian-12</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">s</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">concurrency</span><span class="p">:</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.workflow }}-${{ github.ref }}-my-job</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <p>Comment-triggered workflows (<code>pr-retest</code>, <code>pr-re-review</code>) need a
 different group key:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pr-retest-${{ github.event.issue.number }}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pr-retest-${{ github.event.issue.number }}</span>
 </code></pre></div>
 <p><code>github.ref</code> points at the default branch for <code>issue_comment</code>
 events, so it does not distinguish one pull request from
@@ -17382,11 +17491,11 @@ every push to <code>develop</code>. A group keyed on it is therefore unique
 per rebuild, <code>cancel-in-progress</code> never matches, and superseded
 merge groups run to completion holding runners the whole fleet
 shares. Branch the key on the event:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">        </span><span class="no">${{ github.workflow }}-my-job-${{</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">        </span><span class="no">github.event_name == 'merge_group'</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">        </span><span class="no">&amp;&amp; format('merge_group-{0}', github.event.merge_group.base_ref)</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">        </span><span class="no">|| github.ref }}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">        </span><span class="no">${{ github.workflow }}-my-job-${{</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">        </span><span class="no">github.event_name == 'merge_group'</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">        </span><span class="no">&amp;&amp; format('merge_group-{0}', github.event.merge_group.base_ref)</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">        </span><span class="no">|| github.ref }}</span>
 </code></pre></div>
 <p>The <code>merge_group-</code> prefix keeps a queue run from sharing a group
 with a <code>workflow_dispatch</code> run on <code>develop</code>, whose <code>github.ref</code>
@@ -17408,7 +17517,7 @@ takes a <code>workflow_dispatch</code>, and a manual run <em>should</em> superse
 an in-flight nightly rather than queue behind it. It resolves
 that by making the flag an expression rather than choosing one
 answer for both events:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.event_name == 'workflow_dispatch' }}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.event_name == 'workflow_dispatch' }}</span>
 </code></pre></div>
 <p>A flat <code>true</code> there is the general rule's case exactly. The job
 waits on the same starved <code>l</code> pool the lane exists to get out of
@@ -17428,7 +17537,7 @@ cancelled. Its flag is therefore true only for a pull request. A
 dispatch on <code>develop</code> shares the nightly's group, and must not
 cancel a running nightly whose result is part of the lane's flake
 record:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.event_name == 'pull_request' }}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.event_name == 'pull_request' }}</span>
 </code></pre></div>
 <p>The flag governs running jobs only. GitHub keeps at most one
 pending run per concurrency group whatever it says, so a new run on

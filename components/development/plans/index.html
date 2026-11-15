@@ -3486,6 +3486,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-size-ratchet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a ratchet on source size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-llm-doc-structure/" class="md-nav__link">
         
   
@@ -16026,7 +16054,7 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tr>
 <td>2026-10-02</td>
 <td><a href="/components/development/plans/PLAN-workflow-ref-trust/">Workflow ref trust</a></td>
-<td>Answer #153 with a settled fleet policy on which workflow references may move: finish the <code>secrets: inherit</code> rollout, require a pull request and CI on shakenfist/actions main rather than sha-pinning first-party refs, pin third-party actions to a sha under Renovate and a new criterion, and replace copied workflow templates with callers of shared workflows. Phase 1 (complete) removed every live inherit across eleven repositories and closed 13 issues, with one check deferred because the post-merge <code>pr-fix-tests</code> trigger has never fired. Phase 2 adds the pull-request rule, the required checks and the review-marks App bypass to <code>actions</code>' one ruleset by hand, plus a <code>moving-ref-source-protection</code> criterion so that it cannot regress; it stopped being held once PLAN-bot-bypass-identity phase 3 merged. #153 itself closed with phase 1, ahead of the policy write-up phase 4 owes it</td>
+<td>Answer #153 with a settled fleet policy on which workflow references may move: finish the <code>secrets: inherit</code> rollout, require a pull request and CI on shakenfist/actions main rather than sha-pinning first-party refs, pin third-party actions to a sha under Renovate and a new criterion, and replace copied workflow templates with callers of shared workflows. Phase 1 (complete) removed every live inherit across eleven repositories and closed 13 issues, with one check deferred because the post-merge <code>pr-fix-tests</code> trigger has never fired. Phase 2 (complete) added the pull-request rule, the four required checks and the review-marks App bypass to <code>actions</code>' one ruleset by hand, and the <code>moving-ref-source-protection</code> criterion so that it cannot regress; a direct push to that branch from the operator's own credential is now refused, and the one reading it could not take -- that the App is the actor of a review-mark push -- is deferred because no prune run has yet had a mark to push. Phase 3 pins third-party actions, and its probe now lands in the shared Renovate preset that PLAN-renovate-cadence phase 1 published rather than in this repository's own config, which collapses its first two steps into one; its criterion step waits on that plan's fleet sweep. #153 itself closed with phase 1, ahead of the policy write-up phase 4 owes it</td>
 <td>In progress</td>
 </tr>
 <tr>
@@ -16038,7 +16066,7 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tr>
 <td>2026-10-07</td>
 <td><a href="/components/development/plans/PLAN-bot-bypass-identity/">Bot bypass identity</a></td>
-<td>Settle #211: make the only automation bypass on default-branch rulesets a GitHub App whose key only default-branch code can read, and take the bypass away from <code>shakenfist-bot</code>, whose PATs every Renovate run and several pull-request jobs carry. Phase 1 (#348, complete, with the bot's token list the one record cell deferred) created the App, the eight <code>review-marks</code> environments and the four keys, demoted the bot, and found the audit's read token needing the bot's owner reach, now replaced by the security manager role. Phase 2 (complete) moved <code>prune-reviews</code> onto the App token and the ephemeral vm pool and re-synced the eight adopters, whose script copies were stale; phase 3 (complete) took the bypass away from <code>shakenfist-bot</code> on the merge-queue team, proved the refusal with two authenticated pushes, and added the <code>bypass-actor-identity</code> audit criterion, which the first scheduled run after it reports compliant fleet-wide with nothing newly failing; phase 4 (complete) ran the push audit over the seven landings recorded here and, against the shared block's floor, the eight rollout landings in other repositories, none of which was push-audited when it landed. It found nothing blocking and six advisory defects, all in work the plan added, and the security review found nothing. Five of those six are fixed and the sixth, whether two files past 800 lines should be split, is answered in the plan; what is still open is deferred work rather than this plan's: #352, the team rule behind open question 3, narrowing the two bot tokens, and the bot's token list</td>
+<td>Settle #211: make the only automation bypass on default-branch rulesets a GitHub App whose key only default-branch code can read, and take the bypass away from <code>shakenfist-bot</code>, whose PATs every Renovate run and several pull-request jobs carry. Phase 1 (#348, complete, with the bot's token list the one record cell deferred, and read on 2026-11-15) created the App, the eight <code>review-marks</code> environments and the four keys, demoted the bot, and found the audit's read token needing the bot's owner reach, now replaced by the security manager role. Phase 2 (complete) moved <code>prune-reviews</code> onto the App token and the ephemeral vm pool and re-synced the eight adopters, whose script copies were stale; phase 3 (complete) took the bypass away from <code>shakenfist-bot</code> on the merge-queue team, proved the refusal with two authenticated pushes, and added the <code>bypass-actor-identity</code> audit criterion, which the first scheduled run after it reports compliant fleet-wide with nothing newly failing; phase 4 (complete) ran the push audit over the seven landings recorded here and, against the shared block's floor, the eight rollout landings in other repositories, none of which was push-audited when it landed. It found nothing blocking and six advisory defects, all in work the plan added, and the security review found nothing. Five of those six are fixed and the sixth, whether two files past 800 lines should be split, is answered in the plan; what is still open is deferred work rather than this plan's: #352, the team rule behind open question 3, and narrowing the bot's non-expiring classic tokens, which the token list widened from two secrets to four; the unmatched classic <code>audit_token</code> that reading the bot's token list turned up was revoked on 2026-11-15 (#404)</td>
 <td>Complete</td>
 </tr>
 <tr>
@@ -16046,6 +16074,12 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <td><a href="/components/development/plans/PLAN-plan-references-in-code/">Plan references in code</a></td>
 <td>Settle #239: make the plan-references-in-code block enforceable -- a push-audit grep for added references, a criterion measuring the existing backlog in source, and this repository cleaned first</td>
 <td>Complete</td>
+</tr>
+<tr>
+<td>2026-10-10</td>
+<td><a href="/components/development/plans/PLAN-size-ratchet/">Source size ratchet</a></td>
+<td>Stop already-oversize source files growing silently: a baseline ratchet template every repository runs in pre-commit, <code>source-file-size</code> v2 telling push auditors to read touched files rather than diffs, and a required clippy <code>too_many_lines</code> for Rust, piloted on ryll. Revisits the advisory-only decision in PLAN-review-unit-size.md</td>
+<td>In progress</td>
 </tr>
 <tr>
 <td>2026-10-18</td>

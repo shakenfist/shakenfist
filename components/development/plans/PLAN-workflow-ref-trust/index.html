@@ -3476,6 +3476,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-size-ratchet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a ratchet on source size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-llm-doc-structure/" class="md-nav__link">
         
   
@@ -16483,12 +16511,12 @@ mechanically. In brief, the policy is:</p>
 </tr>
 <tr>
 <td>2. Make <code>actions</code> main require a pull request</td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>development 951fef7 (#388); development 9bd865d (#392)</td>
 </tr>
 <tr>
 <td>3. Pin third-party actions to a sha</td>
-<td>Not started</td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16512,8 +16540,11 @@ mechanically. In brief, the policy is:</p>
 <code>PLAN-bot-bypass-identity.md</code> phase 3 had merged (e460a2b and
 38f15f1) and made the review-marks App the bypass actor its open
 question 1 names. Nothing in this plan's phase 3 depends on phase
-2, so the two can run in either order; the table keeps the phases
-in the order the plan reasons about them.</p>
+2, so the two could run in either order; the table keeps the phases
+in the order the plan reasons about them. Phase 2 ran first in the
+end, although phase 3 was planned first: phase 3 was written on
+2026-10-31 while 2a was still held, and re-planned on 2026-11-13
+once phase 2 had landed and the shared Renovate preset existed.</p>
 <h3 id="phase-1-finish-the-inherit-rollout">Phase 1: finish the inherit rollout<a class="headerlink" href="#phase-1-finish-the-inherit-rollout" title="Permanent link">&para;</a></h3>
 <p>Planning effort: medium. Review effort: high for instar (step 1a),
 which is the only repository where a callee reads a real secret.</p>
@@ -17682,9 +17713,287 @@ the next scheduled run raises it without help. It is in Future work
 as a pointer rather than fixed here, because mixing it into a
 criterion pull request would hide it.</p>
 <h3 id="phase-3-pin-third-party-actions-to-a-sha">Phase 3: pin third-party actions to a sha<a class="headerlink" href="#phase-3-pin-third-party-actions-to-a-sha" title="Permanent link">&para;</a></h3>
-<p>Planning effort: high for 3a, which decides the rollout. Medium for
-the rest, which follows <code>renovate.md</code>'s pre-commit manager
-requirement as a worked example.</p>
+<p>Planning effort: high for 3a, which lands a line in a file the whole
+fleet will read and decides what the probe measures. Medium for 3b,
+which follows the five-file criterion pattern phase 2b worked
+through.</p>
+<p>Planned 2026-10-31, before phase 2, and re-planned 2026-11-13 after
+phase 2 landed and after <code>PLAN-renovate-cadence.md</code>'s phase 1
+published the shared preset. Both moved this phase's ground: the
+probe's home, the number of steps and the window in which anything
+can be observed all changed. The survey below says where, and the
+2026-10-31 plan's findings are carried forward only where they still
+hold.</p>
+<p><strong>Scope.</strong> In: <code>helpers:pinGitHubActionDigests</code> in the fleet preset,
+which is simultaneously the probe because this repository is the
+preset's only consumer today (3a); the
+<code>third-party-action-pinning</code> criterion, measuring workflows and
+composite actions (3b). Out: pinning <code>shakenfist/actions@main</code>
+references, which stay a moving ref under phase 2 and are protected
+by <code>moving-ref-source-protection</code> instead -- and which the helper
+preset would otherwise pin, so keeping them out took an explicit
+exclusion rule rather than silence, as the step 3a record below
+sets out; pinning any fleet
+repository's own workflows by hand, which Renovate does once that
+repository extends the preset; <code>docker://</code> references, which pin by
+image digest and would be a different criterion if ever; and
+<code>actions/create-github-app-token</code>, which
+<code>PLAN-bot-bypass-identity.md</code> already pinned in the form 3b accepts.</p>
+<p><strong>What the survey found</strong> (2026-11-13, against this checkout at
+a463b81, <code>shakenfist/actions</code> and ten fleet repositories through the
+GitHub API). Corrections were made at source in this section, in the
+note under the Execution table, and in <code>PLAN-renovate-cadence.md</code>'s
+coordination paragraph, so a later step need not redo them.</p>
+<ul>
+<li>Nothing of this phase has shipped.
+  <code>helpers:pinGitHubActionDigests</code> appears in no configuration in
+  this repository or in the fleet.</li>
+<li><strong>The inventory has grown and is now partly pinned.</strong> This
+  repository has 54 third-party references, 33 under <code>templates/</code>
+  and 21 under <code>.github/</code>, of which 52 are unpinned:
+  <code>actions/checkout@v7</code> (25), <code>actions/upload-artifact@v7</code> (6),
+  <code>actions/download-artifact@v8</code> (5),
+  <code>github/codeql-action/{init,autobuild,analyze}@v4</code> (6),
+  <code>softprops/action-gh-release@v3</code> (2),
+  <code>dtolnay/rust-toolchain@stable</code> (2), <code>dorny/paths-filter@v4</code> (2),
+  <code>actions/setup-node@v7</code> (2),
+  <code>pypa/gh-action-pypi-publish@release/v1</code> (1) and
+  <code>actions/attest-build-provenance@v4</code> (1). Two are branches rather
+  than tags: <code>release/v1</code> and <code>stable</code>. The 2026-10-31 survey
+  counted 52 references in total; the two added since are the pinned
+  ones below. Every count in this bullet is as of a463b81 and goes
+  stale with the next merge: re-measured on 2026-11-15 against this
+  branch merged with <code>main</code> at 013c9c4, the tree holds 57
+  third-party references, 3 of them pinned and 54 unpinned, with
+  <code>actions/checkout@v7</code> at 26. The three references
+  <code>PLAN-renovate-cadence.md</code>'s central runner added account for the
+  difference. The grep in the definition of done, not this
+  inventory, is the gate: it is measured when it runs rather than
+  when it was written.</li>
+<li><strong>The form 3b accepts is already in the tree, three times.</strong>
+  <code>PLAN-bot-bypass-identity.md</code> landed
+  <code>actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0</code>
+  in <code>.github/workflows/prune-reviews.yml:165</code> and its template twin
+  at the same line. <code>PLAN-renovate-cadence.md</code> then landed a third,
+  <code>dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable</code>
+  at <code>.github/workflows/renovate-fleet.yml:180</code>, which is the more
+  useful of the two forms for this phase: it was pinned by hand, its
+  comment is a branch name rather than a release tag, and it is
+  therefore direct evidence for observations 1 and 2 and a ready
+  fixture for 3b's "sha with a comment" case. So the spec describes
+  a form the repository already demonstrates, rather than one
+  Renovate is predicted to write, and the twin requirement that pin
+  creates for that plan is live rather than anticipated.</li>
+<li><strong>The probe's home has changed, and the old 3a and 3b are now one
+  step.</strong> <code>PLAN-renovate-cadence.md</code> phase 1 has merged (47086db,
+  #391; its table still reads <code>In progress</code> because its close-out
+  belongs to its phase 2's first commit). This repository's
+  <code>renovate.json</code> now extends nothing but
+  <code>local&gt;shakenfist/development:renovate-fleet</code>, keeping only its
+  own <code>github-actions</code> and <code>customManagers</code> file patterns for
+  <code>templates/</code>; and <code>templates/renovate/renovate.json</code> is now a
+  four-line file whose entire content is that same preset
+  reference. So the old 3b's instruction to add the helper to the
+  template has nothing to add it to, and the old 3a's local probe in
+  <code>renovate.json</code> would be a line the fleet step then moves. One
+  edit to <code>renovate-fleet.json</code> is both.</li>
+<li><strong>No fleet repository extends the preset yet.</strong> Read directly:
+  shakenfist, kerbside, ryll, instar, andris, hunkydory, sfui and
+  occystrap all extend <code>customManagers:githubActionsVersions</code> alone,
+  and client-python and agent-python have no <code>extends</code> at all. Only
+  this repository reads the preset, which is what makes 3a's blast
+  radius one repository and decides decision 3.</li>
+<li><strong>The monthly CI-tooling group now stands between the probe and
+  its observation.</strong> <code>renovate-fleet.json</code> sets <code>schedule: ["on
+  saturday"]</code> with <code>timezone: Australia/Sydney</code>, and a package rule
+  matching <code>matchManagers: ["github-actions", "pre-commit"]</code> groups
+  them as <code>CI tooling</code> on <code>schedule: ["on the first day of the
+  month"]</code>, described there as covering "every update type, digests
+  included". The rule matches by manager and sets no
+  <code>matchUpdateTypes</code>, so on its face it captures a pin as well as a
+  digest bump, which would put the probe's pull request on 1
+  December rather than within days. Whether Renovate schedules a
+  <code>pinDigest</code> update that way is not settled by its documentation
+  and is the first thing 3a reads off the dependency dashboard. The
+  master plan's coordination paragraph anticipated exactly this
+  ("a two-week window can see none at all"); it is now the live
+  case rather than a contingency.</li>
+<li><strong>Open question 4's fallback is already in place.</strong> Its default
+  says that if volume is the problem the answer is a grouping rule,
+  not dropping the pins. That grouping rule is the CI-tooling group
+  above, landed by another plan before the pins exist. So 3a does
+  not measure raw volume and then decide whether to group: it
+  measures volume <em>under</em> grouping, which is the only number the
+  fleet will ever see. #88 (one global set of Renovate groupings) is
+  still open, and the preset substantially answers it;
+  <code>PLAN-renovate-cadence.md</code> owns closing it, not this plan.</li>
+<li><strong>The audit already reads a pinned reference, confirmed again.</strong>
+  <code>STEP_USES_RE</code> (<code>scripts/audit/text/workflows.py:442</code>) accepts a
+  trailing comment after the ref and its comment names Renovate's
+  digest form as the reason; <code>step_uses()</code> at 445 and
+  <code>step_action()</code> at 459 drop it for every caller. A grep of
+  <code>scripts/audit/</code> for <code>@v</code> finds no check matching a tag. So the
+  old 3b's sentence about updating such checks remains a
+  confirmation, not a change.</li>
+<li><strong>The helpers 3b builds on are all present</strong>, at these lines:
+  <code>workflow_job_blocks</code> 219, <code>JOB_USES_RE</code> 288, <code>indented_block</code>
+  374, <code>workflow_step_blocks</code> 408 (all
+  <code>scripts/audit/text/workflows.py</code>), and
+  <code>tracked_paths</code> at <code>scripts/audit/files.py:193</code>.
+  <code>ReusableWorkflowSecrets</code> is still at
+  <code>scripts/audit/checks/ci_workflows.py:2428</code>, where the
+  2026-10-31 survey corrected it to; 2162 is still
+  <code>FuzzNightlyReporting</code>.</li>
+<li><strong>The twin test has moved.</strong>
+  <code>test_this_repository_runs_renovate_verbatim</code> is at
+  <code>scripts/tests/test_registry.py:1288</code>, not 1282. Eight templates
+  are byte-identical with their <code>.github/workflows/</code> twins today
+  (<code>pr-re-review</code>, <code>pr-retest</code>, <code>codeql-analysis</code>,
+  <code>export-repo-config</code>, <code>issue-link-check</code>, <code>mermaid-lint</code>,
+  <code>renovate</code>, <code>prune-reviews</code>), and <code>renovate.json</code>'s
+  <code>github-actions</code> block extends the manager's patterns to
+  <code>templates/</code>, so a pin lands on both sides in one pull request.
+  A probe that pinned only <code>.github/</code> would fail that test.</li>
+<li><strong>A preset edit is covered by this repository's own tests.</strong>
+  <code>scripts/tests/test_packaging.py:349</code> and <code>:495</code> load the real
+  <code>renovate-fleet.json</code> and run each check's helper over it, and
+  the comment at <code>scripts/audit/checks/packaging.py:52</code> says why:
+  "a local&gt; preset takes effect fleet-wide the moment an edit to it
+  merges". That is the strongest argument for landing the helper
+  before the sweep rather than after it, and decision 3 turns on it.</li>
+<li><strong>The <code>renovate</code> criterion does not require the preset yet.</strong> It
+  accepts <code>local&gt;shakenfist/development:renovate-fleet</code> <em>or</em>
+  <code>customManagers:githubActionsVersions</code>
+  (<code>scripts/audit/checks/packaging.py:523</code>), so extending the preset
+  is not enforced until <code>PLAN-renovate-cadence.md</code> phase 3 makes it
+  so. Decision 5's claim that the <code>renovate</code> criterion measures the
+  pinning policy transitively is therefore still a future property,
+  conditional on that phase, and is written as one.</li>
+<li><strong>Renovate has moved</strong>, 44.190.0 to 44.222.2
+  (<code>.github/workflows/renovate.yml:92</code>), on <code>node-version: 24</code>. The
+  workflow's own cron is still hourly; what changed is that the
+  preset, not the workflow, now decides when a pull request may
+  open. Decision 6 reads the extractor at the new tag.</li>
+<li><strong><code>renovatebot/github-action</code> still has nothing to pin</strong>, as the
+  2026-10-31 survey found: <code>templates/renovate/renovate.yml</code> runs
+  Renovate from npm. Its third-party references are
+  <code>actions/checkout@v7</code>, <code>actions/setup-node@v7</code> (which installs the
+  Node that runs Renovate with <code>RENOVATE_TOKEN</code> in the next step's
+  environment) and <code>dtolnay/rust-toolchain@stable</code>. The Situation's
+  count of 15 for that action predates the change and is left as the
+  historical reading it is.</li>
+<li><strong>No composite action here; ten in <code>actions</code></strong>
+  (<code>build-smoke-cluster</code>, <code>check-dist</code>, <code>deploy-kolla-ansible</code>,
+  <code>deploy-proxmox-on-shakenfist</code>, <code>pr-bot-trigger</code>,
+  <code>pr-review-ref</code>, <code>require-ci-success</code>, <code>review-pr-with-claude</code>,
+  <code>setup-kerbside-environment</code>, <code>setup-test-environment</code>). So 3b's
+  composite-action path is tested against fixtures here and
+  observed live only when <code>actions</code> extends the preset.</li>
+<li><strong>Open question 5 still cannot be observed</strong>: there is no
+  third-party reusable workflow anywhere in the fleet. It is
+  answered by reading, as decision 6 says.</li>
+</ul>
+<p><strong>Decisions.</strong></p>
+<ol>
+<li><strong>The helper lands in the fleet preset, and that single edit is
+   the probe.</strong> This repository is the preset's only consumer, so
+   the edit's reach is one repository either way; the difference is
+   only which file would be reverted if the probe goes badly. The
+   objection a reviewer should press is that a shared fleet file is
+   the wrong place to experiment, and that a local probe in
+   <code>renovate.json</code> keeps the fleet's policy file free of unproven
+   settings. Three things answer it: <code>templates/renovate/renovate.json</code>
+   no longer holds anything to probe with, so the local alternative
+   is a line that a second commit would move rather than a step
+   that ends somewhere; the preset is held by tests that load the
+   real file (<code>test_packaging.py:349</code>, <code>:495</code>); and the revert is
+   one line out of <code>extends</code>, no worse than reverting it from
+   <code>renovate.json</code>. The old 3a and 3b therefore become one step,
+   3a, and <code>plan-blockers</code> note n5's "step 3b" now means the
+   criterion.</li>
+<li><strong>The probe pins everything Renovate sees here, <code>templates/</code>
+   included.</strong> Unchanged from 2026-10-31, and the twin test still
+   requires it: <code>renovate.json</code>'s <code>github-actions</code> patterns cover
+   <code>templates/</code>, so Renovate pins both sides of all eight twins in
+   one pull request, and a pin landing on only one side fails
+   <code>test_this_repository_runs_renovate_verbatim</code>. The fleet's copies
+   of those templates stay unpinned until their own repository
+   extends the preset, which is the designed rollout rather than a
+   gap: a copy Renovate pins in its own repository is kept current
+   there, and a copy pinned by copying a template is not.</li>
+<li><strong>3a lands before <code>PLAN-renovate-cadence.md</code>'s phase 3 sweep, and
+   its hold was that plan's phase 1, which has merged.</strong> That plan's
+   coordination paragraph says the opposite -- that its phase 3 must
+   land first -- and it is wrong on this point, for the reason its
+   own code comment gives: a <code>local&gt;</code> preset takes effect fleet-wide
+   the moment an edit to it merges. After the sweep, adding the
+   helper to the preset changes every repository's behaviour with no
+   pull request in any of them; before the sweep, it changes one
+   repository, and the sweep's own per-repository pull request then
+   carries the <em>policy</em> in reviewably -- a <code>renovate.json</code> that
+   extends the preset. The pin diff itself arrives afterwards, as
+   one grouped Renovate pull request per repository on the next
+   monthly window, reviewed on its own; roughly one such pull
+   request per repository is also the volume prediction worth
+   stating for the sweep. The churn that paragraph fears
+   -- "one per release per repository" -- is prevented by the
+   CI-tooling group, which lives in the same preset, not by the
+   ordering. That paragraph is corrected at source in this planning
+   commit.</li>
+<li><strong>3b lands two weeks after the sweep, not before.</strong> Unchanged in
+   substance from 2026-10-31. The criterion newly fails every
+   audited repository with an unpinned third-party reference, which
+   today is all of them, and the fix for each is "merge the pin
+   pull request Renovate opened" -- which cannot exist until that
+   repository extends the preset. Filing that issue earlier tracks
+   nothing a repository can act on. The consequence is that this
+   phase stays open for weeks with only 3a landed, waiting on
+   another plan whose phase 3 is not yet planned. That is recorded
+   rather than worked around, and the back brief asks whether to
+   accept it.</li>
+<li><strong>What is measured and what is confirmed.</strong> Measured: every
+   remote <code>uses:</code> whose owner is not <code>shakenfist</code> ends in 40
+   lowercase hex characters, in workflows and in composite actions.
+   Confirmed by a reviewer: the trailing comment naming the release
+   the sha stands for, which Renovate writes and maintains; and the
+   policy that keeps the pins current, which the <code>renovate</code>
+   criterion will measure transitively only once
+   <code>PLAN-renovate-cadence.md</code> phase 3 makes extending the preset
+   mandatory, since the preset is where the helper lives. Until
+   then that half is a reviewer's reading. The comment's form is
+   whatever Renovate writes -- 3a records it, and the one example
+   already in the tree is <code># v3.3.0</code> against a release tag, while a
+   major-tag ref may produce <code># v7</code> -- so the spec describes the
+   comment rather than prescribing <code>vX.Y.Z</code>. Open question 3's
+   default stands: no exemption for GitHub-owned actions.</li>
+<li><strong>Open question 5 is answered from Renovate's source</strong> at the
+   tag the fleet runs, 44.227.4, rather than from a fixture: the
+   <code>github-actions</code> manager's extractor in
+   <code>lib/modules/manager/github-actions/extract.ts</code> either matches a
+   job-level <code>owner/repo/.github/workflows/x.yml@ref</code> or it does
+   not, and the record cites the line. The criterion measures those
+   references either way, as one rule, and if Renovate does not pin
+   them the spec says they are pinned and bumped by hand. There are
+   none in the fleet today.</li>
+<li><strong>Branch references are pinned like tags.</strong> <code>release/v1</code> and
+   <code>stable</code> pin to the commit the branch points at, with the branch
+   name in the comment, and Renovate's digest updates follow the
+   branch. 3a records whether that is what happened. If Renovate
+   declines to pin a branch ref, the reference is pinned by hand in
+   the same form and the spec says which refs Renovate does not
+   maintain.</li>
+<li><strong>The pin's cost to <code>PLAN-bot-bypass-identity.md</code> is already
+   being paid.</strong> That plan's <code>actions/create-github-app-token</code> pin
+   is in the <code>prune-reviews</code> template, and
+   <code>review-tracking-templates</code> requires byte identity across its
+   eight adopters, so every digest bump to that action is a
+   re-sync of eight repositories. This phase did not create that
+   cost and does not change it; once the helper is in the preset
+   and the adopters extend it, Renovate proposes the bump in each
+   of them instead, which the template audit then requires to land
+   together. That interaction is this phase's one genuine new risk
+   and is in the risk list rather than buried here.</li>
+</ol>
 <table>
 <thead>
 <tr>
@@ -17698,48 +18007,265 @@ requirement as a worked example.</p>
 <tbody>
 <tr>
 <td>3a</td>
-<td>high</td>
-<td>opus</td>
-<td>worktree</td>
-<td>Probe in this repository. Add <code>"extends": ["helpers:pinGitHubActionDigests"]</code> to <code>renovate.json</code>. The existing <code>managerFilePatterns</code> already cover <code>templates/</code>. Let one Renovate run produce its pinning pull request, and record: the comment format it writes; whether <code>pypa/gh-action-pypi-publish@release/v1</code> (a branch) pins cleanly; whether <code>actionlint</code> and the template byte-identity checks still pass; whether the github-actions manager also pins a composite <code>action.yml</code> (its default file patterns include one, so confirm it against a fixture rather than assuming); and the digest pull request count over the following two weeks. Answer open questions 4 and 5 in the plan, with numbers.</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Add <code>"helpers:pinGitHubActionDigests"</code> to the <code>extends</code> array in <code>renovate-fleet.json</code>, after <code>customManagers:githubActionsVersions</code>. Give the change a <code>description</code> in the voice of that file's other descriptions: every third-party <code>uses:</code> becomes a sha with a comment naming the release, Renovate keeps the sha current, a moving tag is what the pin removes, and <code>templates/</code> is pinned alongside <code>.github/</code> because this repository's own <code>github-actions</code> patterns scan it and <code>test_this_repository_runs_renovate_verbatim</code> (<code>scripts/tests/test_registry.py:1288</code>) holds the eight twins byte-identical. Say that the CI-tooling package rule already groups these updates monthly, so pinning does not add a stream of pull requests. Do <strong>not</strong> touch <code>renovate.json</code> or <code>templates/renovate/renovate.json</code>: the first keeps only its <code>templates/</code> file patterns and the second is nothing but the preset reference, and neither is where fleet policy lives. Do not pin any <code>uses:</code> line by hand -- the point is to observe what Renovate does. Then document it where the preset is documented: <code>docs/audits/renovate.md</code> describes the preset from line 81, and the paragraph saying what the preset carries is the one to extend. Run <code>python3 -m unittest discover -s scripts/tests -t scripts</code> (the preset's own tests at <code>scripts/tests/test_packaging.py:349</code> and <code>:495</code> load the real file), <code>pre-commit run --all-files</code>, and <code>python3 scripts/audit-check.py --repo-path . --repo-name development</code>, confirming the <code>renovate</code> verdict is the same as before the change. Commit subject: <code>Pin action digests in the fleet preset.</code></td>
 </tr>
 <tr>
 <td>3b</td>
 <td>medium</td>
 <td>sonnet</td>
-<td>none</td>
-<td>Add the same <code>extends</code> to <code>templates/renovate/renovate.json</code>, and say why in <code>templates/renovate/README.md</code>. Pin <code>renovatebot/github-action</code> first: it runs with <code>DEPENDENCIES_TOKEN</code> and write access to its repository, so it is the third-party action most worth pinning. Pin every other third-party <code>uses:</code> under <code>templates/</code> to a sha with a <code># vX.Y.Z</code> comment, keeping template copies and their deployed twins here byte-identical. Grep <code>scripts/audit/</code> for any check that matches a <code>uses:</code> line by tag (for example <code>@v</code>), and update it to accept a pinned form.</td>
-</tr>
-<tr>
-<td>3c</td>
-<td>medium</td>
-<td>sonnet</td>
 <td>worktree</td>
-<td>Add the criterion <code>third-party-action-pinning</code> to <code>scripts/audit/checks/ci_workflows.py</code>, beside <code>ReusableWorkflowSecrets</code> (line 2162). It is measured: every remote <code>uses:</code> whose owner is not <code>shakenfist</code> ends in a 40-hex sha. It is confirmed by a reviewer: the trailing version comment, and the Renovate preset being on. It also scans every <code>action.yml</code> and <code>action.yaml</code> in the repository, wherever it sits, for <code>uses:</code> under <code>runs.steps</code>: a composite action's third-party step runs inside each caller's job, and the existing helpers only read <code>.github/workflows/</code>. Reuse the existing workflow-parsing helpers in that file rather than adding a YAML dependency. Give it the five criterion files as in 2b, plus tests for a tag ref, a sha ref, a branch ref, a commented-out line, a <code>docker://</code> ref (out of scope, not a finding), a local <code>./</code> ref (not a finding), a composite <code>action.yml</code> with an unpinned third-party step (a finding), and a third-party reusable workflow (<code>owner/repo/.github/workflows/x.yml@v1</code>, a finding). Run it against fresh clones of the fleet. The commit message states how many repositories it newly fails, including this one, which must already pass after 3b.</td>
+<td>Held until two weeks after <code>PLAN-renovate-cadence.md</code> phase 3's sweep has landed (decision 4). Add a <code>ThirdPartyActionPinning</code> class to <code>scripts/audit/checks/ci_workflows.py</code> beside <code>ReusableWorkflowSecrets</code> (line 2428 at planning), with <code>id = 'third-party-action-pinning'</code>, <code>spec = 'docs/audits/third-party-action-pinning.md'</code>, <code>template = None</code> and <code>issue_title = 'Third-party action pinning'</code>. <code>applies()</code> returns a reason unless the repository has a workflows directory with files or at least one tracked <code>action.yml</code>/<code>action.yaml</code> (<code>audit.files.tracked_paths</code>, <code>scripts/audit/files.py:193</code>). <code>run()</code> reads every workflow through <code>repo.workflows()</code> and <code>repo.read()</code>, splits jobs with <code>workflow_job_blocks()</code> (line 219) and steps with <code>workflow_step_blocks()</code> (line 408), takes each step's reference from <code>step_uses()</code> (line 445, which already drops a trailing comment and quotes) and each job's reusable-workflow reference from <code>JOB_USES_RE</code> (line 288) against the job body outside its steps; then reads every tracked <code>action.yml</code>/<code>action.yaml</code> and applies the same step splitter to its <code>runs:</code> block (<code>indented_block(body, 'runs')</code>, line 374). Check that <code>workflow_step_blocks()</code> accepts that indentation, and if it does not, add the smallest helper beside it rather than a YAML dependency. A reference is a finding when it is remote (not <code>./</code> or <code>docker://</code>), its owner is not <code>shakenfist</code>, and the part after <code>@</code> is not exactly 40 lowercase hex characters; a missing <code>@</code> is a finding too. Report findings as <code>&lt;file&gt;: &lt;job or action&gt;: &lt;ref&gt;</code>. Write <code>docs/audits/third-party-action-pinning.md</code> following <code>docs/audits/README.md</code>, with decision 5's measured and reviewer-confirmed halves kept apart, the Why citing this plan's Situation (540 third-party references by tag on 2026-10-02, and what a tag can be moved to), 3a's record for the form of a pinned line, and the branch-ref and reusable-workflow outcomes 3a recorded. Register the instance in <code>CHECKS</code> in <code>scripts/audit/registry.py</code>, add the row to <code>docs/audits/README.md</code>, and add its entries to <code>FROZEN_METADATA</code> and <code>FROZEN_ISSUE_TITLES</code> in <code>scripts/tests/test_metadata.py</code>, leaving that file's pinned tool-failure list alone. This criterion reaches no network, so <code>NETWORK_CHECKS</code> in <code>scripts/audit_snapshot.py</code> is <strong>not</strong> edited. Add <code>ThirdPartyActionPinningTest(CheckTestCase)</code> to <code>scripts/tests/test_ci_workflows.py</code> covering: a tag ref (finding), a sha with a comment (pass), a sha without one (pass), a branch ref (finding), a commented-out line (not a finding), a quoted ref, a <code>docker://</code> ref (not a finding), a <code>./</code> ref (not a finding), a <code>shakenfist/actions/...@main</code> ref (not a finding), a job-level third-party reusable workflow (finding), a composite <code>action.yml</code> outside <code>.github/</code> with an unpinned step (finding) and with a pinned one (pass), a repository with neither workflows nor an action file (<code>not_applicable</code>), and a 40-character upper-case sha (a finding, since GitHub prints lower case and the comparison is exact). Then run the before-and-after procedure in <code>docs/consistency-audits.md</code> (<code>tools/audit-snapshot.sh</code> then <code>--diff</code>) against fresh clones of the matrix, and state in the commit message how many repositories newly fail, including this one, which must pass because 3a's pin pull request merged. Any <code>audit-manage-issues.py</code> run is <code>--dry-run</code>. Commit subject: <code>Add the third-party-action-pinning criterion.</code></td>
 </tr>
 </tbody>
 </table>
-<p><strong>Coordination with <code>PLAN-renovate-cadence.md</code>.</strong> That plan moves
-the fleet's Renovate policy into one shared preset and runs Renovate
-once for the whole fleet from this repository. If its phase 3 has
-landed when this phase starts, step 3b adds
-<code>helpers:pinGitHubActionDigests</code> to the preset once rather than to
-<code>templates/renovate/renovate.json</code> and every copy of it. Its monthly
-CI-tooling group (all <code>github-actions</code> and <code>pre-commit</code> updates,
-digests included) is the grouping rule that open question 4's
-default anticipates. Once its phase 3 has landed,
-<code>renovatebot/github-action</code> appears only in this repository's
-central workflow, so 3b pins it there. Land that plan's phase 3
-before this phase's 3b: its phase 1 only publishes the preset, and
-no repository but this one extends it until its phase 3 sweep, so
-otherwise every pin arrives as a separate pull request in every
-repository. Step 3a is not held, but it is affected: if that plan's
-phase 1 has landed when 3a runs, this repository already extends the
-preset, so its digest updates fall into the monthly CI-tooling group
-and a two-week window can see none at all. In that case run 3a's
-count across the first of a month and report it as grouped pull
-requests, which is the number that matters once the preset governs
-the fleet.</p>
+<p><strong>The observation after 3a is the management session's</strong>, not a
+sub-agent's, because it happens after the merge and across a window
+nobody can shorten. Once 3a has merged, Renovate's next permitted
+window opens the pin pull request. Review it against the unpinned
+references the grep in the definition of done reports on the day --
+54 when this phase was last measured, and not a number to carry
+around -- and record in this section:</p>
+<ol>
+<li>the exact form of a pinned line, comment included, for a major
+   tag and for a release tag;</li>
+<li>what <code>pypa/gh-action-pypi-publish@release/v1</code> in
+   <code>templates/release-automation/release.yml</code> and
+   <code>dtolnay/rust-toolchain@stable</code> in <code>templates/renovate/renovate.yml</code>
+   became -- and, for the two <code>rust-toolchain</code> references, that the
+   same pull request also adds <code>with: toolchain: stable</code>, which the
+   risk list explains and <code>.github/workflows/renovate-fleet.yml:170-183</code>
+   already does by hand;</li>
+<li>one pull request or several, and whether the CI-tooling group
+   captured the pin -- read off the dependency dashboard, with the
+   date the pull request appeared, which answers whether a
+   <code>pinDigest</code> update obeys that rule's monthly schedule -- and
+   <strong>which runner opened it</strong>, the repository's own hourly workflow
+   or the central fleet runner, because <code>renovate-runner.json</code>
+   disables the two Renovate workflow files for the fleet runner and
+   only the local one can pin them;</li>
+<li>whether <code>minimumReleaseAge: 3 days</code> held anything back;</li>
+<li>that <code>pre-commit run --all-files</code> passes on the pull request's
+   branch, <code>actionlint</code>, <code>actionlint-templates</code> and the twin test
+   included;</li>
+<li>the number of grouped pull requests Renovate opens here over the
+   following two monthly windows (<code>gh pr list --author
+   shakenfist-bot --search digest --state all</code>), as open question
+   4's answer, stated as grouped pull requests because that is the
+   only shape the fleet will see;</li>
+<li>open question 5, answered by reading the <code>github-actions</code>
+   extractor and citing the line (decision 6). <strong>Answered on
+   2026-11-15</strong>, before the pull request, in the step 3a record
+   below: <code>extract.ts:105</code> and <code>:111</code> at tag 44.227.4. What is left
+   for the pull request to show is the pinned line's form, which is
+   observation 1.</li>
+</ol>
+<p>Each landing goes in the <code>Merged</code> cell: the preset commit and the
+pin pull request are two landings.</p>
+<p><strong>Risks and mitigations.</strong></p>
+<ul>
+<li><strong>The CI-tooling group delays the probe to 1 December</strong>, leaving
+  the phase apparently stalled for two and a half weeks. Mitigation:
+  the dependency dashboard shows the pending update immediately, so
+  3a's record can state on day one which window will produce the
+  pull request; the management session reads the dashboard rather
+  than waiting for a pull request to appear. If the wait is
+  unacceptable, the alternative is a temporary rule scheduling
+  <code>pinDigest</code> at any time, which is deliberately not planned,
+  because it would measure a volume the fleet will never see.</li>
+<li><strong>A pin lands on one side of a twin and breaks the twin test.</strong>
+  Mitigation: decision 2 and <code>renovate.json</code>'s existing
+  <code>templates/</code> patterns make Renovate see both sides; 3a asserts
+  the twin test passes on the pull request's branch before it
+  merges, and <code>pre-commit</code> runs <code>actionlint-templates</code>.</li>
+<li><strong>A pinned <code>dtolnay/rust-toolchain@stable</code> keeps working only by
+  accident.</strong> The earlier reading of this risk -- that the pin
+  freezes the Rust toolchain -- was wrong: the sha pins the action's
+  code, and rustup still resolves <code>stable</code> at run time. The real
+  hazard is already written down in this repository, at
+  <code>.github/workflows/renovate-fleet.yml:170-183</code>, where the same
+  reference was pinned by hand: the action takes its own default
+  from the ref name, so on the <code>stable</code> branch the <code>toolchain</code> input
+  defaults to <code>stable</code> while on the default branch it is required,
+  and a bare sha works only by virtue of which branch it happens to
+  sit on. So when Renovate pins
+  <code>dtolnay/rust-toolchain@stable</code> in <code>.github/workflows/renovate.yml:57</code>
+  and <code>templates/renovate/renovate.yml:57</code>, the step keeps working
+  incidentally, and a later digest update that moves it off that
+  branch makes <code>toolchain</code> required and the step fail. Mitigation:
+  the one <code>renovate-fleet.yml</code> already applies -- the pin pull
+  request must also add <code>with: toolchain: stable</code> to both files, in
+  the same pull request, keeping the template and its twin
+  byte-identical. There is no exempt-by-name fallback, because the
+  problem that fallback addressed does not exist.</li>
+<li><strong>The pins in <code>templates/renovate/renovate.yml</code> lose their
+  maintainer at the cutover.</strong> <code>renovate-runner.json</code>, which
+  <code>PLAN-renovate-cadence.md</code> phase 2 landed, disables every
+  dependency in <code>.github/workflows/renovate.yml</code> and
+  <code>templates/renovate/renovate.yml</code> for the central runner, while
+  each repository's own hourly copy reads <code>renovate.json</code> and sees
+  both. So those two files can only ever be pinned by the local
+  runner, and once phase 2 disables the per-repository copies and
+  the fleet runner takes the schedule, a pin in the template is
+  maintained by nobody -- and the template outlives the deployed
+  copies that rule exists for. Mitigation: that rule has to lose the
+  <code>templates/renovate/renovate.yml</code> path when the copies are
+  deleted; it is recorded here and in <code>docs/audits/renovate.md</code>'s
+  preset section rather than left for whoever notices a stale sha.</li>
+<li><strong>The eight <code>prune-reviews</code> adopters must re-sync together</strong> on
+  every bump of <code>actions/create-github-app-token</code>, because
+  <code>review-tracking-templates</code> requires byte identity. Mitigation:
+  decision 8 and this entry; <code>template-resync</code> is the skill that
+  does it, and the cost is one re-sync per release of that action,
+  recorded in <code>PLAN-bot-bypass-identity.md</code> as well.</li>
+<li><strong>3b newly fails most of the fleet the morning it lands.</strong>
+  Mitigation: decision 4's two-week wait after the sweep, and the
+  before-and-after snapshot procedure, whose count the commit
+  message states so the first morning's issues can be compared
+  against a prediction rather than a hope.</li>
+</ul>
+<p><strong>Definition of done.</strong></p>
+<ul>
+<li><code>renovate-fleet.json</code>'s <code>extends</code> holds
+  <code>helpers:pinGitHubActionDigests</code>, and
+  <code>python3 -m unittest discover -s scripts/tests -t scripts</code> passes.</li>
+<li><code>python3 scripts/audit-check.py --repo-path . --repo-name development</code>
+  reports the same <code>renovate</code> verdict as before 3a.</li>
+<li>The pin pull request is recorded here by number and merge commit,
+  with all seven observations above answered, including the date it
+  appeared and which window produced it.</li>
+<li>After it merges, this prints nothing:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git grep -hoE '^[[:space:]]*-?[[:space:]]*uses:[[:space:]]*[^ ]+' \
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    -- 'templates/**' '.github/**' |
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    sed -E 's/^[[:space:]]*-?[[:space:]]*uses:[[:space:]]*//' |
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    sed -E 's/["'"'"']//g' |
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    grep -v '^\./' | grep -v '^shakenfist/' | grep -v '^docker://' |
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    grep -vE '@[0-9a-f]{40}$'
+</code></pre></div>
+<p>Any line it prints is a third-party reference Renovate did not
+  pin, and decision 7 says what happens to it.
+- Open questions 4 and 5 are answered in this section with a number
+  and a cited source line respectively, and the plan's Open
+  questions section says where the answer is.
+- <code>docs/audits/third-party-action-pinning.md</code> exists, is linked from
+  <code>docs/audits/README.md</code>, carries no <code>consistency-audit</code> marker
+  block, and keeps decision 5's two halves apart.
+- <code>scripts/tests/test_metadata.py</code> passes without its pinned
+  tool-failure list having been edited, and <code>NETWORK_CHECKS</code> in
+  <code>scripts/audit_snapshot.py</code> is unchanged.
+- The commit that lands 3b states how many repositories newly fail,
+  measured with <code>tools/audit-snapshot.sh</code> before and after, and the
+  first scheduled audit after it reports that number.
+- This repository passes <code>third-party-action-pinning</code> on the day 3b
+  lands.</p>
+<p><strong>Back brief gate.</strong> Two answers are needed before 3a runs.</p>
+<ol>
+<li><strong>Decision 3 contradicts <code>PLAN-renovate-cadence.md</code>.</strong> This plan
+   says 3a lands before that plan's sweep; that plan's coordination
+   paragraph says after. The planning commit corrects that
+   paragraph. Confirm that is the right way round, because it edits
+   another plan's reasoning.</li>
+<li><strong>Decision 4 leaves this phase open for weeks.</strong> 3b waits on a
+   sweep in a plan whose phase 3 is not yet planned, so phase 3
+   lands 3a and then holds. The alternative is to let phase 3 close
+   on 3a alone and plan the criterion as its own phase later, which
+   renumbers phases 4 to 6. Confirm holding is acceptable.</li>
+</ol>
+<p><strong>Back brief outcome</strong> (2026-11-14). Both gates were answered yes.
+Decision 3's reversal stands, so the correction this planning commit
+made to <code>PLAN-renovate-cadence.md</code>'s coordination paragraph is kept
+and 3a lands before that plan's sweep. Decision 4's hold is accepted:
+this phase lands 3a, stays <code>In progress</code>, and 3b waits for the sweep
+plus two weeks, so phases 4 to 6 are not renumbered. 3a then ran in
+the same session.</p>
+<p><strong>Step 3a record (2026-11-14).</strong> The helper is in the preset's
+<code>extends</code>, after <code>customManagers:githubActionsVersions</code>, and
+<code>docs/audits/renovate.md</code>'s fleet-preset section describes the policy
+in two new paragraphs. The <code>renovate</code> criterion reports <code>pass</code> with
+details "Renovate workflow and config exist", identical before and
+after; <code>python3 -m unittest discover -s scripts/tests -t scripts</code> ran
+2678 tests, OK; <code>pre-commit run --all-files</code> passed every hook,
+<code>renovate-config-validator</code> included. No <code>uses:</code> line was pinned by
+hand, and neither <code>renovate.json</code> nor
+<code>templates/renovate/renovate.json</code> was touched.</p>
+<p><strong>The helper had to be fenced, which this phase did not plan for.</strong>
+Read from Renovate's documentation during execution,
+<code>helpers:pinGitHubActionDigests</code> expands to a single rule --
+<code>matchDepTypes</code> of <code>action</code> and <code>workflow</code> with <code>pinDigests: true</code> --
+with no owner scoping of any kind. Three consequences follow, and the
+first contradicted this phase's Scope:</p>
+<ol>
+<li>The fleet's own references would have been pinned. This
+   repository's scanned paths hold 22 <code>shakenfist/actions/...@main</code>
+   references, 15 step-level and 7 job-level reusable workflows, and
+   nothing in the preset distinguished them from a third party's. The
+   Scope rules them out and the definition of done's grep excludes
+   <code>^shakenfist/</code>, so the plan assumed an exemption that did not
+   exist. Pinning them would have frozen this repository on the sha
+   it last merged and defeated the moving ref that phase 2 exists to
+   protect. 3a therefore carries a <code>packageRules</code> entry naming both
+   dep types and <code>shakenfist/**</code> with <code>pinDigests: false</code>. Renovate
+   applies a configuration's own rules after the rules it inherits
+   through <code>extends</code>, so the exception wins. The Scope above is
+   corrected to say so.</li>
+<li>A branch reference is pinned like a tag, which is decision 7's
+   first half answered from documentation rather than observation:
+   the <code>github-actions</code> manager routes a non-semver ref to the
+   digest datasource, "only digest pinning updates are supported",
+   and the original ref is preserved in the trailing comment. The
+   second half -- whether the digest then follows the branch, which
+   is what <code>dtolnay/rust-toolchain@stable</code> turns on -- is still an
+   observation 3a's pull request has to make.</li>
+<li>Open question 5 is answered, and decision 6's citation is
+   discharged. A job-level reusable workflow is a <code>workflow</code> dep
+   type, distinct from <code>action</code>, and the helper pins both, so
+   Renovate does extract third-party reusable workflows and would
+   pin them.</li>
+</ol>
+<p><strong>The citations, added 2026-11-15 in review round 1.</strong> The three
+claims above were first read from Renovate's documentation during
+execution, which review item 2 correctly called an assertion. They
+are now read from Renovate's source at 44.227.4, the version
+<code>.github/workflows/renovate-fleet.yml:233</code> pins:</p>
+<ul>
+<li><code>lib/config/presets/internal/helpers.preset.ts:118-126</code> is the
+  whole of <code>helpers:pinGitHubActionDigests</code>: one <code>packageRules</code>
+  entry, <code>matchDepTypes: ['action', 'workflow']</code>, <code>pinDigests: true</code>,
+  and no owner scoping of any kind. The fence 3a added is therefore
+  necessary, not defensive.</li>
+<li><code>lib/modules/manager/github-actions/extract.ts:111</code> sets
+  <code>depType: isReusableWorkflow ? 'workflow' : 'action'</code>, and
+  <code>:105</code> computes that flag from <code>reusableWorkflowPathRe</code> at <code>:78</code>,
+  which is <code>^\.github/workflows/[^/]+\.ya?ml$</code> tested against the
+  reference's sub-path. So this repository's 7 job-level
+  <code>shakenfist/actions/.github/workflows/*.yml@main</code> references are
+  <code>workflow</code> and its 15 step-level ones are <code>action</code>; the
+  exception's two dep type names are exactly the set that covers
+  them, which is what review item 2 asked to have proved rather
+  than stated.</li>
+<li><code>:113</code> is where the pinned line's shape comes from: the
+  <code>autoReplaceStringTemplate</code> writes the digest and then, when
+  there is a <code>newValue</code>, <code># {{newValue}}</code> -- the ref it replaced,
+  tag or branch name alike. That is documentation of the form, not
+  an observation of it; observation 1 still reads the real line off
+  the pull request.</li>
+<li>The path the review suggested, <code>lib/config/presets/internal/helpers.ts</code>,
+  does not exist at this tag; the file is <code>helpers.preset.ts</code>.</li>
+</ul>
+<p>A wrong dep type name would have passed <code>renovate-config-validator</code>
+silently, since it accepts any string there, and the first visible
+symptom would have been a pin on a first-party reference in the pull
+request. <code>test_the_real_preset_exempts_the_fleets_own_actions</code> now
+pins both names in this repository's own tests.</p>
+<p>The exception is also why <code>renovate-fleet.json</code> carries no top-level
+<code>description</code>: the first draft of 3a put one there to describe the
+<code>extends</code> entry, which an <code>extends</code> string cannot carry itself, but
+every other description in that file sits on the rule or block it
+explains. The pinning rationale now sits on the exclusion rule, where
+a reader meets it beside the behaviour it modifies.</p>
 <h3 id="phase-4-record-the-policy">Phase 4: record the policy<a class="headerlink" href="#phase-4-record-the-policy" title="Permanent link">&para;</a></h3>
 <p>Planning effort: medium. It documents a policy that phases 2 and 3
 have already decided.</p>

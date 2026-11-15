@@ -3632,6 +3632,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-size-ratchet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a ratchet on source size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-llm-doc-structure/" class="md-nav__link">
         
   
@@ -16349,10 +16377,15 @@ report <code>error</code> for every repository, and <code>github-security</code>
 stop checking secret scanning without saying so, so a token that
 cannot see them fails every leg instead.</p>
 <p><code>AUDIT_READ_TOKEN</code> is a repository secret on this repository, and a
-fine-grained token always has an expiry date. When it lapses, every leg
-fails at "Check the read token" and <code>report-failure</code> files its issue
-pointing at the run. Mint a replacement with the permissions above and
-replace the secret, then dispatch a run of <code>main</code> to confirm it.</p>
+fine-grained token always has an expiry date. The current one expires
+at 2027-10-24 21:29:44 UTC (2027-10-25 AEDT). <code>AUDIT_TOKEN</code> expires
+on 2027-10-25 AEDT as well, though the token list shows it only as a
+date, so the two share a local day rather than an instant. One
+rotation covers both; update both dates here when they are replaced.
+When <code>AUDIT_READ_TOKEN</code> lapses, every leg fails at "Check the read
+token" and <code>report-failure</code> files its issue pointing at the run. Mint
+a replacement with the permissions above and replace the secret,
+then dispatch a run of <code>main</code> to confirm it.</p>
 <p><code>AUDIT_TOKEN</code> is also a fine-grained personal access token, with the
 <code>shakenfist</code> organisation as its resource owner, access to all
 repositories and no organisation permissions. It needs two repository
@@ -16370,9 +16403,11 @@ open issues the page links to; the page itself is pushed by
 <code>scripts/commit-audit-docs.sh</code> with the job's own <code>GITHUB_TOKEN</code>,
 which <code>actions/checkout</code> leaves in the clone and the job's
 <code>contents: write</code> permission lets push to this repository alone. The
-same lifetime limit applies. When it lapses, <code>manage-issues</code> fails
-and <code>report-failure</code> files its issue, and <code>update-docs</code> still pushes
-the page but renders each issue link it could not look up as <code>?</code>.</p>
+same lifetime limit applies: the current token expires on 2027-10-25
+AEDT, the local day <code>AUDIT_READ_TOKEN</code> does. When it lapses,
+<code>manage-issues</code> fails and <code>report-failure</code> files its issue, and
+<code>update-docs</code> still pushes the page but renders each issue link it
+could not look up as <code>?</code>.</p>
 <p><code>AUDIT_TOKEN</code> is not a repository secret. It is an environment secret
 in the <code>audit-write</code> environment, whose deployment branch policy
 allows only <code>main</code>, and <code>manage-issues</code> and <code>update-docs</code> are the only

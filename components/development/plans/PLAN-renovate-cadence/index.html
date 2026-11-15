@@ -3476,6 +3476,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-size-ratchet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a ratchet on source size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-llm-doc-structure/" class="md-nav__link">
         
   
@@ -16923,20 +16951,29 @@ run.</p>
   then deletes the disabled files and moves each <code>renovate.json</code>
   onto the preset in a single pull request per repository, so the
   sweep costs one CI run per repository rather than two.</li>
-<li><strong>This plan's phase 3 must land before
-  <code>PLAN-workflow-ref-trust.md</code> step 3b.</strong> Phase 1 only publishes the
-  preset; apart from this repository, nothing extends it until phase
-  3's sweep. A line added to the preset before then reaches one
-  repository, and the fleet's digest pull requests would arrive one
-  per release per repository -- the churn this plan removes. Once
-  the sweep has merged, that plan's switch to digest pinning is a
-  one-line addition to the preset rather than a second fleet sweep,
-  and its digest updates fall into the monthly CI-tooling group.
-  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/209" title="GitHub Issue: shakenfist/development #209">development#209</a> has merged, so the in-repository record of the
-  dependency is that plan's coordination paragraph, which this plan's
-  pull request rewrote to name phase 3. (The operator's
-  <code>plan-blockers</code> tool carries a matching note, but it lives outside
-  this repository.)</li>
+<li><strong><code>PLAN-workflow-ref-trust.md</code>'s digest pinning lands in the
+  preset before this plan's phase 3, not after it.</strong> This paragraph
+  said the opposite until 2026-11-13, reasoning that a line added
+  to the preset before the sweep reaches one repository while the
+  fleet's digest pull requests would arrive one per release per
+  repository. The second half does not follow from the first: that
+  churn is prevented by the monthly CI-tooling group, which lives
+  in this same preset, rather than by the ordering. What the
+  ordering decides is where the change gets reviewed. Before the
+  sweep it changes one repository, and this plan's own sweep pull
+  request then carries the <em>policy</em> into each repository
+  reviewably, alongside everything else that repository receives.
+  The pin diff is not in that pull request: it arrives afterwards,
+  as one grouped Renovate pull request per repository on the next
+  monthly window, which is also the volume to expect from the
+  sweep -- roughly one grouped pull request per repository, not one
+  per action per release. After the sweep the
+  same one-line edit changes every repository's behaviour with no
+  pull request in any of them -- which is what the comment above
+  <code>RENOVATE_FLEET_PRESET</code> in <code>scripts/audit/checks/packaging.py</code>
+  warns about. The matching reasoning is in that plan's phase 3.
+  (The operator's <code>plan-blockers</code> tool carries a matching note, but
+  it lives outside this repository.)</li>
 </ul>
 <p>Only phase 1 carries a step table. Phases 2 to 4 get theirs when
 each is planned, from the scope written here, because what phase 1

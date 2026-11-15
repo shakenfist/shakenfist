@@ -3606,6 +3606,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-size-ratchet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a ratchet on source size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-llm-doc-structure/" class="md-nav__link">
         
   
@@ -16137,10 +16165,13 @@
 <li>embed the current <strong><code>comment-proportion</code></strong> shared block in its
   code-quality review section;</li>
 <li>embed the current <strong><code>source-file-size</code></strong> shared block alongside it
-  -- the advisory guidance on how long a source file gets before its
-  size is itself worth raising in review, framed as the cost of
-  re-reading a whole file rather than as taste, because where review
-  is tracked per file every change discards the review of all of it;</li>
+  -- the guidance on how long a source file gets before its size is
+  itself worth raising in review, framed as the cost of re-reading a
+  whole file rather than as taste, because where review is tracked
+  per file every change discards the review of all of it, and the
+  ratchet rule that a file over 1,500 lines may not grow, nor any
+  file cross 1,500, without a reviewed edit to the repository's
+  baseline;</li>
 <li>embed the current <strong><code>plan-references-in-code</code></strong> shared block
   alongside those -- code, comments and configuration describe the
   software as it is, so they cite no plan phase, step or decision
@@ -16217,6 +16248,26 @@ independently in each repository -- several still told the
 documentation reviewer that "<code>README.md</code> reflects any new features",
 which is the exact feedback loop that bloats READMEs.</p>
 <h3 id="recently-enforced">Recently enforced<a class="headerlink" href="#recently-enforced" title="Permanent link">&para;</a></h3>
+<p><strong><code>source-file-size</code> moved to v2</strong> under
+<a href="/components/development/plans/PLAN-size-ratchet/">PLAN-size-ratchet.md</a>. v1 said
+neither of its thresholds was a gate. v2 keeps the 800 and 1,500
+figures, the exemptions, splitting at seams and never trading
+comments for length, and still has no cap and forces no split,
+but a file over 1,500 lines may no longer grow, and no file may
+cross 1,500, without a reviewed edit to the repository's baseline
+of oversize files. <code>templates/source-size-ratchet/</code> checks that on
+every commit where a repository has adopted it, and the push
+auditor applies it by hand where one has not; adopting the ratchet
+is not something this audit checks. v2 also has the auditor read
+the files a diff touches rather than only the diff, raise growth
+of any file already over 800 lines however small the branch's own
+addition, review a raised baseline entry as a decision whose
+reason belongs in the pull request description, and treat a diff
+that shrinks a baselined file by deleting rationale comments as a
+finding. v1 was advisory for argued reasons, and the plan's
+mission section says why a ratchet does not fall foul of them.
+Every repository carrying v1 is non-compliant from the next run,
+and the fix is a verbatim copy of the v2 block.</p>
 <p><strong><code>plan-references-in-code</code> became a required block on 2026-09-24.</strong>
 It extends to code the rule <code>plan-phase-references</code> already applies
 to documentation: a reader of the code has not read the plan, so
