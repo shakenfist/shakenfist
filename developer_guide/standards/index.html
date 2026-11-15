@@ -16207,6 +16207,45 @@ and reporting a mismatch as a crash rather than as one failed
 assertion. Ordinary exceptions are only safe there while no collection
 module makes a terminal call inside a <code>try</code> which catches <code>Exception</code>,
 which <code>shakenfist/tests/test_ansible_module_loader.py</code> enforces.</p>
+<h3 id="a-test-run-is-bounded-and-growth-is-attributed">A test run is bounded, and growth is attributed<a class="headerlink" href="#a-test-run-is-bounded-and-growth-is-attributed" title="Permanent link">&para;</a></h3>
+<p><code>OS_TEST_TIMEOUT</code> bounds how long one test may take. Nothing used to
+bound how much a worker may <em>allocate</em>, and a stestr worker runs many
+tests in one long-lived process -- so a test which leaked still passed,
+and the worker carried the leak into every test scheduled after it. One
+reached 16.3 GB resident plus 5.9 GB of swap and held a workstation in
+direct reclaim for an hour before it was killed by hand (issue #4928).</p>
+<p>Two things now stop that, and both run by default:</p>
+<ul>
+<li><code>tools/bounded-test-run.sh</code> wraps every <code>stestr run</code> in <code>tox.ini</code>. It
+  prefers a per-run cgroup (<code>systemd-run --user --scope</code>, which bounds
+  swap as well as resident memory and kills only that scope) and falls
+  back to <code>RLIMIT_DATA</code> where there is no user systemd session, as on a
+  CI runner. <code>RLIMIT_AS</code> is deliberately not used: CPython reserves far
+  more address space than it touches. Both defaults are sized per
+  worker, because the legitimate footprint is -- a worker of this suite
+  peaks a little over 200 MB and stestr runs one per CPU -- so the
+  scope's bound scales with the CPU count while <code>RLIMIT_DATA</code>, being
+  per process, bounds a worker and says nothing about their sum.
+  Override with <code>SF_TEST_MEMORY_MAX</code>, <code>SF_TEST_SWAP_MAX</code> and
+  <code>SF_TEST_HEAP_MAX_MB</code>, any of them <code>none</code> to go without.</li>
+<li><code>ShakenFistTestCase</code> samples <code>/proc/self/statm</code> after each test's
+  cleanups have run, and fails that test if it added more than
+  <code>SF_TEST_MEMORY_GROWTH_MB</code> megabytes, or if the worker is now over
+  <code>SF_TEST_MEMORY_CEILING_MB</code>. The ceiling is what catches a leak
+  spread thinly across many tests, and the test it names may be a
+  victim rather than the culprit -- which is still a point in the run
+  and a readable message rather than a <code>MemoryError</code> from inside
+  whichever library allocated next. Both defaults live in
+  <code>shakenfist/tests/memory.py</code>, not in <code>tox.ini</code>, so a script which
+  runs stestr outside tox is still guarded, and both are loose:
+  importing a module and parsing the tree are charged to whichever test
+  first did it, so the worst-behaved test in the suite grows a worker
+  by 63 MB without leaking anything. These catch a runaway; they are
+  not a budget. Set either to <code>none</code> to switch it off.</li>
+</ul>
+<p>A test which genuinely needs a large allocation should release it before
+it returns, rather than holding it on the test instance -- the instance
+is still alive when the sample is taken.</p>
 <h2 id="pre-commit-hooks">Pre-commit Hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h2>
 <p>The repository uses pre-commit hooks to validate code before commits:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>pre-commit<span class="w">           </span><span class="c1"># Install pre-commit</span>
