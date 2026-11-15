@@ -1464,6 +1464,21 @@ and nothing in it is done without an explicit yes.
    `kerbside-client`, `kerbside-patches`, `library-utilities`,
    `occystrap`, `ryll`, `sfui`, `shakenfist`,
    `uncalibrated-sextant`, `visual-digest-rust`.
+
+   **Not before the rust-toolchain pin lands, due about
+   2026-11-18.** `renovate-runner.json` disables every dependency
+   in `.github/workflows/renovate.yml` and
+   `templates/renovate/renovate.yml` for the central runner, so
+   the `dtolnay/rust-toolchain@stable` reference in both --- held
+   by `minimumReleaseAge` because the `stable` branch moved on
+   2026-11-15 --- can only ever be pinned by each repository's own
+   hourly workflow, which step 2 and this step disable. Disabling
+   first strands those two references unpinned, and
+   `PLAN-workflow-ref-trust.md` step 3a's definition-of-done grep
+   then fails on them. Either wait for that pin, or narrow this
+   rule to drop `templates/renovate/renovate.yml` first, which
+   phase 3 has to do anyway. The reasoning is in that plan's step
+   3a record.
 4. **Turn the schedule on, and watch a full day.** The workflow
    lands with `workflow_dispatch` only, so this step is a pull
    request of its own adding the `schedule` block its header comment
@@ -1863,6 +1878,21 @@ fleet runner as well as the template, but it means the two durations
 differ in version as well as in mode.
 
 #### Risks and mitigations
+
+* **Disabling a repository's own Renovate strands what the central
+  runner is configured not to see.** `renovate-runner.json`'s
+  temporary rule disables every dependency in
+  `.github/workflows/renovate.yml` and
+  `templates/renovate/renovate.yml`, so those two files are
+  maintained only by the per-repository workflow this phase turns
+  off. The live case is
+  `PLAN-workflow-ref-trust.md`'s step 3a: its
+  `dtolnay/rust-toolchain@stable` pin is held by `minimumReleaseAge`
+  until about 2026-11-18, and disabling first means it never
+  arrives. Mitigation: cutover steps 2 and 3 carry the date, and
+  the alternative is to narrow the rule to drop the template path,
+  which phase 3 has to do anyway --- the template outlives the
+  deployed copies the rule exists for.
 
 * **The VM image may not have what Renovate needs.** The
   `audit-write` job's comment says the image "has git and python3
