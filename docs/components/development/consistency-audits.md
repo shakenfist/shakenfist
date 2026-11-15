@@ -763,6 +763,25 @@ a spec-page comparison -- correctly does not use it; it stays a plain
 `unittest.TestCase`, since there is no check to run and nothing
 `CheckTestCase` would add.
 
+A test that mutates a **real** shipped workflow or template, rather
+than a fixture, derives the reference it substitutes instead of
+writing it out: `current_ref(text, action)` for the reference, or
+`uses_clause(text, action)` for the whole `uses:` clause including
+any trailing comment, both from `scripts/tests/base.py`. The fleet
+Renovate preset carries `helpers:pinGitHubActionDigests`, so every
+third-party `uses:` in a repository that extends it becomes a sha
+with a comment, and the digest then moves on each monthly CI-tooling
+update. A hard-coded `uses: actions/checkout@v7` stops matching the
+day the pin lands, and a hard-coded sha stops matching the month
+after; five such tests broke here when the pin arrived, and a sixth
+had an adjacency assumption rather than a literal. Substituting only
+the reference is the near miss to avoid: it leaves the file's own
+`# v7` behind, so whether a fixture carries a comment depends on
+whether the shipped file is pinned yet -- `uses_clause()` exists for
+that case. Both raise `RefNotFound`, an `AssertionError` subclass,
+rather than returning the action or None: a substitution that finds
+nothing would otherwise pass while measuring nothing.
+
 Two conventions in `write_all()` are worth knowing before writing a
 fixture. A `None` content means the file is *absent* and is skipped;
 an empty file is spelled `''`. Both readings were in use before the

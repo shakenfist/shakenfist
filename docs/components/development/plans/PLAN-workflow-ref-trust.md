@@ -309,7 +309,7 @@ Out of scope:
 |-------|--------|--------|
 | 1. Finish the inherit rollout | Complete | development 8df8179 (#209); instar bdc8905 (#617); shakenfist e4c7726 (#4404); occystrap c583d68 (#152); client-python 68f295f (#415); agent-python 4bf7763 (#148); client-python-k3s 03998e0 (#83); clingwrap 125eb20 (#141); divergulent 8a2852e (#125); library-utilities 832d82d (#67); sfui ad0d6a2 (#44) |
 | 2. Make `actions` main require a pull request | Complete | development 951fef7 (#388); development 9bd865d (#392) |
-| 3. Pin third-party actions to a sha | In progress | |
+| 3. Pin third-party actions to a sha | In progress | development 6170a78 (#406) |
 | 4. Record the policy | Not started | |
 | 5. Shared workflows instead of copied templates | Not started | |
 | 6. Push audit | Not started | |
@@ -1679,6 +1679,21 @@ coordination paragraph, so a later step need not redo them.
    declines to pin a branch ref, the reference is pinned by hand in
    the same form and the spec says which refs Renovate does not
    maintain.
+
+   **Half right, corrected 2026-11-15 from the pull request.**
+   `release/v1` pinned exactly as predicted, comment included.
+   `stable` did not, and the reason is one this decision did not
+   anticipate: `minimumReleaseAge: 3 days` applies to a branch
+   digest, so a branch that moved recently is held rather than
+   refused. `dtolnay/rust-toolchain@stable` moved to `3900882` at
+   02:32 UTC on 2026-11-15, five hours before the run, so its pin
+   is due about 2026-11-18. The reference is therefore maintained
+   by Renovate, just later, and no hand pin is called for. What
+   this does create is a sequencing constraint on
+   `PLAN-renovate-cadence.md`, recorded in the risk list: the pin
+   arrives only while this repository's own hourly Renovate is
+   still enabled, because the central runner excludes both files
+   the reference sits in.
 8. **The pin's cost to `PLAN-bot-bypass-identity.md` is already
    being paid.** That plan's `actions/create-github-app-token` pin
    is in the `prune-reviews` template, and
@@ -1698,11 +1713,14 @@ coordination paragraph, so a later step need not redo them.
 
 **The observation after 3a is the management session's**, not a
 sub-agent's, because it happens after the merge and across a window
-nobody can shorten. Once 3a has merged, Renovate's next permitted
-window opens the pin pull request. Review it against the unpinned
-references the grep in the definition of done reports on the day --
-54 when this phase was last measured, and not a number to carry
-around -- and record in this section:
+nobody can shorten. **Observations 1 to 5 were answered on
+2026-11-15** in the step 3a pin pull request record below; only 6,
+the two-window volume count, is still open. Once 3a has merged,
+Renovate's next permitted window opens the pin pull request.
+Review it against the unpinned references the grep in the
+definition of done reports on the day -- 54 when this phase was
+last measured, and not a number to carry around -- and record in
+this section:
 
 1. the exact form of a pinned line, comment included, for a major
    tag and for a release tag;
@@ -1729,7 +1747,12 @@ around -- and record in this section:
    following two monthly windows (`gh pr list --author
    shakenfist-bot --search digest --state all`), as open question
    4's answer, stated as grouped pull requests because that is the
-   only shape the fleet will see;
+   only shape the fleet will see. **#407 counts as one**, and the
+   December window is expected to carry only ordinary digest bumps
+   because the pin itself was pulled forward out of it: a
+   repository that waits for its own window sees the same total in
+   a different order, so the count is comparable but the first
+   window's shape is not;
 7. open question 5, answered by reading the `github-actions`
    extractor and citing the line (decision 6). **Answered on
    2026-11-15**, before the pull request, in the step 3a record
@@ -1737,8 +1760,11 @@ around -- and record in this section:
    for the pull request to show is the pinned line's form, which is
    observation 1.
 
-Each landing goes in the `Merged` cell: the preset commit and the
-pin pull request are two landings.
+Each landing goes in the `Merged` cell: the preset commit, the pin
+pull request, and the rust-toolchain pin that carries the two
+`with: toolchain: stable` blocks --- three landings, not the two this
+sentence said before 2026-11-15, because the held digest made the
+third one separate.
 
 **Risks and mitigations.**
 
@@ -1776,6 +1802,20 @@ pin pull request are two landings.
   the same pull request, keeping the template and its twin
   byte-identical. There is no exempt-by-name fallback, because the
   problem that fallback addressed does not exist.
+- **Disabling this repository's own Renovate before 2026-11-18
+  strands the last two pins.** `dtolnay/rust-toolchain@stable` in
+  `.github/workflows/renovate.yml` and
+  `templates/renovate/renovate.yml` is held by
+  `minimumReleaseAge` until about then, and `renovate-runner.json`
+  disables both files for the central runner, so the pin arrives
+  only if the local hourly workflow is still enabled when it does.
+  `PLAN-renovate-cadence.md`'s cutover step 2 disables exactly that
+  workflow. Mitigation: the two plans are sequenced -- land the
+  rust-toolchain pin before the canary, or narrow the runner rule
+  first -- and this phase's definition-of-done grep is what
+  notices if neither happened, because it prints those two lines
+  and nothing else. The `with: toolchain: stable` that pin also
+  owes is the entry below, not repeated here.
 - **The pins in `templates/renovate/renovate.yml` lose their
   maintainer at the cutover.** `renovate-runner.json`, which
   `PLAN-renovate-cadence.md` phase 2 landed, disables every
@@ -1812,7 +1852,10 @@ pin pull request are two landings.
 - The pin pull request is recorded here by number and merge commit,
   with all seven observations above answered, including the date it
   appeared and which window produced it.
-- After it merges, this prints nothing:
+- After #407 merges this prints exactly two lines, both
+  `dtolnay/rust-toolchain@stable`, until the digest held by
+  `minimumReleaseAge` lands --- see the step 3a record below. After
+  that pin merges it prints nothing:
 
   ```
   git grep -hoE '^[[:space:]]*-?[[:space:]]*uses:[[:space:]]*[^ ]+' \
@@ -1941,6 +1984,150 @@ silently, since it accepts any string there, and the first visible
 symptom would have been a pin on a first-party reference in the pull
 request. `test_the_real_preset_exempts_the_fleets_own_actions` now
 pins both names in this repository's own tests.
+
+**Step 3a's pin pull request: #407, opened 2026-11-15.** Forced
+rather than waited for: the dependency dashboard (#58) listed the
+pin as one entry on branch `renovate/ci-tooling` awaiting its
+schedule, which answered observation 3 on its own, and ticking that
+box brought the pull request forward from 1 December. Observations
+1 to 5 are answered here; 6 is still two monthly windows away and 7
+was answered in the citations above.
+
+1. **The form.** A major tag gives
+   `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7`
+   and a branch ref gives
+   `pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1`:
+   the sha, then the reference it replaced, verbatim, which is what
+   `extract.ts:113`'s `autoReplaceStringTemplate` writes. No
+   release-tag example arose, because nothing in this repository
+   referenced one.
+2. **The two branch references diverged.** `release/v1` pinned.
+   `dtolnay/rust-toolchain@stable` did not, and is held rather than
+   refused: `minimumReleaseAge: 3 days` covers a branch digest, the
+   `stable` branch moved to `3900882` at 02:32 UTC the same morning,
+   and the dashboard still offers the update. Due about 2026-11-18.
+   Decision 7 is corrected above. When it lands, that pull request
+   must also add `with: toolchain: stable` to both files, which
+   Renovate will not do and the risk list explains.
+3. **One grouped pull request, from the local runner.** Branch
+   `renovate/ci-tooling`, so the CI-tooling package rule does
+   capture a `pinDigest` update as well as a digest bump --- the
+   question the plan recorded as unsettled by Renovate's
+   documentation, now settled by observation. It was awaiting the
+   monthly schedule, so left alone it would have appeared on 1
+   December. The runner was this repository's own hourly
+   `renovate.yml`, not the central fleet runner, which matters for
+   the reason the risk list gives: only the local runner can see
+   the two Renovate workflow files.
+4. **`minimumReleaseAge` held two things.** The rust-toolchain
+   digest above, and the newer `renovatebot/pre-commit-hooks`
+   releases --- `44.235.1` is in the pull request with `44.239.1`
+   and 17 others listed as pending. The release age is doing its
+   job in both cases.
+5. **`pre-commit run --all-files` did not pass on the branch, and
+   that is the finding.** Two hooks failed on #407: `source size
+   ratchet`, which is the stale baseline this pull request repairs
+   and nothing to do with the pin, and `audit package and script
+   tests`, which is. Five tests across two files assumed a real
+   shipped file contains an unpinned `uses: owner/action@vN`
+   literal, and located it by exact string:
+   `RenovateWorkflowDriftTest`'s three ref tests against
+   `templates/renovate/renovate.yml`, and
+   `GithubReleaseTest.test_no_download_fails` and
+   `test_no_release_step_fails` against
+   `templates/release-automation-rust/release.yml`. `actionlint`,
+   `actionlint-templates` and
+   `test_this_repository_runs_renovate_verbatim` all passed, so the
+   twin risk this observation exists to check is clear; what the pin
+   broke was tests about the templates rather than the templates
+   themselves. The fix is in this pull request and is described
+   under *What the pin broke* below; with it, all 2786 tests pass
+   against #407's tree.
+
+**An unasked-for observation, worth keeping.** Because
+   the CI-tooling rule matches `github-actions` and `pre-commit`
+   together, the pin pull request also carries that hook bump, and
+   the group's youngest member puts a pending
+   `renovate/stability-days` check on it. This repository's `main`
+   has no required-status-checks rule, so it does not block the
+   merge; on a repository that gains one it would. Worth knowing
+   before the sweep puts this preset in front of the fleet.
+
+**What the pull request proves about the fence.** Not one
+`shakenfist/` reference appears in its diff. All 22 first-party
+references this repository consumes --- 15 step-level actions and 7
+job-level reusable workflows --- are still moving refs, while 52
+third-party references across 18 files were pinned, on both sides of
+every twin. The exception is therefore observed in production rather
+than argued from Renovate's merge order.
+
+**What the pin broke, and the shape of the fix.** Five tests, named in
+observation 5 above, located an unpinned `uses:` literal inside a real
+shipped file in order to mutate it. Pinning that file made the literal
+absent, and the two in `test_release_rust.py` failed with
+`ValueError: substring not found` from their own `in_job()` helper
+rather than with an assertion, which is the signature to recognise if
+this recurs elsewhere in the fleet.
+
+The literal was not updated to the pinned form, because that would
+break again on every digest bump --- and under the CI-tooling group a
+digest bump arrives monthly. The tests now derive the reference from
+the file with `current_ref()` in `scripts/tests/base.py`, which raises
+rather than returning the bare action, so a substitution that finds
+nothing fails loudly instead of passing while measuring nothing. That
+helper has its own suite, `scripts/tests/test_base.py`. Its cases
+are a tag, a branch ref, a pinned sha with its comment, a sub-path
+action, a quoted ref, a tab after `uses:`, a list dash, a missing
+action, the escaping of the action before it becomes a pattern (an
+unescaped `.` in `actions/setup.node` would otherwise match
+`setup-node`), and a commented-out step --- which review round 2
+found the first cut of the helper matching, with a live example at
+`templates/release-automation-rust/release.yml:154`. A test that
+mutated a comment would have passed while measuring nothing, which
+is the failure the helper exists to prevent, so the pattern is now
+anchored to the start of a line and admits only whitespace and an
+optional list dash before `uses:`.
+
+A sixth test was found by review round 2 rather than by the suite:
+`test_a_comment_after_a_uses_line_is_compared` asserted
+`uses: dtolnay/rust-toolchain@stable` against the shipped file and
+passed only because that is the one reference the held digest left
+unpinned. Enumerating by what failed rather than by shape is what hid
+it, which is worth knowing for the sweep: **the class is tests
+asserting against a real workflow's `uses:` line, not tests that
+failed today**, and adjacency assumptions belong to it as much as
+literals do --- that one asserted a `\n\n` between the reference and
+the next comment, which the `with: toolchain: stable` block the pin
+owes would also have broken.
+
+This is the one consequence of pinning that reaches beyond the files
+Renovate rewrites, and it generalises: **any repository whose tests
+assert against a real workflow's `uses:` line breaks when that
+repository extends the preset.** It therefore belongs in step 3b's
+specification, and the fleet sweep in `PLAN-renovate-cadence.md` phase
+3 should expect it per repository rather than discover it. Filed as
+#410 so the sweep can plan for it, with the durable half of the
+guidance in `docs/consistency-audits.md` beside the rest of what
+`scripts/tests/base.py` offers, since this plan is a point-in-time
+record due for retirement.
+
+**The pin's other half now fails loudly.** The `with: toolchain:
+stable` that the rust-toolchain pin owes was recorded only in prose
+here, and Renovate will not write it; if the pin landed without it,
+the first symptom would be the hourly Renovate run failing in this
+repository and in every repository that copied the template, rather
+than a red test. `test_a_pinned_rust_toolchain_states_its_toolchain`
+in `scripts/tests/test_registry.py` now asserts that a
+40-hex-sha reference carries the input and that a branch reference
+need not, so the pull request carrying the pin fails until it adds
+the block.
+
+**The gate after #407 merges: exactly two lines.** 54 unpinned
+references were measured before it, 52 are pinned in it, and the two
+that remain are both `dtolnay/rust-toolchain@stable`, in
+`.github/workflows/renovate.yml:57` and
+`templates/renovate/renovate.yml:57`. So the definition of done's
+grep prints two lines until the held digest lands, and nothing else.
 
 The exception is also why `renovate-fleet.json` carries no top-level
 `description`: the first draft of 3a put one there to describe the
