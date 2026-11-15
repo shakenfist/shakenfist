@@ -18127,7 +18127,22 @@ and nothing in it is done without an explicit yes.</p>
    <code>kerbside-client</code>, <code>kerbside-patches</code>, <code>library-utilities</code>,
    <code>occystrap</code>, <code>ryll</code>, <code>sfui</code>, <code>shakenfist</code>,
    <code>uncalibrated-sextant</code>, <code>visual-digest-rust</code>.</li>
-<li><strong>Turn the schedule on, and watch a full day.</strong> The workflow
+</ol>
+<p><strong>Not before the rust-toolchain pin lands, due about
+   2026-11-18.</strong> <code>renovate-runner.json</code> disables every dependency
+   in <code>.github/workflows/renovate.yml</code> and
+   <code>templates/renovate/renovate.yml</code> for the central runner, so
+   the <code>dtolnay/rust-toolchain@stable</code> reference in both --- held
+   by <code>minimumReleaseAge</code> because the <code>stable</code> branch moved on
+   2026-11-15 --- can only ever be pinned by each repository's own
+   hourly workflow, which step 2 and this step disable. Disabling
+   first strands those two references unpinned, and
+   <code>PLAN-workflow-ref-trust.md</code> step 3a's definition-of-done grep
+   then fails on them. Either wait for that pin, or narrow this
+   rule to drop <code>templates/renovate/renovate.yml</code> first, which
+   phase 3 has to do anyway. The reasoning is in that plan's step
+   3a record.
+4. <strong>Turn the schedule on, and watch a full day.</strong> The workflow
    lands with <code>workflow_dispatch</code> only, so this step is a pull
    request of its own adding the <code>schedule</code> block its header comment
    records, and it comes after step 3 because a schedule with the
@@ -18141,8 +18156,7 @@ and nothing in it is done without an explicit yes.</p>
    pending run per concurrency group and cancels the older one. If
    the central runner is not clearly better, stop and investigate
    before phase 3: this plan's promise on security latency rests on
-   Renovate actually running.</li>
-</ol>
+   Renovate actually running.</p>
 <p>Rollback is <code>gh workflow enable</code> per repository and disabling the
 central workflow. Nothing in this phase deletes a file elsewhere in
 the fleet.</p>
@@ -18512,7 +18526,24 @@ fleet runner as well as the template, but it means the two durations
 differ in version as well as in mode.</p>
 <h4 id="risks-and-mitigations_1">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations_1" title="Permanent link">&para;</a></h4>
 <ul>
-<li><strong>The VM image may not have what Renovate needs.</strong> The
+<li>
+<p><strong>Disabling a repository's own Renovate strands what the central
+  runner is configured not to see.</strong> <code>renovate-runner.json</code>'s
+  temporary rule disables every dependency in
+  <code>.github/workflows/renovate.yml</code> and
+  <code>templates/renovate/renovate.yml</code>, so those two files are
+  maintained only by the per-repository workflow this phase turns
+  off. The live case is
+  <code>PLAN-workflow-ref-trust.md</code>'s step 3a: its
+  <code>dtolnay/rust-toolchain@stable</code> pin is held by <code>minimumReleaseAge</code>
+  until about 2026-11-18, and disabling first means it never
+  arrives. Mitigation: cutover steps 2 and 3 carry the date, and
+  the alternative is to narrow the rule to drop the template path,
+  which phase 3 has to do anyway --- the template outlives the
+  deployed copies the rule exists for.</p>
+</li>
+<li>
+<p><strong>The VM image may not have what Renovate needs.</strong> The
   <code>audit-write</code> job's comment says the image "has git and python3
   but not gh", and says nothing about Node. <code>actions/setup-node</code>
   supplies Node, and the template's own steps supply npm, Rust when
@@ -18524,7 +18555,8 @@ differ in version as well as in mode.</p>
   rather than the shared-home static pool, and if neither is
   available the residual risk is recorded and accepted explicitly
   rather than by default. Checked by the management session against
-  the dry run's duration, before step 3 disables anything.</li>
+  the dry run's duration, before step 3 disables anything.</p>
+</li>
 <li><strong>A pass longer than an hour halves the cadence in silence.</strong> One
   pending run per concurrency group means a slow pass drops runs
   without failing anything. The watch day counts runs rather than

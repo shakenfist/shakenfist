@@ -16929,6 +16929,24 @@ helper rather than a <code>Check</code> subclass -- a regex, a parsing function,
 a spec-page comparison -- correctly does not use it; it stays a plain
 <code>unittest.TestCase</code>, since there is no check to run and nothing
 <code>CheckTestCase</code> would add.</p>
+<p>A test that mutates a <strong>real</strong> shipped workflow or template, rather
+than a fixture, derives the reference it substitutes instead of
+writing it out: <code>current_ref(text, action)</code> for the reference, or
+<code>uses_clause(text, action)</code> for the whole <code>uses:</code> clause including
+any trailing comment, both from <code>scripts/tests/base.py</code>. The fleet
+Renovate preset carries <code>helpers:pinGitHubActionDigests</code>, so every
+third-party <code>uses:</code> in a repository that extends it becomes a sha
+with a comment, and the digest then moves on each monthly CI-tooling
+update. A hard-coded <code>uses: actions/checkout@v7</code> stops matching the
+day the pin lands, and a hard-coded sha stops matching the month
+after; five such tests broke here when the pin arrived, and a sixth
+had an adjacency assumption rather than a literal. Substituting only
+the reference is the near miss to avoid: it leaves the file's own
+<code># v7</code> behind, so whether a fixture carries a comment depends on
+whether the shipped file is pinned yet -- <code>uses_clause()</code> exists for
+that case. Both raise <code>RefNotFound</code>, an <code>AssertionError</code> subclass,
+rather than returning the action or None: a substitution that finds
+nothing would otherwise pass while measuring nothing.</p>
 <p>Two conventions in <code>write_all()</code> are worth knowing before writing a
 fixture. A <code>None</code> content means the file is <em>absent</em> and is skipped;
 an empty file is spelled <code>''</code>. Both readings were in use before the
