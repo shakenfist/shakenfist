@@ -1413,6 +1413,40 @@ class BaseTestCase(testtools.TestCase):
             f'After time {after}, instance {instance_uuid} had no event '
             f'"{operation}"')
 
+    # How long an event its emitter has already written may take to become
+    # readable. add_event() only enqueues into the emitting daemon's local
+    # spool, and a per-process drainer ships the spool to sf-eventlog in
+    # ~100 ms batches -- slower under load or while the drainer backs off
+    # from a failed write -- so an event emitted before a state change can
+    # still be unreadable once the API reports that change. The wait is
+    # paid only when the event is late or missing, so it is generous.
+    EVENT_VISIBLE_DEADLINE_SECONDS = 30
+    EVENT_VISIBLE_POLL_SECONDS = 1
+
+    def _await_instance_event_extra(self, instance_uuid, message, field):
+        """The values of ``field`` in the extra of an instance's events.
+
+        Polls until at least one event whose ``message`` matches carries
+        ``field`` in its extra, then returns every such value from that
+        read, in event order. Events matching ``message`` without the
+        field are ignored, so a caller asserting how many carried it still
+        can. Unlike _await_instance_event() this does not wait for the
+        instance to be created: it is for an event whose emitter is known
+        to have run, which is the case where reading once races the
+        eventlog drainer (issue 4919). Returns an empty list if none
+        arrived by the deadline, leaving the failure message to the caller.
+        """
+        deadline = time.time() + self.EVENT_VISIBLE_DEADLINE_SECONDS
+        while True:
+            values = [
+                (e.get('extra') or {}).get(field)
+                for e in self.system_client.get_instance_events(instance_uuid)
+                if e.get('message') == message]
+            values = [v for v in values if v is not None]
+            if values or time.time() >= deadline:
+                return values
+            time.sleep(self.EVENT_VISIBLE_POLL_SECONDS)
+
     def _await_domain_xml(self, instance_uuid):
         """The newest libvirt domain XML a hypervisor recorded for an instance.
 
