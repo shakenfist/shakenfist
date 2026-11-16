@@ -1055,8 +1055,15 @@ class SFConfig(BaseSettings):
         description='Default download mirror for Cirros images.'
     )
     CHECKSUM_URL_CIRROS: AnyHttpUrl = Field(
-        'https://download.cirros-cloud.net/%(vernum)s/MD5SUMS',
-        description='Default checksum URL for Cirros images.'
+        'https://download.cirros-cloud.net/%(vernum)s/%(digest_file)s',
+        description=(
+            'Default checksum URL for Cirros images. Takes both the '
+            'release version and the name of the digest file, because '
+            'which digest files a release publishes varies: cirros '
+            'publishes SHA256SUMS only from 0.6.3 onwards, and older '
+            'releases have MD5SUMS and nothing else. The strongest '
+            'digest a release actually publishes is used.'
+        )
     )
     LISTING_URL_CIRROS: AnyHttpUrl = Field(
         'https://download.cirros-cloud.net/',

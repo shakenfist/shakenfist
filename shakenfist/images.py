@@ -6,6 +6,7 @@ import shutil
 import time
 import urllib.parse
 import uuid
+from typing import NamedTuple
 
 import requests
 from shakenfist_utilities import logs  # noreorder
@@ -105,16 +106,52 @@ def is_fetchable(url):
     return scheme in FETCHABLE_SCHEMES
 
 
+class ResolvedImage(NamedTuple):
+    """A fetchable URL, and the digest the mirror published for it.
+
+    ``algorithm`` and ``checksum`` are both None when the mirror
+    publishes no digest we can read. They travel together because the
+    algorithm is not fixed -- see CHECKSUM_FILES -- and a checksum
+    without the algorithm which produced it cannot be checked.
+    """
+
+    url: str
+    algorithm: 'str | None' = None
+    checksum: 'str | None' = None
+
+
+# The digest files a mirror may publish beside its images, strongest
+# first. A resolver takes the first one which exists.
+#
+# cirros publishes SHA256SUMS only from 0.6.3 onwards: 0.4.0, 0.5.2 and
+# 0.6.1 have MD5SUMS and nothing else (checked against the mirror). So
+# md5 cannot simply be dropped, even though it is not a hash anyone
+# should be relying on in 2026 and is deliberately absent from
+# BLOB_HASH_ALGORITHMS. It is kept as a fallback, and which algorithm
+# actually verified an image is recorded on the event, so an operator
+# can tell the two apart.
+CHECKSUM_FILES = [
+    ('sha256', 'SHA256SUMS'),
+    ('md5', 'MD5SUMS'),
+]
+
+
 def _resolve_image(url):
+    """Expand a source URL, with any digest the mirror publishes.
+
+    Always a ResolvedImage. A plain URL resolves to one with no
+    checksum, which is the honest answer: we have nothing to check it
+    against, which is a different thing from having checked it.
+    """
     # Short cut URLs do not have subdirectories
     if not is_image_shortcut(url):
-        return url
+        return ResolvedImage(url)
 
     if url.startswith('cirros'):
         # cirros is a special case as we can't rebuild the images yet
         return _resolve_cirros(url)
 
-    return f'{config.IMAGE_DOWNLOAD_URL}{url}/latest.qcow2'
+    return ResolvedImage(f'{config.IMAGE_DOWNLOAD_URL}{url}/latest.qcow2')
 
 
 def _resolve_cirros(name):
@@ -145,26 +182,65 @@ def _resolve_cirros(name):
 
     url = str(config.DOWNLOAD_URL_CIRROS) % {'vernum': vernum}
 
-    checksum_url = str(config.CHECKSUM_URL_CIRROS) % {'vernum': vernum}
-    checksums = _fetch_remote_checksum(checksum_url)
-    checksum = checksums.get(os.path.basename(url))
+    algorithm, checksum = _resolve_cirros_checksum(url, vernum)
     LOG.with_fields({
         'name': name,
         'url': url,
+        'algorithm': algorithm,
         'checksum': checksum
     }).info('Image resolved')
 
-    if checksum:
-        return url
-    else:
-        return url
+    return ResolvedImage(url, algorithm, checksum)
+
+
+def _resolve_cirros_checksum(url, vernum):
+    """The published digest for a cirros image, strongest first.
+
+    Returns (algorithm, checksum), or (None, None) when the mirror
+    publishes no digest we can read. Returning no checksum is not the
+    same as returning one which does not match: the caller must not be
+    able to confuse them, which is why this is a pair and not a string.
+    """
+    filename = os.path.basename(url)
+
+    for algorithm, digest_file in CHECKSUM_FILES:
+        checksum_url = str(config.CHECKSUM_URL_CIRROS) % {
+            'vernum': vernum, 'digest_file': digest_file}
+        checksums = _fetch_remote_checksum(checksum_url)
+        if checksums is None:
+            # The digest file could not be read at all. A mirror which
+            # is briefly unwell must not silently downgrade us to a
+            # weaker algorithm, and must not look like a mirror which
+            # publishes nothing -- try the next file, but say so.
+            LOG.with_fields({
+                'url': checksum_url,
+                'algorithm': algorithm
+            }).warning('Could not read published checksums')
+            continue
+
+        checksum = checksums.get(filename)
+        if checksum:
+            return algorithm, checksum
+
+    return None, None
 
 
 def _fetch_remote_checksum(checksum_url):
-    resp = requests.get(checksum_url,
-                        headers={'User-Agent': util_general.get_user_agent()})
+    """Parse a `<digest>  <filename>` digest file.
+
+    Returns a dict, or None when the file could not be fetched. An
+    empty dict means the file exists and names no files, which is a
+    different fact.
+    """
+    try:
+        resp = requests.get(
+            checksum_url,
+            headers={'User-Agent': util_general.get_user_agent()})
+    except requests.exceptions.RequestException:
+        return None
+
     if resp.status_code != 200:
-        return {}
+        return None
 
     checksums = {}
     for line in resp.text.split('\n'):
@@ -224,7 +300,8 @@ class ImageFetchHelper:
         is the fallback for a source which cannot be reached but whose
         image has previously been fetched (issue 3603).
         """
-        url = _resolve_image(self.artifact.source_url)
+        resolved = _resolve_image(self.artifact.source_url)
+        url = resolved.url
 
         # If this is a request for a URL, do we have the most recent version
         # somewhere in the cluster?
@@ -295,7 +372,12 @@ class ImageFetchHelper:
                         dirty = True
 
             if not dirty:
-                url = f'{BLOB_URL}{most_recent_blob.uuid}'
+                # Serving from a copy the cluster already holds. That
+                # blob was verified when it was fetched; the mirror's
+                # digest is for the mirror's copy and says nothing about
+                # this one, so it does not come along -- carrying it
+                # would claim a check which did not happen.
+                resolved = ResolvedImage(f'{BLOB_URL}{most_recent_blob.uuid}')
             elif cached_only:
                 raise exceptions.BlobMissing(
                     f'Artifact {self.artifact.uuid} has no cached version '
@@ -303,16 +385,20 @@ class ImageFetchHelper:
 
         # Ensure that we have the blob in the local store. This blob is in the
         # "original format" if downloaded from an HTTP source.
-        if url.startswith(BLOB_URL):
+        #
+        # Both the branch and the fetch read `resolved`, so there is one
+        # answer to "what are we fetching, and what may we check it
+        # against" rather than two which can drift apart.
+        if resolved.url.startswith(BLOB_URL):
             add_event_multi(
                 EVENT_TYPE_STATUS, self.objects,
                 'fetching image from within the cluster')
-            b = self._blob_get(url)
+            b = self._blob_get(resolved.url)
         else:
             add_event_multi(
                 EVENT_TYPE_STATUS, self.objects,
                 'fetching image from the internet')
-            b = self._http_get_inner(url)
+            b = self._http_get_inner(resolved)
 
         return b
 
@@ -434,8 +520,9 @@ class ImageFetchHelper:
         b.ensure_local(instance_object=self.instance)
         return b
 
-    def _http_get_inner(self, url):
+    def _http_get_inner(self, resolved):
         """Fetch image if not downloaded and return image path."""
+        url = resolved.url
 
         with util_general.RecordedOperation('fetch image', self.instance):
             resp = self._open_connection(url)
@@ -447,15 +534,35 @@ class ImageFetchHelper:
             objects_including_blob.append(b)
             add_event_multi(
                 EVENT_TYPE_STATUS, objects_including_blob,
-                'commencing HTTP fetch to blob', extra={'url': url})
+                'commencing HTTP fetch to blob',
+                extra={'url': url, 'algorithm': resolved.algorithm})
 
             try:
-                blob.http_fetch(url, resp, b, objects_including_blob)
+                blob.http_fetch(
+                    url, resp, b, objects_including_blob,
+                    expected_algorithm=resolved.algorithm,
+                    expected_checksum=resolved.checksum)
             except exceptions.BadCheckSum as e:
                 add_event_multi(
                     EVENT_TYPE_AUDIT, objects_including_blob,
-                    'fetched image had bad checksum', extra={'url': url})
+                    'fetched image had bad checksum',
+                    extra={'url': url, 'algorithm': resolved.algorithm})
                 raise e
+
+            if resolved.checksum:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, objects_including_blob,
+                    'fetched image matched its published checksum',
+                    extra={'url': url, 'algorithm': resolved.algorithm})
+            else:
+                # Say so. A fetch nobody could check is not the same as
+                # a fetch which checked out, and an operator reading
+                # these events back should not have to guess which
+                # happened (issue 764).
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, objects_including_blob,
+                    'fetched image had no published checksum to verify '
+                    'against', extra={'url': url})
 
             return b
 

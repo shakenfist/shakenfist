@@ -562,7 +562,7 @@ class PlaintextUrlDefaultTestCase(base.ShakenFistTestCase):
             'cirros-%(vernum)s-x86_64-disk.img',
             str(config.DOWNLOAD_URL_CIRROS))
         self.assertEqual(
-            'https://download.cirros-cloud.net/%(vernum)s/MD5SUMS',
+            'https://download.cirros-cloud.net/%(vernum)s/%(digest_file)s',
             str(config.CHECKSUM_URL_CIRROS))
         self.assertEqual(
             'https://download.cirros-cloud.net/',

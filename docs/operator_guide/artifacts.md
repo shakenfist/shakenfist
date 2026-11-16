@@ -37,6 +37,42 @@ new version, the proposed new version is skipped. Artifact uploads from v0.7 can
 also skip actual upload of the contents of the artifact if there is already a
 blob in the cluster with a matching checksum.
 
+## Verifying a download against the mirror
+
+The checksums above answer "does this replica still hold the bytes we
+stored?". They say nothing about whether those were the right bytes in
+the first place — for that, the download has to be compared against a
+digest the mirror published.
+
+When an image shortcut resolves to a mirror which publishes a digest
+file beside its images, Shaken Fist fetches it, hashes the download as
+it streams past, and refuses the image if the two disagree. A
+mismatched download is deleted rather than registered, so it cannot
+become a usable image, and the artifact fetch fails with the
+`fetched image does not match its published checksum` event carrying
+both the expected and the actual digest.
+
+Which digest is used is whatever the mirror actually publishes,
+strongest first. For cirros that is `SHA256SUMS` where it exists and
+`MD5SUMS` otherwise: cirros publishes SHA256SUMS only from 0.6.3
+onwards, and releases before that have MD5SUMS and nothing else, so
+md5 is kept as a fallback rather than dropped. The algorithm which
+actually verified an image is recorded on the event, so an operator
+can tell a sha256-verified fetch from an md5-verified one without
+guessing. (md5 is deliberately absent from `BLOB_HASH_ALGORITHMS` and
+is not used for anything else.)
+
+A fetch from a mirror which publishes no digest we can read is
+recorded as `fetched image had no published checksum to verify
+against`. That is a different fact from a fetch which was checked and
+passed, and reading these events back should not require guessing
+which happened.
+
+A copy served from elsewhere in the cluster is not a mirror fetch, and
+does not carry the mirror's digest: that blob was verified when it was
+originally fetched, and the mirror's digest describes the mirror's
+copy rather than this one.
+
 ## Sharing artifacts
 
 Artifacts in the system namespace can be shared with all other namespaces.

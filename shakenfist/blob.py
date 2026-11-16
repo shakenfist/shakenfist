@@ -43,6 +43,7 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.eventlog import add_event
 from shakenfist.eventlog import add_event_multi
+from shakenfist.exceptions import BadCheckSum
 from shakenfist.exceptions import BlobAlreadyBeingTransferred
 from shakenfist.exceptions import BlobDependencyMissing
 from shakenfist.exceptions import BlobFetchFailed
@@ -1223,8 +1224,19 @@ def snapshot_disk(
 
 
 def http_fetch(
-        url: str, resp: Any, b: Blob, affected_objects: list[Any]
+        url: str, resp: Any, b: Blob, affected_objects: list[Any],
+        expected_algorithm: Optional[str] = None,
+        expected_checksum: Optional[str] = None
 ) -> Blob:
+    """Fetch a URL into a blob, verifying it if we have something to
+    verify it against.
+
+    ``expected_checksum`` is the digest the mirror published for this
+    image, and ``expected_algorithm`` the algorithm which produced it.
+    Both or neither: a checksum whose algorithm is unknown cannot be
+    checked, and silently not checking is the defect this closes
+    (issue 764).
+    """
     fetched = 0
 
     if resp.headers.get('Content-Length'):
@@ -1234,8 +1246,21 @@ def http_fetch(
 
     dest_path = Blob.filepath(b.uuid)
 
-    md5_hash = hashlib.md5()
+    # sha512 is what the blob is registered with. The expected
+    # algorithm, when there is one, is hashed alongside it in the same
+    # pass over the data -- the alternative is re-reading the whole
+    # image off disk to check it.
     sha512_hash = hashlib.sha512()
+    expected_hash = None
+    expected_digest = ''
+    if expected_checksum and expected_algorithm:
+        expected_hash = hashlib.new(expected_algorithm)
+        # Normalised here, beside the hash it will be compared with, so
+        # "we have something to check against" is one fact rather than
+        # two which can disagree. Mirrors are not consistent about the
+        # case they publish, and a case mismatch is not a corrupt
+        # image.
+        expected_digest = expected_checksum.lower()
 
     percentage: float = 0
     next_percentage: float = 10
@@ -1244,8 +1269,9 @@ def http_fetch(
         for chunk in resp.iter_content(chunk_size=8192):
             fetched += len(chunk)
             f.write(chunk)
-            md5_hash.update(chunk)
             sha512_hash.update(chunk)
+            if expected_hash:
+                expected_hash.update(chunk)
 
             if total_size:
                 percentage = fetched / total_size * 100.0
@@ -1282,6 +1308,28 @@ def http_fetch(
             'url': url,
             'bytes_fetched': fetched
         })
+
+    # The published digest is checked before the blob is registered,
+    # so a corrupt or substituted download never becomes a usable
+    # image. Until this check existed the digest was fetched, logged
+    # and discarded, and a mirror serving the wrong bytes was
+    # indistinguishable from one serving the right ones (issue 764).
+    if expected_hash:
+        actual = expected_hash.hexdigest()
+        if actual.lower() != expected_digest:
+            add_event_multi(
+                EVENT_TYPE_AUDIT, affected_objects,
+                'fetched image does not match its published checksum',
+                extra={
+                    'url': url,
+                    'algorithm': expected_algorithm,
+                    'expected': expected_checksum,
+                    'actual': actual
+                })
+            os.unlink(dest_path + '.partial')
+            raise BadCheckSum(
+                f'{expected_algorithm} of {url} is {actual}, the mirror '
+                f'published {expected_checksum}')
 
     # Import the newly fetched blob
     b.size = fetched
