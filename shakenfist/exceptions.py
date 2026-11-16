@@ -630,6 +630,17 @@ class UnknownNodeLockReplyException(Exception):
     ...
 
 
+class NodeLockUnavailable(Exception):
+    """This node's nodelock daemon could not be reached.
+
+    Deliberately distinct from a peer node being unreachable: this is
+    the node's own privileged lock daemon, on a local Unix socket, so
+    the caller's request cannot be served here and saying anything
+    about peers would be the wrong sentence (issue 4161).
+    """
+    ...
+
+
 class MissingPrivExecSocket(Exception):
     ...
 

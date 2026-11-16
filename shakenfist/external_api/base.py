@@ -2781,6 +2781,34 @@ def handle_database_unavailable(func):
     return wrapper
 
 
+def handle_nodelock_unavailable(func):
+    # The node's own privileged lock daemon not answering is an
+    # infrastructure condition on this node, not a fault in the handler,
+    # so it must not escape as an unqualified 500 (issue 4161, the
+    # local-socket variant of issue 3743). It is deliberately worded
+    # differently from the peer-node case in proxy_request_to_node: no
+    # peer is involved, and saying one was would send diagnosis to the
+    # wrong machine. Logged at WARNING because the commonest cause is
+    # sf-nodelock restarting during a deploy, which is handled and
+    # retryable.
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except exceptions.NodeLockUnavailable as e:
+            LOG.with_fields({
+                'method': flask.request.method,
+                'path': flask.request.path,
+                'error': str(e)}).warning(
+                'Nodelock daemon unavailable while handling API request')
+            return sf_api.error(
+                503,
+                'the lock service on the node handling this request is '
+                'unavailable, please retry',
+                suppress_traceback=True)
+
+    return wrapper
+
+
 # The flask.g key carrying the correlation fields for a recorded
 # exception from the record_exception decorator out to
 # suppress_exceptions_to_client, which sits immediately outside it in
@@ -3143,6 +3171,7 @@ class Resource(flask_restful.Resource):
         log_request,
         handle_authorization_exceptions,
         handle_database_unavailable,
+        handle_nodelock_unavailable,
         record_exception,
         suppress_exceptions_to_client
         ]
