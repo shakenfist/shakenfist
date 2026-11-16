@@ -16013,6 +16013,17 @@
   fleet's
   <a href="../../components/development/audits/plan-source-references/">plan references in source</a>
   audit accepts, so one marker answers both</li>
+<li>A <code>PLAN-*.md</code> pointer which survives has to land on a file, which is
+  not advisory: nothing renders one -- a path in a comment or a YAML
+  value is inert text no link checker follows -- so a renamed or
+  archived plan rots it in silence. The same hook fails the commit for
+  a pointer in a tracked non-markdown file which resolves neither from
+  the repository root nor from <code>docs/</code>, and not bare against the plans
+  in <code>docs/plans/</code> at any depth. A plan in another repository is
+  written as an absolute <code>https://github.com/.../docs/plans/PLAN-x.md</code>
+  URL, which is not resolved here, and the two markers above exempt a
+  line or a file of fixtures -- which is how the test suites for this
+  tooling name plans that deliberately do not exist</li>
 </ul>
 <p>This page is the style guide; <code>AGENTS.md</code> summarises it and links here.</p>
 <h2 id="attribute-updates-use-field-masks">Attribute updates use field masks<a class="headerlink" href="#attribute-updates-use-field-masks" title="Permanent link">&para;</a></h2>
