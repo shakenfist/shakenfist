@@ -95,21 +95,30 @@ class ImageCacheOp(BaseClusterOperation):
 
         b = Blob.from_db(self.blob_uuid)
         if not b:
-            self.state = ImageCacheOp.STATE_ERROR
+            self.enter_error_state(
+                ImageCacheOp.STATE_ERROR,
+                f'blob {self.blob_uuid} is missing')
             return
         if b.state.value != Blob.STATE_CREATED:
-            self.state = ImageCacheOp.STATE_ERROR
+            self.enter_error_state(
+                ImageCacheOp.STATE_ERROR,
+                f'blob {self.blob_uuid} is in state {b.state.value}, not '
+                f'{Blob.STATE_CREATED}')
             return
 
         if not os.path.exists(self.cache_path):
-            self.state = ImageCacheOp.STATE_ERROR
+            self.enter_error_state(
+                ImageCacheOp.STATE_ERROR,
+                f'cached image {self.cache_path} is missing from this node')
             return
 
         try:
             self.__getattribute__(f'_{task.name}')(b)
         except Exception as e:
             util_exceptions.ignore_exception('imgcache_op', e)
-            self.state = ImageCacheOp.STATE_ERROR
+            self.enter_error_state(
+                ImageCacheOp.STATE_ERROR,
+                f'{task.name} task raised {e.__class__.__name__}: {e}')
 
     def _archive_transcode(self, b):
         try:

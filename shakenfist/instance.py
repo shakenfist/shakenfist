@@ -3016,10 +3016,10 @@ class Instance(dbowo):
             return
 
         try:
-            self.state = f'{self.state.value}-error'
+            self.enter_error_state(f'{self.state.value}-error', error_msg)
         except Exception:
             # We can land here if there is a serious database error.
-            self.state = self.STATE_ERROR
+            self.enter_error_state(self.STATE_ERROR, error_msg)
 
         try:
             self.error = error_msg

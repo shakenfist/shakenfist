@@ -165,7 +165,10 @@ class NetOp(BaseClusterOperation):
                 'Failed to create VXLAN interface, will retry')
             mariadb.set_cluster_operation_error(
                 str(self.uuid), ErrorReport.from_exception(e))
-            self.state = NetOp.STATE_ERROR
+            self.enter_error_state(
+                NetOp.STATE_ERROR,
+                f'failed to create VXLAN interface for network '
+                f'{self.network_uuid}: {e}')
 
         except EnsureMeshFailed as e:
             # ensure_vxlan_mesh fails when this node has no vxlan interface
@@ -180,7 +183,10 @@ class NetOp(BaseClusterOperation):
                 # traceback) rather than retrying.
                 mariadb.set_cluster_operation_error(
                     str(self.uuid), ErrorReport.from_exception(e))
-                self.state = NetOp.STATE_ERROR
+                self.enter_error_state(
+                    NetOp.STATE_ERROR,
+                    f'ensure_mesh is moot, network {self.network_uuid} is '
+                    f'being torn down (state {n.state.value}): {e}')
             elif self.defer_with_backoff(
                     reason='ensure_mesh failed, vxlan interface not ready'):
                 # Active network: the interface is most likely still being
@@ -196,13 +202,18 @@ class NetOp(BaseClusterOperation):
                     'ensure_mesh still failing after retries, erroring op')
                 mariadb.set_cluster_operation_error(
                     str(self.uuid), ErrorReport.from_exception(e))
-                self.state = NetOp.STATE_ERROR
+                self.enter_error_state(
+                    NetOp.STATE_ERROR,
+                    f'ensure_mesh for network {self.network_uuid} still '
+                    f'failing after retries: {e}')
 
         except Exception as e:
             util_exceptions.ignore_exception('net_op', e)
             mariadb.set_cluster_operation_error(
                 str(self.uuid), ErrorReport.from_exception(e))
-            self.state = NetOp.STATE_ERROR
+            self.enter_error_state(
+                NetOp.STATE_ERROR,
+                f'{task.name} task raised {e.__class__.__name__}: {e}')
 
     def _network_deploy(self, n):
         # This task is no longer enqueued by any production code path;

@@ -161,9 +161,7 @@ def apply_result(node: Node, result: NodeHealthResult) -> bool:
                 {'path': r.identity, 'status': r.status, 'detail': r.detail}
                 for r in result.failed],
         })
-    # The base state property's setter is not visible under the silent
-    # follow-imports mypy uses for this module; the setter does exist.
-    node.state = Node.STATE_ERROR  # type: ignore[misc]
+    node.enter_error_state(Node.STATE_ERROR, result.reason)
     return True
 
 

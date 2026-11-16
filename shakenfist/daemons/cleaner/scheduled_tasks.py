@@ -226,7 +226,9 @@ def _update_active_domain(lc, inst, instance_uuid, domain, log_ctx):
                 f'virsh undefine --nvram "sf:{instance_uuid}"')
             inst.state = dbo.STATE_DELETED
         else:
-            inst.state = inst.state.value + '-error'
+            inst.enter_error_state(
+                inst.state.value + '-error',
+                'libvirt reports the guest has crashed')
 
     elif state == 'paused':
         # A pause this loop is the first to see was not made by pause(),
@@ -283,11 +285,8 @@ def _update_active_domain(lc, inst, instance_uuid, domain, log_ctx):
                     {'disk_errors': disk_errors}).warning(
                     'Instance paused by disk I/O error, '
                     'marking errored')
-                # State must move to the error state before error
-                # is set: the error setter rejects a message
-                # unless the instance is already errored.
-                inst.state = inst.state.value + '-error'
-                inst.error = (
+                inst.enter_error_state(
+                    inst.state.value + '-error',
                     'instance paused by disk I/O error' +
                     (f' ({errors})' if errors else ''))
 
@@ -563,11 +562,8 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
                 return
 
             log_ctx.warning('Instance files missing, marking errored')
-            # State must move to the error state before error is set: the
-            # error setter rejects a message unless the instance is
-            # already errored.
-            inst.state = db_state.value + '-error'
-            inst.error = 'instance files missing'
+            inst.enter_error_state(
+                db_state.value + '-error', 'instance files missing')
             inst.add_event(EVENT_TYPE_AUDIT, 'instance files missing')
         return
 

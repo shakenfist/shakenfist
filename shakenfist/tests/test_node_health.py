@@ -16,6 +16,7 @@ class _FakeNode:
         self._state = state_value
         self.uuid = uuid
         self.events = []
+        self.error_reasons = []
 
     @property
     def state(self):
@@ -24,6 +25,11 @@ class _FakeNode:
     @state.setter
     def state(self, value):
         self._state = value
+
+    def enter_error_state(self, value, message,
+                          skip_transition_validation=False):
+        self._state = value
+        self.error_reasons.append(message)
 
     def add_event(self, eventtype, message, extra=None, **kwargs):
         self.events.append((eventtype, message, extra))

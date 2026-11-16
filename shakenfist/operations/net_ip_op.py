@@ -92,7 +92,9 @@ class NetIPOp(BaseClusterOperation):
             util_exceptions.ignore_exception('net_ip_op', e)
             mariadb.set_cluster_operation_error(
                 str(self.uuid), ErrorReport.from_exception(e))
-            self.state = NetIPOp.STATE_ERROR
+            self.enter_error_state(
+                NetIPOp.STATE_ERROR,
+                f'{task.name} task raised {e.__class__.__name__}: {e}')
 
     def _route_address(self, n):
         if n.is_dead():

@@ -394,9 +394,10 @@ class BaseClusterOperation(BaseOperation):
             try:
                 self.__tasks.append(schema.model_tasks[task_name])
             except KeyError as e:
-                self.state = self.STATE_ERROR  # type: ignore[misc]
+                self.enter_error_state(
+                    self.STATE_ERROR, f'unknown task {task_name}: {e}')
                 self.add_event(
-                    EVENT_TYPE_AUDIT, 'unknown task {task_name}: {e}')
+                    EVENT_TYPE_AUDIT, f'unknown task {task_name}: {e}')
                 raise e
 
     @property

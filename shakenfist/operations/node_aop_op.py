@@ -104,7 +104,9 @@ class NodeAgentopOp(BaseClusterOperation):
             self.__getattribute__(f'_{task.name}')(aop)
         except Exception as e:
             util_exceptions.ignore_exception('node_aop_op', e)
-            self.state = NodeAgentopOp.STATE_ERROR
+            self.enter_error_state(
+                NodeAgentopOp.STATE_ERROR,
+                f'{task.name} task raised {e.__class__.__name__}: {e}')
             aop.fail(f'{task.name} task raised an exception')
 
     def _preflight(self, aop):
@@ -130,7 +132,10 @@ class NodeAgentopOp(BaseClusterOperation):
             if command['command'] == 'put-blob':
                 b = Blob.from_db(command['blob_uuid'])
                 if not b:
-                    self.state = NodeAgentopOp.STATE_ERROR
+                    self.enter_error_state(
+                        NodeAgentopOp.STATE_ERROR,
+                        'preflight failure, blob missing: '
+                        f'{command["blob_uuid"]}')
                     aop.fail('preflight failure, blob missing: '
                              f'{command["blob_uuid"]}')
                     return

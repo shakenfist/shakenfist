@@ -119,7 +119,9 @@ class NodeBlobOp(BaseClusterOperation):
             self.__getattribute__(f'_{task.name}')(b)
         except Exception as e:
             util_exceptions.ignore_exception('node_blob_op', e)
-            self.state = NodeBlobOp.STATE_ERROR
+            self.enter_error_state(
+                NodeBlobOp.STATE_ERROR,
+                f'{task.name} task raised {e.__class__.__name__}: {e}')
 
     def _verify_size_and_checksum(self, b):
         locations = b.locations

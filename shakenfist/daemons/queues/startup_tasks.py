@@ -460,7 +460,10 @@ def _recover_interrupted_operation(row):
         if row['attempts'] >= config.CLUSTER_OP_MAX_ATTEMPTS:
             if not mariadb.delete_work_queue_row(row['id']):
                 return
-            op.state = BaseClusterOperation.STATE_ERROR
+            op.enter_error_state(
+                BaseClusterOperation.STATE_ERROR,
+                'errored at sf-queues startup: interrupted after '
+                f'{row["attempts"]} claim attempts')
             op.add_event(
                 EVENT_TYPE_AUDIT,
                 f'errored at sf-queues startup: interrupted after '
@@ -473,7 +476,11 @@ def _recover_interrupted_operation(row):
             # before this recovery existed (#4656).
             if not mariadb.delete_work_queue_row(row['id']):
                 return
-            op.state = BaseClusterOperation.STATE_ERROR
+            op.enter_error_state(
+                BaseClusterOperation.STATE_ERROR,
+                'errored at sf-queues startup: interrupted, and this '
+                'operation type cannot be safely re-run from its first '
+                'task')
             op.add_event(
                 EVENT_TYPE_AUDIT,
                 'errored at sf-queues startup: interrupted, and this '

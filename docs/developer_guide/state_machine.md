@@ -16,6 +16,29 @@ deleted it will no longer appear in any API request, as it no longer exists in
 the database. The exception is that it will still appear in relevant events that
 have not yet aged out.
 
+## Error states always carry a reason
+
+Every object type has at least one error state, and an object in one always
+records why it got there. That reason is published as `error_message` in the
+object's API view, and it is written at the same moment as the state itself:
+`enter_error_state(state, reason)` on the object is the supported way in, and
+it takes both.
+
+This matters because the alternative leaves no record at all. Setting the state
+and then the message as two separate writes leaves a window in which the object
+says it failed and nothing says what failed, and loses the reason entirely if
+the process dies in between. CI observed exactly that -- an instance in `error`
+with `error_message` null, and no way to tell what had put it there.
+
+Two rules follow, both enforced rather than documented:
+
+* A transition from one error state to another keeps the earlier reason, since
+  the move to `error` from a `*-error` transition state has nothing new to say.
+* A caller which enters an error state without a reason has the location it was
+  set from recorded in its place, and logs an error naming that location. The
+  `test_error_state_reasons` audit reads the tree and fails on any such caller,
+  so the fallback is a backstop rather than a supported path.
+
 ## Agent Operations
 
 * `initial`: the first state for an agent operation. A UUID has been allocated,

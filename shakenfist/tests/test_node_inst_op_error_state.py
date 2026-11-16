@@ -45,6 +45,7 @@ class FakeInstance:
         self._state_value = state_value
         self._reject = reject
         self.state_sets = []
+        self.error_reasons = []
 
     @property
     def state(self):
@@ -57,6 +58,11 @@ class FakeInstance:
                 'Invalid state change from %s to %s'
                 % (self._state_value, new_value))
         self.state_sets.append(new_value)
+
+    def enter_error_state(self, new_value, message,
+                          skip_transition_validation=False):
+        self.state = new_value
+        self.error_reasons.append(message)
         self._state_value = new_value
 
 

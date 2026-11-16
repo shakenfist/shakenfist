@@ -739,6 +739,29 @@ class DatabaseBackedObject:
                 self._is_error_state_value(new_value)):
             message = orig.message
 
+        # Entering an error state with no reason at all is a diagnostic
+        # dead end: the object says it failed, and nothing anywhere says
+        # what failed. That is how CI found an instance in state error
+        # with error_message null and no way to tell what had put it
+        # there (issue 3665). Callers enter an error state through
+        # enter_error_state(), which takes the reason and writes it with
+        # the state in a single write. This is the backstop for a caller
+        # which did not: record where the transition came from, so the
+        # next occurrence names a line of code rather than nothing.
+        # test_error_state_reasons asserts that no production call site
+        # relies on it.
+        if (message is None and state_attribute_name == 'state' and
+                self._is_error_state_value(new_value)):
+            caller = util_callstack.get_caller(offset=-3)
+            LOG.with_fields({
+                'uuid': self.uuid,
+                'object_type': self.object_type,
+                'original state': orig.value,
+                'new state': new_value,
+                'caller': caller
+            }).error('Error state entered with no reason recorded')
+            message = f'no reason recorded, state set by {caller}'
+
         new_state = State(value=new_value, update_time=time.time(), message=message)
 
         # Primary state is stored in MariaDB, except for in-memory only
@@ -806,6 +829,37 @@ class DatabaseBackedObject:
                 f'Failed to write error message for '
                 f'{self.object_type}/{self.uuid} to MariaDB')
         self._log_attribute_mutation('error', {'message': msg})
+
+    def enter_error_state(self, new_value, message,
+                          skip_transition_validation=False):
+        """Move into an error state and record why, in one write.
+
+        The reason an object failed is only useful if it is still there
+        when somebody looks. Setting the state and then the message as
+        two writes leaves a window in which the object is in error with
+        no reason, and loses the reason entirely if the process dies in
+        between -- which is how an instance was observed in state error
+        with a null error_message (issue 3665).
+
+        ``message`` is required and is what ``error`` and the object's
+        ``error_message`` view field will read back. Prefer a reason a
+        reader who was not here can act on: name the thing that was
+        missing or the operation that failed, not just 'failed'.
+        """
+        if not self._is_error_state_value(new_value):
+            raise exceptions.InvalidStateException(
+                'enter_error_state() called with non-error state %s for '
+                'object=%s uuid=%s'
+                % (new_value, self.object_type, self.uuid))
+
+        if not message:
+            raise exceptions.InvalidStateException(
+                'enter_error_state() requires a reason for object=%s '
+                'uuid=%s' % (self.object_type, self.uuid))
+
+        self._state_update(
+            new_value, message=message,
+            skip_transition_validation=skip_transition_validation)
 
     @property
     def metadata(self):
