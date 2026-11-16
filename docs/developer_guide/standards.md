@@ -85,6 +85,17 @@ Memory is measured in MiB in Shaken Fist. All references to memory size are stor
   fleet's
   [plan references in source](../components/development/audits/plan-source-references.md)
   audit accepts, so one marker answers both
+- A `PLAN-*.md` pointer which survives has to land on a file, which is
+  not advisory: nothing renders one -- a path in a comment or a YAML
+  value is inert text no link checker follows -- so a renamed or
+  archived plan rots it in silence. The same hook fails the commit for
+  a pointer in a tracked non-markdown file which resolves neither from
+  the repository root nor from `docs/`, and not bare against the plans
+  in `docs/plans/` at any depth. A plan in another repository is
+  written as an absolute `https://github.com/.../docs/plans/PLAN-x.md`
+  URL, which is not resolved here, and the two markers above exempt a
+  line or a file of fixtures -- which is how the test suites for this
+  tooling name plans that deliberately do not exist
 
 This page is the style guide; `AGENTS.md` summarises it and links here.
 

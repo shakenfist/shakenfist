@@ -65,6 +65,17 @@ data, where rewording splits a committed dataset on one condition.
 `audit-ok: plan-reference-file` once near the top, exempts it -- the
 same tokens the fleet's plan-source-references audit accepts, so one
 marker answers both.
+
+A pointer which survives is then held to resolving, by
+plan_pointer_problems(): the fleet's plan-source-references audit run
+here rather than the morning after. Nothing renders these pointers, so
+a renamed or archived plan rots one silently, which is why this pass
+fails the commit and reads every tracked file rather than only Python.
+A path resolves from the repository root and then from `docs/`, which
+is how mkdocs addresses a page; a bare filename resolves against every
+plan under a plans directory in `docs/` at any depth, naming no
+directory to be wrong about; an absolute URL is somebody else's
+repository; and the markers above exempt a line or a file of fixtures.
 """
 
 import ast
@@ -158,6 +169,20 @@ ADVISORY_NAME_RE = re.compile(
 # that a line needs one marker and not two.
 PLAN_MARKER = 'audit-ok: plan-reference'
 PLAN_FILE_MARKER = 'audit-ok: plan-reference-file'
+
+# A pointer to a plan, with or without the path it was written with. A
+# bare name is resolved against every plan this repository has, because
+# it names no directory to be wrong about; a path is resolved as
+# written, from the repository root and then from `docs/`, which is how
+# mkdocs addresses a page.
+PLAN_POINTER_RE = re.compile(r'(?:[\w.-]+/)*PLAN-[\w.-]*\.md')
+
+# Not a plan but the template plans are written from, and it lives at
+# the repository root rather than in docs/plans/.
+PLAN_TEMPLATE_NAME = 'PLAN-TEMPLATE.md'
+
+# Where this repository's own plans live, below DOCS_DIR.
+PLANS_DIR = 'plans'
 
 # FSTRING_MIDDLE only exists from Python 3.12, which stopped emitting an
 # f-string as one STRING token. A message built with an f-string is
@@ -313,6 +338,72 @@ def source_problems(root_dir=None):
     return found
 
 
+def plan_files(root_dir=None):
+    """The bare filename of every plan in docs/plans/, at any depth.
+
+    Only this repository's own plans: the plans directories under
+    docs/components/ are an automated import of the sibling
+    repositories' documentation, and a name which resolves only there
+    is a pointer into somebody else's repository, which is written as
+    an absolute URL.
+    """
+    root_dir = root_dir or REPO_ROOT
+    names = set()
+    for _, _, filenames in os.walk(
+            os.path.join(root_dir, DOCS_DIR, PLANS_DIR)):
+        names.update(f for f in filenames if f.endswith('.md'))
+    return names
+
+
+def _plan_pointer_resolves(reference, root_dir, names):
+    if '/' in reference:
+        return any(
+            os.path.isfile(os.path.join(base, reference))
+            for base in (root_dir, os.path.join(root_dir, DOCS_DIR)))
+    return reference in names
+
+
+def plan_pointers(path, root_dir, names):
+    """(line number, reference) for each plan pointer which lands nowhere."""
+    lines = _readable_lines(path)
+    if lines is None:
+        return []
+
+    # The file marker contains the line marker as a prefix, so the file
+    # test comes first and a line carrying only the line marker is not
+    # mistaken for it.
+    if any(PLAN_FILE_MARKER in line for line in lines):
+        return []
+
+    found = []
+    for index, line in enumerate(lines):
+        if PLAN_MARKER in line:
+            continue
+        # A plan in another repository is written as an absolute URL and
+        # cannot be resolved here, so an address is not a pointer.
+        for match in PLAN_POINTER_RE.finditer(URL_RE.sub('', line)):
+            reference = match.group(0)
+            if os.path.basename(reference) == PLAN_TEMPLATE_NAME:
+                continue
+            if not _plan_pointer_resolves(reference, root_dir, names):
+                found.append((index + 1, reference))
+    return found
+
+
+def plan_pointer_problems(root_dir=None):
+    root_dir = root_dir or REPO_ROOT
+    names = plan_files(root_dir=root_dir)
+    found = []
+    for path in source_files(root_dir=root_dir):
+        for number, reference in plan_pointers(path, root_dir, names):
+            found.append(
+                f'{path}:{number}: plan reference {reference!r} resolves to '
+                'no file -- update the path, write an absolute '
+                'https://github.com/... URL for a plan in another '
+                'repository, or mark the line audit-ok: plan-reference')
+    return found
+
+
 def python_sources(root_dir=None):
     """The Python files the advisory pass reads."""
     for path in source_files(root_dir=root_dir):
@@ -407,11 +498,12 @@ def main(argv=None):
               'and names. These do not fail the commit: fix the ones in the '
               'files you touch.\n')
 
-    found = problems() + source_problems()
+    found = problems() + source_problems() + plan_pointer_problems()
     for problem in found:
         print(problem)
     if found:
-        print(f'\n{len(found)} plan phase or history reference(s).')
+        print(f'\n{len(found)} plan phase, history or unresolved '
+              'reference(s).')
         return 1
     return 0
 

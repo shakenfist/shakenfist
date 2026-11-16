@@ -11,6 +11,12 @@ Six such references accumulated on one page before the fleet-wide audit
 reported them, because nothing here checked; the checker closes that
 gap at commit time, these tests keep it honest, and the final test is
 the regression guard for the documentation itself.
+
+The last suites here cover the other half of the same checker: whether
+a plan pointer written into code still lands on a file. Nothing renders
+one, so it rots in silence when a plan is renamed or archived, and
+fourteen such pointers were in this repository's own plan-tooling
+fixtures when the fleet audit reported them.
 """
 
 import contextlib
@@ -468,11 +474,140 @@ class PlanCitationAdvisoryRegressionTestCase(base.ShakenFistTestCase):
         # The point of the advisory pass: the tree carries hundreds of
         # these citations, and the checker still exits zero so that they
         # are worked off file by file rather than in one sweep. The
-        # blocking passes stay blocking, which the two regression tests
-        # above cover.
+        # blocking passes stay blocking, which the regression tests
+        # either side of this one cover.
         printed = io.StringIO()
         with contextlib.redirect_stdout(printed):
             status = checker.main(argv=[])
         self.assertEqual(0, status)
         self.assertIn('advisory plan citation', printed.getvalue())
         self.assertIn('do not fail the commit', printed.getvalue())
+
+
+class PlanPointerFixtureTestCase(base.ShakenFistTestCase):
+    """The resolution pass (the plan-source-references audit).
+
+    Nothing renders a plan path written into code: a name inside a `#`
+    comment or a YAML value is inert text no link checker follows, so a
+    renamed or archived plan rots the pointer silently and the first
+    person to notice is someone who went looking for the plan and did
+    not find it. At that point the comment is worse than none, because
+    it asserts a record exists.
+    """
+
+    def _write(self, tmp, name, content):
+        path = os.path.join(tmp, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write(content)
+        return path
+
+    def _tree(self, tmp):
+        # A plan which is here, one archived into a subdirectory, and the
+        # template, which is not a plan and lives at the root.
+        self._write(tmp, 'docs/plans/PLAN-here.md', '# Here\n')
+        self._write(tmp, 'docs/plans/completed/PLAN-archived.md', '# Old\n')
+        self._write(tmp, 'PLAN-TEMPLATE.md', '# Template\n')
+
+    def _problems(self, name, content):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._tree(tmp)
+            self._write(tmp, name, content)
+            return checker.plan_pointer_problems(root_dir=tmp)
+
+    def test_a_pointer_which_resolves_passes(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# Deferred; see docs/plans/PLAN-here.md.\n'))
+
+    def test_a_pointer_which_resolves_to_nothing_is_reported(self):
+        problems = self._problems(
+            'shakenfist/thing.py',
+            '# Fine.\n# Deferred; see docs/plans/PLAN-gone.md.\n')
+        self.assertEqual(1, len(problems))
+        self.assertIn('thing.py:2', problems[0])
+        self.assertIn("'docs/plans/PLAN-gone.md'", problems[0])
+
+    def test_a_bare_name_resolves_at_any_depth(self):
+        # A bare filename names no directory, so there is no path for it
+        # to be wrong about, and a plan archived into a subdirectory of
+        # docs/plans/ still answers to the name the code wrote.
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py', '# Deferred; see PLAN-archived.md.\n'))
+
+    def test_an_imported_sibling_plan_does_not_resolve_a_bare_name(self):
+        # docs/components/ is an automated import of the sibling
+        # repositories' documentation, so a name which is only there is
+        # a pointer into another repository and wants an absolute URL.
+        with tempfile.TemporaryDirectory() as tmp:
+            self._tree(tmp)
+            self._write(tmp, 'docs/components/kerbside/plans/PLAN-theirs.md',
+                        '# Theirs\n')
+            self._write(tmp, 'shakenfist/thing.py',
+                        '# Deferred; see PLAN-theirs.md.\n')
+            self.assertEqual(
+                1, len(checker.plan_pointer_problems(root_dir=tmp)))
+
+    def test_a_path_is_resolved_from_the_documentation_root_too(self):
+        # mkdocs addresses a page relative to docs/, so a nav entry or a
+        # config value written that way is not wrong.
+        self.assertEqual([], self._problems(
+            'deploy/thing.yaml', 'plan: plans/PLAN-here.md\n'))
+
+    def test_a_wrong_path_to_a_real_plan_is_reported(self):
+        # The case a bare name would hide: the file exists, but not
+        # where the pointer says it does.
+        self.assertEqual(1, len(self._problems(
+            'shakenfist/thing.py', '# See docs/PLAN-here.md.\n')))
+
+    def test_an_absolute_url_is_not_a_local_pointer(self):
+        # A plan in another repository cannot resolve here, and is
+        # written as an absolute URL for exactly that reason.
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py',
+            '# See https://github.com/shakenfist/client-python/blob/'
+            'develop/docs/plans/PLAN-gone.md.\n'))
+
+    def test_the_template_is_not_a_plan(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/thing.py', '# Written from PLAN-TEMPLATE.md.\n'))
+
+    def test_the_line_marker_suppresses_a_line(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/tests/test_thing.py',
+            "name = 'PLAN-gone.md'  # audit-ok: plan-reference\n"))
+
+    def test_the_file_marker_suppresses_the_whole_file(self):
+        self.assertEqual([], self._problems(
+            'shakenfist/tests/test_thing.py',
+            '# audit-ok: plan-reference-file -- fixtures.\n'
+            "name = 'PLAN-gone.md'\n"))
+
+    def test_markdown_is_not_read(self):
+        # Documentation links break visibly and are audited as links;
+        # this pass is for the pointers nothing renders.
+        self.assertEqual([], self._problems(
+            'docs/guide.md', 'See docs/plans/PLAN-gone.md.\n'))
+
+    def test_a_plans_directory_is_skipped(self):
+        # A plans directory is the record of how the software was built,
+        # and citing plans -- including ones since renamed, retired or
+        # written in another repository -- is its job.
+        self.assertEqual([], self._problems(
+            'docs/plans/helper.py', '# See PLAN-gone.md.\n'))
+
+
+class PlanPointerRegressionTestCase(base.ShakenFistTestCase):
+    def test_every_plan_pointer_in_source_resolves(self):
+        # The guard for the tree itself. No workflow runs pre-commit, so
+        # the hook alone would not catch a contributor who has not
+        # installed it, and the fleet audit reports a day late.
+        plans = os.path.join(checker.REPO_ROOT, 'docs', 'plans')
+        if not os.path.isdir(plans):
+            self.skipTest('documentation tree is not present')
+
+        problems = checker.plan_pointer_problems()
+        self.assertEqual(
+            [], problems,
+            'Plan references which resolve to nothing:\n'
+            + '\n'.join(problems))
