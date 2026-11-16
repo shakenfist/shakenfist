@@ -5010,6 +5010,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database FindArtifacts failed', e)
+            # An empty artifact list is a valid-looking answer, so a
+            # failed find must not be reported as a successful one --
+            # the caller cannot otherwise tell a database outage from
+            # "no artifact by that name" (#3522).
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
             return database_pb2.FindArtifactsReply(artifacts=[])
 
     def UpdateArtifact(
