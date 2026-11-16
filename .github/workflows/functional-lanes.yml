@@ -22,7 +22,10 @@ name: Functional lanes
 # A lane which calls the reusable workflow names itself in that workflow's
 # concurrency_key input. A lane which runs its own steps has no inputs to
 # name itself in, so its concurrency group carries the name instead and the
-# seam test reads it from there.
+# seam test reads it from there. Such a lane also carries the caller_key its
+# caller passes, because this is a reusable workflow: github.workflow is the
+# caller's name, not this file's, so without it two calls on one ref share a
+# group and the second cancels the first.
 #
 # Each lane is its own job rather than an entry of one matrix, because a job
 # level 'if' cannot read the matrix context, and because
@@ -55,6 +58,16 @@ on:
         description: >-
           A JSON array of the lanes to run, named by their concurrency_key,
           for example '["debian-13-slim-primary", "guests"]'.
+        type: string
+        required: true
+      caller_key:
+        description: >-
+          Which invocation of this workflow the caller is, distinct per call
+          site, for example 'merge' or 'weekly'. A lane which runs its own
+          steps puts it in its concurrency group. github.workflow resolves to
+          the *caller's* workflow name inside a reusable workflow, so a group
+          built only from caller contexts renders identically for every
+          invocation on a ref, and the second would cancel the first.
         type: string
         required: true
 
@@ -234,14 +247,17 @@ jobs:
     # is still far short of GitHub's six hour default.
     timeout-minutes: 180
     # The same key smoke-cluster.yml gives every other lane, so this lane
-    # behaves as they do wherever it runs. The merge_group arm cannot fire
-    # while the lane is weekly; it is kept so that moving the lane back into
-    # the merge queue needs no edit here (see automated_delinter in
+    # behaves as they do wherever it runs, plus the caller's own key: the
+    # other lanes get theirs from the concurrency_key they pass, and this one
+    # has no such call to put it in. The merge_group arm cannot fire while
+    # the lane is weekly; it is kept so that moving the lane back into the
+    # merge queue needs no edit here (see automated_delinter in
     # functional-tests.yml for why the queue wants it). The seam test reads
     # the lane name from this group, so it must stay in it.
     concurrency:
       group: >-
         ${{ github.workflow }}-node-lifecycle-collection-${{
+        inputs.caller_key }}-${{
         github.event_name == 'merge_group' && github.run_attempt == '1'
         && format('merge_group-{0}', github.event.merge_group.base_ref)
         || github.ref }}
