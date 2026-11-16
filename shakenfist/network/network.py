@@ -6,6 +6,8 @@ from uuid import uuid4
 
 from shakenfist_utilities import logs  # noreorder
 
+from functools import partial
+
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist import ipam
 from shakenfist import mariadb
@@ -811,6 +813,56 @@ class Network(dbowo):
         if not is_running:
             self.add_event(EVENT_TYPE_STATUS, 'dnsmasq is not running')
         return is_running
+
+    def signal_instances_of_failure(self, reason):
+        """Record on every instance using this network that it failed.
+
+        A network which cannot be brought up, or which the maintenance
+        circuit breaker has quiesced, is recorded on the network and
+        nowhere else. The instances attached to it have no working
+        network and no way for their owner to find that out: they read
+        `created` and healthy, and the only trace is on an object the
+        owner may not think to look at (issue 520).
+
+        An event rather than a state change. The instance has not
+        failed -- its guest is running and its disks are fine -- so
+        erroring it would be a lie, and would also make it
+        undeletable-by-the-usual-path for a condition which may clear
+        on its own.
+
+        Returns the instance uuids signalled, for the caller to log.
+        """
+        instance_uuids = set()
+        for ni in interface.NetworkInterfaces(
+                [partial(interface.network_uuid_filter, self.uuid)],
+                prefilter='active'):
+            if ni.instance_uuid:
+                instance_uuids.add(str(ni.instance_uuid))
+
+        if not instance_uuids:
+            return []
+
+        ordered = sorted(instance_uuids)
+        add_event_multi(
+            EVENT_TYPE_STATUS,
+            [(ObjectType.INSTANCE, u) for u in ordered],
+            'network this instance is attached to has failed',
+            extra={'network_uuid': str(self.uuid), 'reason': reason})
+        return ordered
+
+    def enter_error_state(self, new_value, message,
+                          skip_transition_validation=False):
+        """Error the network, and tell the instances sitting on it."""
+        # Only on the way in. A network already in an error state has
+        # signalled its instances once; saying it again on every
+        # subsequent transition between error states would be noise on
+        # an object the owner is already looking at.
+        already_errored = self._is_error_state_value(self.state.value)
+        super().enter_error_state(
+            new_value, message,
+            skip_transition_validation=skip_transition_validation)
+        if not already_errored:
+            self.signal_instances_of_failure(message)
 
     def is_dnsmasq_serving_dhcp(self):
         """Is this network's dnsmasq answering DHCP?

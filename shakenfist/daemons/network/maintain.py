@@ -47,6 +47,12 @@ LOG, _ = logs.setup(__name__)
 # for a vxid when the stray leaves the host or is reaped.
 EXTRA_VLANS_HISTORY: dict[int, float] = {}
 EXTRA_VLANS_WARNED: dict[int, set[str]] = {}
+
+# Networks whose instances have already been told that reconciliation
+# is quiesced, so they are told once per episode rather than once per
+# pass. Dropped for a network when it next reconciles cleanly, so a
+# network which breaks again is reported again (issue 520).
+QUIESCE_REPORTED: set[str] = set()
 STRAY_VXLAN_HANDLING_FAILING: bool = False
 
 
@@ -611,8 +617,28 @@ class Job(util_concurrency.Job):
                 'network has failed reconciliation %d times in a '
                 'row; quiesced pending operator attention' % (
                     circuit_k))
+
+            # The instances on this network have no working network and
+            # no way to find that out: the quiesce is recorded on the
+            # network and nowhere else (issue 520). Once per episode,
+            # not once per pass -- this branch is reached every 30
+            # seconds for as long as the network stays quiesced, and
+            # the point is to tell the owner, not to fill their event
+            # log.
+            if str(n.uuid) not in QUIESCE_REPORTED:
+                QUIESCE_REPORTED.add(str(n.uuid))
+                signalled = n.signal_instances_of_failure(
+                    'reconciliation quiesced after %d consecutive '
+                    'failures, pending operator attention' % circuit_k)
+                if signalled:
+                    LOG.with_fields({
+                        'network_uuid': str(n.uuid),
+                        'instances': signalled
+                    }).warning(
+                        'Told instances their network is quiesced')
             return True
 
+        QUIESCE_REPORTED.discard(str(n.uuid))
         return False
 
     def execute(self):
@@ -750,7 +776,10 @@ class Job(util_concurrency.Job):
                                and n.uuid in routed_by_network)
 
                 if network_okay and mesh_okay and not routed_here:
-                    # No drift detected for this network on this pass.
+                    # No drift detected for this network on this pass,
+                    # so any quiesce episode is over and the next one
+                    # should be reported afresh.
+                    QUIESCE_REPORTED.discard(str(n.uuid))
                     continue
 
                 # Per-network gating. If a cluster operation targeting

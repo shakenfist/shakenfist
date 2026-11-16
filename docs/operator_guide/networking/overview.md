@@ -560,6 +560,38 @@ end by `TestFloatingIPLifecycle` in the cluster CI suite. If you change
 a name, change it in the add path, the remove path, the tests, this
 page and `docs/components/cloudgood/networking-shakenfist.md` together.
 
+## Telling instances their network has failed
+
+A network which cannot be brought up, or whose reconciliation the
+circuit breaker has quiesced, records that on the network. The
+instances attached to it have no working network, and until recently
+had no way for their owner to find out: they read `created` and
+healthy, and the only trace was on an object the owner may not think
+to look at.
+
+Both paths now record a `network this instance is attached to has
+failed` event on every instance holding an interface on that network,
+carrying the network's uuid and the reason, so an operator reading an
+instance's events can see what happened without first knowing to go
+and read the network.
+
+It is an event, not a state change. The instance has not failed — its
+guest is running and its disks are fine — so erroring it would be a
+lie, and would make it awkward to delete for a condition which may
+clear on its own.
+
+Two paths signal, and they are rate limited differently:
+
+* A network **entering an error state** signals once, on the way in. A
+  network already in an error state has told its instances, and
+  repeating it on every subsequent transition between error states
+  would be noise.
+* A network the maintenance pass **quiesces** signals once per episode.
+  That branch is reached every 30 seconds for as long as the network
+  stays quiesced, so the episode is tracked and cleared when the
+  network next reconciles cleanly. A network which breaks again is
+  reported again.
+
 ## Checking that dnsmasq is actually serving
 
 The network node's maintenance pass asks two separate questions about
