@@ -10,7 +10,6 @@
 - api-query-batching-roadmap.md: API query batching roadmap
 - PLAN-sql-pushdown-filtering.md: SQL-pushdown filtering
 - PLAN-replace-last-cluster-operation.md: Replace last_cluster_operation with cluster_operation_targets gating
-- PLAN-fix-cluster-operation-targets-unique-constraint.md: Fix cluster_operation_targets UNIQUE constraint
 - PLAN-network-facade.md: Network operations facade and queue-only mutation
 - PLAN-queue-performance.md: Queue performance and coalescing
 - PLAN-recurring-operations.md: Recurring cluster operations framework
@@ -25,7 +24,6 @@
 - PLAN-artifact-fetch-retry-with-backoff.md: Retry transient artifact fetches with backoff
 - PLAN-replace-exec-with-netlink.md: Replace exec'd network commands with native netlink operations
 - PLAN-scheduler-reservations.md: Atomic scheduling via a reservations table
-- PLAN-per-host-resource-reservations.md: Per-host RAM/CPU/disk reservation overrides for nodes
 - PLAN-eventlog-direct-mariadb.md: Remove the eventlog service and write events directly to MariaDB
 - PLAN-generic-allocator.md: Unify finite-resource allocation onto one primitive
 - PLAN-attribute-field-masks.md: Attribute field masks everywhere, and un-packing the node instances list

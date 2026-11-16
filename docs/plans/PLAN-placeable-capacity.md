@@ -670,9 +670,10 @@ not complete until they are resolved or declined in writing.
   migration, the guard) stands and is `A`'s real cost. Its phase 5
   answered open question 8 "no server-side queue", so waiting stays
   in callers and no hold is re-tried server-side.
-- **`PLAN-per-host-resource-reservations`** (`Complete`). The
-  per-host reservation overrides are the lever 33fl would use if
-  phase 0's live-memory reading shows the host counted twice.
+- **[`PLAN-per-host-resource-reservations`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-per-host-resource-reservations.md)**
+  (`Complete`, retired). The per-host reservation overrides are the
+  lever 33fl would use if phase 0's live-memory reading shows the
+  host counted twice.
 
 ## Out of scope
 

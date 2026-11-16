@@ -23,7 +23,9 @@ These things are checked:
 * every master plan in `docs/plans/` is registered in both `index.md` and
   `order.yml`, and neither names a plan that is not there, nor names one
   twice -- a second index row for a plan is never read, so it is free to
-  say anything at all;
+  say anything at all. A row whose link is absolute registers no local
+  plan: that is a retired plan, whose files are gone and whose row now
+  points at a permalink, or a plan in another repository;
 * every master plan whose index status is not terminal (`Complete`,
   `Abandoned` or `Superseded`) names `PUSH-AUDIT.md`, because the
   `plan-push-audit-phase` shared block requires every open plan to end with
@@ -298,6 +300,17 @@ def index_rows(path):
     overwrite the first, and the stale one -- the whole point of this
     checker -- would never be looked at. Fenced blocks are skipped here for
     the same reason they are everywhere else in this file.
+
+    A row whose link is absolute registers no local plan, so it is not
+    returned at all. That is a retired plan -- its files are deleted and
+    its row keeps its date, intent and status with the link replaced by a
+    permalink pinned to the commit that last held the text -- or a plan
+    which belongs to another repository. Reading the basename out of such
+    a URL would report the plan as listed in the index but absent from
+    docs/plans/, which is exactly the state retirement creates on purpose,
+    so the first retirement in this repository would have failed this
+    check. A local link that is merely wrong is still caught, from the
+    other side: a master plan with no row of its own is unregistered.
     """
     rows = {}
     with open(path, encoding='utf-8') as f:
@@ -311,7 +324,10 @@ def index_rows(path):
         link = LINK_RE.search(row[1])
         if not link:
             continue
-        name = os.path.basename(link.group(1).split('#')[0])
+        target = link.group(1).split('#')[0].strip()
+        if ABSOLUTE_RE.match(target):
+            continue
+        name = os.path.basename(target)
         rows.setdefault(name, []).append((lineno, row[3], row[4]))
     return rows
 

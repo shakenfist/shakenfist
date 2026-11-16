@@ -557,6 +557,42 @@ removal thirty seconds after it goes terminal and removed by the
 [deleted-object sweep](../operator_guide/database.md#the-deleted-object-sweep)),
 so the prune is a backstop.
 
+### A target row is identified by the triple, not by the operation
+
+The uniqueness constraint on `cluster_operation_targets` is the composite
+`(operation_uuid, target_object_type, target_uuid)`, with a plain index on
+`operation_uuid` beside it for lookups. It is written that way because
+`target_fields` exists to let one operation name several objects, so the
+operation UUID is not an identity — it is a group. The table was originally
+declared `unique=True` on `operation_uuid` alone, which made a multi-target
+operation physically unrecordable: the write helper treats `IntegrityError`
+as "already recorded, which is fine", so the second and third target rows of
+every multi-target operation were dropped in silence. Four schemas were
+affected, and the one that showed was `node_inst_net_iface_op`, whose
+*instance* row was the one that survived: the gate on the instance side
+behaved, `has_pending_cluster_operation()` on the *network* side returned
+False while a hot-plug was queued, and `sf-net`'s maintainer recreated a
+bridge the operation was about to create, tripping CI's forbidden-string
+scanner intermittently for months. Keep the `IntegrityError` early return —
+on the composite constraint it now means what its comment always claimed,
+a genuine replay of the same target — and if you add a column that
+participates in a target row's identity, add it to the constraint too.
+The migration deliberately backfills nothing: every pre-existing row was
+already unique by operation, and an operation in flight across the
+upgrade keeps the one row it was enqueued with rather than being
+replayed, so the gate it defeats stays defeated for that operation and
+no longer.
+
+The reason this survived review and a test is worth repeating: the test
+asserting that a hot-plug enqueue writes three target rows mocked
+`create_cluster_operation_target` and counted calls, so it passed whatever
+the database did with the writes. A constraint is only exercised by a test
+that reaches a real engine, which is why
+`shakenfist/tests/test_cluster_operation_targets.py` now builds the table
+against an in-memory SQLAlchemy engine and asserts the rows are there. The
+mock-based test is still worth keeping, as a test of the `target_fields`
+fan-out — but that is all it tests, and all its docstring should claim.
+
 ## Cluster Operation Storage and Work Queues
 
 Cluster operation headers and the per-node work queues both live in

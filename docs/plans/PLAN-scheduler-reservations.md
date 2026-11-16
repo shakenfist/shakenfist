@@ -1353,9 +1353,9 @@ and the client surface it reviews is the final one.
   phase 0 should read the pushdown plan's decisions document
   before deciding the conditional-INSERT shape so the two
   approaches stay coherent.
-- **`PLAN-per-host-resource-reservations` (complete) is landed
-  groundwork.** It generalised phase 00a's cluster-global
-  reservation knobs into per-host settings:
+- **[`PLAN-per-host-resource-reservations`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-per-host-resource-reservations.md)
+  (complete, retired) is landed groundwork.** It generalised
+  phase 00a's cluster-global reservation knobs into per-host settings:
   `NODE_RAM_RESERVATION_GB`, `NODE_CPU_RESERVATION_THREADS`
   (thread-denominated — a semantics change from 00a's cores)
   and `NODE_DISK_RESERVATION_GB` (which took over
@@ -1548,7 +1548,8 @@ because the following statements will be true:
   weighted selection, CPU topology tracking, and a measured
   overcommit default); the reservation knobs were subsequently
   generalised per host by
-  `PLAN-per-host-resource-reservations` (see Dependencies).
+  [`PLAN-per-host-resource-reservations`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-per-host-resource-reservations.md)
+  (retired; see Dependencies).
 - **Demand-based adaptive overcommit (the learning loop).**
   The end-state sketched in open question 13: each node's
   expected demand-per-vCPU is *learned* from observed

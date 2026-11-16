@@ -233,6 +233,20 @@ class PlanStatusHelperTestCase(base.ShakenFistTestCase):
                  ', following PLAN-elsewhere-phase-02-two.md',
                  'Complete']))
 
+    def test_index_rows_ignores_a_retired_row(self):
+        # Retirement deletes the plan's files and leaves the row pointing
+        # at a permalink. Reading the basename out of that URL would
+        # register a local plan which is deliberately not there.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'index.md')
+            with open(path, 'w') as f:
+                f.write(INDEX + (
+                    '| 2026-01-03 | [Retired](https://github.com/shakenfist/'
+                    'shakenfist/blob/abc123/docs/plans/FIXTURE-gone.md) '
+                    '(retired) | Did a thing | Complete | 3 of 3 |\n'))
+            self.assertEqual({'FIXTURE-plan.md'},
+                             set(checker.index_rows(path)))
+
     def test_index_rows_keeps_every_row_for_a_plan(self):
         # A dict keyed on the filename would drop the stale row, which is
         # the one worth complaining about.
@@ -489,6 +503,41 @@ class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
         self._write('FIXTURE-plan.md', MASTER.replace(
             '| 2. Two |', '| 2. Two, to be PLAN-later-phase-02-two.md |'))
         self.assertEqual([], checker.problems())
+
+    def test_a_retired_row_is_not_a_missing_master_plan(self):
+        # The first retirement in this repository failed here: the row's
+        # permalink ends in the plan's filename, so the basename of it read
+        # as a local plan which the retirement had just deleted.
+        self._write('index.md', INDEX + (
+            '| 2026-01-03 | [Retired](https://github.com/shakenfist/'
+            'shakenfist/blob/abc123/docs/plans/FIXTURE-gone.md) (retired) '
+            '| Did a thing | Complete | 3 of 3 |\n'))
+        self.assertEqual([], checker.problems())
+
+    def test_a_local_row_pointing_at_a_deleted_plan_still_fails(self):
+        # The other side of the same rule: a retirement which deleted the
+        # files without pinning the link is still caught, because the plan
+        # it names is not a master plan here.
+        self._write('index.md', INDEX + (
+            '| 2026-01-03 | [Gone](FIXTURE-gone.md) | Did a thing | '
+            'Complete | 3 of 3 |\n'))
+        self.assertProblem('FIXTURE-gone.md is listed but is not a master '
+                           'plan')
+
+    def test_a_plan_whose_only_row_is_absolute_is_unregistered(self):
+        # An absolute link registers nothing, so a plan file still in the
+        # tree with only such a row is reported as missing from the index
+        # rather than quietly accepted.
+        self._write('FIXTURE-other.md', '# Other\n')
+        self._write('order.yml', '- index.md: Plans index\n'
+                                 '- FIXTURE-plan.md: A plan\n'
+                                 '- FIXTURE-other.md: Other\n')
+        self._write('index.md', INDEX + (
+            '| 2026-01-03 | [Other](https://github.com/shakenfist/'
+            'shakenfist/blob/abc123/docs/plans/FIXTURE-other.md) | Other '
+            '| Complete | — |\n'))
+        self.assertProblem('is not registered in %s'
+                           % os.path.join(self.plans, 'index.md'))
 
     def test_the_template_is_not_a_missing_plan_file(self):
         # It is a real file, at the repository root rather than in

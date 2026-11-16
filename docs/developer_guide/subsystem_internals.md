@@ -261,6 +261,77 @@ case-sensitive collation makes a binding that confuses the two fail.
 Operator-facing documentation is
 [`scheduler.md`](../operator_guide/scheduler.md).
 
+### Why the reservations are per-node keys with new names
+
+The three `NODE_*` reservation keys replaced four cluster-wide ones
+(`RAM_SYSTEM_RESERVATION`, `CPU_SYSTEM_RESERVATION`,
+`RAM_INFRA_ROLE_RESERVATION`, `CPU_INFRA_ROLE_RESERVATION`) and
+`MINIMUM_FREE_DISK`. They were renamed rather than redefined in place,
+and that is load bearing in three separate ways. `load_cluster_config()`
+writes every `cluster_config` row into the environment *unconditionally*,
+overwriting what `/etc/sf/config` put there, so a value is per-node only
+while no cluster-wide row of that name exists — reusing a name that had
+ever been pushed with `sf-ctl set-config` would have left the old row
+silently overriding the per-host one on every node. The CPU key also
+changed unit, from physical cores to hardware threads, and a silent
+meaning change under an unchanged name is worse than a key that is
+simply absent. And the system-plus-infra-role split collapsed into a
+single absolute number, so the old names no longer described their own
+arithmetic.
+
+The split did not move into the server; it moved into the deploy. The
+server now reads one flat reserved figure per resource and does no
+role branching at all, because the case the scheme exists for — a node
+also running something Shaken Fist has never heard of, which in the
+motivating case was a packet sensor — cannot be expressed as a role the
+server knows. Ansible computes a per-host default which reproduces the old
+effective reservation and the operator overrides the whole number from
+inventory. The computation lives in the example playbook as a
+`set_fact` guarded on the variable not already being defined, not in
+the node role, because the role's contract is to read only plain
+variables and never inventory groups or facts
+([installation](../operator_guide/installation.md)) — and the role
+templates the three keys into `/etc/sf/config` and must never acquire
+an `sf-ctl set-config` task for them, which would reintroduce exactly
+the layer-2 override the rename was avoiding. `is_network_node` and
+`is_database_node` are still published and still load bearing
+elsewhere; only their use in reservation arithmetic went. The
+scheduler's mixed-version fallback drops the role bump for the same
+reason it has to: it cannot know a remote node's per-host override,
+and the fallback is transient.
+
+The disk reservation is enforced at the two allocation points which
+exist — instance scheduling against `disk_free_instances` and blob
+placement against `disk_free_blobs` — and not against every filesystem
+the resources daemon tracks. The intent was the broader one, and the
+narrower reading was chosen deliberately: nothing allocates onto
+`events`, `uploads`, `image_cache` or `sfroot`, so those have no
+decision to gate, and the alternative — gating every check on the
+aggregate `disk_free`, which is the tightest tracked filesystem — would
+refuse an instance because an unrelated small filesystem was full. If
+root ever needs protecting in its own right, that alternative is a
+change of metric key at each read site rather than a new mechanism.
+
+The change was deliberately *not* a strict numeric no-op, which matters
+if you are reconciling a cluster's numbers across that upgrade. RAM
+became each host's own 10% floored at 2 GB where the deploy had pushed
+one cluster-wide value computed from the *database* host's memory and
+applied everywhere, so it differs on a heterogeneous cluster and is a
+correction rather than a regression. CPU converts the old core counts at
+an assumed two threads per core, so a non-hyperthreaded node
+over-reserves by about a thread. Disk is identical at the default. The
+stale `RAM_SYSTEM_RESERVATION` row was left in `cluster_config` rather
+than deleted: once the pydantic `Field` is gone the leftover environment
+variable is ignored, so an inert row is harmless — it is only visible in
+`sf-ctl show-config`, and `sf-ctl unset-config` can clear it.
+
+One bug fell out of that work and is worth remembering as a shape:
+`node_blob_op._ensure_local()` compared free bytes against
+`MINIMUM_FREE_DISK`, a figure denominated in GB, so it reserved about
+twenty *bytes* before pulling a local replica while every other consumer
+divided by `GiB` first. A free-space floor that never fires looks exactly
+like one that is never reached.
+
 ### The claim admission transaction
 
 `namespace_claims` is writable. A claim is a namespace's promise of
