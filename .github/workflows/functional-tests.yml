@@ -551,6 +551,7 @@ jobs:
     needs: [check_paths]
     uses: ./.github/workflows/functional-lanes.yml
     with:
+      caller_key: merge
       lanes: >-
         ["debian-13-slim-primary", "guests"]
 

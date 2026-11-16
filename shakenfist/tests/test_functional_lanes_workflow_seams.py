@@ -6,7 +6,9 @@ functional-lanes.yml defines every functional cluster lane once, each as a
 job gated on its name appearing in the caller's 'lanes' input. A lane is that
 gate and a name, not a particular kind of job: most lanes call the reusable
 smoke-cluster workflow and name themselves in its concurrency_key input, and
-one runs its own steps and names itself in its own concurrency group.
+one runs its own steps and names itself in its own concurrency group. That
+last one also carries the caller_key its caller passes, because inside a
+reusable workflow there is no context which says which call site this is.
 
 That shape has one dangerous failure: a caller naming a lane which does not
 exist, or a lane whose gate names something other than itself, skips that
@@ -108,6 +110,45 @@ class FunctionalLanesWorkflowSeamsTestCase(base.ShakenFistTestCase):
                     'lane which runs its own steps passes no concurrency_key, '
                     'so its concurrency group is where its name has to appear.'
                     % (LANES_WORKFLOW, job_id, lane, group))
+
+    def test_each_caller_identifies_its_own_invocation(self):
+        # github.workflow resolves to the caller's workflow name inside a
+        # reusable workflow, and there is no context at all for which call
+        # site this is. So a lane which builds its own concurrency group
+        # from caller contexts alone renders the same group for every
+        # invocation on one ref, and the second cancels the first while it
+        # is still building a cluster. Each caller says which it is, the
+        # keys are distinct, and the self-run lane carries the value.
+        keys = {}
+        for (name, job_id) in self._callers():
+            key = (self.workflows[name]['jobs'][job_id].get('with')
+                   or {}).get('caller_key')
+            self.assertTrue(
+                key,
+                '%s:%s calls %s without a caller_key, so its concurrency '
+                'groups are indistinguishable from the other callers\'.'
+                % (name, job_id, LANES_WORKFLOW))
+            self.assertNotIn(
+                key, keys,
+                '%s:%s and %s both pass caller_key %r, so they share a '
+                'concurrency group and cancel each other.'
+                % (name, job_id, keys.get(key), key))
+            keys[key] = '%s:%s' % (name, job_id)
+
+        for job_id in self._defined_lanes().values():
+            job = self.lanes_jobs[job_id]
+            if job.get('uses'):
+                # Its invocation is distinguished by the concurrency_key it
+                # passes on, which test_a_lane_is_named_by_its_concurrency_key
+                # holds to the lane name.
+                continue
+            group = (job.get('concurrency') or {}).get('group') or ''
+            self.assertIn(
+                'inputs.caller_key', group,
+                '%s job %s runs its own steps, so its concurrency group is '
+                'built here rather than by the workflow it calls, and %r '
+                'names no caller. Two callers on one ref would share it.'
+                % (LANES_WORKFLOW, job_id, group))
 
     def test_the_callers_are_the_ones_expected(self):
         # Guards the scan below: a renamed caller job would otherwise drop

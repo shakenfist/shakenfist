@@ -53,6 +53,7 @@ jobs:
     name: "Weekly lanes"
     uses: ./.github/workflows/functional-lanes.yml
     with:
+      caller_key: weekly
       lanes: >-
         ["ubuntu-2404-slim-primary", "debian-13-slim-tier", "debian-13-localhost",
          "ansible-modules", "node-lifecycle"]
