@@ -172,7 +172,11 @@ repos:
           definition names get a second, advisory pass for a bare plan
           label (D13, P7, F5, N1) and a PLAN-*.md pointer, which reports
           without failing the commit while the backlog of those is
-          worked off.
+          worked off. Whether a pointer which survives still lands on a
+          file is not advisory: every PLAN-*.md path in a tracked
+          non-markdown file must resolve here or be an absolute URL (the
+          plan-source-references audit), because nothing renders these
+          pointers and a renamed plan rots one silently.
         entry: python3 tools/check-plan-phase-references.py
         language: system
         files: ^(?!docs/(.*/)?plans/).*$

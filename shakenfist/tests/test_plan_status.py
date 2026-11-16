@@ -37,6 +37,14 @@ does not; that split is the workflow's deliberate design -- cheap checks gate
 the pull request, expensive integration jobs gate the merge -- and moving a
 lint-and-unit-test job onto the merge gate is a change to make on its own
 terms, not as a side effect of adding a checker.
+
+The fixture plan names in this suite are deliberately absent from the tree:
+what the checker reports is a name which resolves to no file, so a fixture
+which resolved would test nothing. Each line naming one carries
+`audit-ok: plan-reference`, which is what the plan-source-references audit
+reads. The per-line marker is used rather than the file-wide one because
+this file also cites a real plan, in the comment above the vocabulary
+fixture, and that pointer should still be checked for rot.
 """
 
 import importlib.util
@@ -192,9 +200,9 @@ class PlanStatusHelperTestCase(base.ShakenFistTestCase):
 
     def test_unlinked_plan_names_finds_a_bare_name(self):
         self.assertEqual(
-            ['PLAN-elsewhere-phase-01-one.md'],
+            ['PLAN-elsewhere-phase-01-one.md'],  # audit-ok: plan-reference
             checker.unlinked_plan_names(
-                ['1. One', 'PLAN-elsewhere-phase-01-one.md (in elsewhere)',
+                ['1. One', 'PLAN-elsewhere-phase-01-one.md (in elsewhere)',  # audit-ok: plan-reference
                  'Complete']))
 
     def test_unlinked_plan_names_finds_a_backticked_name(self):
@@ -202,16 +210,16 @@ class PlanStatusHelperTestCase(base.ShakenFistTestCase):
         # wrote it. A name in a code span is no more followable than one in
         # prose.
         self.assertEqual(
-            ['PLAN-elsewhere-phase-01-one.md'],
+            ['PLAN-elsewhere-phase-01-one.md'],  # audit-ok: plan-reference
             checker.unlinked_plan_names(
-                ['1. One', '`PLAN-elsewhere-phase-01-one.md`', 'Complete']))
+                ['1. One', '`PLAN-elsewhere-phase-01-one.md`', 'Complete']))  # audit-ok: plan-reference
 
     def test_unlinked_plan_names_ignores_a_link(self):
         self.assertEqual([], checker.unlinked_plan_names(
             ['1. One',
-             '[PLAN-elsewhere-phase-01-one.md]'
+             '[PLAN-elsewhere-phase-01-one.md]'  # audit-ok: plan-reference
              '(https://example.com/docs/plans/'
-             'PLAN-elsewhere-phase-01-one.md)',
+             'PLAN-elsewhere-phase-01-one.md)',  # audit-ok: plan-reference
              'Complete']))
 
     def test_unlinked_plan_names_ignores_a_bare_url(self):
@@ -220,17 +228,17 @@ class PlanStatusHelperTestCase(base.ShakenFistTestCase):
         self.assertEqual([], checker.unlinked_plan_names(
             ['1. One',
              'see https://example.com/docs/plans/'
-             'PLAN-elsewhere-phase-01-one.md',
+             'PLAN-elsewhere-phase-01-one.md',  # audit-ok: plan-reference
              'Complete']))
 
     def test_unlinked_plan_names_reads_the_rest_of_a_linked_row(self):
         # Removing the link must not hide a second citation beside it.
         self.assertEqual(
-            ['PLAN-elsewhere-phase-02-two.md'],
+            ['PLAN-elsewhere-phase-02-two.md'],  # audit-ok: plan-reference
             checker.unlinked_plan_names(
                 ['1. One',
-                 '[PLAN-elsewhere-phase-01-one.md](https://example.com/a.md)'
-                 ', following PLAN-elsewhere-phase-02-two.md',
+                 '[PLAN-elsewhere-phase-01-one.md](https://example.com/a.md)'  # audit-ok: plan-reference
+                 ', following PLAN-elsewhere-phase-02-two.md',  # audit-ok: plan-reference
                  'Complete']))
 
     def test_index_rows_keeps_every_row_for_a_plan(self):
@@ -472,22 +480,22 @@ class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
         # because the real ones are spread across a Phase, Repo and Plan
         # cell.
         self._write('FIXTURE-plan.md', MASTER.replace(
-            '| 1. One |', '| 1. One, planned as PLAN-gone-phase-01-one.md |'))
+            '| 1. One |', '| 1. One, planned as PLAN-gone-phase-01-one.md |'))  # audit-ok: plan-reference
         self.assertProblem('as text, and there is no such file')
 
     def test_a_finished_row_may_link_a_plan_in_another_repository(self):
         self._write('FIXTURE-plan.md', MASTER.replace(
             '| 1. One |',
-            '| 1. One, planned as [PLAN-gone-phase-01-one.md]'
+            '| 1. One, planned as [PLAN-gone-phase-01-one.md]'  # audit-ok: plan-reference
             '(https://example.com/x/blob/abc123/docs/plans/'
-            'PLAN-gone-phase-01-one.md) |'))
+            'PLAN-gone-phase-01-one.md) |'))  # audit-ok: plan-reference
         self.assertEqual([], checker.problems())
 
     def test_an_unfinished_row_may_name_a_file_it_will_write(self):
         # Most of the bare names in docs/plans/ are this: an Execution
         # table saying what the file a future phase writes will be called.
         self._write('FIXTURE-plan.md', MASTER.replace(
-            '| 2. Two |', '| 2. Two, to be PLAN-later-phase-02-two.md |'))
+            '| 2. Two |', '| 2. Two, to be PLAN-later-phase-02-two.md |'))  # audit-ok: plan-reference
         self.assertEqual([], checker.problems())
 
     def test_the_template_is_not_a_missing_plan_file(self):
