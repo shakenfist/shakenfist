@@ -560,6 +560,52 @@ end by `TestFloatingIPLifecycle` in the cluster CI suite. If you change
 a name, change it in the add path, the remove path, the tests, this
 page and `docs/components/cloudgood/networking-shakenfist.md` together.
 
+## Checking that dnsmasq is actually serving
+
+The network node's maintenance pass asks two separate questions about
+each network's `dnsmasq`, and the distinction matters.
+
+The first is **liveness**: is the process still there? That reads the
+pid file and checks the process exists. It catches a `dnsmasq` which
+crashed or was killed, and nothing else — a process which is alive but
+no longer answering passes it, and the network reads as healthy while
+its guests cannot get a lease.
+
+The second is **readiness**: is it still answering DHCP? The pass sends
+a DHCPINFORM from inside the network's namespace and waits for a
+DHCPACK. Three things make that the right request to send, each
+measured against a real `dnsmasq` configured the way Shaken Fist
+configures one rather than assumed:
+
+* It is answered for a client the server has never heard of. A
+  DHCPDISCOVER is not — networks are configured `dhcp-range=...,static`,
+  so `dnsmasq` ignores a client which is not in its hosts file, and a
+  DISCOVER probe would have reported every healthy network as broken.
+* It allocates nothing. The reply carries `yiaddr` 0.0.0.0 and the
+  lease file is untouched, so the probe can run every pass without
+  consuming addresses or disturbing a real client.
+* A wedged `dnsmasq` fails it. With the process stopped but still
+  present — state `T`, which the liveness check reports as healthy —
+  the probe times out.
+
+Liveness is asked first, because there is no point sending a packet to
+a process which is not there, and it is far cheaper than a round trip.
+
+A network which fails either check is not okay, and the maintenance
+pass rebuilds it. `DHCP_PROBE_TIMEOUT` (default 2 seconds) is how long
+the probe waits. A healthy server answers in milliseconds over a
+namespace-local round trip, so this is a wedge detector rather than a
+latency budget: raising it delays detection, and lowering it risks
+calling a loaded network node broken and rebuilding its networks.
+
+A network which provides DNS but not DHCP is not probed. There is no
+DHCP readiness to check, and reporting such a network unhealthy would
+rebuild it on every pass.
+
+The events to look for on a network are `network not ok, dnsmasq not
+running` (liveness) and `network not ok, dnsmasq not answering DHCP`
+(readiness). The second is the one which used to be invisible.
+
 ## Stray vxlan reaping
 
 Every node's network maintainer compares the vxlan devices actually

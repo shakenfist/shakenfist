@@ -898,6 +898,19 @@ class SFConfig(BaseSettings):
             'reconciliation requests on top of an already backed-up queue.'
         )
     )
+    DHCP_PROBE_TIMEOUT: float = Field(
+        2.0,
+        description=(
+            'How long the dnsmasq readiness probe waits for a DHCPACK '
+            'before reporting that dnsmasq is not answering DHCP. The '
+            'probe is a DHCPINFORM sent inside the network namespace, '
+            'so the round trip is local and a healthy server answers '
+            'in milliseconds; this is a wedge detector, not a latency '
+            'budget. Raising it delays detection of a wedged dnsmasq; '
+            'lowering it risks reporting a loaded network node as '
+            'broken, which rebuilds the network.'
+        )
+    )
     MAINTAIN_RECONCILE_COOLDOWN_SECONDS: int = Field(
         60,
         description=(

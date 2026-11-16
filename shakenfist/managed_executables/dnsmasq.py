@@ -201,6 +201,46 @@ class DnsMasq(managedexecutable.ManagedExecutable):
         d.update(self.network.subst_dict())
         return d
 
+    def is_serving_dhcp(self) -> bool:
+        """Is this dnsmasq still answering DHCP, not merely alive?
+
+        ``is_running()`` reads the pid file and asks whether that
+        process exists, so a dnsmasq which is alive but wedged passes
+        it and the network looks healthy while its guests cannot get a
+        lease (issue 730).
+
+        Sends a DHCPINFORM from inside the network's namespace, which
+        is where the server's address exists. A DHCPINFORM is answered
+        for a client the server has never heard of and allocates
+        nothing, which is what makes it safe to run on every
+        maintenance pass -- see shakenfist/util/dhcp_probe.py for the
+        measurements behind both claims.
+
+        Answers True when this dnsmasq does not serve DHCP at all:
+        there is no readiness to check, and reporting a DNS-only
+        network as unhealthy would have it rebuilt on every pass.
+        """
+        if not self.provide_dhcp:
+            return True
+
+        subst = self.subst_dict()
+        try:
+            util_concurrency.execute(
+                'python3 -m shakenfist.util.dhcp_probe '
+                '%(router)s %(router)s %(timeout)s'
+                % {
+                    'router': subst['router'],
+                    'timeout': config.DHCP_PROBE_TIMEOUT
+                },
+                netns=subst['netns'],
+                suppress_command_logging=True)
+        except ProcessExecutionError:
+            # The probe exits non-zero when nothing answered. That is
+            # the condition this method exists to report, not an error
+            # in running it.
+            return False
+        return True
+
     def _read_templates(self) -> None:
         if not self._templates_initialized:
             self._read_template('config', 'dhcp.tmpl')

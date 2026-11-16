@@ -547,6 +547,16 @@ class Network(dbowo):
                     EVENT_TYPE_STATUS, 'network not ok, dnsmasq not running')
                 return False
 
+            # Alive is not the same as serving. Asked second, because
+            # there is no point sending a DHCPINFORM to a process which
+            # is not there, and the liveness check is a great deal
+            # cheaper than a round trip (issue 730).
+            if not self.is_dnsmasq_serving_dhcp():
+                self.add_event(
+                    EVENT_TYPE_STATUS,
+                    'network not ok, dnsmasq not answering DHCP')
+                return False
+
         if self.provide_nat and not self.is_nat_okay():
             return False
 
@@ -801,6 +811,21 @@ class Network(dbowo):
         if not is_running:
             self.add_event(EVENT_TYPE_STATUS, 'dnsmasq is not running')
         return is_running
+
+    def is_dnsmasq_serving_dhcp(self):
+        """Is this network's dnsmasq answering DHCP?
+
+        Separate from is_dnsmasq_running(), which is a liveness check:
+        a wedged dnsmasq passes that one and leaves guests unable to
+        get a lease (issue 730).
+        """
+        d = self._get_dnsmasq_object()
+        is_serving = d.is_serving_dhcp()
+        if not is_serving:
+            self.add_event(
+                EVENT_TYPE_STATUS,
+                'dnsmasq is running but not answering DHCP')
+        return is_serving
 
     def remove_dhcp_lease(self, ipv4, macaddr):
         """Enqueue a remove_dhcp_lease NetMacaddrIPOp for this network.

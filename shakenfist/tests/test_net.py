@@ -137,9 +137,11 @@ class NetworkNetNodeTestCase(NetworkTestCase):
                 return_value=False)
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_serving_dhcp',
+                return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_nat_okay', return_value=True)
-    def test_is_okay_yes(self, mock_is_nat_okay, mock_is_dnsmasq, mock_is_created,
-                         mock_pending):
+    def test_is_okay_yes(self, mock_is_nat_okay, mock_is_serving, mock_is_dnsmasq,
+                         mock_is_created, mock_pending):
         self.mock_mariadb = MockMariaDB(self, node_count=4)
         self.mock_mariadb.setup()
 
@@ -153,9 +155,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
                 return_value=False)
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_serving_dhcp',
+                return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_nat_okay', return_value=False)
-    def test_is_okay_no_nat_rules(self, mock_is_nat_okay, mock_is_dnsmasq,
-                                  mock_is_created, mock_pending):
+    def test_is_okay_no_nat_rules(self, mock_is_nat_okay, mock_is_serving,
+                                  mock_is_dnsmasq, mock_is_created,
+                                  mock_pending):
         """A network node network with drifted namespace NAT rules is not okay.
 
         Nothing else re-runs the namespace's iptables setup for a network
@@ -176,9 +181,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
                 return_value=False)
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_serving_dhcp',
+                return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_nat_okay', return_value=False)
     def test_is_okay_ignores_nat_rules_without_nat(
-            self, mock_is_nat_okay, mock_is_dnsmasq, mock_is_created, mock_pending):
+            self, mock_is_nat_okay, mock_is_serving, mock_is_dnsmasq,
+            mock_is_created, mock_pending):
         """A network which does not provide NAT has no NAT rules to audit."""
         self.mock_mariadb = MockMariaDB(self, node_count=4)
         self.mock_mariadb.setup()
@@ -313,9 +321,12 @@ class NetworkNetNodeTestCase(NetworkTestCase):
                 return_value=False)
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_serving_dhcp',
+                return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_nat_okay', return_value=True)
     def test_is_okay_falls_through_when_no_pending_operation(
-            self, mock_is_nat_okay, mock_is_dnsmasq, mock_is_created, mock_pending):
+            self, mock_is_nat_okay, mock_is_serving, mock_is_dnsmasq,
+            mock_is_created, mock_pending):
         """is_okay() falls through to bridge/dnsmasq checks when no op is in flight."""
         self.mock_mariadb = MockMariaDB(self, node_count=4)
         self.mock_mariadb.setup()
