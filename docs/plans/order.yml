@@ -29,7 +29,6 @@
 - PLAN-network-carrier-model.md: Lease-based per-network carrier model with VIP advertisement
 - PLAN-api-input-validation.md: Declarative validation and a consistent error contract for the REST API
 - PLAN-oidc-authentication.md: OIDC authentication for Shaken Fist
-- PLAN-auth-federation.md: Workload identity federation and first-class namespace keys
 - PLAN-qemu-futures.md: Owning more of the QEMU stack — QMP, and one day maybe libvirt's job too
 - PLAN-netserv.md: Replace dnsmasq with a Rust per-network service plane (sf-netserv)
 - PLAN-artifact-ux-rework.md: Rework the artifact, blob, label, upload, and snapshot user interface

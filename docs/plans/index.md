@@ -106,7 +106,7 @@ maintained document, so it may state things a later phase overturned.
 | 2026-06-13 | [Artifact UX rework](PLAN-artifact-ux-rework.md) | Rework the artifact, blob, label, upload and snapshot user interface | Proposed | — |
 | 2026-06-19 | [Remove syslog forwarding](PLAN-remove-syslog-forwarding.md) | Structured JSON logging shipped to Loki, replacing the rsyslog wiring | Complete | 7 of 7 |
 | 2026-07-13 | [CI node-exec assertions](PLAN-ci-node-exec-assertions.md) | Run an assertion on a named cluster node, and the floating-IP and network lifecycle tests that use it | Complete | — |
-| 2026-07-14 | [Workload identity federation](PLAN-auth-federation.md) | Federated workload identity and first-class namespace keys | Complete | 7 of 7 |
+| 2026-07-14 | [Workload identity federation](https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md) (retired) | Federated workload identity and first-class namespace keys | Complete | 7 of 7 |
 | 2026-07-17 | [Attribute field masks everywhere](PLAN-attribute-field-masks.md) | Masked attribute writes, and the node instances list un-packed into `object_references` | Complete | 2 of 2 |
 | 2026-07-19 | [Truthful cluster operation visibility](PLAN-cluster-op-visibility.md) | An observational flag, so "is anything in flight?" stops counting background housekeeping | Complete | 7 of 7 |
 | 2026-07-19 | [Database load reduction](PLAN-database-load-reduction.md) | Cut steady-state MariaDB load from the `sf-database` tier, and keep it cut | Complete | 8 of 8 |

@@ -1,9 +1,8 @@
 """Scopes must compose with namespace trust.
 
-Open question 11 of docs/plans/PLAN-auth-federation.md. Namespace trust
-grants cross-namespace visibility, and the deferred CI conductor design
-leans on it: a per-pull-request scratch namespace with read access to a
-per-repository cache namespace.
+Namespace trust grants cross-namespace visibility, and the CI conductor
+design leans on it: a per-pull-request scratch namespace with read access
+to a per-repository cache namespace.
 
 The two mechanisms answer different questions. Trust answers "may this
 caller see that object at all", and scope answers "may this caller do

@@ -8,7 +8,7 @@
 # Mapping rules reference an issuer by name, and a minted key's
 # provenance records the rule, so the whole chain issuer <- rule <- key
 # <- token is object-modelled and auditable. See
-# docs/plans/PLAN-auth-federation-phase-03-exchange.md.
+# docs/developer_guide/authentication.md.
 #
 # This model serves as both:
 # 1. The source of truth for the trusted_issuers table schema (used by

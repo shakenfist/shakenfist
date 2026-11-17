@@ -3,8 +3,9 @@
 # A scope is a "<family>.<verb>" string naming a class of operation a
 # key -- and every token minted from it -- may perform. Scopes are
 # derived mechanically rather than by tagging each endpoint by hand, so
-# that coverage is automatic and a new endpoint cannot be forgotten. See
-# docs/plans/PLAN-auth-federation-phase-03-exchange.md.
+# that coverage is automatic and a new endpoint cannot be forgotten. The
+# vocabulary and the derivation rule are published in
+# docs/developer_guide/authentication.md.
 #
 # The operator-visible vocabulary is deliberately three verbs. Adding a
 # fourth is a decision, not a convenience: the test is whether anyone

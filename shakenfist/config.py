@@ -48,8 +48,7 @@ from pydantic_settings import NoDecode
 # configuration item rather than named ones, so a name check is what
 # covers a secret option which does not exist yet; the types are what
 # cover every other way a field might be stringified. Removing either
-# one re-opens a hole the other does not close. See
-# docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
+# one re-opens a hole the other does not close.
 #
 # The match is case-insensitive because the names tested against it are
 # not all ours to choose. pydantic-settings reads the environment
@@ -1482,8 +1481,7 @@ def redacted_config_items() -> Iterator[tuple[str, Any]]:
     do not exist yet. The secret-carrying fields are separately typed
     SecretStr, which covers every other path one might be stringified
     on; the two mechanisms are complementary rather than redundant, and
-    removing either re-opens a hole the other does not close. See
-    docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
+    removing either re-opens a hole the other does not close.
 
     The decision is made by config_value_is_secret(), which is shared
     with sf-ctl show-config.

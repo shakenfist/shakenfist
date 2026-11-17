@@ -8,8 +8,7 @@
 #
 # The chain issuer <- rule <- key <- token is object-modelled end to
 # end, so an audit can answer "why does this credential exist" without
-# leaving the database. See
-# docs/plans/PLAN-auth-federation-phase-03-exchange.md.
+# leaving the database. See docs/developer_guide/authentication.md.
 #
 # This model serves as both:
 # 1. The source of truth for the mapping_rules table schema (used by

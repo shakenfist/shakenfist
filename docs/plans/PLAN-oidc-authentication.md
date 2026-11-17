@@ -27,7 +27,7 @@ development priorities. Key references inside the repo:
 * `docs/glossary.md` — the authentication vocabulary, pinned
   by phase 1 of the auth federation plan. Use these words
   rather than inventing synonyms for them.
-* `docs/plans/PLAN-auth-federation.md` — the sibling plan,
+* [`PLAN-auth-federation.md`](https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md) (retired) — the sibling plan,
   which built the machine half of federation. Its phases 1
   to 4 are the infrastructure this plan builds on.
 * `shakenfist/external_api/auth.py` — `/auth`, the namespace
@@ -73,7 +73,8 @@ explaining what changed and why.
 
 ## Situation
 
-Phases 1 to 4 of `PLAN-auth-federation.md` rebuilt the
+Phases 1 to 4 of [`PLAN-auth-federation.md`](https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md) (retired)
+rebuilt the
 machinery this plan was originally written against. Every
 numbered item below exists in the tree today; this plan
 builds on it rather than proposing it. The vocabulary is
@@ -253,7 +254,7 @@ What it does not give us:
 
 ### Relationship to the auth federation plan
 
-`PLAN-auth-federation.md` is the *machine* half of
+[`PLAN-auth-federation.md`](https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md) (retired) is the *machine* half of
 federation and has been largely built: a workload exchanges
 an IdP-issued identity token for a scoped namespace key.
 This plan is the *human* half. The two share everything up
@@ -346,7 +347,7 @@ Scope boundaries:
   JWKS fetch, caching or rotation. `shakenfist/federation.py`
   does this and any new work extends it.
 * **Out of scope:** the workload exchange itself, which is
-  `PLAN-auth-federation.md`'s subject and is built.
+  [`PLAN-auth-federation.md`](https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md)'s subject and is built.
 * **Out of scope:** running an IdP inside SF. SF is the
   *relying party*; operators bring their own IdP.
 * **Out of scope:** SAML, LDAP-direct, or other non-OIDC
@@ -887,7 +888,7 @@ Scope boundaries:
 
 13. **Direct-bearer or exchange-based human sessions?**
     This plan's central unresolved question, and the one
-    `PLAN-auth-federation.md` explicitly reserves for this
+    [`PLAN-auth-federation.md`](https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md) explicitly reserves for this
     plan's own phase 0 decisions pass rather than answering
     in passing. It is posed here with the evidence that has
     accumulated; it is deliberately not answered.
@@ -1374,8 +1375,8 @@ not land anywhere else.
 | Phase | Repo | Plan | Status | Merged |
 |-------|------|------|--------|--------|
 | 0. Research and decisions | shakenfist | [PLAN-oidc-authentication-phase-00-decisions.md](PLAN-oidc-authentication-phase-00-decisions.md) | Complete | `2bbe472eff` (#4831) |
-| 1. JWT validation refactor (split issuance from validation; introduce per-issuer validators) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as `PLAN-auth-federation.md` phase 3 steps 3a-3c and 3f: `72187d2ff` (#3556), `c64269e63` (#3625) |
-| 2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as `PLAN-auth-federation.md` phase 3 step 3f: `c64269e63` (#3625), `1e7a167ea` (#3641) |
+| 1. JWT validation refactor (split issuance from validation; introduce per-issuer validators) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](https://github.com/shakenfist/shakenfist/blob/6ba39f69f4e69ea78af591cd1b060fd683dcce1e/docs/plans/PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as that plan's phase 3 steps 3a-3c and 3f: `72187d2ff` (#3556), `c64269e63` (#3625) |
+| 2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](https://github.com/shakenfist/shakenfist/blob/6ba39f69f4e69ea78af591cd1b060fd683dcce1e/docs/plans/PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as that plan's phase 3 step 3f: `c64269e63` (#3625), `1e7a167ea` (#3641) |
 | 3. OIDC discovery | shakenfist | [PLAN-oidc-authentication-phase-03-discovery.md](PLAN-oidc-authentication-phase-03-discovery.md) | Complete | `d884dd56c1` (#4891) |
 | 4. Minting the entitled set of credentials at login | shakenfist | [PLAN-oidc-authentication-phase-04-credential-set.md](PLAN-oidc-authentication-phase-04-credential-set.md) | In progress | — |
 | 5. Admin as a claim | shakenfist | TBD | Abandoned | — |
@@ -1393,7 +1394,8 @@ landed yet. Phases 1 and 2 are the exception: they were
 superseded rather than abandoned, so their cells name the
 merges that landed the work under another plan, and phase
 10's audit reads those ranges directly rather than following
-a pointer. `PLAN-auth-federation.md` is `Complete` and so
+a pointer. [`PLAN-auth-federation.md`](https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md) is `Complete`,
+retired, and so
 carries no `Merged` column of its own -- a Complete plan is
 not reopened to acquire one -- which is why the merges are
 written out here. They were reconstructed from that plan's

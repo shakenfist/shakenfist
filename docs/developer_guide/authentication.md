@@ -268,6 +268,33 @@ Adding a verb is a vocabulary decision, not a convenience: the test is
 whether anyone would sensibly write a mapping rule granting it alone.
 The full set is pinned by a test over the real routing table.
 
+### Where the policy decision happens
+
+All of the policy intelligence runs **once**, at the exchange: the
+inbound token's claims are evaluated against a mapping rule, and what
+comes out is a key carrying an explicit, dumb list of scopes.
+Per-request enforcement is then set membership against the endpoint's
+derived scope. There is deliberately no attribute evaluation, and no
+policy engine, on the request path.
+
+That is why narrowing a mapping rule does not narrow the keys already
+minted from it, which the API reference also states as behaviour: there
+is nothing on the request path that reads the rule. Evaluating rules per
+request would make a narrowed rule take effect immediately, which sounds
+like an improvement until it is priced — it puts claim evaluation in
+front of every authenticated call, requires the original inbound token
+to still be available (it is not; it was exchanged and discarded), and
+makes a provider outage an authentication outage. Delete the keys if a
+narrowed rule should apply to them.
+
+Expiry follows the same split. It is enforced exactly, at use time, by
+the filtered accessor that both the mint path and `verify_token` read
+through, so an expired key can neither mint a new token nor validate an
+outstanding one. The cluster daemon's reaper exists to garbage-collect
+dead rows and emit lifecycle events — it is hygiene, and **nothing about
+security may depend on its cadence**. A reaper that has not run for a
+week costs table growth, not access.
+
 ### Wildcards and compatibility
 
 A key with no scopes recorded mints a token carrying the wildcard `*`,

@@ -206,7 +206,8 @@ cluster-daemon reap task (template:
 widening is automatic; (10) `verify_schema_versions` means
 sf-database refuses to start on mismatch, so **no dual-read
 window is ever needed** (argument made explicitly in
-`PLAN-auth-federation-phase-02-key-objects.md:87-92`).
+[`PLAN-auth-federation-phase-02-key-objects.md`](https://github.com/shakenfist/shakenfist/blob/55583f1ca20684038e29d0d42d7cc8ab7a62fa29/docs/plans/PLAN-auth-federation-phase-02-key-objects.md),
+lines 87-92).
 
 ### Namespace lifecycle and authz
 
