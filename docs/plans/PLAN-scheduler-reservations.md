@@ -10,7 +10,8 @@ current scheduler (`shakenfist/scheduler.py`), its callers
 `shakenfist/operations/node_inst_netdesc_op.py`), the
 `node_metrics` table and how it is populated (the resources
 daemon under `shakenfist/daemons/resources/`), the existing
-SQL-pushdown pattern delivered by `PLAN-sql-pushdown-filtering`,
+SQL-pushdown pattern delivered by
+[`PLAN-sql-pushdown-filtering`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-sql-pushdown-filtering.md) (retired),
 the cluster-lock leasing pattern in `shakenfist/locks.py`, and
 the instance lifecycle states. Ground your answers in what the
 code actually does today rather than guessing.
@@ -1346,7 +1347,8 @@ and the client surface it reviews is the final one.
 
 ## Dependencies on other plans
 
-- **`PLAN-sql-pushdown-filtering` is the existing precedent**
+- **[`PLAN-sql-pushdown-filtering`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-sql-pushdown-filtering.md) (retired) is the
+  existing precedent**
   and pattern for SQL-side filtering. The reservations work
   applies that same rule to a new domain (scheduling decisions)
   rather than extending it. No hard ordering dependency, but

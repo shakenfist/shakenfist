@@ -73,11 +73,16 @@ rework](PLAN-artifact-ux-rework.md) and [blobs as containers](PLAN-blob-containe
 decisions pass and "(later phases)". These six are the checker's blind spot, and the only
 numbers here it cannot recompute.
 
+A plan linked by a pinned `blob/<sha>/` URL has been retired, and its
+row is marked `(retired)`. Its reasoning now lives in the `docs/` page
+that owns the topic; the pinned copy is frozen history rather than a
+maintained document, so it may state things a later phase overturned.
+
 | Date | Plan | Intent | Status | Phases |
 |------|------|--------|--------|--------|
 | 2026-01-08 | [Blob storage roadmap](blob-storage-roadmap.md) | Composite blobs, lazy deduplication and content-defined chunking | In progress | 1 of 4 |
 | 2026-01-10 | [API query batching](api-query-batching-roadmap.md) | Batch and prefetch related objects so list endpoints stop issuing per-object queries | Not started | 0 of 4 |
-| 2026-04-23 | [SQL-pushdown filtering](PLAN-sql-pushdown-filtering.md) | Push object filtering into MariaDB instead of scanning and filtering in Python | Complete | 7 of 7 |
+| 2026-04-23 | [SQL-pushdown filtering](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-sql-pushdown-filtering.md) (retired) | Push object filtering into MariaDB instead of scanning and filtering in Python | Complete | 7 of 7 |
 | 2026-05-06 | [Replace `last_cluster_operation`](PLAN-replace-last-cluster-operation.md) | Trade the single-pointer gate for an append-only `cluster_operation_targets` history | Complete | 5 of 5 |
 | 2026-05-14 | [Fix `cluster_operation_targets` uniqueness](PLAN-fix-cluster-operation-targets-unique-constraint.md) | Composite UNIQUE so a multi-target operation records all of its target rows | Complete | — |
 | 2026-05-15 | [Network operations facade](PLAN-network-facade.md) | Split `Network` into a queue-enqueuing facade and a single-mutator worker | Complete | 10 of 10 |

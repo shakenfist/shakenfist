@@ -216,10 +216,15 @@ return hydrated `NetworkInterface` objects rather than the cached UUID list that
 attribute table). The other `find_*` helpers leave the FK fields at their default of `None` because the
 underlying tables have no matching column.
 
-See the Future-work entry in
-[`docs/plans/PLAN-sql-pushdown-filtering.md`](../plans/PLAN-sql-pushdown-filtering.md) ("NetworkInterface
-namespace column") for the deferred discussion of whether to add the column or use a JOIN-based approach
-once a concrete caller exists.
+Adding a namespace to this type is deferred until a caller needs one, and no production call site filters
+interfaces by namespace today — the dnsmasq DHCP path reaches an interface through its owning network, not
+through a namespace-scoped query. When such a caller appears there are two ways to land it. A JOIN through
+`networks.namespace` or `instances.namespace` needs no schema change and cannot drift, because the owning
+object stays the single source of the answer; a `namespace` column on `network_interfaces` would read the
+same way as the other three types and index as cheaply, but it denormalises an answer the owner already
+holds and goes stale if a network is ever reassigned. The JOIN is the safer default. Either lands as a
+one-line change: `find_network_interfaces` already accepts the field and discards it, so enabling it is a
+matter of building the clause rather than changing the criteria shape.
 
 **Example.**
 
@@ -231,6 +236,37 @@ criteria = ObjectFilterCriteria(states=['created'], namespace='tenant-a')
 for a in mariadb.find_artifacts(criteria):
     ...
 ```
+
+**`namespace='system'` means no namespace clause, not `WHERE namespace = 'system'`.**
+Both `from_db_by_ref` and the iterator collapse a namespace of `'system'` or `None` to "do not filter on
+namespace", which is what `baseobject.namespace_filter` has always meant: the system namespace sees every
+other namespace's objects. Pushing the literal string into the WHERE clause would silently narrow an
+administrative lookup to the handful of objects actually owned by `system`. Each of the three
+`from_db_by_ref` overrides carries the collapse and a comment saying so; `DatabaseBackedObjectIterator.get_iterator`
+does the same for the `namespace=` kwarg.
+
+**Why a criteria object rather than translating the predicates.**
+The predicates these calls replaced are `functools.partial` objects — `partial(state_filter, states)`,
+`partial(namespace_filter, ns)` — and the alternative design kept the predicate signatures and detected the
+known ones at the `filter()` entry point, rewriting them to SQL. That was rejected: recognising a predicate
+means reading `partial.func` and `partial.args`, which turns a refactor of a filter helper, or a caller
+wrapping one in a lambda, into a silent fall back to the Python scan with no error anywhere. A caller that
+asks for SQL in the type system either gets it or fails to compile. The predicate API survives as the
+documented fallback for genuinely custom callables, which is the `filters=` argument above.
+
+**Why there is one `find_*` per type rather than one generic `FindObjects`.**
+The criteria are shared but the replies are not: each one carries that type's static-data message
+(`ArtifactStaticData`, `InstanceStaticData` and so on), so a single RPC would need a union reply and a
+cast at every call site. The split matches the `GetArtifact` / `GetInstance` / `GetNetwork` RPCs beside it.
+The cost is that a new filterable type is four edits — proto, direct helper, gRPC handler and public
+wrapper — rather than one.
+
+**A failed find logs its criteria in full.**
+`_direct_find_*` logs `states`, `namespace` and `name` with the exception, unlike the older
+`_direct_get_all_*` helpers, so a failing query can be reproduced from the log without replaying traffic.
+That is a deliberate choice about what may appear in a log: namespaces and object names are
+administrator-visible identifiers in this codebase rather than tenant data, so none of the three fields is
+sensitive. A criteria field that ever carries tenant content would have to change this.
 
 ## MARIADB_HOST vs MARIADB_GATEWAY_HOSTS
 
@@ -1735,8 +1771,16 @@ Cached lists of *child* object UUIDs are deliberately not stored on
 the parent attribute table — querying the child table by an indexed
 FK column is the source of truth. The last two such caches
 (`network_attributes.networkinterfaces` and
-`instance_attributes.interfaces`) have been removed; see
-`docs/plans/PLAN-sql-pushdown-filtering.md`.
+`instance_attributes.interfaces`) have been removed, along with
+their `add_*` / `remove_*` mutators: the child row is what makes the
+association, so writing the list as well was bookkeeping that could
+disagree with it. `Network.networkinterfaces` and
+`Instance.interfaces` are now properties over
+`find_network_interfaces` with the FK filter set, which also removed
+an N+1 hydration loop from every caller, and dropping the columns
+needed no data migration because every UUID in them was derivable
+from `network_interfaces`. `PUSH-AUDIT.md` carries a review bullet
+so the pattern is not reintroduced.
 
 This approach:
 
@@ -1946,6 +1990,26 @@ Index names follow a predictable pattern:
 
 - Single-column: `idx_{table}_{column}` or `uidx_{table}_{column}` (unique)
 - Compound: `idx_{table}_{col1}_{col2}_{...}`
+
+#### Adding an index to a table that already exists
+
+An `SQLIndex()` annotation only reaches a database where the table is being created. Each per-type
+`_ensure_*_schema()` function in `shakenfist/mariadb.py` creates the table and its annotated indexes
+together, guarded on the stored table version being 0 — that is, only on a fresh table. (The
+`ensure_table_exists()` helper shown under *Table Lifecycle* does the same pair of steps, but nothing in
+the tree calls it; the ensure functions inline the equivalent.) An existing deployment therefore keeps
+whatever indexes it was created with, and adding the annotation alone changes nothing there.
+
+A new index on an existing table needs its own version step in that table's `_ensure_*_schema()`, in the
+same shape as a column addition: a bump guarded on the stored table version, issuing the `CREATE INDEX`
+and catching `IntegrityError` / `OperationalError` so a re-run is a no-op. `_ensure_artifacts_schema()`'s
+version 3 step (`idx_artifacts_name`) is the worked example, with `instances` and `networks` carrying the
+same step. Because the ensure functions run at daemon start, an existing cluster picks the index up on its
+next restart with no separate migration.
+
+Where the index cannot be expressed as an annotation at all — a compound UNIQUE, which the per-field
+`SQLUniqueIndex` marker and the `sql_indexes` config path both decline to emit — it is built by hand in the
+same place; see `NAMESPACE_KEYS_UNIQUE_INDEX_SQL`.
 
 ### Table Lifecycle
 

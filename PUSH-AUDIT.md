@@ -231,7 +231,8 @@ Add the judgment-level review on the diff
   caller; legitimate non-FK list fields (e.g.
   `node_attributes.daemons`, `namespace_attributes.trust`)
   are not flagged. See
-  [docs/plans/PLAN-sql-pushdown-filtering.md](docs/plans/PLAN-sql-pushdown-filtering.md).
+  [docs/operator_guide/database.md](docs/operator_guide/database.md),
+  "Per-Type Attribute Tables".
 - **Three-layer pattern:** Does every new MariaDB function
   have the direct/gRPC/public trio, with the corresponding
   counter registered and proto definition (if needed)?
