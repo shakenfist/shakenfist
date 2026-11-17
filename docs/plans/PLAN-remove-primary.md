@@ -288,7 +288,7 @@ care.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Remove rsyslog aggregation from deployer | _(realised by [PLAN-remove-syslog-forwarding.md](PLAN-remove-syslog-forwarding.md) phase 5)_ | Complete |
+| 1. Remove rsyslog aggregation from deployer | _(realised by [PLAN-remove-syslog-forwarding.md](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-remove-syslog-forwarding.md) phase 5, retired)_ | Complete |
 | 2. ~~`bootstrap_operations` table and idempotent `sf-ctl bootstrap-cluster`~~ | _(dissolved — see phase notes; the role-config-idempotency remainder folds into phase 6)_ | Abandoned |
 | 3. Remove Apache reverse proxy from deployer | _(realised by [PLAN-remove-apache-lb.md](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-remove-apache-lb.md), retired)_ | Complete |
 | 4-5. _(MariaDB BYO and sf-database tier — moved to [PLAN-byo-mariadb.md](PLAN-byo-mariadb.md))_ | _(separate plan)_ | Superseded |
@@ -311,7 +311,7 @@ Phase notes:
   / Splunk want structured logs), and documents the SF
   log-record field-name contract so the operator's log
   pipeline can index it. **Realised by
-  [`PLAN-remove-syslog-forwarding.md`](PLAN-remove-syslog-forwarding.md)
+  [`PLAN-remove-syslog-forwarding.md`](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-remove-syslog-forwarding.md)
   phase 5**, which delivers the Loki-shipper story this phase
   was gated on and then deletes the rsyslog deployer surface
   (`roles/base/tasks/syslog.yml`, the client/server

@@ -127,7 +127,8 @@ frozen.
   — migrated the dnsmasq
   mutation methods onto the operation queue; sf-netserv's update feed
   would replace the apply-side of those operations.
-* `PLAN-remove-syslog-forwarding.md` — the syslog direction that a
+* [`PLAN-remove-syslog-forwarding.md`](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-remove-syslog-forwarding.md) (retired) — the
+  syslog direction that a
   per-network syslog listener would eventually serve.
 
 ### Push audit
