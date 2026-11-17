@@ -173,6 +173,16 @@ compare, the JWT claim), and each of those sites carries a comment
 saying what breaks if the unwrap is missed. Do not add an unwrap to
 make an error go away; move the value, or wrap the other side.
 
+One credential is a plain `str` on purpose: the secret
+`shakenfist/util/credentials.py`'s `generate()` mints for a new key. It
+is the one value in the system which is a bearer credential rather
+than a hash of one, but its whole job is to reach the HTTP response
+body, and the response path has no typed serialiser where an unwrap
+could be made structural. A missed unwrap there would not fail loudly:
+it would render `**********` into the operator's only copy of the
+credential. Revisit this if the response path gains such a
+serialiser, not before.
+
 Two traps, both of which have already caused real bugs:
 
 - **A `SecretStr` never compares equal to a `str`.** `SecretStr('x')

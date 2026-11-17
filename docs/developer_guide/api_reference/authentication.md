@@ -255,9 +255,9 @@ the keys used to authenticate to a namespace.
     -- milliseconds instead of seconds, say -- than an intent.
 
     An expired key can neither mint new tokens nor validate a request, from
-    the moment it lapses. Tokens already minted from it remain valid until
-    their own expiry; delete the key if you need those invalidated
-    immediately.
+    the moment it lapses. That includes tokens minted from it before it
+    lapsed: every request looks the key up again, so those tokens stop
+    working at the key's expiry rather than their own.
 
     Note that updating a key rotates it, and rotation replaces the whole
     mutable attribute set. Updating a key without passing `expiry` clears

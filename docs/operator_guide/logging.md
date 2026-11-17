@@ -52,7 +52,7 @@ problem, read it on the node with `journalctl`.
 
 The performance cost is measured, not assumed: shipping every DEBUG
 line through the per-daemon sqlite spool slowed the multi-node CI
-cluster by about a factor of two. What it buys is that diagnosing a
+cluster by about a factor of two. What it costs is that diagnosing a
 past incident on a node which has since been recycled loses that
 node's DEBUG detail.
 

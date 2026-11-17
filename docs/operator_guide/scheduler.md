@@ -183,21 +183,23 @@ node carries three **per-node** reservation values -- RAM, CPU and
 disk -- set through that node's `/etc/sf/config`, which the deploy
 templates per host. These are ordinary node-local config keys, not
 cluster config: they are **never** set with `sf-ctl set-config`,
-which only reaches cluster-wide values.
-
-That is a hard requirement rather than a convention, because of how the
-two configuration layers compose. `/etc/sf/config` is read by systemd
-as an `EnvironmentFile`, and then `load_cluster_config()` writes every
-`cluster_config` row into the environment *over the top of it*. So a
-single `sf-ctl set-config NODE_RAM_RESERVATION_GB ...` would not set
-one node's reservation — it would override every node's, silently, and
-the per-host values the deploy templated would stop having any effect
-while still being visible in each node's `/etc/sf/config`. A key is
-per-node only for as long as no `cluster_config` row shares its name.
-If one is ever set by mistake, `sf-ctl unset-config` removes it. The resources daemon reads
+which only reaches cluster-wide values. The resources daemon reads
 its own node's values, computes the *schedulable* remainder, and
 publishes it in `node_metrics`; the scheduler consumes the
 published values rather than recomputing them.
+
+Keeping them out of cluster config is a hard requirement rather than a
+convention, because of how the two configuration layers compose.
+`/etc/sf/config` is read by systemd as an `EnvironmentFile`, and then
+`load_cluster_config()` writes every `cluster_config` row which names
+a declared configuration option into the environment *over the top of
+it*. So a single
+`sf-ctl set-config NODE_RAM_RESERVATION_GB ...` would not set one
+node's reservation — it would override every node's, silently, and the
+per-host values the deploy templated would stop having any effect while
+still being visible in each node's `/etc/sf/config`. A key is per-node
+only for as long as no `cluster_config` row shares its name. If one is
+ever set by mistake, `sf-ctl unset-config` removes it.
 
 - **CPU** -- `NODE_CPU_RESERVATION_THREADS` (default 2) is a count
   of hardware **threads**, not physical cores, reserved for the
@@ -221,21 +223,21 @@ values that already accounts for a node's roles -- each host's own
 10% of RAM floored at 2 GB, plus a 4 GB bump on network/database
 nodes, for RAM; `(1 + 1 if network/database else 0) * 2` threads for
 CPU; and a flat 20 GB for disk -- and only fills that default in
-when the operator hasn't already set the value.
-
-The CPU formula assumes two hardware threads per core, which is where
-the `* 2` comes from. On a node without hyperthreading that
-over-reserves by about one thread; the approximation was accepted
-rather than reading CPU topology facts at deploy time, and overriding
-the value per host is the answer where it matters. Note also that the
-RAM default is each host's *own* 10%, where the cluster-wide key it
-replaced collapsed to a single figure taken from one host — so on a
-cluster of unequal machines the per-node defaults are a correction, and
-will not match what was reserved before. An operator can
+when the operator hasn't already set the value. An operator can
 override any of the three per host in inventory (`host_vars` or
 `group_vars`), which is the supported way to give a specific node
 (for example one also running an unrelated sensor workload) extra
 headroom.
+
+The CPU formula assumes two hardware threads per core, which is where
+the `* 2` comes from. On a node without hyperthreading that
+over-reserves by about one thread; the approximation was accepted
+rather than reading CPU topology facts at deploy time, and a per-host
+override is the answer where it matters. Note also that the RAM
+default is each host's *own* 10%, where the cluster-wide key it
+replaced collapsed to a single figure taken from one host — so on a
+cluster of unequal machines the per-node defaults are a correction, and
+will not match what was reserved before.
 
 The published fields are `cpu_cores`, `cpu_threads`,
 `cpu_cores_reserved`, `cpu_schedulable` (threads),

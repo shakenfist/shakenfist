@@ -931,8 +931,10 @@ module for a different reason, or a test that calls a method directly all
 read as "outside", and the failure is silent: the method enqueues a job
 nobody is waiting for, or mutates the host from a second writer. Holding
 the wrong type, by contrast, is not something a caller can do by
-forgetting — there is one constructor and one caller of it. The single-worker-per-queue invariant (see the comment
-block at `self._defer_delays` in workitem.py) is a load-bearing property:
+forgetting: every construction site is inside an operation handler under
+`shakenfist/operations/`, and no code outside that package holds the type
+at all. The single-worker-per-queue invariant (see the comment block at
+`self._defer_delays` in workitem.py) is a load-bearing property:
 it is why the dispatcher's in-memory exponential back-off map is correct,
 and why cross-daemon serialisation can be queue-based rather than
 lock-based. All but one of the `NodeLock(global_scope=False)` wrappers
@@ -993,15 +995,7 @@ pass — see issue #3597 for the log storm that motivated this.
 **REST API surface.** The two network delete endpoints
 (`DELETE /networks/<uuid>` and `DELETE /networks`) return HTTP 202
 (Accepted) with an op-handle body; callers poll
-`GET /clusteroperations/<op_uuid>` for completion. The contract was flipped
-outright rather than advertised as a capability a client could opt into,
-because `shakenfist/client-python` is the only consumer and we ship both
-halves: the alternative was a dual code path on the server, kept
-indefinitely for a client that does not exist, and a blocking branch that
-nothing would exercise. If an external consumer ever appears, advertising
-the 202 contract through `API_CAPABILITIES` and keeping the blocking
-behaviour as the fallback is the shape to add — this is the decision to
-revisit, not the endpoints. Two discovery endpoints
+`GET /clusteroperations/<op_uuid>` for completion. Two discovery endpoints
 are available: `GET /clusteroperations/<op_uuid>/chain` (transitive
 `depends_on` ancestor closure, namespace-scoped) and
 `GET /clusteroperations?target_object_type=<type>&target_uuid=<uuid>`
@@ -1010,6 +1004,15 @@ surviving `@redirect_to_network_node` is on `NetworkPingEndpoint.get`
 because the ping handler runs `ip netns exec` directly on the network
 node; migrating it to queue-based requires op-output infrastructure not
 yet built (deferred future work).
+
+The 202 contract was flipped outright rather than advertised as a
+capability a client could opt into, because `shakenfist/client-python` is
+the only consumer and we ship both halves: the alternative was a dual code
+path on the server, kept indefinitely for a client that does not exist, and
+a blocking branch that nothing would exercise. If an external consumer ever
+appears, advertising the 202 contract through `API_CAPABILITIES` and
+keeping the blocking behaviour as the fallback is the shape to add — this
+is the decision to revisit, not the endpoints.
 
 **Error handling.** `ErrorReport` (`shakenfist/operations/error_report.py`)
 is the on-the-wire shape for failed cluster operations: fields `code`,

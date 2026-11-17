@@ -193,9 +193,9 @@ and matches every key created before this feature existed.
 Enforcement is at the point of use, not on a timer. An expired key can neither
 mint new tokens at `/auth` nor validate a request, from the instant it lapses
 -- there is no window in which an expired key still works because a cleanup
-task has not run yet. Tokens already minted from a key that later expires
-remain valid until their own expiry, which is nominally fifteen minutes; delete
-the key if you need them invalidated immediately, since that changes the nonce.
+task has not run yet. That includes tokens minted from the key before it
+lapsed: `verify_token` looks the key up on every request, so those tokens stop
+validating at the key's expiry rather than at their own.
 
 Expired keys are tidied up by the cluster daemon rather than vanishing the
 moment they lapse. It soft-deletes keys that expired more than
