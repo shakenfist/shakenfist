@@ -181,7 +181,15 @@ transition and the persistence of the report.
 The core architectural principle is that **errors are data, never rehydrated
 Python exception classes**. This converges with gRPC's status-code model and
 is an explicit rejection of the `oslo.messaging` rehydration pattern, which
-made exception types load-bearing across process boundaries.
+made exception types load-bearing across process boundaries. Two reasons,
+and the second is why the rule is not negotiable for convenience. Version
+skew: a consumer can only rehydrate a class it can import, so adding an
+exception type on one side breaks deserialisation on the other until every
+node is upgraded, which is a rolling upgrade this cluster cannot do.
+Security: rehydration means constructing a class named by a string that
+arrived over the wire, and the set of classes reachable that way is not a
+set anyone audits. A `code` string that an unknown consumer does not
+recognise is inert; a class name it resolves is not.
 
 ### How external callers consume the report
 
@@ -403,6 +411,32 @@ through `Network.X()`. This replaces two earlier patterns — late imports, and
 constructing a fresh `BridgedVXLanNetwork(self)` inside the handler. The
 in-class call is cleaner, avoids the redundant wrapper construction, and makes
 the call graph explicit.
+
+## Failure leaves partial state, on purpose
+
+When a step of a chain errors, the dispatcher aborts the remaining
+dependents and whatever the failed step had already written to the host
+stays written. Nothing runs backwards. `maintain` and the cleaner detect
+the resulting drift on a later pass and converge it, which is the same
+mechanism that corrects drift from a crashed node or a lost packet, so it
+is a path that is exercised constantly rather than only after a failure.
+
+Paired forward/undo operations — a compensator per mutating step, run in
+reverse on failure — were considered and rejected. A compensator needs to
+know what its forward step *observed*, not just what it wrote, so it
+carries state the forward step has to persist for it. A compensator can
+itself fail, which needs dead-letter or halt machinery that does not
+otherwise exist. Idempotency then has to hold on both the forward and the
+reverse path rather than only the forward one. And compensation is
+externally visible in confusing ways: an operator watching a network come
+up and then be torn down cannot tell that from a second failure. The same
+effort spent on making convergence robust buys all of those for free.
+
+The lighter version remains available if a concrete case ever needs it: a
+`runs_on_error_of` dependency variant, so a caller that knows precisely
+what to undo can enqueue one cleanup op triggered by one step's failure.
+That is a caller's choice about one chain rather than an obligation on
+every operation, and it should not be built before something needs it.
 
 ## maintain.py and the discovery-only model
 
@@ -888,7 +922,16 @@ single-threaded net-worker dispatcher
 (`shakenfist/daemons/network/workitem.py`) — making re-entrancy through
 the queue structurally impossible. External callers always hold `Network`;
 the dispatcher constructs `BridgedVXLanNetwork` and calls `_apply_*`
-methods on it. The single-worker-per-queue invariant (see the comment
+methods on it. Having the type carry that distinction is the point. The
+obvious alternative is a thread-local or context variable saying "this
+thread is inside the worker", with one set of methods branching on it —
+and it was rejected, because such a flag is correct only while every path
+into the code sets it. A new thread, a callback, a daemon that imports the
+module for a different reason, or a test that calls a method directly all
+read as "outside", and the failure is silent: the method enqueues a job
+nobody is waiting for, or mutates the host from a second writer. Holding
+the wrong type, by contrast, is not something a caller can do by
+forgetting — there is one constructor and one caller of it. The single-worker-per-queue invariant (see the comment
 block at `self._defer_delays` in workitem.py) is a load-bearing property:
 it is why the dispatcher's in-memory exponential back-off map is correct,
 and why cross-daemon serialisation can be queue-based rather than
@@ -950,7 +993,15 @@ pass — see issue #3597 for the log storm that motivated this.
 **REST API surface.** The two network delete endpoints
 (`DELETE /networks/<uuid>` and `DELETE /networks`) return HTTP 202
 (Accepted) with an op-handle body; callers poll
-`GET /clusteroperations/<op_uuid>` for completion. Two discovery endpoints
+`GET /clusteroperations/<op_uuid>` for completion. The contract was flipped
+outright rather than advertised as a capability a client could opt into,
+because `shakenfist/client-python` is the only consumer and we ship both
+halves: the alternative was a dual code path on the server, kept
+indefinitely for a client that does not exist, and a blocking branch that
+nothing would exercise. If an external consumer ever appears, advertising
+the 202 contract through `API_CAPABILITIES` and keeping the blocking
+behaviour as the fallback is the shape to add — this is the decision to
+revisit, not the endpoints. Two discovery endpoints
 are available: `GET /clusteroperations/<op_uuid>/chain` (transitive
 `depends_on` ancestor closure, namespace-scoped) and
 `GET /clusteroperations?target_object_type=<type>&target_uuid=<uuid>`

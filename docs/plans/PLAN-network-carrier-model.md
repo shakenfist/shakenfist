@@ -26,7 +26,8 @@ Consult `ARCHITECTURE.md` for the system architecture
 overview, especially the network subsystem and the existing
 network node role. Consult `CLAUDE.md` for build commands,
 project conventions, the cluster-lock leasing pattern, the
-single-mutator direction in `PLAN-network-facade`, and the
+single-mutator direction in [`PLAN-network-facade`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md)
+(retired), and the
 exec-to-netlink direction in `PLAN-replace-exec-with-netlink`.
 
 This plan is a **placeholder**. It captures intent and the
@@ -266,9 +267,10 @@ has the most open questions. Phase 0 will resolve at least:
     lease-managed." Confirm this case is not pessimised
     (no unnecessary lease churn, no false-failover
     detection in a one-member pool).
-12. **Interaction with `PLAN-network-facade` and
+12. **Interaction with [`PLAN-network-facade`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md) (retired)
+    and
     `PLAN-replace-exec-with-netlink`.** The carrier is
-    exactly the single-mutator that `PLAN-network-facade`
+    exactly the single-mutator that [`PLAN-network-facade`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md)
     is shaping `net-worker` to be — but per-carrier-node,
     not cluster-wide singleton. Phase 0 confirms whether
     `net-worker` remains a cluster-wide singleton with
@@ -339,7 +341,8 @@ finds nothing, that is recorded in one sentence.
   carrier reprograms DNAT'd service ports on lease
   acquire; this plan does not invent its own DNAT
   mechanism.
-- **Tight coherence with `PLAN-network-facade` and
+- **Tight coherence with [`PLAN-network-facade`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md) (retired)
+  and
   `PLAN-replace-exec-with-netlink`.** The carrier is the
   natural home of single-mutator network operations and of
   netlink-driven privileged programming. Either both land

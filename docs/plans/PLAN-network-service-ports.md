@@ -262,7 +262,7 @@ finds nothing, that is recorded in one sentence.
   network-node behaviour) is a valid degenerate case — but
   the two plans together unlock the full smeared-carrier
   story.
-- **Coherent with `PLAN-network-facade` and
+- **Coherent with [`PLAN-network-facade`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md) (retired) and
   `PLAN-replace-exec-with-netlink`.** DNAT rule programming
   is exactly the kind of single-mutator operation those
   plans are shaping the network daemon around. This plan

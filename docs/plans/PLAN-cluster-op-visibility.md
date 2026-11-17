@@ -131,7 +131,7 @@ One endpoint is already history-aware:
 `GET /clusteroperations?target_object_type=&target_uuid=`
 (`external_api/clusteroperation.py`,
 `ClusterOperationsEndpoint`, added in phase 7 of
-`PLAN-network-facade.md`; client wrapper
+[`PLAN-network-facade.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md) (retired); client wrapper
 `list_cluster_operations_for_target()` behind the
 `cluster-operations-by-target` capability). It joins
 `cluster_operation_targets` against `cluster_operations` and

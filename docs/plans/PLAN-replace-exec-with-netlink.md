@@ -9,7 +9,8 @@ document, explore the shakenfist codebase thoroughly. Read
 hold most of SF's exec'd network operations today. Read
 `shakenfist/daemons/network/main.py` for the few exec sites
 that live outside privexec. Read the network worker and the
-single-mutator path being built in `PLAN-network-facade.md`,
+single-mutator path built in [`PLAN-network-facade.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md)
+(retired),
 since this plan changes the *mechanism* the single mutator
 uses without changing *who* the mutator is. Ground your
 answers in what the code does today. Do not speculate when
@@ -113,7 +114,8 @@ needs to solve, and would bind SF to a much larger
 operational and dependency surface.
 
 There is also a **privilege separation opportunity** that
-becomes available once `PLAN-network-facade.md` lands.
+became available when [`PLAN-network-facade.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md)
+(retired) landed.
 Today `sf-privexec` is a single root-privileged daemon
 that any local SF process can ask to run arbitrary
 privileged operations. After network-facade, all network
@@ -140,7 +142,8 @@ sequentially, because each touches the same files in
 and because the typed-RPC shape and the split-daemon shape
 both fall naturally out of an in-process netlink
 implementation. This plan therefore folds them into one
-arc, gated on `PLAN-network-facade.md` having landed so
+arc, gated on [`PLAN-network-facade.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md) (retired)
+having landed so
 the "exactly one caller of network privilege" property
 holds.
 
@@ -208,7 +211,8 @@ Concretely:
   the final name). This new daemon holds only
   `CAP_NET_ADMIN`, exposes only typed network operations,
   and accepts requests only from `net-worker` (the single
-  mutator established by `PLAN-network-facade.md`). The
+  mutator established by [`PLAN-network-facade.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md),
+retired). The
   existing `sf-privexec` daemon retains its non-network
   responsibilities (libvirt, on-disk image manipulation,
   qemu interactions) but drops `CAP_NET_ADMIN` once the
@@ -475,8 +479,9 @@ Notes on sequencing:
 
 ## Dependencies on other plans
 
-- **`PLAN-network-facade.md`** is in progress in a separate
-  work session and **must land before this plan starts**.
+- **[`PLAN-network-facade.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md)** (complete, now
+  retired) **landed before this plan starts**, which was a
+  precondition.
   Two reasons. First, network-facade settles *who* mutates
   network state (the single-mutator `net-worker` pattern)
   while this plan changes *how* the mutator does the
