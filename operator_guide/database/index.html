@@ -17648,6 +17648,13 @@ each have their own single-column index on the type table.</p>
 <p>Name lookups from REST handlers should call the per-type <code>from_db_by_ref(name, namespace=ns)</code> class method
 (e.g. <code>Artifact.from_db_by_ref(ref, namespace=ns)</code>). The override pushes
 the name equality predicate to SQL.</p>
+<p>Each override is one call: it hands <code>DatabaseBackedObject._from_db_by_ref_pushdown</code> its type's <code>find_*</code> and a
+callback which turns one returned row into an object of that type, which is the only thing the three
+implementations differ in. The rest — the guard against a null ref, the UUID short-circuit, the namespace
+collapse where <code>'system'</code> and <code>None</code> both mean "every namespace", and <code>MultipleObjects</code> on an ambiguous
+name — lives in that one body. A fourth type supplies the two callbacks and does not restate it: a copy
+which loses the collapse narrows an administrative lookup to the objects literally owned by <code>system</code> and
+answers a plausible wrong object rather than raising, which is silent (issue 4948).</p>
 <p>Bulk iteration scoped by state and/or namespace should use the iterator constructor directly:
 <code>Artifacts(namespace=ns, prefilter='active')</code>, <code>Instances(namespace=ns)</code>, <code>Networks(namespace=ns)</code>.
 The iterator's <code>_find</code> override builds an <code>ObjectFilterCriteria</code> from the constructor arguments and delegates
