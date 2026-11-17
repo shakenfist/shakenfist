@@ -606,6 +606,21 @@ against a mocked engine cannot do that, and neither can a test that
 rewrites the query to suit sqlite -- register the missing SQL functions
 instead, so the statement under test is the statement that ships.
 
+The same rule has a write-side form, and it cost longer to find. A test
+which mocks the write helper and asserts it was *called* the right number
+of times proves nothing about what the database kept. The v1
+`cluster_operation_targets` table declared `unique=True` on
+`operation_uuid` alone, so a multi-target operation's second and third
+target rows raised `IntegrityError`, which the writer swallowed as
+idempotency -- one row stored out of three. The test enqueued a hot plug
+and asserted three calls with the right arguments, and passed, for months.
+The symptom surfaced from the network side only: the first declared target
+is the one that survives, so instance-side gates read correctly while
+`has_pending_cluster_operation()` on the network returned False and the
+network maintainer recreated a bridge an in-flight operation was about to
+build. A constraint is part of the statement under test; a call count is
+not a row count.
+
 ## A uuid column's type is `uuid_column_type()`, never a bare `sa.Uuid()`
 
 `sa.Uuid()` decides how to bind, read and render itself per dialect.
