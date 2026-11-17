@@ -421,3 +421,63 @@ class CountObjectsByStateTestCase(base.ShakenFistTestCase):
         context.set_code.assert_called_once_with(
             grpc.StatusCode.INVALID_ARGUMENT)
         mock_count.assert_not_called()
+
+
+class FindObjectsFailedReadTestCase(base.ShakenFistTestCase):
+    """A failed find must not be answered with an empty result set.
+
+    All four `Find*` handlers return a `repeated` message with no room
+    to say "the read failed", so an empty list is indistinguishable from
+    an authoritative "nothing matched". That matters most for artifacts,
+    where `Artifact.from_db_by_ref()` reads an empty find as "no
+    artifact by that name" -- the same reasoning `_direct_find_namespace_keys`
+    and `_direct_find_mapping_rules` carry for #3522.
+
+    `FindArtifacts` was the one handler which left the gRPC status alone
+    on failure (#4944); these tests hold all four to the same contract so
+    the next handler added here cannot quietly drop it again.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.servicer = daemons_database_main.DatabaseService(
+            mock.MagicMock())
+
+    # (handler name, mariadb helper patched, reply field)
+    HANDLERS = [
+        ('FindArtifacts', '_direct_find_artifacts', 'artifacts'),
+        ('FindInstances', '_direct_find_instances', 'instances'),
+        ('FindNetworks', '_direct_find_networks', 'networks'),
+        ('FindNetworkInterfaces', '_direct_find_network_interfaces',
+         'network_interfaces'),
+    ]
+
+    def _request(self, handler):
+        return getattr(database_pb2, f'{handler}Request')(
+            criteria=database_pb2.ObjectFilterCriteria(states=['created']))
+
+    def test_failure_is_internal_not_an_empty_reply(self):
+        for handler, helper, field in self.HANDLERS:
+            context = mock.MagicMock()
+            with mock.patch(f'shakenfist.mariadb.{helper}',
+                            side_effect=ValueError('boom')):
+                reply = getattr(self.servicer, handler)(
+                    self._request(handler), context)
+
+            context.set_code.assert_called_once_with(
+                grpc.StatusCode.INTERNAL)
+            context.set_details.assert_called_once_with('boom')
+            self.assertEqual([], list(getattr(reply, field)))
+
+    def test_genuinely_empty_is_not_an_error(self):
+        # The negative control. Without this the test above passes just
+        # as well against a servicer which fails every find.
+        for handler, helper, field in self.HANDLERS:
+            context = mock.MagicMock()
+            with mock.patch(f'shakenfist.mariadb.{helper}', return_value=[]):
+                reply = getattr(self.servicer, handler)(
+                    self._request(handler), context)
+
+            context.set_code.assert_not_called()
+            context.set_details.assert_not_called()
+            self.assertEqual([], list(getattr(reply, field)))
