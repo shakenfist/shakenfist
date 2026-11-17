@@ -179,7 +179,7 @@ it.
    groups['etcd_master'] %}`. Non-database nodes
    get only the gateway-host block. The
    `etcd_master` ansible group name is still the
-   one in use; PLAN-remove-primary phase 7
+   one in use; [PLAN-remove-primary](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7
    renames it. Phase 4 does not.
 
 7. **CI breakage between phase 4 and phase 5
@@ -314,12 +314,12 @@ red between phase 4 and phase 5 landing.
   more extensive phase-7 docs sweep handles the
   full pass.
 - `etcd_master` → `database_node` ansible group
-  rename — PLAN-remove-primary phase 7.
+  rename — [PLAN-remove-primary](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7.
 - `topology.json` migration shim for operators
   with existing files — out of scope (greenfields
   only).
 - The bundled Apache reverse proxy and rsyslog
-  install removal — PLAN-remove-primary phases 1
+  install removal — [PLAN-remove-primary](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phases 1
   and 3.
 
 ## Back brief

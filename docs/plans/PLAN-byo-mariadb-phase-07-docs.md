@@ -100,14 +100,14 @@ the post-phase-6 code. After this phase ships:
 - Docs changes in *other* in-flight plan files
   that reference the now-retired etcd machinery or
   the `roles/mariadb/` role
-  (`PLAN-remove-primary.md`,
+  ([`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md),
   `PLAN-embrace-tls.md`, [`PLAN-health-checks.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md)).
   Those plans reference the machinery as part of
   their own design discussion; updating them
   belongs to the next iteration of those plans,
   not here. The `is_etcd_master` Python-attribute
   and `etcd_master` ansible-group renames are
-  PLAN-remove-primary phase 7's scope.
+  [PLAN-remove-primary](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7's scope.
 - A rewrite of the historical earlier-cycle
   `## Database` section in `v07-v08.md`. Release
   notes are a record of what changed; the new

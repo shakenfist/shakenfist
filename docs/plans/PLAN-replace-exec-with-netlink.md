@@ -492,7 +492,7 @@ Notes on sequencing:
   without it, splitting `sf-privexec` would not actually
   shrink the caller set and the security payoff would be
   weaker.
-- **`PLAN-remove-primary.md`** is independent. Network code
+- **[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md)** is independent. Network code
   lives in `sf-net` and `sf-privexec`, neither of which is
   affected by primary-node removal. This plan can land
   before, during, or after remove-primary.
@@ -507,7 +507,7 @@ This plan sits in the **"not strictly ordered"** group in
 `PLAN-sticky-transfers.md`, and the not-yet-drafted
 eventlog / network-node-failover / OpenTelemetry threads.
 The triage decision for which of these lands first is
-deferred until `PLAN-remove-primary.md` is close to
+deferred until [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) is close to
 landing.
 
 ## Agent guidance
@@ -533,11 +533,11 @@ phase 3's patterns are established.
 
 Each phase plan should include a step table with effort,
 model, isolation, and brief columns in the format used by
-`PLAN-remove-primary.md`.
+[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md).
 
 ### Management session review checklist
 
-Standard checklist from `PLAN-remove-primary.md`, plus:
+Standard checklist from [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), plus:
 
 - [ ] No remaining `subprocess` / `Popen` invocations of
       `iptables`, `ip`, `brctl`, `sysctl`, or `arping` in

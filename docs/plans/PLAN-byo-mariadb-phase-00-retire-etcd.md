@@ -46,14 +46,14 @@ This phase deletes Python-side etcd machinery. It does
 
 - The `etcd_master` ansible group name in `deploy.py`,
   `deploy.yml`, or any ansible role. That rename
-  belongs to `PLAN-remove-primary` phase 7.
+  belongs to [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7.
 - The `is_etcd_master` Python attribute on `Node`, the
   matching column on the `nodes` table, the gRPC
   protobuf field, or any other "is this the database
   node?" boolean threaded through the codebase. Per the
   master plan, that attribute is functionally identical
   to "is database node" today and will be renamed in
-  `PLAN-remove-primary` phase 7 alongside the ansible
+  [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7 alongside the ansible
   group rename. Phase 0 leaves the attribute alone to
   avoid cross-scope churn.
 
@@ -142,7 +142,7 @@ true:
    protobuf change, gRPC client recompile, and Node-
    accessor rewrite. The master plan already scopes
    the rename (`is_etcd_master` → `is_database_node`)
-   to `PLAN-remove-primary` phase 7. Phase 0 keeps to
+   to [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7. Phase 0 keeps to
    that boundary.
 
 2. **No staged removal across releases.** Per master
@@ -256,10 +256,10 @@ For clarity, none of these are touched by phase 0:
 
 - `is_etcd_master` Python attribute on `Node`, the
   matching column on `nodes`, the gRPC field, any
-  caller. → `PLAN-remove-primary` phase 7.
+  caller. → [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7.
 - `etcd_master` ansible-group name in `deploy.py`,
   `deploy.yml`, ansible roles, inventory templates,
-  `installation.md` examples. → `PLAN-remove-primary`
+  `installation.md` examples. → [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md)
   phase 7.
 - The release-notes files under `docs/release_notes/`
   (e.g. `v07-v08.md`) that mention retired
@@ -279,7 +279,7 @@ operator on:
 - The four steps in order, with the file or line-
   range each touches.
 - The deliberate decision to leave `is_etcd_master`
-  alone (left for `PLAN-remove-primary` phase 7), so
+  alone (left for [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7), so
   the management session and the sub-agents do not
   accidentally widen scope.
 - The corrected understanding that `DATA_MIGRATIONS`

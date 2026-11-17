@@ -112,7 +112,7 @@ This design was chosen in preference to two alternatives:
   post-election**, running serially in a single process so it
   can maintain an in-memory overlay of pending decisions.
   Rejected because it walks back the direction of
-  `PLAN-remove-primary` (reducing critical-path single-point-
+  [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) (reducing critical-path single-point-
   of-failure roles), introduces a throughput ceiling, and
   couples a hot user-request path to a daemon whose other
   duties are background-shaped.
@@ -1370,11 +1370,11 @@ and the client surface it reviews is the final one.
   per-host reservations; conceptually this plan extends the
   same "capacity the scheduler may not use" idea from static
   per-host configuration to dynamic per-claim rows.
-- **`PLAN-remove-primary` does not block this plan** and this
-  plan does not block `PLAN-remove-primary`. They are
+- **[`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) does not block this plan** and this
+  plan does not block [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md). They are
   compatible by design — the reservations-via-DB-atomicity
   shape was chosen specifically to avoid adding a new
-  critical-path role that `PLAN-remove-primary` would then
+  critical-path role that [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) would then
   have to undo.
 - **OpenTelemetry instrumentation (not yet drafted) would
   inform phase 0** by giving real numbers for current
@@ -1394,7 +1394,7 @@ and the client surface it reviews is the final one.
 
 All implementation work is done by sub-agents, never in the
 management session. The workflow mirrors
-`PLAN-remove-primary.md` and `PLAN-sticky-transfers.md`: plan
+[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) and `PLAN-sticky-transfers.md`: plan
 in the management session, spawn a sub-agent per implementation
 step, review in the management session, fix or retry, commit
 when satisfied.
@@ -1418,12 +1418,12 @@ lands.
 ### Step-level guidance
 
 Each phase plan should include a step table in the same format
-as `PLAN-remove-primary.md`, with effort, model, isolation, and
+as [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), with effort, model, isolation, and
 brief columns.
 
 ### Management session review checklist
 
-Standard checklist from `PLAN-remove-primary.md`, plus:
+Standard checklist from [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), plus:
 
 - [ ] The atomicity guarantee is exercised by a concurrent-
       scheduling test, not just asserted in docs. Two

@@ -50,7 +50,7 @@ single commit.
 
 ## Situation
 
-`PLAN-remove-primary.md` establishes that when sf-api on a
+[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) establishes that when sf-api on a
 given node is asked for a blob it doesn't hold, the
 receiving node opens a connection to a peer that does and
 streams bytes through to the client without staging the
@@ -126,7 +126,7 @@ for multi-request blob transfers (multi-chunk uploads and
 ranged downloads), eliminating the cluster-mesh
 double-hop for those sessions without exposing per-node
 URLs to clients. The streaming-proxy baseline from
-`PLAN-remove-primary.md` remains the universal fallback for
+[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) remains the universal fallback for
 operators whose LB does not support server-set sticky
 cookies.
 
@@ -194,7 +194,7 @@ questions include at least:
    the first chunk to the chosen owner and being sticky
    from chunk #2 onward)? The latter integrates better
    with the eventual content-addressable placement
-   direction noted in `PLAN-remove-primary.md`.
+   direction noted in [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md).
 6. **Fallback detection.** How does sf-api know that
    stickiness *isn't* working — i.e., the LB isn't honoring
    the cookie? Naive answer: it can't, and falls through
@@ -254,7 +254,7 @@ finds nothing, that is recorded in one sentence.
 
 ## Dependencies on other plans
 
-- **`PLAN-remove-primary.md` must have landed** at least
+- **[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) must have landed** at least
   through the phase that delivers the streaming-proxy
   baseline for blob reads. The streaming proxy is this
   plan's universal fallback; without it, the
@@ -276,7 +276,7 @@ finds nothing, that is recorded in one sentence.
 
 All implementation work is done by sub-agents, never in the
 management session. The workflow mirrors
-`PLAN-remove-primary.md`: plan in the management session,
+[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md): plan in the management session,
 spawn a sub-agent per implementation step, review in the
 management session, fix or retry, commit when satisfied.
 
@@ -297,12 +297,12 @@ phase 0 lands.
 ### Step-level guidance
 
 Each phase plan should include a step table in the same
-format as `PLAN-remove-primary.md`, with effort, model,
+format as [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), with effort, model,
 isolation, and brief columns.
 
 ### Management session review checklist
 
-Standard checklist from `PLAN-remove-primary.md`, plus:
+Standard checklist from [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), plus:
 
 - [ ] Document additions describe each supported LB's
       required configuration with enough specificity that

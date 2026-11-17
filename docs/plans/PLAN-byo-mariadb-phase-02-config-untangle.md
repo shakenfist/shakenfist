@@ -282,7 +282,7 @@ buildable and pre-commit-clean.
   in `deploy.yml:233`.** Step 3's rewrite of the
   `database_node_ip` line continues to reference
   `groups['etcd_master'][0]`. That string is
-  PLAN-remove-primary phase 7's scope — leave the
+  [PLAN-remove-primary](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7's scope — leave the
   group name alone, just rename the *Ansible
   variable* it gets bound to. The brief for step 3
   is explicit about this boundary.
@@ -299,7 +299,7 @@ buildable and pre-commit-clean.
   `getsf` — phase 5.
 - N>1 functional test coverage — phase 6.
 - `etcd_master` ansible group rename to
-  `database_node` — PLAN-remove-primary phase 7.
+  `database_node` — [PLAN-remove-primary](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7.
 - The `SHAKENFIST_MARIADB_HOST=localhost`
   ExecStartPre escape hatch in
   `roles/primary/tasks/cluster_config.yml` — that
@@ -326,6 +326,6 @@ operator on:
   and the phase-2-uses-first-entry / phase-3-does-
   real-LB sequencing.
 - The deliberate boundary against
-  PLAN-remove-primary phase 7 (the `etcd_master`
+  [PLAN-remove-primary](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7 (the `etcd_master`
   ansible-group name stays in `deploy.yml:233`;
   step 3 renames only the variable bound to it).

@@ -35,7 +35,7 @@ overview and daemon structure. Consult `CLAUDE.md` for
 build commands, project conventions, the MariaDB storage
 pattern, the systemd service ordering, and the
 "database daemon special case" around `MARIADB_HOST`.
-Consult `PLAN-remove-primary.md` for the broader
+Consult [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) for the broader
 sf-as-infra direction this plan sits inside; the MariaDB
 and sf-database-tier elements that originally lived in
 remove-primary phases 4-5 have been lifted out into this
@@ -182,7 +182,7 @@ tier of equal instances rather than a singleton on
   bootstrap-time chicken-and-egg that the hack worked
   around is dissolved by `sf-ctl ensure-mariadb-schema`
   and `sf-ctl bootstrap-cluster` (from
-  `PLAN-remove-primary` phase 2) running before any SF
+  [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 2) running before any SF
   daemon starts.
 - `getsf` is reworked. The interactive deployer prompts
   the operator for the MariaDB host(s), user, password,
@@ -242,7 +242,7 @@ practice apply unmodified.
 
 ### Run a single `sf-database` with leader election
 
-The original framing in `PLAN-remove-primary` phase 5 was
+The original framing in [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 5 was
 "elect `sf-database` like `sf-cluster`, with non-elected
 candidates serving as discovery surface that refers
 clients to the current leader." We reject this in favour
@@ -354,11 +354,11 @@ introducing the LB.
    It does not ship per-caller scoping itself. See
    `PLAN-embrace-tls.md`.
 
-10. **Scope is lifted out of `PLAN-remove-primary`.**
+10. **Scope is lifted out of [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md).**
     The mariadb-install and sf-database-tier elements
     that lived in remove-primary phases 4-5 are moved
     into this plan. Phase 01 of this plan updates
-    `PLAN-remove-primary.md` to remove the overlapping
+    [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) to remove the overlapping
     scope and cross-reference this plan as a
     dependency for the surrounding work
     (`bootstrap_operations` table, galaxy-role
@@ -384,7 +384,7 @@ introducing the LB.
     Phase 0 deletes all of it as a single sweep, fully
     superseding `PLAN-remove-etcd.md`. The
     `etcd_master` *ansible group name* rename remains
-    with `PLAN-remove-primary` phase 7 — that is a
+    with [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7 — that is a
     deploy-naming change in the deployer's natural
     surface area, not part of the Python-side etcd
     cleanup.
@@ -504,8 +504,8 @@ Phase 07 documents the end state.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 0. Retire etcd machinery and migration-era scaffolding (supersedes `PLAN-remove-etcd`; deletes `etcd.py`, `etcd3gw`, etcd protos, `DATA_MIGRATIONS` framework, drain tests, dead `sf-ctl` helpers and `show/set-etcd-config` aliases, stale `migrate-*` comments, `ETCDCTL_API` docs line, the `.claude/skills/migrate-etcd-to-mariadb.md` skill; `is_etcd_master` left for `PLAN-remove-primary` phase 7) | [PLAN-byo-mariadb-phase-00-retire-etcd.md](PLAN-byo-mariadb-phase-00-retire-etcd.md) | Complete |
-| 1. PLAN-remove-primary scope lift; `_get_schema_versions_table()` lock fix; stop sf-database calling `ensure_schema()`/`ensure_data_migrations()` at startup; add a startup schema-version check that refuses to start on mismatch; add a hard MariaDB compatibility check (server version against a pinned floor, InnoDB engine, `utf8mb4` charset) to both `sf-ctl ensure-mariadb-schema` and sf-database startup | [PLAN-byo-mariadb-phase-01-statelessness.md](PLAN-byo-mariadb-phase-01-statelessness.md) | Complete |
+| 0. Retire etcd machinery and migration-era scaffolding (supersedes `PLAN-remove-etcd`; deletes `etcd.py`, `etcd3gw`, etcd protos, `DATA_MIGRATIONS` framework, drain tests, dead `sf-ctl` helpers and `show/set-etcd-config` aliases, stale `migrate-*` comments, `ETCDCTL_API` docs line, the `.claude/skills/migrate-etcd-to-mariadb.md` skill; `is_etcd_master` left for [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 7) | [PLAN-byo-mariadb-phase-00-retire-etcd.md](PLAN-byo-mariadb-phase-00-retire-etcd.md) | Complete |
+| 1. [PLAN-remove-primary](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) scope lift; `_get_schema_versions_table()` lock fix; stop sf-database calling `ensure_schema()`/`ensure_data_migrations()` at startup; add a startup schema-version check that refuses to start on mismatch; add a hard MariaDB compatibility check (server version against a pinned floor, InnoDB engine, `utf8mb4` charset) to both `sf-ctl ensure-mariadb-schema` and sf-database startup | [PLAN-byo-mariadb-phase-01-statelessness.md](PLAN-byo-mariadb-phase-01-statelessness.md) | Complete |
 | 2. Untangle `MARIADB_HOST` from "I am the database node"; rename `DATABASE_NODE_IP` → `MARIADB_GATEWAY_HOSTS` (plural list); rewrite the `config.py` bootstrap conditional | [PLAN-byo-mariadb-phase-02-config-untangle.md](PLAN-byo-mariadb-phase-02-config-untangle.md) | Complete |
 | 3. Multi-endpoint client-side gRPC LB; minimal `grpc.health.v1.Health` server-side support on sf-database; channel factory helper | [PLAN-byo-mariadb-phase-03-grpc-tier.md](PLAN-byo-mariadb-phase-03-grpc-tier.md) | Complete |
 | 4. `getsf` reworked to prompt for BYO connection details; `roles/mariadb/` deleted; `tools/bootstrap-mariadb.sql` shipped; `deploy.py` stops generating a password; tuning `.cnf` moved to `examples/` | [PLAN-byo-mariadb-phase-04-deploy-byo.md](PLAN-byo-mariadb-phase-04-deploy-byo.md) | Complete |
@@ -526,7 +526,7 @@ Sequencing constraints between phases:
   the schema_versions race fix and the daemon-
   startup-check change, N>1 cannot work and the
   subsequent phases cannot be validated. The
-  PLAN-remove-primary scope-lift edit also belongs
+  [PLAN-remove-primary](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) scope-lift edit also belongs
   here so the two plans don't contradict each other
   in review.
 - **Phase 02 must land before phase 03.** The LB
@@ -550,7 +550,7 @@ Sequencing constraints between phases:
 
 ## Dependencies on other plans
 
-- **`PLAN-remove-primary.md`** — sibling plan in the
+- **[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md)** — sibling plan in the
   sf-as-infra direction. This plan lifts MariaDB-
   install and sf-database-tier scope out of remove-
   primary. Phase 01 of this plan edits remove-primary
@@ -699,7 +699,7 @@ is None` inside the lock before constructing."
 
 ### Management session review checklist
 
-Standard checklist from `PLAN-remove-primary.md`,
+Standard checklist from [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md),
 plus:
 
 - [ ] The `MARIADB_HOST=localhost` direct-access
@@ -725,7 +725,7 @@ plus:
       sf-database instances across consecutive
       requests (verified by metrics or log
       inspection in the functional test).
-- [ ] `PLAN-remove-primary.md` is edited in phase
+- [ ] [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) is edited in phase
       01 to remove the now-overlapping scope and
       cross-reference this plan. `index.md` and
       `order.yml` are updated to reflect the new
@@ -800,7 +800,7 @@ be true:
   reflect the new deployment shape; release
   notes call out that the deployer no longer
   installs MariaDB.
-* `PLAN-remove-primary.md` no longer carries the
+* [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) no longer carries the
   MariaDB-install or sf-database-tier scope; it
   cross-references this plan. `docs/plans/
   index.md` reflects the change.
@@ -835,7 +835,7 @@ be true:
   and `constants.py`, and the
   `.claude/skills/migrate-etcd-to-mariadb.md`
   skill are all gone. (The `etcd_master` ansible
-  group name remains for `PLAN-remove-primary`
+  group name remains for [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md)
   phase 7 to rename in deploy scope.)
 
 ### Future work

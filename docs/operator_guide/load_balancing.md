@@ -191,6 +191,46 @@ off` and `proxy_buffering off` to stream rather than buffer, and
 `proxy_read_timeout`/`proxy_send_timeout` of `3600s`. Apache uses
 `LimitRequestBody 0` and a `ProxyTimeout` of `3600`.
 
+Any node can serve any blob, because a node asked for a blob it does
+not hold opens a connection to a peer that does and streams the bytes
+through without staging them locally. So your proxy needs no knowledge
+of where data lives, and you can balance across all of your
+hypervisors with any algorithm you like.
+
+That costs a second hop, and it is placed where bandwidth is cheap: the
+extra leg runs on the cluster mesh, which is typically an order of
+magnitude faster than the network your clients sit on -- 10 GbE within
+a rack or two against a 1 GbE LAN is the common shape -- and latency on
+the streamed bytes is unaffected once the first byte arrives.
+
+Two alternatives were rejected, and both are worth knowing before
+anyone proposes them again:
+
+- **A redirect to the node holding the data.** This is what S3 does for
+  regions and etcd for writes, and for Shaken Fist it punches a hole
+  through your perimeter. A `307` naming a per-node address tells the
+  client your cluster topology and sends it around the load balancer,
+  and with it whatever WAF and TLS termination sit behind it. Routing
+  the redirect back through the proxy would mean teaching the proxy to
+  read a token that selects a backend, which is the next item.
+- **A topology-aware balancer** that knows which node holds which blob
+  and which roles run where. That rebuilds the central tier, and the
+  single point of failure, that this architecture exists to remove, and
+  it conflates two different problems -- routing by role and routing by
+  data -- which want different mechanisms. It is also a road no
+  comparable system has taken: S3, HDFS, Cassandra, Ceph and etcd all
+  push routing into the client or into redirects instead. The nearest
+  real example is GitHub's shard router, which is a large piece of
+  bespoke engineering.
+
+Eliminating the second hop for a long multi-request session is a real
+refinement, and is possible without exposing per-node addresses: the
+first request picks an owner and sets an opaque cookie the proxy
+honours for the rest of the session. That has its own trade-offs --
+open-source nginx cannot do server-set sticky cookies, so the streaming
+proxy has to stay as the fallback -- and is planned separately rather
+than assumed here.
+
 ## Single-node escape hatch
 
 If you run everything on a single machine and do not want to operate a proxy at
