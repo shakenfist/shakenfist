@@ -441,7 +441,7 @@ class NetworkInterfacesBackfillIsBatchedTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
     def test_the_backfill_is_handed_to_the_batched_helper(
             self, mock_get_version, mock_set_version):
-        conn = _MockConnection([_MockResult() for _ in range(4)])
+        conn = _MockConnection([_MockResult() for _ in range(6)])
         engine = _MockEngine(conn)
 
         with mock.patch(
@@ -470,6 +470,50 @@ class NetworkInterfacesBackfillIsBatchedTestCase(base.ShakenFistTestCase):
         self.assertIn("s.object_type = 'INTERFACE'", args[3])
         mock_set_version.assert_called_once_with(
             engine, 'network_interfaces', 3)
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=3)
+    def test_an_existing_constraint_is_asked_about_not_inferred(
+            self, mock_get_version, mock_set_version):
+        """The version 4 step probes before it alters.
+
+        Its ALTER failing is reported at WARNING, because unlike the
+        earlier steps this constraint is the whole of the fix for issue
+        4946 and an upgrade which could not land it must not read as a
+        success. That only works if "already there" -- which is what a
+        fresh install sees, the table having been built from the
+        definition -- is told apart from "could not be added" by asking
+        the database rather than by reading the driver's error text.
+        """
+        conn = _MockConnection([_MockResult(first=('whatever',))])
+        engine = _MockEngine(conn)
+
+        result = mariadb._ensure_network_interfaces_schema(engine)
+
+        self.assertEqual(mariadb.NETWORK_INTERFACES_VERSION,
+                         result['end_version'])
+        self.assertEqual(1, len(conn.calls))
+        self.assertIn('information_schema.TABLE_CONSTRAINTS',
+                      conn.calls[0][0])
+        self.assertEqual(
+            'uq_network_interfaces_instance_order_active',
+            conn.calls[0][1]['constraint_name'])
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=3)
+    def test_an_absent_constraint_is_added(
+            self, mock_get_version, mock_set_version):
+        conn = _MockConnection([_MockResult() for _ in range(3)])
+        engine = _MockEngine(conn)
+
+        mariadb._ensure_network_interfaces_schema(engine)
+
+        statements = [sql for sql, _ in conn.calls]
+        self.assertIn('information_schema.TABLE_CONSTRAINTS',
+                      statements[0])
+        self.assertIn(
+            'ADD CONSTRAINT uq_network_interfaces_instance_order_active',
+            ' '.join(statements))
 
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)

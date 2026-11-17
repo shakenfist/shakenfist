@@ -508,6 +508,11 @@ def _netdesc_safety_checks(netdesc, namespace):
 
 
 def _netdesc_allocate_address(inst, netdesc, order, hot_plug=False):
+    # ``order`` is the interface's device index, or None to have
+    # NetworkInterface.new() allocate one under the UNIQUE constraint
+    # which guards it. Create passes an index because the position is
+    # the caller's listed order; hot plug passes None.
+    #
     # On the create path inst is the half-built instance this request is
     # assembling, so error-deleting it is the cleanup for a refused
     # netdesc. On the hot plug path inst existed before the request and
@@ -1542,14 +1547,15 @@ class InstanceInterfacesEndpoint(api_base.Resource):
         if err:
             return err
 
-        ifaces = instance_from_db.interfaces
-        if not ifaces:
-            order = 0
-        else:
-            order = max(ni.order for ni in ifaces) + 1
-
+        # The device index is not chosen here. Reading the highest one
+        # in use and then creating the interface is two steps with
+        # nothing serialising them, so two overlapping hot plugs both
+        # took the same next index, which interfaces_for_instance()
+        # keys a dict on and drops one of (issue 4946).
+        # NetworkInterface.new() picks it inside the insert's own retry
+        # loop instead, under the UNIQUE constraint which guards it.
         netdesc, err = _netdesc_allocate_address(
-            instance_from_db, network, order, hot_plug=True)
+            instance_from_db, network, None, hot_plug=True)
         if err:
             return err
 

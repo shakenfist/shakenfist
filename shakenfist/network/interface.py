@@ -15,6 +15,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttributesData
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
@@ -133,7 +134,26 @@ class NetworkInterface(dbo):
         return None
 
     @classmethod
-    def new(cls, interface_uuid, netdesc, instance_uuid, order):
+    def next_order(cls, instance_uuid):
+        """The next free device index on an instance.
+
+        Read immediately before the insert which uses it, and read
+        again when that insert loses the UNIQUE constraint on
+        (instance_uuid, order, active). Reading it once and trusting it
+        is what issue 4946 was: two concurrent hot plugs both saw the
+        same highest index and both took the next one. The constraint
+        is the arbiter; this is only how a caller finds its next guess.
+        """
+        criteria = ObjectFilterCriteria(
+            states=list(cls.ACTIVE_STATES),
+            instance_uuid=str(instance_uuid))
+        orders = [d.order for d in mariadb.find_network_interfaces(criteria)]
+        if not orders:
+            return 0
+        return max(orders) + 1
+
+    @classmethod
+    def new(cls, interface_uuid, netdesc, instance_uuid, order=None):
         # If the caller supplied a MAC, honour it exactly. A collision
         # against the UNIQUE constraint on network_interfaces.macaddr
         # must surface as an error rather than be silently replaced with
@@ -148,11 +168,23 @@ class NetworkInterface(dbo):
             # uuid should only be specified in testing
             interface_uuid = str(uuid4())
 
+        # An order of None means "whatever index is free on this
+        # instance", which is what hot plug wants: it cannot safely pick
+        # a slot in a separate step from the insert. Instance create
+        # passes an explicit index, because there the index is the
+        # position the caller listed the network in.
+        auto_order = order is None
+
         # Only auto-generated MACs are retried on collision. A caller-
         # supplied MAC is attempted exactly once and the RuntimeError
-        # from the UNIQUE constraint is left to propagate.
-        max_mac_attempts = 1 if caller_supplied_mac else 10
-        for attempt in range(max_mac_attempts):
+        # from the UNIQUE constraint is left to propagate -- unless the
+        # order is ours to choose, in which case the insert may have
+        # lost on the order rather than on the MAC, and is worth another
+        # attempt with the requested MAC untouched.
+        max_attempts = 10 if (auto_order or not caller_supplied_mac) else 1
+        for attempt in range(max_attempts):
+            if auto_order:
+                order = cls.next_order(instance_uuid)
             try:
                 NetworkInterface._db_create(
                     interface_uuid,
@@ -169,13 +201,16 @@ class NetworkInterface(dbo):
                 )
                 break
             except RuntimeError:
-                if attempt >= max_mac_attempts - 1:
+                if attempt >= max_attempts - 1:
                     raise
-                netdesc['macaddress'] = util_network.random_macaddr()
+                if not caller_supplied_mac:
+                    netdesc['macaddress'] = util_network.random_macaddr()
                 LOG.with_fields({
-                    'interface_uuid': interface_uuid
-                }).info('MAC address collision, retrying with %s'
-                        % netdesc['macaddress'])
+                    'interface_uuid': interface_uuid,
+                    'instance_uuid': str(instance_uuid),
+                    'order': order
+                }).info('Network interface create collided, retrying '
+                        'with MAC %s' % netdesc['macaddress'])
 
         ni = NetworkInterface.from_db(interface_uuid)
 

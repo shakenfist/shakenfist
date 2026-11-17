@@ -191,6 +191,22 @@ moment both read "free" and both write. This is the `vsock_cids` pattern from
 `instance.py`: where a unique index cannot be the arbiter, a cluster lock
 around the check-then-act has to be.
 
+Where it can be the arbiter, it should be. A network interface's `order` is
+its per-instance device index, and `interfaces_for_instance()` keys a dict on
+it while the libvirt device naming turns it into `ethN`, so it is a lookup key
+too. The hot plug endpoint used to read the highest index in use and then
+create the interface, and two overlapping plugs both took the same next one;
+one of the pair then disappeared from everything that reads the instance
+through `interfaces_for_instance()`, which is the hypervisor-side view. The
+fix is
+`uq_network_interfaces_instance_order_active` plus a re-read and retry in
+`NetworkInterface.new()`, which is the shape the MAC collision retry one field
+over already had. Prefer that over a lock at the call site: a lock is only an
+invariant for as long as every future writer remembers to take it, and the
+soft-delete nuance comes out in the wash either way -- `active` is NULL on a
+deleted row, and NULLs do not collide, so a deleted interface stops holding
+the index it used to have.
+
 ## Put the meter above the expensive thing, not below it
 
 `/auth/federated` is unauthenticated, so every step above the rate limit is a

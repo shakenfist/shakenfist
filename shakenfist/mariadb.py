@@ -489,7 +489,7 @@ MAPPING_RULE_ATTRIBUTES_VERSION = 1
 ARTIFACTS_VERSION = 3
 ARTIFACT_ATTRIBUTES_VERSION = 2
 ARTIFACT_INDEXES_VERSION = 2
-NETWORK_INTERFACES_VERSION = 3
+NETWORK_INTERFACES_VERSION = 4
 NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
 NETWORKS_VERSION = 3
 NETWORK_ATTRIBUTES_VERSION = 3
@@ -4579,9 +4579,10 @@ def _direct_set_state(object_type: ObjectType, object_uuid: str, state: State) -
 
     For NetworkInterface objects, also nulls out the
     ``network_interfaces.active`` flag when the new state is
-    ``deleted``. The flag is part of the composite UNIQUE constraint
-    on macaddr — clearing it lets the MAC be reused immediately
-    while the soft-deleted row remains in place for audit.
+    ``deleted``. The flag is part of both composite UNIQUE constraints
+    on that table — the one on macaddr and the one on the per-instance
+    order — so clearing it lets the MAC and the device index be reused
+    immediately while the soft-deleted row remains in place for audit.
 
     A deadlock or lock wait timeout is retried with a short escalating
     sleep before degrading to a failed write (issue 4273); the worst
@@ -17664,11 +17665,11 @@ def _get_network_interfaces_table() -> sa.Table:
             # NetworkInterfaceData DTO. It is TRUE while an interface is
             # live and NULLed when the interface enters the ``deleted``
             # state — see ``_direct_set_state``. The flag exists so that
-            # the macaddr UNIQUE constraint below can ignore soft-deleted
+            # the UNIQUE constraints below can ignore soft-deleted
             # rows: NULL values do not collide with each other in MariaDB
             # UNIQUE indexes, so a deleted interface keeps its row (for
-            # audit) without blocking MAC reuse during the
-            # ``CLEANER_DELAY`` window.
+            # audit) without blocking MAC or device-index reuse during
+            # the ``CLEANER_DELAY`` window.
             _network_interfaces_table.append_column(
                 sa.Column('active', sa.Boolean(), nullable=True))
             # MAC must be unique among ACTIVE interfaces on the same
@@ -17681,6 +17682,20 @@ def _get_network_interfaces_table() -> sa.Table:
                 _network_interfaces_table.c.active,
                 _network_interfaces_table.c.network_uuid,
                 name='uq_network_interfaces_macaddr_active_network')
+            # ``order`` is the per-instance device index, and an
+            # identity rather than a label: interfaces_for_instance()
+            # keys a dict on it and the libvirt device naming reads it.
+            # Two concurrent hot plugs both read the highest index in
+            # use and both took the next one (issue 4946); this makes
+            # the second one lose, which NetworkInterface.new() answers
+            # by reading the index again and retrying. ``active`` is in
+            # the key for the same reason it is in the macaddr
+            # constraint: a soft-deleted row must not hold its slot.
+            sa.UniqueConstraint(
+                _network_interfaces_table.c.instance_uuid,
+                _network_interfaces_table.c.order,
+                _network_interfaces_table.c.active,
+                name='uq_network_interfaces_instance_order_active')
     return _network_interfaces_table
 
 
@@ -17837,6 +17852,68 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
         current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver <= 3:
+        # The per-instance device index must be unique among the
+        # interfaces an instance currently has, because that is what
+        # both interfaces_for_instance() and the libvirt device naming
+        # treat it as (issue 4946).
+        LOG.info(f'Upgrading {table_name} table to version 4 '
+                 '(UNIQUE on instance_uuid, order and active)')
+        constraint_name = 'uq_network_interfaces_instance_order_active'
+        with engine.connect() as conn:
+            # Asked for, not inferred from a failed ALTER. A failure
+            # below is reported at WARNING because unlike the earlier
+            # steps this constraint *is* the fix, so "already here" --
+            # what a fresh install sees, its table having been built
+            # from the definition above -- has to be told apart from
+            # "could not be added", and reading that out of the driver's
+            # error text would be a guess.
+            try:
+                already_present = conn.execute(
+                    sa.text(
+                        'SELECT CONSTRAINT_NAME FROM '
+                        'information_schema.TABLE_CONSTRAINTS '
+                        'WHERE TABLE_SCHEMA = DATABASE() '
+                        'AND TABLE_NAME = :table_name '
+                        'AND CONSTRAINT_NAME = :constraint_name'),
+                    {'table_name': table_name,
+                     'constraint_name': constraint_name}).first() is not None
+            except OperationalError as e:
+                LOG.debug(
+                    f'Could not probe for {constraint_name}, assuming it '
+                    f'is absent: {e}')
+                already_present = False
+
+            if already_present:
+                LOG.debug(f'{constraint_name} is already present on '
+                          f'{table_name}')
+            else:
+                # Rows which already collide would refuse the ALTER,
+                # and are already broken anyway. Renumbering the losers
+                # repairs them and clears the way.
+                try:
+                    _migrate_duplicate_interface_orders(conn, table)
+                except (IntegrityError, OperationalError) as e:
+                    LOG.warning(
+                        f'Could not repair duplicate interface orders on '
+                        f'{table_name}: {e}')
+
+                try:
+                    conn.execute(sa.text(
+                        f'ALTER TABLE {table_name} '
+                        f'ADD CONSTRAINT {constraint_name} '
+                        'UNIQUE (instance_uuid, `order`, active)'))
+                    conn.commit()
+                except (IntegrityError, OperationalError) as e:
+                    LOG.warning(
+                        f'{constraint_name} could not be added to '
+                        f'{table_name}, so overlapping interface hot '
+                        f'plugs on one instance are still able to share '
+                        f'a device index: {e}')
+
+        current_ver = 4
+        _set_table_version(engine, table_name, current_ver)
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -17844,6 +17921,56 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
         'target_version': NETWORK_INTERFACES_VERSION,
         'migrated': start_ver != current_ver
     }
+
+
+def _migrate_duplicate_interface_orders(
+        conn: sa.Connection, table: sa.Table) -> int:
+    """Renumber active interfaces which share an instance and an order.
+
+    Only runs once, from the v3 to v4 migration. The read is a plain
+    non-locking SELECT and the writes are by primary key, so this does
+    not need the batched backfill helper: there is no table-wide UPDATE
+    here, and on any cluster which never raced a hot plug there are no
+    writes at all.
+
+    Returns the number of rows moved.
+    """
+    groups = conn.execute(
+        sa.select(table.c.instance_uuid, table.c.order)
+        .where(table.c.active.is_(True))
+        .group_by(table.c.instance_uuid, table.c.order)
+        .having(sa.func.count() > 1)).fetchall()
+
+    moved = 0
+    for instance_uuid, order in groups:
+        colliding = conn.execute(
+            sa.select(table.c.uuid).where(sa.and_(
+                table.c.instance_uuid == instance_uuid,
+                table.c.order == order,
+                table.c.active.is_(True)))
+            .order_by(table.c.uuid)).fetchall()
+        highest = conn.execute(
+            sa.select(sa.func.max(table.c.order)).where(sa.and_(
+                table.c.instance_uuid == instance_uuid,
+                table.c.active.is_(True)))).fetchall()[0][0]
+
+        # The first row keeps the slot; every other claimant is given a
+        # fresh one above everything the instance is using. Recomputed
+        # per group, so an instance with two colliding groups does not
+        # hand out the same new index twice.
+        next_order = (highest if highest is not None else -1) + 1
+        for (ni_uuid, ) in colliding[1:]:
+            conn.execute(sa.update(table)
+                         .where(table.c.uuid == ni_uuid)
+                         .values(order=next_order))
+            LOG.warning(
+                f'Interface {ni_uuid} shared order {order} on instance '
+                f'{instance_uuid} and has been moved to {next_order}')
+            next_order += 1
+            moved += 1
+        conn.commit()
+
+    return moved
 
 
 def _ensure_network_interface_attributes_schema(
@@ -17911,10 +18038,11 @@ def _direct_create_network_interface(data: NetworkInterfaceData) -> bool:
                 order=data.order,
                 model=data.model,
                 version=data.version,
-                # Marks the row as participating in the macaddr UNIQUE
-                # constraint. ``_direct_set_state`` will null this out
-                # when the interface transitions to ``deleted`` so the
-                # MAC can be reused.
+                # Marks the row as participating in the macaddr and
+                # per-instance order UNIQUE constraints.
+                # ``_direct_set_state`` will null this out when the
+                # interface transitions to ``deleted`` so both the MAC
+                # and the device index can be reused.
                 active=True,
             )
             conn.execute(stmt)
