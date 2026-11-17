@@ -20,7 +20,6 @@
 - PLAN-artifact-fetch-retry-with-backoff.md: Retry transient artifact fetches with backoff
 - PLAN-replace-exec-with-netlink.md: Replace exec'd network commands with native netlink operations
 - PLAN-scheduler-reservations.md: Atomic scheduling via a reservations table
-- PLAN-per-host-resource-reservations.md: Per-host RAM/CPU/disk reservation overrides for nodes
 - PLAN-eventlog-direct-mariadb.md: Remove the eventlog service and write events directly to MariaDB
 - PLAN-generic-allocator.md: Unify finite-resource allocation onto one primitive
 - PLAN-attribute-field-masks.md: Attribute field masks everywhere, and un-packing the node instances list
