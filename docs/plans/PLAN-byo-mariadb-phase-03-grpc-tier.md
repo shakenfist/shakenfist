@@ -170,7 +170,7 @@ This phase satisfies the two open questions the
 master plan left for phase 3:
 
 1. **Health-check interaction with
-   `PLAN-health-checks.md`.** Phase 3 lands a
+   [`PLAN-health-checks.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md).** Phase 3 lands a
    minimal `grpc.health.v1.Health` server
    implementation. The health-checks plan's phase
    2 (which was originally scoped to "land the
@@ -179,7 +179,7 @@ master plan left for phase 3:
    per-service health states the broader health-
    checks plan needs" — a smaller follow-on
    rather than a from-scratch implementation. The
-   PLAN-health-checks.md file is **not** edited
+   [PLAN-health-checks.md](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md) file is **not** edited
    in this phase; a note in the phase plan flags
    that the broader plan should be revised when
    it lands, and we trust the operator to do
@@ -236,7 +236,7 @@ master plan left for phase 3:
    check against the same name. Per-service
    granularity (one health entry per RPC
    service) is *out of scope* for this phase —
-   the broader `PLAN-health-checks` plan owns
+   the broader [`PLAN-health-checks`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md) plan owns
    per-service granularity if it wants it.
 
 5. **The minimal server-side `HealthServicer`
@@ -265,10 +265,10 @@ master plan left for phase 3:
    options first and any extras after; gRPC
    takes the last value for any duplicated key.
 
-8. **No changes to `PLAN-health-checks.md`
+8. **No changes to [`PLAN-health-checks.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md)
    itself in this phase.** Phase 3 lands the
    minimal health-protocol implementation;
-   PLAN-health-checks's phase 2 brief will need
+   [PLAN-health-checks](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md)'s phase 2 brief will need
    a small revision the next time it is touched
    to acknowledge that the protocol already
    exists and the work is now *extension*
@@ -382,9 +382,9 @@ tree buildable and pre-commit-clean.
 - Multi-instance sf-database CI shape and N>1
   functional tests — phase 6.
 - Per-service health granularity (one health
-  entry per RPC service) — PLAN-health-checks
+  entry per RPC service) — [PLAN-health-checks](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md)
   if it wants it.
-- Editing `PLAN-health-checks.md` itself — the
+- Editing [`PLAN-health-checks.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md) itself — the
   next operator session that touches the
   health-checks plan should revise its phase 2
   brief to acknowledge the minimal protocol
@@ -411,8 +411,8 @@ the operator on:
   external LB or service-discovery layer.
 - The decision to land a minimal server-side
   health implementation here rather than wait
-  for PLAN-health-checks (and the implication
-  that PLAN-health-checks phase 2 becomes
+  for [PLAN-health-checks](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md) (and the implication
+  that [PLAN-health-checks](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md) phase 2 becomes
   *extension* rather than *creation*).
 - The decision to land the shutdown-time
   NOT_SERVING flip in scope here so rolling

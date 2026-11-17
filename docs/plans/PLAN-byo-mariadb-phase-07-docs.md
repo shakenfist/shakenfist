@@ -101,7 +101,7 @@ the post-phase-6 code. After this phase ships:
   that reference the now-retired etcd machinery or
   the `roles/mariadb/` role
   (`PLAN-remove-primary.md`,
-  `PLAN-embrace-tls.md`, `PLAN-health-checks.md`).
+  `PLAN-embrace-tls.md`, [`PLAN-health-checks.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md)).
   Those plans reference the machinery as part of
   their own design discussion; updating them
   belongs to the next iteration of those plans,

@@ -524,6 +524,20 @@ ordering.
 
 ## Daemon liveness (systemd watchdog)
 
+Liveness and readiness are **not** written into `node_daemon_states`,
+and that separation is deliberate. That table is the orderly-transition
+and kill-signal substrate — `check_daemon_state()`,
+`get_degraded_daemons()`, `external_view()` and `sf-ctl` all read it,
+and a daemon reads it to learn it has been asked to stop. Pulsing
+health into it would do two bad things: a transient probe failure would
+mark the node degraded, which is a cluster-state judgement nothing
+should make from a routing signal, and a health write could overwrite a
+`STOPPING` signal the daemon had not yet acted on. The two answer
+different questions on different clocks — eventual cluster state, versus
+real-time routing and liveness — so they share no storage. `/readyz`
+serves from a per-worker in-memory flag and the watchdog writes to
+systemd; neither touches the database.
+
 `Daemon.pet_watchdog()` in `shakenfist/daemons/daemon.py` is the
 liveness seam for every non-trivial daemon. It writes
 `sd_notify(WATCHDOG=1)` at most every ~10s, and `Daemon.idle()` (the

@@ -561,7 +561,7 @@ Sequencing constraints between phases:
   packaging, and the `etcd_master` → `database_node`
   rename. The galaxy-role packaging is still useful
   and is not absorbed into this plan.
-- **`PLAN-health-checks.md`** — soft dependency.
+- **[`PLAN-health-checks.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md)** — soft dependency.
   Phase 03 of this plan needs gRPC client-side LB
   health-checking to work, which in turn wants the
   `grpc.health.v1.Health` protocol available on
@@ -657,7 +657,7 @@ careful reasoning. Per-phase planning effort:
   is subtle (keepalive interaction, retry policy,
   resolver caching). The health-protocol decision
   about whether to fold in a minimal implementation
-  here or wait for `PLAN-health-checks.md` is a
+  here or wait for [`PLAN-health-checks.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md) is a
   scope call.
 - Phase 04 (deploy BYO): **medium effort, opus**.
   Mostly deletions and reshaping, but the
