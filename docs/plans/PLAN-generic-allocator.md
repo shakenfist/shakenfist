@@ -256,7 +256,8 @@ finds nothing, that is recorded in one sentence.
   of this plan and phase 0 of scheduler-reservations should
   cross-read each other's decisions documents so the pattern
   stays coherent.
-- **Coherent with `PLAN-replace-last-cluster-operation`**
+- **Coherent with [`PLAN-replace-last-cluster-operation`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-replace-last-cluster-operation.md)
+  (retired)**
   insofar as both are about removing redundant single-
   pointer mechanisms in favour of typed table-driven state.
 

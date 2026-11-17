@@ -83,7 +83,7 @@ maintained document, so it may state things a later phase overturned.
 | 2026-01-08 | [Blob storage roadmap](blob-storage-roadmap.md) | Composite blobs, lazy deduplication and content-defined chunking | In progress | 1 of 4 |
 | 2026-01-10 | [API query batching](api-query-batching-roadmap.md) | Batch and prefetch related objects so list endpoints stop issuing per-object queries | Not started | 0 of 4 |
 | 2026-04-23 | [SQL-pushdown filtering](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-sql-pushdown-filtering.md) (retired) | Push object filtering into MariaDB instead of scanning and filtering in Python | Complete | 7 of 7 |
-| 2026-05-06 | [Replace `last_cluster_operation`](PLAN-replace-last-cluster-operation.md) | Trade the single-pointer gate for an append-only `cluster_operation_targets` history | Complete | 5 of 5 |
+| 2026-05-06 | [Replace `last_cluster_operation`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-replace-last-cluster-operation.md) (retired) | Trade the single-pointer gate for an append-only `cluster_operation_targets` history | Complete | 5 of 5 |
 | 2026-05-14 | [Fix `cluster_operation_targets` uniqueness](PLAN-fix-cluster-operation-targets-unique-constraint.md) | Composite UNIQUE so a multi-target operation records all of its target rows | Complete | — |
 | 2026-05-15 | [Network operations facade](PLAN-network-facade.md) | Split `Network` into a queue-enqueuing facade and a single-mutator worker | Complete | 10 of 10 |
 | 2026-05-16 | [Embrace TLS](PLAN-embrace-tls.md) | Operator-provided PKI and TLS on every internal and external listener | Not started | 0 of 9 |

@@ -408,6 +408,24 @@ Every operation schema's `model` class declares its target objects via a
 `cluster_operation_targets` row per non-None target field. Callers have
 no per-target bookkeeping obligation — targets are recorded automatically.
 
+The declaration is explicit rather than inferred from the field names, and
+that is deliberate: no naming convention separates a target from an
+execution context. `node_uuid` appears on most operation schemas and is
+never a target — it says *where* the operation runs, and `Node` does not
+even inherit `DatabaseBackedObjectWithOperations`, so there is nothing for
+a target row to point at. `interface_uuid` is a target on the interface
+operations and context elsewhere. Discovering targets by matching `*_uuid`
+would therefore record every operation as targeting the node it runs on,
+which would make `has_pending_cluster_operation()` true for a node for as
+long as anything at all was happening on it. The cost of the explicit form
+is that a new schema which forgets `target_fields` records no targets at
+all, and nothing reports it: `enqueue_cluster_operation` reads the
+declaration with a `getattr` default, so a missing one is indistinguishable
+from an operation that genuinely targets nothing. The `ClassVar` trap below
+is the same failure arriving by a different route. All fourteen schemas
+declare one today, and nothing holds a fifteenth to it — see
+[issue 4957](https://github.com/shakenfist/shakenfist/issues/4957).
+
 Each target row also carries an `observational` flag (schema v3), derived
 at enqueue time by `is_observational()` in `schema/operations/util.py`. A
 model may declare `observational_tasks: ClassVar[frozenset[...]]` beside
