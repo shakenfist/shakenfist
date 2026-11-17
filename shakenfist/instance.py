@@ -561,37 +561,13 @@ class Instance(dbowo):
         state + namespace + name down to a single indexed SQL
         query via mariadb.find_instances.
 
-        A null or otherwise non-string ref answers "not found" here:
-        handed to ObjectFilterCriteria as a name, None would read as
-        *no name filter* and resolve to an arbitrary active instance in
-        the namespace (issue 4223).
+        The body, including the namespace collapse and the guard
+        against a null ref, lives in
+        baseobject._from_db_by_ref_pushdown.
         """
-        if not baseobject.valid_object_ref(object_ref):
-            return None
-
-        if util_general.valid_uuid4(object_ref):
-            return cls.from_db(object_ref)
-
-        # namespace='system' or namespace=None means 'look across
-        # all namespaces' - preserve that by omitting the namespace
-        # filter. Matches baseobject.namespace_filter semantics.
-        criteria_namespace = (
-            namespace if namespace and namespace != 'system' else None)
-
-        criteria = ObjectFilterCriteria(
-            states=list(cls.ACTIVE_STATES),
-            namespace=criteria_namespace,
-            name=object_ref,
-        )
-        matches = mariadb.find_instances(criteria)
-
-        if not matches:
-            return None
-        if len(matches) > 1:
-            raise exceptions.MultipleObjects(
-                f'multiple instances have the name "{object_ref}"'
-                f' in namespace "{namespace}"')
-        return cls(cls._static_values_to_dict(matches[0]))
+        return cls._from_db_by_ref_pushdown(
+            object_ref, namespace, mariadb.find_instances,
+            lambda data: cls(cls._static_values_to_dict(data)))
 
     @contextmanager
     def attribute_memo(self):
