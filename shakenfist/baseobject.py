@@ -59,6 +59,17 @@ VERSION_CACHE_MINIMUM = None
 VERSION_CACHE_MAXIMUM = None
 VERSION_CACHE_AGE = 0
 
+# What an object entering an error state with no reason records as its
+# error_message. Where the transition came from is logged alongside it,
+# not written here; see _state_update().
+NO_REASON_RECORDED = 'no reason recorded, see the node logs'
+
+# The functions a bare ``obj.state = <error>`` passes through before it
+# reaches the no-reason backstop in _state_update(). Their number
+# varies -- Blob overrides _state_update() and adds a frame -- so the
+# caller worth naming is found by skipping them, not by a fixed offset.
+STATE_PLUMBING_FUNCTIONS = frozenset({'_state_update', 'state'})
+
 
 def _maintain_version_cache(max_cache_age):
     global VERSION_CACHE_MINIMUM
@@ -750,9 +761,15 @@ class DatabaseBackedObject:
         # next occurrence names a line of code rather than nothing.
         # test_error_state_reasons asserts that no production call site
         # relies on it.
+        #
+        # The calling line goes to the log, not into the message: the
+        # message is the object's error_message, which any caller who
+        # can read the object sees, and a source path and line number
+        # are not theirs to read.
         if (message is None and state_attribute_name == 'state' and
                 self._is_error_state_value(new_value)):
-            caller = util_callstack.get_caller(offset=-3)
+            caller = util_callstack.get_caller_outside(
+                STATE_PLUMBING_FUNCTIONS)
             LOG.with_fields({
                 'uuid': self.uuid,
                 'object_type': self.object_type,
@@ -760,7 +777,7 @@ class DatabaseBackedObject:
                 'new state': new_value,
                 'caller': caller
             }).error('Error state entered with no reason recorded')
-            message = f'no reason recorded, state set by {caller}'
+            message = NO_REASON_RECORDED
 
         new_state = State(value=new_value, update_time=time.time(), message=message)
 
@@ -856,6 +873,15 @@ class DatabaseBackedObject:
             raise exceptions.InvalidStateException(
                 'enter_error_state() requires a reason for object=%s '
                 'uuid=%s' % (self.object_type, self.uuid))
+
+        # Already there, and _state_update() would see no change and
+        # write nothing -- not even the reason, so a second failure of
+        # an object which had already failed was reported as recorded
+        # and silently dropped. Record the newer reason, as the two
+        # writes this method replaced did.
+        if self.state.value == new_value:
+            self.error = message
+            return
 
         self._state_update(
             new_value, message=message,

@@ -135,6 +135,11 @@ CHECKSUM_FILES = [
     ('md5', 'MD5SUMS'),
 ]
 
+# (connect, read) seconds for fetching a digest file. It is a few
+# hundred bytes; a mirror which takes longer than this is treated as
+# one whose digest could not be read, and says so.
+CHECKSUM_FETCH_TIMEOUT = (10, 30)
+
 
 def _resolve_image(url):
     """Expand a source URL, with any digest the mirror publishes.
@@ -200,11 +205,36 @@ def _resolve_cirros_checksum(url, vernum):
     publishes no digest we can read. Returning no checksum is not the
     same as returning one which does not match: the caller must not be
     able to confuse them, which is why this is a pair and not a string.
+
+    A digest is only ever labelled with the algorithm its length says
+    produced it. The file name it came from is a hint, and a wrong one
+    -- an MD5SUMS served where SHA256SUMS was asked for -- would
+    otherwise fail every fetch with a checksum mismatch which was
+    nothing of the sort.
     """
     filename = os.path.basename(url)
+    template = str(config.CHECKSUM_URL_CIRROS)
+
+    if '%(digest_file)s' not in template:
+        # A template from before the digest file was a substitution,
+        # which names one file -- MD5SUMS, when it was the shipped
+        # default. Still a published digest worth checking against, so
+        # read it and let the digest say what it is.
+        checksum_url = template % {'vernum': vernum}
+        checksums = _fetch_remote_checksum(checksum_url)
+        checksum = (checksums or {}).get(filename)
+        algorithm = _algorithm_for_digest(checksum)
+        if checksum and not algorithm:
+            LOG.with_fields({
+                'url': checksum_url,
+                'checksum': checksum
+            }).warning('Published checksum is not a digest we recognise')
+        if algorithm:
+            return algorithm, checksum
+        return None, None
 
     for algorithm, digest_file in CHECKSUM_FILES:
-        checksum_url = str(config.CHECKSUM_URL_CIRROS) % {
+        checksum_url = template % {
             'vernum': vernum, 'digest_file': digest_file}
         checksums = _fetch_remote_checksum(checksum_url)
         if checksums is None:
@@ -219,10 +249,39 @@ def _resolve_cirros_checksum(url, vernum):
             continue
 
         checksum = checksums.get(filename)
-        if checksum:
-            return algorithm, checksum
+        if not checksum:
+            continue
+        if _algorithm_for_digest(checksum) != algorithm:
+            LOG.with_fields({
+                'url': checksum_url,
+                'algorithm': algorithm,
+                'checksum': checksum
+            }).warning('Published checksum is not the digest its file '
+                       'name says it is, ignoring it')
+            continue
+        return algorithm, checksum
 
     return None, None
+
+
+# The length of each algorithm's hex digest, which is how a digest read
+# from a file says which algorithm produced it.
+DIGEST_LENGTHS = {
+    32: 'md5',
+    64: 'sha256',
+    128: 'sha512',
+}
+
+
+def _algorithm_for_digest(checksum):
+    """The algorithm which produced a hex digest, or None if unknown."""
+    if not checksum:
+        return None
+    try:
+        int(checksum, 16)
+    except ValueError:
+        return None
+    return DIGEST_LENGTHS.get(len(checksum))
 
 
 def _fetch_remote_checksum(checksum_url):
@@ -235,7 +294,8 @@ def _fetch_remote_checksum(checksum_url):
     try:
         resp = requests.get(
             checksum_url,
-            headers={'User-Agent': util_general.get_user_agent()})
+            headers={'User-Agent': util_general.get_user_agent()},
+            timeout=CHECKSUM_FETCH_TIMEOUT)
     except requests.exceptions.RequestException:
         return None
 

@@ -1,5 +1,7 @@
 import os
+import shlex
 import signal
+import sys
 import time
 from typing import Any
 from typing import Optional
@@ -10,6 +12,7 @@ from shakenfist import instance
 from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.exceptions import DHCPProbeFailed
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.managed_executables import managedexecutable
@@ -17,6 +20,7 @@ from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import dhcp_probe
 from shakenfist.util import network as util_network
 
 
@@ -219,26 +223,38 @@ class DnsMasq(managedexecutable.ManagedExecutable):
         Answers True when this dnsmasq does not serve DHCP at all:
         there is no readiness to check, and reporting a DNS-only
         network as unhealthy would have it rebuilt on every pass.
+
+        False only when the probe ran and nothing answered. A probe
+        which could not be run -- privexec unreachable, the module not
+        importable, anything but the probe's own "no answer" status --
+        raises DHCPProbeFailed instead, because it says nothing about
+        dnsmasq and must not get a healthy network rebuilt.
         """
         if not self.provide_dhcp:
             return True
 
+        # Run by this process's own interpreter. privexec runs commands
+        # with a system PATH, on which python3 has no shakenfist to
+        # import, and that import failure was read as "no answer" for
+        # every network on every pass.
         subst = self.subst_dict()
+        command = shlex.join([
+            sys.executable, '-m', 'shakenfist.util.dhcp_probe',
+            subst['router'], subst['router'],
+            str(config.DHCP_PROBE_TIMEOUT)])
         try:
             util_concurrency.execute(
-                'python3 -m shakenfist.util.dhcp_probe '
-                '%(router)s %(router)s %(timeout)s'
-                % {
-                    'router': subst['router'],
-                    'timeout': config.DHCP_PROBE_TIMEOUT
-                },
-                netns=subst['netns'],
-                suppress_command_logging=True)
-        except ProcessExecutionError:
-            # The probe exits non-zero when nothing answered. That is
-            # the condition this method exists to report, not an error
-            # in running it.
-            return False
+                command, netns=subst['netns'], suppress_command_logging=True)
+        except ProcessExecutionError as e:
+            if e.exit_code == dhcp_probe.EXIT_NO_ANSWER:
+                return False
+            stderr = (e.stderr or '').strip()[-200:]
+            raise DHCPProbeFailed(
+                f'the DHCP probe exited {e.exit_code}: {stderr}') from e
+        except Exception as e:
+            raise DHCPProbeFailed(
+                f'the DHCP probe could not be run: '
+                f'{e.__class__.__name__}: {e}') from e
         return True
 
     def _read_templates(self) -> None:

@@ -16,6 +16,7 @@ erroring it would be a lie.
 
 from functools import partial
 from unittest import mock
+from uuid import UUID
 
 from shakenfist.baseobject import State
 from shakenfist.daemons.network import maintain
@@ -44,10 +45,15 @@ class SignalInstancesTestCase(base.ShakenFistTestCase):
         return n
 
     def _signal(self, interfaces, reason='because'):
+        # The interfaces come from the network's own pushed-down query.
+        # Iterating NetworkInterfaces with a Python filter would read
+        # every active interface in the cluster to find these, so it
+        # is made to fail rather than merely left unused.
         n = self._network()
+        n.networkinterfaces = interfaces
         with mock.patch(
                 'shakenfist.network.network.interface.NetworkInterfaces',
-                return_value=interfaces):
+                side_effect=AssertionError('cluster-wide interface scan')):
             with mock.patch(
                     'shakenfist.network.network.add_event_multi') as events:
                 signalled = n.signal_instances_of_failure(reason)
@@ -230,3 +236,18 @@ class QuiesceSignalTestCase(base.ShakenFistTestCase):
 
         self.assertFalse(fired)
         n.signal_instances_of_failure.assert_not_called()
+
+    def test_a_network_no_pass_visits_is_forgotten(self):
+        # Deleted while quiesced: it never reconciles cleanly, so only
+        # the end-of-pass prune removes it.
+        self._guard(['error', 'error', 'error'])
+        self.assertIn(NETWORK_UUID, maintain.QUIESCE_REPORTED)
+
+        maintain.forget_unvisited_quiesces(['some-other-network'])
+        self.assertNotIn(NETWORK_UUID, maintain.QUIESCE_REPORTED)
+
+    def test_a_network_a_pass_visits_is_remembered(self):
+        self._guard(['error', 'error', 'error'])
+        maintain.forget_unvisited_quiesces(
+            [UUID(NETWORK_UUID), 'some-other-network'])
+        self.assertIn(NETWORK_UUID, maintain.QUIESCE_REPORTED)

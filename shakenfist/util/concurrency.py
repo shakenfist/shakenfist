@@ -54,6 +54,12 @@ NODELOCK_SOCKET_PATH = '/srv/shakenfist/.nodelock'
 # UnknownNodeLockReplyException is deliberately not one of them: a reply which
 # parses but carries no known field is a bug in this protocol rather than a
 # daemon which is restarting, and it stays loud in every caller.
+# The PATH a command run through sf-privexec gets unless it brings its
+# own. It names no virtualenv, so a bare ``python3`` here is the system
+# interpreter, which has no shakenfist installed.
+PRIVEXEC_DEFAULT_PATH = (
+    '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin')
+
 NODELOCK_TRANSPORT_ERRORS = (
     ConnectionError,
     FileNotFoundError,
@@ -184,7 +190,7 @@ def execute(
     if 'PATH' not in env_variables:
         ev = request.execute_request.environment_variables.add()
         ev.name = 'PATH'
-        ev.value = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+        ev.value = PRIVEXEC_DEFAULT_PATH
 
     if not suppress_command_logging:
         LOG.with_fields({

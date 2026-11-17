@@ -53,6 +53,7 @@ from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import BlobSizeCannotChange
 from shakenfist.exceptions import BlobTransferSetupFailed
 from shakenfist.exceptions import HashFailed
+from shakenfist.exceptions import NodeLockUnavailable
 from shakenfist.node import Node
 from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import callstack as util_callstack
@@ -773,7 +774,10 @@ class Blob(dbo):
                         affected_objects, partial_path, blob_path)
                     return
             except (ConnectionRefusedError, BlobTransferSetupFailed,
-                    BlobFetchFailed) as e:
+                    BlobFetchFailed, NodeLockUnavailable) as e:
+                # NodeLockUnavailable is this node's nodelock daemon not
+                # answering, which a restart of it clears; it used to
+                # reach here as the ConnectionRefusedError above.
                 attempts += 1
                 time.sleep(10)
                 if attempts > 3:
@@ -1310,10 +1314,13 @@ def http_fetch(
         })
 
     # The published digest is checked before the blob is registered,
-    # so a corrupt or substituted download never becomes a usable
-    # image. Until this check existed the digest was fetched, logged
-    # and discarded, and a mirror serving the wrong bytes was
-    # indistinguishable from one serving the right ones (issue 764).
+    # so a corrupt or truncated download, or a mirror serving the
+    # wrong file, never becomes a usable image. Until this check
+    # existed the digest was fetched, logged and discarded, and a
+    # mirror serving the wrong bytes was indistinguishable from one
+    # serving the right ones (issue 764). It does not authenticate the
+    # mirror: the digest arrives by the same route as the image, so
+    # whoever can substitute one can substitute both.
     if expected_hash:
         actual = expected_hash.hexdigest()
         if actual.lower() != expected_digest:

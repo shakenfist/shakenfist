@@ -80,7 +80,7 @@ def _open_remote(target, blob_uuid, offset=0, limit=0):
         'host': target
     }).info('Requesting blob from remote host')
     return requests.request(
-        'GET', url, stream=True,
+        'GET', url, stream=True, timeout=api_base.PEER_REQUEST_TIMEOUT,
         headers={
             'Authorization': api_token,
             'User-Agent': util_general.get_user_agent(),

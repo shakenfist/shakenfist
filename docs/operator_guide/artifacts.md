@@ -40,9 +40,8 @@ blob in the cluster with a matching checksum.
 ## Verifying a download against the mirror
 
 The checksums above answer "does this replica still hold the bytes we
-stored?". They say nothing about whether those were the right bytes in
-the first place — for that, the download has to be compared against a
-digest the mirror published.
+stored?". They say nothing about whether the download arrived intact —
+for that, it has to be compared against a digest the mirror published.
 
 When an image shortcut resolves to a mirror which publishes a digest
 file beside its images, Shaken Fist fetches it, hashes the download as
@@ -67,6 +66,26 @@ recorded as `fetched image had no published checksum to verify
 against`. That is a different fact from a fetch which was checked and
 passed, and reading these events back should not require guessing
 which happened.
+
+What this establishes is integrity, not authenticity. It catches a
+truncated or corrupted download and a mirror serving the wrong file. It
+does not catch a deliberate substitution: the digest is fetched from
+the same mirror, by the same route, as the image, so anyone able to
+replace one can replace the other. The default cirros URLs
+(`DOWNLOAD_URL_CIRROS` and `CHECKSUM_URL_CIRROS`) are plain `http://`;
+an operator who wants the stronger property should point both at an
+`https://` mirror they trust. md5 adds nothing against an adversary
+either way, which is one more reason sha256 is preferred when a
+release publishes it.
+
+Each digest is labelled by its length (32 hex characters is md5, 64 is
+sha256, 128 is sha512), never by the name of the file it came from, so
+a mirror serving `MD5SUMS` under the name `SHA256SUMS` costs a warning
+rather than failing every fetch as a mismatch. A `CHECKSUM_URL_CIRROS`
+override written before the template took `%(digest_file)s` — one
+pointing at `.../%(vernum)s/MD5SUMS`, which was the shipped default —
+is still honoured: the one file it names is read, and its digest is
+used under whatever algorithm its length identifies.
 
 A copy served from elsewhere in the cluster is not a mirror fetch, and
 does not carry the mirror's digest: that blob was verified when it was

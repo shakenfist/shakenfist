@@ -40,6 +40,27 @@ def get_caller(offset: int = -2) -> str:
     return f'{filename}:{frame.f_lineno}:{frame.f_code.co_name}()'
 
 
+def get_caller_outside(function_names: frozenset[str]) -> str:
+    """The nearest caller not named in function_names, as get_caller() has it.
+
+    For a call which reaches here through a varying number of frames --
+    an overridden method which calls its parent, say -- where a fixed
+    offset would name one of those frames rather than the code which
+    started the call. The function calling this one is always skipped.
+    """
+    frame = sys._getframe(1).f_back
+    while frame is not None and frame.f_code.co_name in function_names:
+        frame = frame.f_back
+    if frame is None:
+        return 'unknown'
+
+    filename = frame.f_code.co_filename
+    f_match = FILENAME_RE.match(filename)
+    if f_match:
+        filename = f_match.group(1)
+    return f'{filename}:{frame.f_lineno}:{frame.f_code.co_name}()'
+
+
 def generate_traceback(offset: int = -2) -> str:
     stack = traceback.extract_stack()
     formatted = traceback.format_list(stack[:-offset])

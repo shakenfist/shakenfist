@@ -232,6 +232,10 @@ class FakeInstanceLocks:
         self.events = []
         self.timeout = False
 
+        # An exception to raise in place of taking the lock, for the
+        # failures which are not a timeout.
+        self.raises = None
+
         # Called with the instance uuid once a lock is held, to stand in for
         # whatever the previous holder did.
         self.on_lock = None
@@ -245,6 +249,8 @@ class FakeInstanceLocks:
         if self.timeout:
             raise exceptions.NodeLockTimeout(
                 f'Timed out waiting for lock instance-{inst_uuid}')
+        if self.raises:
+            raise self.raises
         self.events.append(('lock', inst_uuid))
         try:
             if self.on_lock:
@@ -760,6 +766,27 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
             sorted(inst_uuids.values()), sorted(self.locks.locked_uuids()))
         for inst_uuid in inst_uuids.values():
             self.assertNotIn(self._power_state(inst_uuid), ['on', 'paused'])
+            self.assertEqual(before[inst_uuid], self._power_state(inst_uuid))
+
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_unreachable_nodelock_skips_the_instance_not_the_pass(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists):
+        """NodeLock raises NodeLockUnavailable when this node's nodelock
+        daemon does not answer. That is no more a reason to abandon the
+        pass than a busy instance is: every instance is still tried, and
+        none is written without its lock."""
+        inst_uuids = self._create_instances(['running', 'paused'])
+        before = {u: self._power_state(u) for u in inst_uuids.values()}
+        self.locks.raises = exceptions.NodeLockUnavailable('no nodelock')
+
+        cleaner_st.update_power_states()
+
+        self.assertEqual(
+            sorted(inst_uuids.values()), sorted(self.locks.locked_uuids()))
+        for inst_uuid in inst_uuids.values():
             self.assertEqual(before[inst_uuid], self._power_state(inst_uuid))
 
     @mock.patch('os.path.exists', side_effect=fake_exists)

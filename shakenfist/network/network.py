@@ -6,8 +6,6 @@ from uuid import uuid4
 
 from shakenfist_utilities import logs  # noreorder
 
-from functools import partial
-
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist import ipam
 from shakenfist import mariadb
@@ -40,6 +38,7 @@ from shakenfist.schema.operations.node_net_op \
 from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
 from shakenfist.exceptions import CannotAssignFloatingGateway
+from shakenfist.exceptions import DHCPProbeFailed
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.schema.object_filter import ObjectFilterCriteria
@@ -832,10 +831,11 @@ class Network(dbowo):
 
         Returns the instance uuids signalled, for the caller to log.
         """
+        # self.networkinterfaces pushes the network filter down to the
+        # indexed column; filtering NetworkInterfaces in Python would
+        # read every active interface in the cluster to find these.
         instance_uuids = set()
-        for ni in interface.NetworkInterfaces(
-                [partial(interface.network_uuid_filter, self.uuid)],
-                prefilter='active'):
+        for ni in self.networkinterfaces:
             if ni.instance_uuid:
                 instance_uuids.add(str(ni.instance_uuid))
 
@@ -872,7 +872,23 @@ class Network(dbowo):
         get a lease (issue 730).
         """
         d = self._get_dnsmasq_object()
-        is_serving = d.is_serving_dhcp()
+        try:
+            is_serving = d.is_serving_dhcp()
+        except DHCPProbeFailed as e:
+            # Not knowing is not the same as dnsmasq being wedged, and
+            # only the latter is worth a rebuild. Say so where an
+            # operator will see it, every time: a probe which can never
+            # run is a broken readiness check, and it should be as
+            # loud as the rebuilds it would otherwise have caused.
+            LOG.with_fields({
+                'network': self,
+                'error': str(e)
+            }).warning('Could not check whether dnsmasq is answering DHCP')
+            self.add_event(
+                EVENT_TYPE_STATUS,
+                'could not check whether dnsmasq is answering DHCP',
+                extra={'error': str(e)})
+            return True
         if not is_serving:
             self.add_event(
                 EVENT_TYPE_STATUS,

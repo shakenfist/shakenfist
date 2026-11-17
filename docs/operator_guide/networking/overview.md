@@ -620,6 +620,16 @@ configures one rather than assumed:
   present — state `T`, which the liveness check reports as healthy —
   the probe times out.
 
+A fourth was measured because a review doubted it: `dnsmasq` sends its
+answer to a DHCPINFORM back to the address and port the request came
+from, not to the DHCP client port (68), so the probe needs no
+privileged bind. That held on `dnsmasq` 2.90 (Debian 12) and 2.91
+(Ubuntu 24.04 and Debian 13), it is what `dhcp_packet()` in `dnsmasq`'s
+`src/dhcp.c` says it does, and
+`tools/dhcp-probe-against-dnsmasq.sh` repeats the measurement in a
+container. The smoke CI suite also runs the probe against the real
+`dnsmasq` on its network node.
+
 Liveness is asked first, because there is no point sending a packet to
 a process which is not there, and it is far cheaper than a round trip.
 
@@ -637,6 +647,15 @@ rebuild it on every pass.
 The events to look for on a network are `network not ok, dnsmasq not
 running` (liveness) and `network not ok, dnsmasq not answering DHCP`
 (readiness). The second is the one which used to be invisible.
+
+A probe which could not be run at all is a third outcome, and is not
+treated as either. If the network node cannot reach `sf-privexec`, or
+the probe exits with anything but its own "no answer" status, the
+network records `could not check whether dnsmasq is answering DHCP`
+with the error and is left alone. A probe which cannot run says nothing
+about `dnsmasq`, and rebuilding every network because the check itself
+was broken would be worse than not checking. That event recurs every
+pass for as long as the cause persists, so it should not go unnoticed.
 
 ## Stray vxlan reaping
 

@@ -202,13 +202,15 @@ class EnterErrorStateTestCase(base.ShakenFistTestCase):
         mock.patch.object(DatabaseBackedObject, 'add_event').start()
         self.addCleanup(mock.patch.stopall)
 
-    def _object(self, current_state):
+    def _object(self, current_state, message=None,
+                cls=_StatefulObject):
         # _state_update() reads through _state_read() rather than the
         # property, so the database read is what has to be mocked.
         mock.patch(
             'shakenfist.mariadb.get_state',
-            return_value=State(value=current_state, update_time=10)).start()
-        return _StatefulObject('12345678-1234-4321-8234-123456789012')
+            return_value=State(value=current_state, update_time=10,
+                               message=message)).start()
+        return cls('12345678-1234-4321-8234-123456789012')
 
     def test_the_reason_is_written_with_the_state(self):
         obj = self._object(DatabaseBackedObject.STATE_CREATED)
@@ -257,3 +259,58 @@ class EnterErrorStateTestCase(base.ShakenFistTestCase):
         self.assertEqual(DatabaseBackedObject.STATE_ERROR, written.value)
         self.assertIsNotNone(written.message)
         self.assertIn('no reason recorded', written.message)
+
+    def test_a_new_reason_is_recorded_when_already_in_that_state(self):
+        # _state_update() writes nothing when the state does not change,
+        # so an object which failed a second time kept the first reason
+        # and the caller was told the second had been recorded.
+        obj = self._object(DatabaseBackedObject.STATE_ERROR,
+                           message='the first failure')
+        obj.enter_error_state(
+            DatabaseBackedObject.STATE_ERROR, 'the second failure')
+
+        self.set_state.assert_called_once()
+        written = self.set_state.call_args[0][2]
+        self.assertEqual(DatabaseBackedObject.STATE_ERROR, written.value)
+        self.assertEqual('the second failure', written.message)
+
+    def test_the_backstop_message_names_no_source_path(self):
+        # The message is the object's error_message, which anyone who
+        # can read the object sees. Where the state was set goes to the
+        # log instead.
+        obj = self._object(DatabaseBackedObject.STATE_CREATED)
+        obj.state = DatabaseBackedObject.STATE_ERROR
+
+        written = self.set_state.call_args[0][2]
+        self.assertEqual(baseobject.NO_REASON_RECORDED, written.message)
+        self.assertNotIn('.py', written.message)
+
+    def _logged_caller(self, obj):
+        with mock.patch.object(baseobject, 'LOG') as mock_log:
+            obj.state = DatabaseBackedObject.STATE_ERROR
+        return mock_log.with_fields.call_args[0][0]['caller']
+
+    def test_the_backstop_logs_the_line_which_set_the_state(self):
+        obj = self._object(DatabaseBackedObject.STATE_CREATED)
+        caller = self._logged_caller(obj)
+        self.assertIn('test_error_state_reasons.py', caller)
+        self.assertIn('_logged_caller()', caller)
+
+    def test_the_backstop_sees_past_an_overridden_state_update(self):
+        # Blob overrides _state_update() and calls its parent, which
+        # adds a frame. A fixed offset named the state setter, which is
+        # no use to anybody.
+        obj = self._object(DatabaseBackedObject.STATE_CREATED,
+                           cls=_OverridingStatefulObject)
+        caller = self._logged_caller(obj)
+        self.assertIn('_logged_caller()', caller)
+
+
+class _OverridingStatefulObject(_StatefulObject):
+    """Overrides _state_update() the way Blob does."""
+
+    def _state_update(self, new_value, skip_transition_validation=False,
+                      state_attribute_name='state', message=None):
+        super()._state_update(
+            new_value, skip_transition_validation=skip_transition_validation,
+            state_attribute_name=state_attribute_name, message=message)

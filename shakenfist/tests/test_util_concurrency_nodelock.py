@@ -198,3 +198,39 @@ class NodeLockUnlockFailureTestCase(base.ShakenFistTestCase):
         with testtools.ExpectedException(AttributeError):
             with util_concurrency.NodeLock('some-lock'):
                 pass
+
+
+class NodeLockUnavailableTypeTestCase(base.ShakenFistTestCase):
+    def test_it_is_a_lock_exception(self):
+        # Like NodeLockTimeout: the caller did not get the lock. A
+        # handler which skips an item it cannot lock (stray_nics
+        # catches LockException) must skip this one too.
+        self.assertTrue(issubclass(
+            exceptions.NodeLockUnavailable, exceptions.LockException))
+
+    def test_a_blob_transfer_retries_it(self):
+        # Blob.ensure_local() retries a transfer whose lock could not
+        # be taken. A refused nodelock connection used to reach it as a
+        # ConnectionRefusedError, which it caught; it now arrives as
+        # NodeLockUnavailable, and must still be retried rather than
+        # fail the replication outright.
+        from shakenfist.blob import Blob
+
+        b = mock.MagicMock()
+        b.STATE_CREATED = Blob.STATE_CREATED
+        b.state.value = Blob.STATE_CREATED
+        b.depends_on = None
+        with mock.patch.object(Blob, 'filepath', return_value='/nonexistent'):
+            with mock.patch('shakenfist.blob.os.path.exists',
+                            return_value=False):
+                with mock.patch('shakenfist.blob.add_event_multi'):
+                    with mock.patch('shakenfist.blob.time.sleep'):
+                        with mock.patch(
+                                'shakenfist.blob.util_concurrency.NodeLock',
+                                side_effect=[
+                                    exceptions.NodeLockUnavailable('gone'),
+                                    mock.MagicMock()]) as mock_lock:
+                            Blob.ensure_local(b)
+
+        self.assertEqual(2, mock_lock.call_count)
+        b._attempt_transfer.assert_called_once()

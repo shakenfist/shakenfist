@@ -64,6 +64,17 @@ class HealthCheckNodelockTestCase(base.ShakenFistTestCase):
                 daemon.util_concurrency, 'NodeLock', return_value=lock):
             self.assertFalse(daemon.health_check_nodelock())
 
+    @mock.patch('time.sleep')
+    @mock.patch('shakenfist.util.concurrency._node_lock_request',
+                side_effect=ConnectionRefusedError())
+    def test_a_daemon_which_never_answers_is_unhealthy(
+            self, mock_request, mock_sleep):
+        # The real NodeLock, not a mock of it. Its acquire retries a
+        # transport failure and then raises NodeLockUnavailable in its
+        # place, so that -- not the transport error the tests above
+        # mock -- is what an unreachable daemon looks like here.
+        self.assertFalse(daemon.health_check_nodelock())
+
     def test_protocol_error_still_raises(self):
         # A malformed reply is a bug, not a transient restart, and should
         # not be silently converted into an unhealthy poll.

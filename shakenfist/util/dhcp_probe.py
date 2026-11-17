@@ -21,18 +21,38 @@ with a ``dhcp-hostsfile``), rather than assumed:
   present (state ``T``, which ``is_running()`` reports as healthy) the
   probe times out.
 
-This module is executed inside the network's namespace via ``python3
--m shakenfist.util.dhcp_probe``, because the server listens on an
-address which only exists in there. It deliberately imports nothing
-from shakenfist: it runs as a short-lived subprocess, and the cost of
-importing the package into one on every maintenance pass is the kind
-of thing the database load work spent a plan removing.
+A fourth property was measured because a review doubted it: dnsmasq
+answers a DHCPINFORM at the source address *and port* it came from,
+not at the client port (68). ``dhcp_packet()`` in dnsmasq's
+``src/dhcp.c`` says so -- "If we're replying to a DHCPINFORM, trust
+the source address always" -- so the probe needs no privileged bind.
+Measured on dnsmasq 2.90 (Debian 12) and 2.91 (Ubuntu 24.04, Debian
+13). ``tools/dhcp-probe-against-dnsmasq.sh`` repeats the measurement,
+and the smoke CI suite probes the real dnsmasq on its network node.
+
+This module is executed inside the network's namespace, because the
+server listens on an address which only exists in there. It is run by
+the interpreter of the process asking (``sys.executable``), never a
+bare ``python3``: sf-privexec runs commands with a system ``PATH``, on
+which ``python3`` is an interpreter with no shakenfist installed, and
+the import failure that produced read as "no answer" for every network
+on every pass. It deliberately imports nothing from shakenfist: it runs
+as a short-lived subprocess, and the cost of importing the package
+into one on every maintenance pass is the kind of thing the database
+load work spent a plan removing.
+
+The exit status separates "dnsmasq did not answer" from "the probe
+could not be run", because only the first is a reason to rebuild a
+network. Neither may be 1: that is what Python itself exits with for
+an import failure or an uncaught exception, which is exactly the
+failure that has to stay distinguishable from silence.
 """
 
 import random
 import socket
 import struct
 import sys
+import time
 
 
 # The BOOTP magic cookie which introduces the DHCP options (RFC 2132).
@@ -60,6 +80,13 @@ DHCP_SERVER_PORT = 67
 PROBE_MAC = b'\x02\x00\x5f\x70\x72\x62'
 
 DEFAULT_TIMEOUT = 2.0
+
+# Exit statuses, see the module docstring. EXIT_COULD_NOT_PROBE is what
+# main() returns for anything it can name; anything else non-zero (1 for
+# an import failure, say) means the same thing to the caller.
+EXIT_ANSWERED = 0
+EXIT_COULD_NOT_PROBE = 2
+EXIT_NO_ANSWER = 3
 
 
 def build_inform(client_address, mac=PROBE_MAC, xid=None):
@@ -123,12 +150,18 @@ def parse_transaction_id(packet):
 
 
 def probe(server_address, client_address, timeout=DEFAULT_TIMEOUT,
-          sock=None):
+          sock=None, server_port=DHCP_SERVER_PORT):
     """True if ``server_address`` answered a DHCPINFORM with a DHCPACK.
 
     ``client_address`` is the address the INFORM claims, which must sit
     inside the server's configured range for it to be answered -- the
     network's own router address does.
+
+    False means nothing answered within ``timeout`` seconds, in total
+    rather than per packet read. An error which says nothing about the
+    server (a socket which cannot be sent from, say) is raised rather
+    than reported as silence, so that the caller can tell the two
+    apart.
     """
     xid, packet = build_inform(client_address)
 
@@ -136,25 +169,33 @@ def probe(server_address, client_address, timeout=DEFAULT_TIMEOUT,
     if owned:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        sock.settimeout(timeout)
-        sock.sendto(packet, (server_address, DHCP_SERVER_PORT))
+        deadline = time.monotonic() + timeout
+        sock.sendto(packet, (server_address, server_port))
 
         # A reply whose transaction id is not ours belongs to a real
         # client's exchange, which we may see because the server
         # broadcasts. Keep reading until the deadline rather than
         # reporting somebody else's packet as our answer -- or, worse,
         # reporting a healthy server as wedged because a guest was
-        # mid-handshake.
+        # mid-handshake. The deadline is overall: a socket timeout
+        # applies afresh to each read, so on a busy network every
+        # foreign packet would otherwise restart the wait.
         while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            sock.settimeout(remaining)
             try:
                 reply, _ = sock.recvfrom(2048)
             except socket.timeout:
                 return False
+            except ConnectionRefusedError:
+                # Nothing is listening on the server port: an answer
+                # about the server, and the answer is no.
+                return False
             if parse_transaction_id(reply) != xid:
                 continue
             return parse_message_type(reply) == DHCPACK
-    except OSError:
-        return False
     finally:
         if owned:
             sock.close()
@@ -165,10 +206,16 @@ def main(argv=None):
     if len(argv) < 2:
         print('usage: dhcp_probe <server address> <client address> '
               '[timeout]', file=sys.stderr)
-        return 2
+        return EXIT_COULD_NOT_PROBE
 
-    timeout = float(argv[2]) if len(argv) > 2 else DEFAULT_TIMEOUT
-    return 0 if probe(argv[0], argv[1], timeout=timeout) else 1
+    try:
+        timeout = float(argv[2]) if len(argv) > 2 else DEFAULT_TIMEOUT
+        answered = probe(argv[0], argv[1], timeout=timeout)
+    except Exception as e:
+        print(f'dhcp_probe: could not probe: {e.__class__.__name__}: {e}',
+              file=sys.stderr)
+        return EXIT_COULD_NOT_PROBE
+    return EXIT_ANSWERED if answered else EXIT_NO_ANSWER
 
 
 if __name__ == '__main__':

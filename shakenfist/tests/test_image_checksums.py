@@ -108,6 +108,62 @@ class ResolveCirrosChecksumTestCase(base.ShakenFistTestCase):
         self.assertIsNone(algorithm)
         self.assertIsNone(checksum)
 
+    def test_an_md5_digest_is_never_labelled_sha256(self):
+        # A mirror serving MD5SUMS under the name SHA256SUMS. Labelled
+        # by its file name, the md5 digest was compared against a
+        # sha256 of the download and every fetch failed as a mismatch.
+        (algorithm, checksum), mock_get = self._resolve(
+            [_response(200, MD5SUMS), _response(200, MD5SUMS)])
+
+        self.assertEqual('md5', algorithm)
+        self.assertEqual('2' * 32, checksum)
+        self.assertEqual(2, mock_get.call_count)
+
+    def _resolve_legacy(self, responses):
+        # The template as shipped before it took %(digest_file)s, which
+        # an operator's cluster_config may still carry.
+        with mock.patch.object(
+                images.config, 'CHECKSUM_URL_CIRROS',
+                'http://mirror.example.com/%(vernum)s/MD5SUMS'):
+            return self._resolve(responses)
+
+    def test_a_legacy_template_is_still_checked(self):
+        (algorithm, checksum), mock_get = self._resolve_legacy(
+            [_response(200, MD5SUMS)])
+
+        self.assertEqual('md5', algorithm)
+        self.assertEqual('2' * 32, checksum)
+        self.assertEqual(1, mock_get.call_count)
+        self.assertEqual(
+            'http://mirror.example.com/0.6.3/MD5SUMS',
+            mock_get.call_args[0][0])
+
+    def test_a_legacy_template_is_labelled_by_its_digest(self):
+        # Whatever the one file it names turns out to hold.
+        (algorithm, checksum), _ = self._resolve_legacy(
+            [_response(200, SHA256SUMS)])
+
+        self.assertEqual('sha256', algorithm)
+        self.assertEqual('1' * 64, checksum)
+
+    def test_a_digest_we_do_not_recognise_is_not_used(self):
+        (algorithm, checksum), _ = self._resolve_legacy(
+            [_response(200, 'abc  cirros-0.6.3-x86_64-disk.img\n')])
+
+        self.assertIsNone(algorithm)
+        self.assertIsNone(checksum)
+
+
+class AlgorithmForDigestTestCase(base.ShakenFistTestCase):
+    def test_lengths(self):
+        self.assertEqual('md5', images._algorithm_for_digest('a' * 32))
+        self.assertEqual('sha256', images._algorithm_for_digest('a' * 64))
+        self.assertEqual('sha512', images._algorithm_for_digest('a' * 128))
+
+    def test_not_a_digest(self):
+        for value in [None, '', 'a' * 40, 'z' * 64]:
+            self.assertIsNone(images._algorithm_for_digest(value))
+
 
 class FetchRemoteChecksumTestCase(base.ShakenFistTestCase):
     def test_a_missing_file_is_none_not_empty(self):
@@ -124,6 +180,22 @@ class FetchRemoteChecksumTestCase(base.ShakenFistTestCase):
                         return_value=_response(200, '')):
             self.assertEqual(
                 {},
+                images._fetch_remote_checksum('http://example.com/SHA256SUMS'))
+
+    def test_the_fetch_is_bounded(self):
+        # A mirror which accepts the connection and then says nothing
+        # must not park an image fetch forever.
+        with mock.patch('shakenfist.images.requests.get',
+                        return_value=_response(200, '')) as mock_get:
+            images._fetch_remote_checksum('http://example.com/SHA256SUMS')
+        self.assertEqual(
+            images.CHECKSUM_FETCH_TIMEOUT, mock_get.call_args.kwargs['timeout'])
+
+    def test_a_timeout_is_none(self):
+        with mock.patch(
+                'shakenfist.images.requests.get',
+                side_effect=requests.exceptions.ReadTimeout('slow')):
+            self.assertIsNone(
                 images._fetch_remote_checksum('http://example.com/SHA256SUMS'))
 
     def test_a_transport_error_is_none(self):

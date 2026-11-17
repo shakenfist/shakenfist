@@ -114,6 +114,32 @@ class BlobDataPeerUnreachableTestCase(base.ShakenFistTestCase):
         self.assertIn('sf-5', resp.get_json()['error'])
         self.assertIn('retry', resp.get_json()['error'])
 
+    def test_a_holder_which_stalls_is_a_503_naming_it(self):
+        # A hung node accepts the connection and never answers. Only a
+        # bounded read makes that an exception at all; this pins what
+        # the handler does with it.
+        resp = self._proxied(requests.exceptions.ReadTimeout('stalled'))
+
+        self.assertEqual(503, resp.status_code, resp.get_data())
+        self.assertIn('sf-5', resp.get_json()['error'])
+
+    def test_the_proxied_read_is_bounded(self):
+        # ...and this pins that the read is bounded, which the test
+        # above cannot: a mocked request raises whenever it is told to.
+        with mock.patch('shakenfist.external_api.blob.get_api_token',
+                        return_value='Bearer token'):
+            with mock.patch(
+                    'shakenfist.external_api.blob.request_namespace',
+                    return_value='system'):
+                with mock.patch('shakenfist.external_api.blob.flask'):
+                    with mock.patch(
+                            'shakenfist.external_api.blob.requests.request'
+                    ) as mock_request:
+                        api_blob._open_remote('sf-5', self.BLOB_UUID)
+        self.assertEqual(
+            api_base.PEER_REQUEST_TIMEOUT,
+            mock_request.call_args.kwargs['timeout'])
+
     def test_the_connection_opens_before_the_status_is_committed(self):
         # The regression guard. If the request moves back inside the
         # generator, the response is a 200 whose body is empty and the
@@ -186,20 +212,52 @@ class ArtifactUploadProxyTestCase(base.ShakenFistTestCase):
         self.assertEqual(503, resp.status_code)
         self.assertIn('sf-5', json.loads(resp.get_data(as_text=True))['error'])
 
+    def test_a_peer_which_stalls_is_a_503_naming_it(self):
+        with self.app.test_request_context('/artifacts', method='POST'):
+            with mock.patch(
+                    'shakenfist.external_api.base.requests.request',
+                    side_effect=requests.exceptions.ReadTimeout(
+                        'stalled')) as mock_request:
+                resp = api_base.proxy_request_to_node(
+                    'http://sf-5:13000/artifacts', 'Bearer token',
+                    json.dumps({'upload_uuid': 'u'}), 'sf-5')
+
+        self.assertEqual(503, resp.status_code)
+        self.assertIn('sf-5', json.loads(resp.get_data(as_text=True))['error'])
+        # A hung peer only raises at all because the request is bounded.
+        self.assertEqual(
+            api_base.PEER_REQUEST_TIMEOUT,
+            mock_request.call_args.kwargs['timeout'])
+
     def test_artifact_py_has_no_proxy_of_its_own(self):
         # The point of the fix is that this site stopped carrying its
         # own copy of the proxy. A second copy is how the guard came to
         # be missing here in the first place, so assert the module makes
         # no raw node-to-node request at all rather than re-testing the
         # helper's behaviour through it.
+        #
+        # Read as a syntax tree rather than as text, so a comment or a
+        # docstring which mentions requests neither trips this nor
+        # satisfies it.
+        import ast
         import inspect
 
         from shakenfist.external_api import artifact as api_artifact
 
-        source = inspect.getsource(api_artifact)
-        self.assertIn('api_base.proxy_request_to_node(', source)
-        self.assertNotIn('requests.request(', source)
-        self.assertNotIn('import requests', source)
+        tree = ast.parse(inspect.getsource(api_artifact))
+
+        imported = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported.update(a.name.split('.')[0] for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported.add(node.module.split('.')[0])
+        self.assertNotIn('requests', imported)
+
+        called = {
+            ast.unparse(node.func) for node in ast.walk(tree)
+            if isinstance(node, ast.Call)}
+        self.assertIn('api_base.proxy_request_to_node', called)
 
 
 class NodeLockUnavailableTestCase(base.ShakenFistTestCase):

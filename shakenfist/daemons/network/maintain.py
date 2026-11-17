@@ -51,9 +51,21 @@ EXTRA_VLANS_WARNED: dict[int, set[str]] = {}
 # Networks whose instances have already been told that reconciliation
 # is quiesced, so they are told once per episode rather than once per
 # pass. Dropped for a network when it next reconciles cleanly, so a
-# network which breaks again is reported again (issue 520).
+# network which breaks again is reported again (issue 520), and when a
+# pass no longer visits it, so a deleted network does not linger.
 QUIESCE_REPORTED: set[str] = set()
 STRAY_VXLAN_HANDLING_FAILING: bool = False
+
+
+def forget_unvisited_quiesces(visited_networks):
+    """Drop QUIESCE_REPORTED entries for networks a pass did not visit.
+
+    A network deleted while quiesced never reconciles cleanly, so the
+    discard on a clean pass never removes it, and it would sit in the
+    set for the life of the process. The stray vxid caches are pruned
+    against what a pass saw in the same way.
+    """
+    QUIESCE_REPORTED.intersection_update(str(u) for u in visited_networks)
 
 
 # Instance states in which a domain on this node may still be attached
@@ -902,6 +914,8 @@ class Job(util_concurrency.Job):
                     priority=PRIORITY.background,
                     target=str(config.NODE_UUID),
                     family='network')
+
+            forget_unvisited_quiesces(host_networks)
 
             # Determine if there are any extra vxids
             extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)

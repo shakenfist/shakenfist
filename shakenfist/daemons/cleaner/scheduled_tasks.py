@@ -181,6 +181,14 @@ def _instance_lock(inst, pet):
                 f'Instance is busy, skipping it this pass: {e}')
             yield False
             return
+        except exceptions.NodeLockUnavailable as e:
+            # This node's nodelock daemon is not answering, which is no
+            # more a reason to abandon the rest of the pass than a busy
+            # instance is. NodeLock has already logged it at WARNING.
+            LOG.with_fields({'instance': inst.uuid}).debug(
+                f'Cannot lock instance, skipping it this pass: {e}')
+            yield False
+            return
         yield True
 
 
