@@ -199,12 +199,14 @@ possible; only `instar dd` exit 0 is asserted.
 `instar dd` also exits 0 but its empty vhdx is rejected by `qemu-img
 info`. No data is lost (both have zero payload); this is a limitation
 of the vhdx writer when the virtual size is zero. It is tracked as
-future work; see [Future work](#future-work).
+[#917](https://github.com/shakenfist/instar/issues/917); see also
+[Future work](#future-work).
 
 ### `-f` input format flag
 
 `-f FMT` is accepted by the CLI and validated, but format forcing is
-deferred to a future release. Auto-detection from the file's magic bytes
+deferred ([#918](https://github.com/shakenfist/instar/issues/918)).
+Auto-detection from the file's magic bytes
 is authoritative. Passing `-f raw` on a raw input does not cause an
 error and the output matches `qemu-img dd` (which uses auto-detection),
 but the hint itself is currently ignored.
@@ -295,10 +297,11 @@ instar dd if=disk.raw of=empty.raw bs=512 count=0
 
 ## Future work
 
-- **`-f` input format forcing.** The `-f` flag is accepted but the
-  hint is currently ignored; auto-detection is authoritative.
-  Wiring the hint through `discover_backing_chain` is a small
-  follow-up.
+- **`-f` input format forcing**
+  ([#918](https://github.com/shakenfist/instar/issues/918)). The `-f`
+  flag is accepted but the hint is currently ignored; auto-detection
+  is authoritative. Wiring the hint through `discover_backing_chain`
+  is a small follow-up.
 - **`--image-opts` / `--object` / `-U`.** The QEMU driver-option,
   object, and unlock flags are not implemented. These depend on
   QEMU's `--image-opts` URL syntax and are low-priority for instar's
@@ -306,10 +309,11 @@ instar dd if=disk.raw of=empty.raw bs=512 count=0
 - **PVE/downstream extensions.** `osize=`, `isize=`, `seek=`,
   stdin/stdout, `-n`, `-l`, `--target-image-opts`, and `-o` (driver
   create options) are out of scope for upstream parity.
-- **Readable empty vhdx (`count=0 -O vhdx`).** instar's zero-virtual-
-  size vhdx is currently rejected by `qemu-img info`. The vhdx writer
-  needs to produce a header/metadata structure that qemu-img accepts
-  even when there is no payload data.
+- **Readable empty vhdx (`count=0 -O vhdx`)**
+  ([#917](https://github.com/shakenfist/instar/issues/917)). instar's
+  zero-virtual-size vhdx is currently rejected by `qemu-img info`. The
+  vhdx writer needs to produce a header/metadata structure that
+  qemu-img accepts even when there is no payload data.
 - **`seek=` output offset.** Allows writing into the middle of an
   existing output file. Not in upstream `qemu-img dd`; add only if a
   concrete downstream need appears.

@@ -230,10 +230,14 @@ requiring review instead of by a sha. The exception names both the
 reusable workflow a `workflow` while every other `uses:` reference is
 an `action`. Both names, and the helper's own definition, are read
 from Renovate's source at the version this fleet runs, 44.227.4:
-`lib/config/presets/internal/helpers.preset.ts:118-126` for the
-helper, and
-`lib/modules/manager/github-actions/extract.ts:78` and `:111` for the
-dep type a reference is given.
+the helper is the `pinGitHubActionDigests` entry in
+[`lib/config/presets/internal/helpers.preset.ts`](https://github.com/renovatebot/renovate/blob/83794a8993ff455b106ddf1e23ce4deca3f5277d/lib/config/presets/internal/helpers.preset.ts#L118-L126),
+and the dep type a reference is given is chosen by
+`extractRepositoryAction` in
+[`lib/modules/manager/github-actions/extract.ts`](https://github.com/renovatebot/renovate/blob/83794a8993ff455b106ddf1e23ce4deca3f5277d/lib/modules/manager/github-actions/extract.ts#L78-L111),
+which says `workflow` when the reference's sub-path matches
+`reusableWorkflowPathRe` and `action` otherwise. Both links are pinned
+to the commit that release was tagged from.
 
 The preset sets no `vulnerabilityAlerts`: Renovate's defaults
 already drop the schedule, `minimumReleaseAge` and grouping for a

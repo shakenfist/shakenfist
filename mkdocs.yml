@@ -265,7 +265,6 @@ nav:
                 - "Fuzzing bug backlog": components/instar/plans/PLAN-fuzzing-bugs.md
                 - "June 2026 fuzzer bug backlog": components/instar/plans/PLAN-bug-fixes.md
                 - "instar amend subcommand": components/instar/plans/PLAN-amend.md
-                - "instar dd subcommand": components/instar/plans/PLAN-dd.md
                 - "instar bitmap subcommand": components/instar/plans/PLAN-bitmap.md
                 - "instar bench subcommand": components/instar/plans/PLAN-bench.md
                 - "bench qcow2 refcount growth": components/instar/plans/PLAN-bench-refcount-growth.md
@@ -273,6 +272,7 @@ nav:
                 - "Format coverage expansion": components/instar/plans/PLAN-format-coverage.md
                 - "VHD and VHDX differencing output": components/instar/plans/PLAN-differencing.md
                 - "Populated BAT output": components/instar/plans/PLAN-bat-population.md
+                - "Multi-extent VMDK output": components/instar/plans/PLAN-multi-extent-vmdk.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md

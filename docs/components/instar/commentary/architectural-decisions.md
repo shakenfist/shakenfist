@@ -365,3 +365,72 @@ recorded deferral); and refcount-growth *execution* stays op-side as a
 shared helper rather than being expressed as steps. The payoff -- COW,
 growth, and the crash-ordering contract implemented and verified once --
 is worth it.
+
+---
+
+## Decision 12: `dd` is `convert` with a window, not its own guest binary
+
+**The choice:** `instar dd` has no guest binary of its own. The host
+parses the `bs`/`count`/`skip` operands, turns them into an input byte
+window, and runs **`convert.bin`** with a `ConvertConfig` whose
+`window_start`/`window_end` fields are set and whose `FLAG_DD_WINDOW`
+flag is raised. There is no `dd.bin` and no second config magic: `dd`
+and `convert` share one guest binary, one `"CONV"` config, and one host
+entry point, `execute_convert`.
+
+**Why not a dedicated `dd.bin`?** `dd` needs exactly what `convert`
+already has -- the five output writers (`convert_to_raw`,
+`convert_to_qcow2`, `convert_to_vmdk`, `convert_to_vhd`,
+`convert_to_vhdx`), which live inside
+`src/operations/convert/src/main.rs` rather than in a reusable crate.
+Three options were weighed. A standalone `dd.bin` that **duplicated**
+the writers was rejected outright: it would put a second copy of the
+format-writing code inside the sandbox, and the writers are the code
+held to byte-for-byte parity with `qemu-img` (Decision 10). Two copies
+drift, and a drift in a writer is silent wrong output, not a crash.
+It would also add a second `no_std` binary to audit and to keep inside
+the per-operation budget that `make check-binary-sizes` enforces.
+Extracting the writers into a shared `no_std` module linked by both
+binaries was the clean version of the same idea, and remains the
+fallback if `convert`'s config surface ever gets unwieldy -- but it is a
+meaningful refactor of a large, hot file, bought for a subcommand that
+is semantically *convert with a narrower read range*. Reuse won.
+
+**Why `FLAG_DD_WINDOW` is a gate flag and not inferred from the
+values.** It is tempting to drop the flag and let `window_start` and
+`window_end` speak for themselves. They cannot. For `dd`,
+`window_end == 0` means **copy nothing** -- a legitimate request,
+`count=0`, which must produce a valid empty output and exit 0. For
+`convert`, an all-zero window means **copy the whole image**, because
+convert never sets one. The two are indistinguishable from the field
+values alone, so inferring intent would make an empty `dd` window
+silently copy the entire input: the maximum wrong answer for the
+operand that asked for nothing. The flag is what separates "no window
+requested" from "an empty window requested", and the guest ignores the
+window fields entirely when it is clear, so `convert` behaves exactly
+as it did before `dd` existed.
+
+**Dense output is the absence of a flag, not a new one.** `qemu-img dd`
+writes every sector in the window, including zero-filled ones, where
+`convert` elides zero clusters. That difference is expressed by `dd`
+simply **not** setting `FLAG_SKIP_ZEROS` -- it passes `flags = 0` and
+lets `execute_convert` add `FLAG_DD_WINDOW` itself. No sparseness flag
+was added, because dense is already what a convert config with no
+`SKIP_ZEROS` means.
+
+**Why `execute_convert` is shared rather than forked.** The host side
+of a convert is roughly five hundred lines of chain discovery, output
+sizing, guest construction, KVM setup and MMIO plumbing. `dd` differs
+from it in two values: the window, and an output virtual size that is
+the window's length rather than the input's. Those are carried as
+`Option` fields on `ConvertExecution` (`window`, `output_vsize_override`)
+and the function serves both callers. Because only `dd` passes a
+window, `exec.window.is_some()` is also how the shared code names the
+subcommand the user actually ran when it has to report an error.
+
+**The cost:** `dd`'s quirks now have a presence in `convert`'s config
+surface -- a flag, two fields and two `Option`s that mean nothing to a
+plain convert -- and the writers carry a `read_start` offset that is
+always zero for convert. That is the accepted price of one copy of the
+format writers. The escape hatch (extract the writers, then give `dd`
+its own binary) stays available and is deliberately unexercised.

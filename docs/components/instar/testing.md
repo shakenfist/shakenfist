@@ -3456,9 +3456,11 @@ deciding which side moved.
 writes for the commands in `tests/helpers/qemu_pins.py` (`CASES`):
 VHDX create and convert (as a structural summary from
 `tests/helpers/vhdx_structure.py`, including the BAT), what
-preallocation changes for vpc, vmdk and vhdx, and the vmdk
-monolithicFlat descriptor. Results are grouped by outcome, so a
-version boundary shows up as a case with more than one group.
+preallocation changes for vpc, vmdk and vhdx, the vmdk
+monolithicFlat descriptor, and the vmdk `twoGbMaxExtentSparse` and
+`twoGbMaxExtentFlat` subformats, which split an image into extents of
+at most 2 GiB. Results are grouped by outcome, so a version boundary
+shows up as a case with more than one group.
 
 Each preallocation mode records whether its image has the same bytes
 (`same_bytes_as_off`) and the same allocation
@@ -3467,6 +3469,27 @@ entry compares two `off` images, and the bytes that differ between
 those images are masked out, so its `same_bytes_as_off` is true by
 construction. Only its allocation comparison is measured. The `falloc`
 and `full` entries are the ones that carry evidence.
+
+A split-subformat case records the normalised descriptor and, beside
+it, the extents it names: `extent_names`, each name with the image's
+stem replaced by `$STEM`, so the pin holds the naming scheme and not
+a scratch path; `extent_lengths`, the length of the file each extent
+line names, resolved against the directory holding the descriptor,
+`null` for one that is not there and the string `refused` for a name
+that resolves outside that directory -- a writer that failed to create
+a file it promised and one that pointed at a file the image does not
+own are different findings; and, for a sparse extent, the
+`structure` that `tests/helpers/vmdk_structure.py` reads, which
+carries the VMDK4 header fields a reader walks the extent with. The
+names and the lengths come from the descriptor qemu wrote rather than
+from qemu's naming rule, so an extent named wrongly or never created
+reads as a missing file instead of being looked for under the name it
+should have had. Two cases, one per subformat, put a file where the
+second extent is about to go and keep a second hard link to it, so
+their `existing_kept_lengths` says whether qemu truncated that file in
+place or replaced it. Both writers are measured because they take
+different paths: a flat extent is extended to its full declared
+length where a sparse one is written a header.
 
 `tests/test_qemu_create_pins.py` keeps it honest. It fails when a
 build is present that the pin does not list, when 6.0.0, 6.2.0,

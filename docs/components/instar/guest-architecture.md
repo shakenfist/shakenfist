@@ -691,24 +691,46 @@ provides a modular architecture with:
  header-extension relocation across the version change is
  unsupported. Needs `/dev/kvm` (launches a guest VMM). See
  [docs/amend.md](/components/instar/amend/) for the full user reference.
-- **operations/dd/** - Windowed block-copy operation (PLAN-dd,
- qemu-img dd compatible). Implemented host-side in `run_dd`
- (`src/vmm/src/main.rs`): parses `name=value` operands (`if=`,
- `of=`, `bs=`, `count=`, `skip=`) and the `-O` output-format flag
- (default **raw**, not the input format), computes the input byte
- window via `crates/dd::compute_dd_window` (count-then-skip
- semantics: `count` clamps down, `skip` subtracts from the front,
+- **operations/dd/** - Windowed block-copy operation (qemu-img dd
+ compatible). There is no `dd` guest binary: dd is implemented
+ host-side in `run_dd` (`src/vmm/src/main.rs`), which parses
+ `name=value` operands (`if=`, `of=`, `bs=`, `count=`, `skip=`)
+ and the `-O` output-format flag (default **raw**, not the input
+ format), computes the input byte window via
+ `crates/dd::compute_dd_window` (count-then-skip semantics:
+ `count` clamps down, `skip` subtracts from the front,
  skip-past-EOF ⇒ empty output with exit 0), then launches the
  existing `convert.bin` guest with a windowed `ConvertConfig`
- (input byte-window + dense output). The new `crates/dd` crate
- provides the pure window-math helper used by both the host CLI
- and tests. The structured writers (qcow2, vmdk, vhd, vhdx) were
- hardened during this phase via `qcow2::read_chain_virtual_range`
- to correctly fill output grains/blocks that span multiple input
- qcow2 clusters (fixing a pre-existing sub-cluster data-loss bug
- in `convert`). Output is byte- and size-identical to `qemu-img
- dd` for all five output formats (raw, qcow2, vmdk, vpc, vhdx).
- Known divergences: count=0 vmdk/vhdx edge cases. See
+ (input byte-window + dense output). See
+ [Decision 12](/components/instar/commentary/architectural-decisions/) for why dd
+ reuses convert's binary rather than having its own. The
+ `crates/dd` crate provides the pure window-math helper used by
+ both the host CLI and tests.
+
+ Two constraints govern the windowing. **The chain read
+ primitives must be byte-accurate**, not sector-aligned:
+ `read_raw_sectors` and `read_cluster_sectors` are required to
+ return the exact bytes of a sub-sector range, because a dd
+ window may start and end anywhere. Every reader in the guest
+ depends on this, so a change that reintroduces alignment
+ rounding in them breaks dd silently rather than loudly.
+ **Device sector size is chosen by output kind**: raw output uses
+ 512 bytes, matching the 512-byte rounding of `qemu-img dd`'s
+ raw output file size; structured output (qcow2, vmdk, vpc,
+ vhdx) uses the same 64KB `MAX_SECTOR_SIZE` as `convert`, because
+ the structured writers assemble whole maximum-size output
+ sectors and the VHD/VHDX block path assumes it. The declared
+ virtual size and the data are sized from the byte-granular
+ window rather than from the device sector size, so neither
+ choice affects where the window falls.
+
+ The structured writers were hardened as part of this work, via
+ `qcow2::read_chain_virtual_range`, to correctly fill output
+ grains and blocks that span multiple input qcow2 clusters --
+ fixing a pre-existing sub-cluster data-loss bug in `convert`.
+ Output is byte- and size-identical to `qemu-img dd` for all five
+ output formats (raw, qcow2, vmdk, vpc, vhdx). Known
+ divergences: count=0 vmdk/vhdx edge cases. See
  [docs/dd.md](/components/instar/dd/) for the full user reference.
 - **operations/bitmap/** - qcow2 persistent-dirty-bitmap management
  operation (PLAN-bitmap, qcow2 v3-only). The host side (`run_bitmap`
