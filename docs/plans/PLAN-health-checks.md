@@ -166,7 +166,8 @@ Concretely:
   readiness status, so peers and operators can use the
   standard `grpc-health-probe` tool. (There is no sf-eventlog
   daemon — eventlog is library code in `shakenfist/eventlog.py`
-  and `PLAN-eventlog-direct-mariadb.md` removes even that
+  and [`PLAN-eventlog-direct-mariadb.md`](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-eventlog-direct-mariadb.md) (retired)
+removes even that
   proxying role. The earlier draft of this plan named a
   phantom sf-eventlog; phase 0 corrects the inventory.)
 - **Worker / periodic daemons** (sf-cleaner, sf-queues,

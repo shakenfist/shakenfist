@@ -737,7 +737,7 @@ because the following statements will be true:
   galaxy role), so the role's documentation can point at
   well-defined health endpoints.
 - **Remove the eventlog service entirely.** Tracked in
-  [`PLAN-eventlog-direct-mariadb.md`](PLAN-eventlog-direct-mariadb.md).
+  [`PLAN-eventlog-direct-mariadb.md`](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-eventlog-direct-mariadb.md).
   The original framing of this stub was "move sqlite to
   MariaDB and make the daemon electable," but on closer
   inspection `sf-eventlog` is a thin gRPC wrapper in front

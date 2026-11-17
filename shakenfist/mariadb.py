@@ -7040,7 +7040,8 @@ def _direct_get_object_events(
     and ``limit > 1000`` is capped at 1000. The current REST API
     allows negative limit which the legacy ``EventLog.read_events()``
     interprets as "all rows"; this caps that foot-gun. Cursor-style
-    pagination is deferred (see Future work in the master plan).
+    pagination is deferred until a client asks for it; the
+    ``limit``-only shape is what every current caller uses.
 
     Args:
         object_type: One of the constants.OBJECT_NAMES values

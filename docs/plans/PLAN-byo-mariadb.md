@@ -332,7 +332,7 @@ introducing the LB.
 
 7. **Greenfields only; no migration story.** Consistent
    with the project's posture (see the
-   `PLAN-eventlog-direct-mariadb.md` and
+   [`PLAN-eventlog-direct-mariadb.md`](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-eventlog-direct-mariadb.md) (retired) and
    `PLAN-remove-etcd.md` precedents and the
    `CLAUDE.md` note that the in-place upgrade path is
    being closed), this plan does not preserve
@@ -678,7 +678,7 @@ careful reasoning. Per-phase planning effort:
 ### Step-level guidance
 
 Each phase plan should include a step table in the
-same format as `PLAN-eventlog-direct-mariadb.md`,
+same format as [`PLAN-eventlog-direct-mariadb.md`](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-eventlog-direct-mariadb.md),
 with effort, model, isolation, and brief columns.
 **When in doubt, skew to the more capable model** —
 saving money only matters if the outcome is still

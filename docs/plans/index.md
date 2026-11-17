@@ -93,7 +93,7 @@ maintained document, so it may state things a later phase overturned.
 | 2026-05-17 | [Retry transient artifact fetches](PLAN-artifact-fetch-retry-with-backoff.md) | A per-operation retry budget, so a network blip during a fetch no longer errors the artifact | Complete | — |
 | 2026-05-17 | [Health checks, readiness and drain](PLAN-health-checks.md) | `/livez`, `/readyz`, `/healthz`, gRPC health, watchdog liveness and SIGTERM drain | Complete | 5 of 5 |
 | 2026-05-20 | [Replace exec'd network commands with netlink](PLAN-replace-exec-with-netlink.md) | Native netlink calls in place of shelling out to `ip`, `bridge` and friends | Not started | 0 of 8 |
-| 2026-05-22 | [Eventlog direct to MariaDB](PLAN-eventlog-direct-mariadb.md) | Remove the eventlog service and write events straight to MariaDB | Complete | 7 of 7 |
+| 2026-05-22 | [Eventlog direct to MariaDB](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-eventlog-direct-mariadb.md) (retired) | Remove the eventlog service and write events straight to MariaDB | Complete | 7 of 7 |
 | 2026-05-22 | [Generic allocator](PLAN-generic-allocator.md) | Replace five ad-hoc finite-resource allocators with a single primitive | Not started | 0 of 8 |
 | 2026-05-22 | [Network carrier model](PLAN-network-carrier-model.md) | A lease-based per-network carrier with VIP advertisement, retiring the network-node singleton | Not started | 0 of 13 |
 | 2026-05-22 | [Network service ports](PLAN-network-service-ports.md) | Per-network DNAT'd ports for managed services | Not started | 0 of 8 |

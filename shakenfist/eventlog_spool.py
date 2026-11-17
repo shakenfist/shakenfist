@@ -17,10 +17,11 @@ startup the spool module scans for orphan spool files left
 behind by previously-dead PIDs and migrates their rows into the
 fresh-pid spool so the drainer drains them too.
 
-This module lands in the network-facade branch ahead of the
-broader ``PLAN-eventlog-direct-mariadb`` plan; once that plan
-executes the drainer will swap its gRPC target from sf-eventlog
-to sf-database, but the spool shape itself doesn't change.
+The drainer's gRPC target is ``sf-database``. It was
+``sf-eventlog`` when this module was written, and the swap did not
+change the spool's shape -- the spool is the durability boundary
+either way, and there is no dead-letter queue behind it. See
+``docs/operator_guide/events.md``.
 """
 import contextlib
 import fcntl

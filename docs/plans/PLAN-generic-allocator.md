@@ -269,7 +269,8 @@ All implementation work is done by sub-agents, never in the
 management session. The workflow mirrors
 `PLAN-remove-primary.md`, `PLAN-sticky-transfers.md`,
 `PLAN-scheduler-reservations.md`, and
-`PLAN-eventlog-direct-mariadb.md`: plan in the management
+[`PLAN-eventlog-direct-mariadb.md`](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-eventlog-direct-mariadb.md) (retired): plan in
+  the management
 session, spawn a sub-agent per implementation step, review
 in the management session, fix or retry, commit when
 satisfied.

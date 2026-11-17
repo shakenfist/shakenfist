@@ -303,7 +303,8 @@ Sequencing constraints:
   type. `page_size` 0 keeps today's unbounded reply, so every other
   caller is unchanged. This plan's phase 2 should treat that caller as
   done and reuse the fields for the rest.
-- **`PLAN-eventlog-direct-mariadb` is complete and is where this came
+- **[`PLAN-eventlog-direct-mariadb`](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-eventlog-direct-mariadb.md) (retired) is complete
+  and is where this came
   from.** Its Future work section listed cursor pagination for
   `GetObjectEvents` as deferred; issue 3638 is that deferral coming due.
   Phase 3 should read its phase 4 plan for the REST contract
