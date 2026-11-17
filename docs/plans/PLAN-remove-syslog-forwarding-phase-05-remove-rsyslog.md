@@ -264,7 +264,8 @@ lands as a new actions artefact.
 
 Update [`PLAN-remove-primary.md`](PLAN-remove-primary.md): mark
 its phase 1 ("Remove rsyslog aggregation") complete with a pointer
-to this plan (mirroring how `PLAN-remove-apache-lb` realised its
+to this plan (mirroring how [`PLAN-remove-apache-lb`](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-remove-apache-lb.md)
+(retired) realised its
 phase 3), and update the row in `docs/plans/index.md`.
 
 ## Step-level guidance

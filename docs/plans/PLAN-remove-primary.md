@@ -290,7 +290,7 @@ care.
 |-------|------|--------|
 | 1. Remove rsyslog aggregation from deployer | _(realised by [PLAN-remove-syslog-forwarding.md](PLAN-remove-syslog-forwarding.md) phase 5)_ | Complete |
 | 2. ~~`bootstrap_operations` table and idempotent `sf-ctl bootstrap-cluster`~~ | _(dissolved — see phase notes; the role-config-idempotency remainder folds into phase 6)_ | Abandoned |
-| 3. Remove Apache reverse proxy from deployer | _(realised by [PLAN-remove-apache-lb.md](PLAN-remove-apache-lb.md))_ | Complete |
+| 3. Remove Apache reverse proxy from deployer | _(realised by [PLAN-remove-apache-lb.md](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-remove-apache-lb.md), retired)_ | Complete |
 | 4-5. _(MariaDB BYO and sf-database tier — moved to [PLAN-byo-mariadb.md](PLAN-byo-mariadb.md))_ | _(separate plan)_ | Superseded |
 | 6. Repackage deployer as the `shakenfist.shakenfist` galaxy collection; delete the getsf installer chain; example consumers | [PLAN-remove-primary-phase-06-galaxy-role.md](PLAN-remove-primary-phase-06-galaxy-role.md) | Complete |
 | 7. Rename `etcd_master` → `database_node`; final cleanup | [PLAN-remove-primary-phase-07-rename-cleanup.md](PLAN-remove-primary-phase-07-rename-cleanup.md) | Complete |
@@ -318,7 +318,7 @@ Phase notes:
   `rsyslog-*.conf` templates, the `syslog_target` variable, the
   `rsyslog` package + service enablement, and the
   `--log-syslog` gunicorn flag), in the same way phase 3 was
-  realised by `PLAN-remove-apache-lb.md`.
+  realised by [`PLAN-remove-apache-lb.md`](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-remove-apache-lb.md) (retired).
 - **Phase 2 (dissolved).** This phase originally introduced
   a `bootstrap_operations` table and an idempotent
   `sf-ctl bootstrap-cluster` command that subsumed every

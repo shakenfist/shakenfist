@@ -14,6 +14,28 @@ Shaken Fist does **not** ship a load balancer or reverse proxy. Putting one in
 front of the API is operator-provided infrastructure: you choose the software,
 own its configuration, and run it where it suits your network.
 
+It did once. The deployer used to install Apache on the primary node and
+configure `mod_proxy_balancer` across every hypervisor's `:13000`. That was
+removed rather than made optional or swapped for a bundled nginx, and the
+reasoning is worth knowing before anyone proposes putting it back:
+
+- **A topology flag** would have kept the vhost template, the
+  `BalancerMember` loop and an install that no test exercised, in order to
+  serve a configuration no known deployment used — every operator who took
+  Shaken Fist to production had already replaced it, because it terminated no
+  TLS, health-checked no backend and hard-coded the OpenAPI passthrough
+  paths. An example config copied once is less to own than a conditional role
+  action and its template.
+- **Bundling nginx instead**, which is what the one real deployment used,
+  would have kept the deployer in the load-balancer business with a different
+  daemon, and a deployer-managed nginx would then be fighting the operator's
+  own — which already holds their TLS, their certificate rotation, their WAF
+  and their logging.
+
+What the deployer still does is deploy `sf-*` daemons on the hosts you name,
+against infrastructure whose addresses you give it. The load balancer sits on
+your side of that line, with the database and the log store.
+
 ## Why you need one
 
 A reverse proxy or load balancer in front of the `sf-api` workers lets you:
@@ -42,6 +64,15 @@ no `/v1/` -- so `<lb>/api/instances` reaches `/instances` on the backend.
 | `/apidocs` | `/apidocs` | Passed through unchanged (Swagger UI). |
 | `/flasgger_static` | `/flasgger_static` | Passed through unchanged (Swagger UI assets). |
 | `/apispec_1.json` | `/apispec_1.json` | Passed through unchanged (OpenAPI spec). |
+
+The prefix is an artefact of that removed Apache: gunicorn has always served
+the API at `/`, and the proxy is what put `/api` in front of it. Retiring the
+convention and serving the API at `/` behind your proxy would be simpler, and
+was deliberately not done when Apache went — it is baked into every existing
+`api_url`, into the OpenAPI document URLs and into client expectations, so it
+is a compatibility break on its own schedule rather than a free tidy-up. The
+single-node escape hatch below is the one place there is no `/api`, because
+there is no proxy to add it.
 
 ## Example configurations
 

@@ -224,7 +224,7 @@ This plan delivers the "Loki-shipper story" that
 waiting on. The actual deletion of the rsyslog deployer wiring
 (remove-primary's phase 1 deliverable) is performed here in
 phase 5, in the same way that
-[`PLAN-remove-apache-lb.md`](PLAN-remove-apache-lb.md) realised
+[`PLAN-remove-apache-lb.md`](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-remove-apache-lb.md) (retired) realised
 remove-primary's phase 3. When phase 5 lands, remove-primary
 phase 1 should be marked complete with a pointer to this plan.
 
