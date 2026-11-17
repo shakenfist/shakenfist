@@ -1021,50 +1021,6 @@
          <lastmod>2026-11-17</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-01-abi/</loc>
-         <lastmod>2026-11-17</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-02-host-operands/</loc>
-         <lastmod>2026-11-17</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-03-guest-raw/</loc>
-         <lastmod>2026-11-17</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-04-guest-formats/</loc>
-         <lastmod>2026-11-17</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-05-rust-tests/</loc>
-         <lastmod>2026-11-17</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-06-integration/</loc>
-         <lastmod>2026-11-17</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-07-baselines/</loc>
-         <lastmod>2026-11-17</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-08-fuzz/</loc>
-         <lastmod>2026-11-17</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-09-diff-fuzz/</loc>
-         <lastmod>2026-11-17</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-10-docs/</loc>
-         <lastmod>2026-11-17</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/instar/plans/PLAN-dd/</loc>
-         <lastmod>2026-11-17</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-differencing-phase-01-pin/</loc>
          <lastmod>2026-11-17</lastmod>
     </url>
@@ -1318,6 +1274,14 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-measure/</loc>
+         <lastmod>2026-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-multi-extent-vmdk-phase-01-pin/</loc>
+         <lastmod>2026-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-multi-extent-vmdk/</loc>
          <lastmod>2026-11-17</lastmod>
     </url>
     <url>

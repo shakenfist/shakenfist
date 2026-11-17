@@ -6130,34 +6130,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-dd/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    instar dd subcommand
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../PLAN-bitmap/" class="md-nav__link">
         
   
@@ -6591,6 +6563,34 @@
     
   
     Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-multi-extent-vmdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-extent VMDK output
   
 
     
@@ -16435,7 +16435,7 @@ plan is.</p>
 VMM, KVM guest, call table, device emulation). Consult <code>AGENTS.md</code>
 for build commands, project conventions, code organisation, and the
 security-model summary. The closest prior art for this plan is
-<strong><code>PLAN-dd.md</code></strong> (a host-orchestrated subcommand that reuses
+<strong><a href="https://github.com/shakenfist/instar/blob/8871b068fc3a997bf930c5f59509cdd5246aa8df/docs/plans/PLAN-dd.md"><code>PLAN-dd.md</code></a></strong> (a host-orchestrated subcommand that reuses
 existing guest read machinery plus a small pure <code>crates/dd</code> math
 crate) and <strong><code>PLAN-map.md</code></strong> (a single-image read-only op with a
 streamed result and a host renderer). Note one structural
@@ -16454,7 +16454,8 @@ qemu-img subcommand instar does not implement</strong> — instar covers 14
 of <code>qemu-img 10.0.8</code>'s 15 subcommands, plus the two instar-only
 extras <code>copy</code> and <code>config</code>. Every prior plan deliberately deferred
 bench behind a design spike: <em>"is benchmarking through the KVM
-sandbox meaningful?"</em> (<code>PLAN-dd.md</code>, <code>PLAN-bitmap.md</code> Future work).</p>
+sandbox meaningful?"</em> (<a href="https://github.com/shakenfist/instar/blob/8871b068fc3a997bf930c5f59509cdd5246aa8df/docs/plans/PLAN-dd.md"><code>PLAN-dd.md</code></a>, <code>PLAN-bitmap.md</code> Future
+work).</p>
 <p><strong>This plan resolves the design spike in the affirmative, with an
 honest reframing.</strong> <code>instar bench</code> does not measure what
 <code>qemu-img bench</code> measures (qemu's block layer over the host page

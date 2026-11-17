@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/instar/plans/PLAN-dd-phase-08-fuzz/">
+        <link rel="canonical" href="https://shakenfist.com/components/instar/plans/PLAN-multi-extent-vmdk-phase-01-pin/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>PLAN-dd phase 08: Coverage-guided fuzzing - Shaken Fist</title>
+        <title>Multi-extent VMDK phase 1: pin qemu's output - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#plan-dd-phase-08-coverage-guided-fuzzing" class="md-skip">
+        <a href="#multi-extent-vmdk-phase-1-pin-qemus-output" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              PLAN-dd phase 08: Coverage-guided fuzzing
+              Multi-extent VMDK phase 1: pin qemu's output
             
           </span>
         </div>
@@ -6120,34 +6120,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-dd/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    instar dd subcommand
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../PLAN-bitmap/" class="md-nav__link">
         
   
@@ -6324,6 +6296,34 @@
     
   
     Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-multi-extent-vmdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-extent VMDK output
   
 
     
@@ -15906,10 +15906,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-complete-8a-1ddb0c5-8b-46f8a71" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Complete (8a 1ddb0c5, 8b 46f8a71)
+        Status: Complete
       
     </span>
   </a>
@@ -15917,10 +15917,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
+  <a href="#planning-effort" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt
+        Planning effort
       
     </span>
   </a>
@@ -15928,10 +15928,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mission" class="md-nav__link">
+  <a href="#decisions-already-taken-by-the-operator" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mission
+        Decisions already taken by the operator
       
     </span>
   </a>
@@ -15939,74 +15939,35 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#design" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Design
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Design">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-is-fuzzable-today-and-the-one-gap" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What is fuzzable today, and the one gap
+        Scope
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#extraction-srccratesdd" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#what-the-survey-found" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Extraction: src/crates/dd/
+        What the survey found
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#scope-note-fuzz_dd_operands-is-intentionally-not-added" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Scope note: fuzz_dd_operands is intentionally NOT added
+        Decisions
       
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-three-targets" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The three targets
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#registration-ci" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Registration + CI
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -16022,10 +15983,60 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#verification" class="md-nav__link">
+  <a href="#sweep-results" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Verification
+        Sweep results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sweep results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-new-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The new cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-extent-ceiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The extent ceiling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-pre-existing-file-where-an-extent-goes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A pre-existing file where an extent goes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and mitigations
       
     </span>
   </a>
@@ -16033,10 +16044,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#hand-off" class="md-nav__link">
+  <a href="#definition-of-done" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Hand-off
+        Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution notes
       
     </span>
   </a>
@@ -16064,134 +16097,202 @@
   
 
 
-<h1 id="plan-dd-phase-08-coverage-guided-fuzzing">PLAN-dd phase 08: Coverage-guided fuzzing<a class="headerlink" href="#plan-dd-phase-08-coverage-guided-fuzzing" title="Permanent link">&para;</a></h1>
-<p>Master plan: <a href="/components/instar/plans/PLAN-dd/">PLAN-dd.md</a>
-Previous phase: <a href="/components/instar/plans/PLAN-dd-phase-07-baselines/">PLAN-dd-phase-07-baselines.md</a></p>
-<h2 id="status-complete-8a-1ddb0c5-8b-46f8a71">Status: Complete (8a 1ddb0c5, 8b 46f8a71)<a class="headerlink" href="#status-complete-8a-1ddb0c5-8b-46f8a71" title="Permanent link">&para;</a></h2>
-<blockquote>
-<p><strong>Outcome.</strong> 8a: extracted <code>compute_dd_window</code> + <code>DdWindow</code> into a
-new <code>no_std</code> <code>crates/dd</code> library crate (8 tests moved, run_dd
-rewired). 8b: added <code>fuzz_dd_window</code>, <code>fuzz_chs_rounded_size</code>,
-<code>fuzz_dd_read</code> (read primitives via mock CallTable); registered in
-<code>src/fuzz/Cargo.toml</code> + the <code>coverage-fuzz.yml</code> target list (count
-reconciled to the real 26 targets). <code>make fuzz-build</code> compiles
-all; each smoke-ran 30s with no crash (~40M runs for the math
-targets). The fuzz oracle is live — three over-strong first-draft
-invariants crashed and were corrected (CHS 127.5 GiB ceiling cap;
-<code>compute_vhd_geometry</code> floors so exact round-trip isn't universal;
-zero-length reads out of domain) — all inherent behaviour, no code
-bugs. <code>fuzz_dd_operands</code> intentionally omitted (CLI parsing isn't
-fuzzed for any command).</p>
-</blockquote>
-<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this
-document, explore the instar codebase thoroughly. Read relevant
-source files, understand existing patterns (VMM structure, guest
-operation layout, shared crate conventions, call table ABI,
-format parsing, test infrastructure), and ground your answers in
-what the code actually does today. Do not speculate about the
-codebase when you could read it instead. Flag any uncertainty
-explicitly rather than guessing.</p>
-<h2 id="mission">Mission<a class="headerlink" href="#mission" title="Permanent link">&para;</a></h2>
-<p>Add coverage-guided (libFuzzer / cargo-fuzz) targets for the
-dd-specific pure logic, following the <strong>established pattern</strong>: each
-command's pure planner/format logic lives in a <code>src/crates/&lt;cmd&gt;/</code>
-library crate and is fuzzed from <code>src/fuzz/</code> (e.g.
-<code>fuzz_resize_planners</code> → <code>crates/resize</code>, <code>fuzz_create_emitters</code> →
-<code>crates/create</code>). The fuzz crate (<code>src/fuzz</code>, <code>instar-fuzz</code>) depends
-on the <strong>library</strong> crates, not the <code>vmm</code> binary.</p>
-<h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">&para;</a></h2>
-<h3 id="what-is-fuzzable-today-and-the-one-gap">What is fuzzable today, and the one gap<a class="headerlink" href="#what-is-fuzzable-today-and-the-one-gap" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong><code>vhd::chs_rounded_size</code></strong> — already in the <code>vhd</code> library crate
-  (a fuzz dep). Directly fuzzable. Branchy CHS arithmetic (the
-  highest-value new dd target).</li>
-<li><strong><code>qcow2::read_raw_sectors</code> / <code>read_cluster_sectors</code></strong> — already
-  in the <code>qcow2</code> library crate. Fuzzable with a mock <code>CallTable</code>
-  (the phase-5 unit tests built exactly such a mock). Byte-range
-  math worth fuzzing for OOB/panic.</li>
-<li><strong><code>compute_dd_window</code></strong> — the dd window math, currently in the
-  <code>vmm</code> <strong>binary</strong> (<code>run_dd</code>'s neighbourhood), so the fuzz crate
-  <strong>cannot reach it</strong>. This is the gap: dd's pure planner-equivalent
-  lives in the binary instead of a crate, unlike every other
-  command. Phase 8 fixes that by extracting it to a library crate.</li>
-</ul>
-<h3 id="extraction-srccratesdd">Extraction: <code>src/crates/dd/</code><a class="headerlink" href="#extraction-srccratesdd" title="Permanent link">&para;</a></h3>
-<p>Create a new <code>src/crates/dd/</code> library crate (mirroring
-<code>crates/create|resize|amend</code>) and move <code>compute_dd_window</code> + the
-<code>DdWindow</code> struct into it. <code>run_dd</code> in <code>vmm</code> imports
-<code>dd::compute_dd_window</code>; the phase-5 window unit tests move to (or
-are added in) the <code>dd</code> crate. Register <code>crates/dd</code> in the
-<code>[workspace] members</code> of <code>src/Cargo.toml</code> and add it as a
-<code>src/fuzz/Cargo.toml</code> dependency. This is a small, low-risk
-extraction (one pure fn + one struct, no I/O, no <code>parse_qemu_img_size</code>
-dependency — see scope note).</p>
-<h3 id="scope-note-fuzz_dd_operands-is-intentionally-not-added">Scope note: <code>fuzz_dd_operands</code> is intentionally NOT added<a class="headerlink" href="#scope-note-fuzz_dd_operands-is-intentionally-not-added" title="Permanent link">&para;</a></h3>
-<p>The master plan sketched <code>fuzz_dd_operands</code> (over <code>parse_dd_operands</code>)
-alongside <code>fuzz_dd_window</code>. Dropping it, with justification:
-- <code>parse_dd_operands</code> is <strong>CLI operand parsing</strong>. No instar command
-  fuzzes its host-side CLI parser — the fuzz targets cover format /
-  planner logic in crates, not clap/argument parsing. Fuzzing dd's
-  parser would be inconsistent.
-- It depends on <code>parse_qemu_img_size</code> (also in the <code>vmm</code> binary,
-  shared with resize/create arg parsing). Fuzzing it would force
-  relocating that parser to a library crate — a wider refactor for
-  low value.
-- <code>parse_dd_operands</code> is already covered by the phase-5
-  <code>dd_operand_tests</code> (rejection/clamp/suffix cases).
-<code>compute_dd_window</code> (the <em>planner-equivalent</em> — the dd analog of
-the resize planners) IS fuzzed, matching how sibling planners are
-fuzzed. If the operator wants full master-plan fidelity, the
-<code>fuzz_dd_operands</code> target + the <code>parse_qemu_img_size</code>→<code>shared</code> move
-can be added as a follow-up; flag it rather than silently skip.</p>
-<h3 id="the-three-targets">The three targets<a class="headerlink" href="#the-three-targets" title="Permanent link">&para;</a></h3>
+<h1 id="multi-extent-vmdk-phase-1-pin-qemus-output">Multi-extent VMDK phase 1: pin qemu's output<a class="headerlink" href="#multi-extent-vmdk-phase-1-pin-qemus-output" title="Permanent link">&para;</a></h1>
+<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
+<p>Master plan: <code>PLAN-multi-extent-vmdk.md</code>.</p>
+<h2 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h2>
+<p>High. Everything later in the plan rests on these measurements, and
+this repository has a history of sub-agents asserting plausible but
+wrong qemu-img capabilities. Review effort: high for steps 1a and 1c,
+which touch a pin that gates CI across 80 qemu builds.</p>
+<h2 id="decisions-already-taken-by-the-operator">Decisions already taken by the operator<a class="headerlink" href="#decisions-already-taken-by-the-operator" title="Permanent link">&para;</a></h2>
+<p>From the master plan, resolved 2026-11-16:</p>
 <ol>
-<li><strong><code>fuzz_dd_window</code></strong> (over <code>dd::compute_dd_window</code>). Decode the
-   fuzzer bytes into <code>(virtual_size, bs, count_opt, skip)</code> (e.g. a
-   fixed-size header → four u64s + a flag for <code>count</code> present).
-   Call <code>compute_dd_window</code>. Assert (panic is libFuzzer's oracle;
-   add cheap invariant asserts): no panic (saturating arithmetic);
-   <code>out_vsize &lt;= end</code>; <code>end == min(virtual_size, count*bs)</code> or
-   <code>virtual_size</code> when count absent; <code>start == skip*bs</code> (saturating);
-   <code>out_vsize == end.saturating_sub(start)</code>. Guard <code>bs</code> to the
-   valid <code>1..=INT_MAX</code> range the parser enforces, OR fuzz the raw
-   inputs and accept any saturating result (document which).</li>
-<li><strong><code>fuzz_chs_rounded_size</code></strong> (over <code>vhd::chs_rounded_size</code>).
-   Decode a u64 size. Assert: no panic/overflow; <code>result &gt;= size</code>
-   for <code>size &gt; 0</code>; <code>result == 0</code> for <code>size == 0</code>; CHS
-   self-consistency <code>compute_vhd_geometry(result)</code> product × 512 ==
-   <code>result</code> <strong>except</strong> in the very-large (spt=255) region where CHS
-   cannot represent the size exactly (mirror the phase-5 unit-test
-   exclusion).</li>
-<li><strong><code>fuzz_dd_read</code></strong> (over <code>qcow2::read_raw_sectors</code> and
-   <code>read_cluster_sectors</code>). Build a mock <code>CallTable</code> serving a
-   bounded in-memory device with a position-dependent pattern
-   (adapt the phase-5 unit-test mock — note fuzz targets can't use
-   <code>#[cfg(test)]</code> code, so the mock lives in the target or a shared
-   non-test helper). Decode the fuzzer bytes into
-   <code>(virtual_offset, length, sector_size, capacity)</code> within sane
-   bounds. Call the primitive into a buffer of the right size.
-   Assert: no panic/OOB; returned in-range bytes match the pattern;
-   bytes past capacity are zero. (Find an existing CallTable-using
-   fuzz target as the harness template — the <code>src/fuzz/Cargo.toml</code>
-   header distinguishes "buffer-based (no CallTable)" targets, so
-   some targets already build a CallTable.)</li>
+<li>Sequential extent rotation, not simultaneous indexed output devices.</li>
+<li>The read-side extent ceiling is fixed inside this plan, as phase 3.</li>
 </ol>
-<h3 id="registration-ci">Registration + CI<a class="headerlink" href="#registration-ci" title="Permanent link">&para;</a></h3>
+<p>Neither decision constrains this phase, which writes no instar code.
+Open questions 3 to 6 remain open; this phase's measurements are what
+settle 4 (extent path rules) and 5 (the maximum extent count), and it
+must report on them rather than decide them.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<p>In scope:</p>
 <ul>
-<li><code>src/fuzz/Cargo.toml</code>: add <code>dd = { path = "../crates/dd" }</code> to
-  deps and a <code>[[bin]]</code> entry for each new target.</li>
-<li><code>.github/workflows/coverage-fuzz.yml</code>: the target list is
-  <strong>hardcoded</strong> (the explicit list around line 209+, and a "default
-  22" count comment). Add the three new target names to that list
-  and bump the count (22 → 25). Check <code>differential-fuzz.yml</code> and
-  <code>fuzz-autofix.yml</code> for any similar hardcoded enumerations and
-  update consistently.</li>
-<li>No committed seed corpus is required for the targets to run;
-  nightly corpus accrual lands in the testdata repo (out of scope
-  to seed here — note it).</li>
+<li>Extending the existing qemu-img pin infrastructure to cover
+  <code>twoGbMaxExtentSparse</code> and <code>twoGbMaxExtentFlat</code> create, across all 80
+  static builds in <code>instar-testdata/qemu-img-binaries/x86_64/</code>.</li>
+<li>A VMDK structural parser for tests and, later, the differential
+  fuzzer, in the shape of <code>tests/helpers/vhdx_structure.py</code>.</li>
+<li>Making the pinned descriptor able to prove an extent <em>naming scheme</em>
+  and <em>ordering</em>, which today it cannot (see the survey).</li>
+<li>Measuring, and recording in this plan: per-extent sector counts for
+  sizes that are and are not multiples of 2 GiB, the <code>ddb.*</code> values and
+  how geometry is derived, qemu's behaviour when a target extent file
+  already exists, and the maximum extent count with the refusal past
+  it.</li>
 </ul>
+<p>Out of scope:</p>
+<ul>
+<li>Any change under <code>src/</code>. This phase writes no instar behaviour; its
+  deliverable is an oracle. <code>git diff --name-only origin/develop...HEAD
+  -- src/</code> must be empty at the end of it.</li>
+<li>Deciding the extent path rules or the maximum instar will support.
+  Those are open questions 4 and 5, and the operator resolves them with
+  this phase's measurements in hand.</li>
+<li>Reading <code>twoGbMaxExtent*</code> images, which is phase 3, and the structural
+  <em>comparison arm</em> of the differential fuzzer, which is phase 16. This
+  phase builds the parser those depend on and no more.</li>
+<li>Retrofitting <code>ddb.*</code> onto instar's existing VMDK output (open
+  question 3).</li>
+</ul>
+<h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
+<p>The master plan's phase 1 intent is <strong>stale in one load-bearing way</strong>:
+it reads as though a cross-version sweep must be established, and
+describes the per-version builds as the thing to use. All of that
+already exists. <code>PLAN-bat-population-phase-01-pin.md</code> built it, and
+this phase extends it rather than starting one. Corrected at source in
+the master plan and in <code>docs/plans/index.md</code> as part of the planning
+commit; a later step should not redo that.</p>
+<p>What exists today, verified present:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Lines</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tests/helpers/qemu_pins.py</code></td>
+<td>817</td>
+<td><code>CASES</code>, <code>run_case</code>, <code>load_pin</code>, <code>expected</code>, the normalisers</td>
+</tr>
+<tr>
+<td><code>tools/sweep-qemu-create.py</code></td>
+<td>183</td>
+<td>the sweep: <code>--write</code>/<code>--check</code>, <code>--versions</code>, <code>--cases</code>, <code>--scratch</code>, <code>--jobs</code></td>
+</tr>
+<tr>
+<td><code>tests/golden/qemu-create-pins.json</code></td>
+<td>1712</td>
+<td>the pin, shaped <code>{versions: [...], cases: {name: [{result, versions}, ...]}}</code></td>
+</tr>
+<tr>
+<td><code>tests/test_qemu_create_pins.py</code></td>
+<td>119</td>
+<td>the CI check</td>
+</tr>
+<tr>
+<td><code>tests/helpers/vhdx_structure.py</code></td>
+<td>714</td>
+<td>the VHDX structural parser, the model for this phase's VMDK one</td>
+</tr>
+</tbody>
+</table>
+<p><code>instar-testdata/qemu-img-binaries/x86_64/</code> holds 80 builds, 6.0.0
+through 10.2.0, as the master plan said. There is a <code>KIND_VMDK_FLAT</code>
+case kind already (<code>qemu_pins.py:51</code>, cases at <code>:197</code> and <code>:200</code>) which
+captures a normalised descriptor and one extent length.</p>
+<p><strong>The gap that matters.</strong> <code>normalise_descriptor</code> (<code>qemu_pins.py:504-511</code>)
+replaces every extent filename with a single placeholder. Run against
+the 3-extent descriptor measured for the master plan:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>CID=$CID
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>RW 4194304 SPARSE "$EXTENT"
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>RW 4194304 SPARSE "$EXTENT"
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>RW 2097152 SPARSE "$EXTENT"
+</code></pre></div>
+<p>The sector split survives, which is most of what matters, but the names
+do not. A pin built on this normaliser cannot tell <code>-s001.vmdk</code> from
+<code>-001.vmdk</code>, cannot catch extents emitted in the wrong order, and
+cannot catch a descriptor pointing at the wrong file. Since proving the
+naming scheme is a stated goal of this phase, the placeholder has to
+carry an index. Decision 1 takes that up.</p>
+<p><strong>The second gap.</strong> <code>_run_vmdk_flat</code> (<code>:513-522</code>) measures exactly one
+extent, through <code>_prealloc_measured_file({'measure': 'flat-extent'},
+image)</code>. Multi-extent needs a list of per-extent lengths, and the
+extent paths should come from parsing the descriptor rather than from
+reconstructing qemu's naming, so that a wrong name shows up as a
+missing file rather than being silently regenerated.</p>
+<p><strong>There is no VMDK structural parser.</strong> <code>tests/helpers/</code> holds
+<code>vhdx_structure.py</code> but no VMDK equivalent. <code>qemu-img info</code> cannot tell
+a correct extent split from a wrong one, which is the same reason
+<code>PLAN-bat-population-phase-01-pin.md</code> built the VHDX comparator in its
+phase 1 rather than later. Step 1b builds it here for the same reason.</p>
+<p><strong>Measurements already in hand</strong>, taken 2026-11-16 against the host
+qemu-img 10.0.13 (Debian <code>1:10.0.13+ds-0+deb13u1</code>) and recorded in the
+master plan's Situation: both subformats create successfully; naming is
+<code>&lt;stem&gt;-s%03d.vmdk</code> and <code>&lt;stem&gt;-f%03d.vmdk</code>; a 5 GiB image splits
+4194304 / 4194304 / 2097152 sectors; flat extents are the full 2 GiB in
+length but sparse on disk; 40 GiB yields 20 extents; and qemu writes a
+<code>ddb.*</code> block that instar emits for no subformat. The existing pin
+confirms the <code>ddb.*</code> block is captured for <code>vmdk-flat-64M</code>, so the
+machinery already records it. Nothing in the survey contradicted the
+master plan's Situation.</p>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>The extent placeholder becomes index-aware, and the existing pin
+   is migrated textually rather than re-swept.</strong> <code>normalise_descriptor</code>
+   numbers placeholders from 1 in descriptor order (<code>$EXTENT1</code>,
+   <code>$EXTENT2</code>, ...). Every existing pinned descriptor has exactly one
+   extent line, so the migration is a deterministic replacement of
+   <code>"$EXTENT"</code> with <code>"$EXTENT1"</code> in <code>tests/golden/qemu-create-pins.json</code>,
+   and step 1a proves it by re-running <code>--check</code> over a three-version
+   sample rather than re-running 80 builds for a rename.</li>
+</ol>
+<p><em>This is the decision most likely to be argued with.</em> The
+   alternative is a second normaliser used only by the new case kind,
+   which touches no existing pin and carries no migration risk at all.
+   It is rejected because two normalisers for one concept drift: the
+   next person to fix a descriptor-normalisation bug fixes one of them.
+   The migration is mechanical, the sampled <code>--check</code> catches it if it
+   is not, and a wrong migration fails CI loudly rather than silently
+   weakening an oracle. If review disagrees, the second normaliser is a
+   clean fallback and nothing downstream changes.</p>
+<ol>
+<li><strong>Pin cases stay small; the extent ceiling is measured once and
+   recorded in this plan, not in the pin.</strong> The pin runs in CI, and
+   creating hundreds of files per case per version across 80 builds is
+   not affordable. Pinned cases are capped at 11 extents (21 GiB,
+   which is also past the 15-extent read ceiling phase 3 removes, so
+   phase 3 has a pinned case to prove itself against). The ceiling is
+   probed once on a four-version sample (6.0.0, 7.2.0, 8.2.0, 10.2.0)
+   and written into <em>Sweep results</em>.</li>
+</ol>
+<p>This decision was written expecting the <code>%03d</code> naming to imply a
+   ceiling near 999 extents, and the probe to find qemu refusing past
+   it. It does not: <code>%03d</code> is a minimum field width, 1000 extents are
+   named <code>-s1000.vmdk</code> and created without complaint, and 16384 work
+   too. The conclusion stands and the reason changes -- a large case
+   is kept out of the pin because it costs thousands of files per
+   version, not because it would pin a boundary.</p>
+<ol>
+<li>
+<p><strong>Extent paths come from the descriptor, not from qemu's naming
+   rule.</strong> The new runner parses extent filenames out of the descriptor
+   <em>before</em> normalising it, then stats each. A wrong or missing extent
+   then surfaces as a <code>null</code> length rather than being papered over.</p>
+</li>
+<li>
+<p><strong>The VMDK structural parser covers what the fuzzer will need, and
+   stops there.</strong> Descriptor fields (version, CID presence, parentCID,
+   createType), per-extent kind, declared sector count, actual file
+   length, and for sparse extents the VMDK4 header fields that define
+   layout: magic, version, flags, capacity, grain size, descriptor
+   offset and size, GD and RGD offsets, overhead. Grain <em>contents</em> are
+   not parsed; phase 16 compares structure, and content parity is
+   already covered by flattening both sides to raw.</p>
+</li>
+<li>
+<p><strong>Flat cases are safe to pin at these sizes.</strong> A 2 GiB flat extent
+   is sparse on disk (measured: a 5 GiB flat image occupies 4 KiB), so
+   an 11-extent flat case costs kilobytes, not 22 GiB. The runner still
+   deletes each image after measuring, as <code>run_case</code> already does.</p>
+</li>
+</ol>
 <h2 id="steps">Steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
+<p>One commit per step, each passing <code>pre-commit run --all-files</code> after
+<code>git add</code> (the gate cannot see untracked files).</p>
 <table>
 <thead>
 <tr>
@@ -16204,55 +16305,382 @@ can be added as a follow-up; flag it rather than silently skip.</p>
 </thead>
 <tbody>
 <tr>
-<td>8a</td>
-<td>high</td>
+<td>1a</td>
+<td>medium</td>
 <td>opus</td>
 <td>none</td>
-<td>Extract <code>compute_dd_window</code> + <code>DdWindow</code> from <code>src/vmm/src/main.rs</code> into a new <code>src/crates/dd/</code> library crate (Cargo.toml mirroring <code>crates/amend</code>/<code>crates/resize</code>; <code>no_std</code> is NOT required for host-only logic — check whether the fuzz-linked crates are <code>no_std</code> and match the convention, but compute_dd_window is plain <code>u64</code> math so either works). Re-export the fn + struct; update <code>run_dd</code> in <code>vmm</code> to <code>use dd::{compute_dd_window, DdWindow}</code>; move the <code>compute_dd_window</code> unit tests from <code>vmm</code>'s <code>dd_operand_tests</code> into the <code>dd</code> crate (leave <code>parse_dd_operands</code> and its tests in <code>vmm</code>). Add <code>crates/dd</code> to <code>[workspace] members</code> in <code>src/Cargo.toml</code>. Verify <code>make instar</code> + <code>make test-rust</code> + <code>make lint</code> are green and the moved tests run in the <code>dd</code> crate. Do NOT touch <code>parse_dd_operands</code> / <code>parse_qemu_img_size</code>.</td>
+<td><strong>Index the extent placeholder.</strong> In <code>tests/helpers/qemu_pins.py</code>, change <code>normalise_descriptor</code> (<code>:504-511</code>) so each <code>RW &lt;sectors&gt; &lt;KIND&gt; "&lt;name&gt;"</code> line's filename is replaced by <code>$EXTENT&lt;n&gt;</code>, numbered from 1 in descriptor order, keeping the <code>CID=</code> substitution as it is. <code>EXTENT_PLACEHOLDER</code> (<code>:60</code>) becomes a prefix; keep the name or rename it, but update every use. Migrate <code>tests/golden/qemu-create-pins.json</code> in the same commit by replacing <code>"$EXTENT"</code> with <code>"$EXTENT1"</code> wherever it appears in a descriptor field — every existing pinned descriptor has exactly one extent line, so this is deterministic; confirm that with <code>grep -c</code> before and after and state both counts in the commit message. Prove the migration: <code>python3 tools/sweep-qemu-create.py --check tests/golden/qemu-create-pins.json --versions 6.0.0,8.2.0,10.2.0 --cases vmdk-flat-64M --scratch &lt;scratchpad&gt;/pin1a</code> must exit 0. Add a unit test for the normaliser with a three-extent descriptor (use the one in the phase plan's survey section) asserting the three distinct placeholders and the preserved sector counts. Do not add the new case kind here. Commit subject: <code>Number the extent placeholders in VMDK pins.</code></td>
 </tr>
 <tr>
-<td>8b</td>
+<td>1b</td>
+<td>high</td>
+<td>opus</td>
+<td>worktree</td>
+<td><strong>The VMDK structural parser.</strong> Write <code>tests/helpers/vmdk_structure.py</code>: stdlib only, no import from <code>tests/base.py</code> (it must be importable the way <code>scripts/differential-fuzz.py:41-47</code> imports helpers), single quotes, 120 columns, trailing whitespace trimmed. Follow <code>tests/helpers/vhdx_structure.py</code> for API shape: <code>VmdkParseError(ValueError)</code>; <code>parse_vmdk(path) -&gt; VmdkStructure</code> (frozen dataclass); <code>summarise(structure) -&gt; dict</code>; <code>structural_diff(a, b) -&gt; list[str]</code>. Parse the descriptor (plain text, or embedded in a VMDK4 sparse file at the offset/size the header records — <code>qemu_pins.py:380-401</code> already does that read and is the reference, do not edit it): <code>version</code>, <code>parentCID</code>, <code>createType</code>, and an ordered list of extents, each <code>(access, sectors, kind, filename)</code>. For each extent file resolved relative to the descriptor's directory, record the kind, declared sectors and actual length; and for a <code>SPARSE</code> extent parse the VMDK4 header after the <code>KDMV</code> magic per decision 4 — version, flags, capacity, grain size, descriptor offset and size, GD offset, RGD offset, overhead. Bounds-check every offset and length against the file before reading, and read with <code>seek</code>/<code>read</code>, never whole-file. <code>structural_diff</code> names the differing field and the extent index. Tests in a new <code>tests/test_vmdk_structure.py</code> (an <code>InstarTestBase</code> subclass using <code>_require_qemu_img</code>, <code>tests/base.py:473</code>, and <code>skip_unless_qemu_supports</code> for vmdk, <code>:456</code>): for host-qemu-written images, assert the parse of monolithicSparse 64M, monolithicFlat 64M, twoGbMaxExtentSparse 5G and twoGbMaxExtentFlat 5G; that the 5G cases have 3 extents with 4194304/4194304/2097152 declared sectors; that <code>structural_diff</code> is empty between two images made by the same command and names <code>createType</code> between sparse and flat; and that a truncated file, a bad <code>KDMV</code> magic, an extent line pointing at a missing file, and a descriptor with no extent lines each raise <code>VmdkParseError</code>. Run the module with stestr and confirm "Ran: N" matches the test count — do not trust the exit code, a &gt;4 MiB attachment can kill a worker and still exit 0. Commit subject: <code>Add a structural VMDK parser for tests and the fuzzer.</code></td>
+</tr>
+<tr>
+<td>1c</td>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td>Add three fuzz targets in <code>src/fuzz/fuzz_targets/</code>: <code>fuzz_dd_window.rs</code> (over <code>dd::compute_dd_window</code> — invariants per Design §1), <code>fuzz_chs_rounded_size.rs</code> (over <code>vhd::chs_rounded_size</code> — §2), <code>fuzz_dd_read.rs</code> (over <code>qcow2::read_raw_sectors</code>/<code>read_cluster_sectors</code> via a mock <code>CallTable</code> — §3; study an existing CallTable-using target and the phase-5 mock). Add <code>dd = { path = "../crates/dd" }</code> to <code>src/fuzz/Cargo.toml</code> deps + a <code>[[bin]]</code> block per target. Register the three names in <code>.github/workflows/coverage-fuzz.yml</code>'s hardcoded list and bump the count; check/adjust <code>differential-fuzz.yml</code> + <code>fuzz-autofix.yml</code> if they enumerate targets. SMOKE-RUN each target briefly inside the fuzz toolchain (e.g. <code>cargo +nightly fuzz run &lt;target&gt; -- -runs=100000 -max_total_time=30</code> or the project's documented invocation — read AGENTS.md / the workflow for how fuzzing is run, likely in a container) to confirm it builds and finds no immediate crash; report the run output. If a target crashes, that's a real finding — minimise and report, do not weaken the invariant.</td>
+<td><strong>The multi-extent case kind and its cases.</strong> In <code>tests/helpers/qemu_pins.py</code> add <code>KIND_VMDK_MULTI = 'vmdk-multi'</code> beside the existing kinds (<code>:51</code>), a <code>_run_vmdk_multi</code> runner registered in <code>RUNNERS</code> (<code>:526-531</code>), and the cases. The runner creates the image, and on rc 0 records: <code>rc</code>; normalised <code>stderr</code>; the normalised <code>descriptor</code> (now index-aware, from 1a); <code>extent_lengths</code>, a list of actual file lengths in descriptor order, with extent paths parsed out of the descriptor <strong>before</strong> normalisation per decision 3 and resolved relative to the image directory, <code>null</code> for any that does not exist; <code>extent_names</code>, the basenames with the image stem replaced by <code>$STEM</code>, so the naming scheme is pinned without pinning the scratch path; and for sparse, <code>summarise()</code> from <code>helpers.vmdk_structure</code> per extent. Cases, each both subformats unless noted: 2 GiB exactly (1 extent, the boundary), 2 GiB + 1 MiB (2 extents, tiny second), 5 GiB (3 extents, partial last — the measured 4194304/4194304/2097152 case), 4 GiB (2 extents, exact multiple), 21 GiB (11 extents, decision 2's cap, which is also past phase 3's 15-extent read ceiling), 1 MiB (1 extent, far below the split), and a case creating into a directory where <code>&lt;stem&gt;-s002.vmdk</code> already exists (sparse only), whatever qemu does with it. Do not add a 999-extent case; decision 2 keeps the ceiling out of the pin. Smoke-test with <code>--versions 6.0.0,10.2.0 --write &lt;scratchpad&gt;/pin.json</code> -- <code>--cases</code> cannot be combined with <code>--write</code>, which always writes every case, so narrow by version and write to the scratchpad -- and confirm the 5 GiB sparse case reports the three sector counts above; <strong>do not commit a pin in this step</strong>. Commit subject: <code>Add multi-extent VMDK cases to the qemu sweep.</code></td>
+</tr>
+<tr>
+<td>1d</td>
+<td>medium</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Run the full sweep and commit the pin.</strong> Run <code>python3 tools/sweep-qemu-create.py --write tests/golden/qemu-create-pins.json --scratch &lt;scratchpad&gt;/sweep</code> over all 80 versions, host qemu-img excluded. This rewrites the whole pin, so confirm first that <code>--check</code> passes on the unmodified pin for a three-version sample, and afterwards that the only changed cases are the new ones plus 1a's placeholder migration — <code>git diff</code> the pin and say so in the commit message. Host load has made qemu commands fail spuriously in this repository before: before attributing any version boundary, re-run that case alone on the versions either side with <code>--check</code> and confirm it reproduces. Then probe decision 2's ceiling on 6.0.0, 7.2.0, 8.2.0 and 10.2.0 only: find the largest size that creates and the refusal past it, for both subformats, and record the exact stderr. Add a <em>Sweep results</em> section to this plan: the command, the date, wall time, the <code>instar-testdata</code> commit, a table of new cases with group count and any boundary, the ceiling probe, and what qemu did with a pre-existing extent. Any result contradicting the master plan's Situation is reported to the management session <strong>before</strong> anything depends on it. Commit subject: <code>Pin qemu-img multi-extent VMDK output.</code></td>
+</tr>
+<tr>
+<td>1e</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>CI check of the new cases.</strong> Extend <code>tests/test_qemu_create_pins.py</code> (119 lines; follow its existing discovery of <code>self._testdata_root / 'qemu-img-binaries' / 'x86_64'</code> and its skip when absent) so the new cases are checked the way the existing ones are: every version directory present is listed in the pin; for 6.0.0, 6.2.0, 8.2.0 and 10.2.0 when present, each new case's <code>run_case</code> result equals <code>expected(case, version)</code>, one subTest per (version, case), reporting <code>structural_diff</code> output on failure; and the host <code>qemu-img</code> is compared against the group of the newest pinned version at or below its own, calling <code>skip_unless_qemu_supports</code> for vmdk first. If a new case turns out to have exactly one group across all 80 builds, assert that too, so a boundary appearing later is a failure until a phase handles it. Run <code>tools/ci/check-test-partition.sh</code> and confirm the module is still claimed, then run it with stestr and check "Ran: N" and 0 failures. Add <code>tests/stestr-timing.txt</code> lines only if the module exceeds 30 s, sorted by id, per <code>docs/testing.md</code>. Commit subject: <code>Check the multi-extent VMDK pins in CI.</code></td>
+</tr>
+<tr>
+<td>1f</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Close the phase.</strong> Fold this phase's findings back into the master plan: if step 1d found a boundary or a result contradicting <code>PLAN-multi-extent-vmdk.md</code>'s Situation, correct the Situation at source and say so in the commit; if it found none, add one sentence saying the 80-build sweep confirmed it, naming the pin file. Record the ceiling probe's answer against open question 5 and the pre-existing-extent behaviour against open question 4, as measurements, <strong>without resolving either question</strong> — those are the operator's. Confirm <code>git diff --name-only origin/develop...HEAD -- src/</code> is empty, and that <code>git diff origin/develop...HEAD -- tests tools docs/ \| grep -nE 'PLAN-\|[Pp]hase [0-9]\|step 1[a-f]'</code> prints nothing: no plan, phase or step references in landed code or docs. Do not change the Execution table's status; the next phase's first commit closes this one out. Commit subject: <code>Record the multi-extent sweep in the plan.</code></td>
 </tr>
 </tbody>
 </table>
-<p>Per the master plan / <code>PLAN-TEMPLATE.md</code>, sub-agents implement and
-the management session reviews before committing. Suggested
-commits: 8a the <code>crates/dd</code> extraction, 8b the fuzz targets + CI
-registration. The extraction (8a) must land green before 8b builds
-on it.</p>
-<h2 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">&para;</a></h2>
-<ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>crates/dd</code> builds, is in the workspace, and <code>run_dd</code> uses it;
-      <code>make instar</code> / <code>make test-rust</code> / <code>make lint</code> green; the
-      moved <code>compute_dd_window</code> tests run in the <code>dd</code> crate.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>cargo fuzz build</code> succeeds with the three new targets; each
-      smoke-runs without an immediate crash.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Invariant asserts are real (a deliberately-wrong invariant
-      would fail the smoke run) — not just <code>let _ = f(x)</code>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The three targets are registered in
-      <code>coverage-fuzz.yml</code> (and any other enumerating workflow) and
-      the count is updated.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>make check-binary-sizes</code> unaffected (fuzz + dd crate are not
-      guest binaries; confirm <code>crates/dd</code> isn't pulled into a guest
-      op that would bloat it).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> passes.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Commit messages follow conventions (model/context/effort).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>fuzz_dd_operands</code> deliberately omitted (scope note) — recorded
-      in the commit message / Future work, not silently dropped.</li>
+<h2 id="sweep-results">Sweep results<a class="headerlink" href="#sweep-results" title="Permanent link">&para;</a></h2>
+<p>Run on 2026-11-17, starting 05:27 +11:00, against instar-testdata
+<code>f73d4367</code> (<code>f73d43670af5e6ba75e4b135bc807d3e33bbd50d</code>), all 80 static
+builds from 6.0.0 to 10.2.0, the host <code>qemu-img</code> excluded:</p>
+<div class="highlight"><pre><span></span><code>python3 tools/sweep-qemu-create.py \
+    --write tests/golden/qemu-create-pins.json \
+    --scratch &lt;scratchpad&gt;/sweep
+</code></pre></div>
+<p>Wall time 694 s (11 m 35 s) at the default <code>--jobs 1</code>. The pin lists
+exactly the 80 version directories in <code>qemu-img-binaries/x86_64</code>.</p>
+<p>Review round 1 re-swept it on the same builds, for the flat
+pre-existing-extent case it adds and for the extent filenames it
+normalises inside a <code>structure</code> block. That run changed one field of
+the seven sparse multi-extent cases and added one case, leaving every
+other case byte for byte as the first sweep recorded it. The pin now
+holds 49 cases and is 152498 bytes.</p>
+<p>Before the sweep, <code>--check --versions 6.0.0,8.2.0,10.2.0 --cases
+vmdk-flat-64M</code> exited 0 against the unmodified pin. Afterwards the pin
+is a pure insertion: 1478 added lines, no deleted ones, the 13 new
+cases added and no pre-existing case's recorded result changed (<code>rc</code>,
+<code>stderr</code> and every measured field of all 35 existing cases compare
+equal to <code>HEAD</code>'s copy, and the version list is identical).</p>
+<h3 id="the-new-cases">The new cases<a class="headerlink" href="#the-new-cases" title="Permanent link">&para;</a></h3>
+<p>Every new case has exactly two groups, 6.0.0..6.1.1 and 6.2.0..10.2.0,
+and in every one of them the only differing field is <code>descriptor</code>,
+which gains the single line <code>ddb.toolsVersion = "2147483647"</code> from
+6.2.0. <code>rc</code>, <code>stderr</code>, <code>extent_names</code>, <code>extent_lengths</code>, the sparse
+<code>structure</code> and (where present) <code>existing_kept_lengths</code> are identical
+across all 80 builds. This is the same boundary <code>vmdk-flat-64M</code>
+already has, so no new one appeared.</p>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Extents</th>
+<th>Groups</th>
+<th>Boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vmdk-multi-sparse-1M</code></td>
+<td>1</td>
+<td>2</td>
+<td>6.1.1 / 6.2.0, <code>descriptor</code> only</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-flat-1M</code></td>
+<td>1</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-sparse-2G</code></td>
+<td>1</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-flat-2G</code></td>
+<td>1</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-sparse-2049M</code></td>
+<td>2</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-flat-2049M</code></td>
+<td>2</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-sparse-4G</code></td>
+<td>2</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-flat-4G</code></td>
+<td>2</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-sparse-5G</code></td>
+<td>3</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-flat-5G</code></td>
+<td>3</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-sparse-21G</code></td>
+<td>11</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-flat-21G</code></td>
+<td>11</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-sparse-5G-existing-extent</code></td>
+<td>3</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>vmdk-multi-flat-5G-existing-extent</code></td>
+<td>3</td>
+<td>2</td>
+<td>as above</td>
+</tr>
+</tbody>
+</table>
+<p>The boundary was replayed on its own, all 13 cases against
+<code>--versions 6.1.0,6.1.1,6.2.0 --check</code>, and matched the pin, so it is
+qemu's and not host load.</p>
+<p>The 5 GiB sparse case records the expected split, <code>RW 4194304 SPARSE
+"$EXTENT1"</code>, <code>RW 4194304 SPARSE "$EXTENT2"</code>, <code>RW 2097152 SPARSE
+"$EXTENT3"</code>, with names <code>$STEM-s001.vmdk</code>, <code>$STEM-s002.vmdk</code>,
+<code>$STEM-s003.vmdk</code> and file lengths 327680, 327680 and 196608. Its flat
+twin names <code>$STEM-f00{1,2,3}.vmdk</code> with lengths 2147483648, 2147483648
+and 1073741824: a flat extent is its full declared length, a sparse one
+is a header plus directories only. 2 GiB exactly is one extent, not two.</p>
+<h3 id="the-extent-ceiling">The extent ceiling<a class="headerlink" href="#the-extent-ceiling" title="Permanent link">&para;</a></h3>
+<p>Probed on 6.0.0, 7.2.0, 8.2.0 and 10.2.0, both subformats.</p>
+<p><strong>There is no extent-count ceiling to find.</strong> <code>%03d</code> is a minimum field
+width, not a cap: past 999 the names simply grow a digit. At 2000 GiB
+every one of the four builds writes 1000 extents, rc 0, empty stderr,
+and the thousandth descriptor line is verbatim</p>
+<div class="highlight"><pre><span></span><code>RW 4194304 SPARSE "image-s1000.vmdk"
+</code></pre></div>
+<p>on 6.0.0 and on 10.2.0 alike. At 32 TiB all four builds write 16384
+extents, rc 0, empty stderr, 16384 <code>RW</code> lines in the descriptor, in
+12-14 s each. At 1 PiB 10.2.0 does not refuse either: it was still
+creating extents when a 60 s timeout stopped it, 70168 of the 524288
+the size implies.</p>
+<p>The only refusal past it is <code>qemu-img</code>'s generic size parser, not the
+vmdk driver, and it is identical on all four builds and both
+subformats:</p>
+<div class="highlight"><pre><span></span><code>qemu-img: Invalid image size specified. Must be between 0 and 9223372036854775807.
+</code></pre></div>
+<p>So the practical limit on a split VMDK is the filesystem's inodes and
+the operator's patience, not qemu. That is a measurement for open
+question 5, which this phase does not resolve.</p>
+<h3 id="a-pre-existing-file-where-an-extent-goes">A pre-existing file where an extent goes<a class="headerlink" href="#a-pre-existing-file-where-an-extent-goes" title="Permanent link">&para;</a></h3>
+<p>Two cases, one per subformat, drop a 1 MiB file where the second extent
+goes -- <code>image-s002.vmdk</code> and <code>image-f002.vmdk</code> -- with a second hard
+link to it under a name no extent uses, then create a 5 GiB image over
+it. Both writers are measured rather than one inferred from the other,
+because the flat writer extends each extent to its full declared length
+where the sparse one writes a header.</p>
+<p><strong>It is not a refusal.</strong> On all 80 builds qemu returns rc 0 with empty
+stderr and writes the image exactly as it does without the obstruction:
+the same three extents, the same names, the same lengths 327680 /
+327680 / 196608. The kept link reports the length of the extent and
+not of the 1 MiB file it used to name -- 327680 bytes for the sparse
+case, 2147483648 for the flat one -- so qemu <strong>truncated the existing
+file in place</strong> rather than unlinking it and creating its own. Any
+other hard link, and any open descriptor, follows the image.</p>
+<p>The two subformats differ only in direction. <code>ftruncate</code> is what sets
+an extent's length either way, so the sparse case shrinks the 1 MiB
+file to 320 KiB and the flat case grows it to 2 GiB. Neither reports
+anything, and neither leaves the original contents reachable under the
+old name.</p>
+<p>This is a measurement for open question 4 -- what instar should do
+with a file already sitting where an extent goes -- which this phase
+records and does not resolve. What qemu does is not by itself what
+instar should do.</p>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1a's pin migration silently corrupts an existing oracle</td>
+<td>The migration is a single deterministic substitution with before/after <code>grep -c</code> counts in the commit message, and a sampled <code>--check</code> across three versions must pass. If review prefers zero risk, decision 1's fallback is a second normaliser. The management session re-runs the <code>--check</code> itself rather than trusting the report.</td>
+</tr>
+<tr>
+<td>The sweep's spurious failures get attributed as version boundaries</td>
+<td>Known failure mode in this repository under host load. Step 1d re-runs any boundary case alone on the versions either side before recording it, and reports rather than writes when a result contradicts the master plan.</td>
+</tr>
+<tr>
+<td>80 versions × new cases is slow enough to tempt shortcuts</td>
+<td>Decision 2 caps pinned cases at 11 extents and keeps the ceiling probe to a four-version sample. <code>--jobs</code> exists but concurrency is what causes the spurious failures above, so step 1d runs at the default of 1 and the wall time goes in <em>Sweep results</em>.</td>
+</tr>
+<tr>
+<td>A green stestr run that ran almost nothing</td>
+<td>Every step that runs tests checks "Ran: N" against the expected count rather than the exit code. A subunit attachment over 4 MiB kills a worker and the run still exits 0.</td>
+</tr>
+<tr>
+<td>The parser in 1b is written against one qemu version's layout</td>
+<td>1b asserts against host-written images and 1d then exercises it across 80 builds through the sparse cases; a layout difference shows up as a pin group rather than as a silent misparse. Only the sparse ones: a flat extent has no header to read, so every flat case pins a null <code>structure</code> and the parser's flat path is covered by <code>tests/test_vmdk_structure.py</code> against the host alone.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<p>Falsifiable; each is checkable by someone who did not do the work.</p>
+<ol>
+<li><code>normalise_descriptor</code> gives a three-extent descriptor three
+   distinct placeholders, and a unit test asserts it.</li>
+<li><code>tools/sweep-qemu-create.py --check tests/golden/qemu-create-pins.json</code>
+   exits 0 for every version present in the testdata checkout.</li>
+<li><code>tests/golden/qemu-create-pins.json</code> lists exactly the 80 version
+   directories under <code>instar-testdata/qemu-img-binaries/x86_64/</code>.</li>
+<li>For a 5 GiB <code>twoGbMaxExtentSparse</code> image the pin records extents of
+   4194304, 4194304 and 2097152 sectors, in that order, with three
+   distinct <code>$EXTENT&lt;n&gt;</code> placeholders and three <code>$STEM</code>-relative names.</li>
+<li><code>parse_vmdk</code> raises <code>VmdkParseError</code>, not an unhandled exception,
+   for each of: a truncated file, a bad <code>KDMV</code> magic, a descriptor
+   whose extent file is missing, and a descriptor with no extent lines.</li>
+<li><code>tests/test_vmdk_structure.py</code> and <code>tests/test_qemu_create_pins.py</code>
+   both run under stestr with "Ran: N" matching their test counts and
+   0 failures.</li>
+<li>This plan's <em>Sweep results</em> section reports the ceiling probe --
+   the largest extent count measured, and the verbatim stderr of the
+   only refusal found -- and what qemu does when a target extent
+   already exists. (Written expecting an extent-count ceiling; there
+   is none. See <em>Execution notes</em>.)</li>
+<li><code>git diff --name-only origin/develop...HEAD -- src/</code> is empty.</li>
+<li>No plan, phase or step reference appears in anything landed outside
+   <code>docs/plans/</code>.</li>
+<li>The master plan's stale phase 1 intent is corrected at source, and
+    <code>docs/plans/index.md</code> agrees with it.</li>
+</ol>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before step 1a, the implementing session restates: that this phase
+writes no instar code; that the sweep, pin, grouping and CI check
+already exist and are being <em>extended</em>; decision 1 and its fallback;
+and decision 2's reason for keeping the extent ceiling out of the pin.</p>
+<p><strong>Gate before step 1d.</strong> The full sweep rewrites a 1712-line pin that
+gates CI across 80 builds, and it is cheap to propose and expensive to
+redo. The management session reviews 1c's smoke-test output and agrees
+the case list before 1d runs. A case added after 1d means another full
+sweep.</p>
+<h2 id="execution-notes">Execution notes<a class="headerlink" href="#execution-notes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>2026-11-16 (AEDT), back brief. Michael chose the index-aware
+  <code>$EXTENT&lt;n&gt;</code> placeholder with a migration of the existing pin over a
+  second normaliser (decision 1), and asked for the run to stop at the
+  gate before 1d.</li>
+<li>Step 1b's planned commit subject, <code>Add a structural VMDK parser for
+  tests and the fuzzer.</code>, is 54 characters against the hook's limit of</li>
+<li>It was shortened to <code>Add a structural VMDK parser for tests.</code>,
+  with the fuzzer's claim on the parser kept in the body.</li>
+<li>The 1c row specified a smoke test that cannot be run:
+  <code>tools/sweep-qemu-create.py</code> rejects <code>--cases</code> together with
+  <code>--write</code>, because a write always writes every case. The step worked
+  around it by narrowing to two versions and writing to the
+  scratchpad, and the row has been corrected at source rather than the
+  tool changed.</li>
+<li>2026-11-17 (AEDT), the gate before 1d. The gate was proposed on the
+  assumption that the sweep was long enough that a redo would hurt.
+  Measured, 13 cases across 2 versions take 0.30 s; the full 80-build
+  run took 694 s, and all of that is the 35 pre-existing cases, the 64
+  TiB VHDX ones above all. The correction was put to Michael with the
+  gate. He signed off the case list as it stood.</li>
+<li><strong>Steps 1c and 1d landed as one commit</strong>, <code>bf9c987a</code>. Committing 1c
+  alone leaves <code>tests/test_qemu_create_pins.py</code> at 7 run, 5 failed,
+  because the cases exist and the pin does not yet hold them. Michael
+  chose to run the full sweep immediately and land the two as one
+  green unit rather than leave a red commit on the branch. 1c's and
+  1d's commit subjects are therefore replaced by one.</li>
+<li>The management session reproduced 1d's two load-bearing claims
+  rather than taking the report for them: the pin diff is a pure
+  insertion of 13 cases with no pre-existing case's result changed
+  (compared field by field against <code>HEAD</code>'s copy in Python, 1478 added
+  lines and none deleted), and <code>--check</code> over the new cases on
+  6.0.0, 6.1.1, 6.2.0, 8.2.0 and 10.2.0 replays the pin in 0.2 s,
+  across the boundary in both directions.</li>
+<li>The ceiling probe falsified the premise of decision 2 and of
+  done-item 7, both of which expected qemu to refuse past some extent
+  count. It does not: <code>%03d</code> is a minimum field width, so the names
+  grow a digit and keep going. Decision 2's conclusion is unaffected
+  -- the pin still should not carry a 1000-extent case -- but its
+  reason is now the cost of the case, not a boundary to pin.
+  Done-item 7 is corrected at source.</li>
+<li><code>pre-commit run --all-files</code> passes every hook but <code>shellcheck</code>,
+  which fails on <code>tools/ci/test-check-no-runtime-luks-create.sh:122</code>
+  with SC2016. That failure predates this branch: it is present on an
+  untouched <code>develop</code> checkout, and nothing in this phase touches the
+  file. Offered as a fix of its own; not taken up.</li>
+<li>2026-11-17 (AEDT), review round 1 on
+  <a href="https://github.com/shakenfist/instar/pull/921">#921</a>: 0 fix, 1
+  document, 8 consider, 2 none. Six of the eight <code>consider</code> items were
+  taken because each is a defect in code this branch added; two were
+  declined, in the pull request thread. The round added a
+  <code>twoGbMaxExtentFlat</code> case for a pre-existing extent file, which the
+  first sweep measured for the sparse writer only, and normalised the
+  extent filenames inside a pinned <code>structure</code> block, so both required
+  a second full 80-build sweep.</li>
+<li>2026-11-17 (AEDT), review round 2: 1 fix, 9 consider. The fix is a
+  real one in step 1b's parser, found by review rather than by this
+  phase's own tests: an embedded descriptor was read at whatever
+  length the image's own header claimed, against a module docstring
+  that promises bounded reads. Six <code>consider</code> items were taken, three
+  declined in the pull request thread, and the one worth revisiting --
+  checking an extent's declared sectors against its own header -- is
+  recorded in the master plan's Future work rather than guessed at
+  here. The mutation set is twelve, all killed.</li>
+<li>2026-11-17 (AEDT), review round 3: 1 fix, 1 document, 6 consider,
+  4 none -- and the round where the loop stopped converging, so it is
+  the last. The fix is in code round 2 added: asked to tell a refused
+  extent path from a missing one, round 2 added a string sentinel to a
+  function annotated as returning an int. Two more items are likewise
+  about code that did not exist two rounds ago. Four items were taken,
+  four declined, three of the four having been declined in an earlier
+  round already. The mutation set is thirteen; repairing it found a
+  fourteenth problem of its own, below.</li>
+<li>The carried mutation script reported a <strong>skip</strong>, not a kill, on the
+  round-2 normaliser guard: round 3 restructured the line its anchor
+  pointed at, so that guard quietly stopped being exercised while the
+  totals still looked healthy. The anchor was repaired and all
+  thirteen then killed. A mutation harness carried across rounds needs
+  its skips read as failures, which is why this one prints them
+  separately rather than folding them into the count.</li>
 </ul>
-<h2 id="hand-off">Hand-off<a class="headerlink" href="#hand-off" title="Permanent link">&para;</a></h2>
-<p>Remaining phases: 9 differential fuzzing vs <code>qemu-img dd</code> (random
-<code>bs</code>/<code>count</code>/<code>skip</code>/<code>-O</code> invocations cross-checked against the real
-binary — add <code>dd</code> to <code>scripts/differential-fuzz.py</code>; this is also
-where the <code>count=0 -O vhdx</code> limitation should be resolved or
-explicitly excluded), 10 docs (<code>docs/dd.md</code> + README/ARCHITECTURE/
-AGENTS/CHANGELOG + the <code>index.md</code> Complete flip + the deferred
-phase-7 ARCHITECTURE/CHANGELOG baseline notes). The
-[[dd-qemu-img-parity-contract]] memory records the verified rules.</p>
 
 
 
@@ -16273,7 +16701,7 @@ phase-7 ARCHITECTURE/CHANGELOG baseline notes). The
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/instar/plans/PLAN-dd-phase-08-fuzz.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/instar/plans/PLAN-dd-phase-08-fuzz.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/instar/plans/PLAN-dd-phase-08-fuzz/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/instar/plans/PLAN-multi-extent-vmdk-phase-01-pin.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/instar/plans/PLAN-multi-extent-vmdk-phase-01-pin.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/instar/plans/PLAN-multi-extent-vmdk-phase-01-pin/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

@@ -6241,34 +6241,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-dd/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    instar dd subcommand
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-bitmap/" class="md-nav__link">
         
   
@@ -6445,6 +6417,34 @@
     
   
     Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-multi-extent-vmdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-extent VMDK output
   
 
     
@@ -16679,8 +16679,8 @@ provides a modular architecture with:
  <code>scripts/differential-fuzz.py</code>'s <code>op_resize</code>. The binary
  builds at ~73 KiB / 384 KiB.
 - <strong>operations/map/**</strong> Allocation-map operation. Reads a
- <code>MapConfig</code> (sector<strong>ize, input_dev</strong>e<strong>oun</strong> start<strong>ffset,
- max_length</strong>indow) from <code>OPERATION_CONFIG_ADDR</code>, detects the
+ <code>MapConfig</code> (sector<strong>ize, input_dev</strong>e<strong>oun</strong> start_offset,
+ max_length window) from <code>OPERATION_CONFIG_ADDR</code>, detects the
  source format on input device 0, refuses sources with chain
  composition (qcow2 backing-file references, vhd differencing
  disks, and vhdx differencing in an arm of its own, since
@@ -16730,12 +16730,12 @@ provides a modular architecture with:
  suite that catches accidental fixes to known instar-vs-
  qemu-img gaps so <code>KNOWN_MAP_DIVERGENCES</code> doesn't go stale.
  Current baseline: 95 active tests + 91 documented skips.
-- <strong>operation</strong>snapshot/<strong> - Internal-snaps</strong>t operation
+- <strong>operations/snapshot/</strong> - Internal-snapshot operation
  (PLAN-snapshot, qcow2-only like <code>qemu-img snapshot</code>). Reads a
  <code>SnapshotConfig</code> (mode discriminator, argument bytes, flags,
  and for create the host-stamped <code>date_sec</code>/<code>date_nsec</code>) from
  <code>OPERATION_CONFIG_ADDR</code>, opens the image RW as input device 0,
- and dispatches on mode. MODE<strong>IST str</strong>ms one
+ and dispatches on mode. MODE_LIST streams one
  <code>SnapshotEntryRecord</code> per table entry via the qcow2 crate's
  <code>for_each_snapshot_entry</code> (no in-memory cap; one entry
  resident at a time) followed by a <code>SnapshotResult</code> terminator;
@@ -16788,24 +16788,44 @@ provides a modular architecture with:
  header-extension relocation across the version change is
  unsupported. Needs <code>/dev/kvm</code> (launches a guest VMM). See
  <a href="/components/instar/amend/">docs/amend.md</a> for the full user reference.
-- <strong>operations/dd/</strong> - Windowed block-copy operation (PLAN-dd,
- qemu-img dd compatible). Implemented host-side in <code>run_dd</code>
- (<code>src/vmm/src/main.rs</code>): parses <code>name=value</code> operands (<code>if=</code>,
- <code>of=</code>, <code>bs=</code>, <code>count=</code>, <code>skip=</code>) and the <code>-O</code> output-format flag
- (default <strong>raw</strong>, not the input format), computes the input byte
- window via <code>crates/dd::compute_dd_window</code> (count-then-skip
- semantics: <code>count</code> clamps down, <code>skip</code> subtracts from the front,
+- <strong>operations/dd/</strong> - Windowed block-copy operation (qemu-img dd
+ compatible). There is no <code>dd</code> guest binary: dd is implemented
+ host-side in <code>run_dd</code> (<code>src/vmm/src/main.rs</code>), which parses
+ <code>name=value</code> operands (<code>if=</code>, <code>of=</code>, <code>bs=</code>, <code>count=</code>, <code>skip=</code>)
+ and the <code>-O</code> output-format flag (default <strong>raw</strong>, not the input
+ format), computes the input byte window via
+ <code>crates/dd::compute_dd_window</code> (count-then-skip semantics:
+ <code>count</code> clamps down, <code>skip</code> subtracts from the front,
  skip-past-EOF ⇒ empty output with exit 0), then launches the
  existing <code>convert.bin</code> guest with a windowed <code>ConvertConfig</code>
- (input byte-window + dense output). The new <code>crates/dd</code> crate
- provides the pure window-math helper used by both the host CLI
- and tests. The structured writers (qcow2, vmdk, vhd, vhdx) were
- hardened during this phase via <code>qcow2::read_chain_virtual_range</code>
- to correctly fill output grains/blocks that span multiple input
- qcow2 clusters (fixing a pre-existing sub-cluster data-loss bug
- in <code>convert</code>). Output is byte- and size-identical to <code>qemu-img
- dd</code> for all five output formats (raw, qcow2, vmdk, vpc, vhdx).
- Known divergences: count=0 vmdk/vhdx edge cases. See
+ (input byte-window + dense output). See
+ <a href="/components/instar/commentary/architectural-decisions/">Decision 12</a> for why dd
+ reuses convert's binary rather than having its own. The
+ <code>crates/dd</code> crate provides the pure window-math helper used by
+ both the host CLI and tests.</p>
+<p>Two constraints govern the windowing. <strong>The chain read
+ primitives must be byte-accurate</strong>, not sector-aligned:
+ <code>read_raw_sectors</code> and <code>read_cluster_sectors</code> are required to
+ return the exact bytes of a sub-sector range, because a dd
+ window may start and end anywhere. Every reader in the guest
+ depends on this, so a change that reintroduces alignment
+ rounding in them breaks dd silently rather than loudly.
+ <strong>Device sector size is chosen by output kind</strong>: raw output uses
+ 512 bytes, matching the 512-byte rounding of <code>qemu-img dd</code>'s
+ raw output file size; structured output (qcow2, vmdk, vpc,
+ vhdx) uses the same 64KB <code>MAX_SECTOR_SIZE</code> as <code>convert</code>, because
+ the structured writers assemble whole maximum-size output
+ sectors and the VHD/VHDX block path assumes it. The declared
+ virtual size and the data are sized from the byte-granular
+ window rather than from the device sector size, so neither
+ choice affects where the window falls.</p>
+<p>The structured writers were hardened as part of this work, via
+ <code>qcow2::read_chain_virtual_range</code>, to correctly fill output
+ grains and blocks that span multiple input qcow2 clusters --
+ fixing a pre-existing sub-cluster data-loss bug in <code>convert</code>.
+ Output is byte- and size-identical to <code>qemu-img dd</code> for all five
+ output formats (raw, qcow2, vmdk, vpc, vhdx). Known
+ divergences: count=0 vmdk/vhdx edge cases. See
  <a href="/components/instar/dd/">docs/dd.md</a> for the full user reference.
 - <strong>operations/bitmap/</strong> - qcow2 persistent-dirty-bitmap management
  operation (PLAN-bitmap, qcow2 v3-only). The host side (<code>run_bitmap</code>

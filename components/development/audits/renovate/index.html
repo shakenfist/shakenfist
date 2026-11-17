@@ -6304,34 +6304,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../instar/plans/PLAN-dd/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    instar dd subcommand
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../instar/plans/PLAN-bitmap/" class="md-nav__link">
         
   
@@ -6508,6 +6480,34 @@
     
   
     Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-multi-extent-vmdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-extent VMDK output
   
 
     
@@ -16448,10 +16448,14 @@ requiring review instead of by a sha. The exception names both the
 reusable workflow a <code>workflow</code> while every other <code>uses:</code> reference is
 an <code>action</code>. Both names, and the helper's own definition, are read
 from Renovate's source at the version this fleet runs, 44.227.4:
-<code>lib/config/presets/internal/helpers.preset.ts:118-126</code> for the
-helper, and
-<code>lib/modules/manager/github-actions/extract.ts:78</code> and <code>:111</code> for the
-dep type a reference is given.</p>
+the helper is the <code>pinGitHubActionDigests</code> entry in
+<a href="https://github.com/renovatebot/renovate/blob/83794a8993ff455b106ddf1e23ce4deca3f5277d/lib/config/presets/internal/helpers.preset.ts#L118-L126"><code>lib/config/presets/internal/helpers.preset.ts</code></a>,
+and the dep type a reference is given is chosen by
+<code>extractRepositoryAction</code> in
+<a href="https://github.com/renovatebot/renovate/blob/83794a8993ff455b106ddf1e23ce4deca3f5277d/lib/modules/manager/github-actions/extract.ts#L78-L111"><code>lib/modules/manager/github-actions/extract.ts</code></a>,
+which says <code>workflow</code> when the reference's sub-path matches
+<code>reusableWorkflowPathRe</code> and <code>action</code> otherwise. Both links are pinned
+to the commit that release was tagged from.</p>
 <p>The preset sets no <code>vulnerabilityAlerts</code>: Renovate's defaults
 already drop the schedule, <code>minimumReleaseAge</code> and grouping for a
 security fix, so a fix for a vulnerability Dependabot reports arrives

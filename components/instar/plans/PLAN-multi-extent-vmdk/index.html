@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/instar/plans/PLAN-dd/">
+        <link rel="canonical" href="https://shakenfist.com/components/instar/plans/PLAN-multi-extent-vmdk/">
       
       
-        <link rel="prev" href="../PLAN-amend/">
+        <link rel="prev" href="../PLAN-bat-population/">
       
       
-        <link rel="next" href="../PLAN-bitmap/">
+        <link rel="next" href="../../prototypes/building-with-docker/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>instar dd subcommand - Shaken Fist</title>
+        <title>Multi-extent VMDK output - Shaken Fist</title>
       
     
     
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#instar-dd-subcommand" class="md-skip">
+        <a href="#multi-extent-vmdk-output-twogbmaxextentsparse-and-twogbmaxextentflat" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              instar dd subcommand
+              Multi-extent VMDK output
             
           </span>
         </div>
@@ -6127,325 +6127,6 @@
                 
   
   
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    instar dd subcommand
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    instar dd subcommand
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#status-complete" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Status: Complete
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prompt
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Situation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#mission-and-problem-statement" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mission and problem statement
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Mission and problem statement">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#explicitly-out-of-scope-v1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Explicitly out of scope (v1)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Open questions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#design-overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Design overview
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Design overview">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#architectural-shape" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Architectural shape
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#operand-model-host" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Operand model (host)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#guest-windowing-dense-copy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Guest windowing + dense copy
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cross-validation-matrix-drives-phase-679" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cross-validation matrix (drives phase 6/7/9)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Execution">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#recommended-planning-effort-per-phase" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recommended planning effort per phase
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#agent-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agent guidance
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Administration and logistics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Administration and logistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success criteria
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
   
   
     <li class="md-nav__item">
@@ -6633,6 +6314,192 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-extent VMDK output
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-extent VMDK output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#status-not-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: Not started
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#situation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Situation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Situation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-was-measured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What was measured
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-code-does-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the code does today
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mission and problem statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-intents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase intents
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -16207,10 +16074,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-complete" class="md-nav__link">
+  <a href="#status-not-started" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Complete
+        Status: Not started
       
     </span>
   </a>
@@ -16237,6 +16104,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Situation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-was-measured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What was measured
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-code-does-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the code does today
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -16248,23 +16143,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Mission and problem statement">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#explicitly-out-of-scope-v1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Explicitly out of scope (v1)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -16275,67 +16153,6 @@
       
     </span>
   </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#design-overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Design overview
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Design overview">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#architectural-shape" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Architectural shape
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#operand-model-host" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Operand model (host)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#guest-windowing-dense-copy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Guest windowing + dense copy
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cross-validation-matrix-drives-phase-679" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cross-validation matrix (drives phase 6/7/9)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -16352,93 +16169,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#recommended-planning-effort-per-phase" class="md-nav__link">
+  <a href="#phase-intents" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Recommended planning effort per phase
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#agent-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agent guidance
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Administration and logistics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Administration and logistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success criteria
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
+        Phase intents
       
     </span>
   </a>
@@ -16471,8 +16205,8 @@
   
 
 
-<h1 id="instar-dd-subcommand"><code>instar dd</code> subcommand<a class="headerlink" href="#instar-dd-subcommand" title="Permanent link">&para;</a></h1>
-<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
+<h1 id="multi-extent-vmdk-output-twogbmaxextentsparse-and-twogbmaxextentflat">Multi-extent VMDK output: twoGbMaxExtentSparse and twoGbMaxExtentFlat<a class="headerlink" href="#multi-extent-vmdk-output-twogbmaxextentsparse-and-twogbmaxextentflat" title="Permanent link">&para;</a></h1>
+<h2 id="status-not-started">Status: Not started<a class="headerlink" href="#status-not-started" title="Permanent link">&para;</a></h2>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
@@ -16484,7 +16218,6 @@ codebase when you could read it instead. Where a question touches
 on external concepts (QCOW2, VMDK, VHD/VHDX, LUKS, KVM, virtio,
 disk image formats), research as needed to give a confident
 answer. Flag any uncertainty explicitly rather than guessing.</p>
-<p>All planning documents should go into <code>docs/plans/</code>.</p>
 <p>Consult <code>ARCHITECTURE.md</code> for the overall system structure
 (host VMM, KVM guest, call table, device emulation).
 Consult <code>AGENTS.md</code> for build commands, project conventions,
@@ -16492,411 +16225,851 @@ code organisation, and the security model summary. Consult
 <code>docs/</code> for format-specific documentation (<code>docs/qcow2/</code>,
 <code>docs/raw/</code>, etc.) and <code>docs/commentary/</code> for architectural
 decisions and design rationale.</p>
-<p>When we get to detailed planning, I prefer a separate plan
-file per detailed phase. These separate files should be named
-for the master plan, in the same directory as the master
-plan, and simply have <code>-phase-NN-descriptive</code> appended before
-the <code>.md</code> file extension. Tracking of these sub-phases is done
-via the table in the Execution section below.</p>
-<p>I prefer one commit per logical change, and at minimum one
-commit per phase. Do not batch unrelated changes into a
-single commit. Each commit should be self-contained: it
-should build, pass tests, and have a clear commit message
-explaining what changed and why.</p>
-<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>instar implements 13 of qemu-img's 15 subcommands. The three
-absent commands — <code>bench</code>, <code>bitmap</code>, and <code>dd</code> — are all intended
-to be in scope. They share no command-specific machinery with one
-another (<code>dd</code> is a data-copy op like <code>copy</code>/<code>convert</code>; <code>bitmap</code> is
-a qcow2 metadata mutator like <code>amend</code>; <code>bench</code> is a performance
-harness with an open design question about whether benchmarking
-<em>through</em> the KVM sandbox is meaningful), so they are being
-planned as three independent efforts rather than one combined
-plan. This is the first of the three: <strong><code>dd</code></strong>.</p>
-<p><code>dd</code> is the natural next build because it is, semantically,
-<strong><code>convert</code> with a windowed input</strong>: it reads an input image
-(format auto-probed, or forced with <code>-f</code>), writes an output image
-in a target format (<code>-O</code>, default <code>raw</code>), and restricts the copy
-to a byte window controlled by the dd-style operands <code>bs=</code>,
-<code>count=</code>, and <code>skip=</code>. The format writers it needs already exist
-inside the <code>convert</code> guest binary, and the host-side
-config-build / guest-launch lifecycle is already established by
-<code>run_convert</code>. The new work is therefore concentrated in three
-places: an unusual <code>name=value</code> operand parser on the host, an
-input-windowing + dense-copy path in the guest, and faithful
-replication of upstream qemu-img dd's quirks.</p>
-<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
-<p>Ship an <code>instar dd</code> subcommand that is behaviourally compatible
-with <strong>upstream</strong> <code>qemu-img dd</code> (qemu.git, verified against
-<code>stable-9.1</code>/<code>stable-9.2</code>/<code>master</code>, where the <code>img_dd</code> logic is
-byte-identical). Concretely:</p>
-<ol>
-<li><strong>Operands.</strong> Support exactly the five upstream <code>name=value</code>
-   operands — <code>bs=</code>, <code>count=</code>, <code>skip=</code>, <code>if=</code>, <code>of=</code> — and the
-   upstream dash-options <code>-f FMT</code> (input format) and
-   <code>-O OUTPUT_FMT</code> (output format). <code>if=</code> and <code>of=</code> are both
-   mandatory; their absence is an error with non-zero exit.</li>
-<li><strong>Block / window semantics.</strong></li>
-<li><code>bs</code> defaults to <strong>512</strong>, accepts dd-style size suffixes
-     (<code>k/M/G/T/P/E</code>, 1024-based via <code>qemu_strtosz</code>), and is
-     range-checked to <code>1..=INT_MAX</code>. <code>bs=0</code> is rejected (it must
-     <strong>not</strong> silently default to 512).</li>
-<li><code>count</code> selects a number of <code>bs</code>-sized input blocks and
-     <strong>only ever shrinks</strong> the copy: the copy length is
-     <code>min(input_len, count*bs)</code>. <code>count</code> beyond EOF yields the
-     whole input, not a padded/larger output. <code>count=0</code> yields a
-     0-byte output.</li>
-<li><code>skip</code> skips <code>skip*bs</code> bytes on the <strong>input</strong> before reading;
-     the output always starts at byte 0. The output virtual size
-     is <code>copy_len - skip*bs</code>. <code>skip</code> beyond EOF is <strong>not fatal</strong>:
-     it warns, creates an <strong>empty</strong> output, and still exits 0.</li>
-<li>Ordering matters: <code>count</code> clamps the size first, <strong>then</strong>
-     <code>skip</code> subtracts. The skip-beyond-EOF check uses the
-     already-count-clamped size.</li>
-<li><strong>Output format.</strong> <code>-O</code> defaults to <strong><code>raw</code></strong> (not the input
-   format). The copy is <strong>dense</strong> — every block is read and
-   written, with no zero/hole detection (unlike <code>convert</code>, which
-   skips zero clusters by default). Output formats should match
-   the set <code>convert</code> already emits (raw, qcow2, vmdk, vhd, vhdx),
-   created with <strong>default driver options only</strong> — dd sets just the
-   image size; no <code>-o</code>, compression, backing file, preallocation,
-   cluster-size, or encryption.</li>
-<li><strong>Last-block handling.</strong> When <code>bs</code> does not divide the copy
-   length, the final block is short (<code>copy_len - in_pos</code>), and the
-   output virtual size reflects the exact byte count (subject to
-   each output driver's own rounding, e.g. qcow2 to 512).</li>
-<li><strong>Verification.</strong> Cross-validate against the real <code>qemu-img dd</code>
-   binary across the full edge-case matrix (see Design overview),
-   with cross-version baselines, coverage-guided fuzzing of the
-   operand parser and window math, and differential fuzzing of
-   random <code>bs</code>/<code>count</code>/<code>skip</code>/<code>-O</code> invocations.</li>
-<li><strong>Documentation.</strong> <code>docs/dd.md</code>, plus the standard
-   <code>README.md</code> / <code>ARCHITECTURE.md</code> / <code>AGENTS.md</code> / <code>CHANGELOG.md</code>
-   updates and the <code>docs/plans/index.md</code> status flip on
-   completion.</li>
-</ol>
-<h3 id="explicitly-out-of-scope-v1">Explicitly out of scope (v1)<a class="headerlink" href="#explicitly-out-of-scope-v1" title="Permanent link">&para;</a></h3>
-<p>These are <strong>downstream (Proxmox/PVE) or <code>convert</code>-family</strong>
-extensions that upstream <code>qemu-img dd</code> does <strong>not</strong> have. They are
-recorded here so the boundary is unambiguous and deferred to
-Future work:</p>
+<!-- shared-block: plan-file-conventions v2 -->
+<p>Plan file conventions (shared block; do not edit -- the canonical
+copy lives in shakenfist/development at
+<code>templates/shared-blocks/plan-file-conventions.md</code>):</p>
 <ul>
-<li><code>osize=</code>, <code>isize=</code> (PVE).</li>
-<li><code>seek=</code> (output skip — no such operand upstream).</li>
-<li>stdin/stdout streaming (<code>if=-</code> / <code>of=-</code>).</li>
-<li><code>-n</code> (skip target creation), <code>-l</code>/<code>--snapshot</code>,
-  <code>--target-image-opts</code>, <code>-S</code>, <code>-c</code>/compression, <code>-p</code>/progress,
-  <code>-W</code>, <code>-m</code>, <code>-r</code>/rate-limit, <code>-B</code>/<code>-b</code> backing,
-  <code>-o preallocation=</code> and any other <code>-o</code> create options.</li>
-<li><code>--image-opts</code> / <code>--object</code> / <code>-U</code> — pending the operator's
-  answer to Open question 4.</li>
+<li>All planning documents live in <code>docs/plans/</code>.</li>
+<li>Detailed planning gets one plan file per phase. Phase files are
+  named for their master plan, sit in the same directory as it,
+  and append <code>-phase-NN-descriptive</code> before the <code>.md</code> extension.</li>
+<li>The master plan tracks its phases in a table under its Execution
+  section. <code>Merged</code> is last, and the push audit is the last row,
+  for the reasons given in <code>plan-push-audit-phase</code>:</li>
 </ul>
-<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
-<p>These need an operator decision before detailed phase planning.
-Each has a recommended default.</p>
-<p><strong>Resolved (2026-06-21):</strong> OQ1 → <strong>(a) reuse/extend <code>convert.bin</code></strong>
-(no new guest binary or config magic; <code>dd</code> builds an extended
-<code>ConvertConfig</code> with an input byte-window + dense output). OQ2 →
-<strong>full convert format set</strong> (raw + qcow2 + vmdk + vhd + vhdx),
-phased raw-first (ph3) then the rest (ph4). OQ3 → <strong>instar-native
-error text, matching exit codes</strong>. OQ4 → <strong>defer</strong>
-<code>--image-opts</code>/<code>--object</code>/<code>-U</code> to Future work. OQ5 → <strong>replicate</strong>
-the count-shrinks-only and skip-past-EOF quirks. The original
-option text is retained below for the rationale.</p>
-<ol>
-<li><strong>Guest-binary strategy (the load-bearing decision).</strong> dd
-   needs <code>convert</code>'s format writers (<code>convert_to_qcow2</code>,
-   <code>convert_to_vmdk</code>, <code>convert_to_vhd</code>, <code>convert_to_vhdx</code>,
-   <code>convert_to_raw</code>), which today live <em>inside</em>
-   <code>src/operations/convert/src/main.rs</code>, not in a reusable crate.
-   Three options:</li>
-<li><strong>(a) Reuse/extend the <code>convert</code> guest binary</strong> — teach the
-     convert op an input-window (<code>skip</code>/<code>count</code>/<code>bs</code>) and a
-     dense-output flag, and make <code>dd</code> a host-side frontend that
-     builds a convert-style config. One copy of the writers; no
-     384KB duplication risk; matches "dd is convert-with-a-window".
-     Risk: dd's quirks (default-raw, dense, <code>size - skip*bs</code>) leak
-     into convert's config surface.</li>
-<li><strong>(b) Dedicated <code>dd.bin</code> sharing a writer module</strong> — extract
-     the writers into a <code>#[path]</code>-included module (or a <code>no_std</code>
-     crate) linked by both <code>convert.bin</code> and <code>dd.bin</code>. Cleanest
-     separation; meaningful refactor of a large, hot file; new
-     binary must stay under the 384KB cap.</li>
-<li><strong>(c) Standalone <code>dd.bin</code> duplicating only the needed
-     writers</strong> — fastest to a working raw-only dd, but duplicates
-     format logic and risks the size cap once qcow2/vmdk/vhd/vhdx
-     are added.
-   <strong>Recommended: (a)</strong> for the format paths, with raw handled by
-   a compact dedicated path (see Open question 2). Revisit (b) if
-   the convert config surface gets unwieldy.</li>
-<li><strong>v1 output-format scope.</strong> Match <code>convert</code>'s full set
-   (raw + qcow2 + vmdk + vhd + vhdx) immediately, or ship
-   <strong>raw first</strong> (reusing <code>copy</code>'s dense sector loop with byte
-   windowing, no format writers at all) and add the format paths
-   in a follow-on phase? <strong>Recommended: raw first (phase 3), then
-   the full convert set (phase 4)</strong> — raw is the <code>-O</code> default and
-   the common case, and it de-risks the windowing math before
-   touching the writers.</li>
-<li><strong>Error-message fidelity.</strong> Replicate qemu-img's exact stderr
-   strings (e.g. <em>"Must specify both input and output files"</em>,
-   <em>"unrecognized operand"</em>), or use instar-native messages while
-   matching <strong>semantics, output sizes, and exit codes</strong>? instar
-   elsewhere matches qemu-img semantics but emits its own error
-   text/codes. <strong>Recommended: instar-native messages, matching
-   exit codes and observable sizes</strong> — tests assert on
-   sizes/exit-status/byte-content, not stderr text.</li>
-<li><strong><code>--image-opts</code> / <code>--object</code> / <code>-U</code> scope.</strong> Upstream dd
-   accepts these. instar's guest model opens the input read-only
-   and has no general blockdev-options / object-secret surface, so
-   <code>--image-opts</code> and <code>--object</code> likely have no meaning here.
-   <code>-U</code> (force-share) may be a near-no-op given the guest opens a
-   private snapshot of the file. <strong>Recommended: defer all three to
-   Future work; accept-and-ignore <code>-U</code> only if trivial.</strong></li>
-<li><strong>Quirk replication.</strong> Replicate the count-only-shrinks rule
-   and the skip-beyond-EOF "empty output, exit 0" behaviour
-   exactly? <strong>Recommended: yes</strong> — both are cheap, observable, and
-   are the whole point of dd compatibility.</li>
-</ol>
-<h2 id="design-overview">Design overview<a class="headerlink" href="#design-overview" title="Permanent link">&para;</a></h2>
-<h3 id="architectural-shape">Architectural shape<a class="headerlink" href="#architectural-shape" title="Permanent link">&para;</a></h3>
-<p>dd is a thin windowing layer over the existing convert data path:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>host: parse `name=value` operands + dash-opts  -&gt;  DdConfig
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>      (bs, count, skip, output_format, flags, if/of paths)
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>            |
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>            v
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>guest: read input window [skip*bs, skip*bs + copy_len)
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>       copy_len = min(input_len, count*bs)   (count clamps down only)
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>       out_vsize = copy_len - skip*bs        (&gt;=0; empty if skip past EOF)
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>       write DENSE in target format (default raw)
-</code></pre></div>
-<h3 id="operand-model-host">Operand model (host)<a class="headerlink" href="#operand-model-host" title="Permanent link">&para;</a></h3>
-<p>The <code>name=value</code> operands are alien to the clap flag model the
-other subcommands use. The parser must:
-- split argv tokens on the first <code>=</code>; a token without <code>=</code> or an
-  unknown key is an "unrecognized operand" error;
-- parse <code>bs</code>/<code>count</code>/<code>skip</code> values through the same size-suffix
-  arithmetic as qemu (<code>qemu_strtosz</code>: 1024-based <code>k/M/G/T/P/E</code>);
-- enforce <code>bs ∈ 1..=INT_MAX</code> (reject 0), <code>count</code>/<code>skip ∈ 0..</code>;
-- require both <code>if=</code> and <code>of=</code>;
-- interleave freely with the dash-options <code>-f</code>/<code>-O</code> (and any of
-  <code>-U</code>/<code>--image-opts</code>/<code>--object</code> admitted by Open question 4).</p>
-<p><code>-f</code>/<code>-O</code> reuse the format-name resolution that <code>ConvertArgs</code>
-already uses; <code>-O</code> defaults to <code>raw</code>.</p>
-<h3 id="guest-windowing-dense-copy">Guest windowing + dense copy<a class="headerlink" href="#guest-windowing-dense-copy" title="Permanent link">&para;</a></h3>
-<p>The raw path generalises <code>copy</code>'s sector loop to a byte window and
-removes zero-skipping. The format paths feed the same windowed,
-dense byte stream into the convert writers, with the output
-virtual size fixed at <code>copy_len - skip*bs</code> (computed host-side and
-carried in <code>DdConfig</code>). The guest must honour the four boundary
-behaviours: count-clamp-only, skip-subtracts-after-count, short
-final block, and skip-past-EOF ⇒ empty-but-successful.</p>
-<h3 id="cross-validation-matrix-drives-phase-679">Cross-validation matrix (drives phase 6/7/9)<a class="headerlink" href="#cross-validation-matrix-drives-phase-679" title="Permanent link">&para;</a></h3>
-<p>Each row is validated against the real <code>qemu-img dd</code>:</p>
-<ol>
-<li><code>bs</code> not a divisor of size — short final block.</li>
-<li><code>count</code> beyond EOF — output equals whole input.</li>
-<li><code>count</code> smaller than image — output <code>= count*bs</code>.</li>
-<li><code>count=0</code> — empty output.</li>
-<li><code>skip</code> within image — output <code>= size - skip*bs</code>, shifted copy.</li>
-<li><code>skip</code> beyond EOF — empty output, exit 0, warning emitted.</li>
-<li><code>skip</code> + <code>count</code> together — count clamps, then skip subtracts.</li>
-<li><code>bs=0</code> — rejected, non-zero exit.</li>
-<li>missing <code>if=</code> or <code>of=</code> — rejected, non-zero exit.</li>
-<li>no <code>-O</code> — output is <strong>raw</strong>, not the input format.</li>
-<li><code>-O qcow2</code> with no <code>-o</code> — plain default-option qcow2 of size
-    <code>size - skip*bs</code>.</li>
-<li>unknown operand / unknown <code>-O</code> format — rejected.</li>
-<li>size suffixes (<code>bs=1M count=4</code> ⇒ 4 MiB) — 1024-based.</li>
-<li>dense output — zero regions written explicitly (qcow2 output
-    is less compact than <code>convert</code> would make it).</li>
-</ol>
-<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<p>Detailed phase plans live in sibling <code>PLAN-dd-phase-NN-*.md</code>
-files (not yet written; created during detailed planning). The
-phase plan for each phase should be authored at the effort level
-noted in the table. <strong>Open questions 1–3 must be resolved before
-phase 1 is planned</strong>, since they shape the ABI and the guest
-strategy.</p>
 <table>
 <thead>
 <tr>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>1. Shared ABI: extend <code>ConvertConfig</code> with the input byte-window (<code>window_start</code>/<code>window_end</code>) + <code>FLAG_DD_WINDOW</code> (in <code>src/shared/src/lib.rs</code>, mirrored in <code>src/vmm/src/main.rs</code>); register the <code>Dd</code> subcommand variant + <code>run_dd</code> stub. Reuses <code>convert.bin</code> per Open question 1 — no new guest binary or config magic</td>
-<td><a href="/components/instar/plans/PLAN-dd-phase-01-abi/">PLAN-dd-phase-01-abi.md</a></td>
-<td>Complete (7eadd12)</td>
+<td>1. Schema migration</td>
+<td>PLAN-thing-phase-01-schema.md</td>
+<td>Not started</td>
+<td></td>
 </tr>
 <tr>
-<td>2. Host operand parser + <code>run_dd</code>: <code>name=value</code> operands (<code>bs</code>/<code>count</code>/<code>skip</code>/<code>if</code>/<code>of</code>, reusing <code>parse_qemu_img_size</code>) + <code>-f</code>/<code>-O</code>, validation/exit-code rules, pure <code>compute_dd_window</code> math (count-clamps-down, skip-subtracts, empty-on-overrun) → extended <code>ConvertConfig</code> (window fields + <code>FLAG_DD_WINDOW</code>, dense, <code>out_vsize</code> output sizing). Extracts a shared <code>execute_convert</code> core so <code>run_dd</code> reuses convert's launch path instead of duplicating it. Whole-image raw proven end-to-end; windowed cases land in phase 3</td>
-<td><a href="/components/instar/plans/PLAN-dd-phase-02-host-operands/">PLAN-dd-phase-02-host-operands.md</a></td>
-<td>Complete (8909837, 8b55c6c, 1a2cb91)</td>
+<td>2. Public API</td>
+<td>PLAN-thing-phase-02-api.md</td>
+<td>Not started</td>
+<td></td>
 </tr>
 <tr>
-<td>3. Guest op — raw output: make <code>convert_to_raw</code> honour <code>FLAG_DD_WINDOW</code> (loop <code>[window_start, window_end)</code>, carry-scheme output addressing), add <code>has_dd_window()</code>, and size dd raw output to <code>round_up(out_vsize, 512)</code>. Fixed <code>read_raw_sectors</code>/<code>read_cluster_sectors</code> at the root to be byte-accurate for sub-sector windows (grounding wrongly assumed they already were), so any <code>bs</code> works. Windowed <code>dd -O raw</code> is byte- AND size-identical to <code>qemu-img dd</code> (aligned/unaligned skip, short final block, sub-sector bs, empty); matrix cross-validated. Non-raw formats deferred to phase 4</td>
-<td><a href="/components/instar/plans/PLAN-dd-phase-03-guest-raw/">PLAN-dd-phase-03-guest-raw.md</a></td>
-<td>Complete (4375324, 814197e)</td>
-</tr>
-<tr>
-<td>4. Guest op — format output: window all six structured writers (qcow2[/compressed], vmdk[/compressed], vhd, vhdx) — offset reads by <code>window_start</code>, size geometry from <code>out_vsize</code> — mirroring phase 3. The careful part is matching qemu-img dd's per-format declared virtual size (qcow2/vmdk/vhdx → <code>round_up(out_vsize,512)</code>; vhd → CHS rounding, larger). Validated by round-trip-to-raw vs <code>qemu-img dd -O &lt;fmt&gt;</code> (structured files aren't byte-comparable), incl. non-512-end, sub-sector, and empty windows</td>
-<td><a href="/components/instar/plans/PLAN-dd-phase-04-guest-formats/">PLAN-dd-phase-04-guest-formats.md</a></td>
-<td>Complete (d10e5b1, c3cd396)</td>
-</tr>
-<tr>
-<td>5. Rust unit tests: fill the unit gaps from phases 1–4 (operand parsing/window math already covered in phase 2). Highest value: <code>vhd::chs_rounded_size</code> against qemu-verified pairs + CHS self-consistency, and the byte-accurate <code>read_raw_sectors</code>/<code>read_cluster_sectors</code> via a mock call table (regression net for the phase-3 root-cause fix). Plus <code>parse_output_format</code>/<code>compute_output_capacity</code></td>
-<td><a href="/components/instar/plans/PLAN-dd-phase-05-rust-tests/">PLAN-dd-phase-05-rust-tests.md</a></td>
-<td>Complete (44faa76)</td>
-</tr>
-<tr>
-<td>6. Integration consolidation: fill the non-windowing matrix rows the per-phase tests skipped (windowing already covered by <code>TestDdRawWindow</code>/<code>TestDdStructuredWindow</code>) — CLI rejection parity (<code>bs=0</code>, bad operand, missing <code>if</code>/<code>of</code>, unknown <code>-O</code>; both tools exit non-zero), the <code>-O</code>-defaults-to-raw quirk (assert output format is raw, not the input's), and input-format coverage (vmdk/vhd/vhdx + backing-chain inputs vs <code>qemu-img dd</code>)</td>
-<td><a href="/components/instar/plans/PLAN-dd-phase-06-integration/">PLAN-dd-phase-06-integration.md</a></td>
-<td>Complete (b6cffd2)</td>
-</tr>
-<tr>
-<td>7. Cross-version baselines: add <code>dd</code> to the testdata <code>generate-baselines.py</code> + <code>baselines-dd</code> Makefile target exactly like <code>resize</code>/<code>amend</code> (create fixture → <code>qemu-img dd</code> → <code>qemu-img info</code>), curated <code>DD_CASES</code> targeting the output virtual-size rounding (512 / CHS) + empty windows; consuming test compares instar dd's result info to the qemu baseline per profile</td>
-<td><a href="/components/instar/plans/PLAN-dd-phase-07-baselines/">PLAN-dd-phase-07-baselines.md</a></td>
-<td>Complete (6ebe645; testdata push pending)</td>
-</tr>
-<tr>
-<td>8. Coverage-guided fuzzing: extract <code>compute_dd_window</code> into a new <code>crates/dd</code> library crate (so it's fuzzable like sibling planners), then add <code>fuzz_dd_window</code>, <code>fuzz_chs_rounded_size</code>, and <code>fuzz_dd_read</code> (read primitives via mock CallTable) to <code>src/fuzz</code> + the <code>coverage-fuzz.yml</code> target list. <code>fuzz_dd_operands</code> intentionally omitted (CLI parsing isn't fuzzed for any command; covered by phase-5 unit tests)</td>
-<td><a href="/components/instar/plans/PLAN-dd-phase-08-fuzz/">PLAN-dd-phase-08-fuzz.md</a></td>
-<td>Complete (1ddb0c5, 46f8a71)</td>
-</tr>
-<tr>
-<td>9. Differential fuzzing: add <code>op_dd</code> to <code>scripts/differential-fuzz.py</code> (modeled on <code>op_convert</code>) — random <code>bs</code>/<code>count</code>/<code>skip</code>/<code>-O</code> vs <code>qemu-img dd</code>, content-compared by flattening both outputs to raw. Resolves the <code>count=0 -O vmdk</code>/<code>-O vhdx</code> empty-window cases as documented known divergences; run a ≥2000-iteration campaign clean</td>
-<td><a href="/components/instar/plans/PLAN-dd-phase-09-diff-fuzz/">PLAN-dd-phase-09-diff-fuzz.md</a></td>
-<td>Complete (f62d7d9; fixes 779e7a7, b80c5d7)</td>
-</tr>
-<tr>
-<td>10. Documentation: new <code>docs/dd.md</code> (mirroring <code>docs/amend.md</code>: synopsis, window semantics, per-format size rounding incl. VHD CHS, the known divergences, examples) + <code>docs/index.md</code> link; add <code>dd</code> to the operations enumerations in <code>README.md</code>/<code>ARCHITECTURE.md</code>/<code>AGENTS.md</code> + a README usage section; <code>CHANGELOG.md</code> (dd Added + the two phase-9 Fixed entries); <code>ARCHITECTURE.md</code> <code>dd-info-json</code> baselines note; flip <code>index.md</code>/master plan to Complete</td>
-<td><a href="/components/instar/plans/PLAN-dd-phase-10-docs/">PLAN-dd-phase-10-docs.md</a></td>
-<td>Complete</td>
+<td>3. Push audit</td>
+<td>-</td>
+<td>Not started</td>
+<td></td>
 </tr>
 </tbody>
 </table>
-<h3 id="recommended-planning-effort-per-phase">Recommended planning effort per phase<a class="headerlink" href="#recommended-planning-effort-per-phase" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>High effort:</strong> phases 1 (ABI + guest strategy), 2 (operand
-  parser + quirk fidelity), 3 and 4 (guest windowing + writer
-  reuse — these span the input reader, the convert writers, the
-  call table, and the host glue simultaneously, so they need the
-  larger context window regardless of reasoning difficulty).</li>
-<li><strong>Medium effort:</strong> phases 5–10 (well-bounded once the matrix in
-  the Design overview is settled), with phase 6's helper design
-  worth extra care.</li>
+<li>One commit per logical change, and at minimum one commit per
+  phase. Unrelated changes are not batched into a single commit.
+  Each commit is self-contained: it builds, passes tests, and has
+  a message explaining what changed and why.</li>
 </ul>
-<h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
-<p>This plan follows the standard instar execution model defined in
-<code>PLAN-TEMPLATE.md</code> (§ Agent guidance): <strong>all implementation work
-is done by sub-agents</strong>, never in the management session; the
-management session plans, spawns one sub-agent per step, reviews
-the actual files (not the agent's summary), fixes/retries, and
-commits. Use <code>isolation: "worktree"</code> for risky steps.</p>
-<p>Each phase plan must include the standard step table:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>| Step | Effort | Model | Isolation | Brief for sub-agent |
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>|------|--------|-------|-----------|---------------------|
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>| 1a   | medium | sonnet | none     | What to do, which files, patterns to follow |
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>| 1b   | high   | opus   | worktree | Why high effort: needs X to do Y |
+<!-- shared-block-end -->
+
+<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p>The 2026 technical goal <em>VHD/VMDK writers done</em> has one leaf left.
+<code>PLAN-differencing.md</code> closed the differencing leaves;
+<code>PLAN-bat-population.md</code> closed VHDX fixed output, vmdk/vpc/vhdx
+preallocation (as qemu parity, a no-op) and the per-format BAT
+population pattern. What remains is VMDK <code>twoGbMaxExtent*</code> output and
+the prerequisite the goals graph calls the <em>multi-output-device call
+table</em>. Closing both turns the whole waypoint green.</p>
+<p>Three earlier plans deferred to that prerequisite by name and none of
+them built it: <code>PLAN-create-phase-05-backing-file.md</code> ("Future work;
+requires multi-output-device call-table support"), <code>PLAN-resize.md</code>
+(multi-file resize, twice), and <code>PLAN-bat-population.md</code>, which put it
+out of scope because nothing in that plan needed it -- monolithicFlat
+create is host-only and the convert path that writes it already uses
+one output device.</p>
+<h3 id="what-was-measured">What was measured<a class="headerlink" href="#what-was-measured" title="Permanent link">&para;</a></h3>
+<p>Everything in this section was measured on 2026-11-16 against
+<code>24b629cb</code> (the merge of #912), with the host's qemu-img 10.0.13
+(Debian <code>1:10.0.13+ds-0+deb13u1</code>). The instar binary used was
+<code>src/target/release/instar</code> dated 2026-10-19, which predates several
+merges; every instar result below is a <em>host-side</em> refusal or a
+host-side descriptor walk, reached before any guest operation starts,
+so the stale binary does not affect them. Phase 1 re-measures against
+a freshly built binary anyway.</p>
+<p>qemu-img creates both subformats:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$ qemu-img create -f vmdk -o subformat=twoGbMaxExtentSparse sp.vmdk 5G
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>$ ls
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>sp.vmdk (417 bytes)  sp-s001.vmdk  sp-s002.vmdk  sp-s003.vmdk
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>$ qemu-img create -f vmdk -o subformat=twoGbMaxExtentFlat fl.vmdk 5G
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>$ ls
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>fl.vmdk (415 bytes)  fl-f001.vmdk  fl-f002.vmdk  fl-f003.vmdk
 </code></pre></div>
-<p>Briefs must front-load the research already captured in this
-master plan (the qemu-img dd semantics, the <code>CopyConfig</code>/<code>CallTable</code>
-ABI, the convert writer locations, the 384KB guest-binary cap, the
-<code>no_std</code> requirement of guest/format code) so the recommended
-model can succeed without re-deriving it. <strong>When in doubt, skew to
-the more capable model</strong> — see <code>PLAN-TEMPLATE.md</code> for the full
-effort/model rationale and the management-session review checklist.</p>
+<p>So there is a real oracle for both. This is the question that
+collapsed the preallocation leaf in <code>PLAN-bat-population.md</code> into a
+parity no-op, and here it answers the other way.</p>
+<p>Extent naming is <code>&lt;stem&gt;-s%03d.vmdk</code> for sparse and <code>&lt;stem&gt;-f%03d.vmdk</code>
+for flat. Flat extents are the full 2 GiB in length but sparse on disk
+(the 5G flat image occupies 4 KiB). The descriptor qemu wrote:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a># Disk DescriptorFile
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>version=1
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>CID=4de986e1
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>parentCID=ffffffff
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>createType="twoGbMaxExtentSparse"
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a># Extent description
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>RW 4194304 SPARSE "sp-s001.vmdk"
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>RW 4194304 SPARSE "sp-s002.vmdk"
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>RW 2097152 SPARSE "sp-s003.vmdk"
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a># The Disk Data Base
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>#DDB
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>ddb.virtualHWVersion = "4"
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>ddb.geometry.cylinders = "10402"
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>ddb.geometry.heads = "16"
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>ddb.geometry.sectors = "63"
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>ddb.adapterType = "ide"
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>ddb.toolsVersion = "2147483647"
+</code></pre></div>
+<p>Note the <code>ddb.*</code> block. <code>docs/create.md</code>'s Future work records that
+instar emits none of those lines; open question 3 takes that up.</p>
+<p>The 80-build sweep (qemu 6.0.0 to 10.2.0) confirmed the naming and
+descriptor shape above for both subformats; the only difference
+across builds is <code>ddb.toolsVersion = "2147483647"</code> appearing from
+6.2.0 onward. The pin is <code>tests/golden/qemu-create-pins.json</code>.</p>
+<p><strong>The ceiling.</strong> A 40 GiB image is 20 extents, which qemu-img reads
+without complaint. instar refuses it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>$ instar convert -O qcow2 big-flat.vmdk out.qcow2
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Error: "chain depth 21 plus output device exceeds maximum of 16 devices"
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>$ instar convert -O qcow2 fl.vmdk out.qcow2        # 3 extents
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>(succeeds)
+</code></pre></div>
+<p>So instar cannot read any <code>twoGbMaxExtent*</code> image past 15 extents --
+about 30 GiB -- today. That is a shipping limitation, not a
+hypothetical, and it bounds any writer built on the same device model.</p>
+<p>Two other current refusals, both clean and both consistent with the
+docs: sparse extents are refused at descriptor resolution ("extent 0
+has kind Sparse; only FLAT extents are supported"), and <code>instar map</code>
+refuses every flat source ("monolithicFlat source images are not yet
+supported"). <code>instar info</code> walks a 20-extent flat descriptor fine and
+lists <code>/extents.0</code> through <code>/extents.19</code>, because <code>info</code> resolves the
+descriptor on the host and never opens the extents as devices.</p>
+<h3 id="what-the-code-does-today">What the code does today<a class="headerlink" href="#what-the-code-does-today" title="Permanent link">&para;</a></h3>
+<p>Source citations are to <code>24b629cb</code>. Each phase re-reads the lines it
+depends on, because unrelated merges move them.</p>
+<p>The device model is already N-device capable at the virtio layer.
+<code>DeviceSet</code> (<code>src/vmm/src/main.rs:717</code>) holds a <code>Vec&lt;ManagedDevice&gt;</code>,
+each with an <code>is_input</code> flag (<code>:690-697</code>), assigns sequential MMIO
+bases, and dispatches MMIO by address (<code>:772-790</code>). What is capped is
+the total: <code>MAX_CHAIN_DEPTH = 16</code> (<code>:412</code>), and <code>add_device</code> <em>panics</em>
+past it (<code>:736-750</code>). Operations guard with an explicit error first --
+<code>:15088</code> is the convert guard that produced the message above -- so the
+panic is not reachable through the CLI today. That guard is the
+ceiling, and it counts inputs and the output together.</p>
+<p>The call table is asymmetric. Input devices are indexed:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">pub</span><span class="w"> </span><span class="n">get_input_device_count</span><span class="p">:</span><span class="w"> </span><span class="nc">unsafe</span><span class="w"> </span><span class="k">extern</span><span class="w"> </span><span class="s">"C"</span><span class="w"> </span><span class="k">fn</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">pub</span><span class="w"> </span><span class="n">read_input_sector</span><span class="p">:</span><span class="w">  </span><span class="nc">unsafe</span><span class="w"> </span><span class="k">extern</span><span class="w"> </span><span class="s">"C"</span><span class="w"> </span><span class="k">fn</span><span class="p">(</span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="kt">u64</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="k">mut</span><span class="w"> </span><span class="kt">u8</span><span class="p">,</span><span class="w"> </span><span class="kt">usize</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">pub</span><span class="w"> </span><span class="n">get_input_capacity</span><span class="p">:</span><span class="w"> </span><span class="nc">unsafe</span><span class="w"> </span><span class="k">extern</span><span class="w"> </span><span class="s">"C"</span><span class="w"> </span><span class="k">fn</span><span class="p">(</span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u64</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">pub</span><span class="w"> </span><span class="n">get_input_sector_size</span><span class="p">:</span><span class="w"> </span><span class="nc">unsafe</span><span class="w"> </span><span class="k">extern</span><span class="w"> </span><span class="s">"C"</span><span class="w"> </span><span class="k">fn</span><span class="p">(</span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">usize</span><span class="p">,</span>
+</code></pre></div>
+<p>(<code>src/shared/src/lib.rs:1060-1078</code>.) Output devices are not:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// Output device functions (single device)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">pub</span><span class="w"> </span><span class="n">write_output_sector</span><span class="p">:</span><span class="w"> </span><span class="nc">unsafe</span><span class="w"> </span><span class="k">extern</span><span class="w"> </span><span class="s">"C"</span><span class="w"> </span><span class="k">fn</span><span class="p">(</span><span class="kt">u64</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="k">const</span><span class="w"> </span><span class="kt">u8</span><span class="p">,</span><span class="w"> </span><span class="kt">usize</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">pub</span><span class="w"> </span><span class="n">get_output_capacity</span><span class="p">:</span><span class="w"> </span><span class="nc">unsafe</span><span class="w"> </span><span class="k">extern</span><span class="w"> </span><span class="s">"C"</span><span class="w"> </span><span class="k">fn</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u64</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">pub</span><span class="w"> </span><span class="n">get_output_sector_size</span><span class="p">:</span><span class="w"> </span><span class="nc">unsafe</span><span class="w"> </span><span class="k">extern</span><span class="w"> </span><span class="s">"C"</span><span class="w"> </span><span class="k">fn</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">usize</span><span class="p">,</span>
+</code></pre></div>
+<p>(<code>:1083-1092</code>), with <code>read_output_sector</code> (<code>:1227-1234</code>) appended later
+for resize. The table is append-only by convention: several entries
+carry the comment "Appended at the end of <code>CallTable</code> so existing
+operation binaries do not need to recompile against shifted offsets to
+keep working". Anything this plan adds goes at the end.</p>
+<p>In the guest core, inputs are an array and the output is a single
+cell: <code>INPUT_DEVICES: [Option&lt;VirtioBlock&gt;; MAX_INPUT_DEVICES]</code>
+(<code>src/core/src/main.rs:129-130</code>, <code>MAX_INPUT_DEVICES = 16</code> at <code>:49</code>)
+against <code>OUTPUT_DEVICE: SingleThreadCell&lt;Option&lt;VirtioBlock&gt;&gt;</code>
+(<code>:135</code>). Device init (<code>:176-233</code>) fills inputs from index 0, then
+places the output at index <code>active_count</code> -- so the output's device
+index already varies with chain depth -- and bounds-checks it against
+<code>MAX_INPUT_DEVICES</code> (<code>:211-216</code>).</p>
+<p>The host tells the guest about devices over serial, <strong>by name</strong>:
+<code>read_config</code> (<code>src/core/src/serial.rs:130-170</code>) matches <code>"input"</code>,
+then <code>"input1"</code> through <code>"input15"</code> via <code>parse_device_index</code>, then
+<code>"output"</code>. Extending that to <code>"output1".."outputN"</code> needs no protobuf
+schema change, only new device names and a wider <code>DeviceConfig</code>
+(<code>:72-95</code>).</p>
+<p><strong>The <code>.bss</code> hazard.</strong> <code>OUTPUT_DEVICE</code> and <code>INPUT_DEVICES</code> are exactly
+the statics that have twice forced the guest memory map to move.
+<code>OPERATION_LOAD_ADDR</code> (<code>src/shared/src/lib.rs:632</code>) documents it: core's
+<code>.bss</code> once overflowed 0x20000 and device init wrote a <code>VirtioBlock</code>
+over the loaded operation's code at 0x20380-0x203c7, corrupting amend's
+header cross-check; the flat-binary size check missed it because the
+flat image excludes <code>.bss</code>. The address was raised to 0x22000, then to
+0x30000, and <code>scripts/check-binary-sizes.sh</code> now measures the
+<code>.bss</code>-inclusive ELF extent with an 85% warning threshold. Measured
+today, core sits at 68 KiB of its 128 KiB budget (53%). Turning
+<code>OUTPUT_DEVICE</code> into a 16-slot array would add roughly a second copy of
+the <code>INPUT_DEVICES</code> region to that figure. Open question 1 turns on
+this as much as on the ceiling.</p>
+<p>Finally, the surfaces that refuse these subformats today, all of which
+this plan changes or deliberately leaves: <code>create</code> rejects
+<code>subformat=twoGbMaxExtent*</code> (<code>docs/create.md:144</code>), <code>resize</code> rejects
+every multi-extent subformat (<code>docs/resize.md:263-264</code>),
+<code>format-internals.md:89</code> records sparse multi-extent as "detected and
+rejected gracefully", and <code>docs/check.md:58</code> claims check validates
+multi-extent twoGbMaxExtentFlat while issue #822 says check refuses
+monolithicFlat outright.</p>
+<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p>Give instar a device model that can write -- and read -- a VMDK split
+across an arbitrary number of extent files, and use it to emit
+<code>twoGbMaxExtentSparse</code> and <code>twoGbMaxExtentFlat</code> the way qemu-img does,
+at any virtual size qemu-img supports.</p>
+<p>The goals graph calls the prerequisite "multi-output-device call
+table", and the measurement above is the reason this plan does not
+simply build that. Extents are capped at 2 GiB each and the device
+model is capped at 16 slots, so <em>simultaneous</em> output devices reach
+about 30 GiB and stop. qemu-img does not stop there. A design that
+opens every extent at once moves instar's ceiling by one device and
+leaves a parity gap that grows with image size; it would also roughly
+double the virtio statics in core's <code>.bss</code>, the one region of the guest
+memory map with a history of silently corrupting loaded operations.
+Open question 1, resolved on 2026-11-16, takes sequential extent
+rotation instead, which bounds the device count at one regardless of
+extent count and fixes the read-side ceiling with the same mechanism.</p>
+<p>In scope:</p>
+<ul>
+<li>A device-rotation mechanism in the call table, core and VMM, letting
+  a guest operation write (and read) a sequence of extent files
+  through a bounded number of device slots.</li>
+<li>Lifting the read-side ceiling: <code>twoGbMaxExtent*</code> sources with more
+  than 15 extents, and <code>twoGbMaxExtentSparse</code> sources at all.</li>
+<li><code>instar create -f vmdk -o subformat=twoGbMaxExtentFlat</code> (and
+  <code>--subformat</code>), host-only, matching qemu's extent naming, descriptor
+  and per-extent sizing.</li>
+<li><code>instar create -f vmdk -o subformat=twoGbMaxExtentSparse</code>, through
+  the guest, with a streaming per-extent grain directory and grain
+  tables in the same shape <code>PLAN-bat-population.md</code> established for the
+  VHDX BAT: compute each entry from its index, stream through one
+  bounded buffer, never hold the table in memory.</li>
+<li><code>instar convert -O vmdk --subformat twoGbMaxExtentSparse|Flat</code>.</li>
+<li><code>instar measure -O vmdk -o subformat=twoGbMaxExtent*</code>.</li>
+<li>A multi-extent descriptor emitter in the crates (<code>no_std</code>,
+  panic-free), shared by create and convert.</li>
+<li><code>check</code> over instar's own multi-extent output, and a decision on
+  what <code>resize</code> does with one.</li>
+<li>Extent path derivation and its safety: N files written from one CLI
+  argument is a new blast radius for a tool whose threat model assumes
+  hostile images.</li>
+<li>A structural multi-extent comparator for the tests and the
+  differential fuzzer, since <code>qemu-img info</code> alone cannot tell a
+  correct extent split from a wrong one.</li>
+</ul>
+<p>Out of scope:</p>
+<ul>
+<li><code>twoGbMaxExtent*</code> as a <em>backing file</em> or in a backing chain. The
+  chain machinery addresses images by device slot, and rotation
+  changes what a slot means mid-operation; combining the two wants its
+  own plan.</li>
+<li>Real preallocation of the new subformats, for the reasons
+  <code>PLAN-bat-population.md</code> open question 1 gives: qemu-img leaves them
+  sparse, so allocating would be an unflagged instar-only behaviour
+  with no oracle. <code>falloc</code> and <code>full</code> stay accepted no-ops and
+  <code>metadata</code> stays refused.</li>
+<li>Retrofitting <code>ddb.*</code> lines onto the existing VMDK subformats. Open
+  question 3 keeps it out and says why.</li>
+<li><code>instar map</code> on flat sources. It refuses every flat source today,
+  not just multi-extent ones, and that refusal is older and wider than
+  this plan.</li>
+<li>Fixing #822 (check refuses monolithicFlat while <code>docs/check.md</code> says
+  it validates it). This plan's check phase must not <em>widen</em> that
+  inconsistency, but closing it belongs to the issue.</li>
+</ul>
+<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
+<p>Each question carries the planner's recommendation and its reasoning.
+The operator resolved questions 1 and 2 on 2026-11-16, before phase 1's
+plan was written, adopting both recommendations as drafted; each
+question records it. Questions 3 to 6 are still open, and phase 1's
+measurements settle much of 4 and 5.</p>
+<ol>
+<li><strong>Simultaneous output devices, or sequential extent rotation?</strong>
+   <em>Recommendation: rotation.</em> Four reasons, in order of weight.</li>
+</ol>
+<p><em>Parity.</em> Measured above: 16 slots total, 2 GiB per extent, so
+   simultaneous devices support 15 extents against qemu's 20-and-up.
+   Rotation bounds the device count at one and has no size ceiling of
+   its own.</p>
+<p><em>The access pattern already suits it.</em> Conversion and creation walk
+   the virtual disk in ascending order, and extent <em>k</em> owns exactly
+   <code>[k*2GiB, (k+1)*2GiB)</code>. Two data extents are never live at once. A
+   sparse extent's grain directory and grain tables live inside that
+   same extent, and the streaming emitter from
+   <code>PLAN-bat-population.md</code> finalises them without a second pass.</p>
+<p><em>It fixes the read side.</em> The shipping bug is the same ceiling. One
+   mechanism, rotated over inputs as well as outputs, closes both; an
+   indexed-output design closes neither.</p>
+<p><em>Core <code>.bss</code>.</em> Rotation keeps <code>OUTPUT_DEVICE</code> a single cell. A
+   16-slot output array adds roughly another <code>INPUT_DEVICES</code> to the
+   region that has twice forced <code>OPERATION_LOAD_ADDR</code> to move and once
+   silently corrupted a loaded operation.</p>
+<p>The cost is honest and should be weighed: rotation adds control flow
+   to a boundary that currently has none. A new call-table entry
+   ("finish the current output extent and bind the next") means the
+   host opens, closes and <code>fsync</code>s files mid-operation, and a failure
+   between extents leaves a partially written image the guest cannot
+   see. Phase 8 owns that lifecycle and its cleanup.</p>
+<p><em>Alternative, if the operator prefers the simpler change:</em> indexed
+   output devices capped at the slot budget, with sizes above the cap
+   refused and the divergence documented. That is less code and no new
+   control flow, and it would still close the goals-graph node as
+   drawn, but instar would carry a size limit qemu does not.</p>
+<p><strong>Resolved 2026-11-16: rotation</strong>, as recommended. The alternative
+   stays recorded here so a later reader knows it was weighed and why
+   it lost, not to leave the decision open. Phase 8 owns the lifecycle
+   cost this choice accepts.</p>
+<ol>
+<li><strong>Does lifting the read-side ceiling belong in this plan?</strong>
+   <em>Recommendation: yes.</em> It is the same mechanism and the same
+   ceiling, it is a bug users can hit today on images instar otherwise
+   supports, and the differential fuzzer cannot check what this plan
+   writes unless instar can read a 20-extent image back. Doing it first
+   (phase 3) also exercises rotation on the read path, where a mistake
+   corrupts nothing, before the write path trusts it.</li>
+</ol>
+<p><em>Against:</em> it widens a plan that is already large, and the read fix
+   has value on its own. If the operator wants it split, phase 3 is the
+   clean seam -- it would become its own small plan that this one
+   depends on.</p>
+<p><strong>Resolved 2026-11-16: in this plan, as phase 3</strong>, as recommended.</p>
+<ol>
+<li><strong>Does multi-extent output emit qemu's <code>ddb.*</code> lines?</strong>
+   <em>Recommendation: yes for the new subformats, and do not retrofit the
+   existing ones here.</em> The descriptor is small, text, and compared
+   byte-for-byte against qemu's in the pin tests; omitting six lines
+   qemu always writes would mean either a weaker oracle or a documented
+   divergence on brand-new output, and the geometry values are
+   computable from the virtual size. Retrofitting <code>monolithicSparse</code>,
+   <code>streamOptimized</code> and <code>monolithicFlat</code> would change the bytes of
+   every VMDK instar has ever written, churn every VMDK baseline, and
+   deserves its own differential-fuzz exposure. Phase 4 files the
+   retrofit as an issue and names it in Future work.</li>
+</ol>
+<p><em>The cost of the recommendation:</em> instar's VMDK descriptors become
+   inconsistent with each other until that retrofit lands -- new
+   subformats carry <code>ddb.*</code>, old ones do not. Phase 17 documents it
+   explicitly rather than leaving a reader to discover it.</p>
+<ol>
+<li><strong>How are extent paths derived, and what is refused?</strong>
+   <em>Recommendation:</em> derive strictly from the output argument's own
+   stem and directory (<code>out.vmdk</code> -&gt; <code>out-s001.vmdk</code>), never from any
+   string in an input descriptor; refuse if any target already exists;
+   refuse a stem that would collide with the descriptor itself; and
+   write every extent before the descriptor, so a failure never leaves
+   a descriptor pointing at files that do not exist. Phase 1 must
+   measure what qemu-img actually does on each of those -- particularly
+   pre-existing targets -- because matching it matters more than any
+   rule invented here.</li>
+</ol>
+<p><em>Measurement (phase 1, 80 qemu builds; not a resolution):</em> a
+   pre-existing file where an extent goes is not refused, in either
+   split subformat. On all 80 builds qemu returns rc 0 with empty
+   stderr and writes the image exactly as it does without the
+   obstruction. A second hard link kept to the file reports the
+   extent's length, not the original 1 MiB, so qemu truncated it in
+   place rather than unlinking it and creating its own file --
+   shrinking it for a sparse extent and growing it for a flat one,
+   which is the same <code>ftruncate</code> in both directions. Any other hard link, and any open
+   descriptor, follows the image. What qemu does is not by itself
+   what instar should do: silently truncating a file the user did not
+   name is a different risk calculus for a tool whose threat model
+   assumes hostile input. The recommendation above stands
+   unresolved; the decision is the operator's.</p>
+<ol>
+<li><strong>What is the maximum extent count, and what happens past it?</strong>
+   The <code>%03d</code> naming implies 999 extents, about 2 TiB. <em>Recommendation:</em>
+   measure qemu's real ceiling in phase 1 and match it, refusing above
+   it with a message that names the limit and the size that would reach
+   it, before the output file is opened -- the shape
+   <code>PLAN-bat-population.md</code> used for VHDX's 64 TiB refusal, which
+   leaves nothing behind where qemu-img leaves an empty file.</li>
+</ol>
+<p><em>Measurement (phase 1; not a resolution):</em> the premise above is
+   false. <code>%03d</code> is a minimum field width, not a cap. Probed on
+   6.0.0, 7.2.0, 8.2.0 and 10.2.0, both split subformats: at 2000 GiB
+   all four builds write 1000 extents, rc 0, empty stderr, and the
+   thousandth descriptor line is verbatim
+   <code>RW 4194304 SPARSE "image-s1000.vmdk"</code>. At 32 TiB all four write
+   16384 extents. At 1 PiB 10.2.0 still does not refuse; a 60 s
+   timeout stopped it at extent 70168 of 524288. The only refusal
+   anywhere near is qemu-img's generic size parser, identical on
+   every build: <code>qemu-img: Invalid image size specified. Must be
+   between 0 and 9223372036854775807.</code> So there is no qemu ceiling
+   to match. The recommendation above was written before this
+   measurement and its "measure and match" reasoning no longer
+   applies as stated. Whether instar matches qemu or imposes a
+   documented limit of its own is the operator's decision, still
+   open.</p>
+<ol>
+<li><strong>Is flat create host-only, like monolithicFlat?</strong>
+   <em>Recommendation: yes,</em> and it should land <em>before</em> the ABI work.
+   A flat multi-extent image is N sparse files of known length plus a
+   text descriptor -- no format emission, nothing the guest is needed
+   for. <code>PLAN-bat-population.md</code> already established host-only
+   monolithicFlat create. That makes phase 5 a cheap, user-visible
+   delivery that does not depend on phases 6 to 8, and it de-risks the
+   descriptor emitter and the path rules by exercising them first.</li>
+</ol>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<!-- shared-block: plan-push-audit-phase v4 -->
+<p>Push audit phase (shared block; do not edit -- the canonical
+copy lives in shakenfist/development at
+<code>templates/shared-blocks/plan-push-audit-phase.md</code>):</p>
+<ul>
+<li>Every master plan ends with a phase that runs the repository's
+  <code>PUSH-AUDIT.md</code> over the whole plan's work. It is the last row of
+  the Execution table and it is not optional. The rule binds every
+  plan that carries the phase, which is decidable from the plan file
+  alone: a plan that is already <code>Complete</code>, <code>Abandoned</code> or
+  <code>Superseded</code> and does not carry the phase is not reopened to
+  acquire one, and a plan that has the phase runs it even if it
+  reaches <code>Complete</code> before the phase does.</li>
+<li>That phase audits the accumulated diff of every phase in the plan
+  against the default branch, not the diff of the last phase alone.
+  Auditing one phase at a time would miss what the phases did to
+  each other -- the duplicated helper that only exists once phases
+  three and six have both landed, the doc page that phase two made
+  wrong and phase five never revisited.</li>
+<li>Once the plan's phases have merged, a diff against the default
+  branch is empty and would read as a clean audit. The range is not
+  reliably derivable after the fact either: unrelated work lands on
+  the default branch between phases, so anything anchored on "since
+  the plan file appeared" is far too wide. It has to be recorded. As
+  each phase lands, what put it on the default branch goes into the
+  plan: the merge commit of its pull request, whose diff against its
+  first parent is the whole of what landed, or -- where the phase
+  landed directly -- every commit of the phase, or its <code>first..last</code>
+  range. A single commit is only ever enough when it is a merge
+  commit.</li>
+<li>Where the Execution phases are a table, that record is a <code>Merged</code>
+  column, added last so that a row which omits it still reaches
+  <code>Status</code>; where they are prose sections it is a <code>Merged:</code> line in
+  the phase's own section. The <code>Status</code> column keeps its single
+  vocabulary term and nothing else (see <code>plan-status-vocabulary</code>).
+  A phase that landed in another repository records <code>&lt;repo&gt; &lt;sha&gt;
+  (#pr)</code> and is audited against that repository's default branch, as
+  part of the pull request that lands it; the plan's own push-audit
+  phase cites that audit rather than re-running it.</li>
+<li>Phases that landed before the plan started recording them are
+  reconstructed rather than left blank. Recover what you can from
+  <code>gh pr list --state merged</code> and <code>git rev-list --first-parent</code>, and
+  say in the plan that the range was reconstructed. Do not trust a
+  path-filtered <code>git log</code> on its own: it lists the commits that
+  touched a path without saying which arrived directly and which
+  arrived inside a pull request, and recording a commit that came in
+  under a merge audits one commit of that pull request rather than
+  the pull request. A reconstructed record may be a summary table in
+  the audit phase's own section rather than a column or a line in
+  the Execution table, which keeps retrospective archaeology out of
+  a table that tracks live status. Where a phase accreted over
+  months of unrelated commits and no range is recoverable, say that
+  instead and name the paths the audit read -- an audit that says
+  what it could not scope is a result; one that silently audits
+  nothing is not.</li>
+<li>Findings land as their own pull request against the default
+  branch, and the plan is not complete until they are resolved or
+  explicitly declined in writing. A finding that is declined says
+  why, in the plan, where the next reader will find it.</li>
+<li>Where the audit finds nothing, record that in the plan in one
+  sentence. It is a real result, and a run of them is the evidence
+  for making the phase conditional rather than mandatory.</li>
+<li>A repository with no <code>PUSH-AUDIT.md</code> still carries the phase, and
+  the phase says that the runbook does not exist yet and what was
+  done instead. Silently omitting it is what let the audit go
+  untriggered for as long as it did. What is done instead is at
+  least the checklist below, applied to the recorded ranges: it is
+  a floor, not a substitute for a runbook, and a plan adds the
+  questions its own repository's blast radius raises. Each item
+  gets a verdict, or a sentence saying why it does not apply.
+  Do not borrow another repository's runbook instead: a runbook is
+  written for one repository's blast radius.</li>
+<li>Every recorded landing takes one of the forms above: a merge
+     commit with two parents, whose diff is read against its first
+     parent; every commit of a direct landing, or its <code>first..last</code>
+     range; a landing in another repository, whose own audit is
+     cited; or a statement that no range is recoverable, naming the
+     paths the audit read.</li>
+<li>Anything the diff added that runs unattended -- cron, a timer,
+     a scheduled workflow, a self-update -- reports its own failure
+     somewhere a human sees, or is named as not doing so.</li>
+<li>No secret or token entered any repository, and no private
+     hostname or IP address entered a repository more public than
+     the one it came from.</li>
+<li>Anything the diff removed or renamed has no consumer left,
+     checked by grep across every repository that could consume it
+     rather than by assumption, with the greps stated.</li>
+<li>Where the repository publishes something -- an image, a
+     release, a package -- a broken change fails closed: one that
+     publishes nothing is recoverable, one that publishes something
+     wrong is not.</li>
+</ul>
+<!-- shared-block-end -->
+
+<p>The phase order is chosen so that the cheap, user-visible delivery
+(phase 5, host-only flat create) lands before the ABI change, and so
+that rotation is proved on the read path (phase 3), where a mistake
+cannot corrupt an output, before the write path depends on it.</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Plan</th>
+<th>Status</th>
+<th>Merged</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Pin and measure qemu's output</td>
+<td><a href="/components/instar/plans/PLAN-multi-extent-vmdk-phase-01-pin/">PLAN-multi-extent-vmdk-phase-01-pin.md</a></td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>2. Fixtures and baselines</td>
+<td>PLAN-multi-extent-vmdk-phase-02-fixtures.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>3. Read side: lift the extent ceiling</td>
+<td>PLAN-multi-extent-vmdk-phase-03-read-ceiling.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>4. Multi-extent descriptor emitter</td>
+<td>PLAN-multi-extent-vmdk-phase-04-descriptor.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>5. Host-only flat create</td>
+<td>PLAN-multi-extent-vmdk-phase-05-flat-create.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>6. ABI: output rotation</td>
+<td>PLAN-multi-extent-vmdk-phase-06-abi.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>7. Core: rotation in the guest</td>
+<td>PLAN-multi-extent-vmdk-phase-07-core.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>8. VMM: extent lifecycle and safety</td>
+<td>PLAN-multi-extent-vmdk-phase-08-vmm.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>9. Streaming grain tables</td>
+<td>PLAN-multi-extent-vmdk-phase-09-grain-tables.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>10. Sparse create</td>
+<td>PLAN-multi-extent-vmdk-phase-10-sparse-create.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>11. convert -O vmdk multi-extent</td>
+<td>PLAN-multi-extent-vmdk-phase-11-convert.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>12. measure</td>
+<td>PLAN-multi-extent-vmdk-phase-12-measure.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>13. check and resize</td>
+<td>PLAN-multi-extent-vmdk-phase-13-check-resize.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>14. Baselines across the version matrix</td>
+<td>PLAN-multi-extent-vmdk-phase-14-baselines.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>15. Integration tests</td>
+<td>PLAN-multi-extent-vmdk-phase-15-integration.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>16. Fuzzing</td>
+<td>PLAN-multi-extent-vmdk-phase-16-fuzz.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>17. Documentation</td>
+<td>PLAN-multi-extent-vmdk-phase-17-docs.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>18. Push audit</td>
+<td>-</td>
+<td>Not started</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="phase-intents">Phase intents<a class="headerlink" href="#phase-intents" title="Permanent link">&para;</a></h3>
+<p>Each phase gets its own plan file before it is implemented; these are
+the one-paragraph intents the phase plans expand.</p>
+<p><strong>1. Pin and measure qemu's output.</strong> Establish the oracle before
+writing anything. Phase 1's survey corrected this section: the
+cross-version sweep already exists, built by
+<code>PLAN-bat-population-phase-01-pin.md</code> -- <code>tools/sweep-qemu-create.py</code>,
+<code>tests/helpers/qemu_pins.py</code>, <code>tests/golden/qemu-create-pins.json</code> and
+<code>tests/test_qemu_create_pins.py</code>, over the 80 static builds in
+<code>instar-testdata/qemu-img-binaries/x86_64/&lt;version&gt;/qemu-img</code> -- and
+this phase extends it rather than starting one. It also adds the VMDK
+structural parser that phases 10, 11 and 16 depend on, and makes the
+pinned descriptor able to prove an extent naming scheme and ordering,
+which it cannot today. Measure, per version: descriptor bytes for both
+subformats; extent naming; per-extent sector counts for sizes that are
+and are not multiples of 2 GiB; the <code>ddb.*</code> values and how geometry is
+derived; the maximum extent count and the refusal past it; behaviour
+when a target extent already exists; and whether any of this moved
+between versions. Record every answer as a measurement with the version
+that produced it. <strong>Nothing in later phases may assert a qemu-img
+behaviour this phase did not measure</strong> -- sub-agents have asserted
+plausible-but-wrong qemu-img capabilities repeatedly in this
+repository, and the preallocation leaf in <code>PLAN-bat-population.md</code>
+turned on exactly this kind of check.</p>
+<p><strong>2. Fixtures and baselines.</strong> Add <code>twoGbMaxExtent{Sparse,Flat}</code>
+fixtures to <code>instar-testdata</code> with their manifest entries, including at
+least one image past the current 15-extent ceiling so phase 3 has
+something to prove itself against, and one whose last extent is
+partial. Remember that repository takes direct commits to <code>main</code>, never
+a merge request, and that it is git-LFS backed. Generate baselines with
+<code>--no-commit</code> and validate the derived profile directories rather than
+trusting them; they have twice been silently wrong while the raw
+baselines were fine.</p>
+<p><strong>3. Read side: lift the extent ceiling.</strong> Implement rotation on the
+input path and remove the 15-extent limit for multi-extent sources, and
+add <code>twoGbMaxExtentSparse</code> as a readable input. This is where rotation
+is designed and proved; a mistake here fails a read, not an image.
+Includes the guard at <code>src/vmm/src/main.rs:15088</code> and its siblings, and
+<code>DeviceSet::add_device</code>'s panic, which should become unreachable by
+construction rather than by a caller remembering to check.</p>
+<p><strong>4. Multi-extent descriptor emitter.</strong> One <code>no_std</code>, panic-free
+emitter in the crates that writes a multi-extent descriptor from a
+geometry, used by both create and convert, carrying the <code>ddb.*</code>
+decision from open question 3. Files the retrofit issue for the
+existing subformats.</p>
+<p><strong>5. Host-only flat create.</strong> <code>create -f vmdk -o
+subformat=twoGbMaxExtentFlat</code>, written entirely on the host: N sparse
+extent files of the measured lengths plus the descriptor. No ABI
+change, no guest involvement. Carries the path-derivation rules from
+open question 4 and the extent-count refusal from question 5.</p>
+<p><strong>6. ABI: output rotation.</strong> The call-table change, appended at the end
+of <code>CallTable</code> for the back-compat reason the existing entries
+document, plus the serial <code>DeviceConfig</code> extension. Re-measure core's
+<code>.bss</code>-inclusive extent with <code>scripts/check-binary-sizes.sh</code> as part of
+the phase's definition of done, not afterwards.</p>
+<p><strong>7. Core: rotation in the guest.</strong> The guest side of rotation in
+<code>src/core/src/main.rs</code> and <code>serial.rs</code>: binding, rebinding, bounds, and
+what an operation sees when rotation fails. Guest operations are
+<code>no_std</code> and panic-free; a failed rotation is an error code, never a
+fault.</p>
+<p><strong>8. VMM: extent lifecycle and safety.</strong> The host side: opening,
+<code>fsync</code>ing and closing extents as the guest advances, the path rules,
+refusing pre-existing targets, and cleanup when an operation fails
+part-way so a failure never leaves a descriptor pointing at a
+half-written set. This phase owns the blast radius that open question 1
+names as rotation's cost.</p>
+<p><strong>9. Streaming grain tables.</strong> The per-extent grain directory and grain
+table emitter, in the shape <code>PLAN-bat-population.md</code> established for
+the VHDX BAT: computed per index, streamed through one bounded buffer,
+never held in memory. The cluster-size and geometry matrix matters
+here -- a fixed staging buffer that only ever saw one geometry is
+exactly the defect the bitmap plan's phase 7 found.</p>
+<p><strong>10. Sparse create.</strong> <code>create -f vmdk -o
+subformat=twoGbMaxExtentSparse</code> through the guest, on phases 6 to 9.</p>
+<p><strong>11. convert -O vmdk multi-extent.</strong> Both subformats as convert
+targets.</p>
+<p><strong>12. measure.</strong> <code>measure -O vmdk -o subformat=twoGbMaxExtent*</code>,
+against the phase 1 baselines. Note that 81 safe fixtures have no
+measure baselines at any version (#845); new fixtures must not quietly
+join them.</p>
+<p><strong>13. check and resize.</strong> <code>check</code> over instar's own multi-extent
+output, and a decision on <code>resize</code>: today it refuses every multi-extent
+subformat, and the honest options are to keep refusing with a better
+message or to support growing by appending extents. Must not widen</p>
+<h1 id="822s-docsbehaviour-mismatch">822's docs/behaviour mismatch.<a class="headerlink" href="#822s-docsbehaviour-mismatch" title="Permanent link">&para;</a></h1>
+<p><strong>14. Baselines across the version matrix.</strong> Generate and validate
+baselines for every new case across the pinned qemu versions, and check
+the distro matrix: RHEL's <code>qemu-kvm</code> omits several drivers, so a
+capability is not a version.</p>
+<p><strong>15. Integration tests.</strong> Python integration coverage for every new
+surface, including the structural comparator. Watch for the subunit
+attachment trap: an attachment over 4 MiB kills a stestr worker and the
+run still exits 0, so check "Ran: N" rather than trusting a green exit.</p>
+<p><strong>16. Fuzzing.</strong> Coverage targets for the emitter and the descriptor
+parser, and differential-fuzz arms for both subformats with a
+structural comparator -- <code>qemu-img info</code> cannot tell a correct extent
+split from a wrong one, the same reason phase 11 of
+<code>PLAN-bat-population.md</code> needed a VHDX structural comparator. Make sure
+the new options are actually drawn: an option the picker never draws is
+not coverage.</p>
+<p><strong>17. Documentation.</strong> <code>docs/create.md</code>, <code>docs/convert.md</code>,
+<code>docs/measure.md</code>, <code>docs/resize.md</code>, <code>docs/check.md</code>,
+<code>docs/format-internals.md</code>, <code>docs/vmdk/vmdk-format.md</code>, the CHANGELOG,
+and <code>ARCHITECTURE.md</code> -- the last only because rotation changes the
+shape of the device model, which is exactly what that file is for.
+Documents the <code>ddb.*</code> inconsistency from open question 3 explicitly.</p>
+<p><strong>18. Push audit.</strong> Per the shared block above.</p>
+<h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
+<h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
+<!-- shared-block: subagent-execution-model v1 -->
+<p>Sub-agent execution model (shared block; do not edit -- the
+canonical copy lives in shakenfist/development at
+<code>templates/shared-blocks/subagent-execution-model.md</code>):</p>
+<p>All implementation work is done by sub-agents, never in the
+management session. The management session is reserved for
+planning, review, and decision-making. This keeps the management
+context lean and avoids drowning it in implementation diffs.</p>
+<p>The workflow is:</p>
+<ol>
+<li><strong>Plan</strong> at high effort in the management session.</li>
+<li><strong>Spawn a sub-agent</strong> for each implementation step with the
+   brief from the plan, at the recommended effort level and model.</li>
+<li><strong>Review</strong> the sub-agent's output in the management session.
+   Check the actual files -- the sub-agent's summary describes
+   what it intended, not necessarily what it did.</li>
+<li><strong>Fix or retry</strong> if the output is wrong. Diagnose whether the
+   brief was insufficient (improve it) or the model was too light
+   (upgrade it), then re-run.</li>
+<li><strong>Commit</strong> once the management session is satisfied.</li>
+</ol>
+<p>This applies to all steps, including high-effort ones. If a
+sub-agent cannot succeed even with a detailed brief and the right
+model, that is a signal the brief needs improving, not that the
+management session should do the implementation itself.</p>
+<p>Use <code>isolation: "worktree"</code> for sub-agents when the change is
+risky or experimental; the worktree is discarded if the output is
+unsatisfactory. For safe, well-understood changes, sub-agents can
+work directly in the main tree.</p>
+<!-- shared-block-end -->
+
+<h3 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h3>
+<p>The ABI and rotation phases (3, 6, 7, 8) turn on design decisions at
+the guest/host boundary and are planned at high effort. Phase 1 is
+high effort because everything downstream rests on its measurements.
+Phases 5, 10, 11 and 12 follow patterns already established by
+<code>PLAN-bat-population.md</code> and <code>PLAN-create.md</code> and can be planned at
+medium. Phases 14, 15 and 17 are mechanical.</p>
+<h3 id="verification-that-is-not-optional">Verification that is not optional<a class="headerlink" href="#verification-that-is-not-optional" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Cite or measure.</strong> No phase asserts a qemu-img behaviour without
+  either a measurement in this plan or a citation to qemu source. The
+  management session re-runs a sample of any sub-agent's measurements.</li>
+<li><strong>Never trust a single green run.</strong> The integration suite is
+  zero-fail on healthy testdata, but a <code>test_convert</code> cluster on this
+  host reporting "Content mismatch at offset 0" or "convert operation
+  failed" is 16-worker contention, not a regression; replay at low
+  concurrency with <code>--select</code> before attributing it.</li>
+<li><strong>Run the consumer suites.</strong> A change to a crate can alter
+  non-gated behaviour in the operations that link it; crate tests
+  alone are not enough.</li>
+<li><strong>Re-measure the binary sizes.</strong> Phases 6 and 7 change core's
+  <code>.bss</code>. <code>scripts/check-binary-sizes.sh</code> is part of their definition
+  of done.</li>
+<li><strong>Mutation-check the guards.</strong> Where a phase adds a test that is
+  meant to prove a refusal or a bound, prove the test would notice its
+  absence.</li>
+</ul>
 <h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
 <h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
-<p>We will know this plan is successfully implemented when:</p>
-<ul>
-<li><code>make instar</code> builds and <code>make lint</code> is clean.</li>
-<li>Guest binaries pass <code>make check-binary-sizes</code> (384KB limit per
-  operation) — particularly important given Open question 1.</li>
-<li>All Rust unit tests pass (<code>make test-rust</code>).</li>
-<li>All Python integration tests pass (<code>make test-integration</code>),
-  including the full 14-row cross-validation matrix against real
-  <code>qemu-img dd</code>.</li>
-<li><code>pre-commit run --all-files</code> passes.</li>
-<li><code>instar dd</code> matches upstream <code>qemu-img dd</code> on operand parsing,
-  window/size semantics, default-raw output, dense copying, and
-  exit codes (error-message text may diverge per Open question 3).</li>
-<li>Differential fuzzing of <code>dd</code> against <code>qemu-img dd</code> runs clean.</li>
-<li>Documentation in <code>docs/</code> is updated, and <code>ARCHITECTURE.md</code>,
-  <code>README.md</code>, <code>AGENTS.md</code>, and <code>CHANGELOG.md</code> reflect the new
-  subcommand.</li>
-</ul>
+<ol>
+<li><code>instar create -f vmdk -o subformat=twoGbMaxExtentSparse</code> and
+   <code>...=twoGbMaxExtentFlat</code> produce images byte-identical to
+   qemu-img's for every measured geometry, or divergent only where a
+   divergence is documented and justified.</li>
+<li><code>instar convert -O vmdk --subformat twoGbMaxExtent*</code> likewise.</li>
+<li><code>instar measure</code> reports what qemu-img reports for both subformats.</li>
+<li>instar reads a <code>twoGbMaxExtent*</code> image with more than 15 extents,
+   and reads <code>twoGbMaxExtentSparse</code> sources at all.</li>
+<li>The size at which instar refuses a multi-extent image matches
+   qemu-img's, and the refusal leaves nothing behind.</li>
+<li>A failure part-way through writing a multi-extent image never
+   leaves a descriptor pointing at a set of extents that does not
+   match it.</li>
+<li>The differential fuzzer compares multi-extent output structurally,
+   not just through <code>qemu-img info</code>, and the new options are drawn.</li>
+<li><code>make test</code> and the integration suite are zero-fail, with "Ran: N"
+   checked rather than the exit code trusted.</li>
+</ol>
+<h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
+<p>This plan is registered in <code>docs/plans/index.md</code> and <code>docs/plans/order.yml</code>
+when it is created, and its status there is kept in step with the
+Status line above.</p>
 <h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
+<p>Filled in as the plan runs. Already known:</p>
 <ul>
-<li>The PVE/downstream extensions listed under "Explicitly out of
-  scope": <code>osize=</code>/<code>isize=</code>, <code>seek=</code>, stdin/stdout streaming,
-  <code>-n</code>, <code>-l</code>, <code>--target-image-opts</code>, and the <code>-o</code>/compression/
-  backing/preallocation create options.</li>
-<li><code>--image-opts</code> / <code>--object</code> / <code>-U</code> if Open question 4 defers
-  them.</li>
-<li>If Open question 1 chose (a), evaluate extracting convert's
-  format writers into a shared <code>no_std</code> crate (option (b)) so
-  <code>dd</code>, <code>convert</code>, and any future writer-consumers share one
-  implementation.</li>
-<li>The sibling in-scope subcommands <code>bench</code> and <code>bitmap</code> (separate
-  master plans; <code>bench</code> pending a design spike on whether
-  sandboxed benchmarking is meaningful).</li>
-<li><strong><code>-f</code> input-format forcing</strong> — <code>-f</code> is accepted but
-  auto-detection is authoritative; threading a forced format
-  through <code>discover_backing_chain</code> is deferred (OQ4-adjacent).</li>
-<li><strong><code>fuzz_dd_operands</code></strong> — <code>parse_dd_operands</code> is unit-tested but
-  not coverage-fuzzed (phase 8 omitted it: CLI parsing isn't fuzzed
-  for any command, and it would require relocating
-  <code>parse_qemu_img_size</code> to a lib crate). Add if that calculus
-  changes.</li>
-<li><strong><code>count=0 -O vhdx</code> (empty-window VHDX)</strong> — instar produces a
-  0-virtual-size VHDX that <code>qemu-img info</code> rejects (no data, exits
-  0); qemu's empty VHDX is readable. Phase 9 whitelisted it as a
-  known divergence so the differential campaign runs clean; making
-  instar's empty VHDX qemu-readable (the difference appears to be
-  the empty BAT region layout) remains open. (The empty-window vmdk
-  case matches qemu — qemu's own <code>count=0 -O vmdk</code> exits 1.)</li>
-<li><strong>Cherry-pick the convert sub-cluster data-loss fix (<code>779e7a7</code>)
-  to <code>develop</code></strong> — it fixes shipped <code>instar convert -O
-  vmdk|vpc|vhdx</code> for qcow2 inputs with sub-grain cluster sizes, not
-  just dd. (See Bugs fixed.)</li>
+<li>Retrofitting <code>ddb.*</code> onto <code>monolithicSparse</code>, <code>streamOptimized</code> and
+  <code>monolithicFlat</code> descriptors (open question 3), which churns every
+  existing VMDK baseline and wants its own differential-fuzz exposure.</li>
+<li><code>twoGbMaxExtent*</code> as a backing file or in a backing chain, excluded
+  from scope above.</li>
+<li><code>instar map</code> on flat sources, which is refused today for all flat
+  sources and is wider than this plan.</li>
+<li>Making <code>tests/helpers/vmdk_structure.py</code> check an image against
+  itself, rather than only against another image. It never compares an
+  extent line's declared sector count with the sparse header's capacity
+  or with a flat extent's file length, so an image whose descriptor and
+  extents disagree parses cleanly and is caught only if the image it is
+  compared against happens to be right. Raised in review on
+  <a href="https://github.com/shakenfist/instar/pull/921">#921</a> and left to the
+  phases that use the parser as an oracle (10, 11 and 16), because what
+  counts as internally consistent is a property of the writer those
+  phases build, and a refusal added now would be guessing at it. The
+  same entry covers two neighbours raised in the same review: a start
+  offset is carried through on any extent kind although only <code>FLAT</code>
+  lines are supposed to have one, and a <code>ZERO</code> extent that carries a
+  filename is opened and measured as though it held data. No writer
+  produces either, so each is a rule about malformed input rather than
+  a defect against anything that exists.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>convert sub-cluster data loss (<code>779e7a7</code>, phase 9).</strong> The
-  vmdk/vhd/vhdx output writers passed a full grain/block to
-  <code>read_chain_virtual_cluster</code>, which fills at most one input
-  cluster, so qcow2 inputs whose cluster size is smaller than the
-  output grain/block were silently truncated. <strong>Pre-existing on
-  develop</strong> (not dd-specific) — <code>instar convert -O vmdk|vpc|vhdx</code>
-  of a sub-64 KiB-cluster qcow2 dropped data. Surfaced by dd
-  differential fuzzing (<code>op_dd</code> targets the structured formats;
-  <code>op_convert</code> only did raw/qcow2). Fixed with
-  <code>qcow2::read_chain_virtual_range</code>. <strong>Worth cherry-picking to
-  develop independently of the dd branch.</strong></li>
-<li><strong>Dense-VHD output-capacity under-estimate (<code>b80c5d7</code>, phase
-  9).</strong> A dense (dd) dynamic-VHD output's per-block sector-bitmap +
-  64 KiB alignment overhead exceeded the generic structured
-  headroom, so the guest's final write ran past device capacity and
-  stalled. <code>compute_output_capacity</code> now sizes the VHD case
-  explicitly.</li>
-</ul>
-<h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
-<ul>
-<li><code>docs/plans/index.md</code> — a row has been added to the <em>Master
-  plans</em> table for this plan (status <em>Not started</em>); flip it to
-  <em>Complete</em> when all phases land.</li>
-<li><code>docs/plans/order.yml</code> — an entry has been added for
-  <code>PLAN-dd.md</code>. Phase files are intentionally <strong>not</strong> listed in
-  <code>order.yml</code>.</li>
-</ul>
+<p>Filled in as the plan runs. The read-side ceiling measured in the
+Situation needs an issue filed before phase 3 starts, so that the fix
+has something to close.</p>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
-<p>Before executing any step of this plan, the executing session
-should back brief the operator on its understanding of the plan
-and how the intended work aligns with it.</p>
+<p>Before implementation begins, the implementing session restates this
+plan's mission, the resolved open questions, and the phase it is
+starting, in its own words, and the operator confirms. Questions 1 and
+2, which change the shape of the whole plan, were resolved on
+2026-11-16; questions 3 to 6 remain open, and phase 1's plan file names
+which of them its measurements settle.</p>
 
 
 
@@ -16917,7 +17090,7 @@ and how the intended work aligns with it.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/instar/plans/PLAN-dd.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/instar/plans/PLAN-dd.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/instar/plans/PLAN-dd/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/instar/plans/PLAN-multi-extent-vmdk.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/instar/plans/PLAN-multi-extent-vmdk.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/instar/plans/PLAN-multi-extent-vmdk/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

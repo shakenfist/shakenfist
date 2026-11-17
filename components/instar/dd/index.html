@@ -6358,34 +6358,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-dd/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    instar dd subcommand
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-bitmap/" class="md-nav__link">
         
   
@@ -6562,6 +6534,34 @@
     
   
     Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-multi-extent-vmdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-extent VMDK output
   
 
     
@@ -16627,10 +16627,12 @@ possible; only <code>instar dd</code> exit 0 is asserted.</p>
 <code>instar dd</code> also exits 0 but its empty vhdx is rejected by <code>qemu-img
 info</code>. No data is lost (both have zero payload); this is a limitation
 of the vhdx writer when the virtual size is zero. It is tracked as
-future work; see <a href="#future-work">Future work</a>.</p>
+<a href="https://github.com/shakenfist/instar/issues/917">#917</a>; see also
+<a href="#future-work">Future work</a>.</p>
 <h3 id="-f-input-format-flag"><code>-f</code> input format flag<a class="headerlink" href="#-f-input-format-flag" title="Permanent link">&para;</a></h3>
 <p><code>-f FMT</code> is accepted by the CLI and validated, but format forcing is
-deferred to a future release. Auto-detection from the file's magic bytes
+deferred (<a href="https://github.com/shakenfist/instar/issues/918">#918</a>).
+Auto-detection from the file's magic bytes
 is authoritative. Passing <code>-f raw</code> on a raw input does not cause an
 error and the output matches <code>qemu-img dd</code> (which uses auto-detection),
 but the hint itself is currently ignored.</p>
@@ -16688,10 +16690,11 @@ transparently), write raw:</p>
 </code></pre></div>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong><code>-f</code> input format forcing.</strong> The <code>-f</code> flag is accepted but the
-  hint is currently ignored; auto-detection is authoritative.
-  Wiring the hint through <code>discover_backing_chain</code> is a small
-  follow-up.</li>
+<li><strong><code>-f</code> input format forcing</strong>
+  (<a href="https://github.com/shakenfist/instar/issues/918">#918</a>). The <code>-f</code>
+  flag is accepted but the hint is currently ignored; auto-detection
+  is authoritative. Wiring the hint through <code>discover_backing_chain</code>
+  is a small follow-up.</li>
 <li><strong><code>--image-opts</code> / <code>--object</code> / <code>-U</code>.</strong> The QEMU driver-option,
   object, and unlock flags are not implemented. These depend on
   QEMU's <code>--image-opts</code> URL syntax and are low-priority for instar's
@@ -16699,10 +16702,11 @@ transparently), write raw:</p>
 <li><strong>PVE/downstream extensions.</strong> <code>osize=</code>, <code>isize=</code>, <code>seek=</code>,
   stdin/stdout, <code>-n</code>, <code>-l</code>, <code>--target-image-opts</code>, and <code>-o</code> (driver
   create options) are out of scope for upstream parity.</li>
-<li><strong>Readable empty vhdx (<code>count=0 -O vhdx</code>).</strong> instar's zero-virtual-
-  size vhdx is currently rejected by <code>qemu-img info</code>. The vhdx writer
-  needs to produce a header/metadata structure that qemu-img accepts
-  even when there is no payload data.</li>
+<li><strong>Readable empty vhdx (<code>count=0 -O vhdx</code>)</strong>
+  (<a href="https://github.com/shakenfist/instar/issues/917">#917</a>). instar's
+  zero-virtual-size vhdx is currently rejected by <code>qemu-img info</code>. The
+  vhdx writer needs to produce a header/metadata structure that
+  qemu-img accepts even when there is no payload data.</li>
 <li><strong><code>seek=</code> output offset.</strong> Allows writing into the middle of an
   existing output file. Not in upstream <code>qemu-img dd</code>; add only if a
   concrete downstream need appears.</li>

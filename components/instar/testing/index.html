@@ -6380,34 +6380,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-dd/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    instar dd subcommand
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../plans/PLAN-bitmap/" class="md-nav__link">
         
   
@@ -6584,6 +6556,34 @@
     
   
     Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-multi-extent-vmdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-extent VMDK output
   
 
     
@@ -19917,9 +19917,11 @@ deciding which side moved.</p>
 writes for the commands in <code>tests/helpers/qemu_pins.py</code> (<code>CASES</code>):
 VHDX create and convert (as a structural summary from
 <code>tests/helpers/vhdx_structure.py</code>, including the BAT), what
-preallocation changes for vpc, vmdk and vhdx, and the vmdk
-monolithicFlat descriptor. Results are grouped by outcome, so a
-version boundary shows up as a case with more than one group.</p>
+preallocation changes for vpc, vmdk and vhdx, the vmdk
+monolithicFlat descriptor, and the vmdk <code>twoGbMaxExtentSparse</code> and
+<code>twoGbMaxExtentFlat</code> subformats, which split an image into extents of
+at most 2 GiB. Results are grouped by outcome, so a version boundary
+shows up as a case with more than one group.</p>
 <p>Each preallocation mode records whether its image has the same bytes
 (<code>same_bytes_as_off</code>) and the same allocation
 (<code>same_allocation_as_off</code>) as a <code>preallocation=off</code> image. The <code>off</code>
@@ -19927,6 +19929,26 @@ entry compares two <code>off</code> images, and the bytes that differ between
 those images are masked out, so its <code>same_bytes_as_off</code> is true by
 construction. Only its allocation comparison is measured. The <code>falloc</code>
 and <code>full</code> entries are the ones that carry evidence.</p>
+<p>A split-subformat case records the normalised descriptor and, beside
+it, the extents it names: <code>extent_names</code>, each name with the image's
+stem replaced by <code>$STEM</code>, so the pin holds the naming scheme and not
+a scratch path; <code>extent_lengths</code>, the length of the file each extent
+line names, resolved against the directory holding the descriptor,
+<code>null</code> for one that is not there and the string <code>refused</code> for a name
+that resolves outside that directory -- a writer that failed to create
+a file it promised and one that pointed at a file the image does not
+own are different findings; and, for a sparse extent, the
+<code>structure</code> that <code>tests/helpers/vmdk_structure.py</code> reads, which
+carries the VMDK4 header fields a reader walks the extent with. The
+names and the lengths come from the descriptor qemu wrote rather than
+from qemu's naming rule, so an extent named wrongly or never created
+reads as a missing file instead of being looked for under the name it
+should have had. Two cases, one per subformat, put a file where the
+second extent is about to go and keep a second hard link to it, so
+their <code>existing_kept_lengths</code> says whether qemu truncated that file in
+place or replaced it. Both writers are measured because they take
+different paths: a flat extent is extended to its full declared
+length where a sparse one is written a header.</p>
 <p><code>tests/test_qemu_create_pins.py</code> keeps it honest. It fails when a
 build is present that the pin does not list, when 6.0.0, 6.2.0,
 8.2.0, 10.2.0 or the host <code>qemu-img</code> no longer produce what the pin

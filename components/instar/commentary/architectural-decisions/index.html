@@ -6298,34 +6298,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/PLAN-dd/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    instar dd subcommand
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../plans/PLAN-bitmap/" class="md-nav__link">
         
   
@@ -6502,6 +6474,34 @@
     
   
     Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-multi-extent-vmdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-extent VMDK output
   
 
     
@@ -16526,6 +16526,67 @@ recorded deferral); and refcount-growth <em>execution</em> stays op-side as a
 shared helper rather than being expressed as steps. The payoff -- COW,
 growth, and the crash-ordering contract implemented and verified once --
 is worth it.</p>
+<hr />
+<h2 id="decision-12-dd-is-convert-with-a-window-not-its-own-guest-binary">Decision 12: <code>dd</code> is <code>convert</code> with a window, not its own guest binary<a class="headerlink" href="#decision-12-dd-is-convert-with-a-window-not-its-own-guest-binary" title="Permanent link">&para;</a></h2>
+<p><strong>The choice:</strong> <code>instar dd</code> has no guest binary of its own. The host
+parses the <code>bs</code>/<code>count</code>/<code>skip</code> operands, turns them into an input byte
+window, and runs <strong><code>convert.bin</code></strong> with a <code>ConvertConfig</code> whose
+<code>window_start</code>/<code>window_end</code> fields are set and whose <code>FLAG_DD_WINDOW</code>
+flag is raised. There is no <code>dd.bin</code> and no second config magic: <code>dd</code>
+and <code>convert</code> share one guest binary, one <code>"CONV"</code> config, and one host
+entry point, <code>execute_convert</code>.</p>
+<p><strong>Why not a dedicated <code>dd.bin</code>?</strong> <code>dd</code> needs exactly what <code>convert</code>
+already has -- the five output writers (<code>convert_to_raw</code>,
+<code>convert_to_qcow2</code>, <code>convert_to_vmdk</code>, <code>convert_to_vhd</code>,
+<code>convert_to_vhdx</code>), which live inside
+<code>src/operations/convert/src/main.rs</code> rather than in a reusable crate.
+Three options were weighed. A standalone <code>dd.bin</code> that <strong>duplicated</strong>
+the writers was rejected outright: it would put a second copy of the
+format-writing code inside the sandbox, and the writers are the code
+held to byte-for-byte parity with <code>qemu-img</code> (Decision 10). Two copies
+drift, and a drift in a writer is silent wrong output, not a crash.
+It would also add a second <code>no_std</code> binary to audit and to keep inside
+the per-operation budget that <code>make check-binary-sizes</code> enforces.
+Extracting the writers into a shared <code>no_std</code> module linked by both
+binaries was the clean version of the same idea, and remains the
+fallback if <code>convert</code>'s config surface ever gets unwieldy -- but it is a
+meaningful refactor of a large, hot file, bought for a subcommand that
+is semantically <em>convert with a narrower read range</em>. Reuse won.</p>
+<p><strong>Why <code>FLAG_DD_WINDOW</code> is a gate flag and not inferred from the
+values.</strong> It is tempting to drop the flag and let <code>window_start</code> and
+<code>window_end</code> speak for themselves. They cannot. For <code>dd</code>,
+<code>window_end == 0</code> means <strong>copy nothing</strong> -- a legitimate request,
+<code>count=0</code>, which must produce a valid empty output and exit 0. For
+<code>convert</code>, an all-zero window means <strong>copy the whole image</strong>, because
+convert never sets one. The two are indistinguishable from the field
+values alone, so inferring intent would make an empty <code>dd</code> window
+silently copy the entire input: the maximum wrong answer for the
+operand that asked for nothing. The flag is what separates "no window
+requested" from "an empty window requested", and the guest ignores the
+window fields entirely when it is clear, so <code>convert</code> behaves exactly
+as it did before <code>dd</code> existed.</p>
+<p><strong>Dense output is the absence of a flag, not a new one.</strong> <code>qemu-img dd</code>
+writes every sector in the window, including zero-filled ones, where
+<code>convert</code> elides zero clusters. That difference is expressed by <code>dd</code>
+simply <strong>not</strong> setting <code>FLAG_SKIP_ZEROS</code> -- it passes <code>flags = 0</code> and
+lets <code>execute_convert</code> add <code>FLAG_DD_WINDOW</code> itself. No sparseness flag
+was added, because dense is already what a convert config with no
+<code>SKIP_ZEROS</code> means.</p>
+<p><strong>Why <code>execute_convert</code> is shared rather than forked.</strong> The host side
+of a convert is roughly five hundred lines of chain discovery, output
+sizing, guest construction, KVM setup and MMIO plumbing. <code>dd</code> differs
+from it in two values: the window, and an output virtual size that is
+the window's length rather than the input's. Those are carried as
+<code>Option</code> fields on <code>ConvertExecution</code> (<code>window</code>, <code>output_vsize_override</code>)
+and the function serves both callers. Because only <code>dd</code> passes a
+window, <code>exec.window.is_some()</code> is also how the shared code names the
+subcommand the user actually ran when it has to report an error.</p>
+<p><strong>The cost:</strong> <code>dd</code>'s quirks now have a presence in <code>convert</code>'s config
+surface -- a flag, two fields and two <code>Option</code>s that mean nothing to a
+plain convert -- and the writers carry a <code>read_start</code> offset that is
+always zero for convert. That is the accepted price of one copy of the
+format writers. The escape hatch (extract the writers, then give <code>dd</code>
+its own binary) stays available and is deliberately unexercised.</p>
 
 
 
