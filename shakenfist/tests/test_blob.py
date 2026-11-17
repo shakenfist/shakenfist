@@ -364,9 +364,12 @@ class ObserveLocalBlobsTestCase(base.ShakenFistTestCase):
     (github issue 3490).
     """
 
+    @mock.patch('shakenfist.mariadb.get_blob_uuids_with_info',
+                return_value=[])
     @mock.patch('shakenfist.mariadb.get_node_blob_uuids', return_value=[])
     @mock.patch('shakenfist.blob.Blob.from_db', return_value=None)
-    def test_non_uuid_names_are_skipped(self, mock_from_db, mock_node_blobs):
+    def test_non_uuid_names_are_skipped(self, mock_from_db, mock_node_blobs,
+                                        mock_with_info):
         tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(tempdir.cleanup)
 
@@ -425,6 +428,13 @@ class ObserveLocalBlobsUsageTestCase(base.ShakenFistTestCase):
         patcher = mock.patch(
             'shakenfist.blob.Blob.from_db',
             side_effect=lambda u, **kwargs: self.blobs[u])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        # No blob carries image info, so each one is hydrated and these
+        # tests are about which of them counts as used.
+        patcher = mock.patch('shakenfist.mariadb.get_blob_uuids_with_info',
+                             return_value=[])
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -502,6 +512,13 @@ class ObserveLocalBlobsStateReadsTestCase(base.ShakenFistTestCase):
         self.get_state = patcher.start()
         self.addCleanup(patcher.stop)
 
+        # No blob carries image info, so each one is still hydrated and
+        # the state reads are the only thing under test here.
+        patcher = mock.patch('shakenfist.mariadb.get_blob_uuids_with_info',
+                             return_value=[])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def _observe(self, by_state):
         with mock.patch('shakenfist.blob.config',
                         FakeConfig(STORAGE_PATH=self.storage_path,
@@ -544,6 +561,132 @@ class ObserveLocalBlobsStateReadsTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, observed)
         for b in self.blobs.values():
             b.observe.assert_not_called()
+
+
+class ObserveLocalBlobsHydrationTestCase(base.ShakenFistTestCase):
+    """The pass does not hydrate a blob per local file (issue 4965).
+
+    observe_local_blobs() runs every five minutes on every node. With
+    the state supplied, the only thing observe() does which needs the
+    hydrated object is the qemu-img info backfill, and that happened the
+    first time the blob was seen -- so hydrating every local blob to ask
+    "does it have info yet?" made the cleaner's GetBlob rate a function
+    of how many blobs a node stores rather than of how much work the
+    cluster is doing.
+    """
+
+    RECORDED = '12345678-1234-4321-8234-123456789012'
+    NEW = '87654321-4321-4123-8321-210987654321'
+
+    def setUp(self):
+        super().setUp()
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
+        self.storage_path = tempdir.name
+
+        for blob_uuid in [self.RECORDED, self.NEW]:
+            shard = os.path.join(self.storage_path, 'blobs', blob_uuid[:2])
+            os.makedirs(shard, exist_ok=True)
+            with open(os.path.join(shard, blob_uuid), 'w') as f:
+                f.write('...')
+
+        self.blobs = {}
+        for blob_uuid in [self.RECORDED, self.NEW]:
+            b = mock.MagicMock()
+            b.state.value = blob.Blob.STATE_CREATED
+            self.blobs[blob_uuid] = b
+
+        patcher = mock.patch(
+            'shakenfist.blob.Blob.from_db',
+            side_effect=lambda u, **kwargs: self.blobs[u])
+        self.from_db = patcher.start()
+        self.addCleanup(patcher.stop)
+
+        patcher = mock.patch('shakenfist.blob.Blob.record_location')
+        self.record_location = patcher.start()
+        self.addCleanup(patcher.stop)
+
+        patcher = mock.patch('shakenfist.mariadb.get_node_blob_uuids',
+                             return_value=[self.RECORDED])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _observe(self, with_info):
+        with mock.patch('shakenfist.blob.config',
+                        FakeConfig(STORAGE_PATH=self.storage_path,
+                                   NODE_NAME='sf-1')):
+            with mock.patch('shakenfist.mariadb.get_objects_by_state',
+                            return_value=[self.RECORDED, self.NEW]):
+                with mock.patch(
+                        'shakenfist.mariadb.get_blob_uuids_with_info',
+                        return_value=with_info) as mock_with_info:
+                    observed = blob.observe_local_blobs()
+        return observed, mock_with_info
+
+    def test_a_recorded_blob_with_info_is_not_hydrated(self):
+        observed, mock_with_info = self._observe([self.RECORDED, self.NEW])
+
+        # Both blobs are still observed, and the one whose location was
+        # already recorded cost no per-blob read at all.
+        self.assertEqual(2, observed)
+        mock_with_info.assert_called_once_with()
+        self.record_location.assert_called_once_with('sf-1', self.RECORDED)
+        self.from_db.assert_called_once_with(
+            self.NEW, suppress_failure_audit=True)
+        self.blobs[self.RECORDED].observe.assert_not_called()
+
+    def test_a_new_location_is_still_hydrated(self):
+        # The negative control for the test above: a location which is
+        # not recorded yet counts as usage, and record_usage() needs the
+        # object to stamp its attributes row (issue 4440).
+        observed, _ = self._observe([self.RECORDED, self.NEW])
+
+        self.assertEqual(2, observed)
+        self.blobs[self.NEW].observe.assert_called_once_with(
+            already_recorded=False, known_state=blob.Blob.STATE_CREATED)
+
+    def test_a_blob_without_info_is_hydrated(self):
+        # The backfill this pass does for a blob which has never been
+        # identified has to keep happening, and it needs the object.
+        observed, _ = self._observe([self.NEW])
+
+        self.assertEqual(2, observed)
+        self.record_location.assert_not_called()
+        self.blobs[self.RECORDED].observe.assert_called_once_with(
+            already_recorded=True, known_state=blob.Blob.STATE_CREATED)
+
+    def test_a_failed_info_read_hydrates_everything(self):
+        # None is the read that did not happen, and must not be read as
+        # "every blob has info", which would skip the backfill for a
+        # blob which needs it. Collapsing it to "no blob has info" costs
+        # a pass of reads instead, which is what the pass did before.
+        observed, _ = self._observe(None)
+
+        self.assertEqual(2, observed)
+        self.record_location.assert_not_called()
+        for b in self.blobs.values():
+            b.observe.assert_called_once()
+
+    def test_one_bulk_info_query_for_the_whole_pass(self):
+        observed, mock_with_info = self._observe([])
+
+        self.assertEqual(2, observed)
+        # Not once per blob: that is the regression this read replaced.
+        mock_with_info.assert_called_once_with()
+
+
+class BlobRecordLocationTestCase(base.ShakenFistTestCase):
+    """record_location() writes the same row add_location() does."""
+
+    @mock.patch('shakenfist.mariadb.record_relationship')
+    def test_the_reference_is_keyed_by_uuid_alone(self, mock_record):
+        blob.Blob.record_location(
+            'sf-1', '12345678-1234-4321-8234-123456789012')
+
+        mock_record.assert_called_once_with(
+            ObjectType.NODE, 'sf-1',
+            RelationshipType.BLOB_LOCATION, None,
+            ObjectType.BLOB, '12345678-1234-4321-8234-123456789012')
 
 
 class BlobObserveKnownStateTestCase(base.ShakenFistTestCase):

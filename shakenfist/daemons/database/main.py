@@ -2348,6 +2348,42 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetStaleTranscodedBlobUuids failed', e)
             return database_pb2.GetStaleTranscodedBlobUuidsReply(uuids=[])
 
+    def GetBlobUuidsWithInfo(
+        self,
+        request: database_pb2.GetBlobUuidsWithInfoRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetBlobUuidsWithInfoReply:
+        """Get the UUIDs of blobs whose attributes carry image info.
+
+        An empty reply must mean "no blob has image info", never "the
+        read failed", following GetObjectsByState above: the caller
+        reads this as the set it may skip hydrating, and a failed read
+        answered as an empty list would silently put it back to one
+        hydration per blob per pass -- the cost this read exists to
+        remove (issue 4965). UNAVAILABLE is retried by _grpc_call and
+        becomes a None the client wrapper reports honestly.
+        """
+        try:
+            self.monitor.counters['get_blob_uuids_with_info'].inc()
+            uuids = mariadb._direct_get_blob_uuids_with_info()
+            if uuids is None:
+                LOG.warning(
+                    'GetBlobUuidsWithInfo transient MariaDB error')
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details('blob info read failed')
+                return database_pb2.GetBlobUuidsWithInfoReply(uuids=[])
+            return database_pb2.GetBlobUuidsWithInfoReply(uuids=uuids)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetBlobUuidsWithInfo failed', e)
+            # INTERNAL rather than UNAVAILABLE: an unexpected exception
+            # here is a bug, not a transient outage, and retrying it
+            # only spends the caller's budget. Non-retryable, so the
+            # client wrapper turns it into a failed read.
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetBlobUuidsWithInfoReply(uuids=[])
+
     # =====================================================================
     # Node Operations (MariaDB)
     # =====================================================================
@@ -6743,7 +6779,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'create_blob_attributes', 'get_blob_attributes',
             'update_blob_attributes', 'update_blob_last_used',
             'delete_blob_attributes', 'get_expired_blob_uuids',
-            'get_stale_transcoded_blob_uuids',
+            'get_stale_transcoded_blob_uuids', 'get_blob_uuids_with_info',
             # MariaDB node operations
             'create_node', 'get_node', 'get_node_by_fqdn',
             'get_all_node_uuids', 'delete_node', 'update_node',

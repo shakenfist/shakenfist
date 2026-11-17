@@ -75,6 +75,35 @@ CLEANER_TASKS = frozenset({
 CLEANER_TASK_WAIT_SECONDS = 150
 CLEANER_TASK_POLL_SECONDS = 10
 
+# observe_local_blobs() is scheduled every five minutes, and costs one
+# RecordRelationship per local blob file to refresh its BLOB_LOCATION
+# reference. It used to cost one GetBlob as well -- it hydrated every
+# local blob to find out whether its qemu-img info had been backfilled
+# yet, which made the cleaner's GetBlob rate a function of how many
+# blobs a node stores rather than of any workload (issue 4965). The two
+# counters are now measured against each other, which is what makes the
+# assertion independent of how many blobs this cluster happens to hold.
+#
+# The wait covers a pass plus a margin, because a cluster deployed
+# moments ago has not run one yet. In practice the counters are already
+# there: the deploy fetches the CI images, so the passes which ran while
+# the suite was starting have already touched blobs.
+OBSERVE_PASS_WAIT_SECONDS = 420
+OBSERVE_PASS_POLL_SECONDS = 15
+
+# The floor and the ceiling are read off cumulative counters, so the
+# denominator is every pass since the cleaners started rather than one
+# window's worth. That is deliberate: the defect is one hydration per
+# blob per pass forever, so it holds the ratio at 1.0 however long the
+# cluster runs, while the legitimate hydrations -- a blob seen here for
+# the first time -- are one-off and are diluted by every pass after
+# them. A small denominator therefore costs discrimination only against
+# the legitimate case.
+OBSERVE_LOCATION_FLOOR = 5
+# The old behaviour was exactly one hydration per recorded location, so
+# this discriminates with a factor of two either way.
+OBSERVE_HYDRATION_CEILING = 0.5
+
 # A metrics scrape is a plain HTTP GET against a daemon's port, so a
 # single failure is not evidence about the property under test.
 SCRAPE_ATTEMPTS = 3
@@ -243,6 +272,33 @@ class DatabaseTierTestsMixin:
                     % (node['name'], node['ip'], SCRAPE_ATTEMPTS, last))
         return totals, sum(read_at) / len(read_at)
 
+    def _cleaner_task_counters(self, database_nodes):
+        """Every (operation, caller_task) counter for the cleaner.
+
+        Summed across the tier and retried the same way and for the same
+        reason as _sum_requests(): a refused scrape says nothing about
+        the property under test, and these tests gate every PR.
+        """
+        seen = {}
+        for node in database_nodes:
+            last = None
+            for attempt in range(SCRAPE_ATTEMPTS):
+                try:
+                    for key, value in scrape_caller_tasks(
+                            node['ip'], 'cleaner').items():
+                        seen[key] = seen.get(key, 0.0) + value
+                    break
+                except Exception as e:
+                    last = e
+                    if attempt < SCRAPE_ATTEMPTS - 1:
+                        time.sleep(SCRAPE_RETRY_SECONDS)
+            else:
+                self.fail(
+                    'Failed to scrape database metrics from %s (%s) '
+                    'after %d attempts: %s'
+                    % (node['name'], node['ip'], SCRAPE_ATTEMPTS, last))
+        return seen
+
     def _sum_requests(self, database_nodes, operation, caller_daemon):
         """Sum one counter across the tier, retrying a failed scrape.
 
@@ -319,32 +375,11 @@ class DatabaseTierTestsMixin:
         # only on a deployed cluster as a label which is silently empty.
         database_nodes = self._database_nodes()
 
-        def _tasks():
-            seen = {}
-            for node in database_nodes:
-                last = None
-                for attempt in range(SCRAPE_ATTEMPTS):
-                    try:
-                        for key, value in scrape_caller_tasks(
-                                node['ip'], 'cleaner').items():
-                            seen[key] = seen.get(key, 0.0) + value
-                        break
-                    except Exception as e:
-                        last = e
-                        if attempt < SCRAPE_ATTEMPTS - 1:
-                            time.sleep(SCRAPE_RETRY_SECONDS)
-                else:
-                    self.fail(
-                        'Failed to scrape database metrics from %s (%s) '
-                        'after %d attempts: %s'
-                        % (node['name'], node['ip'], SCRAPE_ATTEMPTS, last))
-            return seen
-
         deadline = time.time() + CLEANER_TASK_WAIT_SECONDS
-        tasks = _tasks()
+        tasks = self._cleaner_task_counters(database_nodes)
         while not tasks and time.time() < deadline:
             time.sleep(CLEANER_TASK_POLL_SECONDS)
-            tasks = _tasks()
+            tasks = self._cleaner_task_counters(database_nodes)
 
         self.addDetail(
             'cleaner_tasks',
@@ -369,6 +404,73 @@ class DatabaseTierTestsMixin:
             set(), named - CLEANER_TASKS,
             'The cleaner reported a task which is not one of its known '
             'passes: %s' % sorted(named - CLEANER_TASKS))
+
+    def test_observe_local_blobs_does_not_hydrate_a_blob_per_file(self):
+        # The pass re-observes every local blob every five minutes, and
+        # used to hydrate each one to find out whether its qemu-img info
+        # had already been backfilled -- an answer which is yes for every
+        # blob in steady state. Its GetBlob rate was therefore a function
+        # of how many blobs a node stores and climbed with the blob store
+        # while the workload was flat (issue 4965). The pass now asks
+        # that question once per pass, for the whole cluster.
+        #
+        # RecordRelationship is the denominator because the pass issues
+        # exactly one per local blob file, whatever else it does: it is
+        # the count of blobs the pass walked. Before the fix the two
+        # counters moved together one for one, so a ratio discriminates
+        # without this test needing to know how many blobs this cluster
+        # holds, or when the last pass ran.
+        database_nodes = self._database_nodes()
+
+        def _counts(tasks):
+            return (tasks.get(('GetBlob', 'observe_local_blobs'), 0.0),
+                    tasks.get(('RecordRelationship', 'observe_local_blobs'),
+                              0.0))
+
+        deadline = time.time() + OBSERVE_PASS_WAIT_SECONDS
+        hydrations, locations = _counts(
+            self._cleaner_task_counters(database_nodes))
+        while locations < OBSERVE_LOCATION_FLOOR and time.time() < deadline:
+            time.sleep(OBSERVE_PASS_POLL_SECONDS)
+            hydrations, locations = _counts(
+                self._cleaner_task_counters(database_nodes))
+
+        measurement = {
+            'locations_recorded': locations,
+            'blobs_hydrated': hydrations,
+            'ceiling': OBSERVE_HYDRATION_CEILING,
+        }
+        self.addDetail(
+            'measurement',
+            content.text_content(json.dumps(
+                measurement, indent=2, sort_keys=True)))
+
+        # The floor, and it fails rather than skips: a cluster where the
+        # pass has never walked a blob is one this assertion cannot say
+        # anything about, and passing vacuously would hide exactly the
+        # regression it exists to catch. Every supported topology
+        # deploys hypervisors which fetch the CI images, so reaching
+        # this means the pass is not running at all, is not reaching the
+        # tier, or is no longer naming itself.
+        self.assertGreaterEqual(
+            locations, OBSERVE_LOCATION_FLOOR,
+            'observe_local_blobs recorded %.0f blob locations in %d '
+            'seconds, which is below the floor of %d this assertion '
+            'needs to mean anything. measurement=%s'
+            % (locations, OBSERVE_PASS_WAIT_SECONDS,
+               OBSERVE_LOCATION_FLOOR, measurement))
+
+        # A blob seen here for the first time is still hydrated, which is
+        # why this is a ratio with headroom rather than zero.
+        per_location = hydrations / locations
+        self.assertLess(
+            per_location, OBSERVE_HYDRATION_CEILING,
+            'observe_local_blobs hydrated %.2f blobs per blob it walked, '
+            'which is above the ceiling of %s. The pass is reading a blob '
+            'per local file again, so its GetBlob rate grows with the '
+            'node\'s blob store rather than with the workload. '
+            'measurement=%s'
+            % (per_location, OBSERVE_HYDRATION_CEILING, measurement))
 
     def test_instance_get_fetches_the_attributes_row_once(self):
         # Every MariaDB backed instance attribute lives in one

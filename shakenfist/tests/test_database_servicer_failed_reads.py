@@ -481,3 +481,65 @@ class FindObjectsFailedReadTestCase(base.ShakenFistTestCase):
             context.set_code.assert_not_called()
             context.set_details.assert_not_called()
             self.assertEqual([], list(getattr(reply, field)))
+
+
+class GetBlobUuidsWithInfoFailedReadTestCase(base.ShakenFistTestCase):
+    """The blobs-with-info read is the same contract (issue #4965).
+
+    observe_local_blobs() uses the reply as the set of blobs it may skip
+    hydrating. An empty list is a real answer -- "no blob has image
+    info", which skips nothing -- so a failed read answered as an empty
+    list is not a hazard the way the complement sets above are. It is
+    still wrong: it silently restores one hydration per local blob per
+    pass, which is the cost this read exists to remove, and leaves
+    nothing in the logs saying why the rate went back up.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.servicer = daemons_database_main.DatabaseService(
+            mock.MagicMock())
+        self.request = database_pb2.GetBlobUuidsWithInfoRequest()
+
+    @mock.patch('shakenfist.mariadb._direct_get_blob_uuids_with_info',
+                return_value=None)
+    def test_failed_read_is_an_error_status_not_an_empty_reply(self, mock_get):
+        context = mock.MagicMock()
+
+        reply = self.servicer.GetBlobUuidsWithInfo(self.request, context)
+
+        context.set_code.assert_called_once_with(
+            grpc.StatusCode.UNAVAILABLE)
+        self.assertEqual([], list(reply.uuids))
+
+    @mock.patch('shakenfist.mariadb._direct_get_blob_uuids_with_info',
+                return_value=[])
+    def test_genuinely_empty_is_not_an_error(self, mock_get):
+        # The negative control: a cluster where no blob has been
+        # identified yet is not a broken database.
+        context = mock.MagicMock()
+
+        reply = self.servicer.GetBlobUuidsWithInfo(self.request, context)
+
+        context.set_code.assert_not_called()
+        self.assertEqual([], list(reply.uuids))
+
+    @mock.patch('shakenfist.mariadb._direct_get_blob_uuids_with_info',
+                return_value=['uuid-1', 'uuid-2'])
+    def test_results_are_returned_unchanged(self, mock_get):
+        context = mock.MagicMock()
+
+        reply = self.servicer.GetBlobUuidsWithInfo(self.request, context)
+
+        context.set_code.assert_not_called()
+        self.assertEqual(['uuid-1', 'uuid-2'], list(reply.uuids))
+
+    @mock.patch('shakenfist.mariadb._direct_get_blob_uuids_with_info',
+                side_effect=ValueError('boom'))
+    def test_unexpected_exception_is_internal_not_empty(self, mock_get):
+        context = mock.MagicMock()
+
+        reply = self.servicer.GetBlobUuidsWithInfo(self.request, context)
+
+        context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
+        self.assertEqual([], list(reply.uuids))

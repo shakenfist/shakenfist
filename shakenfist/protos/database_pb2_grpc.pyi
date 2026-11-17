@@ -157,6 +157,7 @@ class DatabaseServiceStub:
     DeleteBlobAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteBlobAttributesRequest, _database_pb2.StatusReply]
     GetExpiredBlobUuids: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetExpiredBlobUuidsRequest, _database_pb2.GetExpiredBlobUuidsReply]
     GetStaleTranscodedBlobUuids: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetStaleTranscodedBlobUuidsRequest, _database_pb2.GetStaleTranscodedBlobUuidsReply]
+    GetBlobUuidsWithInfo: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetBlobUuidsWithInfoRequest, _database_pb2.GetBlobUuidsWithInfoReply]
     CreateNode: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNodeRequest, _database_pb2.StatusReply]
     """Node Operations (MariaDB)
     These manage node static values (uuid, fqdn, ip) in MariaDB.
@@ -592,6 +593,7 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     DeleteBlobAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteBlobAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     GetExpiredBlobUuids: _aio.UnaryUnaryMultiCallable[_database_pb2.GetExpiredBlobUuidsRequest, _database_pb2.GetExpiredBlobUuidsReply]  # type: ignore[assignment]
     GetStaleTranscodedBlobUuids: _aio.UnaryUnaryMultiCallable[_database_pb2.GetStaleTranscodedBlobUuidsRequest, _database_pb2.GetStaleTranscodedBlobUuidsReply]  # type: ignore[assignment]
+    GetBlobUuidsWithInfo: _aio.UnaryUnaryMultiCallable[_database_pb2.GetBlobUuidsWithInfoRequest, _database_pb2.GetBlobUuidsWithInfoReply]  # type: ignore[assignment]
     CreateNode: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNodeRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Node Operations (MariaDB)
     These manage node static values (uuid, fqdn, ip) in MariaDB.
@@ -1540,6 +1542,13 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.GetStaleTranscodedBlobUuidsRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.GetStaleTranscodedBlobUuidsReply, _abc.Awaitable[_database_pb2.GetStaleTranscodedBlobUuidsReply]]: ...
+
+    @_abc_1.abstractmethod
+    def GetBlobUuidsWithInfo(
+        self,
+        request: _database_pb2.GetBlobUuidsWithInfoRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetBlobUuidsWithInfoReply, _abc.Awaitable[_database_pb2.GetBlobUuidsWithInfoReply]]: ...
 
     @_abc_1.abstractmethod
     def CreateNode(
