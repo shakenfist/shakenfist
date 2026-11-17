@@ -36,7 +36,7 @@ Consult `ARCHITECTURE.md` for the overall system structure (host
 VMM, KVM guest, call table, device emulation). Consult `AGENTS.md`
 for build commands, project conventions, code organisation, and the
 security-model summary. The closest prior art for this plan is
-**`PLAN-dd.md`** (a host-orchestrated subcommand that reuses
+**[`PLAN-dd.md`](https://github.com/shakenfist/instar/blob/8871b068fc3a997bf930c5f59509cdd5246aa8df/docs/plans/PLAN-dd.md)** (a host-orchestrated subcommand that reuses
 existing guest read machinery plus a small pure `crates/dd` math
 crate) and **`PLAN-map.md`** (a single-image read-only op with a
 streamed result and a host renderer). Note one structural
@@ -58,7 +58,8 @@ qemu-img subcommand instar does not implement** — instar covers 14
 of `qemu-img 10.0.8`'s 15 subcommands, plus the two instar-only
 extras `copy` and `config`. Every prior plan deliberately deferred
 bench behind a design spike: *"is benchmarking through the KVM
-sandbox meaningful?"* (`PLAN-dd.md`, `PLAN-bitmap.md` Future work).
+sandbox meaningful?"* ([`PLAN-dd.md`](https://github.com/shakenfist/instar/blob/8871b068fc3a997bf930c5f59509cdd5246aa8df/docs/plans/PLAN-dd.md), `PLAN-bitmap.md` Future
+work).
 
 **This plan resolves the design spike in the affirmative, with an
 honest reframing.** `instar bench` does not measure what
