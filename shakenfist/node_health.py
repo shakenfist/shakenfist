@@ -1,10 +1,11 @@
 """Node-level resource health evaluation.
 
 Maps a node's capability flags to the object types it hosts, collects the
-storage-path health checks those types declare
-(PLAN-node-resource-health E1/E2), de-duplicates them, runs each, and
-composes a result naming the failed checks and the affected object types.
-sf-resources consumes this to drive node.state.
+storage-path health checks those types declare in
+``health_dependencies``, de-duplicates them by check identity, runs each,
+and composes a result naming the failed checks and the affected object
+types. sf-resources consumes this to drive node.state. See "Node resource
+health" in docs/developer_guide/subsystem_internals.md.
 """
 
 import os

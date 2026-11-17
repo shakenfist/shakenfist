@@ -458,6 +458,43 @@ Node error never clears automatically; `sf-ctl clear-node-error` is the
 operator recovery path, documented in
 [`node_health.md`](../operator_guide/node_health.md).
 
+Two boundaries are worth knowing before extending this.
+
+**The question is asked of a type, not of an object.** "Instance depends
+on `blobs`" means the blob store on this node is usable, not that a
+particular instance's particular backing chain reads correctly. Node
+health needs only the former, and the latter is a per-object graph whose
+cost scales with the number of objects rather than the number of types.
+Nothing here should grow into the per-object question by accident.
+
+**Which instances die is decided by dependency membership, not by a
+flag.** An earlier shape gave each path an `implies_instance_death`
+boolean; it was dropped because the declarations already carry the
+answer. A node whose `uploads` path fails does not error its instances,
+because `uploads` is not in `Instance.health_dependencies` — no separate
+field has to agree with that list, and none can disagree with it.
+
+For the same reason a type lists the paths it needs directly, rather than
+declaring that it depends on another *type* and inheriting that type's
+paths. `Instance` repeats `blobs` even though `Blob` also declares it.
+With three types and one to three paths each that duplication is
+trivial, de-duplication by check identity erases its runtime cost, and
+the alternative buys a tidier declaration at the price of cycle
+detection and an evaluation order. Revisit when the type or check set is
+large enough for direct listing to actually hurt.
+
+**Adding a non-path check is not a one-line change.** `HealthCheck` and
+the evaluator are already check-type-agnostic, so neither needs
+touching. But `node_health.build_checks()` reads each type's
+`health_dependencies` as `STORAGE_PATH`-relative subdirectory strings
+and constructs `PathCheck`s from them, so the first non-path check — a
+libvirtd liveness probe on a hypervisor, MariaDB reachability on a
+database node, or [issue 730](https://github.com/shakenfist/shakenfist/issues/730)'s
+dnsmasq-serving probe on a network node — needs a richer dependency
+descriptor than a bare string. The generalisation is local to
+`build_checks`; the seam is in the right place, but the cost is not
+nothing.
+
 ## Daemon start ordering
 
 Each daemon is a systemd unit rendered from

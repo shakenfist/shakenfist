@@ -1,7 +1,7 @@
 """Node resource health checks.
 
-The primitive behind PLAN-node-resource-health: a small, self-contained
-health-check abstraction plus a deadline-guarded runner. Object types
+A small, self-contained health-check abstraction plus a deadline-guarded
+runner. Object types
 declare the local resources they depend on as checks; the sf-resources
 evaluator (a later phase) collects the checks of the object types a node
 hosts, de-duplicates them by identity, runs each, and drives node.state
@@ -97,10 +97,9 @@ class DeadlineProbe:
     second run while a previous one is still outstanding.
 
     The outstanding case is not an error to paper over: a hard NFS mount
-    *hangs* on server death rather than returning EIO (see
-    PLAN-node-resource-health decision D5), so a probe that has not
-    returned means "still hung", and piling a second blocked thread on
-    top would help nobody. A still-running probe therefore reports "not
+    *hangs* on server death rather than returning EIO, so a probe that
+    has not returned means "still hung", and piling a second blocked
+    thread on top would help nobody. A still-running probe therefore reports "not
     completed" and no new work is started until it finishes.
 
     The worker runs in a *daemon* thread deliberately, not a
@@ -170,7 +169,7 @@ HEARTBEAT_FILENAME = '_heartbeat'
 class PathCheck(HealthCheck):
     """Health of a single local storage path.
 
-    Two tiers, both under one deadline (see PLAN-node-resource-health D4/D5):
+    Two tiers, both under one deadline:
 
     - A cheap ``statvfs`` on every call. Its raising OSError means the store
       is gone (the sf-6 case: a shut-down filesystem EIOs even on statvfs);

@@ -28,8 +28,8 @@ class Upload(dbo):
     current_version = 5
 
     # STORAGE_PATH-relative subdirectories this object type depends on to be
-    # healthy on a node that hosts it (PLAN-node-resource-health). Uploads in
-    # flight are staged in the uploads directory.
+    # healthy on a node that hosts it. Uploads in flight are staged in the
+    # uploads directory.
     health_dependencies = ['uploads']
 
     # docs/developer_guide/state_machine.md has a description of these states.
