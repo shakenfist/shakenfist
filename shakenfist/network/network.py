@@ -16,7 +16,6 @@ from shakenfist.schema.network_data import NetworkData
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectWithOperations as dbowo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
-from shakenfist.baseobject import valid_object_ref
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
@@ -198,37 +197,13 @@ class Network(dbowo):
         in the database. A tenant-scoped query (namespace != None) won't
         match it via SQL NULL semantics, so no explicit skip is required.
 
-        A null or otherwise non-string ref answers "not found" here:
-        handed to ObjectFilterCriteria as a name, None would read as
-        *no name filter* and resolve to an arbitrary active network in
-        the namespace (issue 4223).
+        The body, including the namespace collapse and the guard
+        against a null ref, lives in
+        baseobject._from_db_by_ref_pushdown.
         """
-        if not valid_object_ref(object_ref):
-            return None
-
-        if util_general.valid_uuid4(object_ref):
-            return cls.from_db(object_ref)
-
-        # namespace='system' or namespace=None means 'look across
-        # all namespaces' - preserve that by omitting the namespace
-        # filter. Matches baseobject.namespace_filter semantics.
-        criteria_namespace = (
-            namespace if namespace and namespace != 'system' else None)
-
-        criteria = ObjectFilterCriteria(
-            states=list(cls.ACTIVE_STATES),
-            namespace=criteria_namespace,
-            name=object_ref,
-        )
-        matches = mariadb.find_networks(criteria)
-
-        if not matches:
-            return None
-        if len(matches) > 1:
-            raise exceptions.MultipleObjects(
-                f'multiple networks have the name "{object_ref}"'
-                f' in namespace "{namespace}"')
-        return cls(cls._static_values_to_dict(matches[0]))
+        return cls._from_db_by_ref_pushdown(
+            object_ref, namespace, mariadb.find_networks,
+            lambda data: cls(cls._static_values_to_dict(data)))
 
     def _load_attributes(self) -> Optional[NetworkAttributesData]:
         """Load attributes from MariaDB."""

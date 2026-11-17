@@ -464,6 +464,55 @@ class DatabaseBackedObject:
         return found_obj
 
     @classmethod
+    def _from_db_by_ref_pushdown(cls, object_ref, namespace, finder, hydrate):
+        """The pushed-down implementation of from_db_by_ref.
+
+        A type with a ``find_*`` gRPC query overrides from_db_by_ref to
+        call this instead of the scan above. ``finder`` takes an
+        ObjectFilterCriteria and returns a list of that type's Pydantic
+        rows; ``hydrate`` turns one of those rows into an object of this
+        type, which is the only thing the three implementations ever
+        differed in.
+
+        This body is deliberately not repeated per type. The namespace
+        collapse below is silent when it is wrong -- a copy which drops
+        it narrows an administrative lookup to the objects literally
+        owned by ``system`` and answers a plausible wrong object rather
+        than raising (issue 4948).
+
+        A null or otherwise non-string ref answers "not found" here:
+        handed to ObjectFilterCriteria as a name, None would read as *no
+        name filter* and resolve to an arbitrary active object in the
+        namespace (issue 4223).
+        """
+        if not valid_object_ref(object_ref):
+            return None
+
+        if util_general.valid_uuid4(object_ref):
+            # Already a valid UUID
+            return cls.from_db(object_ref)
+
+        # namespace='system' or namespace=None means "look across all
+        # namespaces" -- preserve that by omitting the namespace filter.
+        # Matches namespace_filter semantics.
+        criteria_namespace = (
+            namespace if namespace and namespace != 'system' else None)
+
+        matches = finder(ObjectFilterCriteria(
+            states=list(cls.ACTIVE_STATES),
+            namespace=criteria_namespace,
+            name=object_ref,
+        ))
+
+        if not matches:
+            return None
+        if len(matches) > 1:
+            raise exceptions.MultipleObjects(
+                f'multiple {cls.object_type}s have the name "{object_ref}"'
+                f' in namespace "{namespace}"')
+        return hydrate(matches[0])
+
+    @classmethod
     def zombie_repair_state(cls, object_uuid: str) -> str:
         """The state the orphan reconciler writes for a zombie of this type.
 

@@ -249,37 +249,13 @@ class Artifact(dbowo):
         state + namespace + name down to a single indexed SQL
         query via mariadb.find_artifacts.
 
-        A null or otherwise non-string ref answers "not found" here:
-        handed to ObjectFilterCriteria as a name, None would read as
-        *no name filter* and resolve to an arbitrary active artifact in
-        the namespace (issue 4223).
+        The body, including the namespace collapse and the guard
+        against a null ref, lives in
+        baseobject._from_db_by_ref_pushdown; an Artifact is hydrated
+        straight from its Pydantic row.
         """
-        if not baseobject.valid_object_ref(object_ref):
-            return None
-
-        if util_general.valid_uuid4(object_ref):
-            return cls.from_db(object_ref)
-
-        # namespace='system' or namespace=None means "look across
-        # all namespaces" — preserve that by omitting the namespace
-        # filter. Matches baseobject.namespace_filter semantics.
-        criteria_namespace = (
-            namespace if namespace and namespace != 'system' else None)
-
-        criteria = ObjectFilterCriteria(
-            states=list(cls.ACTIVE_STATES),
-            namespace=criteria_namespace,
-            name=object_ref,
-        )
-        matches = mariadb.find_artifacts(criteria)
-
-        if not matches:
-            return None
-        if len(matches) > 1:
-            raise exceptions.MultipleObjects(
-                f'multiple artifacts have the name "{object_ref}"'
-                f' in namespace "{namespace}"')
-        return cls(matches[0])
+        return cls._from_db_by_ref_pushdown(
+            object_ref, namespace, mariadb.find_artifacts, cls)
 
     @classmethod
     def from_db_by_ref_visible_to(

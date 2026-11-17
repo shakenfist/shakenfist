@@ -171,6 +171,14 @@ Name lookups from REST handlers should call the per-type `from_db_by_ref(name, n
 (e.g. `Artifact.from_db_by_ref(ref, namespace=ns)`). The override pushes
 the name equality predicate to SQL.
 
+Each override is one call: it hands `DatabaseBackedObject._from_db_by_ref_pushdown` its type's `find_*` and a
+callback which turns one returned row into an object of that type, which is the only thing the three
+implementations differ in. The rest — the guard against a null ref, the UUID short-circuit, the namespace
+collapse where `'system'` and `None` both mean "every namespace", and `MultipleObjects` on an ambiguous
+name — lives in that one body. A fourth type supplies the two callbacks and does not restate it: a copy
+which loses the collapse narrows an administrative lookup to the objects literally owned by `system` and
+answers a plausible wrong object rather than raising, which is silent (issue 4948).
+
 Bulk iteration scoped by state and/or namespace should use the iterator constructor directly:
 `Artifacts(namespace=ns, prefilter='active')`, `Instances(namespace=ns)`, `Networks(namespace=ns)`.
 The iterator's `_find` override builds an `ObjectFilterCriteria` from the constructor arguments and delegates
