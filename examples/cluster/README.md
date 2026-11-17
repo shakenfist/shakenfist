@@ -73,7 +73,8 @@ apt-get install gnutls-bin
 Provision MariaDB on (or reachable by) the database tier and point
 `mariadb_host` / `mariadb_user` / `mariadb_password` / `mariadb_database` in
 `group_vars/all.yml` at it (see `tools/bootstrap-mariadb.sql` and
-`PLAN-byo-mariadb`). Only database-tier nodes render these into
+"Bring-your-own MariaDB setup" in `docs/operator_guide/database.md`).
+Only database-tier nodes render these into
 `/etc/sf/config`. The playbook runs `sf-ctl ensure-mariadb-schema` itself
 (once, on the first database host) before any node registers.
 

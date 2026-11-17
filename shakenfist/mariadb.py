@@ -553,7 +553,7 @@ CLUSTER_CAPACITY_VERSION = 1
 
 
 # Minimum supported MariaDB version. Originally 10.6.0, to align with Ubuntu
-# 22.04's MariaDB (see docs/plans/PLAN-byo-mariadb-phase-01-statelessness.md),
+# 22.04's MariaDB,
 # but the ipam_reservations.address column uses the native INET4 type, which
 # only exists from MariaDB 10.10 -- so schema creation on 10.6 fails and that
 # floor had silently stopped being real (found by running ensure_schema()

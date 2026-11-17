@@ -10,6 +10,29 @@ the administrative commands, the table inventory, and the schema system.
 Shaken Fist does not bundle or install MariaDB. The operator provisions the
 database server before deploying the cluster.
 
+That is a stronger position than "we install it for you with a flag to turn
+it off", and it was chosen over two softer ones. Delegating the install to a
+well-maintained community Ansible role would have moved the problem sideways
+rather than solved it: operators would still inherit a Shaken Fist opinion
+about how MariaDB is deployed, and the role would still have had to decide
+between Galera, primary-replica and single-node on their behalf. A
+provisioning checklist and a SQL snippet the operator applies is less code
+than any role adoption, and it lets whatever MariaDB practice they already
+have apply unmodified.
+
+`sf-database` is a **tier of equal, stateless instances**, not a leader with
+standbys. Electing one, as the earlier framing had it, would have introduced
+a leader concept the daemon does not need and a client redirect that adds a
+hop and a failure mode; the only state that would have justified election was
+schema migration at startup, and that moved out to an operator-run
+`sf-ctl ensure-mariadb-schema`. Clients reach the tier through gRPC's own
+client-side round-robin over `MARIADB_GATEWAY_HOSTS` rather than through an
+L4 load balancer or a VIP, which would be one more moving part for the
+operator to run and misconfigure. Both rejected shapes also compose badly
+with the mTLS direction: a TLS-terminating front and client-certificate
+authentication fight each other, where client-side balancing over mTLS
+channels does not.
+
 ### Provisioning checklist
 
 1. **Provision a MariaDB server.** Any host reachable from every SF node

@@ -10,7 +10,6 @@
 - api-query-batching-roadmap.md: API query batching roadmap
 - PLAN-queue-performance.md: Queue performance and coalescing
 - PLAN-recurring-operations.md: Recurring cluster operations framework
-- PLAN-byo-mariadb.md: Bring-your-own MariaDB and sf-database as a tier
 - PLAN-embrace-tls.md: Embrace TLS across Shaken Fist
 - PLAN-sticky-transfers.md: Sticky session affinity for SF blob transfers
 - PLAN-artifact-fetch-retry-with-backoff.md: Retry transient artifact fetches with backoff
