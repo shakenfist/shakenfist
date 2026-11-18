@@ -171,6 +171,38 @@ def get_bridge_members(name: str, netns: str | None = None) -> list[str]:
             if elem.get('ifname')]
 
 
+def bridge_members_we_own(vxid: int) -> set[str]:
+    """The devices Shaken Fist itself enslaves to br-vxlan-<vxid>.
+
+    The one definition of what is not evidence that a guest is attached:
+    our own vxlan interface, and on the network node the outer ends of
+    the vx and egress veth pairs.
+    """
+    return {'vxlan-%06x' % vxid, 'veth-%06x-o' % vxid, 'egr-%06x-o' % vxid}
+
+
+def foreign_bridge_members(vxid: int) -> list[str]:
+    """Devices enslaved to br-vxlan-<vxid> which Shaken Fist did not put there.
+
+    A guest tap enslaved to the bridge is proof that a domain is attached
+    to that network on this node right now, whatever the placement and
+    interface records say. It is therefore the host's veto on a teardown
+    the records authorised. What is not evidence is in
+    ``bridge_members_we_own()``.
+
+    A bridge which does not exist is an answer, not a failure:
+    ``get_bridge_members()`` returns an empty list for it, which is the
+    common shape rather than the exotic one, because hypervisor teardown
+    deletes the bridge before the vxlan interface.
+
+    Every other failure raises. "Could not ask the host" is not "the host
+    says nobody is using it", so a caller which is about to delete
+    something must treat the exception as a reason to protect it.
+    """
+    members = get_bridge_members('br-vxlan-%06x' % vxid)
+    return sorted(set(members) - bridge_members_we_own(vxid))
+
+
 def get_interface_addresses(name: str, netns: str | None = None) -> list[str]:
     stdout, _ = concurrency.execute(
         'ip -pretty -json addr show %s' % name,

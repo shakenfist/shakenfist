@@ -12,6 +12,7 @@ from unittest import mock
 
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.tests import base
+from shakenfist.util import network as real_util_network
 
 
 def _build_mock_network(uuid='net-uuid-001', vxid=42, state='created',
@@ -119,10 +120,13 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         existing; the default is that every device asked about exists.
 
         ``bridge_members`` maps a bridge name to the devices enslaved
-        to it, and ``bridge_members_error`` makes
-        ``get_bridge_members()`` raise. Both drive the host side
-        cross-check the reaper performs before it mutates anything;
-        the default is a bridge with no members at all.
+        to it, and ``bridge_members_error`` makes the membership read
+        raise. Both drive the host side cross-check the reaper performs
+        before it mutates anything; the default is a bridge with no
+        members at all. The devices which are ours come from the real
+        ``util_network.bridge_members_we_own()`` so that a test naming
+        our own devices still exercises the production filter rather
+        than a copy of it.
 
         ``namespace_routes`` is the set of host route destinations
         ``get_host_routes()`` reports from inside a network namespace,
@@ -181,12 +185,14 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
                     lambda device: device in present_devices)
 
             if bridge_members_error is not None:
-                active['util_network'].get_bridge_members.side_effect = (
+                active['util_network'].foreign_bridge_members.side_effect = (
                     bridge_members_error)
             else:
                 members = bridge_members or {}
-                active['util_network'].get_bridge_members.side_effect = (
-                    lambda bridge: list(members.get(bridge, [])))
+                active['util_network'].foreign_bridge_members.side_effect = (
+                    lambda vxid: sorted(
+                        set(members.get('br-vxlan-%06x' % vxid, [])) -
+                        real_util_network.bridge_members_we_own(vxid)))
 
             active['network'].Networks.return_value = networks
             # Network.from_db should return the matching mock by uuid
@@ -1638,7 +1644,8 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
 
 class MaintainBridgeVetoTest(base.ShakenFistTestCase):
     """The host side veto, exercised through the real
-    ``util_network.get_bridge_members()`` rather than a stub.
+    ``util_network.foreign_bridge_members()`` and the ``ip`` invocation
+    underneath it rather than a stub.
 
     The tests above patch ``util_network`` wholesale, which is right for
     testing what maintain does with each answer but means they can never

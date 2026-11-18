@@ -28,7 +28,12 @@ class TestNetworkPlumbingLifecycle(base.BaseNamespacedTestCase):
     exists to catch it.
 
     Precise invariant: a network is present on a node iff that node hosts
-    an instance on it, or the node is the network node.
+    an instance on it, or the node is the network node. The "an instance"
+    half matters in both directions, so the test puts two instances on
+    one hypervisor and deletes them one at a time: the first delete must
+    leave the plumbing alone, because the delete path decides whether to
+    tear it down from a question it asks about the node's *other*
+    instances (issue 4958).
 
     The per-node assertions run over the mesh via the node-exec helper.
     The test skips loudly if the nodes cannot be reached, or if the
@@ -86,6 +91,24 @@ class TestNetworkPlumbingLifecycle(base.BaseNamespacedTestCase):
             % (self.net['uuid'], 'present' if present else 'absent',
                node['name']))
 
+    def _assert_network_stays_present(self, node, seconds=30):
+        """The plumbing is still there, and stays there.
+
+        A single check immediately after a delete proves nothing: the
+        per-network cleanup runs after the instance reaches deleted, so
+        it may not have made its decision yet. Poll instead, and fail on
+        the first absence. The window only has to outlast one delete
+        operation's cleanup loop, which is seconds.
+        """
+        start_time = time.time()
+        while time.time() - start_time < seconds:
+            self.assertTrue(
+                self._network_present_on(node),
+                'network %s disappeared from node %s while an instance on '
+                'it was still running'
+                % (self.net['uuid'], node['name']))
+            time.sleep(5)
+
     def _create_instance_on(self, node):
         inst = self.create_instance(
             'netlifecycle', 1, 1024,
@@ -140,20 +163,35 @@ class TestNetworkPlumbingLifecycle(base.BaseNamespacedTestCase):
         # rather than the much slower agent/cloud-init readiness.
         inst_a = self._create_instance_on(node_a)
         inst_b = self._create_instance_on(node_b)
+        # A second instance on node_a, so that node has two users of the
+        # network and deleting one of them must not take the network away
+        # from the other.
+        inst_c = self._create_instance_on(node_a)
         self._await_instance_create(inst_a['uuid'])
         self._await_instance_create(inst_b['uuid'])
+        self._await_instance_create(inst_c['uuid'])
 
         # Hosting an instance brings the network's plumbing up on each
         # hypervisor.
         self._await_network_presence(node_a, True)
         self._await_network_presence(node_b, True)
 
-        # Deleting the instances drains the plumbing from the hypervisors,
-        # while the network node keeps it (the network still exists).
+        # Deleting one of node_a's two instances leaves the plumbing in
+        # place for the other one. The delete path answers "is anything
+        # else on this node using this network?" for itself, from the
+        # records and then from the host, so this is the assertion which
+        # catches it answering wrongly.
         self.test_client.delete_instance(inst_a['uuid'])
-        self.test_client.delete_instance(inst_b['uuid'])
         self._await_instance_deleted(inst_a['uuid'])
+        self._assert_network_stays_present(node_a)
+
+        # Deleting the remaining instances drains the plumbing from the
+        # hypervisors, while the network node keeps it (the network still
+        # exists).
+        self.test_client.delete_instance(inst_b['uuid'])
+        self.test_client.delete_instance(inst_c['uuid'])
         self._await_instance_deleted(inst_b['uuid'])
+        self._await_instance_deleted(inst_c['uuid'])
 
         self._await_network_presence(node_a, False)
         self._await_network_presence(node_b, False)

@@ -849,3 +849,33 @@ batch, which is quadratic in the size of the table and much slower than
 the statement it replaced. And the backfill statement keeps its own "not
 done yet" predicate alongside the range, which is what makes a batch
 idempotent and the whole migration restartable.
+
+## A sample taken before the work is not a decision
+
+`NodeInstOp._instance_delete()` decided whether to tear a network's bridge
+and vxlan device off the hypervisor from a list of "networks the node's other
+instances use" that it built *before* it deleted the instance. Between the
+sample and the teardown ran the whole of `inst.delete()` and one
+`update_dnsmasq()` enqueue per network, and in that window an interface hot
+plug or an instance create landing on the node attaches to one of those
+networks. The sample says nobody else is using it, so a live domain loses its
+network -- which does not announce itself as a race, it looks like the bridge
+going missing for no reason (issue 4958).
+
+The shape to copy was already in the same loop: it re-reads each `Network`
+from the database and skips one in `delete-wait` rather than trusting
+anything sampled earlier. So ask the question at the point of decision, or
+hold across both the check and the act whatever lock the thing you are racing
+takes. A sample is only as good as the window after it, and "it is only a few
+statements later" is a statement about today's code.
+
+Then, because the records are records and not observations, the host gets a
+veto. `util_network.foreign_bridge_members()` asks `ip` which devices are
+enslaved to `br-vxlan-<vxid>` and subtracts the ones Shaken Fist put there
+itself; anything left is a guest tap, which is proof that a domain is
+attached right now whatever the records say. The stray vxlan reaper
+(`daemons/network/maintain.py`) has applied that veto before mutating for
+longer, and the two share one definition of which devices are ours so they
+cannot drift apart. A host which cannot be asked counts as in use, because
+the two errors are not equal: a bridge left behind is reaped by a later
+maintain pass, while a bridge taken from a live domain is an outage.
