@@ -14,6 +14,7 @@ import json
 import time
 from typing import Any
 from typing import cast
+from typing import NoReturn
 from uuid import UUID
 
 import grpc
@@ -7035,6 +7036,29 @@ def drain_and_stop(server: Any, health_servicer: Any) -> None:
     LOG.info('gRPC server stopped')
 
 
+def _refuse_to_start(message: str, status: str) -> NoReturn:
+    """Log why sf-database will not start, and tell systemd as well.
+
+    Refusing to start when a startup precondition fails is deliberate:
+    it is unambiguous, and it is why readiness never has to wait through
+    a migration. But the unit is Restart=on-failure, so systemd then
+    restarts the process every RestartSec, and `systemctl status
+    sf-database` shows nothing but a restart loop -- the operator has to
+    know to go and read the journal to find that the answer is `sf-ctl
+    ensure-mariadb-schema` (#4963). An sd_notify STATUS= line outlives
+    the process, so the reason sits on `systemctl status`, where the
+    operator is already looking.
+
+    `status` is a short single line rather than `message` itself:
+    sd_notify reads its datagram as newline separated KEY=value
+    assignments, so the multi-line detail a schema mismatch carries
+    cannot go in a STATUS= line.
+    """
+    LOG.error(message)
+    send_systemd_status(status)
+    raise SystemExit(1)
+
+
 def main() -> None:
     util_exceptions.install_exception_tracking()
 
@@ -7062,9 +7086,10 @@ def main() -> None:
     # MariaDB is required for the database service. Abort early with a clear
     # error message if it's not configured.
     if not config.MARIADB_HOST:
-        LOG.error('MariaDB is not configured. The database service requires '
-                  'MARIADB_HOST to be set. Aborting.')
-        raise SystemExit(1)
+        _refuse_to_start(
+            'MariaDB is not configured. The database service requires '
+            'MARIADB_HOST to be set. Aborting.',
+            'MariaDB is not configured; set MARIADB_HOST')
 
     # Verify the MariaDB server is compatible before serving any request.
     # Schema creation and migrations are operator-driven via
@@ -7074,14 +7099,14 @@ def main() -> None:
     try:
         mariadb.verify_mariadb_compat(engine)
     except exceptions.MariaDBIncompatibleError as e:
-        LOG.error(str(e))
-        raise SystemExit(1)
+        _refuse_to_start(
+            str(e), 'MariaDB server is incompatible with this release')
 
     try:
         mariadb.verify_schema_versions(engine)
     except exceptions.SchemaVersionMismatchError as e:
-        LOG.error(str(e))
-        raise SystemExit(1)
+        _refuse_to_start(
+            str(e), 'schema out of date; run sf-ctl ensure-mariadb-schema')
 
     # Pre-populate every SQLAlchemy ``Table`` object before the gRPC
     # server starts accepting requests. The lazy ``_get_*_table()``

@@ -675,6 +675,13 @@ def send_systemd_stopping():
 
 
 def send_systemd_status(message):
+    # sd_notify reads its datagram as newline separated KEY=value
+    # assignments, so a newline in the status text would have everything
+    # after it parsed as further assignments rather than as status. The
+    # messages which report a refusal to start are derived from exception
+    # text, which is multi-line, so flatten here rather than trusting
+    # every caller to have done it (#4963).
+    message = ' '.join(str(message).split())
     _send_systemd_notification(f'STATUS={message}'.encode('utf-8'))
 
 

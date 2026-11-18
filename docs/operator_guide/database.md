@@ -99,6 +99,23 @@ After an SF version bump that includes schema changes, you must run
 skip this step, the daemon will refuse to start with a schema-version
 mismatch error that names the command to run.
 
+The unit is `Restart=on-failure`, so systemd keeps restarting a
+`sf-database` which is refusing to start. Each refusal reports its reason
+to systemd before it exits, so you do not have to read the journal to find
+out which refusal it is:
+
+```
+$ systemctl status sf-database
+...
+   Status: "schema out of date; run sf-ctl ensure-mariadb-schema"
+```
+
+The other two refusals report `MariaDB is not configured; set
+MARIADB_HOST` and `MariaDB server is incompatible with this release`. The
+full detail -- every mismatched table, or every failing compatibility
+check -- is only in the journal (`journalctl -u sf-database`), because a
+systemd status line is a single line.
+
 ## Why MariaDB and what it stores
 
 MariaDB is the sole data store for Shaken Fist. All object state, IPAM

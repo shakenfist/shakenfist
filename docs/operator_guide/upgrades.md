@@ -517,6 +517,9 @@ sudo /srv/shakenfist/venv/bin/sf-ctl ensure-mariadb-schema
 `sf-database` refuses to start if the schema version does not match what
 its build expects, so applying migrations first lets you upgrade the
 database tier without downtime before touching the API or hypervisor nodes.
+If you roll a node before migrating, `systemctl status sf-database` names
+the refusal in its `Status:` line -- see
+[the MariaDB compatibility requirements](database.md#mariadb-compatibility-requirements).
 See [MariaDB schema migrations](#mariadb-schema-migrations) above and the
 [database reference](database.md#administrative-commands) for full details.
 
