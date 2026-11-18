@@ -115,14 +115,32 @@ def enqueue_cluster_operation(
     # no target rows, and a by-target reader (has_pending, is_okay
     # gating, the /clusteroperations listing, the CI await helpers)
     # in that window wrongly concluded nothing targeted the object.
+    #
+    # The declaration itself is read with a silent default, because
+    # raising here would turn a reporting gap into a runtime failure
+    # on a path which creates work. A schema which forgets it is
+    # caught in review instead, by
+    # shakenfist/tests/schema/operations/test_target_fields.py -- but
+    # that test only sees the schemas in this tree, so an empty
+    # declaration is also reported here rather than passing silently.
+    # An empty op_targets is not reported: every target field of
+    # artifact_fetch_op is optional, so a legitimately untargeted
+    # operation is normal.
     op_targets: list[tuple[ObjectType, str]] = []
-    if model_class is not None:
-        target_fields = getattr(model_class, 'target_fields', {})
-        for field_name, target_object_type in target_fields.items():
-            target_uuid = metadata.get(field_name)
-            if target_uuid is None:
-                continue
-            op_targets.append((target_object_type, target_uuid))
+    target_fields = getattr(model_class, 'target_fields', {})
+    if not target_fields:
+        LOG.with_fields({
+            'operation_uuid': metadata['uuid'],
+            'operation_type': object_type_str,
+            'model_class': getattr(model_class, '__name__', None),
+        }).error('Cluster operation declares no targets, so nothing will '
+                 'report it as pending against any object')
+
+    for field_name, target_object_type in target_fields.items():
+        target_uuid = metadata.get(field_name)
+        if target_uuid is None:
+            continue
+        op_targets.append((target_object_type, target_uuid))
 
     # Whether this op only observes its targets, derived from its tasks
     # so the stored flag cannot disagree with the work the op does. It
