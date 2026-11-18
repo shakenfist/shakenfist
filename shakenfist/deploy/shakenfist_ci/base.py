@@ -2076,6 +2076,56 @@ class BaseNamespacedTestCase(BaseTestCase):
 
 
 class TestDistroBoots(BaseNamespacedTestCase):
+    def _await_agentop_state(self, instance_uuid, aop, states, timeout,
+                             description):
+        """Poll one agent operation until it reaches one of states.
+
+        _await_agentop_complete() above only knows how to wait for success,
+        which is what most of the suite wants. The timing and dependency
+        tests wait for failures they induced on purpose -- an operation
+        expired on its deadline, or aborted because something it depended on
+        failed -- so they need a version which is told which states count as
+        arrival.
+
+        Hoisted here, like the waiter above, once there were two callers.
+        The timing tests had the only copy and said in as many words that
+        base.py is where a helper with one caller goes to be copied later;
+        the dependency tests then copied it, which is the moment to stop.
+
+        Reaching some *other* terminal state fails immediately rather than
+        burning the rest of the window, and every failure routes through
+        _raise_agent_operation_failure() so it prints the operation and the
+        instance's recent events. That matters because the external view
+        carries only the machine readable reason -- expiry_reason, or
+        dependency_failure -- while the prose version, and the audit of an
+        expiry or a cascade against the instance, are events. An operation
+        which failed for a reason its test did not expect is legible there
+        and nowhere else.
+        """
+        terminal = tuple(self.AGENT_OPERATION_FAILED_STATES) + ('complete',)
+        wanted = ', '.join(states)
+        start_time = time.time()
+
+        while aop['state'] not in states:
+            if aop['state'] in terminal:
+                self._raise_agent_operation_failure(
+                    instance_uuid, description, aop,
+                    f"agent operation {aop['uuid']} for {description} "
+                    f"finished in state {aop['state']}, but this test "
+                    f'expected it to reach one of {wanted}')
+
+            if time.time() - start_time > timeout:
+                self._raise_agent_operation_failure(
+                    instance_uuid, description, aop,
+                    f"agent operation {aop['uuid']} for {description} was "
+                    f"still in state {aop['state']} after {timeout} seconds "
+                    f'without reaching one of {wanted}')
+
+            time.sleep(5)
+            aop = self.test_client.get_agent_operation(aop['uuid'])
+
+        return aop
+
     def setUp(self):
         super().setUp()
         self.net = self.test_client.allocate_network(
