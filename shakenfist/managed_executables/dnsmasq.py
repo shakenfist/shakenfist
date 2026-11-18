@@ -236,10 +236,13 @@ class DnsMasq(managedexecutable.ManagedExecutable):
         # Run by this process's own interpreter. privexec runs commands
         # with a system PATH, on which python3 has no shakenfist to
         # import, and that import failure was read as "no answer" for
-        # every network on every pass.
+        # every network on every pass. -P keeps the inherited working
+        # directory off sys.path: this runs as root, and -m would
+        # otherwise import a socket.py planted there ahead of the real
+        # one.
         subst = self.subst_dict()
         command = shlex.join([
-            sys.executable, '-m', 'shakenfist.util.dhcp_probe',
+            sys.executable, '-P', '-m', 'shakenfist.util.dhcp_probe',
             subst['router'], subst['router'],
             str(config.DHCP_PROBE_TIMEOUT)])
         try:

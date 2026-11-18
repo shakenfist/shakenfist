@@ -25,6 +25,7 @@ the dnsmasq on its network node. What is tested here with real sockets
 is the probe's own side of the exchange.
 """
 
+import os
 import shlex
 import socket
 import struct
@@ -147,8 +148,10 @@ class ProbeTestCase(base.ShakenFistTestCase):
         self.assertFalse(result)
 
     def test_a_reply_which_is_not_an_ack_is_not_serving(self):
-        result, _ = self._probe([_reply(self.XID, 6)])      # DHCPNAK
+        result, sock = self._probe([_reply(self.XID, 6)])   # DHCPNAK
         self.assertFalse(result)
+        # It is an answer, so it is not asked for again.
+        self.assertEqual(1, len(sock.sent))
 
     def test_a_reply_from_anywhere_else_is_not_believed(self):
         # The namespace is bridged to the guests. A guest which got a
@@ -191,7 +194,25 @@ class ProbeTestCase(base.ShakenFistTestCase):
 
     def test_it_is_sent_to_the_dhcp_server_port(self):
         _, sock = self._probe([])
-        self.assertEqual([(b'packet', ('10.0.0.1', 67))], sock.sent)
+        self.assertEqual(
+            [(b'packet', ('10.0.0.1', 67))] * dhcp_probe.DEFAULT_ATTEMPTS,
+            sock.sent)
+
+    def test_a_lost_datagram_is_sent_again(self):
+        # One dropped packet must not get a healthy network rebuilt.
+        result, sock = self._probe([
+            socket.timeout(), _reply(self.XID, dhcp_probe.DHCPACK)])
+        self.assertTrue(result)
+        self.assertEqual(2, len(sock.sent))
+
+    def test_an_answer_is_not_asked_for_again(self):
+        _, sock = self._probe([_reply(self.XID, dhcp_probe.DHCPACK)])
+        self.assertEqual(1, len(sock.sent))
+
+    def test_silence_is_given_up_on_after_every_attempt(self):
+        result, sock = self._probe([socket.timeout()] * 10)
+        self.assertFalse(result)
+        self.assertEqual(dhcp_probe.DEFAULT_ATTEMPTS, len(sock.sent))
 
     def test_the_timeout_is_applied_to_the_socket(self):
         sock = _FakeSocket([])
@@ -214,8 +235,10 @@ class _Responder:
     ``interval`` seconds between them.
     """
 
-    def __init__(self, replies, interval=0.0):
+    def __init__(self, replies, interval=0.0, ignore=0):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._ignore = ignore
+        self.requests = 0
         self.sock.bind(('127.0.0.1', 0))
         self.port = self.sock.getsockname()[1]
         self._replies = replies
@@ -226,10 +249,14 @@ class _Responder:
 
     def _serve(self):
         self.sock.settimeout(5)
-        try:
-            request, source = self.sock.recvfrom(2048)
-        except OSError:
-            return
+        while True:
+            try:
+                request, source = self.sock.recvfrom(2048)
+            except OSError:
+                return
+            self.requests += 1
+            if self.requests > self._ignore:
+                break
         xid = dhcp_probe.parse_transaction_id(request)
         for packet in self._replies(xid):
             if self._stop.is_set():
@@ -250,8 +277,8 @@ class _Responder:
 class RealSocketProbeTestCase(base.ShakenFistTestCase):
     """probe() over a real loopback socket, not a scripted one."""
 
-    def _probe_against(self, replies, timeout, interval=0.0):
-        responder = _Responder(replies, interval=interval)
+    def _probe_against(self, replies, timeout, interval=0.0, ignore=0):
+        responder = _Responder(replies, interval=interval, ignore=ignore)
         self.addCleanup(responder.close)
         start = time.monotonic()
         result = dhcp_probe.probe(
@@ -266,10 +293,22 @@ class RealSocketProbeTestCase(base.ShakenFistTestCase):
             lambda xid: [_reply(xid, dhcp_probe.DHCPACK)], timeout=2)
         self.assertTrue(result)
 
+    def test_a_dropped_request_is_answered_on_the_retry(self):
+        # The responder drops the first INFORM, as a full receive buffer
+        # would, and answers the next.
+        result, elapsed = self._probe_against(
+            lambda xid: [_reply(xid, dhcp_probe.DHCPACK)], timeout=1.5,
+            ignore=1)
+        self.assertTrue(result)
+        self.assertLess(elapsed, 1.5)
+
     def test_silence_times_out(self):
-        result, elapsed = self._probe_against(lambda xid: [], timeout=0.3)
+        result, elapsed = self._probe_against(lambda xid: [], timeout=0.6)
         self.assertFalse(result)
-        self.assertGreaterEqual(elapsed, 0.3)
+        self.assertGreaterEqual(elapsed, 0.6)
+        # The retransmissions share the timeout rather than each
+        # getting one of their own.
+        self.assertLess(elapsed, 1.2)
 
     def test_the_deadline_is_overall_not_per_packet(self):
         # A busy network delivers other clients' packets to the probe.
@@ -513,6 +552,36 @@ class IsServingDhcpTestCase(base.ShakenFistTestCase):
             result = subprocess.run(
                 command, shell=True, cwd=cwd, env=env, timeout=60,
                 capture_output=True, text=True)
+        self.assertEqual(
+            dhcp_probe.EXIT_NO_ANSWER, result.returncode,
+            f'{command!r} exited {result.returncode}: {result.stderr}')
+
+    def test_the_command_ignores_modules_in_its_working_directory(self):
+        # It runs as root, in whatever directory privexec inherited. With
+        # -m and nothing else, that directory is first on sys.path, so a
+        # socket.py planted there would run in place of the real one.
+        d = self._dnsmasq()
+        d.subst_dict.return_value = {
+            'router': '127.0.0.1', 'netns': 'a-netns'}
+        with mock.patch(
+                'shakenfist.managed_executables.dnsmasq.util_concurrency.'
+                'execute', return_value=('', '')) as mock_execute:
+            with mock.patch(
+                    'shakenfist.managed_executables.dnsmasq.config.'
+                    'DHCP_PROBE_TIMEOUT', 0.2):
+                d.is_serving_dhcp()
+        command = mock_execute.call_args[0][0]
+
+        with tempfile.TemporaryDirectory() as cwd:
+            with open(os.path.join(cwd, 'socket.py'), 'w') as f:
+                f.write('raise SystemExit(42)\n')
+            env = {'PATH': util_concurrency.PRIVEXEC_DEFAULT_PATH}
+            result = subprocess.run(
+                command, shell=True, cwd=cwd, env=env, timeout=60,
+                capture_output=True, text=True)
+        self.assertNotEqual(
+            42, result.returncode,
+            f'{command!r} imported socket.py from its working directory')
         self.assertEqual(
             dhcp_probe.EXIT_NO_ANSWER, result.returncode,
             f'{command!r} exited {result.returncode}: {result.stderr}')

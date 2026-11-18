@@ -635,7 +635,9 @@ a process which is not there, and it is far cheaper than a round trip.
 
 A network which fails either check is not okay, and the maintenance
 pass rebuilds it. `DHCP_PROBE_TIMEOUT` (default 2 seconds) is how long
-the probe waits. A healthy server answers in milliseconds over a
+the probe waits. Within that it sends the DHCPINFORM three times, evenly
+spaced, as a real DHCP client retransmits: a single datagram dropped by
+a busy node must not get a healthy network rebuilt. A healthy server answers in milliseconds over a
 namespace-local round trip, so this is a wedge detector rather than a
 latency budget: raising it delays detection, and lowering it risks
 calling a loaded network node broken and rebuilding its networks.

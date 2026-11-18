@@ -639,7 +639,9 @@ class ImageFetchHelper:
                     extra={'url': url, 'algorithm': resolved.algorithm})
                 raise e
 
-            if resolved.checksum:
+            # The same predicate http_fetch() verifies on, so this
+            # event can never claim a check which did not run.
+            if resolved.algorithm and resolved.checksum:
                 add_event_multi(
                     EVENT_TYPE_AUDIT, objects_including_blob,
                     'fetched image matched its published checksum',

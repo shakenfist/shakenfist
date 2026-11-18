@@ -91,6 +91,14 @@ PROBE_MAC = b'\x02\x00\x5f\x70\x72\x62'
 
 DEFAULT_TIMEOUT = 2.0
 
+# How many times the INFORM is sent within the timeout, evenly spaced.
+# UDP may drop a datagram -- a full receive buffer on a busy network
+# node is enough -- and a single lost packet must not get a healthy
+# network rebuilt. A real DHCP client retransmits for the same reason
+# (RFC 2131 section 4.1). A healthy server answers the first in
+# milliseconds, so the repeats cost nothing unless they are needed.
+DEFAULT_ATTEMPTS = 3
+
 # The loopback interface's flags, as sysfs exposes them, and the IFF_UP
 # bit within them.
 LOOPBACK_FLAGS_PATH = '/sys/class/net/lo/flags'
@@ -187,16 +195,58 @@ def parse_transaction_id(packet):
     return struct.unpack('!I', packet[4:8])[0]
 
 
+def _await_reply(sock, xid, server_address, server_port, until):
+    """Read until our reply arrives or ``until`` passes.
+
+    True or False for an answer from the server, None if nothing which
+    answers our request arrived in time.
+    """
+    # A reply whose transaction id is not ours belongs to a real
+    # client's exchange, which we may see because the server
+    # broadcasts. Keep reading until the deadline rather than
+    # reporting somebody else's packet as our answer -- or, worse,
+    # reporting a healthy server as wedged because a guest was
+    # mid-handshake. The deadline is overall: a socket timeout
+    # applies afresh to each read, so on a busy network every
+    # foreign packet would otherwise restart the wait.
+    while True:
+        remaining = until - time.monotonic()
+        if remaining <= 0:
+            return None
+        sock.settimeout(remaining)
+        try:
+            reply, source = sock.recvfrom(2048)
+        except socket.timeout:
+            return None
+        except ConnectionRefusedError:
+            # Nothing is listening on the server port: an answer
+            # about the server, and the answer is no.
+            return False
+        # The namespace is bridged to the guests, so an answer is
+        # only believed from the server and port we asked. dnsmasq
+        # 2.90 and 2.91 reply from exactly that, which
+        # tools/dhcp-probe-against-dnsmasq.sh checks against the
+        # real thing.
+        if source != (server_address, server_port):
+            continue
+        if parse_transaction_id(reply) != xid:
+            continue
+        return parse_message_type(reply) == DHCPACK
+
+
 def probe(server_address, client_address, timeout=DEFAULT_TIMEOUT,
-          sock=None, server_port=DHCP_SERVER_PORT):
+          sock=None, server_port=DHCP_SERVER_PORT,
+          attempts=DEFAULT_ATTEMPTS):
     """True if ``server_address`` answered a DHCPINFORM with a DHCPACK.
 
     ``client_address`` is the address the INFORM claims, which must sit
     inside the server's configured range for it to be answered -- the
     network's own router address does.
 
-    False means nothing answered within ``timeout`` seconds, in total
-    rather than per packet read. An error which says nothing about the
+    The INFORM is sent up to ``attempts`` times, evenly spaced within
+    the timeout and with the same transaction id, so a reply to any of
+    them is an answer. False means nothing answered any of them within
+    ``timeout`` seconds, in total rather than per packet read. An error which says nothing about the
     server (a socket which cannot be sent from, say) is raised rather
     than reported as silence, so that the caller can tell the two
     apart. A down loopback is such an error: the server address is
@@ -215,40 +265,16 @@ def probe(server_address, client_address, timeout=DEFAULT_TIMEOUT,
     if owned:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        deadline = time.monotonic() + timeout
-        sock.sendto(packet, (server_address, server_port))
-
-        # A reply whose transaction id is not ours belongs to a real
-        # client's exchange, which we may see because the server
-        # broadcasts. Keep reading until the deadline rather than
-        # reporting somebody else's packet as our answer -- or, worse,
-        # reporting a healthy server as wedged because a guest was
-        # mid-handshake. The deadline is overall: a socket timeout
-        # applies afresh to each read, so on a busy network every
-        # foreign packet would otherwise restart the wait.
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                return False
-            sock.settimeout(remaining)
-            try:
-                reply, source = sock.recvfrom(2048)
-            except socket.timeout:
-                return False
-            except ConnectionRefusedError:
-                # Nothing is listening on the server port: an answer
-                # about the server, and the answer is no.
-                return False
-            # The namespace is bridged to the guests, so an answer is
-            # only believed from the server and port we asked. dnsmasq
-            # 2.90 and 2.91 reply from exactly that, which
-            # tools/dhcp-probe-against-dnsmasq.sh checks against the
-            # real thing.
-            if source != (server_address, server_port):
-                continue
-            if parse_transaction_id(reply) != xid:
-                continue
-            return parse_message_type(reply) == DHCPACK
+        start = time.monotonic()
+        attempts = max(1, attempts)
+        for attempt in range(1, attempts + 1):
+            sock.sendto(packet, (server_address, server_port))
+            answer = _await_reply(
+                sock, xid, server_address, server_port,
+                start + timeout * attempt / attempts)
+            if answer is not None:
+                return answer
+        return False
     finally:
         if owned:
             sock.close()

@@ -509,15 +509,19 @@ class AgentOperation(BaseOperation):
         Every call site this helper replaced also assigned self.error
         as well; that second write is dropped deliberately. Since the
         fix for issue #3899 the error setter stores the message on the
-        object's state row, which is the row _state_update() has just
-        written, so self.error already reads back what was passed here
-        and assigning it again would buy nothing but a redundant mutate
-        event on every failure.
+        object's state row, which is the row enter_error_state() has
+        just written, so self.error already reads back what was passed
+        here and assigning it again would buy nothing but a redundant
+        mutate event on every failure.
+
+        Through enter_error_state() rather than _state_update(), so an
+        empty message gets the same backstop as every other way into
+        an error state.
         """
         if self.state.value in self.TERMINAL_STATES:
             return
 
-        self._state_update(dbo.STATE_ERROR, message=message)
+        self.enter_error_state(dbo.STATE_ERROR, message)
 
     def cascade_abort_for_dependency(self, dep, dep_state,
                                      event=CASCADE_EVENT_FAILED):

@@ -175,8 +175,7 @@ def _instance_lock(inst, pet):
             stack.enter_context(inst.get_lock(
                 op='Cleaner power state update', global_scope=False,
                 node_timeout=2))
-        except (exceptions.NodeLockTimeout,
-                exceptions.MissingNodeLockSocket) as e:
+        except exceptions.NodeLockTimeout as e:
             LOG.with_fields({'instance': inst.uuid}).debug(
                 f'Instance is busy, skipping it this pass: {e}')
             yield False
@@ -185,6 +184,9 @@ def _instance_lock(inst, pet):
             # This node's nodelock daemon is not answering, which is no
             # more a reason to abandon the rest of the pass than a busy
             # instance is. NodeLock has already logged it at WARNING.
+            # Every nodelock transport error (a missing socket, a
+            # truncated reply) arrives here: NodeLock.__enter__ turns
+            # them all into this one.
             LOG.with_fields({'instance': inst.uuid}).debug(
                 f'Cannot lock instance, skipping it this pass: {e}')
             yield False
@@ -667,9 +669,13 @@ def _per_domain_errors(lc):
     transient, must not end the pass for the domains listed after it:
     a libvirt call on that domain, the virsh fallback for undefining or
     destroying it (which raises ProcessExecutionError on a non-zero exit),
-    privexec and node lock transport errors, a database outage, and
-    errors from the filesystem or a socket. A programming error is not
-    among them, and still ends the pass loudly.
+    privexec transport errors, a nodelock reply this node cannot parse, a
+    database outage, and errors from the filesystem or a socket. A
+    programming error is not among them, and still ends the pass loudly.
+
+    Nodelock transport errors are not here because they cannot arrive:
+    NodeLock.__enter__ turns them into NodeLockUnavailable, which
+    _instance_lock() handles, and __exit__ swallows them.
     """
     return (
         lc.libvirt.libvirtError,
@@ -678,7 +684,6 @@ def _per_domain_errors(lc):
         exceptions.MissingPrivExecSocket,
         exceptions.TruncatedPrivExecResponse,
         exceptions.UnknownPrivExecReplyException,
-        exceptions.TruncatedNodeLockResponse,
         exceptions.UnknownNodeLockReplyException,
         OSError,
     )

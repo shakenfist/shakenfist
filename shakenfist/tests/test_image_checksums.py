@@ -453,3 +453,39 @@ class CachedBlobPathTestCase(base.ShakenFistTestCase):
         mock_blob_get.assert_called_once()
         self.assertTrue(
             mock_blob_get.call_args[0][0].startswith(images.BLOB_URL))
+
+
+class FetchedImageEventTestCase(base.ShakenFistTestCase):
+    """What the audit event says was checked, against what was."""
+
+    def _events_for(self, resolved):
+        helper = images.ImageFetchHelper.__new__(images.ImageFetchHelper)
+        helper.objects = []
+        helper.instance = None
+        with mock.patch.object(helper, '_open_connection'):
+            with mock.patch.object(images.blob.Blob, 'new'):
+                with mock.patch.object(images.blob, 'http_fetch'):
+                    with mock.patch(
+                            'shakenfist.images.add_event_multi') as events:
+                        with mock.patch(
+                                'shakenfist.images.util_general.'
+                                'RecordedOperation'):
+                            helper._http_get_inner(resolved)
+        return [c[0][2] for c in events.call_args_list]
+
+    def test_a_verified_fetch_says_it_matched(self):
+        messages = self._events_for(images.ResolvedImage(
+            'http://example.com/i.qcow2', 'sha256', '1' * 64))
+        self.assertIn(
+            'fetched image matched its published checksum', messages)
+
+    def test_a_checksum_without_an_algorithm_is_not_claimed(self):
+        # http_fetch() only checks when it has both, so the event must
+        # not say the image matched when only one was known.
+        messages = self._events_for(images.ResolvedImage(
+            'http://example.com/i.qcow2', None, '1' * 64))
+        self.assertNotIn(
+            'fetched image matched its published checksum', messages)
+        self.assertIn(
+            'fetched image had no published checksum to verify against',
+            messages)

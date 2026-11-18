@@ -30,7 +30,9 @@ says it failed and nothing says what failed, and loses the reason entirely if
 the process dies in between. CI observed exactly that -- an instance in `error`
 with `error_message` null, and no way to tell what had put it there.
 
-Two rules follow, both enforced rather than documented:
+Three rules follow. The first two are enforced -- by `_state_update()` and by
+the `test_error_state_reasons` audit -- and the third says what the backstop
+does when a caller gets it wrong anyway:
 
 * A transition from one error state to another keeps the earlier reason, since
   the move to `error` from a `*-error` transition state has nothing new to say.
@@ -38,9 +40,10 @@ Two rules follow, both enforced rather than documented:
   recorded, see the node logs` recorded in its place, and an error is logged
   naming the line which set the state. The location goes to the log rather than
   the message because the message is visible to anyone who can read the
-  object. The `test_error_state_reasons` audit reads the tree and fails on a
-  bare assignment of an error state, so the fallback is a backstop rather than
-  a supported path.
+  object. The `test_error_state_reasons` audit reads the tree and fails on any
+  write of a state -- an assignment to `.state`, `setattr()` or a direct
+  `_state_update()` -- whose value is not provably a non-error state, so the
+  fallback is a backstop rather than a supported path.
 * `enter_error_state()` given an empty reason -- usually the text of an
   exception which had none -- still enters the error state, through the same
   backstop, and keeps the reason the object already had if it was in an error

@@ -16,6 +16,7 @@ end.
 """
 
 import ast
+import functools
 import os
 
 import testtools
@@ -39,8 +40,8 @@ PACKAGE_ROOT = os.path.dirname(os.path.abspath(baseobject.__file__))
 # daemons.
 SKIPPED_DIRECTORIES = ['tests', 'deploy']
 
-# Assignments which may set an error state without a reason, each with
-# the reason it is allowed to.
+# Writes which may set a state without a reason, each with the reason
+# it is allowed to.
 #
 # An entry is '<path relative to the package>:<function>'. It is not an
 # escape hatch for a new failure path: a failure with nothing to say
@@ -53,26 +54,48 @@ BARE_ERROR_STATE_ALLOWED = {
     # here -- inventing one would overwrite the real one.
     'instance.py:_delete_globally': (
         'error-to-error transition, message carried by _state_update'),
+
+    # The state machine itself, which writes whatever value it was
+    # handed: the bare setter (whose error case is the backstop),
+    # enter_error_state() (which has the reason), and Blob's override
+    # of _state_update(), which passes its message through.
+    'baseobject.py:state': 'the setter, which is the backstop',
+    'baseobject.py:enter_error_state': 'writes the reason with the state',
+    'blob.py:_state_update': 'an override, passes the message through',
+
+    # Every caller passes a lifecycle constant (created, degraded,
+    # stopping, stopped) from the sentinel daemons, and the function
+    # exists to keep a node *out* of the transition to a lifecycle state
+    # when it is in error.
+    'node.py:set_lifecycle_state': 'sentinel lifecycle states only',
 }
 
 
-def _is_error_state_expression(node):
-    """Does this expression look like it evaluates to an error state?
+def _could_be_error_state(node):
+    """Could this expression evaluate to an error state?
 
-    Deliberately generous: a constant ending in 'error', a NAME or
-    attribute mentioning ERROR, an f-string or a concatenation with an
-    '-error' piece in it. A false positive here costs an allow-list
-    entry with a reason, which is the outcome this audit wants anyway.
+    Answered the safe way round: an expression is cleared only if it is
+    provably not an error state -- a string constant which does not end
+    in 'error', None, or a ``STATE_*`` name which does not mention
+    ERROR. Anything else, including a plain variable, a call or a
+    conditional, could be one, and is reported. A false positive costs
+    an allow-list entry with a reason, which is the outcome this audit
+    wants anyway; a false negative is a production path into an error
+    state with no reason, which is what it exists to stop.
     """
-    for child in ast.walk(node):
-        if isinstance(child, ast.Constant) and isinstance(child.value, str):
-            if child.value.endswith('error'):
-                return True
-        if isinstance(child, ast.Name) and 'ERROR' in child.id:
-            return True
-        if isinstance(child, ast.Attribute) and 'ERROR' in child.attr:
-            return True
-    return False
+    if isinstance(node, ast.Constant):
+        if node.value is None:
+            return False
+        return not (isinstance(node.value, str)
+                    and not node.value.endswith('error'))
+
+    if isinstance(node, ast.Name):
+        identifier = node.id
+    elif isinstance(node, ast.Attribute):
+        identifier = node.attr
+    else:
+        return True
+    return not (identifier.startswith('STATE_') and 'ERROR' not in identifier)
 
 
 def _enclosing_function(tree, target):
@@ -89,6 +112,58 @@ def _enclosing_function(tree, target):
     return best
 
 
+def _state_value_written(node):
+    """The value a node writes as an object's state, or None.
+
+    Every shape which can reach _state_update() from outside it: an
+    assignment to ``.state`` (plain or annotated), ``setattr(obj,
+    'state', value)``, and a direct ``_state_update(value, ...)`` call,
+    which is how AgentOperation.fail() bypassed the bare-assignment
+    check this audit started as.
+    """
+    if isinstance(node, ast.Assign):
+        for target in node.targets:
+            if isinstance(target, ast.Attribute) and target.attr == 'state':
+                return node.value
+        return None
+
+    if isinstance(node, ast.AnnAssign):
+        if (isinstance(node.target, ast.Attribute)
+                and node.target.attr == 'state' and node.value is not None):
+            return node.value
+        return None
+
+    if not isinstance(node, ast.Call):
+        return None
+
+    func = node.func
+    if (isinstance(func, ast.Name) and func.id == 'setattr'
+            and len(node.args) == 3
+            and isinstance(node.args[1], ast.Constant)
+            and node.args[1].value == 'state'):
+        return node.args[2]
+
+    if isinstance(func, ast.Attribute) and func.attr == '_state_update':
+        if node.args:
+            return node.args[0]
+        for keyword in node.keywords:
+            if keyword.arg == 'new_value':
+                return keyword.value
+    return None
+
+
+def find_error_state_writes_in(source, relative):
+    """Every write in ``source`` which could enter an error state."""
+    tree = ast.parse(source, filename=relative)
+    found = []
+    for node in ast.walk(tree):
+        value = _state_value_written(node)
+        if value is None or not _could_be_error_state(value):
+            continue
+        found.append((relative, node.lineno, _enclosing_function(tree, node)))
+    return found
+
+
 def _python_sources():
     for dirpath, dirnames, filenames in os.walk(PACKAGE_ROOT):
         dirnames[:] = [d for d in dirnames
@@ -99,29 +174,20 @@ def _python_sources():
                 yield os.path.join(dirpath, filename)
 
 
-def find_bare_error_state_assignments():
-    """Every `something.state = <an error state>` in production code."""
+@functools.cache
+def find_bare_error_state_writes():
+    """Every write of a possible error state in production code.
+
+    Parsed once per process: it reads the whole package, mariadb.py
+    and the generated protos included, and two tests want the answer.
+    """
     found = []
     for path in _python_sources():
         with open(path) as f:
             source = f.read()
-        tree = ast.parse(source, filename=path)
-        relative = os.path.relpath(path, PACKAGE_ROOT)
-
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Assign):
-                continue
-            for target in node.targets:
-                if not isinstance(target, ast.Attribute):
-                    continue
-                if target.attr != 'state':
-                    continue
-                if not _is_error_state_expression(node.value):
-                    continue
-                found.append((
-                    relative, node.lineno,
-                    _enclosing_function(tree, node)))
-    return found
+        found.extend(find_error_state_writes_in(
+            source, os.path.relpath(path, PACKAGE_ROOT)))
+    return tuple(found)
 
 
 class ErrorStateAuditTestCase(testtools.TestCase):
@@ -132,49 +198,73 @@ class ErrorStateAuditTestCase(testtools.TestCase):
             os.path.join(PACKAGE_ROOT, 'baseobject.py')))
         self.assertTrue(list(_python_sources()))
 
-    def test_the_audit_can_see_an_error_state_assignment(self):
+    def test_the_matcher_reports_anything_which_could_be_an_error(self):
         # The audit is only worth running if its matcher fires. Prove it
-        # on each shape of error state expression the tree uses.
+        # on each shape of error state expression the tree uses, and on
+        # a value it cannot see through: a variable is how
+        # _end_for_dependency() entered error with no reason, unseen.
         for expression in ['Instance.STATE_ERROR', 'self.STATE_ERROR',
-                           "dbo.STATE_ERROR", "'preflight-error'",
+                           'dbo.STATE_ERROR', "'preflight-error'",
                            "inst.state.value + '-error'",
-                           "f'{inst.state.value}-error'"]:
-            tree = ast.parse(f'obj.state = {expression}')
-            assign = tree.body[0]
+                           "f'{inst.state.value}-error'",
+                           'new_state', 'target', 'pick_a_state()',
+                           'STATE_CREATED if ok else STATE_ERROR']:
+            value = ast.parse(expression, mode='eval').body
             self.assertTrue(
-                _is_error_state_expression(assign.value),
-                f'matcher did not recognise {expression}')
+                _could_be_error_state(value),
+                f'matcher did not report {expression}')
 
-        # And that it does not fire on a non-error state.
-        for expression in ['Instance.STATE_CREATED', "'created'"]:
-            tree = ast.parse(f'obj.state = {expression}')
+        # And that it clears what is provably not an error state.
+        for expression in ['Instance.STATE_CREATED', "'created'",
+                           'STATE_DELETED', 'None']:
+            value = ast.parse(expression, mode='eval').body
             self.assertFalse(
-                _is_error_state_expression(tree.body[0].value),
-                f'matcher wrongly recognised {expression}')
+                _could_be_error_state(value),
+                f'matcher wrongly reported {expression}')
+
+    def test_the_audit_sees_every_way_into_a_state(self):
+        for statement in ['obj.state = dbo.STATE_ERROR',
+                          'obj.state: str = dbo.STATE_ERROR',
+                          "setattr(obj, 'state', dbo.STATE_ERROR)",
+                          'self._state_update(dbo.STATE_ERROR, message=m)',
+                          'self._state_update(new_value=dbo.STATE_ERROR)',
+                          'super()._state_update(new_value)']:
+            self.assertEqual(
+                1, len(find_error_state_writes_in(statement, 'x.py')),
+                f'audit did not see {statement}')
+
+        for statement in ['obj.state = dbo.STATE_CREATED',
+                          'obj.error = dbo.STATE_ERROR',
+                          "setattr(obj, 'power_state', dbo.STATE_ERROR)",
+                          'self._state_update(dbo.STATE_EXPIRED, message=m)',
+                          'obj.enter_error_state(dbo.STATE_ERROR, m)']:
+            self.assertEqual(
+                [], find_error_state_writes_in(statement, 'x.py'),
+                f'audit wrongly reported {statement}')
 
     def test_no_production_code_enters_an_error_state_bare(self):
         unexpected = []
-        for relative, lineno, function in find_bare_error_state_assignments():
+        for relative, lineno, function in find_bare_error_state_writes():
             if f'{relative}:{function}' in BARE_ERROR_STATE_ALLOWED:
                 continue
             unexpected.append(f'{relative}:{lineno} (in {function})')
 
         self.assertEqual(
             [], sorted(unexpected),
-            'These assignments enter an error state with no reason '
+            'These writes could enter an error state with no reason '
             'recorded, which is the diagnostic dead end of issue 3665. '
-            'Call enter_error_state(state, reason) instead, or add an '
-            'entry to BARE_ERROR_STATE_ALLOWED saying why this one has '
-            'nothing to say for itself.')
+            'Call enter_error_state(state, reason) for an error state, '
+            'or add an entry to BARE_ERROR_STATE_ALLOWED saying why this '
+            'one cannot be one, or has nothing to say for itself.')
 
     def test_every_allow_list_entry_is_still_real(self):
         # An allow-list entry which no longer matches anything is a
         # stale exemption waiting to excuse an unrelated defect.
         live = {f'{relative}:{function}' for relative, _, function
-                in find_bare_error_state_assignments()}
+                in find_bare_error_state_writes()}
         self.assertEqual(
             set(), set(BARE_ERROR_STATE_ALLOWED) - live,
-            'allow-list entries which no longer match any assignment')
+            'allow-list entries which no longer match any write')
 
 
 class _StatefulObject(DatabaseBackedObject):

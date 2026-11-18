@@ -998,7 +998,8 @@ class BaseClusterOperation(BaseOperation):
         the operation has already ended some other way, and it is not
         this call which ended it, so no ending event is recorded.
         """
-        was_queued = self.state.value == BaseClusterOperation.STATE_QUEUED
+        current = self.state.value
+        was_queued = current == BaseClusterOperation.STATE_QUEUED
         if was_queued:
             try:
                 self._dependency_failed(reason)
@@ -1012,8 +1013,23 @@ class BaseClusterOperation(BaseOperation):
                     'failed to tell targets the operation will never run',
                     extra={'error': str(e)})
 
+        # Already ended this way, so not by this call. An operation
+        # which failed for a reason of its own keeps that reason:
+        # enter_error_state() would replace it with the dependency's.
+        if current == new_state:
+            return
+
+        # cancel_for_missing_dependency() ends in error, and the reason
+        # is already in hand: a bare assignment recorded "no reason
+        # recorded" for an operation whose dependency is known to be
+        # missing. Abort is the only other ending, and is written as a
+        # constant so test_error_state_reasons can see it is not an
+        # error state.
         try:
-            self.state = new_state  # type: ignore[misc]
+            if new_state == BaseClusterOperation.STATE_ABORT:
+                self.state = BaseClusterOperation.STATE_ABORT  # type: ignore[misc]
+            else:
+                self.enter_error_state(new_state, reason)
         except exceptions.InvalidStateException:
             self.add_event(EVENT_TYPE_AUDIT, failure_message)
             return
