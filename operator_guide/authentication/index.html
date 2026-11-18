@@ -16648,8 +16648,16 @@ answers with the same object for a single key. Both detailed reads include
 expired keys, so "which of my keys lapsed, and when" can be answered without
 reading the database. <code>sf-client namespace show</code> renders them too, with
 <code>provenance</code> in its table and JSON output rather than in its comma separated
-one, where a serialised object would be ambiguous.</p>
-<p>The detailed reads never return the key's secret.</p>
+one, where a serialised object would be ambiguous. That comma separated output
+gives the expiry as the raw unix timestamp the cluster sent, so a script can
+compare it with the current time without parsing a date.</p>
+<p>The detailed reads never return the key's secret. A key with no scopes
+recorded reports <code>scopes</code> as null, and that means the key is <strong>unrestricted</strong>
+rather than unprivileged: such a key mints wildcard tokens. There is no state
+field, so a key the expiry sweep has already soft deleted still appears, with
+an expiry in the past, until it is hard deleted -- <code>NAMESPACE_KEY_REAP_GRACE</code>
+plus <code>CLEANER_DELAY</code> after it lapsed, which is the forensic window described
+above.</p>
 <p><code>provenance</code>, the record of who or what minted a key, is served only to a
 caller authenticated to the <code>system</code> namespace. Every other caller who can read
 the namespace gets the remaining fields but not <code>provenance</code>, because it can
@@ -16660,6 +16668,15 @@ of them. Weigh that when you grant trust. A missing <code>provenance</code> mean
 caller is not in <code>system</code>, not that the key has none. See
 <a href="#human-login-mints-credentials">a minted key records who it was minted for</a>
 for what provenance contains.</p>
+<p>Note that this gate is the namespace alone, not the namespace and a scope.
+<strong>Scoping a <code>system</code> credential does not withhold provenance from it</strong>: a key
+minted into <code>system</code> and scoped to only what these reads need still sees the
+field, which is deliberate, because an operator administering keys with a
+correctly narrowed credential is exactly who the field is for. The namespace
+event trail carries the same subjects and claims and is served behind the
+stricter test of <code>system</code> plus <code>cluster-admin</code>, so the two surfaces disagree
+on purpose. If you need a <code>system</code> credential which cannot read who logged in,
+there is no scope which arranges that today.</p>
 <p>Even so, the forensic window above is worth keeping in mind: setting
 <code>NAMESPACE_KEY_REAP_GRACE</code> to <code>0</code> while investigating keeps an expired key
 readable indefinitely.</p>

@@ -14361,6 +14361,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#reading-a-namespace-keys-expiry-scopes-and-provenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a namespace key's expiry, scopes and provenance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#affinity-constraints-and-the-deprecation-of-weights" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16634,6 +16645,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#reading-a-namespace-keys-expiry-scopes-and-provenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a namespace key's expiry, scopes and provenance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#affinity-constraints-and-the-deprecation-of-weights" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -18407,6 +18429,30 @@ and <a href="/operator_guide/scheduler/#listing-every-namespaces-claims">listing
 and the client's
 <a href="https://github.com/shakenfist/client-python/blob/develop/docs/cluster-capacity.md">cluster capacity page</a>
 for what <code>node capacity</code> prints.</p>
+<h2 id="reading-a-namespace-keys-expiry-scopes-and-provenance">Reading a namespace key's expiry, scopes and provenance<a class="headerlink" href="#reading-a-namespace-keys-expiry-scopes-and-provenance" title="Permanent link">&para;</a></h2>
+<p>A namespace key has carried an expiry, a scope list and a provenance
+record for two releases, and none of it could be read back: the key
+listing answered with names alone, so a credential's lifetime could only
+be recovered from the database. Two reads now answer it.</p>
+<p><code>GET /auth/namespaces/&lt;namespace&gt;/keys</code> is unchanged and still returns a
+bare list of names, omitting keys which have expired. Adding
+<code>detail=true</code> returns one object per key instead, <strong>including expired
+keys</strong>, and <code>GET /auth/namespaces/&lt;namespace&gt;/keys/&lt;key_name&gt;</code> returns
+the same object for one key. Both are ordered by key name. Each object
+carries <code>namespace</code>, <code>key_name</code>, <code>uuid</code>, <code>expiry</code> and <code>scopes</code>, and
+never the key's secret. A null <code>scopes</code> means the key is unrestricted
+rather than unprivileged.</p>
+<p><code>provenance</code> -- the record of who or what minted a key, which for a
+human login names the person -- is served only to a caller in the
+<code>system</code> namespace. Its absence describes the caller and not the key.</p>
+<p>Both reads are advertised by <code>namespace-key-metadata</code> in the <code>auth</code>
+family. <code>sf-client namespace show</code> renders the new fields where a
+cluster advertises it and falls back to the bare name list where it does
+not, so the command works against either.</p>
+<p>See the operator guide's
+<a href="/operator_guide/authentication/#reading-a-keys-expiry-and-scopes">reading a key's expiry and scopes</a>
+and the developer guide's
+<a href="/developer_guide/api_reference/authentication/">authentication API reference</a>.</p>
 <h2 id="affinity-constraints-and-the-deprecation-of-weights">Affinity constraints, and the deprecation of weights<a class="headerlink" href="#affinity-constraints-and-the-deprecation-of-weights" title="Permanent link">&para;</a></h2>
 <p>The <code>affinity</code> metadata entry accepts a second value shape, using four
 reserved names that each take a JSON list of tags:</p>
