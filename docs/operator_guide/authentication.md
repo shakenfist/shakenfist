@@ -34,21 +34,36 @@ want a longer forensic window; set it to `0` if you would rather expired keys
 were never removed. Neither choice affects security, because enforcement does
 not depend on the sweep having run.
 
-!!! warning "You cannot currently read an expiry back"
+### Reading a key's expiry and scopes
 
-    A key's expiry is recorded on the key object, and no API returns it.
-    `GET /auth/namespaces/{namespace}/keys` answers with a list of key
-    *names* only, and the same is true of the scopes and the provenance of
-    a key minted by the federated exchange.
+A key's expiry and scopes are readable by any caller who can read the
+namespace: one authenticated to the namespace itself, to `system`, or to a
+namespace the target trusts.
+`GET /auth/namespaces/{namespace}/keys` still answers with a bare list of key
+names, and omits keys which have expired. Adding `?detail=true` answers with
+one object per key instead, and `GET /auth/namespaces/{namespace}/keys/{key_name}`
+answers with the same object for a single key. Both detailed reads include
+expired keys, so "which of my keys lapsed, and when" can be answered without
+reading the database. `sf-client namespace show` renders them too, with
+`provenance` in its table and JSON output rather than in its comma separated
+one, where a serialised object would be ambiguous.
 
-    This makes the forensic window above more important than it should be:
-    when automation stops authenticating, the evidence that the key lapsed
-    is the key's disappearance and its events, not a field you can query.
-    Setting `NAMESPACE_KEY_REAP_GRACE` to `0` while investigating keeps
-    that evidence indefinitely.
+The detailed reads never return the key's secret.
 
-    Tracked as
-    [issue #3672](https://github.com/shakenfist/shakenfist/issues/3672).
+`provenance`, the record of who or what minted a key, is served only to a
+caller authenticated to the `system` namespace. Every other caller who can read
+the namespace gets the remaining fields but not `provenance`, because it can
+carry the identity of a person. That audience is wider than the namespace's own
+callers -- trusting another namespace lets its callers list these keys too -- so
+serving provenance to all of them would publish who logged in, and when, to each
+of them. Weigh that when you grant trust. A missing `provenance` means the
+caller is not in `system`, not that the key has none. See
+[a minted key records who it was minted for](#human-login-mints-credentials)
+for what provenance contains.
+
+Even so, the forensic window above is worth keeping in mind: setting
+`NAMESPACE_KEY_REAP_GRACE` to `0` while investigating keeps an expired key
+readable indefinitely.
 
 ## Cluster generated key secrets
 
@@ -495,15 +510,15 @@ that window, which is worth knowing when you size a cluster for many users. See
 
 **A minted key records who it was minted for.** The key's provenance
 carries the person's subject identifier, the token's `jti`, and the claims
-that actually matched -- and provenance is part of a key's external view,
-which is readable by anyone who can list keys in that namespace. So every
-namespace a person is entitled to can see that they logged in and when. That
-is deliberate, because it is what makes a federated grant auditable, and it
-is why the key's *name* carries a random discriminator instead of the
-person's identity. But it means the claims you bind are published to every
-namespace the rule mints into: bind `email` or `preferred_username` and you
-have put that address in front of every one of those namespace owners. Bind
-the narrowest claim that expresses the entitlement, usually a group.
+that actually matched. Provenance is served only to a caller in the `system`
+namespace (see [reading a key's expiry and scopes](#reading-a-keys-expiry-and-scopes)),
+so a namespace owner cannot read it back from their own keys. The grant stays
+auditable to an administrator, and that is why the key's *name* carries a
+random discriminator instead of the person's identity: the name is visible to
+everyone who can list the namespace's keys. Even so, the claims you bind are
+recorded
+on every key the rule mints, so bind the narrowest claim that expresses the
+entitlement, usually a group, rather than an address.
 
 Requests are rate limited per source address like the others, on a counter
 of their own, so a burst of logins does not throttle CI and the reverse. As for

@@ -151,14 +151,14 @@ stream, and soft delete. Practically, that means a key's history is auditable
 -- when it was created, when it was rotated, when it expired -- rather than
 being an anonymous entry in a JSON blob hanging off the namespace.
 
-Nothing about this is visible on the wire. The key management endpoints and
-their responses are unchanged, and a client written against an older release
-behaves identically.
-
-That backwards compatibility has a cost worth knowing about: the key listing
-endpoint still returns a list of key *names*, so a key's expiry, scopes and
-provenance are recorded on the object but are not readable through any API.
-`NamespaceKey.external_view()` renders them and nothing serves it.
+The key management endpoints and their responses are backwards compatible: the
+bare key listing still returns a list of key *names*, so a client written against
+an older release behaves identically. A key's expiry, scopes and provenance are
+read through two additive calls, described in the
+[API reference](api_reference/authentication.md#namespace-keys). Of those fields,
+`provenance` is served only to a caller in the `system` namespace, because it can
+identify a person; the others are served to any caller who can read the
+namespace, which includes the callers of every namespace it trusts.
 
 ### Secrets the cluster generates
 

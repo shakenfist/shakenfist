@@ -478,10 +478,16 @@ class Namespace(dbo):
             }
         })
 
-        # Mix in key names
-        keys = self.keys
-        for k in keys.get('nonced_keys', {}):
-            retval['keys'].append(k)
+        # Mix in key names, read through the joined accessor rather than
+        # through the keys property. This view wants nothing but the
+        # names, and that property belongs to the authentication path:
+        # it hands out a hash and a nonce per key, which nothing here
+        # looks at and which an operator visible shape should not be
+        # carrying around at all. The names, their order and the
+        # exclusion of expired keys are all unchanged.
+        for key, _ in namespace_key.keys_with_attributes(
+                self.uuid, now=time.time()):
+            retval['keys'].append(key.name)
 
         return retval
 

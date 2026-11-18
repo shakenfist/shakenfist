@@ -17,6 +17,8 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
+from webargs import fields
+from webargs.flaskparser import use_kwargs
 
 from shakenfist import artifact
 from shakenfist import baseobject
@@ -26,6 +28,7 @@ from shakenfist import federation
 from shakenfist import instance
 from shakenfist import locks
 from shakenfist import mariadb
+from shakenfist import namespace_key
 from shakenfist import oidc_discovery
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -634,23 +637,136 @@ class AuthNamespaceEventsEndpoint(api_base.Resource):
             'namespace', namespace_from_db.uuid, limit, event_type)
 
 
+namespace_key_detail_example = """{
+    "expiry": 1792000000.0,
+    "key_name": "deploy",
+    "namespace": "banana",
+    "provenance": {
+        "claims": {"groups": ["platform"]},
+        "issuer": "keycloak",
+        "jti": "a4e0...",
+        "rule": "0b2b4f76-0a1b-4d0f-8b3f-6f1a2c4d5e6f",
+        "rule_name": "platform-team",
+        "source": "login",
+        "sub": "person@example.com"
+    },
+    "scopes": ["blob.read"],
+    "uuid": "f0a1b2c3-d4e5-4f60-8a9b-0c1d2e3f4a5b"
+}"""
+
+
+def _key_detail(key, attrs, caller_is_system):
+    """The caller sensitive view of one namespace key.
+
+    Deliberately not NamespaceKey.external_view(), for two reasons.
+
+    The first is that what a caller may see depends on who is asking.
+    A key's provenance records the person a login minted it for: their
+    subject identifier, the identifier of the token they presented and
+    the claims it satisfied. The audience for a namespace's key listing
+    is the namespace itself, the system namespace, and every namespace
+    the target has granted full trust to -- so serving provenance to
+    everyone who can read the listing would publish who logged in, and
+    when, to each of them, and binding a claim such as an email address
+    in a mapping rule would publish that too. A disclosure cannot be
+    withdrawn once a client has read it, so provenance goes to the
+    system namespace alone. That is also the rule the minting path
+    already states where it chooses what to put in a key's name: who
+    logged in is recorded in provenance, which an administrator reads,
+    rather than in the name, which everyone who can list the
+    namespace's keys can see.
+
+    The second is that the secret material travels beside the metadata.
+    The listing accessor returns each key joined to its attributes row,
+    so the hash and the nonce are in ``attrs`` -- and neither may ever
+    appear here, under any spelling.
+
+    The name is spelled ``key_name``, which is how the key create
+    response, the login mint response and the route parameter all spell
+    it.
+
+    Object state is deliberately absent. The listing accessor does not
+    join the state table, so rendering a state would cost a point read
+    per key on a listing a namespace owner may call as often as they
+    like. Nothing but the expiry sweep moves a key's state anyway, and
+    the expiry this view does carry is the thing an operator was
+    reading the state to infer.
+    """
+    out = {
+        'namespace': key.namespace,
+        'key_name': key.name,
+        'uuid': str(key.uuid),
+        'expiry': attrs.expiry,
+        'scopes': attrs.scopes
+    }
+    if caller_is_system:
+        out['provenance'] = attrs.provenance
+    return out
+
+
+def _caller_is_system():
+    """Is this request authenticated into the system namespace?
+
+    Deliberately not api_base.caller_has_admin_rights(), which also
+    requires the cluster-admin scope: this decides what a response
+    says, not whether an administrative route may be called, and a
+    correctly scoped operator credential would otherwise find the
+    field silently missing.
+    """
+    return request_namespace() == 'system'
+
+
 class AuthNamespaceKeysEndpoint(api_base.Resource):
+    # Arguments which come from the mounted route -- the namespace here
+    # -- are deliberately absent from the webargs schema, because
+    # webargs does not read them. The schema is bound where both a query
+    # string and a JSON body are read, since the shipped client
+    # serialises even a GET's parameters into a body.
+    get_args = {
+        'detail': fields.Boolean(load_default=False)
+    }
+
     @swag_from(api_base.swagger_helper(
         'auth', 'Get the authentication keys for a namespace.',
         [
             ('namespace', 'path', 'string',
-             'The namespace to fetch authentication keys for.', True)
+             'The namespace to fetch authentication keys for.', True),
+            ('detail', 'query', 'boolean',
+             'Optional. When set, the response is one object per key '
+             'carrying that key\'s metadata instead of a list of key '
+             'names, and keys which have already expired are included. '
+             'Defaults to false, which is the historical response.', False)
         ],
-        [(200, 'A list of keynames for the namespace.', '["deploy", ...]'),
+        [(200, 'A list of keynames for the namespace, or one metadata '
+               'object per key when detail is set. A detailed entry '
+               'carries provenance only for a caller in the system '
+               'namespace, so its absence does not mean the key has '
+               'none.',
+          '["deploy", ...]'),
          (404, 'Namespace not found.', None)]))
+    @use_kwargs(get_args, location='json_or_query')
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
-    def get(self, namespace=None, namespace_from_db=None):
-        out = []
-        for keyname in namespace_from_db.keys.get('nonced_keys', {}):
-            out.append(keyname)
-        return out
+    def get(self, namespace=None, detail=False, namespace_from_db=None):
+        # Both arms read the keys of one namespace as static rows
+        # joined to their attributes rows, in a single indexed query.
+        # The listing object would instead cost a point read per key
+        # whenever a state filter was applied, on a route a namespace
+        # owner may call freely.
+        if not detail:
+            return [key.name for key, _ in
+                    namespace_key.keys_with_attributes(namespace)]
+
+        # An expired key is the thing an audit most needs to see, and
+        # the bare listing hides it: a key which has lapsed simply
+        # stops being mentioned. Each detailed entry carries its own
+        # expiry, so an expired key here describes itself.
+        caller_is_system = _caller_is_system()
+        return [
+            _key_detail(key, attrs, caller_is_system)
+            for key, attrs in namespace_key.keys_with_attributes(
+                namespace, include_expired=True)]
 
     @swag_from(api_base.swagger_helper(
         'auth', 'Add an authentication key for the namespace.',
@@ -688,6 +804,35 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
 
 
 class AuthNamespaceKeyEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Get the metadata of one of a namespace\'s keys.',
+        [
+            ('namespace', 'path', 'string',
+             'The namespace the key belongs to.', True),
+            ('key_name', 'path', 'string', 'The name of the key.', True)
+        ],
+        [(200, 'The metadata of a single key. provenance is present only '
+               'for a caller in the system namespace, so its absence does '
+               'not mean the key has none.',
+          namespace_key_detail_example),
+         (404, 'Namespace or key not found.', None)]))
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def get(self, namespace=None, key_name=None, namespace_from_db=None):
+        # The accessor lists one namespace's keys, so a key of the same
+        # name in another namespace is not a candidate here: it is a
+        # 404 like any other name this namespace does not have. Expired
+        # keys are included for the reason the detailed listing
+        # includes them, and so that a key the listing showed can still
+        # be read on its own route.
+        caller_is_system = _caller_is_system()
+        for key, attrs in namespace_key.keys_with_attributes(
+                namespace, include_expired=True):
+            if key.name == key_name:
+                return _key_detail(key, attrs, caller_is_system)
+        return sf_api.error(404, 'key name not found in namespace')
+
     @swag_from(api_base.swagger_helper(
         'auth', 'Update an authentication key for a namespace.',
         [

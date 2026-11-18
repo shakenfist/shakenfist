@@ -198,21 +198,23 @@ the keys used to authenticate to a namespace.
 
 ???+ tip "REST API calls"
 
-    * [GET /auth/namespaces/{namespace}/keys](https://openapi.shakenfist.com/#/auth/get_auth_namespaces__namespace__keys): List all authentication keys for a given namespace.
+    * [GET /auth/namespaces/{namespace}/keys](https://openapi.shakenfist.com/#/auth/get_auth_namespaces__namespace__keys): List all authentication keys for a given namespace. Pass `detail=true` for each key's metadata.
+    * [GET /auth/namespaces/{namespace}/keys/{key_name}](https://openapi.shakenfist.com/#/auth/get_auth_namespaces__namespace__keys__key_name_): Read the metadata of a single key.
     * [POST /auth/namespaces/{namespace}/keys](https://openapi.shakenfist.com/#/auth/post_auth_namespaces__namespace__keys): Create a new key for a namespace.
     * [DELETE /auth/namespaces/{namespace}/keys/{key_name}](https://openapi.shakenfist.com/#/auth/delete_auth_namespaces__namespace__keys__key_name_): Delete a specific key for a namespace.
     * [PUT /auth/namespaces/{namespace}/keys/{key_name}](https://openapi.shakenfist.com/#/auth/put_auth_namespaces__namespace__keys__key_name_): Update a key for a namespace.
 
-??? example "Python API client: list all keys for a namespace"
+??? example "Python API client: list the names of all keys for a namespace"
 
-    This example lists all the keys in a namespace:
+    This example lists the names of the keys in a namespace. Expired keys are
+    not listed:
 
     ```python
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
-    keys = sf_client.get_namespace_keynames('ci')
-    print(keys)
+    names = sf_client.get_namespace_keynames('ci')
+    print(names)
     ```
 
     Which returns something like:
@@ -220,6 +222,59 @@ the keys used to authenticate to a namespace.
     ```json
     ['jenkins']
     ```
+
+??? example "Python API client: read the metadata of a namespace's keys"
+
+    This example lists every key in a namespace with its metadata, and then
+    reads one key:
+
+    ```python
+    import json
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    keys = sf_client.get_namespace_keys('ci')
+    print(json.dumps(keys, indent=4, sort_keys=True))
+
+    key = sf_client.get_namespace_key('ci', 'jenkins')
+    ```
+
+    Which returns something like:
+
+    ```json
+    [
+        {
+            "expiry": 1792000000.0,
+            "key_name": "jenkins",
+            "namespace": "ci",
+            "scopes": ["blob.read"],
+            "uuid": "..."
+        }
+    ]
+    ```
+
+???+ info "Reading key metadata"
+
+    `GET /auth/namespaces/{namespace}/keys` returns a bare JSON list of key
+    names, and omits expired keys. With `detail=true` it returns one object
+    per key instead, **including expired keys**, so you can see which keys
+    have lapsed. `GET /auth/namespaces/{namespace}/keys/{key_name}` returns the
+    same object for one key, expired or not, and a 404 if the namespace has
+    no key of that name.
+
+    Each object carries `namespace`, `key_name`, `uuid`, `expiry` (epoch
+    seconds, or null for a key which never expires) and `scopes`. The key's
+    secret is never returned.
+
+    A caller authenticated to the `system` namespace also sees `provenance`,
+    which records who or what minted the key and can identify a person. For
+    any other caller the field is absent. Absence therefore means the caller
+    is not in `system`, **not** that the key has no provenance.
+
+    Both reads are gated by the one capability token `namespace-key-metadata`,
+    which a client can use to discover whether a cluster serves them. They
+    require the caller to be authenticated to the namespace, to `system`, or to
+    a namespace the target trusts -- the same test as the other key routes.
 
 ??? example "Python API client: create a new key for a namespace"
 
@@ -232,8 +287,8 @@ the keys used to authenticate to a namespace.
     sf_client.add_namespace_key('ci', 'newkey', 'thesecretvalue')
 
     # Fetch the list of keys to make sure the new one exists
-    keys = sf_client.get_namespace_keynames('ci')
-    print(keys)
+    names = sf_client.get_namespace_keynames('ci')
+    print(names)
     ```
 
     Which returns something like:
@@ -277,8 +332,8 @@ the keys used to authenticate to a namespace.
     sf_client.delete_namespace_key('ci', 'newkey')
 
     # Fetch the list of keys to make sure the new one exists
-    keys = sf_client.get_namespace_keynames('ci')
-    print(keys)
+    names = sf_client.get_namespace_keynames('ci')
+    print(names)
     ```
 
     Which returns something like:

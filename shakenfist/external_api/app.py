@@ -521,7 +521,19 @@ API_CAPABILITIES = {
         # capacity did over time is only ever complete on the
         # namespace, and a client calibrating a claim needs to know it
         # can ask for both.
-        'namespace-events', 'namespace-claim-events'],
+        'namespace-events', 'namespace-claim-events',
+        # namespace-key-metadata says that a key's own properties can be
+        # read back: that GET on a single key route exists, and that the
+        # keys listing takes detail=true and then answers with one object
+        # per key instead of a list of names. One token for the pair,
+        # because they arrive together and a client has no use for either
+        # without the other. It also promises two things about what comes
+        # back: the detailed listing includes keys which have already
+        # expired, which the bare listing omits, and provenance is served
+        # only to a caller in the system namespace -- so a client which
+        # does not see that field must not conclude the key has no
+        # provenance.
+        'namespace-key-metadata'],
     'blobs': [
         'blob-metadata', 'blob-search-by-hash', 'blob-data-limit',
         'blob-hash-sha1', 'blob-hash-sha256', 'blob-hash-xxh128',

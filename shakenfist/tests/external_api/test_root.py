@@ -51,7 +51,7 @@ EXPECTED_CAPABILITIES = {
         'mapping-rules', 'federated-exchange', 'issuer-discovery',
         'human-login-metadata', 'human-login',
         'namespace-claims', 'namespace-events',
-        'namespace-claim-events'],
+        'namespace-claim-events', 'namespace-key-metadata'],
     'blobs': [
         'blob-metadata', 'blob-search-by-hash', 'blob-data-limit',
         'blob-hash-sha1', 'blob-hash-sha256', 'blob-hash-xxh128',
