@@ -15597,6 +15597,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#there-is-no-dead-letter-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        There is no dead-letter queue
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -16136,6 +16147,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#there-is-no-dead-letter-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        There is no dead-letter queue
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -16294,6 +16316,22 @@ the drainer can flush.</p>
 previously-dead PIDs. Their rows are migrated into the fresh-pid
 spool so the drainer picks them up automatically. No operator
 action is needed.</p>
+<h3 id="there-is-no-dead-letter-queue">There is no dead-letter queue<a class="headerlink" href="#there-is-no-dead-letter-queue" title="Permanent link">&para;</a></h3>
+<p>An event the drainer cannot write is retried from the spool, not
+moved aside. There used to be an <code>event_dlq</code> table for events that
+could not be delivered, and it was removed deliberately: the spool
+is the durability boundary, and a second holding area behind it
+answers no question the spool does not already answer. The case the
+dead-letter queue was built for was the bootstrap one -- events
+generated while <code>sf-database</code> is itself starting, with nowhere to
+write them -- and the spool covers that by construction, because
+those events simply sit in it until the drainer's channel comes up.</p>
+<p>So the two ways an event is lost are both visible and both counted:
+the spool hitting its high-water mark (<code>eventlog_spool_dropped_total</code>),
+and a batch the server rejects permanently or that ages out, which the
+drainer drops rather than letting it wedge the queue. Neither leaves a
+row anywhere to be inspected afterwards, which is why the gauge and
+the counter above are the things to monitor.</p>
 <h2 id="read-path">Read path<a class="headerlink" href="#read-path" title="Permanent link">&para;</a></h2>
 <p>Seven REST endpoints return events for each object type:</p>
 <table>

@@ -16465,6 +16465,24 @@ that proves it matches something. Asserting the statement's <em>shape</em>
 against a mocked engine cannot do that, and neither can a test that
 rewrites the query to suit sqlite -- register the missing SQL functions
 instead, so the statement under test is the statement that ships.</p>
+<p>The same rule has a write-side form, and it cost longer to find. A test
+which mocks the write helper and asserts it was <em>called</em> the right number
+of times proves nothing about what the database kept. The v1
+<code>cluster_operation_targets</code> table declared <code>unique=True</code> on
+<code>operation_uuid</code> alone, so a multi-target operation's second and third
+target rows raised <code>IntegrityError</code>, which the writer swallowed as
+idempotency -- one row stored out of three. The test enqueued a hot plug
+and asserted three calls with the right arguments, and passed, for months.
+The symptom surfaced from the network side only: the first declared target
+is the one that survives, so instance-side gates read correctly while
+<code>has_pending_cluster_operation()</code> on the network returned False and the
+network maintainer recreated a bridge an in-flight operation was about to
+build. A constraint is part of the statement under test; a call count is
+not a row count. What holds the invariant now is structural rather than a
+test: every target travels as one <code>targets=</code> list into
+<code>create_and_enqueue_cluster_operation</code>, written in the same transaction
+as the operation, and the table's uniqueness is the composite
+<code>uq_cot_op_target</code> on operation and target.</p>
 <h2 id="a-uuid-columns-type-is-uuid_column_type-never-a-bare-sauuid">A uuid column's type is <code>uuid_column_type()</code>, never a bare <code>sa.Uuid()</code><a class="headerlink" href="#a-uuid-columns-type-is-uuid_column_type-never-a-bare-sauuid" title="Permanent link">&para;</a></h2>
 <p><code>sa.Uuid()</code> decides how to bind, read and render itself per dialect.
 SQLAlchemy 2.0 treated MariaDB as having no native UUID type, so every

@@ -16130,8 +16130,9 @@ the CI bundle established the following sequence:</p>
 </ul>
 <p>The underlying defect is the <strong>single-pointer
 <code>last_cluster_operation</code> pattern</strong>.
-<code>PLAN-replace-last-cluster-operation.md</code> (all phases
-complete) already moved the <em>internal gating</em> callers --
+<a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-replace-last-cluster-operation.md"><code>PLAN-replace-last-cluster-operation.md</code></a>
+(all phases complete, now retired -- the plans index links its
+text) already moved the <em>internal gating</em> callers --
 <code>Network.is_okay()</code> and siblings -- onto the history-aware
 <code>has_pending_cluster_operation()</code> query, and its docstring
 (<code>baseobject.py:685</code>) names this exact race: "a later
@@ -16177,7 +16178,7 @@ pointer:</p>
 <code>GET /clusteroperations?target_object_type=&amp;target_uuid=</code>
 (<code>external_api/clusteroperation.py</code>,
 <code>ClusterOperationsEndpoint</code>, added in phase 7 of
-<code>PLAN-network-facade.md</code>; client wrapper
+<a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md"><code>PLAN-network-facade.md</code></a> (retired); client wrapper
 <code>list_cluster_operations_for_target()</code> behind the
 <code>cluster-operations-by-target</code> capability). It joins
 <code>cluster_operation_targets</code> against <code>cluster_operations</code> and

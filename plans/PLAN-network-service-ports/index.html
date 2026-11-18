@@ -16416,7 +16416,7 @@ finds nothing, that is recorded in one sentence.</p>
   network-node behaviour) is a valid degenerate case — but
   the two plans together unlock the full smeared-carrier
   story.</li>
-<li><strong>Coherent with <code>PLAN-network-facade</code> and
+<li><strong>Coherent with <a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md"><code>PLAN-network-facade</code></a> (retired) and
   <code>PLAN-replace-exec-with-netlink</code>.</strong> DNAT rule programming
   is exactly the kind of single-mutator operation those
   plans are shaping the network daemon around. This plan
@@ -16427,7 +16427,7 @@ finds nothing, that is recorded in one sentence.</p>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the
 management session. The workflow mirrors
-<code>PLAN-remove-primary.md</code> and the other placeholder plans.</p>
+<a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a> and the other placeholder plans.</p>
 <p>The DNAT programming and reconciler phases (3 and 4) touch
 production network state and should be skewed toward
 <strong>opus at high effort</strong>. Phases 0-2 are foundational and
@@ -16441,10 +16441,10 @@ model and the carrier-coupling contract) is high effort.
 Subsequent phases will be re-evaluated once phase 0 lands.</p>
 <h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
 <p>Each phase plan should include a step table in the same
-format as <code>PLAN-remove-primary.md</code>, with effort, model,
+format as <a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>, with effort, model,
 isolation, and brief columns.</p>
 <h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
-<p>Standard checklist from <code>PLAN-remove-primary.md</code>, plus:</p>
+<p>Standard checklist from <a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>, plus:</p>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Concurrent allocations against the same network's
       port pool do not collide (exercised by test, not

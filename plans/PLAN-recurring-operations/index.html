@@ -16131,7 +16131,8 @@ ad-hoc:</p>
    network reconciliation loop. It runs on a thread inside
    <code>sf-net</code>, ticking every interval and walking all
    networks. The network-facade plan
-   (<code>PLAN-network-facade.md</code>) deliberately keeps it as a
+   (<a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md"><code>PLAN-network-facade.md</code></a>, retired) deliberately
+keeps it as a
    thread for now and gates its enqueues per-network,
    noting that the proper landing place for "maintain is a
    recurring CO" is here.</li>
@@ -16390,11 +16391,13 @@ each is resolved or declined in writing here. If the audit
 finds nothing, that is recorded in one sentence.</p>
 <p>This plan is currently in stub form. It exists primarily
 to anchor a future-work reference in
-<code>PLAN-network-facade.md</code> and to capture the framing for
+<a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md"><code>PLAN-network-facade.md</code></a> (retired) and to capture
+the framing for
 when work begins.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <p>(To be filled in when this plan moves out of stub status.
-The structure will mirror <code>PLAN-network-facade.md</code>'s Agent
+The structure will mirror <a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md"><code>PLAN-network-facade.md</code></a>'s
+Agent
 guidance section: execution model, planning effort,
 step-level guidance table, management session review
 checklist.)</p>
@@ -16415,7 +16418,7 @@ checklist.)</p>
   have moved to a <code>network_maintain_pass</code> CO triggered by
   an internal <code>RecurringOperation</code>. The per-network
   gating + cooldown + circuit breaker behaviour from
-  <code>PLAN-network-facade.md</code> Q6 is preserved.</li>
+  <a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md"><code>PLAN-network-facade.md</code></a> (retired) Q6 is preserved.</li>
 <li>A user can <code>POST /recurring_operations</code> to create
   e.g. "snapshot instance X every 24 hours at 3 am UTC"
   and the snapshot fires on schedule.</li>

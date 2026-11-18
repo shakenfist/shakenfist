@@ -16154,7 +16154,7 @@ construction code — confirm during phase 0 research),
 and the SPICE-cert path which is the closest existing
 example of cert distribution.</p>
 <p>This plan is currently less formed than its sibling
-(<code>PLAN-remove-primary.md</code>). The Open Questions section is
+(<a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>). The Open Questions section is
 larger than usual and should be resolved into a Decisions
 section before phase 1 begins. The phase breakdown below
 is provisional and may be re-cut once phase 0 (research and
@@ -16184,7 +16184,7 @@ nonetheless behind where SF should be as an adult cloud
 platform. An operator with a security review will ask, and
 the answer today is "the mesh is private; trust it." That's
 not a great answer.</p>
-<p>Once <code>PLAN-remove-primary.md</code> lands, operators will already
+<p>Once <a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a> lands, operators will already
 be expected to bring their own PKI — that plan establishes
 the operator-provides-CA surface. This plan is then about
 <em>actually using</em> that PKI: turning the gRPC channels, the
@@ -16382,7 +16382,7 @@ landed yet.</p>
   recorded in one sentence.</li>
 </ul>
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
-<p>This plan <strong>depends on <code>PLAN-remove-primary.md</code> having
+<p>This plan <strong>depends on <a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a> having
 landed</strong> — specifically, the operator-provides-PKI surface
 that emerges from the BYO-MariaDB / galaxy-role phases.
 Trying to do mTLS-everywhere while the deployer still
@@ -16397,7 +16397,7 @@ packaging).</p>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the
 management session. The workflow mirrors
-<code>PLAN-remove-primary.md</code>: plan in the management session,
+<a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>: plan in the management session,
 spawn a sub-agent per implementation step, review the
 diff in the management session, fix or retry, commit when
 satisfied. See that plan's "Agent guidance" section for the
@@ -16419,7 +16419,7 @@ medium.</p>
 <h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
 <p>Each phase plan should include a table of steps with effort,
 model, isolation, and brief, in the same format as
-<code>PLAN-remove-primary.md</code>. The same effort and model
+<a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>. The same effort and model
 guidance applies.</p>
 <h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
 <p>After a sub-agent completes a TLS-related step, the

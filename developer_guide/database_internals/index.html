@@ -16536,6 +16536,23 @@ object static values now live in MariaDB.</p>
 <code>cluster_operations</code> row, it reads that declaration and writes one
 <code>cluster_operation_targets</code> row per non-None target field. Callers have
 no per-target bookkeeping obligation — targets are recorded automatically.</p>
+<p>The declaration is explicit rather than inferred from the field names, and
+that is deliberate: no naming convention separates a target from an
+execution context. <code>node_uuid</code> appears on most operation schemas and is
+never a target — it says <em>where</em> the operation runs, and <code>Node</code> does not
+even inherit <code>DatabaseBackedObjectWithOperations</code>, so there is nothing for
+a target row to point at. <code>interface_uuid</code> is a target on the interface
+operations and context elsewhere. Discovering targets by matching <code>*_uuid</code>
+would therefore record every operation as targeting the node it runs on,
+which would make <code>has_pending_cluster_operation()</code> true for a node for as
+long as anything at all was happening on it. The cost of the explicit form
+is that a new schema which forgets <code>target_fields</code> records no targets at
+all, and nothing reports it: <code>enqueue_cluster_operation</code> reads the
+declaration with a <code>getattr</code> default, so a missing one is indistinguishable
+from an operation that genuinely targets nothing. The <code>ClassVar</code> trap below
+is the same failure arriving by a different route. All fourteen schemas
+declare one today, and nothing holds a fifteenth to it — see
+<a href="https://github.com/shakenfist/shakenfist/issues/4957">issue 4957</a>.</p>
 <p>Each target row also carries an <code>observational</code> flag (schema v3), derived
 at enqueue time by <code>is_observational()</code> in <code>schema/operations/util.py</code>. A
 model may declare <code>observational_tasks: ClassVar[frozenset[...]]</code> beside

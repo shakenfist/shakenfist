@@ -16052,15 +16052,15 @@
 <p>Plans describe intended future work and may change based on implementation experience, community feedback, or shifting priorities. Check the status table below to see what has been implemented.</p>
 </div>
 <h2 id="plan-sequencing">Plan sequencing<a class="headerlink" href="#plan-sequencing" title="Permanent link">&para;</a></h2>
-<p>The set of incomplete plans has grown to the point where the order they land in matters. The intended sequencing is:</p>
+<p>The bring-your-own-infrastructure thread had to land in a particular order. All of it has now landed, and the sequence is kept as a record of that order and why:</p>
 <ol>
-<li><strong><a href="PLAN-network-facade/">Network operations facade</a></strong> — complete. Landed via the <code>network-facade</code> branch.</li>
-<li><strong>Retire etcd</strong> — <em>(absorbed into <a href="PLAN-byo-mariadb/">BYO MariaDB and sf-database tier</a> phase 0; the standalone <code>PLAN-remove-etcd.md</code> has been removed.)</em> Done. The data drain was already complete (the <code>DATA_MIGRATIONS</code> dict is empty), and the supporting machinery — <code>shakenfist/etcd.py</code>, <code>etcd3gw</code>, the etcd proto stubs, the drain test files, the migration-era <code>sf-ctl</code> aliases — was deleted as a single sweep by the BYO-MariaDB plan. The <code>etcd_master</code> ansible group rename landed with <code>PLAN-remove-primary</code>. What survives is deliberate: the vestigial <code>is_etcd_master</code> flag is pinned False for one release as a rollback fallback.</li>
-<li><strong><a href="PLAN-health-checks/">Health checks, readiness, and graceful drain</a></strong> — <strong>complete.</strong> A precondition for the BYO load-balancer story in remove-primary being operationally honest. Delivered sf-api <code>/livez</code>/<code>/readyz</code>/<code>/healthz</code> with SIGTERM drain, dependency-aware <code>grpc.health.v1</code> on sf-database, systemd <code>WATCHDOG</code> liveness on the worker/elected daemons (which also closes the cluster-lock proof-of-life gap), and operator LB/upgrade docs. Landed on the <code>health-checks</code> branch. <strong><a href="PLAN-node-resource-health/">Node resource health</a></strong> is a <em>sibling</em> (complete) on a different axis — it drives <code>node.state</code> from the health of the storage/resource dependencies a node's hosted object types declare, so a dead disk or hung NFS mount takes a node out of scheduling. It was not sequenced against the BYO thread; it grew out of the sf-6 blob-NVMe incident and landed independently on the <code>node-resource-health</code> branch.</li>
-<li><strong><a href="PLAN-remove-primary/">Remove the primary node</a></strong> — the BYO-infrastructure scope reduction. Complete: the deployer-level <code>etcd_master</code> → <code>database_node</code> rename landed with one-release fallbacks, and the deployer is now the <code>shakenfist.shakenfist</code> collection. Naturally followed by a wipe-and-redeploy of Mikal's production cluster against the new shape.</li>
-<li><strong><a href="PLAN-byo-mariadb/">BYO MariaDB and <code>sf-database</code> as a tier</a></strong> — lifted out of remove-primary because it grew into its own master plan. Removes MariaDB-server install from the deployer entirely, reshapes <code>sf-database</code> into a deployer-chosen tier of equal stateless instances reached via client-side gRPC load balancing (not leader election), and carves schema/migration execution out of daemon startup into an operator-run <code>sf-ctl ensure-mariadb-schema</code> command. Complete. It landed in parallel with remove-primary's remaining phases, and its first phase performed the scope-shift edit to remove-primary itself.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md">Network operations facade</a></strong> — complete. Landed via the <code>network-facade</code> branch.</li>
+<li><strong>Retire etcd</strong> — <em>(absorbed into <a href="https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-byo-mariadb.md">BYO MariaDB and sf-database tier</a> phase 0; the standalone <code>PLAN-remove-etcd.md</code> has been removed.)</em> Done. The data drain was already complete (the <code>DATA_MIGRATIONS</code> dict is empty), and the supporting machinery — <code>shakenfist/etcd.py</code>, <code>etcd3gw</code>, the etcd proto stubs, the drain test files, the migration-era <code>sf-ctl</code> aliases — was deleted as a single sweep by the BYO-MariaDB plan. The <code>etcd_master</code> ansible group rename landed with <a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary</code></a>. What survives is deliberate: the vestigial <code>is_etcd_master</code> flag is pinned False for one release as a rollback fallback.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md">Health checks, readiness, and graceful drain</a></strong> — <strong>complete.</strong> A precondition for the BYO load-balancer story in remove-primary being operationally honest. Delivered sf-api <code>/livez</code>/<code>/readyz</code>/<code>/healthz</code> with SIGTERM drain, dependency-aware <code>grpc.health.v1</code> on sf-database, systemd <code>WATCHDOG</code> liveness on the worker/elected daemons (which also closes the cluster-lock proof-of-life gap), and operator LB/upgrade docs. Landed on the <code>health-checks</code> branch. <strong><a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-node-resource-health.md">Node resource health</a></strong> is a <em>sibling</em> (complete) on a different axis — it drives <code>node.state</code> from the health of the storage/resource dependencies a node's hosted object types declare, so a dead disk or hung NFS mount takes a node out of scheduling. It was not sequenced against the BYO thread; it grew out of the sf-6 blob-NVMe incident and landed independently on the <code>node-resource-health</code> branch.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md">Remove the primary node</a></strong> — the BYO-infrastructure scope reduction. Complete: the deployer-level <code>etcd_master</code> → <code>database_node</code> rename landed with one-release fallbacks, and the deployer is now the <code>shakenfist.shakenfist</code> collection. Naturally followed by a wipe-and-redeploy of Mikal's production cluster against the new shape.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-byo-mariadb.md">BYO MariaDB and <code>sf-database</code> as a tier</a></strong> — lifted out of remove-primary because it grew into its own master plan. Removes MariaDB-server install from the deployer entirely, reshapes <code>sf-database</code> into a deployer-chosen tier of equal stateless instances reached via client-side gRPC load balancing (not leader election), and carves schema/migration execution out of daemon startup into an operator-run <code>sf-ctl ensure-mariadb-schema</code> command. Complete. It landed in parallel with remove-primary's remaining phases, and its first phase performed the scope-shift edit to remove-primary itself.</li>
 </ol>
-<p><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding (ship logs to Loki)</a> delivers the "Loki-shipper story" that remove-primary phase 1 is explicitly gated on — it adds structured-JSON logging and an in-process, on-disk-spooled Loki push (modelled on the eventlog spool/drainer) before deleting the rsyslog wiring. It can land in parallel with the other BYO work and is sequenced ahead of remove-primary phase 1, which it realises.</p>
+<p><a href="https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-remove-syslog-forwarding.md">Remove syslog forwarding (ship logs to Loki)</a> delivered the "Loki-shipper story" that remove-primary phase 1 was gated on — it added structured-JSON logging and an in-process, on-disk-spooled Loki push (modelled on the eventlog spool/drainer) before deleting the rsyslog wiring. It landed in parallel with the other BYO work and ahead of remove-primary phase 1, which it realised.</p>
 <p>The remaining incomplete plans — <a href="PLAN-embrace-tls/">Embrace TLS</a>, <a href="PLAN-sticky-transfers/">Sticky blob transfers</a>, <a href="PLAN-replace-exec-with-netlink/">Replace exec'd network commands with netlink</a>, <a href="PLAN-scheduler-reservations/">Atomic scheduling via reservations</a>, the connected <a href="PLAN-generic-allocator/">Generic allocator</a> / <a href="PLAN-network-service-ports/">Network service ports</a> / <a href="PLAN-network-carrier-model/">Network carrier model</a> triple, and the not-yet-drafted OpenTelemetry instrumentation thread — are intentionally <strong>not ordered relative to each other</strong> here. They each have specific dependencies on either remove-primary having established the BYO shape (the operator-provides-PKI surface for TLS, the streaming-proxy baseline for sticky transfers, the sf-database election pattern for the others) or network-facade having landed (the netlink plan, whose privilege-separation phases need network-facade's single-mutator property), but among themselves the order is a triage decision still to be made now that remove-primary has landed. The scheduler-reservations plan is independent of the BYO shape but benefits from the OpenTelemetry thread landing first so that phase 0's design choices can be informed by real load and contention numbers.</p>
 <p><a href="PLAN-database-load-reduction/">Database load reduction</a> sits outside that triage: it addresses a measured production problem (the sf-database tier serving ~527 ops/second at idle, 57% of it one polling loop). All eight phases are complete. Phases 1–6 took that to ~102 ops/second on a quiet cluster, largely by removing fixed-rate idle polling and restoring the etcd-era “objects are cacheable, attributes of objects are not” principle in a MariaDB form. Its phase 4 (caller attribution via gRPC metadata and a per-caller counter) is also the first concrete slice of the OpenTelemetry instrumentation thread — the caller-identity plumbing is what a later span-propagation phase would reuse, it is designed to compose with the mTLS peer-identity model from <a href="PLAN-embrace-tls/">Embrace TLS</a> rather than duplicate it, and it is what made every subsequent diagnosis possible. Phase 6 chased what looked like a rot back to ~142 ops/second and found that most of it was the counter learning to see two more nodes and the cluster daemon (#3708) rather than new load — so the earlier “target met” reading is withdrawn, though the hunt still turned up two real defects worth ~21 ops/second (#3814, #3655). Its durable output is a load <em>model</em> with a per-node term, and phase 7 made regression detection against that model something any deployer can run rather than something only our own operations tooling can see. Phase 8 then audited the whole plan as one body of work under <code>PUSH-AUDIT.md</code>, which nine separate pull request reviews never did: the blocking findings were fixed on the way through, the remainder filed as #3942, #3943 and #3944, and the automated review of the audit’s own fixes found two further defects — one of them predicted by a test-coverage gap the audit had written down and not acted on.</p>
 <p>The <strong>generic-allocator / network-service-ports / network-carrier-model triple</strong> is internally ordered. Generic-allocator is the foundational refactor (replaces five ad-hoc allocators with one primitive and is independently shippable). Network-service-ports builds on the allocator to expose per-network DNAT'd ports for managed services (web consoles, transfer agents, managed VPN endpoints). Network-carrier-model layers a smeared lease-based per-network carrier role with VIP advertisement on top, removing the network-node singleton; it depends on both prior plans and is the largest of the three. The triple supersedes the "network node failover" thread that was previously a not-yet-drafted line item.</p>
@@ -16069,7 +16069,7 @@
 <p><a href="PLAN-grpc-bounded-replies/">Bound the size of DatabaseService gRPC replies</a> is independent and gated on nothing, but it is driven by a production defect rather than an ambition, so it should not sit indefinitely. Several <code>DatabaseService</code> replies are unbounded by construction and the only ceiling on them is gRPC's message size limit, which the sfcbr cluster has now crossed twice from two daemons on two RPCs (#3638). A stopgap has raised the client cap and made the affected callers honest about failed reads — including one that was using an unreadable list as a licence to delete a node's blob store — but the protocol still permits replies whose size we discover by having one fail. Its phase 2 (sweep callers ask for a bounded page rather than everything) is small and independently shippable; its phase 3 is a protocol change and inherits the eventlog plan's deferred cursor-pagination work.</p>
 <p><a href="PLAN-ci-cloud-sizing/">Right-size the CI test clouds</a> is independent of all of the above and gated on nothing. It is driven by measurement rather than ambition: the five-hypervisor test cloud each CI job builds was an arbitrary choice that had never been checked, and checking it found that what binds is the scheduler's admission ledger (a 4 vCPU node yields 6 admitted vCPU, a 4 vCPU network node yields 3) rather than real CPU or memory, which sit at roughly 18% and 50% of allocation. The three-node <code>slim-tier</code> topology is below that line and passes 19% of merge runs, which is where the #3772 507 family comes from. The plan instruments headroom first, converts the coverage we currently get from scarcity by accident into explicit tests, and only then reshapes the topologies -- deliberately, because a bigger cloud would otherwise close #3772 and #3907 by silencing them. #3565 left that corpus when scheduler-reservations phase 6 closed it on a test change: <code>test_affinity</code> now skips rather than passes when the candidate set collapsed before affinity was scored, so a bigger cloud can no longer turn it green by hiding the question.</p>
 <p><a href="PLAN-transient-capacity-refusals/">A capacity refusal is transient</a> is the sibling that plan and scheduler-reservations both deferred to: what the system does about "no capacity right now" once the ledger is correct and the cloud is the size it should be. It was written on 2026-09-08 from a journal reading of six post-#4106 failing merge runs, which found that every <code>sufficient_idle_cpu</code> refusal was a pinned create onto a 4-thread infra hypervisor whose ledger of 3 was genuinely full while the cluster was not, that #4106's one-shot reconcile fires before any hypervisor has published and so leaves the warm-up window open in CI, and that a node keeps refusing for a metrics period after its instances are deleted. It closes the window for real, makes the functional suite wait for the node it needs and report how long it waited, publishes node metrics when the running-domain set changes, gives the API a <code>Retry-After</code> and a machine-readable transient marker, and defers the question of a server-side placement queue -- a reversal of scheduler-reservations D8 -- to a decision phase fed by the suite's own wait numbers. It owns nothing the sizing plan owns: topology is that plan's phase 4, and the evidence here is written into it.</p>
-<p>The blob-storage and SQL-pushdown roadmaps and the network-facade plan run on their own cadence and are not part of this sequencing. Neither are the plans which appear only in the table below: <a href="PLAN-netserv/">sf-netserv</a>, <a href="PLAN-ci-node-exec-assertions/">CI node-exec assertions</a>, <a href="PLAN-attribute-field-masks/">attribute field masks</a>, <a href="PLAN-artifact-fetch-retry-with-backoff/">retry transient artifact fetches</a>, <a href="PLAN-fix-cluster-operation-targets-unique-constraint/">fix cluster_operation_targets uniqueness</a>, <a href="PLAN-kerbside-vdi-tokens/">Kerbside VDI console tokens</a> and <a href="PLAN-blob-containers/">blobs as containers</a> — the first is a thoughtbubble, the last a placeholder, and the rest are self-contained pieces of work that were never sequenced against this thread.</p>
+<p>The <a href="blob-storage-roadmap/">blob-storage roadmap</a>, the <a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-sql-pushdown-filtering.md">SQL-pushdown plan</a> and the <a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md">network-facade plan</a> ran on their own cadence and are not part of this sequencing. Neither are the plans which appear only in the table below: <a href="PLAN-netserv/">sf-netserv</a>, <a href="PLAN-ci-node-exec-assertions/">CI node-exec assertions</a>, <a href="PLAN-attribute-field-masks/">attribute field masks</a>, <a href="PLAN-artifact-fetch-retry-with-backoff/">retry transient artifact fetches</a>, <a href="https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-fix-cluster-operation-targets-unique-constraint.md">fix cluster_operation_targets uniqueness</a>, <a href="PLAN-kerbside-vdi-tokens/">Kerbside VDI console tokens</a> and <a href="PLAN-blob-containers/">blobs as containers</a> — the first is a thoughtbubble, the last a placeholder, and the rest are self-contained pieces of work that were never sequenced against this thread.</p>
 <h2 id="status-vocabulary">Status vocabulary<a class="headerlink" href="#status-vocabulary" title="Permanent link">&para;</a></h2>
 <p>The <code>Status</code> column below holds exactly one of these terms and nothing else. It is the
 whole-plan status, so it only reads <code>Complete</code> once every phase has landed. Where a plan
@@ -16131,6 +16131,10 @@ QEMU stack</a> names three phases and then an ellipsis, and <a href="PLAN-artifa
 rework</a> and <a href="PLAN-blob-containers/">blobs as containers</a> a
 decisions pass and "(later phases)". These six are the checker's blind spot, and the only
 numbers here it cannot recompute.</p>
+<p>A plan linked by a pinned <code>blob/&lt;sha&gt;/</code> URL has been retired, and its
+row is marked <code>(retired)</code>. Its reasoning now lives in the <code>docs/</code> page
+that owns the topic; the pinned copy is frozen history rather than a
+maintained document, so it may state things a later phase overturned.</p>
 <table>
 <thead>
 <tr>
@@ -16158,28 +16162,28 @@ numbers here it cannot recompute.</p>
 </tr>
 <tr>
 <td>2026-04-23</td>
-<td><a href="PLAN-sql-pushdown-filtering/">SQL-pushdown filtering</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-sql-pushdown-filtering.md">SQL-pushdown filtering</a> (retired)</td>
 <td>Push object filtering into MariaDB instead of scanning and filtering in Python</td>
 <td>Complete</td>
 <td>7 of 7</td>
 </tr>
 <tr>
 <td>2026-05-06</td>
-<td><a href="PLAN-replace-last-cluster-operation/">Replace <code>last_cluster_operation</code></a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-replace-last-cluster-operation.md">Replace <code>last_cluster_operation</code></a> (retired)</td>
 <td>Trade the single-pointer gate for an append-only <code>cluster_operation_targets</code> history</td>
 <td>Complete</td>
 <td>5 of 5</td>
 </tr>
 <tr>
 <td>2026-05-14</td>
-<td><a href="PLAN-fix-cluster-operation-targets-unique-constraint/">Fix <code>cluster_operation_targets</code> uniqueness</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-fix-cluster-operation-targets-unique-constraint.md">Fix <code>cluster_operation_targets</code> uniqueness</a> (retired)</td>
 <td>Composite UNIQUE so a multi-target operation records all of its target rows</td>
 <td>Complete</td>
 <td>—</td>
 </tr>
 <tr>
 <td>2026-05-15</td>
-<td><a href="PLAN-network-facade/">Network operations facade</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md">Network operations facade</a> (retired)</td>
 <td>Split <code>Network</code> into a queue-enqueuing facade and a single-mutator worker</td>
 <td>Complete</td>
 <td>10 of 10</td>
@@ -16200,7 +16204,7 @@ numbers here it cannot recompute.</p>
 </tr>
 <tr>
 <td>2026-05-16</td>
-<td><a href="PLAN-remove-primary/">Remove the primary node</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md">Remove the primary node</a> (retired)</td>
 <td>Retire the special primary node in favour of a BYO-infrastructure deployer</td>
 <td>Complete</td>
 <td>5 of 7</td>
@@ -16221,7 +16225,7 @@ numbers here it cannot recompute.</p>
 </tr>
 <tr>
 <td>2026-05-17</td>
-<td><a href="PLAN-health-checks/">Health checks, readiness and drain</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-health-checks.md">Health checks, readiness and drain</a> (retired)</td>
 <td><code>/livez</code>, <code>/readyz</code>, <code>/healthz</code>, gRPC health, watchdog liveness and SIGTERM drain</td>
 <td>Complete</td>
 <td>5 of 5</td>
@@ -16235,7 +16239,7 @@ numbers here it cannot recompute.</p>
 </tr>
 <tr>
 <td>2026-05-22</td>
-<td><a href="PLAN-eventlog-direct-mariadb/">Eventlog direct to MariaDB</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-eventlog-direct-mariadb.md">Eventlog direct to MariaDB</a> (retired)</td>
 <td>Remove the eventlog service and write events straight to MariaDB</td>
 <td>Complete</td>
 <td>7 of 7</td>
@@ -16291,14 +16295,14 @@ numbers here it cannot recompute.</p>
 </tr>
 <tr>
 <td>2026-06-03</td>
-<td><a href="PLAN-byo-mariadb/">BYO MariaDB and <code>sf-database</code> as a tier</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-byo-mariadb.md">BYO MariaDB and <code>sf-database</code> as a tier</a> (retired)</td>
 <td>A deployer-chosen database tier reached by client-side gRPC load balancing</td>
 <td>Complete</td>
 <td>8 of 8</td>
 </tr>
 <tr>
 <td>2026-06-12</td>
-<td><a href="PLAN-remove-apache-lb/">Remove the Apache load balancer</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-remove-apache-lb.md">Remove the Apache load balancer</a> (retired)</td>
 <td>An operator-provided load balancer in place of the bundled Apache</td>
 <td>Complete</td>
 <td>2 of 2</td>
@@ -16312,7 +16316,7 @@ numbers here it cannot recompute.</p>
 </tr>
 <tr>
 <td>2026-06-19</td>
-<td><a href="PLAN-remove-syslog-forwarding/">Remove syslog forwarding</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-remove-syslog-forwarding.md">Remove syslog forwarding</a> (retired)</td>
 <td>Structured JSON logging shipped to Loki, replacing the rsyslog wiring</td>
 <td>Complete</td>
 <td>7 of 7</td>
@@ -16326,7 +16330,7 @@ numbers here it cannot recompute.</p>
 </tr>
 <tr>
 <td>2026-07-14</td>
-<td><a href="PLAN-auth-federation/">Workload identity federation</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md">Workload identity federation</a> (retired)</td>
 <td>Federated workload identity and first-class namespace keys</td>
 <td>Complete</td>
 <td>7 of 7</td>
@@ -16361,14 +16365,14 @@ numbers here it cannot recompute.</p>
 </tr>
 <tr>
 <td>2026-07-19</td>
-<td><a href="PLAN-node-resource-health/">Node resource health</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-node-resource-health.md">Node resource health</a> (retired)</td>
 <td>Declarative dependency checks driving node state, so a dead disk stops scheduling</td>
 <td>Complete</td>
 <td>5 of 5</td>
 </tr>
 <tr>
 <td>2026-07-21</td>
-<td><a href="PLAN-per-host-resource-reservations/">Per-host resource reservations</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-per-host-resource-reservations.md">Per-host resource reservations</a> (retired)</td>
 <td>Per-node RAM, CPU and disk reservation overrides</td>
 <td>Complete</td>
 <td>4 of 4</td>

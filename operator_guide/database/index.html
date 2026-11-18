@@ -15936,6 +15936,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#attribute-table-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attribute Table Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cached-child-uuid-lists-are-not-stored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cached Child-UUID Lists Are Not Stored
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -16091,6 +16113,17 @@
     <span class="md-ellipsis">
       
         Generated Index Names
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-an-index-to-a-table-that-already-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding an index to a table that already exists
       
     </span>
   </a>
@@ -17131,6 +17164,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#attribute-table-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attribute Table Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cached-child-uuid-lists-are-not-stored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cached Child-UUID Lists Are Not Stored
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -17286,6 +17341,17 @@
     <span class="md-ellipsis">
       
         Generated Index Names
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-an-index-to-a-table-that-already-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding an index to a table that already exists
       
     </span>
   </a>
@@ -17509,6 +17575,27 @@ the administrative commands, the table inventory, and the schema system.</p>
 <h2 id="bring-your-own-mariadb-setup">Bring-your-own MariaDB setup<a class="headerlink" href="#bring-your-own-mariadb-setup" title="Permanent link">&para;</a></h2>
 <p>Shaken Fist does not bundle or install MariaDB. The operator provisions the
 database server before deploying the cluster.</p>
+<p>That is a stronger position than "we install it for you with a flag to turn
+it off", and it was chosen over two softer ones. Delegating the install to a
+well-maintained community Ansible role would have moved the problem sideways
+rather than solved it: operators would still inherit a Shaken Fist opinion
+about how MariaDB is deployed, and the role would still have had to decide
+between Galera, primary-replica and single-node on their behalf. A
+provisioning checklist and a SQL snippet the operator applies is less code
+than any role adoption, and it lets whatever MariaDB practice they already
+have apply unmodified.</p>
+<p><code>sf-database</code> is a <strong>tier of equal, stateless instances</strong>, not a leader with
+standbys. Electing one, as the earlier framing had it, would have introduced
+a leader concept the daemon does not need and a client redirect that adds a
+hop and a failure mode; the only state that would have justified election was
+schema migration at startup, and that moved out to an operator-run
+<code>sf-ctl ensure-mariadb-schema</code>. Clients reach the tier through gRPC's own
+client-side round-robin over <code>MARIADB_GATEWAY_HOSTS</code> rather than through an
+L4 load balancer or a VIP, which would be one more moving part for the
+operator to run and misconfigure. Both rejected shapes also compose badly
+with the mTLS direction: a TLS-terminating front and client-certificate
+authentication fight each other, where client-side balancing over mTLS
+channels does not.</p>
 <h3 id="provisioning-checklist">Provisioning checklist<a class="headerlink" href="#provisioning-checklist" title="Permanent link">&para;</a></h3>
 <ol>
 <li>
@@ -17685,10 +17772,15 @@ indexed columns on the <code>network_interfaces</code> table, and they are how <
 return hydrated <code>NetworkInterface</code> objects rather than the cached UUID list that used to live on the
 attribute table). The other <code>find_*</code> helpers leave the FK fields at their default of <code>None</code> because the
 underlying tables have no matching column.</p>
-<p>See the Future-work entry in
-<a href="../../plans/PLAN-sql-pushdown-filtering/"><code>docs/plans/PLAN-sql-pushdown-filtering.md</code></a> ("NetworkInterface
-namespace column") for the deferred discussion of whether to add the column or use a JOIN-based approach
-once a concrete caller exists.</p>
+<p>Adding a namespace to this type is deferred until a caller needs one, and no production call site filters
+interfaces by namespace today — the dnsmasq DHCP path reaches an interface through its owning network, not
+through a namespace-scoped query. When such a caller appears there are two ways to land it. A JOIN through
+<code>networks.namespace</code> or <code>instances.namespace</code> needs no schema change and cannot drift, because the owning
+object stays the single source of the answer; a <code>namespace</code> column on <code>network_interfaces</code> would read the
+same way as the other three types and index as cheaply, but it denormalises an answer the owner already
+holds and goes stale if a network is ever reassigned. The JOIN is the safer default. Either lands as a
+one-line change: <code>find_network_interfaces</code> already accepts the field and discards it, so enabling it is a
+matter of building the clause rather than changing the criteria shape.</p>
 <p><strong>Example.</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist</span><span class="w"> </span><span class="kn">import</span> <span class="n">mariadb</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.object_filter</span><span class="w"> </span><span class="kn">import</span> <span class="n">ObjectFilterCriteria</span>
@@ -17697,6 +17789,33 @@ once a concrete caller exists.</p>
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">mariadb</span><span class="o">.</span><span class="n">find_artifacts</span><span class="p">(</span><span class="n">criteria</span><span class="p">):</span>
 <a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="o">...</span>
 </code></pre></div>
+<p><strong><code>namespace='system'</code> means no namespace clause, not <code>WHERE namespace = 'system'</code>.</strong>
+Both <code>from_db_by_ref</code> and the iterator collapse a namespace of <code>'system'</code> or <code>None</code> to "do not filter on
+namespace", which is what <code>baseobject.namespace_filter</code> has always meant: the system namespace sees every
+other namespace's objects. Pushing the literal string into the WHERE clause would silently narrow an
+administrative lookup to the handful of objects actually owned by <code>system</code>. The collapse lives once in
+<code>DatabaseBackedObject._from_db_by_ref_pushdown</code>, which all three <code>from_db_by_ref</code> overrides delegate to (see above);
+<code>DatabaseBackedObjectIterator.get_iterator</code> carries its own copy for the <code>namespace=</code> kwarg.</p>
+<p><strong>Why a criteria object rather than translating the predicates.</strong>
+The predicates these calls replaced are <code>functools.partial</code> objects — <code>partial(state_filter, states)</code>,
+<code>partial(namespace_filter, ns)</code> — and the alternative design kept the predicate signatures and detected the
+known ones at the <code>filter()</code> entry point, rewriting them to SQL. That was rejected: recognising a predicate
+means reading <code>partial.func</code> and <code>partial.args</code>, which turns a refactor of a filter helper, or a caller
+wrapping one in a lambda, into a silent fall back to the Python scan with no error anywhere. A caller that
+asks for SQL in the type system either gets it or fails to compile. The predicate API survives as the
+documented fallback for genuinely custom callables, which is the <code>filters=</code> argument above.</p>
+<p><strong>Why there is one <code>find_*</code> per type rather than one generic <code>FindObjects</code>.</strong>
+The criteria are shared but the replies are not: each one carries that type's static-data message
+(<code>ArtifactStaticData</code>, <code>InstanceStaticData</code> and so on), so a single RPC would need a union reply and a
+cast at every call site. The split matches the <code>GetArtifact</code> / <code>GetInstance</code> / <code>GetNetwork</code> RPCs beside it.
+The cost is that a new filterable type is four edits — proto, direct helper, gRPC handler and public
+wrapper — rather than one.</p>
+<p><strong>A failed find logs its criteria in full.</strong>
+<code>_direct_find_*</code> logs <code>states</code>, <code>namespace</code> and <code>name</code> with the exception, unlike the older
+<code>_direct_get_all_*</code> helpers, so a failing query can be reproduced from the log without replaying traffic.
+That is a deliberate choice about what may appear in a log: namespaces and object names are
+administrator-visible identifiers in this codebase rather than tenant data, so none of the three fields is
+sensitive. A criteria field that ever carries tenant content would have to change this.</p>
 <h2 id="mariadb_host-vs-mariadb_gateway_hosts">MARIADB_HOST vs MARIADB_GATEWAY_HOSTS<a class="headerlink" href="#mariadb_host-vs-mariadb_gateway_hosts" title="Permanent link">&para;</a></h2>
 <p>These two config keys are orthogonal and serve different purposes. Understanding
 the distinction helps when troubleshooting or planning a deployment.</p>
@@ -19217,6 +19336,7 @@ scenarios where local storage has been lost but the node's UUID is known.</p>
 <p>If the persisted UUID does not match the current node's FQDN, it is
 ignored and the FQDN-based fallback is used. This guards against stale
 UUID files left over from a previous node installation.</p>
+<h4 id="attribute-table-pattern">Attribute Table Pattern<a class="headerlink" href="#attribute-table-pattern" title="Permanent link">&para;</a></h4>
 <p>Each attribute table follows the same pattern — typed scalar columns
 for hot-path fields, JSON columns for complex structures, and one
 indexed FK column per parent — for example:</p>
@@ -19230,12 +19350,6 @@ indexed FK column per parent — for example:</p>
 <a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a><span class="w">    </span><span class="n">metrics</span><span class="w"> </span><span class="n">JSON</span>
 <a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a><span class="p">);</span>
 </code></pre></div>
-<p>Cached lists of <em>child</em> object UUIDs are deliberately not stored on
-the parent attribute table — querying the child table by an indexed
-FK column is the source of truth. The last two such caches
-(<code>network_attributes.networkinterfaces</code> and
-<code>instance_attributes.interfaces</code>) have been removed; see
-<code>docs/plans/PLAN-sql-pushdown-filtering.md</code>.</p>
 <p>This approach:</p>
 <ul>
 <li><strong>Avoids wide generic tables</strong>: Each type has exactly the columns it needs</li>
@@ -19243,6 +19357,21 @@ FK column is the source of truth. The last two such caches
 <li><strong>Supports efficient indexes</strong>: Can index frequently-queried columns</li>
 <li><strong>Keeps queries simple</strong>: No joins needed for common operations</li>
 </ul>
+<h4 id="cached-child-uuid-lists-are-not-stored">Cached Child-UUID Lists Are Not Stored<a class="headerlink" href="#cached-child-uuid-lists-are-not-stored" title="Permanent link">&para;</a></h4>
+<p>Cached lists of <em>child</em> object UUIDs are deliberately not stored on
+the parent attribute table — querying the child table by an indexed
+FK column is the source of truth. The last two such caches
+(<code>network_attributes.networkinterfaces</code> and
+<code>instance_attributes.interfaces</code>) have been removed, along with
+their <code>add_*</code> / <code>remove_*</code> mutators: the child row is what makes the
+association, so writing the list as well was bookkeeping that could
+disagree with it. <code>Network.networkinterfaces</code> and
+<code>Instance.interfaces</code> are now properties over
+<code>find_network_interfaces</code> with the FK filter set, which also removed
+an N+1 hydration loop from every caller, and dropping the columns
+needed no data migration because every UUID in them was derivable
+from <code>network_interfaces</code>. <code>PUSH-AUDIT.md</code> carries a review bullet
+so the pattern is not reintroduced.</p>
 <h3 id="abstract-base-classes">Abstract Base Classes<a class="headerlink" href="#abstract-base-classes" title="Permanent link">&para;</a></h3>
 <p>Abstract base classes like <code>DatabaseBackedObject</code> and <code>ManagedExecutable</code> do
 not get their own tables. Only concrete classes that are actually instantiated
@@ -19445,6 +19574,22 @@ to be checked where it is written as well.</p>
 <li>Single-column: <code>idx_{table}_{column}</code> or <code>uidx_{table}_{column}</code> (unique)</li>
 <li>Compound: <code>idx_{table}_{col1}_{col2}_{...}</code></li>
 </ul>
+<h4 id="adding-an-index-to-a-table-that-already-exists">Adding an index to a table that already exists<a class="headerlink" href="#adding-an-index-to-a-table-that-already-exists" title="Permanent link">&para;</a></h4>
+<p>An <code>SQLIndex()</code> annotation only reaches a database where the table is being created. Each per-type
+<code>_ensure_*_schema()</code> function in <code>shakenfist/mariadb.py</code> creates the table and its annotated indexes
+together, guarded on the stored table version being 0 — that is, only on a fresh table. (The
+<code>ensure_table_exists()</code> helper shown under <em>Table Lifecycle</em> does the same pair of steps, but nothing in
+the tree calls it; the ensure functions inline the equivalent.) An existing deployment therefore keeps
+whatever indexes it was created with, and adding the annotation alone changes nothing there.</p>
+<p>A new index on an existing table needs its own version step in that table's <code>_ensure_*_schema()</code>, in the
+same shape as a column addition: a bump guarded on the stored table version, issuing the <code>CREATE INDEX</code>
+and catching <code>IntegrityError</code> / <code>OperationalError</code> so a re-run is a no-op. <code>_ensure_artifacts_schema()</code>'s
+version 3 step (<code>idx_artifacts_name</code>) is the worked example, with <code>instances</code> and <code>networks</code> carrying the
+same step. Because the ensure functions run at daemon start, an existing cluster picks the index up on its
+next restart with no separate migration.</p>
+<p>Where the index cannot be expressed as an annotation at all — a compound UNIQUE, which the per-field
+<code>SQLUniqueIndex</code> marker and the <code>sql_indexes</code> config path both decline to emit — it is built by hand in the
+same place; see <code>NAMESPACE_KEYS_UNIQUE_INDEX_SQL</code>.</p>
 <h3 id="table-lifecycle">Table Lifecycle<a class="headerlink" href="#table-lifecycle" title="Permanent link">&para;</a></h3>
 <p>The <code>ensure_table_exists()</code> function handles idempotent table creation:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>

@@ -16025,7 +16025,8 @@ dnshosts handling), the <code>Network</code> methods that mutate dnsmasq state
 (<code>update_dnsmasq</code>, <code>remove_dnsmasq</code>, <code>remove_dhcp_lease</code>,
 <code>update_dns_entry</code>, <code>remove_dns_entry</code> in
 <code>shakenfist/network/network.py</code>), and the operation-queue handlers that
-invoke them (see <code>PLAN-network-facade-phase-04-dnsmasq.md</code>, which
+invoke them (see <a href="https://github.com/shakenfist/shakenfist/blob/94b21e53e9a022977ade17dfb1e2464eb8fb94a7/docs/plans/PLAN-network-facade-phase-04-dnsmasq.md"><code>PLAN-network-facade-phase-04-dnsmasq.md</code></a>,
+which
 migrated these onto the queue). Also read how network namespaces are
 created and entered on the network node
 (<code>shakenfist/network/bridged_vxlan_network.py</code>), and the gRPC patterns
@@ -16128,10 +16129,12 @@ maintains beats new Rust that we maintain, if the feature set is
 frozen.</p>
 <h3 id="related-plans">Related plans<a class="headerlink" href="#related-plans" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>PLAN-network-facade-phase-04-dnsmasq.md</code> — migrated the dnsmasq
+<li><a href="https://github.com/shakenfist/shakenfist/blob/94b21e53e9a022977ade17dfb1e2464eb8fb94a7/docs/plans/PLAN-network-facade-phase-04-dnsmasq.md"><code>PLAN-network-facade-phase-04-dnsmasq.md</code></a> (retired)
+  — migrated the dnsmasq
   mutation methods onto the operation queue; sf-netserv's update feed
   would replace the apply-side of those operations.</li>
-<li><code>PLAN-remove-syslog-forwarding.md</code> — the syslog direction that a
+<li><a href="https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-remove-syslog-forwarding.md"><code>PLAN-remove-syslog-forwarding.md</code></a> (retired) — the
+  syslog direction that a
   per-network syslog listener would eventually serve.</li>
 </ul>
 <h3 id="push-audit">Push audit<a class="headerlink" href="#push-audit" title="Permanent link">&para;</a></h3>

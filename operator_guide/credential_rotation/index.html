@@ -15547,6 +15547,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-namespace-key-published-in-the-user-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A namespace key published in the user guide
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rotating-auth_secret_seed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16103,6 +16114,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-namespace-key-published-in-the-user-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A namespace key published in the user guide
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rotating-auth_secret_seed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16295,6 +16317,31 @@ Loki the same query as above. Purging the <code>events</code> rows carrying blob
 transfer tokens is not necessary in the same way: a transfer token is
 only useful while that transfer's server socket is listening, which is
 seconds to minutes, and every one of them is long dead.</p>
+<h2 id="a-namespace-key-published-in-the-user-guide">A namespace key published in the user guide<a class="headerlink" href="#a-namespace-key-published-in-the-user-guide" title="Permanent link">&para;</a></h2>
+<p>Separately from the three above, a namespace key secret was committed
+to this repository as the example of a cluster-generated key in
+<code>docs/user_guide/authentication.md</code>. It was introduced on 2026-08-09
+and replaced on 2026-08-16 by a deliberately checksum-invalid example,
+so it was readable in the published documentation for seven days, and
+it remains readable in the git history — rewriting history would not
+unpublish it. The finding is accepted in <code>.gitleaksignore</code> so the
+secret scanner does not re-raise it.</p>
+<p><strong>The open question, which no one has answered.</strong> The published value
+is checksum-valid, so something implementing the key format produced
+it. Either it came from <code>credentials.generate()</code> run at a shell, in
+which case it never authorised anything anywhere, or it was copied from
+a real cluster, in which case that cluster's plaintext has been public
+since 2026-08-09. Nothing in the repository can distinguish those two
+cases; only whoever wrote that documentation can.</p>
+<p>Until that is settled, treat it as disclosed: <strong>if any namespace on any
+cluster still holds a key with that secret, delete it.</strong> Deleting a key
+revokes every token derived from it immediately, through the nonce
+check, so there is no window to manage and no reason to wait. A
+namespace's keys are listed with <code>sf-client namespace show</code>.</p>
+<p>This is recorded here rather than only in <code>.gitleaksignore</code> because an
+accepted scanner finding records that a secret is known, not what to do
+about it, and an unanswered question should not live only in a comment
+next to a hash.</p>
 <h2 id="rotating-auth_secret_seed">Rotating <code>AUTH_SECRET_SEED</code><a class="headerlink" href="#rotating-auth_secret_seed" title="Permanent link">&para;</a></h2>
 <p><strong>Blast radius: every outstanding token in the zone stops validating
 immediately.</strong> Every client re-authenticates on its next request,

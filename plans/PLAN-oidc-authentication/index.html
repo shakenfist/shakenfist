@@ -16012,7 +16012,7 @@ development priorities. Key references inside the repo:</p>
 <li><code>docs/glossary.md</code> — the authentication vocabulary, pinned
   by phase 1 of the auth federation plan. Use these words
   rather than inventing synonyms for them.</li>
-<li><code>docs/plans/PLAN-auth-federation.md</code> — the sibling plan,
+<li><a href="https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md"><code>PLAN-auth-federation.md</code></a> (retired) — the sibling plan,
   which built the machine half of federation. Its phases 1
   to 4 are the infrastructure this plan builds on.</li>
 <li><code>shakenfist/external_api/auth.py</code> — <code>/auth</code>, the namespace
@@ -16054,7 +16054,8 @@ single commit. Each commit should be self-contained: it
 should build, pass tests, and have a clear commit message
 explaining what changed and why.</p>
 <h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>Phases 1 to 4 of <code>PLAN-auth-federation.md</code> rebuilt the
+<p>Phases 1 to 4 of <a href="https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md"><code>PLAN-auth-federation.md</code></a> (retired)
+rebuilt the
 machinery this plan was originally written against. Every
 numbered item below exists in the tree today; this plan
 builds on it rather than proposing it. The vocabulary is
@@ -16233,7 +16234,7 @@ the one pinned in <code>docs/glossary.md</code>.</p>
   families are wrapped by the client either.</li>
 </ul>
 <h3 id="relationship-to-the-auth-federation-plan">Relationship to the auth federation plan<a class="headerlink" href="#relationship-to-the-auth-federation-plan" title="Permanent link">&para;</a></h3>
-<p><code>PLAN-auth-federation.md</code> is the <em>machine</em> half of
+<p><a href="https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md"><code>PLAN-auth-federation.md</code></a> (retired) is the <em>machine</em> half of
 federation and has been largely built: a workload exchanges
 an IdP-issued identity token for a scoped namespace key.
 This plan is the <em>human</em> half. The two share everything up
@@ -16321,7 +16322,7 @@ credential path working while that happens.</p>
   JWKS fetch, caching or rotation. <code>shakenfist/federation.py</code>
   does this and any new work extends it.</li>
 <li><strong>Out of scope:</strong> the workload exchange itself, which is
-  <code>PLAN-auth-federation.md</code>'s subject and is built.</li>
+  <a href="https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md"><code>PLAN-auth-federation.md</code></a>'s subject and is built.</li>
 <li><strong>Out of scope:</strong> running an IdP inside SF. SF is the
   <em>relying party</em>; operators bring their own IdP.</li>
 <li><strong>Out of scope:</strong> SAML, LDAP-direct, or other non-OIDC
@@ -16840,7 +16841,7 @@ session shapes is chosen.</p>
 <li>
 <p><strong>Direct-bearer or exchange-based human sessions?</strong>
     This plan's central unresolved question, and the one
-    <code>PLAN-auth-federation.md</code> explicitly reserves for this
+    <a href="https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md"><code>PLAN-auth-federation.md</code></a> explicitly reserves for this
     plan's own phase 0 decisions pass rather than answering
     in passing. It is posed here with the evidence that has
     accumulated; it is deliberately not answered.</p>
@@ -17315,16 +17316,16 @@ not land anywhere else.</p>
 <tr>
 <td>1. JWT validation refactor (split issuance from validation; introduce per-issuer validators)</td>
 <td>shakenfist</td>
-<td><a href="../PLAN-auth-federation-phase-03-exchange/">PLAN-auth-federation-phase-03-exchange.md</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/6ba39f69f4e69ea78af591cd1b060fd683dcce1e/docs/plans/PLAN-auth-federation-phase-03-exchange.md">PLAN-auth-federation-phase-03-exchange.md</a></td>
 <td>Superseded</td>
-<td>Superseded -- landed as <code>PLAN-auth-federation.md</code> phase 3 steps 3a-3c and 3f: <code>72187d2ff</code> (#3556), <code>c64269e63</code> (#3625)</td>
+<td>Superseded -- landed as that plan's phase 3 steps 3a-3c and 3f: <code>72187d2ff</code> (#3556), <code>c64269e63</code> (#3625)</td>
 </tr>
 <tr>
 <td>2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification)</td>
 <td>shakenfist</td>
-<td><a href="../PLAN-auth-federation-phase-03-exchange/">PLAN-auth-federation-phase-03-exchange.md</a></td>
+<td><a href="https://github.com/shakenfist/shakenfist/blob/6ba39f69f4e69ea78af591cd1b060fd683dcce1e/docs/plans/PLAN-auth-federation-phase-03-exchange.md">PLAN-auth-federation-phase-03-exchange.md</a></td>
 <td>Superseded</td>
-<td>Superseded -- landed as <code>PLAN-auth-federation.md</code> phase 3 step 3f: <code>c64269e63</code> (#3625), <code>1e7a167ea</code> (#3641)</td>
+<td>Superseded -- landed as that plan's phase 3 step 3f: <code>c64269e63</code> (#3625), <code>1e7a167ea</code> (#3641)</td>
 </tr>
 <tr>
 <td>3. OIDC discovery</td>
@@ -17392,7 +17393,8 @@ landed yet. Phases 1 and 2 are the exception: they were
 superseded rather than abandoned, so their cells name the
 merges that landed the work under another plan, and phase
 10's audit reads those ranges directly rather than following
-a pointer. <code>PLAN-auth-federation.md</code> is <code>Complete</code> and so
+a pointer. <a href="https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md"><code>PLAN-auth-federation.md</code></a> is <code>Complete</code>,
+retired, and so
 carries no <code>Merged</code> column of its own -- a Complete plan is
 not reopened to acquire one -- which is why the merges are
 written out here. They were reconstructed from that plan's

@@ -16091,6 +16091,15 @@ named boundaries (the SQL writes, the gRPC encoder, the bcrypt
 compare, the JWT claim), and each of those sites carries a comment
 saying what breaks if the unwrap is missed. Do not add an unwrap to
 make an error go away; move the value, or wrap the other side.</p>
+<p>One credential is a plain <code>str</code> on purpose: the secret
+<code>shakenfist/util/credentials.py</code>'s <code>generate()</code> mints for a new key. It
+is the one value in the system which is a bearer credential rather
+than a hash of one, but its whole job is to reach the HTTP response
+body, and the response path has no typed serialiser where an unwrap
+could be made structural. A missed unwrap there would not fail loudly:
+it would render <code>**********</code> into the operator's only copy of the
+credential. Revisit this if the response path gains such a
+serialiser, not before.</p>
 <p>Two traps, both of which have already caused real bugs:</p>
 <ul>
 <li><strong>A <code>SecretStr</code> never compares equal to a <code>str</code>.</strong> <code>SecretStr('x')

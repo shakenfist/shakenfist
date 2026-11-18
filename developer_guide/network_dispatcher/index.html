@@ -15258,6 +15258,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#failure-leaves-partial-state-on-purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure leaves partial state, on purpose
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#maintainpy-and-the-discovery-only-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16747,6 +16758,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#failure-leaves-partial-state-on-purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure leaves partial state, on purpose
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#maintainpy-and-the-discovery-only-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -17212,7 +17234,15 @@ transition and the persistence of the report.</p>
 <p>The core architectural principle is that <strong>errors are data, never rehydrated
 Python exception classes</strong>. This converges with gRPC's status-code model and
 is an explicit rejection of the <code>oslo.messaging</code> rehydration pattern, which
-made exception types load-bearing across process boundaries.</p>
+made exception types load-bearing across process boundaries. Two reasons,
+and the second is why the rule is not negotiable for convenience. Version
+skew: a consumer can only rehydrate a class it can import, so adding an
+exception type on one side breaks deserialisation on the other until every
+node is upgraded, which is a rolling upgrade this cluster cannot do.
+Security: rehydration means constructing a class named by a string that
+arrived over the wire, and the set of classes reachable that way is not a
+set anyone audits. A <code>code</code> string that an unknown consumer does not
+recognise is inert; a class name it resolves is not.</p>
 <h3 id="how-external-callers-consume-the-report">How external callers consume the report<a class="headerlink" href="#how-external-callers-consume-the-report" title="Permanent link">&para;</a></h3>
 <p>External callers receive an op handle from enqueueing methods such as
 <code>Network.ensure_mesh()</code>. The typical usage pattern is:</p>
@@ -17507,6 +17537,28 @@ through <code>Network.X()</code>. This replaces two earlier patterns — late im
 constructing a fresh <code>BridgedVXLanNetwork(self)</code> inside the handler. The
 in-class call is cleaner, avoids the redundant wrapper construction, and makes
 the call graph explicit.</p>
+<h2 id="failure-leaves-partial-state-on-purpose">Failure leaves partial state, on purpose<a class="headerlink" href="#failure-leaves-partial-state-on-purpose" title="Permanent link">&para;</a></h2>
+<p>When a step of a chain errors, the dispatcher aborts the remaining
+dependents and whatever the failed step had already written to the host
+stays written. Nothing runs backwards. <code>maintain</code> and the cleaner detect
+the resulting drift on a later pass and converge it, which is the same
+mechanism that corrects drift from a crashed node or a lost packet, so it
+is a path that is exercised constantly rather than only after a failure.</p>
+<p>Paired forward/undo operations — a compensator per mutating step, run in
+reverse on failure — were considered and rejected. A compensator needs to
+know what its forward step <em>observed</em>, not just what it wrote, so it
+carries state the forward step has to persist for it. A compensator can
+itself fail, which needs dead-letter or halt machinery that does not
+otherwise exist. Idempotency then has to hold on both the forward and the
+reverse path rather than only the forward one. And compensation is
+externally visible in confusing ways: an operator watching a network come
+up and then be torn down cannot tell that from a second failure. The same
+effort spent on making convergence robust buys all of those for free.</p>
+<p>The lighter version remains available if a concrete case ever needs it: a
+<code>runs_on_error_of</code> dependency variant, so a caller that knows precisely
+what to undo can enqueue one cleanup op triggered by one step's failure.
+That is a caller's choice about one chain rather than an obligation on
+every operation, and it should not be built before something needs it.</p>
 <h2 id="maintainpy-and-the-discovery-only-model">maintain.py and the discovery-only model<a class="headerlink" href="#maintainpy-and-the-discovery-only-model" title="Permanent link">&para;</a></h2>
 <p><code>shakenfist/daemons/network/maintain.py</code> is <strong>discovery-only</strong>: the maintain
 thread detects drift and enqueues reconciliation ops,
@@ -17972,8 +18024,19 @@ single-threaded net-worker dispatcher
 (<code>shakenfist/daemons/network/workitem.py</code>) — making re-entrancy through
 the queue structurally impossible. External callers always hold <code>Network</code>;
 the dispatcher constructs <code>BridgedVXLanNetwork</code> and calls <code>_apply_*</code>
-methods on it. The single-worker-per-queue invariant (see the comment
-block at <code>self._defer_delays</code> in workitem.py) is a load-bearing property:
+methods on it. Having the type carry that distinction is the point. The
+obvious alternative is a thread-local or context variable saying "this
+thread is inside the worker", with one set of methods branching on it —
+and it was rejected, because such a flag is correct only while every path
+into the code sets it. A new thread, a callback, a daemon that imports the
+module for a different reason, or a test that calls a method directly all
+read as "outside", and the failure is silent: the method enqueues a job
+nobody is waiting for, or mutates the host from a second writer. Holding
+the wrong type, by contrast, is not something a caller can do by
+forgetting: every construction site is inside an operation handler under
+<code>shakenfist/operations/</code>, and no code outside that package holds the type
+at all. The single-worker-per-queue invariant (see the comment block at
+<code>self._defer_delays</code> in workitem.py) is a load-bearing property:
 it is why the dispatcher's in-memory exponential back-off map is correct,
 and why cross-daemon serialisation can be queue-based rather than
 lock-based. All but one of the <code>NodeLock(global_scope=False)</code> wrappers
@@ -18039,6 +18102,14 @@ surviving <code>@redirect_to_network_node</code> is on <code>NetworkPingEndpoint
 because the ping handler runs <code>ip netns exec</code> directly on the network
 node; migrating it to queue-based requires op-output infrastructure not
 yet built (deferred future work).</p>
+<p>The 202 contract was flipped outright rather than advertised as a
+capability a client could opt into, because <code>shakenfist/client-python</code> is
+the only consumer and we ship both halves: the alternative was a dual code
+path on the server, kept indefinitely for a client that does not exist, and
+a blocking branch that nothing would exercise. If an external consumer ever
+appears, advertising the 202 contract through <code>API_CAPABILITIES</code> and
+keeping the blocking behaviour as the fallback is the shape to add — this
+is the decision to revisit, not the endpoints.</p>
 <p><strong>Error handling.</strong> <code>ErrorReport</code> (<code>shakenfist/operations/error_report.py</code>)
 is the on-the-wire shape for failed cluster operations: fields <code>code</code>,
 <code>message</code>, <code>details</code>, <code>origin_class</code>, <code>traceback</code>. Errors are data, never

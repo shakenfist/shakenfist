@@ -16534,7 +16534,8 @@ to be distinguishable from a complete one.</p>
   type. <code>page_size</code> 0 keeps today's unbounded reply, so every other
   caller is unchanged. This plan's phase 2 should treat that caller as
   done and reuse the fields for the rest.</li>
-<li><strong><code>PLAN-eventlog-direct-mariadb</code> is complete and is where this came
+<li><strong><a href="https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-eventlog-direct-mariadb.md"><code>PLAN-eventlog-direct-mariadb</code></a> (retired) is complete
+  and is where this came
   from.</strong> Its Future work section listed cursor pagination for
   <code>GetObjectEvents</code> as deferred; issue 3638 is that deferral coming due.
   Phase 3 should read its phase 4 plan for the REST contract

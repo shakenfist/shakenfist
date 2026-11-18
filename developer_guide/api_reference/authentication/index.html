@@ -16456,9 +16456,9 @@ rejected with a 400 rather than creating a key which is unusable the
 instant it exists, since that is far more likely to be a units mistake
 -- milliseconds instead of seconds, say -- than an intent.</p>
 <p>An expired key can neither mint new tokens nor validate a request, from
-the moment it lapses. Tokens already minted from it remain valid until
-their own expiry; delete the key if you need those invalidated
-immediately.</p>
+the moment it lapses. That includes tokens minted from it before it
+lapsed: every request looks the key up again, so those tokens stop
+working at the key's expiry rather than their own.</p>
 <p>Note that updating a key rotates it, and rotation replaces the whole
 mutable attribute set. Updating a key without passing <code>expiry</code> clears
 any expiry it previously carried.</p>

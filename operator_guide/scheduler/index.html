@@ -16702,6 +16702,18 @@ which only reaches cluster-wide values. The resources daemon reads
 its own node's values, computes the <em>schedulable</em> remainder, and
 publishes it in <code>node_metrics</code>; the scheduler consumes the
 published values rather than recomputing them.</p>
+<p>Keeping them out of cluster config is a hard requirement rather than a
+convention, because of how the two configuration layers compose.
+<code>/etc/sf/config</code> is read by systemd as an <code>EnvironmentFile</code>, and then
+<code>load_cluster_config()</code> writes every <code>cluster_config</code> row which names
+a declared configuration option into the environment <em>over the top of
+it</em>. So a single
+<code>sf-ctl set-config NODE_RAM_RESERVATION_GB ...</code> would not set one
+node's reservation — it would override every node's, silently, and the
+per-host values the deploy templated would stop having any effect while
+still being visible in each node's <code>/etc/sf/config</code>. A key is per-node
+only for as long as no <code>cluster_config</code> row shares its name. If one is
+ever set by mistake, <code>sf-ctl unset-config</code> removes it.</p>
 <ul>
 <li><strong>CPU</strong> -- <code>NODE_CPU_RESERVATION_THREADS</code> (default 2) is a count
   of hardware <strong>threads</strong>, not physical cores, reserved for the
@@ -16730,6 +16742,15 @@ override any of the three per host in inventory (<code>host_vars</code> or
 <code>group_vars</code>), which is the supported way to give a specific node
 (for example one also running an unrelated sensor workload) extra
 headroom.</p>
+<p>The CPU formula assumes two hardware threads per core, which is where
+the <code>* 2</code> comes from. On a node without hyperthreading that
+over-reserves by about one thread; the approximation was accepted
+rather than reading CPU topology facts at deploy time, and a per-host
+override is the answer where it matters. Note also that the RAM
+default is each host's <em>own</em> 10%, where the cluster-wide key it
+replaced collapsed to a single figure taken from one host — so on a
+cluster of unequal machines the per-node defaults are a correction, and
+will not match what was reserved before.</p>
 <p>The published fields are <code>cpu_cores</code>, <code>cpu_threads</code>,
 <code>cpu_cores_reserved</code>, <code>cpu_schedulable</code> (threads),
 <code>cpu_cores_schedulable</code>, <code>memory_reserved_mb</code> and

@@ -16168,7 +16168,7 @@ file per detailed phase, named for the master plan with
 commit per phase. Do not batch unrelated changes into a
 single commit.</p>
 <h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p><code>PLAN-remove-primary.md</code> establishes that when sf-api on a
+<p><a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a> establishes that when sf-api on a
 given node is asked for a blob it doesn't hold, the
 receiving node opens a connection to a peer that does and
 streams bytes through to the client without staging the
@@ -16238,7 +16238,7 @@ for multi-request blob transfers (multi-chunk uploads and
 ranged downloads), eliminating the cluster-mesh
 double-hop for those sessions without exposing per-node
 URLs to clients. The streaming-proxy baseline from
-<code>PLAN-remove-primary.md</code> remains the universal fallback for
+<a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a> remains the universal fallback for
 operators whose LB does not support server-set sticky
 cookies.</p>
 <p>Concretely:</p>
@@ -16303,7 +16303,7 @@ questions include at least:</p>
    the first chunk to the chosen owner and being sticky
    from chunk #2 onward)? The latter integrates better
    with the eventual content-addressable placement
-   direction noted in <code>PLAN-remove-primary.md</code>.</li>
+   direction noted in <a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>.</li>
 <li><strong>Fallback detection.</strong> How does sf-api know that
    stickiness <em>isn't</em> working — i.e., the LB isn't honoring
    the cookie? Naive answer: it can't, and falls through
@@ -16398,7 +16398,7 @@ each is resolved or declined in writing here. If the audit
 finds nothing, that is recorded in one sentence.</p>
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong><code>PLAN-remove-primary.md</code> must have landed</strong> at least
+<li><strong><a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a> must have landed</strong> at least
   through the phase that delivers the streaming-proxy
   baseline for blob reads. The streaming proxy is this
   plan's universal fallback; without it, the
@@ -16418,7 +16418,7 @@ finds nothing, that is recorded in one sentence.</p>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the
 management session. The workflow mirrors
-<code>PLAN-remove-primary.md</code>: plan in the management session,
+<a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>: plan in the management session,
 spawn a sub-agent per implementation step, review in the
 management session, fix or retry, commit when satisfied.</p>
 <p>This work touches the operator-LB interface, which is a
@@ -16434,10 +16434,10 @@ features. Subsequent phases will be re-evaluated once
 phase 0 lands.</p>
 <h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
 <p>Each phase plan should include a step table in the same
-format as <code>PLAN-remove-primary.md</code>, with effort, model,
+format as <a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>, with effort, model,
 isolation, and brief columns.</p>
 <h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
-<p>Standard checklist from <code>PLAN-remove-primary.md</code>, plus:</p>
+<p>Standard checklist from <a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>, plus:</p>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Document additions describe each supported LB's
       required configuration with enough specificity that

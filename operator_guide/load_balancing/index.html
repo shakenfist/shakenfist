@@ -16407,6 +16407,27 @@ any request, so the API is horizontally scalable out of the box.</p>
 <p>Shaken Fist does <strong>not</strong> ship a load balancer or reverse proxy. Putting one in
 front of the API is operator-provided infrastructure: you choose the software,
 own its configuration, and run it where it suits your network.</p>
+<p>It did once. The deployer used to install Apache on the primary node and
+configure <code>mod_proxy_balancer</code> across every hypervisor's <code>:13000</code>. That was
+removed rather than made optional or swapped for a bundled nginx, and the
+reasoning is worth knowing before anyone proposes putting it back:</p>
+<ul>
+<li><strong>A topology flag</strong> would have kept the vhost template, the
+  <code>BalancerMember</code> loop and an install that no test exercised, in order to
+  serve a configuration no known deployment used — every operator who took
+  Shaken Fist to production had already replaced it, because it terminated no
+  TLS, health-checked no backend and hard-coded the OpenAPI passthrough
+  paths. An example config copied once is less to own than a conditional role
+  action and its template.</li>
+<li><strong>Bundling nginx instead</strong>, which is what the one real deployment used,
+  would have kept the deployer in the load-balancer business with a different
+  daemon, and a deployer-managed nginx would then be fighting the operator's
+  own — which already holds their TLS, their certificate rotation, their WAF
+  and their logging.</li>
+</ul>
+<p>What the deployer still does is deploy <code>sf-*</code> daemons on the hosts you name,
+against infrastructure whose addresses you give it. The load balancer sits on
+your side of that line, with the database and the log store.</p>
 <h2 id="why-you-need-one">Why you need one<a class="headerlink" href="#why-you-need-one" title="Permanent link">&para;</a></h2>
 <p>A reverse proxy or load balancer in front of the <code>sf-api</code> workers lets you:</p>
 <ul>
@@ -16456,6 +16477,14 @@ no <code>/v1/</code> -- so <code>&lt;lb&gt;/api/instances</code> reaches <code>/
 </tr>
 </tbody>
 </table>
+<p>The prefix is an artefact of that removed Apache: gunicorn has always served
+the API at <code>/</code>, and the proxy is what put <code>/api</code> in front of it. Retiring the
+convention and serving the API at <code>/</code> behind your proxy would be simpler, and
+was deliberately not done when Apache went — it is baked into every existing
+<code>api_url</code>, into the OpenAPI document URLs and into client expectations, so it
+is a compatibility break on its own schedule rather than a free tidy-up. The
+single-node escape hatch below is the one place there is no <code>/api</code>, because
+there is no proxy to add it.</p>
 <h2 id="example-configurations">Example configurations<a class="headerlink" href="#example-configurations" title="Permanent link">&para;</a></h2>
 <p>Shaken Fist ships two example proxy configurations, one for Apache and one for
 nginx. Both implement the proxy contract above, terminate TLS, and balance
@@ -16551,6 +16580,43 @@ bodies with long timeouts, or transfers will be truncated or time out.</p>
 off</code> and <code>proxy_buffering off</code> to stream rather than buffer, and
 <code>proxy_read_timeout</code>/<code>proxy_send_timeout</code> of <code>3600s</code>. Apache uses
 <code>LimitRequestBody 0</code> and a <code>ProxyTimeout</code> of <code>3600</code>.</p>
+<p>Any node can serve any blob, because a node asked for a blob it does
+not hold opens a connection to a peer that does and streams the bytes
+through without staging them locally. So your proxy needs no knowledge
+of where data lives, and you can balance across all of your
+hypervisors with any algorithm you like.</p>
+<p>That costs a second hop, and it is placed where bandwidth is cheap: the
+extra leg runs on the cluster mesh, which is typically an order of
+magnitude faster than the network your clients sit on -- 10 GbE within
+a rack or two against a 1 GbE LAN is the common shape -- and latency on
+the streamed bytes is unaffected once the first byte arrives.</p>
+<p>Two alternatives were rejected, and both are worth knowing before
+anyone proposes them again:</p>
+<ul>
+<li><strong>A redirect to the node holding the data.</strong> This is what S3 does for
+  regions and etcd for writes, and for Shaken Fist it punches a hole
+  through your perimeter. A <code>307</code> naming a per-node address tells the
+  client your cluster topology and sends it around the load balancer,
+  and with it whatever WAF and TLS termination sit behind it. Routing
+  the redirect back through the proxy would mean teaching the proxy to
+  read a token that selects a backend, which is the next item.</li>
+<li><strong>A topology-aware balancer</strong> that knows which node holds which blob
+  and which roles run where. That rebuilds the central tier, and the
+  single point of failure, that this architecture exists to remove, and
+  it conflates two different problems -- routing by role and routing by
+  data -- which want different mechanisms. It is also a road no
+  comparable system has taken: S3, HDFS, Cassandra, Ceph and etcd all
+  push routing into the client or into redirects instead. The nearest
+  real example is GitHub's shard router, which is a large piece of
+  bespoke engineering.</li>
+</ul>
+<p>Eliminating the second hop for a long multi-request session is a real
+refinement, and is possible without exposing per-node addresses: the
+first request picks an owner and sets an opaque cookie the proxy
+honours for the rest of the session. That has its own trade-offs --
+open-source nginx cannot do server-set sticky cookies, so the streaming
+proxy has to stay as the fallback -- and is planned separately rather
+than assumed here.</p>
 <h2 id="single-node-escape-hatch">Single-node escape hatch<a class="headerlink" href="#single-node-escape-hatch" title="Permanent link">&para;</a></h2>
 <p>If you run everything on a single machine and do not want to operate a proxy at
 all, you can skip the load balancer entirely. Point <code>api_url</code> (and the

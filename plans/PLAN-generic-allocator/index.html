@@ -16444,7 +16444,8 @@ finds nothing, that is recorded in one sentence.</p>
   of this plan and phase 0 of scheduler-reservations should
   cross-read each other's decisions documents so the pattern
   stays coherent.</li>
-<li><strong>Coherent with <code>PLAN-replace-last-cluster-operation</code></strong>
+<li><strong>Coherent with <a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-replace-last-cluster-operation.md"><code>PLAN-replace-last-cluster-operation</code></a>
+  (retired)</strong>
   insofar as both are about removing redundant single-
   pointer mechanisms in favour of typed table-driven state.</li>
 </ul>
@@ -16452,9 +16453,10 @@ finds nothing, that is recorded in one sentence.</p>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the
 management session. The workflow mirrors
-<code>PLAN-remove-primary.md</code>, <code>PLAN-sticky-transfers.md</code>,
+<a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>, <code>PLAN-sticky-transfers.md</code>,
 <code>PLAN-scheduler-reservations.md</code>, and
-<code>PLAN-eventlog-direct-mariadb.md</code>: plan in the management
+<a href="https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-eventlog-direct-mariadb.md"><code>PLAN-eventlog-direct-mariadb.md</code></a> (retired): plan in
+  the management
 session, spawn a sub-agent per implementation step, review
 in the management session, fix or retry, commit when
 satisfied.</p>
@@ -16472,10 +16474,10 @@ effort. Subsequent phases are mechanical refactors with
 small per-phase scope.</p>
 <h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
 <p>Each phase plan should include a step table in the same
-format as <code>PLAN-remove-primary.md</code>, with effort, model,
+format as <a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>, with effort, model,
 isolation, and brief columns.</p>
 <h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
-<p>Standard checklist from <code>PLAN-remove-primary.md</code>, plus:</p>
+<p>Standard checklist from <a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>, plus:</p>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Each ported allocator has a test that exercises
       concurrent allocation against the same pool and

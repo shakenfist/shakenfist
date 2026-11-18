@@ -3349,75 +3349,7 @@
          <lastmod>2026-11-18</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-01-glossary/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-02-key-objects/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-03-exchange/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-04-docs/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-05-oidc-plan-refresh/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-06-secret-types/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-07-leak-detection/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-auth-federation/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/plans/PLAN-blob-containers/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-00-retire-etcd/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-01-statelessness/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-02-config-untangle/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-03-grpc-tier/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-04-deploy-byo/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-05-ci-byo/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-06-ci-tier/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-07-docs/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-byo-mariadb/</loc>
          <lastmod>2026-11-18</lastmod>
     </url>
     <url>
@@ -3553,67 +3485,11 @@
          <lastmod>2026-11-18</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb-phase-01-schema/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb-phase-02-write/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb-phase-03-prune/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb-phase-04-read/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb-phase-05-remove/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb-phase-06-docs/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-fix-cluster-operation-targets-unique-constraint/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/plans/PLAN-generic-allocator/</loc>
          <lastmod>2026-11-18</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-grpc-bounded-replies/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-00-decisions/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-01-sf-api/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-02-grpc-health/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-03-watchdog/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-04-operator-docs/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-health-checks/</loc>
          <lastmod>2026-11-18</lastmod>
     </url>
     <url>
@@ -3677,67 +3553,7 @@
          <lastmod>2026-11-18</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-01-per-node-queues/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-02-ensure-mesh/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-03-floating-ip/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-04-dnsmasq/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-05-lifecycle/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-06-maintain/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-07-rest-contract/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-08-cleanup/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-09-docs/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-network-facade/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/plans/PLAN-network-service-ports/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-node-resource-health-phase-01-checks/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-node-resource-health-phase-02-evaluator/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-node-resource-health-phase-03-cascade/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-node-resource-health-phase-04-docs/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-node-resource-health/</loc>
          <lastmod>2026-11-18</lastmod>
     </url>
     <url>
@@ -3754,26 +3570,6 @@
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-oidc-authentication/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations-phase-01-config-cpu-ram/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations-phase-02-disk-metric/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations-phase-03-ansible-templating/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations-phase-04-docs-cleanup/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations/</loc>
          <lastmod>2026-11-18</lastmod>
     </url>
     <url>
@@ -3857,99 +3653,7 @@
          <lastmod>2026-11-18</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-apache-lb-phase-01-docs/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-apache-lb-phase-02-remove/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-apache-lb/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-primary-phase-06-galaxy-role/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-primary-phase-06-step5b-ci-design/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-primary-phase-06-step6-legacy-removal/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-primary-phase-07-rename-cleanup/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-primary-phase-08-shared-ci/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-primary/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-00-decisions/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-01-json-logging/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-02-loki-shipper/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-03-ci-loki/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-04-ci-tooling/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-06-docs/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/plans/PLAN-replace-exec-with-netlink/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-01-query/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-02-gating/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-03-auto-target/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-04-drop-column/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-05-docs/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation/</loc>
          <lastmod>2026-11-18</lastmod>
     </url>
     <url>
@@ -4018,38 +3722,6 @@
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-01-infrastructure/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-02-artifact/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-03-instance-network/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-04-iterators/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-05-adhoc/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-06-tests-docs/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-07-denorm-lists/</loc>
-         <lastmod>2026-11-18</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering/</loc>
          <lastmod>2026-11-18</lastmod>
     </url>
     <url>

@@ -16184,7 +16184,8 @@ document, explore the shakenfist codebase thoroughly. Read
 hold most of SF's exec'd network operations today. Read
 <code>shakenfist/daemons/network/main.py</code> for the few exec sites
 that live outside privexec. Read the network worker and the
-single-mutator path being built in <code>PLAN-network-facade.md</code>,
+single-mutator path built in <a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md"><code>PLAN-network-facade.md</code></a>
+(retired),
 since this plan changes the <em>mechanism</em> the single mutator
 uses without changing <em>who</em> the mutator is. Ground your
 answers in what the code does today. Do not speculate when
@@ -16277,7 +16278,8 @@ options but are scope-creep relative to what this plan
 needs to solve, and would bind SF to a much larger
 operational and dependency surface.</p>
 <p>There is also a <strong>privilege separation opportunity</strong> that
-becomes available once <code>PLAN-network-facade.md</code> lands.
+became available when <a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md"><code>PLAN-network-facade.md</code></a>
+(retired) landed.
 Today <code>sf-privexec</code> is a single root-privileged daemon
 that any local SF process can ask to run arbitrary
 privileged operations. After network-facade, all network
@@ -16303,7 +16305,8 @@ sequentially, because each touches the same files in
 and because the typed-RPC shape and the split-daemon shape
 both fall naturally out of an in-process netlink
 implementation. This plan therefore folds them into one
-arc, gated on <code>PLAN-network-facade.md</code> having landed so
+arc, gated on <a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md"><code>PLAN-network-facade.md</code></a> (retired)
+having landed so
 the "exactly one caller of network privilege" property
 holds.</p>
 <h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
@@ -16368,7 +16371,8 @@ network commands in the server tree.</p>
   the final name). This new daemon holds only
   <code>CAP_NET_ADMIN</code>, exposes only typed network operations,
   and accepts requests only from <code>net-worker</code> (the single
-  mutator established by <code>PLAN-network-facade.md</code>). The
+  mutator established by <a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md"><code>PLAN-network-facade.md</code></a>,
+retired). The
   existing <code>sf-privexec</code> daemon retains its non-network
   responsibilities (libvirt, on-disk image manipulation,
   qemu interactions) but drops <code>CAP_NET_ADMIN</code> once the
@@ -16671,8 +16675,9 @@ landed yet.</p>
 </ul>
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong><code>PLAN-network-facade.md</code></strong> is in progress in a separate
-  work session and <strong>must land before this plan starts</strong>.
+<li><strong><a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md"><code>PLAN-network-facade.md</code></a></strong> (complete, now
+  retired) <strong>landed before this plan starts</strong>, which was a
+  precondition.
   Two reasons. First, network-facade settles <em>who</em> mutates
   network state (the single-mutator <code>net-worker</code> pattern)
   while this plan changes <em>how</em> the mutator does the
@@ -16683,7 +16688,7 @@ landed yet.</p>
   without it, splitting <code>sf-privexec</code> would not actually
   shrink the caller set and the security payoff would be
   weaker.</li>
-<li><strong><code>PLAN-remove-primary.md</code></strong> is independent. Network code
+<li><strong><a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a></strong> is independent. Network code
   lives in <code>sf-net</code> and <code>sf-privexec</code>, neither of which is
   affected by primary-node removal. This plan can land
   before, during, or after remove-primary.</li>
@@ -16698,7 +16703,7 @@ landed yet.</p>
 <code>PLAN-sticky-transfers.md</code>, and the not-yet-drafted
 eventlog / network-node-failover / OpenTelemetry threads.
 The triage decision for which of these lands first is
-deferred until <code>PLAN-remove-primary.md</code> is close to
+deferred until <a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a> is close to
 landing.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
@@ -16718,9 +16723,9 @@ phase 3's patterns are established.</p>
 <h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
 <p>Each phase plan should include a step table with effort,
 model, isolation, and brief columns in the format used by
-<code>PLAN-remove-primary.md</code>.</p>
+<a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>.</p>
 <h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
-<p>Standard checklist from <code>PLAN-remove-primary.md</code>, plus:</p>
+<p>Standard checklist from <a href="https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md"><code>PLAN-remove-primary.md</code></a>, plus:</p>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No remaining <code>subprocess</code> / <code>Popen</code> invocations of
       <code>iptables</code>, <code>ip</code>, <code>brctl</code>, <code>sysctl</code>, or <code>arping</code> in

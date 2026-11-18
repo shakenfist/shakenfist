@@ -15019,6 +15019,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#where-the-policy-decision-happens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the policy decision happens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#wildcards-and-compatibility" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16381,6 +16392,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#where-the-policy-decision-happens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the policy decision happens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#wildcards-and-compatibility" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16763,9 +16785,9 @@ and matches every key created before this feature existed.</p>
 <p>Enforcement is at the point of use, not on a timer. An expired key can neither
 mint new tokens at <code>/auth</code> nor validate a request, from the instant it lapses
 -- there is no window in which an expired key still works because a cleanup
-task has not run yet. Tokens already minted from a key that later expires
-remain valid until their own expiry, which is nominally fifteen minutes; delete
-the key if you need them invalidated immediately, since that changes the nonce.</p>
+task has not run yet. That includes tokens minted from the key before it
+lapsed: <code>verify_token</code> looks the key up on every request, so those tokens stop
+validating at the key's expiry rather than at their own.</p>
 <p>Expired keys are tidied up by the cluster daemon rather than vanishing the
 moment they lapse. It soft-deletes keys that expired more than
 <code>NAMESPACE_KEY_REAP_GRACE</code> seconds ago (one hour by default; set it to <code>0</code> to
@@ -16862,6 +16884,29 @@ the mechanism rather than the privilege:</p>
 <p>Adding a verb is a vocabulary decision, not a convenience: the test is
 whether anyone would sensibly write a mapping rule granting it alone.
 The full set is pinned by a test over the real routing table.</p>
+<h3 id="where-the-policy-decision-happens">Where the policy decision happens<a class="headerlink" href="#where-the-policy-decision-happens" title="Permanent link">&para;</a></h3>
+<p>All of the policy intelligence runs <strong>once</strong>, at the exchange: the
+inbound token's claims are evaluated against a mapping rule, and what
+comes out is a key carrying an explicit, dumb list of scopes.
+Per-request enforcement is then set membership against the endpoint's
+derived scope. There is deliberately no attribute evaluation, and no
+policy engine, on the request path.</p>
+<p>That is why narrowing a mapping rule does not narrow the keys already
+minted from it, which the API reference also states as behaviour: there
+is nothing on the request path that reads the rule. Evaluating rules per
+request would make a narrowed rule take effect immediately, which sounds
+like an improvement until it is priced — it puts claim evaluation in
+front of every authenticated call, requires the original inbound token
+to still be available (it is not; it was exchanged and discarded), and
+makes a provider outage an authentication outage. Delete the keys if a
+narrowed rule should apply to them.</p>
+<p>Expiry follows the same split. It is enforced exactly, at use time, by
+the filtered accessor that both the mint path and <code>verify_token</code> read
+through, so an expired key can neither mint a new token nor validate an
+outstanding one. The cluster daemon's reaper exists to garbage-collect
+dead rows and emit lifecycle events — it is hygiene, and <strong>nothing about
+security may depend on its cadence</strong>. A reaper that has not run for a
+week costs table growth, not access.</p>
 <h3 id="wildcards-and-compatibility">Wildcards and compatibility<a class="headerlink" href="#wildcards-and-compatibility" title="Permanent link">&para;</a></h3>
 <p>A key with no scopes recorded mints a token carrying the wildcard <code>*</code>,
 which satisfies everything. Every key created before scopes existed is

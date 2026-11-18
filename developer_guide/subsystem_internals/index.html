@@ -16494,6 +16494,38 @@ deleted-node path but errors rather than deletes.</p>
 <p>Node error never clears automatically; <code>sf-ctl clear-node-error</code> is the
 operator recovery path, documented in
 <a href="../../operator_guide/node_health/"><code>node_health.md</code></a>.</p>
+<p>Two boundaries are worth knowing before extending this.</p>
+<p><strong>The question is asked of a type, not of an object.</strong> "Instance depends
+on <code>blobs</code>" means the blob store on this node is usable, not that a
+particular instance's particular backing chain reads correctly. Node
+health needs only the former, and the latter is a per-object graph whose
+cost scales with the number of objects rather than the number of types.
+Nothing here should grow into the per-object question by accident.</p>
+<p><strong>Which instances die is decided by dependency membership, not by a
+flag.</strong> An earlier shape gave each path an <code>implies_instance_death</code>
+boolean; it was dropped because the declarations already carry the
+answer. A node whose <code>uploads</code> path fails does not error its instances,
+because <code>uploads</code> is not in <code>Instance.health_dependencies</code> — no separate
+field has to agree with that list, and none can disagree with it.</p>
+<p>For the same reason a type lists the paths it needs directly, rather than
+declaring that it depends on another <em>type</em> and inheriting that type's
+paths. <code>Instance</code> repeats <code>blobs</code> even though <code>Blob</code> also declares it.
+With three types and one to three paths each that duplication is
+trivial, de-duplication by check identity erases its runtime cost, and
+the alternative buys a tidier declaration at the price of cycle
+detection and an evaluation order. Revisit when the type or check set is
+large enough for direct listing to actually hurt.</p>
+<p><strong>Adding a non-path check is not a one-line change.</strong> <code>HealthCheck</code> and
+the evaluator are already check-type-agnostic, so neither needs
+touching. But <code>node_health.build_checks()</code> reads each type's
+<code>health_dependencies</code> as <code>STORAGE_PATH</code>-relative subdirectory strings
+and constructs <code>PathCheck</code>s from them, so the first non-path check — a
+libvirtd liveness probe on a hypervisor, MariaDB reachability on a
+database node, or <a href="https://github.com/shakenfist/shakenfist/issues/730">issue 730</a>'s
+dnsmasq-serving probe on a network node — needs a richer dependency
+descriptor than a bare string. The generalisation is local to
+<code>build_checks</code>; the seam is in the right place, but the cost is not
+nothing.</p>
 <h2 id="daemon-start-ordering">Daemon start ordering<a class="headerlink" href="#daemon-start-ordering" title="Permanent link">&para;</a></h2>
 <p>Each daemon is a systemd unit rendered from
 <code>shakenfist/deploy/collection/roles/node/templates/sf.service</code>, grouped
@@ -16520,6 +16552,21 @@ ahead of <code>sf-database</code> hangs on its first database call -- <code>sf-a
 particular -- so a new unit must keep the <code>After=sf-database.service</code>
 ordering.</p>
 <h2 id="daemon-liveness-systemd-watchdog">Daemon liveness (systemd watchdog)<a class="headerlink" href="#daemon-liveness-systemd-watchdog" title="Permanent link">&para;</a></h2>
+<p>Liveness and readiness are <strong>not</strong> written into <code>node_daemon_states</code>,
+and that separation is deliberate. That table is the orderly-transition
+and kill-signal substrate — <code>check_daemon_state()</code>,
+<code>get_degraded_daemons()</code>, <code>external_view()</code> and <code>sf-ctl</code> all read it,
+and a daemon reads it to learn it has been asked to stop. Pulsing
+health into it would do two bad things: a transient probe failure would
+mark the node degraded, which is a cluster-state judgement nothing
+should make from a routing signal, and a health write could overwrite a
+<code>STOPPING</code> signal the daemon had not yet acted on. The two answer
+different questions on different clocks — eventual cluster state, versus
+real-time routing and liveness — so they share no storage. <code>/readyz</code>
+serves from a per-worker in-memory flag and the watchdog writes to
+systemd; neither writes health into a table. The readiness flag is
+refreshed out of band by a background checker that asks sf-database,
+not by anything on the request path.</p>
 <p><code>Daemon.pet_watchdog()</code> in <code>shakenfist/daemons/daemon.py</code> is the
 liveness seam for every non-trivial daemon. It writes
 <code>sd_notify(WATCHDOG=1)</code> at most every ~10s, and <code>Daemon.idle()</code> (the

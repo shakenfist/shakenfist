@@ -17852,14 +17852,17 @@ existing deployments must be rebuilt against the new shape.</p>
   also been removed.</p>
 </li>
 <li>
-<p><strong>Greenfields only.</strong> PLAN-byo-mariadb does not preserve compatibility
-  with deployments that took the earlier-in-the-v0.8-cycle shape
+<p><strong>Greenfields only.</strong>
+  <a href="https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-byo-mariadb.md">PLAN-byo-mariadb</a>
+  does not preserve compatibility with deployments that took the
+  earlier-in-the-v0.8-cycle shape
   (deployer-installed MariaDB, singular <code>DATABASE_NODE_IP</code>, etc.).
   Operators rebuild against the new shape.</p>
 </li>
 </ul>
-<p>See <code>docs/plans/PLAN-byo-mariadb.md</code> for the multi-phase rollout
-details.</p>
+<p>See the retired
+<a href="https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-byo-mariadb.md">PLAN-byo-mariadb</a>
+for the multi-phase rollout details.</p>
 <h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Events are written directly to MariaDB via a per-daemon local spool
