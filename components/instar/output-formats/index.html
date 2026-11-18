@@ -3752,6 +3752,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-protect-development-main/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protect development's default branch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-release-gating/" class="md-nav__link">
         
   
@@ -16699,6 +16727,20 @@ layer. For file-backed images, this includes:</p>
 </ul>
 <p>This information was previously only available by examining the image file
 directly. The addition improves transparency for debugging and scripting.</p>
+<p>An image that is several files on disk has one child per file. A VMDK
+descriptor that resolves to separate extent files -- <code>monolithicFlat</code> and the
+<code>twoGbMaxExtent*</code> split subformats -- exposes an <code>/extents.N</code> child per extent
+ahead of the descriptor's own <code>/file</code> child, and qemu-img walks the extents
+from last to first while keeping each one's own index, so the array reads
+<code>extents.N-1</code> down to <code>extents.0</code> and then <code>file</code>. Select a child by its
+<code>name</code> rather than its position. The format-specific <code>extents</code> array is a
+different thing and stays in descriptor order.</p>
+<p>Two disk-size figures are involved and they are not the same number. Each
+child reports the allocation of its own file, while the image's own <code>disk
+size</code> line and top-level <code>actual-size</code> report the sum over the descriptor and
+every extent. A three-extent flat image holding 512 KiB per extent reports
+1576960 bytes for the image and 524288 for each extent child, not 4096 -- the
+descriptor's own allocation -- for all of them.</p>
 <h3 id="compatibility-considerations">Compatibility Considerations<a class="headerlink" href="#compatibility-considerations" title="Permanent link">&para;</a></h3>
 <p>When writing scripts that parse qemu-img/instar output:</p>
 <ol>

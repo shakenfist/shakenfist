@@ -3912,6 +3912,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-protect-development-main/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protect development's default branch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-release-gating/" class="md-nav__link">
         
   
@@ -16399,15 +16427,14 @@ the bot was an organisation owner; once it became a member on
 2026-10-30 the token could no longer file in private-ci (#349), and
 Contents read was added to it on 2026-10-31; audit run 41140043392
 then filed there again. <code>update-docs</code> uses it only to look up the
-open issues the page links to; the page itself is pushed by
-<code>scripts/commit-audit-docs.sh</code> with the job's own <code>GITHUB_TOKEN</code>,
-which <code>actions/checkout</code> leaves in the clone and the job's
-<code>contents: write</code> permission lets push to this repository alone. The
-same lifetime limit applies: the current token expires on 2027-10-25
-AEDT, the local day <code>AUDIT_READ_TOKEN</code> does. When it lapses,
-<code>manage-issues</code> fails and <code>report-failure</code> files its issue, and
-<code>update-docs</code> still pushes the page but renders each issue link it
-could not look up as <code>?</code>.</p>
+open issues the page links to, and its checkout keeps no credential
+for the code it runs to find; the page is pushed by the <code>push-docs</code>
+job below, as the review-marks App. The same lifetime limit applies:
+the current token expires on 2027-10-25 AEDT, the local day
+<code>AUDIT_READ_TOKEN</code> does. When it lapses, <code>manage-issues</code> fails and
+<code>report-failure</code> files its issue, and <code>update-docs</code> still generates
+the page, and <code>push-docs</code> lands it, but each issue link <code>update-docs</code>
+could not look up is rendered as <code>?</code>.</p>
 <p><code>AUDIT_TOKEN</code> is not a repository secret. It is an environment secret
 in the <code>audit-write</code> environment, whose deployment branch policy
 allows only <code>main</code>, and <code>manage-issues</code> and <code>update-docs</code> are the only
@@ -16440,13 +16467,14 @@ and only <code>runner.temp</code> is emptied between jobs. Code an audit leg run
 -- skillsaw's unpinned dependencies, or anything an audited repository
 can steer -- could leave something in that user's home directory (a
 <code>.pth</code> file in the user site-packages, a <code>~/.gitconfig</code> hook) for a
-later job there to run. So <code>manage-issues</code> and <code>update-docs</code> run on
-ephemeral <code>[self-hosted, vm, debian-13, s]</code> runners instead: each
-starts from the image and is thrown away after one job, so nothing a
-leg wrote reaches a job holding <code>AUDIT_TOKEN</code>. The image has no <code>gh</code>,
-so both jobs install it from Debian first.
-<code>scripts/tests/test_audit_workflow.py</code> fails if either job moves back
-to <code>static</code>.</p>
+later job there to run. So <code>manage-issues</code>, <code>update-docs</code> and
+<code>push-docs</code> run on ephemeral <code>[self-hosted, vm, debian-13, s]</code>
+runners instead: each starts from the image and is thrown away after
+one job, so nothing a leg wrote reaches a job holding <code>AUDIT_TOKEN</code> or
+the review-marks App's key. The image has no <code>gh</code>, so the two jobs
+that use it install it from Debian first.
+<code>scripts/tests/test_audit_workflow.py</code> fails if any of the three
+moves back to <code>static</code>.</p>
 <p>Within a leg, the isolation is weaker. skillsaw runs as the same user
 as <code>audit-check.py</code>, so taking the token out of its environment is
 defence in depth, not isolation: it could still read its parent's.
@@ -16460,9 +16488,25 @@ rewrites everything between the <code>&lt;!-- consistency-audit:begin --&gt;</co
 <code>&lt;!-- consistency-audit:end --&gt;</code> markers in
 <a href="/components/development/audits/compliance/"><code>docs/audits/compliance.md</code></a> from the same
 results -- one table per criterion, linking the issues the previous job
-just filed. <code>scripts/commit-audit-docs.sh</code> then commits and pushes
-that one file to <code>main</code> as <code>shakenfist-bot</code>, rebasing first in case
-another push landed while the audit ran.</p>
+just filed, and uploads the result as an artifact. It pushes nothing.</p>
+<p><strong>3b. <code>push-docs</code></strong> -- runs after <code>update-docs</code>, from <code>main</code> only, in
+the <code>review-marks</code> environment on its own ephemeral VM.
+<code>scripts/commit-audit-docs.sh</code> commits the downloaded page, as
+<code>shakenfist-bot</code>, in a fresh clone at the commit the audit ran on,
+rebases it in case another push landed while the audit ran, and pushes
+that one file to <code>main</code> with a token minted from the
+<code>shakenfist-review-marks</code> App. The App is used because a ruleset
+requiring a pull request on <code>main</code> refuses a push with
+<code>GITHUB_TOKEN</code>; the script fails rather than fall back to it. It is a
+separate job so that <code>AUDIT_TOKEN</code>, held in <code>audit-write</code>, and the
+App's key, held in <code>review-marks</code>, are never in one job. See
+<a href="/components/development/audits/bypass-actor-identity/">bypass-actor-identity.md</a>.</p>
+<p>If the rebase stops -- a pull request merged during the run changed
+the same lines of the page, which in practice means its hand-written
+prose next to a table that also changed -- <code>push-docs</code> fails, nothing
+is pushed, and <code>report-failure</code> files its issue. Nothing is lost: the
+next run regenerates the tables over the merged prose, so a re-run
+by hand once the cause is understood is the whole fix.</p>
 <p>It writes that page and nothing else. The criterion specifications are
 hand-written, and are in scope for whole-file human review because of
 it; a generated block in one would carry a timestamp that changes
@@ -16483,19 +16527,19 @@ start one by hand once the cause is fixed.</p>
 <p>Only a run of <code>main</code> writes anything. Dispatched on another branch
 (<code>gh workflow run consistency-audit.yml --ref &lt;branch&gt;</code>), the audit
 matrix runs that branch's checks against the whole fleet and uploads
-its results as artifacts, and <code>manage-issues</code>, <code>update-docs</code> and
-<code>report-failure</code> are skipped. That is the way to measure a change to
-the checks against the fleet before merging it. The <code>main</code>-only
-condition catches a dispatch of the wrong ref; the <code>audit-write</code>
-environment above is what keeps <code>AUDIT_TOKEN</code> from a branch that edits
-the condition out. The read token is another matter: a branch run
-needs it to measure anything, and a branch controls the code that runs
-with it, so a branch can read every private repository in the
-organisation. For reading, the trust boundary is push access to this
-repository, as it always was. Two runs of one ref never overlap: the
-second waits for the first to finish. Runs of different refs do not
-wait for each other, so a branch run can never hold up or displace the
-scheduled run of <code>main</code>.</p>
+its results as artifacts, and <code>manage-issues</code>, <code>update-docs</code>,
+<code>push-docs</code> and <code>report-failure</code> are skipped. That is the way to
+measure a change to the checks against the fleet before merging it.
+The <code>main</code>-only condition catches a dispatch of the wrong ref; the
+<code>audit-write</code> environment above is what keeps <code>AUDIT_TOKEN</code> from a
+branch that edits the condition out. The read token is another matter:
+a branch run needs it to measure anything, and a branch controls the
+code that runs with it, so a branch can read every private repository
+in the organisation. For reading, the trust boundary is push access to
+this repository, as it always was. Two runs of one ref never overlap:
+the second waits for the first to finish. Runs of different refs do
+not wait for each other, so a branch run can never hold up or displace
+the scheduled run of <code>main</code>.</p>
 <h2 id="issues-are-the-work-tracking">Issues are the work tracking<a class="headerlink" href="#issues-are-the-work-tracking" title="Permanent link">&para;</a></h2>
 <p><code>audit-manage-issues.py</code> files one issue per failing check, on the
 repository the work has to happen in, labelled <code>consistency</code> (the label

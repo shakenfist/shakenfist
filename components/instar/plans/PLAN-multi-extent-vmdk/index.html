@@ -3752,6 +3752,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/plans/PLAN-protect-development-main/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protect development's default branch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/plans/PLAN-release-gating/" class="md-nav__link">
         
   
@@ -6386,10 +6414,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-not-started" class="md-nav__link">
+  <a href="#status-in-progress" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Not started
+        Status: In progress
       
     </span>
   </a>
@@ -16074,10 +16102,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-not-started" class="md-nav__link">
+  <a href="#status-in-progress" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Not started
+        Status: In progress
       
     </span>
   </a>
@@ -16206,7 +16234,7 @@
 
 
 <h1 id="multi-extent-vmdk-output-twogbmaxextentsparse-and-twogbmaxextentflat">Multi-extent VMDK output: twoGbMaxExtentSparse and twoGbMaxExtentFlat<a class="headerlink" href="#multi-extent-vmdk-output-twogbmaxextentsparse-and-twogbmaxextentflat" title="Permanent link">&para;</a></h1>
-<h2 id="status-not-started">Status: Not started<a class="headerlink" href="#status-not-started" title="Permanent link">&para;</a></h2>
+<h2 id="status-in-progress">Status: In progress<a class="headerlink" href="#status-in-progress" title="Permanent link">&para;</a></h2>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
@@ -16733,13 +16761,13 @@ cannot corrupt an output, before the write path depends on it.</p>
 <tr>
 <td>1. Pin and measure qemu's output</td>
 <td><a href="/components/instar/plans/PLAN-multi-extent-vmdk-phase-01-pin/">PLAN-multi-extent-vmdk-phase-01-pin.md</a></td>
-<td>Not started</td>
-<td></td>
+<td>Complete</td>
+<td>34832d47</td>
 </tr>
 <tr>
 <td>2. Fixtures and baselines</td>
-<td>PLAN-multi-extent-vmdk-phase-02-fixtures.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-multi-extent-vmdk-phase-02-fixtures/">PLAN-multi-extent-vmdk-phase-02-fixtures.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16864,18 +16892,47 @@ behaviour this phase did not measure</strong> -- sub-agents have asserted
 plausible-but-wrong qemu-img capabilities repeatedly in this
 repository, and the preallocation leaf in <code>PLAN-bat-population.md</code>
 turned on exactly this kind of check.</p>
-<p><strong>2. Fixtures and baselines.</strong> Add <code>twoGbMaxExtent{Sparse,Flat}</code>
-fixtures to <code>instar-testdata</code> with their manifest entries, including at
-least one image past the current 15-extent ceiling so phase 3 has
-something to prove itself against, and one whose last extent is
-partial. Remember that repository takes direct commits to <code>main</code>, never
-a merge request, and that it is git-LFS backed. Generate baselines with
-<code>--no-commit</code> and validate the derived profile directories rather than
-trusting them; they have twice been silently wrong while the raw
-baselines were fine.</p>
+<p><strong>2. Fixtures and baselines.</strong> Add <code>twoGbMaxExtentSparse</code> fixtures to
+<code>instar-testdata</code> with their manifest entries, and a test-time
+generator for <code>twoGbMaxExtentFlat</code>. Phase 2's survey corrected this
+section in three ways. An image past the current 15-extent ceiling
+already exists -- <code>osboxes-vmdk-split-sparse</code>, a real VMware
+Workstation image of 26 extents with full baselines -- but its extents
+are 8304640 sectors (3.96 GiB) each under a
+<code>createType="twoGbMaxExtentSparse"</code> descriptor, so it covers the
+device-slot ceiling and not qemu's geometry, and it is kept as a
+real-world foil rather than replaced. A split-flat fixture cannot be
+stored at all: its extents are full-length sparse files and git-LFS
+stores holes as bytes, measured at 22,548,578,304 bytes apparent for
+the 11-extent case against 3,473,408 for the sparse one, which is why
+<code>scripts/create-vmdk-flat-testdata.sh</code> already creates a split-flat
+image and deletes its extents. And the pin's structural oracle is
+sparse-only by design, so the <code>vmdk-multi-flat-*</code> cases record a null
+structure and that is not a gap. Remember that repository takes direct
+commits to <code>main</code>, never a merge request, and that it is git-LFS
+backed. Generate baselines with <code>--no-commit</code> and validate the derived
+profile directories rather than trusting them; they have twice been
+silently wrong while the raw baselines were fine. A fixture that
+carries <code>skip_qemu_img</code> gets no baselines at all, which is how the
+existing multi-extent fixtures came to have none. The phase also fixes
+the <code>info</code> divergences on multi-file VMDK that the operator pulled
+forward from phase 3: the two its survey found, and a third the
+80-build <code>children[]</code> sweep turned up while the phase ran.</p>
 <p><strong>3. Read side: lift the extent ceiling.</strong> Implement rotation on the
 input path and remove the 15-extent limit for multi-extent sources, and
-add <code>twoGbMaxExtentSparse</code> as a readable input. This is where rotation
+add <code>twoGbMaxExtentSparse</code> as a readable input. Read each extent's
+declared sector count rather than inferring 2 GiB from the create type:
+phase 2 measured the one real-world split-sparse image in the corpus
+declaring 3.96 GiB extents under <code>twoGbMaxExtentSparse</code>. The <code>info</code>
+divergences on multi-file VMDK -- the top-level <code>actual-size</code> reporting
+the descriptor's allocation where qemu reports the sum over the
+descriptor and every extent, <code>children[]</code> coming back in the opposite
+order, and the version gate the array bypassed -- were first deferred
+to this phase and then pulled back into phase 2 by the operator,
+together with the
+single-file substitution in <code>tests/helpers/comparators.py</code> that masked
+the first of them. So this phase inherits a VMM that already sums
+extent allocations. This is where rotation
 is designed and proved; a mistake here fails a read, not an image.
 Includes the guard at <code>src/vmm/src/main.rs:15088</code> and its siblings, and
 <code>DeviceSet::add_device</code>'s panic, which should become unreachable by
@@ -17058,11 +17115,59 @@ Status line above.</p>
   filename is opened and measured as though it held data. No writer
   produces either, so each is a rule about malformed input rather than
   a defect against anything that exists.</li>
+<li>Three VMDK fixtures, <code>vmdk-multi-extent</code>, <code>vmdk-flat-parent</code> and
+  <code>vmdk-flat-with-parent</code>, carry <code>skip_qemu_img</code> for no recoverable
+  reason. Measured with qemu-img 10.2.0, it opens all three
+  successfully (rc=0; <code>vmdk-multi-extent</code> reports 2 GiB without opening
+  its absent extents). Only <code>vmdk-twogb-flat</code> is genuinely refused
+  (rc=1, "Could not open ... vmdk-twogb-flat-f001.vmdk: No such file or
+  directory"). <code>git log -S</code> puts each flag in the commit that created
+  its fixture with no explanation, so the original reason is
+  unrecoverable, and the flag costs those three images every qemu
+  baseline they could have.</li>
+<li><code>info --ignore-quirks</code> has no test coverage anywhere in the suite; no
+  test file mentions it. This work changed its behaviour for a
+  multi-file VMDK (it now sums the extents' apparent lengths rather than
+  printing the descriptor's length on every line), and nothing would
+  have caught that being wrong.</li>
+<li><code>tests/test_convert.py</code>'s <code>_test_vhd_convert</code> asserts <code>cmp_rc == 0</code>
+  and reports any other value as "differs from qemu-img", but 4 is
+  <code>COMPARE_EXIT_READ_ERROR</code> (<code>src/vmm/src/main.rs</code>), not the exit code
+  for a content difference, and the helper discards compare's stderr. A
+  load-induced read error therefore reads as a parity failure with an
+  empty message, which has cost real debugging time.</li>
+<li>The human-format path of <code>tests/helpers/comparators.py</code> treats every
+  <code>disk size:</code> line after the first <code>Child node '</code> line as belonging to
+  a child. That is correct for one image's output and wrong for the
+  concatenated text of several, which <code>info --chain</code> human output would
+  be. No baseline comparison feeds it such text today, so this is latent
+  rather than live.</li>
+<li>The read-side device-slot ceiling still needs an issue filed before
+  phase 3 starts: a split image with more extents than <code>MAX_CHAIN_DEPTH</code>
+  (16) device slots cannot be presented to the guest as one device per
+  extent.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>Filled in as the plan runs. The read-side ceiling measured in the
-Situation needs an issue filed before phase 3 starts, so that the fix
-has something to close.</p>
+Situation still needs its issue; it is recorded under Future work above.</p>
+<ul>
+<li><a href="https://github.com/shakenfist/instar/issues/922">#922</a>, <code>info</code>
+  reports the wrong allocation and child order for a multi-file VMDK.
+  Three divergences, all on a VMDK whose descriptor resolves to
+  separate extent files, <code>monolithicFlat</code> as much as the
+  <code>twoGbMaxExtent*</code> split subformats:</li>
+<li>The top-level allocation figure was the descriptor's own block count
+    alone, where qemu-img reports the sum over the descriptor and every
+    extent; <code>vmdk-multi-flat</code> read 4096 bytes against qemu's 1576960.</li>
+<li>The human-format rendering printed the descriptor's allocation on
+    every per-extent child line, instead of that extent's own.</li>
+<li><code>children[]</code> was emitted in descriptor order and unconditionally,
+    bypassing the version gate, so <code>--qemu-version 7.2</code> produced an
+    array that no qemu build before 8.0.0 emits. qemu walks the extents
+    from last to first, keeping each index, descriptor afterwards.</li>
+</ul>
+<p>All three are fixed on the phase 2 branch, together with the test
+  helper that was masking the first one.</p>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
 <p>Before implementation begins, the implementing session restates this
 plan's mission, the resolved open questions, and the phase it is

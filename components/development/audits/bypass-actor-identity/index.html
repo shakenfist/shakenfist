@@ -3853,6 +3853,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-protect-development-main/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protect development's default branch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-release-gating/" class="md-nav__link">
         
   
@@ -16268,6 +16296,18 @@ repository's jobs -- and in a bypass of the pull-request ruleset that
 step created. Nothing about the chain changed; what changed is what sits
 at the end of it. A reviewer accepting the residual should know that is
 the reach.</p>
+<p>On <code>shakenfist/development</code> the key is read by a second job. The
+<code>push-docs</code> job of <code>consistency-audit.yml</code> mints a token from it to
+land the regenerated <code>docs/audits/compliance.md</code> on <code>main</code>, because a
+ruleset requiring a pull request on <code>main</code> refuses a push with
+<code>GITHUB_TOKEN</code>, and the review-marks App is the one automation identity
+such a ruleset admits as a bypass. Opening a weekly pull request for
+the page was rejected, since the page would
+stay stale until someone merged it, and so was moving the page off
+<code>main</code>, which would break every link to <code>compliance.md</code>. What bounds
+this second use is the same thing that bounds the first: the
+<code>review-marks</code> environment's policy admits <code>main</code> alone, so only a
+run of <code>main</code> can read the key.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- this is a one-time ruleset and environment configuration
 change.</p>
