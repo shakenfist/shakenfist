@@ -11,6 +11,10 @@ from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import StateWriteFailed
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
+from shakenfist.operations.baseoperation import DEPENDENCY_FAILED_STATES
+from shakenfist.operations.baseoperation import DEPENDENCY_PENDING_STATES
+from shakenfist.schema.operations.baseclusteroperation import \
+    TERMINAL_OPERATION_STATES
 from shakenfist.util import concurrency as util_concurrency
 
 
@@ -144,20 +148,23 @@ class Job(util_concurrency.Job):
         for dep in op.depends_on:
             dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
             if not dep_op:
+                # None here is an absent dependency and nothing else. A
+                # read which failed raises DatabaseUnavailable out of
+                # from_db() rather than answering None (issue 3373), and
+                # execute() above leaves the work item claimed for the
+                # stuck-row reaper when it does -- so a database blip no
+                # longer cancels every dependent whose edge it happened
+                # to interrupt, irreversibly, for a dependency which was
+                # alive (issue 4910).
                 op.cancel_for_missing_dependency(dep)
                 return
 
             dep_op_state = dep_op.state.value
-            if dep_op_state in [BaseClusterOperation.STATE_ERROR,
-                                BaseClusterOperation.STATE_DELETED,
-                                BaseClusterOperation.STATE_ABORT]:
+            if dep_op_state in DEPENDENCY_FAILED_STATES:
                 op.abort_for_unsuitable_dependency(dep_op)
                 return
 
-            if dep_op_state in [BaseClusterOperation.STATE_INITIAL,
-                                BaseClusterOperation.STATE_QUEUED,
-                                BaseClusterOperation.STATE_PREFLIGHT,
-                                BaseClusterOperation.STATE_EXECUTING]:
+            if dep_op_state in DEPENDENCY_PENDING_STATES:
                 # A dependency which never goes terminal must not park us
                 # forever (issue 3992) -- give up loudly once the defer
                 # budget is exhausted.
@@ -170,11 +177,30 @@ class Job(util_concurrency.Job):
                          delay=dependency_defer_delay(op.current_defer_count))
                 return
 
+            if dep_op_state != BaseClusterOperation.STATE_COMPLETE:
+                # Named, rather than reached by falling off the end of
+                # this loop body. The two tuples above do enumerate the
+                # whole of BaseClusterOperation's vocabulary, and a
+                # derived test holds them to it, but falling through
+                # would let a state added later satisfy a fate-sharing
+                # edge silently -- the one direction this edge must
+                # never fail in. An unknown state waits instead,
+                # bounded by the same defer budget as a pending one
+                # (issue 4910).
+                if op.current_defer_count >= DEPENDENCY_DEFER_BUDGET:
+                    op.abandon_dependency_wait(dep_op)
+                    return
+
+                op.defer(waiting_on=[dep_op],
+                         delay=dependency_defer_delay(op.current_defer_count))
+                return
+
         # Ensure that we are running after any runs_after requirements.
         for dep in op.runs_after:
             dep_op = get_object_class(dep['op_type']).from_db(
                 dep['op_uuid'], suppress_failure_audit=True)
             if not dep_op:
+                # Absent, not unreadable: see the depends_on walk above.
                 # Not fatal because otherwise a missing cluster operation
                 # could cause the entire cluster to stop being able to manage
                 # a given object.
@@ -188,10 +214,7 @@ class Job(util_concurrency.Job):
                 continue
 
             dep_op_state = dep_op.state.value
-            if dep_op_state in [BaseClusterOperation.STATE_INITIAL,
-                                BaseClusterOperation.STATE_QUEUED,
-                                BaseClusterOperation.STATE_PREFLIGHT,
-                                BaseClusterOperation.STATE_EXECUTING]:
+            if dep_op_state in DEPENDENCY_PENDING_STATES:
                 # runs_after is an ordering hint, and a missing dependency
                 # already warns and continues rather than making the object
                 # unmanageable -- treat an exhausted defer budget the same
@@ -209,6 +232,29 @@ class Job(util_concurrency.Job):
                     continue
 
                 # Dependency not yet ready, we should defer
+                op.defer(waiting_on=[dep_op],
+                         delay=dependency_defer_delay(op.current_defer_count))
+                return
+
+            if dep_op_state not in TERMINAL_OPERATION_STATES:
+                # The depends_on walk's guard, for the same reason: this
+                # edge says "not before", so a state which cannot be
+                # shown to have finished has not earned a dispatch.
+                # Warned past once the budget is spent, as everything
+                # else in this walk is (issue 4910).
+                if op.current_defer_count >= DEPENDENCY_DEFER_BUDGET:
+                    op.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'warning, gave up waiting for an unknown '
+                        'runs_after dependency state',
+                        extra={
+                            'dep_object_type': dep_op.object_type,
+                            'dep_object_uuid': str(dep_op.uuid),
+                            'dep_object_state': dep_op_state,
+                            'defer_count': op.current_defer_count
+                        })
+                    continue
+
                 op.defer(waiting_on=[dep_op],
                          delay=dependency_defer_delay(op.current_defer_count))
                 return

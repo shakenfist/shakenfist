@@ -10,6 +10,8 @@ from shakenfist import mariadb
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import CannotDeferUnqueued
 from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
+from shakenfist.operations.baseoperation import DEPENDENCY_FAILED_STATES
+from shakenfist.operations.baseoperation import DEPENDENCY_PENDING_STATES
 from shakenfist.operations.net_op import NetOp
 from shakenfist.operations.node_inst_netdesc_op import NodeInstNetdescOp
 from shakenfist.schema.object_state import State
@@ -64,6 +66,57 @@ def _make_net_op_static_values(tasks, node_uuid=None):
         'tasks': tasks,
         'version': net_op_schema.current_version,
     }
+
+
+class DependencyStateClassificationTestCase(base.ShakenFistTestCase):
+    """Every state a cluster operation can hold must be classified.
+
+    Both dispatchers walk depends_on and runs_after against
+    DEPENDENCY_FAILED_STATES, DEPENDENCY_PENDING_STATES and
+    STATE_COMPLETE. The walks name the satisfied arm rather than
+    falling through to it, so an unclassified state is held rather
+    than treated as finished -- but a state added to the vocabulary and
+    not classified here would then hold every dependent on it until the
+    defer budget aborted them, which is a test failure's worth of
+    warning (issue 4910).
+    """
+
+    def test_every_cluster_operation_state_is_classified(self):
+        classified = (set(DEPENDENCY_FAILED_STATES)
+                      | set(DEPENDENCY_PENDING_STATES)
+                      | {BaseClusterOperation.STATE_COMPLETE})
+        vocabulary = {state for state in BaseClusterOperation.state_targets
+                      if state is not None}
+
+        self.assertEqual(
+            set(), vocabulary - classified,
+            'a state no arm of the dependency walk classifies')
+
+    def test_no_state_is_classified_twice(self):
+        self.assertEqual(
+            len(DEPENDENCY_FAILED_STATES) + len(DEPENDENCY_PENDING_STATES) + 1,
+            len(set(DEPENDENCY_FAILED_STATES)
+                | set(DEPENDENCY_PENDING_STATES)
+                | {BaseClusterOperation.STATE_COMPLETE}),
+            'a state is classified twice, so which arm handles it '
+            'depends on the order the walk tests them in')
+
+    def test_only_the_unreachable_base_states_are_spare(self):
+        # initial and preflight are classified as pending although
+        # state_targets reaches neither, because they are base-object
+        # states a row could physically carry and waiting is the right
+        # answer for both. Anything else spare is a classification of a
+        # state no operation can hold, which is dead code.
+        classified = (set(DEPENDENCY_FAILED_STATES)
+                      | set(DEPENDENCY_PENDING_STATES)
+                      | {BaseClusterOperation.STATE_COMPLETE})
+        vocabulary = {state for state in BaseClusterOperation.state_targets
+                      if state is not None}
+
+        self.assertEqual(
+            {BaseClusterOperation.STATE_INITIAL,
+             BaseClusterOperation.STATE_PREFLIGHT},
+            classified - vocabulary)
 
 
 class DeferWithBackoffTestCase(base.ShakenFistTestCase):

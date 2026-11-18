@@ -58,7 +58,22 @@ seconds. The defer cycle is:
    (`cancel_for_missing_dependency()`); if it is in `error`, `deleted`, or
    `abort` the op goes to `abort` (`abort_for_unsuitable_dependency()`).
    In both cases, as for an abandoned wait, the op's map entry is dropped.
-5. When all dependencies are satisfied the op executes normally and its map
+   "No longer exists" means exactly that: `from_db()` answers `None` only
+   for an absent object, and raises `DatabaseUnavailable` for a read which
+   did not happen (issue 3373), which leaves the work item claimed for the
+   stuck-row reaper rather than cancelling the dependent for a dependency
+   which is alive.
+5. A dependency in any other state -- one added to the vocabulary after
+   this walk was written -- is *held*, bounded by the same defer budget,
+   rather than treated as finished. `complete` is the only state which
+   satisfies a `depends_on` edge and the walk names it, because falling
+   through to satisfied is the one direction a fate-sharing edge must never
+   fail in. Both dispatchers classify against `DEPENDENCY_FAILED_STATES`
+   and `DEPENDENCY_PENDING_STATES` in
+   `shakenfist/operations/baseoperation.py`, and a derived test holds those
+   two tuples to `BaseClusterOperation.state_targets`, so a state added
+   later fails a test rather than silently permitting a dispatch.
+6. When all dependencies are satisfied the op executes normally and its map
    entry is dropped.
 
 Each of the three ways a dependency ends an op in steps 3 and 4 also calls the
