@@ -32,6 +32,7 @@ from unittest import mock
 
 from shakenfist_utilities import api as sf_api
 
+from shakenfist import exceptions
 from shakenfist.external_api import util as api_util
 from shakenfist.instance import Instance
 from shakenfist.network.interface import NetworkInterface
@@ -200,13 +201,14 @@ class HotplugDeviceIndexTestCase(SweepFixtureTestCase):
         Every refusal arm in _netdesc_allocate_address() cleans up what
         it reserved. NetworkInterface.new() running out of attempts --
         more overlapping plugs than its budget covers, or a caller's MAC
-        already in use -- was the one which let a RuntimeError escape as
-        a 500 with the address still reserved and nothing left to ever
+        already in use -- was the one which let an exception escape as a
+        500 with the address still reserved and nothing left to ever
         release it.
         """
         with mock.patch.object(
                 NetworkInterface, 'new',
-                side_effect=RuntimeError('every attempt collided')):
+                side_effect=exceptions.NetworkInterfaceCollision(
+                    'every attempt collided')):
             response = self._hotplug({'network_uuid': str(self.hotnet.uuid),
                                       'address': '10.20.31.60'})
 
@@ -221,3 +223,84 @@ class HotplugDeviceIndexTestCase(SweepFixtureTestCase):
                                'address': '10.20.31.60'})
         self.assertEqual(200, retry.status_code,
                          retry.get_data(as_text=True))
+
+    def test_a_refused_plug_with_no_address_releases_nothing(self):
+        # address 'none' reserves nothing, so there is nothing to give
+        # back -- and asking IPAM to release None is not a no-op.
+        with mock.patch.object(
+                NetworkInterface, 'new',
+                side_effect=exceptions.NetworkInterfaceCollision(
+                    'every attempt collided')), \
+             mock.patch('shakenfist.ipam.IPAM.release') as release:
+            response = self._hotplug({'network_uuid': str(self.hotnet.uuid),
+                                      'address': 'none'})
+
+        self.assertEqual(409, response.status_code,
+                         response.get_data(as_text=True))
+        release.assert_not_called()
+
+    def test_an_outage_answers_503_and_keeps_the_address(self):
+        """A database outage is not a collision, and proves nothing.
+
+        It used to read as a collision: ten retries, then a 409 naming a
+        MAC or index race. It is retryable, so a 503. And whether the
+        row was written is unknown, so the address must stay reserved:
+        released under a committed row it would go to a second guest.
+        """
+        with mock.patch.object(
+                NetworkInterface, 'new',
+                side_effect=exceptions.DatabaseUnavailable('away')), \
+             mock.patch('shakenfist.ipam.IPAM.release') as release:
+            response = self._hotplug({'network_uuid': str(self.hotnet.uuid),
+                                      'address': '10.20.31.61'})
+
+        self.assertEqual(503, response.status_code,
+                         response.get_data(as_text=True))
+        self.assertIn('Retry-After', response.headers)
+        release.assert_not_called()
+        self.assertEqual(
+            'created', self.instance.state.value,
+            'a hot plug refused by an outage must not change the state '
+            'of its pre-existing target instance')
+
+    def _create_instance(self, new_side_effect):
+        created = []
+        real_new = Instance.new
+
+        def spy_new(*args, **kwargs):
+            inst = real_new(*args, **kwargs)
+            created.append(inst)
+            return inst
+
+        with mock.patch.object(Instance, 'new', side_effect=spy_new), \
+             mock.patch.object(NetworkInterface, 'new',
+                               side_effect=new_side_effect):
+            response = self.client.post(
+                '/instances', headers={'Authorization': self.token},
+                content_type='application/json',
+                data=json.dumps({
+                    'name': 'refusedcreate', 'cpus': 1, 'memory': 1024,
+                    'disk': [{'size': 8}],
+                    'network': [{'network_uuid': str(self.hotnet.uuid)}]}))
+        self.assertEqual(1, len(created))
+        return response, created[0]
+
+    def test_a_refused_create_deletes_the_new_instance(self):
+        # The create arm of the same handler. Its instance is this
+        # request's own half-built one, so unlike a hot plug's target it
+        # is error-deleted.
+        response, inst = self._create_instance(
+            exceptions.NetworkInterfaceCollision('every attempt collided'))
+
+        self.assertEqual(409, response.status_code,
+                         response.get_data(as_text=True))
+        self.assertIn(inst.state.value, Instance.TERMINAL_STATES)
+
+    def test_an_outage_on_create_answers_503_and_deletes_the_instance(self):
+        response, inst = self._create_instance(
+            exceptions.DatabaseUnavailable('away'))
+
+        self.assertEqual(503, response.status_code,
+                         response.get_data(as_text=True))
+        self.assertIn(str(inst.uuid), response.get_data(as_text=True))
+        self.assertIn(inst.state.value, Instance.TERMINAL_STATES)

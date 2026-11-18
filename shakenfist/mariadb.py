@@ -17895,7 +17895,12 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
                         f'ADD CONSTRAINT {constraint_name} '
                         'UNIQUE (instance_uuid, `order`, active)'))
                     conn.commit()
-                except (IntegrityError, OperationalError) as e:
+                except SQLAlchemyError as e:
+                    # Rolled back before the probe below reuses the
+                    # connection: after a disconnect-flavoured error the
+                    # transaction is dead, and the probe would otherwise
+                    # raise PendingRollbackError rather than answer.
+                    conn.rollback()
                     LOG.warning(
                         f'{constraint_name} could not be added to '
                         f'{table_name}: {e}')
@@ -17935,7 +17940,11 @@ def _table_has_constraint(
 
     A probe which itself fails reads as absent: the caller then tries to
     add the constraint, and does not record a schema version which
-    claims it.
+    claims it. Any SQLAlchemy error counts, not only OperationalError:
+    a probe on a connection whose transaction died raises
+    PendingRollbackError, and that must read as absent too rather than
+    abort the whole schema ensure. The connection is rolled back so the
+    caller can keep using it.
     """
     try:
         return conn.execute(
@@ -17947,10 +17956,14 @@ def _table_has_constraint(
                 'AND CONSTRAINT_NAME = :constraint_name'),
             {'table_name': table_name,
              'constraint_name': constraint_name}).first() is not None
-    except OperationalError as e:
+    except SQLAlchemyError as e:
         LOG.debug(
             f'Could not probe {table_name} for {constraint_name}, '
             f'assuming it is absent: {e}')
+        try:
+            conn.rollback()
+        except SQLAlchemyError:
+            pass
         return False
 
 
@@ -18060,8 +18073,14 @@ def _direct_create_network_interface(data: NetworkInterfaceData) -> bool:
         data: The NetworkInterfaceData to insert.
 
     Returns:
-        True if the record was created, False if it already exists or
-        error.
+        True if the record was created, False if a UNIQUE constraint
+        refused it.
+
+    Raises:
+        DatabaseUnavailable: the insert failed for any other reason. A
+            database outage must not read as a collision: the caller
+            retries a collision with a fresh device index, and reports
+            an exhausted budget as a 409 which names the wrong cause.
     """
     engine = _get_engine()
     table = _get_network_interfaces_table()
@@ -18089,11 +18108,13 @@ def _direct_create_network_interface(data: NetworkInterfaceData) -> bool:
             return True
     except IntegrityError:
         return False
-    except OperationalError as e:
+    except SQLAlchemyError as e:
         LOG.warning(
             f'MariaDB create failed for network_interface '
             f'{data.uuid}: {e}')
-        return False
+        raise exceptions.DatabaseUnavailable(
+            f'network interface {data.uuid} could not be created: {e}'
+        ) from e
 
 
 def _direct_get_network_interface(
@@ -18486,10 +18507,16 @@ def _grpc_create_network_interface(
         reply = _grpc_call(stub.CreateNetworkInterface, request)
         return bool(reply.success)
     except grpc.RpcError as e:
+        # Only success=False on an OK status means a UNIQUE constraint
+        # refused the row. Any failed call -- including the INTERNAL the
+        # servicer answers for an unexpected error -- says nothing about
+        # a collision, so it must not be returned as one.
         LOG.error(
             f'gRPC CreateNetworkInterface failed for '
             f'{data.uuid}: {e}')
-        return False
+        raise exceptions.DatabaseUnavailable(
+            f'network interface {data.uuid} could not be created: {e}'
+        ) from e
 
 
 def _grpc_get_network_interface(
@@ -18780,7 +18807,11 @@ def create_network_interface(data: NetworkInterfaceData) -> bool:
         data: The NetworkInterfaceData to insert.
 
     Returns:
-        True if created, False if already exists or error.
+        True if created, False if a UNIQUE constraint refused it.
+
+    Raises:
+        DatabaseUnavailable: the database could not be asked, or failed
+            for some other reason. Nothing is known about the row then.
     """
     if _use_database_service():
         return _grpc_create_network_interface(data)

@@ -585,12 +585,15 @@ def _netdesc_allocate_address(inst, netdesc, order, hot_plug=False):
     }).with_fields(netdesc).info('Interface allocated')
     try:
         ni = NetworkInterface.new(iface_uuid, netdesc, inst.uuid, order)
-    except RuntimeError as e:
+    except exceptions.NetworkInterfaceCollision as e:
         # Every attempt lost a UNIQUE constraint: a caller-supplied MAC
         # already in use, or more overlapping plugs racing for this
         # instance's next device index than the retry budget covers. No
         # interface row exists to release the address on its delete, so
-        # release it here, on either path.
+        # release it here, on either path. Keyed to this exception
+        # rather than to anything new() might raise, because only a
+        # refused insert proves there is no row still holding the
+        # address; releasing one a row holds hands it to a second guest.
         if netdesc.get('address'):
             n.ipam.release(netdesc['address'],
                            expected_type=ReservationType.INSTANCE)
@@ -602,6 +605,31 @@ def _netdesc_allocate_address(inst, netdesc, order, hot_plug=False):
                  'address is in use or too many concurrent requests '
                  'competed for its device index: %s' % e,
             suppress_traceback=True)
+    except exceptions.DatabaseUnavailable as e:
+        # Not a collision, and worth retrying, so not a 409. Whether the
+        # row was written is unknown -- a lost reply looks the same as a
+        # refused write -- so the address is deliberately not released:
+        # a reservation left behind is a leak, but one released under a
+        # committed row is a duplicate guest address. The create path's
+        # cleanup is itself a database write, so as with a failed
+        # placement write it is best-effort on the outage that got us
+        # here, and the response names the instance so the caller can
+        # delete it once the database returns.
+        if not hot_plug:
+            try:
+                inst.enqueue_delete_due_error(
+                    'failed to create network interface: %s' % e)
+            except exceptions.DatabaseException as cleanup_error:
+                LOG.with_fields({'instance': inst.uuid}).error(
+                    'Could not clean up instance after failed network '
+                    f'interface create: {cleanup_error}')
+        resp = sf_api.error(
+            503, f'network interface for instance {inst.uuid} could not be '
+                 f'created, the database could not be reached: {e}',
+            suppress_traceback=True)
+        resp.headers['Retry-After'] = str(
+            api_base.TRANSIENT_RETRY_AFTER_SECONDS)
+        return None, resp
 
     try:
         # Not a bare truthiness test on the raw body. The netdesc
@@ -767,10 +795,10 @@ class InstancesEndpoint(api_base.Resource):
                 'configuration.', None),
             (404, 'Namespace, network, node, blob, snapshot, or label not found.', None),
             (406, 'Network not ready.', None),
-            (409, 'Network address in use, or no node satisfies a hard '
-                'affinity constraint.', None),
-            (503, 'The database could not be reached while recording the '
-                'placement. The half-built instance is torn down (the error '
+            (409, 'Network address or MAC address in use, or no node '
+                'satisfies a hard affinity constraint.', None),
+            (503, 'The database could not be reached while recording a '
+                'network interface or the placement. The half-built instance is torn down (the error '
                 'body names its uuid) and the request can be retried; the '
                 'response carries a `Retry-After` header.', None),
             (507, 'Unable to allocate resources for the instance. A refusal '
@@ -1552,7 +1580,11 @@ class InstanceInterfacesEndpoint(api_base.Resource):
             (400, 'Network description invalid.', None),
             (404, 'Instance or network not found.', None),
             (406, 'Instance or network not ready.', None),
-            (409, 'Address in use.', None)
+            (409, 'Address or MAC address in use, or too many concurrent '
+                  'plugs competed for a device index.', None),
+            (503, 'The database could not be reached while recording the '
+                  'interface. The request can be retried; the response '
+                  'carries a `Retry-After` header.', None)
         ]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership

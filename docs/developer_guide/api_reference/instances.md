@@ -258,6 +258,16 @@ As of Shaken Fist v0.8, it is also possible to add network interfaces to an
 existing instance, assuming that your guest operating system supports device hot
 plugging (all modern Linux versions do).
 
+The new interface is given the next free device index on the instance, chosen
+by the server under a database constraint, so overlapping hot plugs on one
+instance each get their own index. A hot plug answers 409 when the requested
+address is in use, when a requested MAC address is already in use on that
+network, or in the unlikely case that more concurrent hot plugs competed for
+the instance's next device index than the server retries. It answers 503 with
+a `Retry-After` header when the database could not be reached while recording
+the interface; that is worth retrying, and a 409 for a requested address or
+MAC address is not.
+
 ???+ tip "REST API calls"
 
     * [POST /instances/{instance_ref}/interfaces](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__interfaces)

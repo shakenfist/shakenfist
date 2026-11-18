@@ -488,6 +488,17 @@ class NetworkInterfaceAlreadyFloating(NetworkInterfaceException):
     ...
 
 
+class NetworkInterfaceCollision(NetworkInterfaceException):
+    """The interface row was refused by a UNIQUE constraint: its MAC on
+    that network, or its device index on that instance, is already held
+    by a live interface. Raised only when the insert was refused, so a
+    caller catching it knows no row exists for the interface -- which
+    is what makes it safe to release the address reserved for it. A
+    database which could not be reached raises DatabaseUnavailable
+    instead, where nothing is known about the row."""
+    ...
+
+
 # Artifacts
 class ArtifactException(Exception):
     ...

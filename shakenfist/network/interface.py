@@ -62,10 +62,15 @@ class NetworkInterface(dbo):
 
     @classmethod
     def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
-        """Create a NetworkInterface record in both etcd and MariaDB."""
-        # Write to etcd (base class behavior)
-        super()._db_create(object_uuid, metadata)
+        """Create a NetworkInterface record in MariaDB.
 
+        Raises NetworkInterfaceCollision when a UNIQUE constraint refuses
+        the row, and lets DatabaseUnavailable through when the database
+        could not be asked. The base class's audit event is written only
+        once the row exists: new() retries a refused insert, and each
+        refusal used to leave a 'db record created' event behind for an
+        interface which never was.
+        """
         # Also write static values to MariaDB. Ensure UUIDs are uuid.UUID
         # objects as required by SQLAlchemy's native UUID type. Values may
         # already be UUID objects (e.g. from baseobject.uuid property).
@@ -88,7 +93,12 @@ class NetworkInterface(dbo):
             version=metadata['version']
         )
         if not mariadb.create_network_interface(data):
-            raise RuntimeError(f'Failed to create network interface {object_uuid} in MariaDB')
+            raise exceptions.NetworkInterfaceCollision(
+                f'Network interface {object_uuid} was refused by a UNIQUE '
+                f'constraint: MAC {metadata["macaddr"]} or device index '
+                f'{metadata["order"]} is already in use')
+
+        super()._db_create(object_uuid, metadata)
 
     @staticmethod
     def _static_values_to_dict(data):
@@ -200,11 +210,19 @@ class NetworkInterface(dbo):
         auto_order = order is None
 
         # Only auto-generated MACs are retried on collision. A caller-
-        # supplied MAC is attempted exactly once and the RuntimeError
-        # from the UNIQUE constraint is left to propagate -- unless the
-        # order is ours to choose, in which case the insert may have
-        # lost on the order rather than on the MAC, and is worth another
-        # attempt with the requested MAC untouched.
+        # supplied MAC is attempted exactly once and the
+        # NetworkInterfaceCollision from the UNIQUE constraint is left to
+        # propagate -- unless the order is ours to choose, in which case
+        # the insert may have lost on the order rather than on the MAC,
+        # and is worth another attempt with the requested MAC untouched.
+        # Which constraint refused the row is not asked: over gRPC it
+        # could only be read out of the driver's error text, and the
+        # cost of not knowing is a few fast failed inserts on a request
+        # which was going to be refused anyway.
+        #
+        # DatabaseUnavailable is not caught. A database which cannot be
+        # reached is not a collision, and retrying it here would only
+        # spend the budget before reporting the wrong cause.
         max_attempts = 10 if (auto_order or not caller_supplied_mac) else 1
         for attempt in range(max_attempts):
             if auto_order:
@@ -224,7 +242,7 @@ class NetworkInterface(dbo):
                     }
                 )
                 break
-            except RuntimeError:
+            except exceptions.NetworkInterfaceCollision:
                 if attempt >= max_attempts - 1:
                     raise
                 if not caller_supplied_mac:

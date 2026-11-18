@@ -26,6 +26,7 @@ from unittest import mock
 import sqlalchemy as sa
 from sqlalchemy.exc import DataError
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import PendingRollbackError
 
 from shakenfist import mariadb
 from shakenfist.tests import base
@@ -54,17 +55,29 @@ class _MockRow:
 
 
 class _MockConnection:
-    """Connection stub recording every statement, parameter set and commit."""
+    """Connection stub recording every statement, parameter set and commit.
 
-    def __init__(self, results):
+    With ``poison_on_error`` it also models the one piece of transaction
+    state the schema steps depend on: after a statement fails with a
+    disconnect, SQLAlchemy refuses every further statement on that
+    connection with PendingRollbackError until it is rolled back.
+    """
+
+    def __init__(self, results, poison_on_error=False):
         self._results = list(results)
+        self._poison_on_error = poison_on_error
+        self._poisoned = False
         self.calls = []
         self.commits = 0
 
     def execute(self, stmt, params=None):
+        if self._poisoned:
+            raise PendingRollbackError(
+                'Can\'t reconnect until invalid transaction is rolled back')
         self.calls.append((str(stmt), params))
         result = self._results.pop(0)
         if isinstance(result, Exception):
+            self._poisoned = self._poison_on_error
             raise result
         return result
 
@@ -72,6 +85,7 @@ class _MockConnection:
         self.commits += 1
 
     def rollback(self):
+        self._poisoned = False
         self.rollbacks = getattr(self, 'rollbacks', 0) + 1
 
     def __enter__(self):
@@ -555,6 +569,59 @@ class NetworkInterfacesBackfillIsBatchedTestCase(base.ShakenFistTestCase):
         self.assertEqual(3, result['end_version'])
         self.assertFalse(result['migrated'])
         mock_set_version.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=3)
+    def test_a_disconnected_alter_is_rolled_back_before_the_probe(
+            self, mock_get_version, mock_set_version):
+        """The closing probe must actually ask, not fail on a dead transaction.
+
+        A lost lock wait on a serving cluster can come back as a
+        disconnect, after which SQLAlchemy refuses the next statement on
+        the connection with PendingRollbackError. Unrolled-back, that
+        escaped the probe and took the whole ensure_schema() run down
+        with a traceback -- the opposite of staying at version 3.
+        """
+        conn = _MockConnection([
+            _MockResult(),                    # probe: absent
+            _MockResult(),                    # repair: no collisions
+            OperationalError('ALTER', {}, Exception('server has gone away')),
+            _MockResult(),                    # probe: still absent
+        ], poison_on_error=True)
+        engine = _MockEngine(conn)
+
+        result = mariadb._ensure_network_interfaces_schema(engine)
+
+        self.assertEqual(3, result['end_version'])
+        mock_set_version.assert_not_called()
+        self.assertEqual(
+            [], conn._results,
+            'the closing probe never reached the database, so its answer '
+            'was a guess rather than a read')
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=3)
+    def test_any_failed_probe_reads_as_absent(
+            self, mock_get_version, mock_set_version):
+        """A probe failing with anything SQLAlchemy raises reads as absent.
+
+        Not only OperationalError: PendingRollbackError is what a dead
+        transaction answers, and it must not escape the step either.
+        """
+        conn = _MockConnection([
+            PendingRollbackError('invalid transaction'),  # probe fails
+            _MockResult(),                    # repair: no collisions
+            _MockResult(),                    # ALTER
+            _MockResult(first=('whatever',)),  # probe: now present
+        ])
+        engine = _MockEngine(conn)
+
+        result = mariadb._ensure_network_interfaces_schema(engine)
+
+        self.assertIn(
+            'ADD CONSTRAINT uq_network_interfaces_instance_order_active',
+            ' '.join(sql for sql, _ in conn.calls))
+        self.assertEqual(4, result['end_version'])
 
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=3)

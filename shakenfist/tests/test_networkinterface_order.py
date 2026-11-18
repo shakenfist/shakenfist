@@ -25,10 +25,16 @@ which is the only place real overlapping requests exist.
 import uuid
 from unittest import mock
 
+import grpc
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import OperationalError
 
+from shakenfist.daemons.database import main as daemons_database_main
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.network.interface import NetworkInterface
+from shakenfist.protos import database_pb2
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
@@ -233,8 +239,8 @@ class NewRetriesOnOrderCollisionTestCase(base.ShakenFistTestCase):
             self.attempts.append(
                 (metadata['order'], metadata['macaddr']))
             if len(self.attempts) <= fail_attempts:
-                raise RuntimeError(
-                    'Failed to create network interface in MariaDB')
+                raise exceptions.NetworkInterfaceCollision(
+                    'refused by a UNIQUE constraint')
         return _fake
 
     def _run_new(self, fail_attempts=1, order=None, next_orders=(1, 2, 3)):
@@ -295,14 +301,139 @@ class NewRetriesOnOrderCollisionTestCase(base.ShakenFistTestCase):
         # With a caller MAC as well there is nothing left to retry, and
         # the failure propagates on the first attempt as it always has.
         self.netdesc['macaddress'] = '02:00:00:19:e4:b4'
-        self.assertRaises(RuntimeError, self._run_new,
+        self.assertRaises(exceptions.NetworkInterfaceCollision, self._run_new,
                           fail_attempts=1, order=2)
         self.assertEqual([(2, '02:00:00:19:e4:b4')], self.attempts)
 
     def test_an_exhausted_retry_budget_still_raises(self):
-        self.assertRaises(RuntimeError, self._run_new, fail_attempts=10,
-                          next_orders=range(1, 12))
+        self.assertRaises(exceptions.NetworkInterfaceCollision, self._run_new,
+                          fail_attempts=10, next_orders=range(1, 12))
         self.assertEqual(10, len(self.attempts))
+
+    def test_an_outage_is_not_retried_as_a_collision(self):
+        # A database which cannot be reached is not a lost race. Retrying
+        # it would spend the budget and then report a 409 naming the
+        # wrong cause, so it leaves on the first attempt.
+        def _fake(interface_uuid, metadata):
+            self.attempts.append((metadata['order'], metadata['macaddr']))
+            raise exceptions.DatabaseUnavailable('database is away')
+
+        with mock.patch.object(NetworkInterface, '_db_create',
+                               side_effect=_fake), \
+             mock.patch.object(NetworkInterface, 'next_order',
+                               return_value=1):
+            self.assertRaises(
+                exceptions.DatabaseUnavailable, NetworkInterface.new,
+                str(uuid.uuid4()), self.netdesc, str(uuid.uuid4()))
+        self.assertEqual(1, len(self.attempts))
+
+
+class CreateFailureIsNotACollisionTestCase(base.ShakenFistTestCase):
+    """Only a refused insert may read as a collision, on either path.
+
+    new() retries a collision with a fresh index, and the API answers an
+    exhausted budget with a 409 and releases the reserved address. Both
+    are wrong for a database which could not be asked: the row may even
+    exist. So the direct insert, the gRPC client, the servicer between
+    them and NetworkInterface._db_create each keep the two apart.
+    """
+
+    def _data(self):
+        return _ni(uuid.uuid4(), 0, '02:00:00:00:00:01', uuid.uuid4())
+
+    def test_direct_operational_error_raises(self):
+        engine = mock.MagicMock()
+        conn = engine.connect.return_value.__enter__.return_value
+        conn.execute.side_effect = OperationalError(
+            'INSERT', {}, Exception('lost connection'))
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=engine):
+            self.assertRaises(exceptions.DatabaseUnavailable,
+                              mariadb._direct_create_network_interface,
+                              self._data())
+
+    def test_direct_integrity_error_is_a_refusal(self):
+        # The negative control for the test above.
+        engine = mock.MagicMock()
+        conn = engine.connect.return_value.__enter__.return_value
+        conn.execute.side_effect = IntegrityError(
+            'INSERT', {}, Exception('Duplicate entry'))
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=engine):
+            self.assertFalse(
+                mariadb._direct_create_network_interface(self._data()))
+
+    def test_grpc_failure_raises(self):
+        with mock.patch('shakenfist.mariadb._get_database_stub'), \
+             mock.patch('shakenfist.mariadb._grpc_call',
+                        side_effect=grpc.RpcError()):
+            self.assertRaises(exceptions.DatabaseUnavailable,
+                              mariadb._grpc_create_network_interface,
+                              self._data())
+
+    def _servicer_create(self, **direct):
+        servicer = daemons_database_main.DatabaseService(mock.MagicMock())
+        request = database_pb2.CreateNetworkInterfaceRequest(
+            network_interface=database_pb2.NetworkInterfaceStaticData(
+                uuid=str(uuid.uuid4()), network_uuid=str(uuid.uuid4()),
+                instance_uuid=str(uuid.uuid4()),
+                macaddr='02:00:00:00:00:01', order=0, model='virtio',
+                version=NetworkInterface.current_version))
+        context = mock.MagicMock()
+        with mock.patch(
+                'shakenfist.mariadb._direct_create_network_interface',
+                **direct):
+            reply = servicer.CreateNetworkInterface(request, context)
+        return reply, context
+
+    def test_servicer_answers_an_outage_with_unavailable(self):
+        # UNAVAILABLE so _grpc_call retries it, then raises
+        # DatabaseUnavailable rather than returning success=False.
+        reply, context = self._servicer_create(
+            side_effect=exceptions.DatabaseUnavailable('away'))
+        context.set_code.assert_called_once_with(
+            grpc.StatusCode.UNAVAILABLE)
+        self.assertFalse(reply.success)
+
+    def test_servicer_answers_a_bug_with_internal(self):
+        reply, context = self._servicer_create(
+            side_effect=ValueError('boom'))
+        context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
+        self.assertFalse(reply.success)
+
+    def test_servicer_answers_a_refusal_with_ok(self):
+        # success=False on an OK status is the one shape which means a
+        # collision.
+        reply, context = self._servicer_create(return_value=False)
+        context.set_code.assert_not_called()
+        self.assertFalse(reply.success)
+
+    def _db_create(self, created, add_event):
+        with mock.patch('shakenfist.mariadb.create_network_interface',
+                        return_value=created), \
+             mock.patch('shakenfist.baseobject.eventlog.add_event',
+                        add_event):
+            NetworkInterface._db_create(str(uuid.uuid4()), {
+                'network_uuid': str(uuid.uuid4()),
+                'instance_uuid': str(uuid.uuid4()),
+                'macaddr': '02:00:00:00:00:01', 'ipv4': None,
+                'order': 0, 'model': 'virtio',
+                'version': NetworkInterface.current_version})
+
+    def test_a_refused_insert_raises_a_collision_and_audits_nothing(self):
+        # new() retries refusals, and each one used to leave a 'db record
+        # created' audit event for an interface which never existed.
+        add_event = mock.MagicMock()
+        self.assertRaises(exceptions.NetworkInterfaceCollision,
+                          self._db_create, False, add_event)
+        add_event.assert_not_called()
+
+    def test_a_created_row_is_audited(self):
+        # The negative control for the test above.
+        add_event = mock.MagicMock()
+        self._db_create(True, add_event)
+        self.assertEqual(['db record created'],
+                         [c.args[3] for c in add_event.call_args_list])
 
 
 class RepairDuplicateInterfaceOrdersTestCase(dbfixture.MariaDBTableFixture,
