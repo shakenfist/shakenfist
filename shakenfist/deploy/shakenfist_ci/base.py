@@ -1675,7 +1675,17 @@ class BaseTestCase(testtools.TestCase):
     # is why this loop grew a terminal state check: before it, an
     # operation which was never going to complete simply never
     # completed, and there was no state to notice.
-    AGENT_OPERATION_FAILED_STATES = ('error', 'expired', 'deleted')
+    #
+    # This is the suite's copy of the server's
+    # AgentOperation.TERMINAL_STATES (shakenfist/operations/agentoperation.py)
+    # minus complete. There are three copies of that list in the
+    # ecosystem, so whoever adds a terminal state must update all of them:
+    # this one; TERMINAL_AGENT_OPERATION_STATES in client-python's
+    # shakenfist_client/apiclient.py; and AGENT_OP_FAILED_STATES in
+    # client-python-k3s's shakenfist_client_k3s/cluster.py. An aborted
+    # operation is already finished, so a wait which does not know abort is
+    # terminal burns its whole window on an operation that will never change.
+    AGENT_OPERATION_FAILED_STATES = ('error', 'expired', 'deleted', 'abort')
 
     def _await_command(self, instance_ref, command):
         aop = self.system_client.instance_execute(instance_ref, command)
