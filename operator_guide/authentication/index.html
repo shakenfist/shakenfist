@@ -15449,6 +15449,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Key expiry and reaping">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-a-keys-expiry-and-scopes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a key's expiry and scopes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -16244,6 +16261,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Key expiry and reaping">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-a-keys-expiry-and-scopes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a key's expiry and scopes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -16575,20 +16609,32 @@ suddenly stopped working can still see the key that lapsed. Lengthen it if you
 want a longer forensic window; set it to <code>0</code> if you would rather expired keys
 were never removed. Neither choice affects security, because enforcement does
 not depend on the sweep having run.</p>
-<div class="admonition warning">
-<p class="admonition-title">You cannot currently read an expiry back</p>
-<p>A key's expiry is recorded on the key object, and no API returns it.
-<code>GET /auth/namespaces/{namespace}/keys</code> answers with a list of key
-<em>names</em> only, and the same is true of the scopes and the provenance of
-a key minted by the federated exchange.</p>
-<p>This makes the forensic window above more important than it should be:
-when automation stops authenticating, the evidence that the key lapsed
-is the key's disappearance and its events, not a field you can query.
-Setting <code>NAMESPACE_KEY_REAP_GRACE</code> to <code>0</code> while investigating keeps
-that evidence indefinitely.</p>
-<p>Tracked as
-<a href="https://github.com/shakenfist/shakenfist/issues/3672">issue #3672</a>.</p>
-</div>
+<h3 id="reading-a-keys-expiry-and-scopes">Reading a key's expiry and scopes<a class="headerlink" href="#reading-a-keys-expiry-and-scopes" title="Permanent link">&para;</a></h3>
+<p>A key's expiry and scopes are readable by any caller who can read the
+namespace: one authenticated to the namespace itself, to <code>system</code>, or to a
+namespace the target trusts.
+<code>GET /auth/namespaces/{namespace}/keys</code> still answers with a bare list of key
+names, and omits keys which have expired. Adding <code>?detail=true</code> answers with
+one object per key instead, and <code>GET /auth/namespaces/{namespace}/keys/{key_name}</code>
+answers with the same object for a single key. Both detailed reads include
+expired keys, so "which of my keys lapsed, and when" can be answered without
+reading the database. <code>sf-client namespace show</code> renders them too, with
+<code>provenance</code> in its table and JSON output rather than in its comma separated
+one, where a serialised object would be ambiguous.</p>
+<p>The detailed reads never return the key's secret.</p>
+<p><code>provenance</code>, the record of who or what minted a key, is served only to a
+caller authenticated to the <code>system</code> namespace. Every other caller who can read
+the namespace gets the remaining fields but not <code>provenance</code>, because it can
+carry the identity of a person. That audience is wider than the namespace's own
+callers -- trusting another namespace lets its callers list these keys too -- so
+serving provenance to all of them would publish who logged in, and when, to each
+of them. Weigh that when you grant trust. A missing <code>provenance</code> means the
+caller is not in <code>system</code>, not that the key has none. See
+<a href="#human-login-mints-credentials">a minted key records who it was minted for</a>
+for what provenance contains.</p>
+<p>Even so, the forensic window above is worth keeping in mind: setting
+<code>NAMESPACE_KEY_REAP_GRACE</code> to <code>0</code> while investigating keeps an expired key
+readable indefinitely.</p>
 <h2 id="cluster-generated-key-secrets">Cluster generated key secrets<a class="headerlink" href="#cluster-generated-key-secrets" title="Permanent link">&para;</a></h2>
 <p>Secrets Shaken Fist generates itself — the short-lived service keys
 used between nodes, keys minted by the federated exchange, and any key
@@ -16997,15 +17043,15 @@ that window, which is worth knowing when you size a cluster for many users. See
 <a href="#key-expiry-and-reaping">key expiry and reaping</a>.</p>
 <p><strong>A minted key records who it was minted for.</strong> The key's provenance
 carries the person's subject identifier, the token's <code>jti</code>, and the claims
-that actually matched -- and provenance is part of a key's external view,
-which is readable by anyone who can list keys in that namespace. So every
-namespace a person is entitled to can see that they logged in and when. That
-is deliberate, because it is what makes a federated grant auditable, and it
-is why the key's <em>name</em> carries a random discriminator instead of the
-person's identity. But it means the claims you bind are published to every
-namespace the rule mints into: bind <code>email</code> or <code>preferred_username</code> and you
-have put that address in front of every one of those namespace owners. Bind
-the narrowest claim that expresses the entitlement, usually a group.</p>
+that actually matched. Provenance is served only to a caller in the <code>system</code>
+namespace (see <a href="#reading-a-keys-expiry-and-scopes">reading a key's expiry and scopes</a>),
+so a namespace owner cannot read it back from their own keys. The grant stays
+auditable to an administrator, and that is why the key's <em>name</em> carries a
+random discriminator instead of the person's identity: the name is visible to
+everyone who can list the namespace's keys. Even so, the claims you bind are
+recorded
+on every key the rule mints, so bind the narrowest claim that expresses the
+entitlement, usually a group, rather than an address.</p>
 <p>Requests are rate limited per source address like the others, on a counter
 of their own, so a burst of logins does not throttle CI and the reverse. As for
 the exchange and the listing, setting <code>FEDERATION_RATE_LIMIT_PER_MINUTE</code> to

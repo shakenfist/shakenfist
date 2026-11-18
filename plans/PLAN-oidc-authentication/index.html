@@ -17338,8 +17338,8 @@ not land anywhere else.</p>
 <td>4. Minting the entitled set of credentials at login</td>
 <td>shakenfist</td>
 <td><a href="../PLAN-oidc-authentication-phase-04-credential-set/">PLAN-oidc-authentication-phase-04-credential-set.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>666cff3d9a</code> (#4913)</td>
 </tr>
 <tr>
 <td>5. Admin as a claim</td>
@@ -17351,8 +17351,8 @@ not land anywhere else.</p>
 <tr>
 <td>6. Serving namespace key metadata (#3672)</td>
 <td>shakenfist, client-python</td>
-<td>TBD</td>
-<td>Not started</td>
+<td><a href="../PLAN-oidc-authentication-phase-06-key-metadata/">PLAN-oidc-authentication-phase-06-key-metadata.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -17523,16 +17523,34 @@ row is repurposed onto the work that answer exposed as the
 real obstacle. Keys keep their name; what they do not have
 is an API which serves their properties.
 <code>NamespaceKey.external_view()</code>
-(<code>shakenfist/namespace_key.py:404-418</code>) already produces
+(<code>shakenfist/namespace_key.py:404-419</code>) already produces
 <code>namespace</code>, <code>name</code>, <code>expiry</code>, <code>scopes</code> and <code>provenance</code>,
 and <code>AuthNamespaceKeysEndpoint.get</code>
-(<code>shakenfist/external_api/auth.py:591-595</code>) still returns
-bare names out of the legacy <code>nonced_keys</code> compatibility
-view. That is issue #3672, recorded against this row because
-it is what blocks operating a key as a service-account
-credential: a credential whose expiry and scopes cannot be
-read back cannot be audited or rotated on purpose. The row
-still names two repositories — the endpoint is this
+(<code>shakenfist/external_api/auth.py:637-653</code>) still returns
+bare names. That is issue #3672, recorded against this row
+because it is what blocks operating a key as a
+service-account credential: a credential whose expiry and
+scopes cannot be read back cannot be audited or rotated on
+purpose.</p>
+<p><strong>Corrected during planning of phase 6.</strong> Two claims this
+paragraph used to make were wrong. First, it described the
+endpoint as reading "the legacy <code>nonced_keys</code> compatibility
+view". <code>Namespace.keys</code> (<code>shakenfist/namespace.py:175-214</code>)
+synthesises that dict on every call from the real key
+objects, and its docstring records that the legacy
+<code>namespace_attributes.keys</code> column "is neither read nor
+written any more". So the shape is legacy, the store is not,
+and there is nothing to migrate. Second, the paragraph
+treated that endpoint as the obstacle and
+<code>sf-client namespace show</code> as its renderer. They are
+unconnected: <code>namespace show</code> reads <code>ns['keys']</code> from
+<code>Namespace.external_view()</code>
+(<code>shakenfist/namespace.py:469-486</code>), a <em>second</em> bare-name
+listing, and the keys endpoint's only in-tree consumer is an
+<code>apiclient</code> method no CLI command calls. A change to the
+endpoint alone would leave every user-facing surface as it
+is. #3672's own body identifies both consumers.</p>
+<p>The row still names two repositories — the endpoints are this
 repository's, and whatever renders the new fields in
 <code>sf-client namespace show</code> is <code>client-python</code>'s.</p>
 <p><strong>Phase 7 — interactive CLI flows, the credential set and
