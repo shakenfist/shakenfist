@@ -45,7 +45,7 @@ def _ni(instance_uuid, order, macaddr, network_uuid, ni_uuid=None):
         ipv4=None,
         order=order,
         model='virtio',
-        version=5)
+        version=NetworkInterface.current_version)
 
 
 class InterfaceOrderConstraintTestCase(dbfixture.MariaDBTableFixture,

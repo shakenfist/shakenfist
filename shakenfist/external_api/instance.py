@@ -583,7 +583,25 @@ def _netdesc_allocate_address(inst, netdesc, order, hot_plug=False):
         'instance': inst,
         'network': n
     }).with_fields(netdesc).info('Interface allocated')
-    ni = NetworkInterface.new(iface_uuid, netdesc, inst.uuid, order)
+    try:
+        ni = NetworkInterface.new(iface_uuid, netdesc, inst.uuid, order)
+    except RuntimeError as e:
+        # Every attempt lost a UNIQUE constraint: a caller-supplied MAC
+        # already in use, or more overlapping plugs racing for this
+        # instance's next device index than the retry budget covers. No
+        # interface row exists to release the address on its delete, so
+        # release it here, on either path.
+        if netdesc.get('address'):
+            n.ipam.release(netdesc['address'],
+                           expected_type=ReservationType.INSTANCE)
+        if not hot_plug:
+            inst.enqueue_delete_due_error(
+                'failed to create network interface: %s' % e)
+        return None, sf_api.error(
+            409, 'network interface could not be created, either its MAC '
+                 'address is in use or too many concurrent requests '
+                 'competed for its device index: %s' % e,
+            suppress_traceback=True)
 
     try:
         # Not a bare truthiness test on the raw body. The netdesc

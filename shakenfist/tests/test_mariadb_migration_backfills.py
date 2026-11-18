@@ -24,6 +24,7 @@ import re
 from unittest import mock
 
 import sqlalchemy as sa
+from sqlalchemy.exc import DataError
 from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
@@ -69,6 +70,9 @@ class _MockConnection:
 
     def commit(self):
         self.commits += 1
+
+    def rollback(self):
+        self.rollbacks = getattr(self, 'rollbacks', 0) + 1
 
     def __enter__(self):
         return self
@@ -441,7 +445,7 @@ class NetworkInterfacesBackfillIsBatchedTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
     def test_the_backfill_is_handed_to_the_batched_helper(
             self, mock_get_version, mock_set_version):
-        conn = _MockConnection([_MockResult() for _ in range(6)])
+        conn = _MockConnection([_MockResult() for _ in range(7)])
         engine = _MockEngine(conn)
 
         with mock.patch(
@@ -503,10 +507,15 @@ class NetworkInterfacesBackfillIsBatchedTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=3)
     def test_an_absent_constraint_is_added(
             self, mock_get_version, mock_set_version):
-        conn = _MockConnection([_MockResult() for _ in range(3)])
+        conn = _MockConnection([
+            _MockResult(),                    # probe: absent
+            _MockResult(),                    # repair: no collisions
+            _MockResult(),                    # ALTER
+            _MockResult(first=('whatever',)),  # probe: now present
+        ])
         engine = _MockEngine(conn)
 
-        mariadb._ensure_network_interfaces_schema(engine)
+        result = mariadb._ensure_network_interfaces_schema(engine)
 
         statements = [sql for sql, _ in conn.calls]
         self.assertIn('information_schema.TABLE_CONSTRAINTS',
@@ -514,6 +523,66 @@ class NetworkInterfacesBackfillIsBatchedTestCase(base.ShakenFistTestCase):
         self.assertIn(
             'ADD CONSTRAINT uq_network_interfaces_instance_order_active',
             ' '.join(statements))
+        self.assertIn('information_schema.TABLE_CONSTRAINTS',
+                      statements[-1])
+        self.assertEqual(4, result['end_version'])
+        mock_set_version.assert_called_once_with(
+            engine, 'network_interfaces', 4)
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=3)
+    def test_a_failed_alter_is_not_recorded_as_version_4(
+            self, mock_get_version, mock_set_version):
+        """An upgrade which could not land the constraint is retried.
+
+        Stamping the table as version 4 regardless would make every
+        later ensure-mariadb-schema run skip the step, leaving the
+        cluster without the constraint for good -- and without it the
+        device index is a read-then-insert with no arbiter, which is
+        issue 4946 again. An ALTER on a serving cluster can lose on a
+        lock wait timeout, so this is not a contrived failure.
+        """
+        conn = _MockConnection([
+            _MockResult(),                    # probe: absent
+            _MockResult(),                    # repair: no collisions
+            OperationalError('ALTER', {}, Exception('lock wait timeout')),
+            _MockResult(),                    # probe: still absent
+        ])
+        engine = _MockEngine(conn)
+
+        result = mariadb._ensure_network_interfaces_schema(engine)
+
+        self.assertEqual(3, result['end_version'])
+        self.assertFalse(result['migrated'])
+        mock_set_version.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=3)
+    def test_a_failed_repair_does_not_abort_the_ensure(
+            self, mock_get_version, mock_set_version):
+        """Any database error from the repair is logged, not raised.
+
+        Every step around it degrades to a log line and carries on, so a
+        surprise here -- a DataError, a ProgrammingError on an old
+        cluster -- must not take the rest of the schema run down with
+        it. The ALTER is still attempted, and the version is decided by
+        what the table ends up with.
+        """
+        conn = _MockConnection([
+            _MockResult(),                    # probe: absent
+            DataError('SELECT', {}, Exception('surprise')),
+            _MockResult(),                    # ALTER
+            _MockResult(first=('whatever',)),  # probe: now present
+        ])
+        engine = _MockEngine(conn)
+
+        result = mariadb._ensure_network_interfaces_schema(engine)
+
+        self.assertIn(
+            'ADD CONSTRAINT uq_network_interfaces_instance_order_active',
+            ' '.join(sql for sql, _ in conn.calls))
+        self.assertEqual(1, conn.rollbacks)
+        self.assertEqual(4, result['end_version'])
 
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)

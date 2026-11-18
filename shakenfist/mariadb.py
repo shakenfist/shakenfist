@@ -48,6 +48,7 @@ from sqlalchemy.exc import DataError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import SQLAlchemyError
 from shakenfist_utilities import logs
 
 from shakenfist.config import config
@@ -17861,39 +17862,29 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
                  '(UNIQUE on instance_uuid, order and active)')
         constraint_name = 'uq_network_interfaces_instance_order_active'
         with engine.connect() as conn:
-            # Asked for, not inferred from a failed ALTER. A failure
-            # below is reported at WARNING because unlike the earlier
-            # steps this constraint *is* the fix, so "already here" --
-            # what a fresh install sees, its table having been built
-            # from the definition above -- has to be told apart from
-            # "could not be added", and reading that out of the driver's
-            # error text would be a guess.
-            try:
-                already_present = conn.execute(
-                    sa.text(
-                        'SELECT CONSTRAINT_NAME FROM '
-                        'information_schema.TABLE_CONSTRAINTS '
-                        'WHERE TABLE_SCHEMA = DATABASE() '
-                        'AND TABLE_NAME = :table_name '
-                        'AND CONSTRAINT_NAME = :constraint_name'),
-                    {'table_name': table_name,
-                     'constraint_name': constraint_name}).first() is not None
-            except OperationalError as e:
-                LOG.debug(
-                    f'Could not probe for {constraint_name}, assuming it '
-                    f'is absent: {e}')
-                already_present = False
+            # Asked for, not inferred from a failed ALTER. Unlike the
+            # earlier steps this constraint *is* the fix, so "already
+            # here" -- what a fresh install sees, its table having been
+            # built from the definition above -- has to be told apart
+            # from "could not be added", and reading that out of the
+            # driver's error text would be a guess.
+            present = _table_has_constraint(
+                conn, table_name, constraint_name)
 
-            if already_present:
+            if present:
                 LOG.debug(f'{constraint_name} is already present on '
                           f'{table_name}')
             else:
                 # Rows which already collide would refuse the ALTER,
                 # and are already broken anyway. Renumbering the losers
-                # repairs them and clears the way.
+                # repairs them and clears the way. Any database error
+                # here is logged rather than raised, like the steps
+                # around it: the ALTER below then refuses on whatever
+                # duplicates are left, and the step is retried.
                 try:
                     _migrate_duplicate_interface_orders(conn, table)
-                except (IntegrityError, OperationalError) as e:
+                except SQLAlchemyError as e:
+                    conn.rollback()
                     LOG.warning(
                         f'Could not repair duplicate interface orders on '
                         f'{table_name}: {e}')
@@ -17907,12 +17898,27 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
                 except (IntegrityError, OperationalError) as e:
                     LOG.warning(
                         f'{constraint_name} could not be added to '
-                        f'{table_name}, so overlapping interface hot '
-                        f'plugs on one instance are still able to share '
-                        f'a device index: {e}')
+                        f'{table_name}: {e}')
 
-        current_ver = 4
-        _set_table_version(engine, table_name, current_ver)
+                present = _table_has_constraint(
+                    conn, table_name, constraint_name)
+
+        # Only a table which has the constraint is version 4. Stamping
+        # it regardless would make every later run skip this step, and
+        # leave next_order()'s read-then-insert with no arbiter at all:
+        # issue 4946 again, with nothing to say so. An ALTER on a
+        # serving cluster can lose on a lock wait timeout, so failing
+        # once is not unusual, and the probe makes a retry harmless.
+        if present:
+            current_ver = 4
+            _set_table_version(engine, table_name, current_ver)
+        else:
+            LOG.warning(
+                f'{table_name} stays at version {current_ver} without '
+                f'{constraint_name}, so overlapping interface hot plugs '
+                f'on one instance are still able to share a device '
+                f'index. The next ensure-mariadb-schema run will try '
+                f'again.')
 
     return {
         'table': table_name,
@@ -17921,6 +17927,31 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
         'target_version': NETWORK_INTERFACES_VERSION,
         'migrated': start_ver != current_ver
     }
+
+
+def _table_has_constraint(
+        conn: sa.Connection, table_name: str, constraint_name: str) -> bool:
+    """Ask information_schema whether a table carries a named constraint.
+
+    A probe which itself fails reads as absent: the caller then tries to
+    add the constraint, and does not record a schema version which
+    claims it.
+    """
+    try:
+        return conn.execute(
+            sa.text(
+                'SELECT CONSTRAINT_NAME FROM '
+                'information_schema.TABLE_CONSTRAINTS '
+                'WHERE TABLE_SCHEMA = DATABASE() '
+                'AND TABLE_NAME = :table_name '
+                'AND CONSTRAINT_NAME = :constraint_name'),
+            {'table_name': table_name,
+             'constraint_name': constraint_name}).first() is not None
+    except OperationalError as e:
+        LOG.debug(
+            f'Could not probe {table_name} for {constraint_name}, '
+            f'assuming it is absent: {e}')
+        return False
 
 
 def _migrate_duplicate_interface_orders(
@@ -17932,6 +17963,14 @@ def _migrate_duplicate_interface_orders(
     not need the batched backfill helper: there is no table-wide UPDATE
     here, and on any cluster which never raced a hot plug there are no
     writes at all.
+
+    A moved row belongs to an instance which may be running. Daemons
+    already up hold network interfaces in their process-local object
+    cache for OBJECT_CACHE_TTL_IMMUTABLE, so they can read the old index
+    for up to that long; nothing here can reach their caches, which is
+    another reason the schema is ensured before the nodes restart onto
+    new code. The guest only sees the new index once its config drive is
+    rebuilt at the next power on.
 
     Returns the number of rows moved.
     """

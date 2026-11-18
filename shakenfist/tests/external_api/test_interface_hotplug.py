@@ -34,6 +34,7 @@ from shakenfist_utilities import api as sf_api
 
 from shakenfist.external_api import util as api_util
 from shakenfist.instance import Instance
+from shakenfist.network.interface import NetworkInterface
 from shakenfist.tests.external_api.test_required_sweep import (
     SweepFixtureTestCase)
 
@@ -139,3 +140,84 @@ class HotplugRefusalTestCase(SweepFixtureTestCase):
                          response.get_data(as_text=True))
         self.assertEqual(1, len(created))
         self.assertIn(created[0].state.value, Instance.TERMINAL_STATES)
+
+
+class HotplugDeviceIndexTestCase(SweepFixtureTestCase):
+    """The hot plug endpoint does not choose a device index (issue 4946).
+
+    Reading the highest index in use and then creating the interface was
+    two steps with nothing serialising them, so overlapping plugs took
+    the same index. The endpoint now leaves the choice to
+    NetworkInterface.new(), inside the insert's own retry loop under the
+    UNIQUE constraint. The cluster CI test which races real plugs only
+    runs in the merge queue; these are the pull request time guard on
+    the caller.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.hotnet = self.mock_mariadb.create_network(
+            'indexnet', namespace='system', netblock='10.20.31.0/24',
+            provide_dhcp=True, provide_dns=True)
+
+    def _hotplug(self, netdesc):
+        return self.client.post(
+            '/instances/%s/interfaces' % self.instance.uuid,
+            headers={'Authorization': self.token},
+            content_type='application/json',
+            data=json.dumps({'network': netdesc}))
+
+    def test_the_endpoint_leaves_the_index_to_new(self):
+        real_new = NetworkInterface.new
+        orders = []
+
+        def spy_new(*args, **kwargs):
+            orders.append(args[3] if len(args) > 3 else kwargs.get('order'))
+            return real_new(*args, **kwargs)
+
+        with mock.patch.object(NetworkInterface, 'new', side_effect=spy_new):
+            response = self._hotplug(
+                {'network_uuid': str(self.hotnet.uuid)})
+
+        self.assertEqual(200, response.status_code,
+                         response.get_data(as_text=True))
+        self.assertEqual([None], orders)
+
+    def test_sequential_plugs_get_distinct_increasing_indexes(self):
+        plugged = []
+        for _ in range(3):
+            response = self._hotplug(
+                {'network_uuid': str(self.hotnet.uuid)})
+            self.assertEqual(200, response.status_code,
+                             response.get_data(as_text=True))
+            plugged.append(response.get_json()['order'])
+
+        self.assertEqual(sorted(set(plugged)), plugged)
+
+    def test_an_exhausted_retry_budget_releases_the_address(self):
+        """No interface row exists to release the address, so the API does.
+
+        Every refusal arm in _netdesc_allocate_address() cleans up what
+        it reserved. NetworkInterface.new() running out of attempts --
+        more overlapping plugs than its budget covers, or a caller's MAC
+        already in use -- was the one which let a RuntimeError escape as
+        a 500 with the address still reserved and nothing left to ever
+        release it.
+        """
+        with mock.patch.object(
+                NetworkInterface, 'new',
+                side_effect=RuntimeError('every attempt collided')):
+            response = self._hotplug({'network_uuid': str(self.hotnet.uuid),
+                                      'address': '10.20.31.60'})
+
+        self.assertEqual(409, response.status_code,
+                         response.get_data(as_text=True))
+        self.assertEqual(
+            'created', self.instance.state.value,
+            'a refused hot plug must not change the state of its '
+            'pre-existing target instance')
+
+        retry = self._hotplug({'network_uuid': str(self.hotnet.uuid),
+                               'address': '10.20.31.60'})
+        self.assertEqual(200, retry.status_code,
+                         retry.get_data(as_text=True))

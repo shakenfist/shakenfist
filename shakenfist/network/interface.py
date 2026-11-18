@@ -154,8 +154,20 @@ class NetworkInterface(dbo):
         what the merge CI run for this fix did, ten guesses in 90ms.
 
         Soft-deleted rows are counted too. That means an index freed by
-        a delete is not handed out again until the row is reaped, which
-        costs nothing: the index only has to be unique, not dense.
+        a delete is not handed out again until the row is reaped, so
+        repeated plug and unplug cycles leave the indexes sparse. The
+        constraint only needs them unique, but they are guest-visible:
+        the config drive's network_data.json, rebuilt on every power on,
+        names each link eth{order}, so a second NIC can be published as
+        eth7. cloud-init matches links on ethernet_mac_address rather
+        than that name, which is why sparse is acceptable there.
+
+        An empty list is also what the underlying read returns when it
+        fails, and that reads here as index 0. That is safe rather than
+        right: on an instance which does have live interfaces the insert
+        then loses the constraint and the caller's retry budget runs
+        out, so a broken read fails the create rather than duplicating
+        an index.
         """
         orders = [
             d.order for d in mariadb.get_network_interfaces_by_instance(

@@ -345,7 +345,20 @@ def ensure_mariadb_schema() -> None:
 
     results = mariadb.ensure_schema()
 
+    # A step which could not be applied leaves its table below the
+    # version this release expects, and sf-database's
+    # verify_schema_versions() then refuses to start. Saying so here,
+    # and exiting non-zero, puts the failure where it happened rather
+    # than at the gateway restart which follows it.
+    short = []
     for r in results:
+        target = r.get('target_version')
+        if target is not None and r['end_version'] < target:
+            short.append(r)
+            click.echo(f"Table '{r['table']}' is at version "
+                       f"{r['end_version']}, short of version {target}")
+            continue
+
         if 'altered_columns' in r:
             if r['migrated']:
                 click.echo('Widened ENUM column(s): '
@@ -362,6 +375,13 @@ def ensure_mariadb_schema() -> None:
         else:
             click.echo(f"Table '{r['table']}' is up to date "
                        f"(version {r['end_version']})")
+
+    if short:
+        raise click.ClickException(
+            f'{len(short)} table(s) could not be brought to the version '
+            f'this release expects: '
+            f"{', '.join(r['table'] for r in short)}. The warnings above "
+            f'say why; re-run this command once the cause is cleared.')
 
     click.echo('MariaDB schema verified.')
 

@@ -478,12 +478,16 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.assertEqual(plugs + 1, len(interfaces))
         self.assertEqual(plugs + 1, len({ni['order'] for ni in interfaces}))
 
-        # Every plug's own interface is still listed, rather than having
-        # been created and then hidden behind a colliding sibling.
+        # Every plug produced a row of its own. This listing is the API
+        # view, a plain query of the instance's interfaces which is never
+        # keyed on the index, so it is a floor rather than the regression
+        # check: a duplicate index would still list both rows here. The
+        # distinct-index assertion above is what catches issue 4946. It
+        # was interfaces_for_instance(), the hypervisor-side view, which
+        # keyed a dict on the index and dropped one of a colliding pair.
         listed = {ni['uuid'] for ni in interfaces}
         for plug in plugged:
             self.assertIn(
                 plug['uuid'], listed,
-                'Hot plugged interface %s is missing from the instance, '
-                'which is what a duplicate device index looks like'
+                'Hot plugged interface %s is missing from the instance'
                 % plug['uuid'])
