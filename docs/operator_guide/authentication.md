@@ -44,7 +44,9 @@ names, and omits keys which have expired. Adding `?detail=true` answers with
 one object per key instead, and `GET /auth/namespaces/{namespace}/keys/{key_name}`
 answers with the same object for a single key. Both detailed reads include
 expired keys, so "which of my keys lapsed, and when" can be answered without
-reading the database. The same fields appear in `sf-client namespace show`.
+reading the database. `sf-client namespace show` renders them too, with
+`provenance` in its table and JSON output rather than in its comma separated
+one, where a serialised object would be ambiguous.
 
 The detailed reads never return the key's secret.
 
