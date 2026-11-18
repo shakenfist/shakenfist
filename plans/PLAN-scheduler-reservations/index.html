@@ -16554,7 +16554,7 @@ table entirely (decision D8).</p>
 <td>5a. The calibration re-run</td>
 <td><a href="../PLAN-scheduler-reservations-phase-05a-hard-ceiling/">PLAN-scheduler-reservations-phase-05a-hard-ceiling.md</a></td>
 <td>Complete</td>
-<td>—</td>
+<td><code>3797716023</code> (#4917)</td>
 </tr>
 <tr>
 <td>5b. The hard ceiling</td>
@@ -16610,14 +16610,15 @@ pull request. Every SHA is the merge commit of the pull request named
 beside it, so <code>&lt;sha&gt;^1..&lt;sha&gt;</code> is the whole of what that pull
 request put on <code>develop</code>. A phase which has not landed reads
 <code>—</code>.</p>
-<p>Phase 5a is the one row where <code>Complete</code> and <code>—</code> sit together, and it
-is not a contradiction of that rule but the ordinary consequence of
-it: the pull request which lands a phase cannot record the merge
-commit that lands it, so every phase here was filled in afterwards.
-5a's cell is the next close-out's to write — phase 5b's first commit,
-or phase 9's if 5b has not started by then — and until it is written
-the push audit's range for 5a is its pull request rather than this
-table.</p>
+<p>Phase 5a was for a time the one row where <code>Complete</code> and <code>—</code> sat
+together, which was not a contradiction of that rule but the
+ordinary consequence of it: the pull request which lands a phase
+cannot record the merge commit that lands it, so every phase here was
+filled in afterwards. Its cell was written on 2026-11-18, out of the
+usual order — a close-out of its own rather than the first commit of
+the next phase — because both remaining phases are gated and neither
+gate had opened. Phase 9's audit may therefore read <code>3797716023</code> for
+5a from this table, rather than having to go to the pull request.</p>
 <p>Several phases took more than one pull request, because the
 plan's habit is to land the work and then close the phase out in
 a later documentation change. Two pull requests therefore appear
@@ -16822,8 +16823,7 @@ is here.</p>
   reading; the defect is <code>shakenfist/private-ci#311</code>, against the
   plan which owns the sizing code.</p>
 <ul>
-<li>
-<p><strong>Phase 5b</strong> carries phase 5a's steps 4, 5 and 6 -- the
+<li><strong>Phase 5b</strong> carries phase 5a's steps 4, 5 and 6 -- the
   <code>CLAIM_ENFORCEMENT_HARD</code> flip, the cluster CI assertion inversion
   and the eight documentation lines -- which did not start because
   the gate did not open. It has no plan file yet and needs no new
@@ -16834,14 +16834,28 @@ is here.</p>
   unchanged, which cannot begin until private-ci's per-job binding
   phase has landed and deployed on <code>maui</code>. Recorded as plan-blocker
   b21; nothing in this repository can clear it, and the flip is not
-  to be read again against the window phase 5a already spent.</p>
-</li>
-<li>
-<p><strong>Phase 6</strong> was executed out of order, ahead of phases 4c and 5,
+  to be read again against the window phase 5a already spent.</li>
+</ul>
+<p><strong>That binding has now landed</strong>, traced on 2026-11-18 so a later
+  session need not re-derive the chain. private-ci's phase 3g
+  (<code>PLAN-claim-coverage-and-sizing-phase-03g-bind-oversized.md</code>)
+  stopped after its gate, which passed with room — each of the three
+  jobs' own claim exceeds its own largest single instance in every
+  dimension — and its step 3 bound <code>sf-e2e</code>, <code>oVirt 4.5 on Rocky 8</code>
+  and <code>OpenStack via Kolla-Ansible master on Debian 13</code> to their own
+  runners as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/727" title="GitHub Issue: shakenfist/kerbside #727">kerbside#727</a>, merged 2026-11-14 19:48 UTC
+  (2026-11-15 06:48 AEDT). The fresh window therefore runs from that
+  merge and closes <strong>2026-11-22 AEDT</strong>. 3g's own step 5 reads that
+  window for its effect and its step 6 hands the result to this
+  plan; re-reading D2 is explicitly out of 3g's scope and remains
+  5b's first step. Phase 5b may not be planned before 3g has handed
+  over, because a Hold there changes 5b's shape rather than merely
+  delaying it.</p>
+<ul>
+<li><strong>Phase 6</strong> was executed out of order, ahead of phases 4c and 5,
   and completed on 2026-09-01. It merged as #3972 (the validator
   400s), #3971 (the binary model, the transition mapping and the
-  documentation) and #3957 (this plan file).</p>
-</li>
+  documentation) and #3957 (this plan file).</li>
 </ul>
 <p><strong>#3565 closed on a test change, not a scheduler change.</strong> The
   traced occurrence of 2026-08-26 had the candidate set collapsing
