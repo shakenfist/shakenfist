@@ -45,10 +45,6 @@
 # holds this key, delete it. See
 # docs/operator_guide/credential_rotation.md for the mechanics.
 #
-# This entry is the accepted *finding*, not an answer to that question.
-# The question itself -- whether this secret ever authorised anything on
-# a real cluster -- is recorded under "A namespace key published in the
-# user guide" in docs/operator_guide/credential_rotation.md, because an
-# accepted scanner finding records that a secret is known, not what to
-# do about it.
+# This entry accepts the *finding*: it records that the secret is known,
+# and is not an answer to whether it ever authorised anything.
 0f2593b3388d04cc3b555510376b336db8d45205:docs/user_guide/authentication.md:shakenfist-key-secret:43

@@ -7,7 +7,7 @@ caller-facing ``eventlog.add_event_multi()`` API enqueues events
 into the spool synchronously (one cheap sqlite insert per call,
 sub-millisecond) and returns immediately. A background drainer
 thread (``shakenfist.eventlog_drainer``) reads batches off the
-spool and ships them to ``sf-eventlog`` via the existing gRPC
+spool and ships them to ``sf-database`` via the existing gRPC
 channel.
 
 The spool is the **durability boundary**. An event that returns
@@ -65,10 +65,10 @@ SPOOL_ROOT = '/srv/shakenfist/spool/eventlog'
 # Maximum spool size in number of pending rows. At ~512 bytes
 # per serialised event this is ~50 MiB on disk, which is small
 # enough to live on any deployment's root filesystem and large
-# enough that a brief sf-eventlog outage does not cause loss.
+# enough that a brief sf-database outage does not cause loss.
 # When the cap is exceeded ``enqueue()`` drops the incoming
 # event (with a counter increment + WARN log) rather than
-# blocking the caller -- matching today's "drop if sf-eventlog
+# blocking the caller -- matching today's "drop if sf-database
 # unreachable for >cooldown" posture.
 SPOOL_HIGH_WATER_MARK = 100_000
 

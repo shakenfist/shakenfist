@@ -619,7 +619,11 @@ is the one that survives, so instance-side gates read correctly while
 `has_pending_cluster_operation()` on the network returned False and the
 network maintainer recreated a bridge an in-flight operation was about to
 build. A constraint is part of the statement under test; a call count is
-not a row count.
+not a row count. What holds the invariant now is structural rather than a
+test: every target travels as one `targets=` list into
+`create_and_enqueue_cluster_operation`, written in the same transaction
+as the operation, and the table's uniqueness is the composite
+`uq_cot_op_target` on operation and target.
 
 ## A uuid column's type is `uuid_column_type()`, never a bare `sa.Uuid()`
 

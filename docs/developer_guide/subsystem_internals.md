@@ -536,7 +536,9 @@ should make from a routing signal, and a health write could overwrite a
 different questions on different clocks — eventual cluster state, versus
 real-time routing and liveness — so they share no storage. `/readyz`
 serves from a per-worker in-memory flag and the watchdog writes to
-systemd; neither touches the database.
+systemd; neither writes health into a table. The readiness flag is
+refreshed out of band by a background checker that asks sf-database,
+not by anything on the request path.
 
 `Daemon.pet_watchdog()` in `shakenfist/daemons/daemon.py` is the
 liveness seam for every non-trivial daemon. It writes

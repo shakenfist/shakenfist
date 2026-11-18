@@ -27,7 +27,7 @@ class TestEvents(base.BaseNamespacedTestCase):
     def test_network_events(self):
         # Events are eventually consistent: emitting daemons (sf-api
         # gunicorn workers, sf-net, sf-queues) enqueue into a local
-        # spool that the per-process drainer ships to sf-eventlog in
+        # spool that the per-process drainer ships to sf-database in
         # ~100 ms batches. "Network is created" (which is what
         # _await_networks_ready returns on) does not imply "all
         # events for the network are queryable yet". Poll for a few
@@ -71,7 +71,7 @@ class TestEvents(base.BaseNamespacedTestCase):
         # post-admit capacity counters. Poll for it rather than reading
         # once: events are eventually consistent (see the comment in
         # test_network_events), and _await_instance_ready() returning
-        # does not imply the audit event has reached sf-eventlog.
+        # does not imply the audit event has reached sf-database.
         events = []
         placed = []
         deadline = time.time() + 30

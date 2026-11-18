@@ -264,9 +264,9 @@ for a in mariadb.find_artifacts(criteria):
 Both `from_db_by_ref` and the iterator collapse a namespace of `'system'` or `None` to "do not filter on
 namespace", which is what `baseobject.namespace_filter` has always meant: the system namespace sees every
 other namespace's objects. Pushing the literal string into the WHERE clause would silently narrow an
-administrative lookup to the handful of objects actually owned by `system`. Each of the three
-`from_db_by_ref` overrides carries the collapse and a comment saying so; `DatabaseBackedObjectIterator.get_iterator`
-does the same for the `namespace=` kwarg.
+administrative lookup to the handful of objects actually owned by `system`. The collapse lives once in
+`DatabaseBackedObject._from_db_by_ref_pushdown`, which all three `from_db_by_ref` overrides delegate to (see above);
+`DatabaseBackedObjectIterator.get_iterator` carries its own copy for the `namespace=` kwarg.
 
 **Why a criteria object rather than translating the predicates.**
 The predicates these calls replaced are `functools.partial` objects — `partial(state_filter, states)`,
@@ -1774,6 +1774,8 @@ If the persisted UUID does not match the current node's FQDN, it is
 ignored and the FQDN-based fallback is used. This guards against stale
 UUID files left over from a previous node installation.
 
+#### Attribute Table Pattern
+
 Each attribute table follows the same pattern — typed scalar columns
 for hot-path fields, JSON columns for complex structures, and one
 indexed FK column per parent — for example:
@@ -1790,6 +1792,15 @@ CREATE TABLE node_attributes (
 );
 ```
 
+This approach:
+
+- **Avoids wide generic tables**: Each type has exactly the columns it needs
+- **Enables proper typing**: Native SQL types instead of JSON everywhere
+- **Supports efficient indexes**: Can index frequently-queried columns
+- **Keeps queries simple**: No joins needed for common operations
+
+#### Cached Child-UUID Lists Are Not Stored
+
 Cached lists of *child* object UUIDs are deliberately not stored on
 the parent attribute table — querying the child table by an indexed
 FK column is the source of truth. The last two such caches
@@ -1804,13 +1815,6 @@ an N+1 hydration loop from every caller, and dropping the columns
 needed no data migration because every UUID in them was derivable
 from `network_interfaces`. `PUSH-AUDIT.md` carries a review bullet
 so the pattern is not reintroduced.
-
-This approach:
-
-- **Avoids wide generic tables**: Each type has exactly the columns it needs
-- **Enables proper typing**: Native SQL types instead of JSON everywhere
-- **Supports efficient indexes**: Can index frequently-queried columns
-- **Keeps queries simple**: No joins needed for common operations
 
 ### Abstract Base Classes
 

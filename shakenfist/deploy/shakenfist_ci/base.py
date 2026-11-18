@@ -1415,7 +1415,7 @@ class BaseTestCase(testtools.TestCase):
 
     # How long an event its emitter has already written may take to become
     # readable. add_event() only enqueues into the emitting daemon's local
-    # spool, and a per-process drainer ships the spool to sf-eventlog in
+    # spool, and a per-process drainer ships the spool to sf-database in
     # ~100 ms batches -- slower under load or while the drainer backs off
     # from a failed write -- so an event emitted before a state change can
     # still be unreadable once the API reports that change. The wait is
