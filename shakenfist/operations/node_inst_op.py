@@ -15,7 +15,6 @@ from shakenfist.instance import Instances
 from shakenfist.instance import this_node_filter
 from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
-from shakenfist.network.interface import interfaces_for_instance
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.util import exceptions as util_exceptions
@@ -352,17 +351,16 @@ class NodeInstOp(BaseClusterOperation):
             if inst.state.value not in Instance.ERROR_STATES:
                 inst.state = Instance.STATE_DELETE_WAIT
 
-            # Create list of networks used by instance. We cannot use the
-            # interfaces cached in the instance here, because the instance
-            # may have failed to get to the point where it populates that
-            # field (an image fetch failure for example).
+            # Create list of networks used by instance. ``inst.interfaces``
+            # is a live, instance-scoped query of network_interfaces, so an
+            # instance which never got as far as being fully created (an
+            # image fetch failure, for example) still reports whatever
+            # interfaces it does have.
+            interfaces = inst.interfaces
             instance_networks = []
-            interfaces = []
-            for ni in interfaces_for_instance(inst):
-                if ni:
-                    interfaces.append(ni)
-                    if ni.network_uuid not in instance_networks:
-                        instance_networks.append(ni.network_uuid)
+            for ni in interfaces:
+                if ni.network_uuid not in instance_networks:
+                    instance_networks.append(ni.network_uuid)
             self.log.with_fields({
                 'interfaces': interfaces,
                 'networks': instance_networks

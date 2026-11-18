@@ -208,6 +208,38 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 'deleted', self.test_client.get_interface(iface['uuid'])['state'],
                 f'Interface {iface["uuid"]} did not delete')
 
+    def test_interfaces_are_listed_in_request_order(self):
+        # The interface list an instance reports is ordered by the
+        # per-interface ``order``, which is the order the netdescs were
+        # requested in. ``Instance.interfaces`` is now the only producer
+        # of that list -- the cluster-wide helper which used to sort for
+        # some of its callers is gone (issue 4945) -- so the ordering is
+        # pinned here from the outside, where a caller sees it.
+        requested = [self.net_four['uuid'], self.net_two['uuid'],
+                     self.net_one['uuid']]
+        inst = self.create_instance(
+            'test-iface-order', 1, 1024,
+            [{'network_uuid': u} for u in requested],
+            [
+                {
+                    'size': 8,
+                    'base': base.CLUSTER_CI_IMAGE,
+                    'type': 'disk'
+                }
+            ], None, None)
+
+        self.assertIsNotNone(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
+
+        nics = self.test_client.get_instance_interfaces(inst['uuid'])
+        self.addDetail(
+            'nics',
+            content.text_content(json.dumps(nics, indent=4, sort_keys=True)))
+
+        self.assertEqual(3, len(nics))
+        self.assertEqual([0, 1, 2], [nic['order'] for nic in nics])
+        self.assertEqual(requested, [nic['network_uuid'] for nic in nics])
+
     def test_provided_dns(self):
         inst1 = self.create_instance(
             'test-provided-dns', 1, 1024,

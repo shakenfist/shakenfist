@@ -65,6 +65,11 @@ class FakeInstance:
         self.disk_spec = [{'base': 'cirros', 'size': 8}]
         self.placement = {'node': 'fake-node-uuid', 'placement_attempts': 1}
 
+        # The network restore reads the instance's interfaces from the
+        # instance itself. No test here is about them, so the default is
+        # an instance with none.
+        self.interfaces = []
+
     @contextlib.contextmanager
     def get_lock(self, timeout=None, op=None, global_scope=False,
                  node_timeout=None):
@@ -160,8 +165,6 @@ class RestorePowersOnWhatWasRunningTestCase(base.ShakenFistTestCase):
                 startup_tasks, 'config', fake_config))
             stack.enter_context(mock.patch.object(
                 startup_tasks, 'instance', fake_instance_module))
-            stack.enter_context(mock.patch.object(
-                startup_tasks, 'interfaces_for_instance', return_value=[]))
             stack.enter_context(mock.patch.object(
                 startup_tasks, 'Node', fake_node_class))
             stack.enter_context(mock.patch.object(
@@ -400,8 +403,6 @@ class RestorePlacementReconciliationTestCase(base.ShakenFistTestCase):
                 startup_tasks, 'config', fake_config))
             stack.enter_context(mock.patch.object(
                 startup_tasks, 'instance', fake_instance_module))
-            stack.enter_context(mock.patch.object(
-                startup_tasks, 'interfaces_for_instance', return_value=[]))
             stack.enter_context(mock.patch.object(
                 startup_tasks, 'Node', fake_node_class))
             stack.enter_context(mock.patch.object(

@@ -2356,7 +2356,9 @@ class MockMariaDB():
         criteria.network_uuid and criteria.instance_uuid against the
         corresponding indexed columns on network_interfaces. Namespace
         and name are silently ignored because network_interfaces has
-        neither column.
+        neither column. Results are returned ordered by the ``order``
+        column, because the real query carries an ORDER BY and
+        Instance.interfaces promises that ordering to its callers.
         """
         results = list(self.network_interface_objects.values())
         if criteria.states:
@@ -2378,6 +2380,7 @@ class MockMariaDB():
         # criteria.namespace and criteria.name are silently ignored:
         # network_interfaces has neither column (consistent with the
         # real _direct_find_network_interfaces behaviour).
+        results.sort(key=lambda d: d.order)
         self._trace(
             f'MockMariaDB.find_network_interfaces(criteria={criteria!r}): '
             f'{len(results)} results')

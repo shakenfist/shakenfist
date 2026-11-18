@@ -127,8 +127,8 @@ class DeletedNodeInstanceSweepTestCase(base.ShakenFistTestCase):
         self._place(Instance.STATE_DELETE_WAIT_ERROR)
         ni = mock.MagicMock()
 
-        with mock.patch.object(cluster_main.interface,
-                               'interfaces_for_instance',
+        with mock.patch.object(Instance, 'interfaces',
+                               new_callable=mock.PropertyMock,
                                return_value=[ni]):
             self._sweep()
 

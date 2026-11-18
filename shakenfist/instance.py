@@ -965,13 +965,22 @@ class Instance(dbowo):
 
     @property
     def interfaces(self):
-        """Currently-attached NetworkInterface objects.
+        """Currently-attached NetworkInterface objects, in ``order``.
 
         Queried live from the network_interfaces table
         (instance_uuid is an indexed column), rather than kept
         as a cached list of UUID strings on instance_attributes,
         which was a hand-maintained copy of what the table already
         holds.
+
+        The list is ordered by the per-instance interface index,
+        ascending. That ordering is part of what this property
+        promises, not an accident of row order:
+        ``_direct_find_network_interfaces()`` applies the ``ORDER
+        BY`` and the gRPC path serves its rows from that same
+        function, so both database paths agree. Callers which care
+        -- the default-route choice in the config drive, the delete
+        and restore sweeps -- therefore do not sort again.
         """
         criteria = ObjectFilterCriteria(
             states=list(interface.NetworkInterface.ACTIVE_STATES),

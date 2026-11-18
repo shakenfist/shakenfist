@@ -21,7 +21,6 @@ from shakenfist import ipam
 from shakenfist import node_health
 from shakenfist.network import network
 from shakenfist.schema.ipam_reservation import ReservationType
-from shakenfist.network import interface
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.config import config
@@ -769,7 +768,7 @@ class Monitor(daemon.Daemon):
                 i.delete(global_only=True)
 
             # Cleanup the instance's interfaces
-            for ni in interface.interfaces_for_instance(i):
+            for ni in i.interfaces:
                 ni.delete()
 
     def _cascade_errored_node(self, n):
