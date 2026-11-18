@@ -316,4 +316,21 @@ def create_network_namespace(namespace):
             if not m:
                 return False
 
+    # A namespace from "ip netns add" has its loopback interface down,
+    # and a down loopback drops a packet rather than refusing to send
+    # it: an address which is local to the namespace still routes via
+    # lo, so sendto() succeeds and nothing arrives. The DHCP readiness
+    # probe asks the network's own router address whether dnsmasq is
+    # still answering, so with lo down every healthy DHCP network
+    # reported itself wedged and was queued for a rebuild (issue 730).
+    #
+    # This runs on every create pass rather than only when the
+    # namespace is added, so that a namespace built before this heals
+    # on the next pass.
+    _, _, returncode = command_helper(
+        locate_command('ip'), 'netns', 'exec', namespace,
+        locate_command('ip'), 'link', 'set', 'lo', 'up')
+    if returncode != 0:
+        return False
+
     return True

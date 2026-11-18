@@ -41,6 +41,16 @@ as a short-lived subprocess, and the cost of importing the package
 into one on every maintenance pass is the kind of thing the database
 load work spent a plan removing.
 
+The address it asks is one of the namespace's own, so the request is
+delivered over loopback -- and a namespace from ``ip netns add`` has
+its loopback interface *down*. A down loopback drops the packet rather
+than refusing to send it: ``sendto()`` succeeds, nothing arrives, and
+the probe reads its own undelivered request as a wedged dnsmasq. Every
+DHCP network in CI failed its probe that way. Creating a network now
+brings ``lo`` up, and the probe refuses to call silence an answer when
+it is down, because that silence is about the probe rather than about
+the server (issue 730).
+
 The exit status separates "dnsmasq did not answer" from "the probe
 could not be run", because only the first is a reason to rebuild a
 network. Neither may be 1: that is what Python itself exits with for
@@ -81,12 +91,36 @@ PROBE_MAC = b'\x02\x00\x5f\x70\x72\x62'
 
 DEFAULT_TIMEOUT = 2.0
 
+# The loopback interface's flags, as sysfs exposes them, and the IFF_UP
+# bit within them.
+LOOPBACK_FLAGS_PATH = '/sys/class/net/lo/flags'
+IFF_UP = 0x1
+
 # Exit statuses, see the module docstring. EXIT_COULD_NOT_PROBE is what
 # main() returns for anything it can name; anything else non-zero (1 for
 # an import failure, say) means the same thing to the caller.
 EXIT_ANSWERED = 0
 EXIT_COULD_NOT_PROBE = 2
 EXIT_NO_ANSWER = 3
+
+
+class ProbeImpossible(Exception):
+    """The probe cannot say anything about the server either way."""
+
+
+def loopback_is_up(path=LOOPBACK_FLAGS_PATH):
+    """Is the loopback interface of this namespace up?
+
+    None means the flags could not be read, which the probe treats as
+    permission to go ahead rather than as a refusal: a host without
+    this sysfs file should still be able to probe. Only a definite
+    "down" stops it.
+    """
+    try:
+        with open(path) as f:
+            return bool(int(f.read().strip(), 16) & IFF_UP)
+    except (OSError, ValueError):
+        return None
 
 
 def build_inform(client_address, mac=PROBE_MAC, xid=None):
@@ -165,8 +199,16 @@ def probe(server_address, client_address, timeout=DEFAULT_TIMEOUT,
     rather than per packet read. An error which says nothing about the
     server (a socket which cannot be sent from, say) is raised rather
     than reported as silence, so that the caller can tell the two
-    apart.
+    apart. A down loopback is such an error: the server address is
+    local to this namespace, so the request goes nowhere and the
+    silence that follows is the probe's own.
     """
+    if loopback_is_up() is False:
+        raise ProbeImpossible(
+            'the loopback interface is down, so a request to an address '
+            'which is local to this network namespace is dropped rather '
+            'than delivered')
+
     xid, packet = build_inform(client_address)
 
     owned = sock is None

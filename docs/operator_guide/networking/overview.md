@@ -661,6 +661,17 @@ node logs a `Could not check whether dnsmasq is answering DHCP` warning
 on every pass, so a probe which never runs does not go unnoticed
 without writing an event row per network every thirty seconds.
 
+The probe reports that third outcome, rather than "no answer", when the
+namespace's loopback interface is down. The address it asks is the
+network's own router address, so the request is delivered over
+loopback, and a down loopback *drops* a packet rather than refusing to
+send it: the send succeeds and nothing arrives. A namespace created by
+`ip netns add` has its loopback down, which is why creating a network
+now brings it up — on every pass, so that a namespace built by an
+earlier version is repaired without a rebuild. Before that, every DHCP
+network on a node reported its own undelivered request as a wedged
+`dnsmasq` and was queued for a rebuild on every pass.
+
 ## Stray vxlan reaping
 
 Every node's network maintainer compares the vxlan devices actually

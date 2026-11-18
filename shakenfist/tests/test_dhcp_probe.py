@@ -362,6 +362,73 @@ class MainTestCase(base.ShakenFistTestCase):
         self.assertEqual(7.5, mock_probe.call_args.kwargs['timeout'])
 
 
+class LoopbackTestCase(base.ShakenFistTestCase):
+    """The probe asks an address which is local to its own namespace.
+
+    So the request is delivered over loopback, and a namespace from
+    "ip netns add" has its loopback down. A down loopback drops the
+    packet instead of failing the send, so the probe cannot tell that
+    from a wedged dnsmasq -- which is how every DHCP network in CI
+    reported itself wedged. It must not report that as "no answer",
+    because "no answer" is what rebuilds a network.
+    """
+
+    def _flags_file(self, contents):
+        f = tempfile.NamedTemporaryFile(mode='w', suffix='.flags')
+        self.addCleanup(f.close)
+        f.write(contents)
+        f.flush()
+        return f.name
+
+    def test_the_up_bit_is_read_from_the_flags(self):
+        # 0x9 is IFF_UP|IFF_LOOPBACK, which is what a namespace's lo
+        # reads once it has been brought up; 0x8 is the same interface
+        # down. Measured on debian:trixie.
+        self.assertTrue(
+            dhcp_probe.loopback_is_up(self._flags_file('0x9\n')))
+        self.assertFalse(
+            dhcp_probe.loopback_is_up(self._flags_file('0x8\n')))
+
+    def test_unreadable_flags_are_not_a_refusal(self):
+        # A host with no such sysfs file should still be able to probe,
+        # so "do not know" is permission to go ahead rather than a stop.
+        self.assertIsNone(
+            dhcp_probe.loopback_is_up('/nonexistent/class/net/lo/flags'))
+        self.assertIsNone(
+            dhcp_probe.loopback_is_up(self._flags_file('banana\n')))
+
+    def test_a_down_loopback_stops_the_probe(self):
+        sock = _FakeSocket([])
+        with mock.patch.object(dhcp_probe, 'loopback_is_up',
+                               return_value=False):
+            self.assertRaises(
+                dhcp_probe.ProbeImpossible, dhcp_probe.probe,
+                '10.0.0.1', '10.0.0.1', timeout=0.01, sock=sock)
+        self.assertEqual(
+            [], sock.sent,
+            'A request which cannot be delivered should not be sent')
+
+    def test_a_down_loopback_is_not_reported_as_no_answer(self):
+        # The status which matters: EXIT_NO_ANSWER is read as a wedged
+        # dnsmasq and rebuilds the network, EXIT_COULD_NOT_PROBE is
+        # not.
+        with mock.patch.object(dhcp_probe, 'loopback_is_up',
+                               return_value=False):
+            self.assertEqual(
+                dhcp_probe.EXIT_COULD_NOT_PROBE,
+                dhcp_probe.main(['10.0.0.1', '10.0.0.1']))
+
+    def test_an_unknown_loopback_does_not_stop_the_probe(self):
+        xid = 0x22222222
+        sock = _FakeSocket([_reply(xid, dhcp_probe.DHCPACK)])
+        with mock.patch.object(dhcp_probe, 'loopback_is_up',
+                               return_value=None), \
+                mock.patch.object(dhcp_probe, 'build_inform',
+                                  lambda *a, **k: (xid, b'packet')):
+            self.assertTrue(dhcp_probe.probe(
+                '10.0.0.1', '10.0.0.1', timeout=0.01, sock=sock))
+
+
 class IsServingDhcpTestCase(base.ShakenFistTestCase):
     """DnsMasq.is_serving_dhcp() and the network audit which calls it."""
 

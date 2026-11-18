@@ -1,6 +1,12 @@
 # Copyright 2026 Michael Still and contributors
 """Tests for the privexec util helpers.
 
+create_network_namespace() must leave the namespace's loopback
+interface up. A namespace from "ip netns add" has it down, and a down
+loopback drops a packet to an address which is local to the namespace
+rather than refusing to send it, so the DHCP readiness probe read its
+own undelivered request as a wedged dnsmasq (issue 730).
+
 create_interface() must report why an interface could not be created,
 not just that it could not be. The captured stderr carries the kernel's
 errno text (for example "No such file or directory" when the target
@@ -83,3 +89,61 @@ class CreateInterfaceTestCase(base.ShakenFistTestCase):
         self.assertFalse(success)
         self.assertIn(f'ip link set netns {NETWORK_UUID} exited 1', error)
         self.assertIn('No such file or directory', error)
+
+
+class CreateNetworkNamespaceTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+
+        patcher = mock.patch(
+            'shakenfist.daemons.privexec.util.locate_command',
+            side_effect=lambda c: c)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def patch_command_helper(self, side_effect, exists=False):
+        for target, kwargs in [
+                ('shakenfist.daemons.privexec.util.os.path.exists',
+                 {'return_value': exists}),
+                ('shakenfist.daemons.privexec.util.command_helper',
+                 {'side_effect': side_effect})]:
+            patcher = mock.patch(target, **kwargs)
+            mocked = patcher.start()
+            self.addCleanup(patcher.stop)
+        return mocked
+
+    def _commands(self, mocked):
+        return [' '.join(c.args) for c in mocked.call_args_list]
+
+    def test_a_new_namespace_has_its_loopback_brought_up(self):
+        mocked = self.patch_command_helper(lambda *c, **kw: ('', '', 0))
+
+        self.assertTrue(privexec_util.create_network_namespace(NETWORK_UUID))
+        self.assertEqual(
+            [f'ip netns add {NETWORK_UUID}',
+             f'ip netns exec {NETWORK_UUID} ip link set lo up'],
+            self._commands(mocked))
+
+    def test_an_existing_namespace_has_its_loopback_brought_up(self):
+        # The heal: a namespace created before this fix is not added
+        # again, so bringing lo up cannot be part of the add.
+        mocked = self.patch_command_helper(
+            lambda *c, **kw: ('', '', 0), exists=True)
+
+        self.assertTrue(privexec_util.create_network_namespace(NETWORK_UUID))
+        self.assertEqual(
+            [f'ip netns exec {NETWORK_UUID} ip link set lo up'],
+            self._commands(mocked))
+
+    def test_a_loopback_which_cannot_be_brought_up_fails_the_create(self):
+        # Reporting success here would leave a namespace in which every
+        # DHCP probe times out, and so a network which is rebuilt on
+        # every maintenance pass.
+        def responder(*command, **kwargs):
+            if 'link' in command:
+                return ('', 'Cannot open network namespace: No such file\n', 1)
+            return ('', '', 0)
+
+        self.patch_command_helper(responder)
+
+        self.assertFalse(privexec_util.create_network_namespace(NETWORK_UUID))
