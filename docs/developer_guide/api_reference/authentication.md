@@ -240,7 +240,7 @@ the keys used to authenticate to a namespace.
     print(json.dumps(key, indent=4, sort_keys=True))
     ```
 
-    Which returns something like:
+    The listing returns something like:
 
     ```json
     [
@@ -252,6 +252,18 @@ the keys used to authenticate to a namespace.
             "uuid": "..."
         }
     ]
+    ```
+
+    And the single key read returns that same object on its own:
+
+    ```json
+    {
+        "expiry": 1792000000.0,
+        "key_name": "jenkins",
+        "namespace": "ci",
+        "scopes": ["blob.read"],
+        "uuid": "..."
+    }
     ```
 
 ???+ info "Reading key metadata"
@@ -282,9 +294,9 @@ the keys used to authenticate to a namespace.
     Both reads are advertised by the one capability token
     `namespace-key-metadata`, which a client can use to discover whether a
     cluster serves them; the server serves them whether or not a client
-    looked. They
-    require the caller to be authenticated to the namespace, to `system`, or to
-    a namespace the target trusts -- the same test as the other key routes.
+    looked. They require the caller to be authenticated to the namespace, to
+    `system`, or to a namespace the target trusts -- the same test as the
+    other key routes.
 
 ??? example "Python API client: create a new key for a namespace"
 

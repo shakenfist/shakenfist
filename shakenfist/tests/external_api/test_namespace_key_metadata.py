@@ -117,8 +117,10 @@ class BareListingTestCase(KeyMetadataTestCase):
         resp = self._get('target')
 
         self.assertEqual(200, resp.status_code)
-        # The whole response: the exact names, in the order the
-        # accessor yields them, with the lapsed key absent.
+        # The whole response: the exact names, sorted, with the lapsed
+        # key absent. The sort itself is pinned by
+        # test_both_listings_are_ordered_by_key_name, which defeats the
+        # fixture's own alphabetical creation order.
         self.assertEqual(['login', 'person'], resp.get_json())
 
     def test_detail_arrives_in_a_json_body_too(self):
@@ -178,6 +180,28 @@ class DetailedListingTestCase(KeyMetadataTestCase):
         self.assertIsNone(entries['login']['expiry'])
         self.assertEqual(['blob.read'], entries['lapsed']['scopes'])
         self.assertEqual(['instance.read'], entries['person']['scopes'])
+        # A key with no scopes recorded reports null, which means
+        # unrestricted. Rendering it as [] would invert that: an empty
+        # list is the one spelling which grants nothing.
+        self.assertIsNone(entries['login']['scopes'])
+
+    def test_a_soft_deleted_key_is_still_readable(self):
+        # The expiry sweep soft deletes a lapsed key, and the reaper
+        # hard deletes it NAMESPACE_KEY_REAP_GRACE plus CLEANER_DELAY
+        # after it lapsed. Both detailed reads serve it in between,
+        # which is the forensic window the operator guide promises. A
+        # state filter in either accessor would close that window
+        # silently, so assert it on both reads.
+        NamespaceKey.from_db_by_name('target', 'lapsed').delete()
+
+        entries = self._detail('target')
+        self.assertIn('lapsed', entries)
+        self.assertEqual(self.past, entries['lapsed']['expiry'])
+
+        single = self._get('target', '/auth/namespaces/target/keys/lapsed')
+        self.assertEqual(200, single.status_code,
+                         single.get_data(as_text=True))
+        self.assertEqual(self.past, single.get_json()['expiry'])
 
     def test_the_name_is_key_name_and_never_name(self):
         for entry in self._detail('target').values():
@@ -406,12 +430,12 @@ class CostTestCase(KeyMetadataTestCase):
                 'system', '/auth/namespaces/target/keys/extra-3')
 
         self.assertEqual('extra-3', resp.get_json()['key_name'])
-        # The handler's own read, by its arguments. Authentication reads
-        # the presented key through the same accessor to re-check its
-        # nonce, so the bare count is two and the useful assertions are
-        # that this read happened, that the listing accessor was not
-        # touched, and that neither can scale with the nine keys.
-        self.assertIn(mock.call('target', 'extra-3'), point.call_args_list)
+        # Exactly one read for the key asked about. Authentication
+        # reads the presented key through the same accessor to re-check
+        # its nonce, but that call is ('system', 'login') and so is not
+        # counted here -- where a ceiling on the total would be tripped
+        # by any future read on the authentication path.
+        self.assertEqual(
+            1, point.call_args_list.count(mock.call('target', 'extra-3')))
         self.assertEqual(0, accessor.call_count)
-        self.assertLess(point.call_count, 3)
         self._assert_no_key_state_read(state)

@@ -771,9 +771,9 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
         # expiry, so an expired key here describes itself.
         #
         # include_expired=True also admits a key the expiry sweep has
-        # already soft deleted, which stays readable until the hard
-        # delete reaper runs. That is the forensic window
-        # NAMESPACE_KEY_REAP_GRACE controls, and an audit wants it.
+        # already soft deleted, which stays readable until the reaper
+        # hard deletes it -- NAMESPACE_KEY_REAP_GRACE plus
+        # CLEANER_DELAY after it lapsed. An audit wants that window.
         caller_is_system = _caller_is_system()
         return sorted(
             (_key_detail(key, attrs, caller_is_system)
@@ -842,14 +842,13 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
         # returns expired keys -- including ones the sweep has already
         # soft deleted -- so a key the detailed listing showed can
         # still be read on its own route.
-        row = mariadb.get_namespace_key_by_name(
+        found = namespace_key.key_with_attributes(
             namespace_from_db.uuid, key_name)
-        if not row:
+        if not found:
             return sf_api.error(404, 'key name not found in namespace')
 
-        static, attrs = row
-        return _key_detail(namespace_key.NamespaceKey.from_static_data(static),
-                           attrs, _caller_is_system())
+        key, attrs = found
+        return _key_detail(key, attrs, _caller_is_system())
 
     @swag_from(api_base.swagger_helper(
         'auth', 'Update an authentication key for a namespace.',

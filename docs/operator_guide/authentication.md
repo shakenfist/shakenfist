@@ -54,8 +54,9 @@ The detailed reads never return the key's secret. A key with no scopes
 recorded reports `scopes` as null, and that means the key is **unrestricted**
 rather than unprivileged: such a key mints wildcard tokens. There is no state
 field, so a key the expiry sweep has already soft deleted still appears, with
-an expiry in the past, until it is hard deleted -- which is the forensic
-window `NAMESPACE_KEY_REAP_GRACE` controls.
+an expiry in the past, until it is hard deleted -- `NAMESPACE_KEY_REAP_GRACE`
+plus `CLEANER_DELAY` after it lapsed, which is the forensic window described
+above.
 
 `provenance`, the record of who or what minted a key, is served only to a
 caller authenticated to the `system` namespace. Every other caller who can read

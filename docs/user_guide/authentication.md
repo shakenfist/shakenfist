@@ -111,15 +111,33 @@ expires fairly quickly.
 Setting this up is an administrator's job, and is covered in the
 [operator guide](/operator_guide/authentication/#federated-identity).
 
-## What you cannot currently see
+## Reading your own keys
 
-There is presently no way to ask Shaken Fist what your own key's expiry or
-scopes are. `sf-client namespace show <namespace>` lists the *names* of the
-keys in your namespace and nothing further about them, and there is no API
-which returns the rest.
+You can ask Shaken Fist what your own keys expire at and what they are scoped
+to. Being authenticated to a namespace is enough to read the keys of that
+namespace, so this needs no administrator.
 
-In practice this means that when a key stops working, the status code is your
-diagnostic -- 401 for expired, 403 for out of scope -- and your namespace
-owner or cluster administrator is the source of truth for what a key was
-created with. If you are chasing an intermittent authentication failure, ask
-them to check the expiry rather than trying to determine it yourself.
+```bash
+sf-client namespace show <namespace>
+```
+
+The two reads behind it are `GET /auth/namespaces/{namespace}/keys` with
+`detail=true`, which answers with one object per key -- including keys which
+have already expired, so you can see which one lapsed and when -- and
+`GET /auth/namespaces/{namespace}/keys/{key_name}`, which answers with the
+same object for a single key. Each object carries the key's name, uuid,
+expiry and scopes.
+
+A null expiry means the key never expires. A null `scopes` means the key is
+**unrestricted** rather than unprivileged: such a key may do anything the
+namespace may.
+
+Two things are still not yours to read. The key's secret is never returned by
+any API, so a key you have lost is replaced rather than recovered. And
+`provenance` -- the record of who or what minted a key, which for a key
+issued against a human login names the person -- is served only to a caller
+in the `system` namespace, so it will not appear for your own keys.
+
+If a key stops working the status code is still the fastest diagnostic, 401
+for expired and 403 for out of scope, but you no longer have to ask someone
+else what the key was created with.
