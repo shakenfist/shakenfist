@@ -19,6 +19,7 @@ import sys
 import time
 from unittest import mock
 
+from shakenfist import mariadb
 from shakenfist import namespace_key
 from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
@@ -119,6 +120,43 @@ class BareListingTestCase(KeyMetadataTestCase):
         # The whole response: the exact names, in the order the
         # accessor yields them, with the lapsed key absent.
         self.assertEqual(['login', 'person'], resp.get_json())
+
+    def test_detail_arrives_in_a_json_body_too(self):
+        # The shipped client serialises even a GET's parameters into a
+        # body, which is why the argument is bound json_or_query. A
+        # query-string-only test would pass while that client saw the
+        # bare listing.
+        resp = self.client.get(
+            '/auth/namespaces/target/keys',
+            headers={'Authorization': self._token('system')},
+            data=json.dumps({'detail': True}),
+            content_type='application/json')
+
+        self.assertEqual(200, resp.status_code, resp.get_data(as_text=True))
+        entries = resp.get_json()
+        self.assertIsInstance(entries[0], dict)
+        self.assertEqual(['lapsed', 'login', 'person'],
+                         [e['key_name'] for e in entries])
+
+    def test_both_listings_are_ordered_by_key_name(self):
+        # The accessor does not order its rows, so the handler does. A
+        # table in the client should not reshuffle between two identical
+        # requests. Asserted on the raw list, since the helpers key by
+        # name and would hide the order.
+        #
+        # The fixture's keys happen to be created in alphabetical order,
+        # which would let an unsorted handler pass this. So add one which
+        # sorts first and is created last: the assertion then fails
+        # unless something really is sorting.
+        NamespaceKey.new('target', 'aardvark', 'aardvark-secret',
+                         expiry=self.future)
+
+        self.assertEqual(['aardvark', 'login', 'person'],
+                         self._get('target').get_json())
+
+        detailed = self._get('target', query_string={'detail': 'true'})
+        self.assertEqual(['aardvark', 'lapsed', 'login', 'person'],
+                         [e['key_name'] for e in detailed.get_json()])
 
     def test_detail_false_is_the_bare_listing(self):
         resp = self._get('target', query_string={'detail': 'false'})
@@ -356,10 +394,24 @@ class CostTestCase(KeyMetadataTestCase):
         self.assertEqual(1, accessor.call_count)
         self._assert_no_key_state_read(state)
 
-    def test_the_single_key_read_reads_the_keys_once_and_no_key_state(self):
-        resp, accessor, state = self._count(
-            'system', '/auth/namespaces/target/keys/extra-3')
+    def test_the_single_key_read_is_an_indexed_point_read(self):
+        # Answering a single-key question by listing the namespace would
+        # transfer every key's row, hash and nonce included. The unique
+        # (namespace, name) pair is indexed, so this reads one row and
+        # never touches the listing accessor.
+        real_point = mariadb.get_namespace_key_by_name
+        with mock.patch('shakenfist.mariadb.get_namespace_key_by_name',
+                        side_effect=real_point) as point:
+            resp, accessor, state = self._count(
+                'system', '/auth/namespaces/target/keys/extra-3')
 
         self.assertEqual('extra-3', resp.get_json()['key_name'])
-        self.assertEqual(1, accessor.call_count)
+        # The handler's own read, by its arguments. Authentication reads
+        # the presented key through the same accessor to re-check its
+        # nonce, so the bare count is two and the useful assertions are
+        # that this read happened, that the listing accessor was not
+        # touched, and that neither can scale with the nine keys.
+        self.assertIn(mock.call('target', 'extra-3'), point.call_args_list)
+        self.assertEqual(0, accessor.call_count)
+        self.assertLess(point.call_count, 3)
         self._assert_no_key_state_read(state)

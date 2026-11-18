@@ -237,6 +237,7 @@ the keys used to authenticate to a namespace.
     print(json.dumps(keys, indent=4, sort_keys=True))
 
     key = sf_client.get_namespace_key('ci', 'jenkins')
+    print(json.dumps(key, indent=4, sort_keys=True))
     ```
 
     Which returns something like:
@@ -266,13 +267,22 @@ the keys used to authenticate to a namespace.
     seconds, or null for a key which never expires) and `scopes`. The key's
     secret is never returned.
 
+    **`scopes` is null for a key with no scopes recorded, and that means the
+    key is unrestricted, not unprivileged.** Such a key mints wildcard
+    tokens, so a null here describes the most privileged keys in a namespace
+    rather than the least. There is no state field: a key the expiry sweep
+    has already soft deleted is still served by the detailed reads, with an
+    expiry in the past, until the hard delete reaper removes it.
+
     A caller authenticated to the `system` namespace also sees `provenance`,
     which records who or what minted the key and can identify a person. For
     any other caller the field is absent. Absence therefore means the caller
     is not in `system`, **not** that the key has no provenance.
 
-    Both reads are gated by the one capability token `namespace-key-metadata`,
-    which a client can use to discover whether a cluster serves them. They
+    Both reads are advertised by the one capability token
+    `namespace-key-metadata`, which a client can use to discover whether a
+    cluster serves them; the server serves them whether or not a client
+    looked. They
     require the caller to be authenticated to the namespace, to `system`, or to
     a namespace the target trusts -- the same test as the other key routes.
 

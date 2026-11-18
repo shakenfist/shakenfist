@@ -460,6 +460,17 @@ def keys_with_attributes(
     created via zombie_repair_state() rather than deleting it (issue
     3836). Any future soft delete path must revisit that, here and in
     Namespace.lookup_key().
+
+    That construction holds only while include_expired is false. A
+    caller which sets it does see keys the sweep has already soft
+    deleted, and stateless zombies, until the hard delete reaper
+    removes them -- which is the forensic window
+    NAMESPACE_KEY_REAP_GRACE controls, and is what an audit of lapsed
+    credentials wants. Such a caller must not treat presence here as
+    proof a key is live.
+
+    The rows are not ordered. A caller which presents them to a person
+    should sort them.
     """
     return [
         (NamespaceKey.from_static_data(static_data), attrs)

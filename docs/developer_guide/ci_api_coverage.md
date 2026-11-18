@@ -200,6 +200,14 @@ As well as being tested as a side effect of most other tests, there is the follo
 
 *Not tested.*
 
+## get_namespace_keys
+
+*Not tested.*
+
+## get_namespace_key
+
+*Not tested.*
+
 ## add_namespace_key
 
 * TestAuth.test_namespaces

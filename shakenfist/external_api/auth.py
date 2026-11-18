@@ -738,10 +738,12 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
              'Defaults to false, which is the historical response.', False)
         ],
         [(200, 'A list of keynames for the namespace, or one metadata '
-               'object per key when detail is set. A detailed entry '
-               'carries provenance only for a caller in the system '
-               'namespace, so its absence does not mean the key has '
-               'none.',
+               'object per key when detail is set, in the shape the '
+               'single key route documents. Both are ordered by key '
+               'name. A detailed entry carries provenance only for a '
+               'caller in the system namespace, so its absence does not '
+               'mean the key has none, and a null scopes list means the '
+               'key is unrestricted rather than unprivileged.',
           '["deploy", ...]'),
          (404, 'Namespace not found.', None)]))
     @use_kwargs(get_args, location='json_or_query')
@@ -754,19 +756,30 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
         # The listing object would instead cost a point read per key
         # whenever a state filter was applied, on a route a namespace
         # owner may call freely.
+        #
+        # The accessor does not order its rows, so both arms sort by key
+        # name. A listing rendered as a table should not reshuffle
+        # between two identical requests.
         if not detail:
-            return [key.name for key, _ in
-                    namespace_key.keys_with_attributes(namespace)]
+            return sorted(key.name for key, _ in
+                          namespace_key.keys_with_attributes(
+                              namespace_from_db.uuid))
 
         # An expired key is the thing an audit most needs to see, and
         # the bare listing hides it: a key which has lapsed simply
         # stops being mentioned. Each detailed entry carries its own
         # expiry, so an expired key here describes itself.
+        #
+        # include_expired=True also admits a key the expiry sweep has
+        # already soft deleted, which stays readable until the hard
+        # delete reaper runs. That is the forensic window
+        # NAMESPACE_KEY_REAP_GRACE controls, and an audit wants it.
         caller_is_system = _caller_is_system()
-        return [
-            _key_detail(key, attrs, caller_is_system)
-            for key, attrs in namespace_key.keys_with_attributes(
-                namespace, include_expired=True)]
+        return sorted(
+            (_key_detail(key, attrs, caller_is_system)
+             for key, attrs in namespace_key.keys_with_attributes(
+                 namespace_from_db.uuid, include_expired=True)),
+            key=lambda entry: entry['key_name'])
 
     @swag_from(api_base.swagger_helper(
         'auth', 'Add an authentication key for the namespace.',
@@ -813,25 +826,30 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
         ],
         [(200, 'The metadata of a single key. provenance is present only '
                'for a caller in the system namespace, so its absence does '
-               'not mean the key has none.',
+               'not mean the key has none. A null expiry means the key '
+               'never expires, and a null scopes list means it is '
+               'unrestricted rather than unprivileged.',
           namespace_key_detail_example),
          (404, 'Namespace or key not found.', None)]))
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
     def get(self, namespace=None, key_name=None, namespace_from_db=None):
-        # The accessor lists one namespace's keys, so a key of the same
-        # name in another namespace is not a candidate here: it is a
-        # 404 like any other name this namespace does not have. Expired
-        # keys are included for the reason the detailed listing
-        # includes them, and so that a key the listing showed can still
-        # be read on its own route.
-        caller_is_system = _caller_is_system()
-        for key, attrs in namespace_key.keys_with_attributes(
-                namespace, include_expired=True):
-            if key.name == key_name:
-                return _key_detail(key, attrs, caller_is_system)
-        return sf_api.error(404, 'key name not found in namespace')
+        # One indexed read of the unique (namespace, name) pair, which
+        # is the same accessor token validation uses. It is scoped to
+        # this namespace, so a key of the same name elsewhere is a 404
+        # like any other name this namespace does not have, and it
+        # returns expired keys -- including ones the sweep has already
+        # soft deleted -- so a key the detailed listing showed can
+        # still be read on its own route.
+        row = mariadb.get_namespace_key_by_name(
+            namespace_from_db.uuid, key_name)
+        if not row:
+            return sf_api.error(404, 'key name not found in namespace')
+
+        static, attrs = row
+        return _key_detail(namespace_key.NamespaceKey.from_static_data(static),
+                           attrs, _caller_is_system())
 
     @swag_from(api_base.swagger_helper(
         'auth', 'Update an authentication key for a namespace.',

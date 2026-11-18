@@ -219,8 +219,11 @@ should be removed when this is closed". They are:
 | `docs/developer_guide/api_reference/authentication.md` | 214, 235, 280 | Three worked examples calling `get_namespace_keynames` |
 
 `docs/developer_guide/ci_api_coverage.md:199` also carries a
-`get_namespace_keynames` section, which is generated coverage
-bookkeeping rather than a claim about the API.
+`get_namespace_keynames` section. That page is **manually** maintained --
+its own header says so -- so a new client method with no entry makes the
+page understate the API surface rather than report it untested. The two
+new methods get `*Not tested.*` entries, which the page treats as a
+legitimate answer.
 
 ### `file:line` drift in the master plan
 
