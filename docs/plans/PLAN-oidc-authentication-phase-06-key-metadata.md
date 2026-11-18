@@ -620,4 +620,43 @@ still not worked together.
 
 ## Results
 
-*To be filled in during execution.*
+### Mutation testing the disclosure rule (step 6c)
+
+Seven mutants, each run on a copy of the tree with bytecode writing
+disabled and under `timeout 600`. All seven are killed. Six were killed
+by tests written in 6b; the seventh exposed a coverage gap and is
+discussed below.
+
+| # | Mutation | Killed by | Assertion |
+|---|----------|-----------|-----------|
+| 1 | `provenance` included unconditionally | `DetailedListingTestCase.test_an_owner_entry_has_exactly_the_published_fields` | `OWNER_FIELDS != set(entry)` |
+| 2 | The caller condition inverted | `ProvenanceDisclosureTestCase.test_system_sees_provenance_and_the_owner_does_not_on_one_key` | `KeyError: 'provenance'` for the system caller |
+| 3 | `_caller_is_system()` replaced by `api_base.caller_has_admin_rights()` | `ProvenanceDisclosureTestCase.test_a_scoped_system_caller_still_sees_provenance` | `PROVENANCE != entries['person'].get('provenance')` |
+| 4 | `attrs.key` added to the projection | `NoSecretMaterialTestCase.test_no_response_contains_a_hash_or_a_nonce` | `assertNotIn(secret, body)` |
+| 5 | `detail` defaulting to truthy | `BareListingTestCase.test_the_bare_listing_is_unchanged_and_omits_the_expired_key` | the bare name list differs from the detailed dicts |
+| 6 | The detailed listing passing `include_expired=False` | `DetailedListingTestCase.test_the_detailed_listing_includes_the_expired_key` | `{'login', 'person', 'lapsed'} != set(entries)` |
+| 7 | The single-key read searching every namespace | `SingleKeyTestCase.test_a_name_which_exists_only_in_another_namespace_is_a_404` | `404 != 200` |
+
+**Mutant 3 survived its first run, and that was the one finding.** No
+test exercised a caller who is in `system` but does not hold
+`cluster-admin`, so `request_namespace() == 'system'` and
+`caller_has_admin_rights()` agreed on every case and the substitution was
+invisible. That is precisely the regression `_caller_is_system`'s
+docstring exists to warn about: the field would have vanished for an
+operator holding a correctly scoped key, which is a silent loss of a
+field rather than an error anyone would notice.
+
+The gap was closed by adding
+`test_a_scoped_system_caller_still_sees_provenance`, which mints a key
+in `system` scoped to `auth.read` -- enough to satisfy the universal
+scope check on these routes, not enough to satisfy `cluster-admin` --
+and asserts both reads still serve `provenance`. The test was confirmed
+to fail against mutant 3 before being accepted, so it is not vacuous.
+Neither the mutant nor 6a's code was adjusted to achieve this.
+
+Mutant 7 also had to be rebuilt once: its first form resolved no
+namespaces at all, so every single-key read returned 404 and the mutant
+died for the wrong reason. The faithful version, which chains the
+accessor over every active namespace the way `auth.py` itself iterates
+them, genuinely returns another namespace's key before the test refuses
+it.

@@ -194,6 +194,35 @@ class ProvenanceDisclosureTestCase(KeyMetadataTestCase):
         self.assertEqual(200, as_trustee.status_code)
         self.assertNotIn('provenance', as_trustee.get_json())
 
+    def test_a_scoped_system_caller_still_sees_provenance(self):
+        # The disclosure turns on being in the system namespace, not on
+        # holding cluster-admin. An operator whose key is scoped to just
+        # what these reads need is still an operator, and the field must
+        # not quietly vanish for them. Without this case a projection
+        # which asked for administrative rights instead would behave
+        # identically on every other test here, because the namespace's
+        # fixture key is unscoped and so carries the wildcard.
+        NamespaceKey.new('system', 'scoped', 'scoped-secret',
+                         scopes=['auth.read'])
+        resp = self.client.post('/auth', data=json.dumps(
+            {'namespace': 'system', 'key': 'scoped-secret'}))
+        self.assertEqual(200, resp.status_code, resp.get_data(as_text=True))
+        token = 'Bearer %s' % resp.get_json()['access_token']
+
+        listed = self.client.get(
+            '/auth/namespaces/target/keys', headers={'Authorization': token},
+            query_string={'detail': 'true'})
+        self.assertEqual(200, listed.status_code,
+                         listed.get_data(as_text=True))
+        entries = {e['key_name']: e for e in listed.get_json()}
+        self.assertEqual(PROVENANCE, entries['person']['provenance'])
+
+        single = self.client.get(
+            '/auth/namespaces/target/keys/person',
+            headers={'Authorization': token})
+        self.assertEqual(200, single.status_code, single.get_data(as_text=True))
+        self.assertEqual(PROVENANCE, single.get_json()['provenance'])
+
     def test_a_namespace_nobody_trusts_cannot_read_the_listing(self):
         resp = self._get('stranger', query_string={'detail': 'true'})
 
