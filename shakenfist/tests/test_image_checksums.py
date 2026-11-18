@@ -16,6 +16,7 @@ md5 survives as a fallback rather than being dropped outright.
 """
 
 import hashlib
+import os
 from unittest import mock
 
 import requests
@@ -34,6 +35,11 @@ MD5SUMS = (
     'bbbb  cirros-0.6.3-aarch64-disk.img\n'
     '%s  cirros-0.6.3-x86_64-disk.img\n'
 ) % ('2' * 32)
+
+
+def _fixture(name):
+    with open(os.path.join(os.path.dirname(__file__), 'files', name)) as f:
+        return f.read()
 
 
 def _response(status_code, text=''):
@@ -152,6 +158,55 @@ class ResolveCirrosChecksumTestCase(base.ShakenFistTestCase):
 
         self.assertIsNone(algorithm)
         self.assertIsNone(checksum)
+
+
+class PublishedDigestFilesTestCase(base.ShakenFistTestCase):
+    """The parser against the files cirros actually publishes.
+
+    Every other test here uses a synthetic two-field fixture, which
+    cannot show the parse missing the real format -- and a miss is not
+    an error, it is a fetch which goes ahead unverified. These are the
+    files verbatim, as served by download.cirros-cloud.net.
+    """
+
+    def _resolve(self, vernum, responses):
+        url = (f'http://download.cirros-cloud.net/{vernum}/'
+               f'cirros-{vernum}-x86_64-disk.img')
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=responses):
+            return images._resolve_cirros_checksum(url, vernum)
+
+    def test_the_real_sha256sums_names_our_image(self):
+        algorithm, checksum = self._resolve(
+            '0.6.3', [_response(200, _fixture('cirros-SHA256SUMS-0.6.3'))])
+        self.assertEqual('sha256', algorithm)
+        self.assertEqual(
+            '7d6355852aeb6dbcd191bcda7cd74f15'
+            '36cfe5cbf8a10495a7283a8396e4b75b', checksum)
+
+    def test_the_real_md5sums_names_our_image(self):
+        # 0.4.0 publishes no SHA256SUMS.
+        algorithm, checksum = self._resolve(
+            '0.4.0',
+            [_response(404), _response(200, _fixture('cirros-MD5SUMS-0.4.0'))])
+        self.assertEqual('md5', algorithm)
+        self.assertEqual('443b7623e27ecf03dc9e01ee93f67afe', checksum)
+
+    def test_a_binary_mode_marker_is_not_part_of_the_name(self):
+        text = _fixture('cirros-SHA256SUMS-0.6.3').replace('  ', ' *')
+        algorithm, checksum = self._resolve('0.6.3', [_response(200, text)])
+        self.assertEqual('sha256', algorithm)
+        self.assertEqual(
+            '7d6355852aeb6dbcd191bcda7cd74f15'
+            '36cfe5cbf8a10495a7283a8396e4b75b', checksum)
+
+    def test_finding_nothing_for_cirros_is_said(self):
+        with mock.patch.object(images, 'LOG') as mock_log:
+            self._resolve('0.6.3', [_response(404), _response(404)])
+        warnings = [c.args[0] for c in
+                    mock_log.with_fields.return_value.warning.call_args_list]
+        self.assertIn('No published checksum found for a cirros image, it '
+                      'will be fetched unverified', warnings)
 
 
 class AlgorithmForDigestTestCase(base.ShakenFistTestCase):
@@ -317,6 +372,29 @@ class HttpFetchChecksumTestCase(base.ShakenFistTestCase):
         digest = hashlib.md5(self.CONTENT).hexdigest()
         result, _, _ = self._fetch('md5', digest)
         self.assertIsNotNone(result)
+
+    def test_the_digest_is_not_claimed_as_a_security_primitive(self):
+        # A FIPS-restricted OpenSSL refuses md5 unless told it is not
+        # being used for security, and the fetch failed outright.
+        digest = hashlib.md5(self.CONTENT).hexdigest()
+        real_new = hashlib.new
+        with mock.patch('shakenfist.blob.hashlib.new',
+                        side_effect=real_new) as mock_new:
+            self._fetch('md5', digest)
+        mock_new.assert_called_once_with('md5', usedforsecurity=False)
+
+    def test_a_failed_tidy_up_does_not_hide_the_mismatch(self):
+        # The caller handles BadCheckSum, and records the event the
+        # whole check exists to produce. An OSError from removing the
+        # partial file would skip both.
+        def _cannot_unlink(path):
+            raise PermissionError('read only filesystem')
+
+        unlinked = mock.MagicMock(side_effect=_cannot_unlink)
+        self.assertRaises(
+            exceptions.BadCheckSum, self._fetch, 'sha256', '0' * 64,
+            unlinked=mock.MagicMock(append=unlinked))
+        unlinked.assert_called_once_with('/tmp/x.partial')
 
     def test_no_checksum_means_no_check(self):
         result, _, unlink = self._fetch(None, None)

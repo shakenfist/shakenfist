@@ -58,14 +58,17 @@ STRAY_VXLAN_HANDLING_FAILING: bool = False
 
 
 def forget_unvisited_quiesces(visited_networks):
-    """Drop QUIESCE_REPORTED entries for networks a pass did not visit.
+    """Drop once-per-episode report entries for networks a pass did not visit.
 
     A network deleted while quiesced never reconciles cleanly, so the
     discard on a clean pass never removes it, and it would sit in the
-    set for the life of the process. The stray vxid caches are pruned
-    against what a pass saw in the same way.
+    set for the life of the process. The same holds for a network
+    deleted while its DHCP probe could not be run. The stray vxid
+    caches are pruned against what a pass saw in the same way.
     """
-    QUIESCE_REPORTED.intersection_update(str(u) for u in visited_networks)
+    visited = {str(u) for u in visited_networks}
+    QUIESCE_REPORTED.intersection_update(visited)
+    network.DHCP_PROBE_FAILURE_REPORTED.intersection_update(visited)
 
 
 # Instance states in which a domain on this node may still be attached

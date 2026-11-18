@@ -6,8 +6,10 @@
 # The probe's correctness rests on how dnsmasq answers a DHCPINFORM, which
 # no unit test can establish: that it answers a client it has never heard of,
 # that it answers at the request's source port rather than port 68 (so the
-# probe needs no privileged bind), that it allocates no lease, and that a
-# stopped dnsmasq does not answer. This checks all four.
+# probe needs no privileged bind), that the answer comes from the address and
+# port the request was sent to (the probe ignores anything else), that it
+# allocates no lease, and that a stopped dnsmasq does not answer. This checks
+# all five.
 #
 # Usage: tools/dhcp-probe-against-dnsmasq.sh [image ...]
 #

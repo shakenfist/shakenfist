@@ -13,6 +13,7 @@ prevents ``enqueue_delete()`` from running.
 from unittest import mock
 from uuid import uuid4
 
+from shakenfist import baseobject
 from shakenfist.constants import CAPACITY_GUARD_STAGE
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
@@ -67,12 +68,30 @@ class EnqueueDeleteDueErrorTestCase(base.ShakenFistTestCase):
         inst = self.mock_mariadb.create_instance(
             'writefail', set_state=Instance.STATE_CREATING)
 
+        # The message travels with the state now, so what is left to
+        # fail after it is the refusal stage annotation.
         with mock.patch.object(
-                Instance, 'error', new_callable=mock.PropertyMock,
-                side_effect=RuntimeError('Failed to write error message')):
+                Instance, '_record_refusal_stage',
+                side_effect=RuntimeError('Failed to write stage')):
             inst.enqueue_delete_due_error('Unhandled error: boom')
 
         self.assertEqual(Instance.STATE_CREATING_ERROR, inst.state.value)
+        self.assertEqual('Unhandled error: boom', inst.error)
+        mock_enqueue_delete.assert_called_once_with()
+
+    @mock.patch('shakenfist.instance.Instance.enqueue_delete')
+    def test_an_empty_reason_still_errors_and_cleans_up(
+            self, mock_enqueue_delete):
+        # The text of an exception with no message is ''. Refusing the
+        # transition for want of a reason left the instance in its
+        # pre-failure state and raised out of the error handler.
+        inst = self.mock_mariadb.create_instance(
+            'noreason', set_state=Instance.STATE_CREATING)
+
+        inst.enqueue_delete_due_error('')
+
+        self.assertEqual(Instance.STATE_CREATING_ERROR, inst.state.value)
+        self.assertEqual(baseobject.NO_REASON_RECORDED, inst.error)
         mock_enqueue_delete.assert_called_once_with()
 
 

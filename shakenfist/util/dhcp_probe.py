@@ -137,6 +137,10 @@ def parse_message_type(packet):
         if offset + 1 >= len(options):
             return None
         length = options[offset + 1]
+        if offset + 2 + length > len(options):
+            # The option claims more bytes than the packet has: it was
+            # truncated, and nothing in it or after it can be trusted.
+            return None
         if code == OPTION_MESSAGE_TYPE and length >= 1:
             return options[offset + 2]
         offset += 2 + length
@@ -186,13 +190,20 @@ def probe(server_address, client_address, timeout=DEFAULT_TIMEOUT,
                 return False
             sock.settimeout(remaining)
             try:
-                reply, _ = sock.recvfrom(2048)
+                reply, source = sock.recvfrom(2048)
             except socket.timeout:
                 return False
             except ConnectionRefusedError:
                 # Nothing is listening on the server port: an answer
                 # about the server, and the answer is no.
                 return False
+            # The namespace is bridged to the guests, so an answer is
+            # only believed from the server and port we asked. dnsmasq
+            # 2.90 and 2.91 reply from exactly that, which
+            # tools/dhcp-probe-against-dnsmasq.sh checks against the
+            # real thing.
+            if source != (server_address, server_port):
+                continue
             if parse_transaction_id(reply) != xid:
                 continue
             return parse_message_type(reply) == DHCPACK

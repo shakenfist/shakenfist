@@ -654,8 +654,12 @@ the probe exits with anything but its own "no answer" status, the
 network records `could not check whether dnsmasq is answering DHCP`
 with the error and is left alone. A probe which cannot run says nothing
 about `dnsmasq`, and rebuilding every network because the check itself
-was broken would be worse than not checking. That event recurs every
-pass for as long as the cause persists, so it should not go unnoticed.
+was broken would be worse than not checking. The event is recorded
+once when the probe starts failing, and `can check whether dnsmasq is
+answering DHCP again` once when it recovers; in between, the network
+node logs a `Could not check whether dnsmasq is answering DHCP` warning
+on every pass, so a probe which never runs does not go unnoticed
+without writing an event row per network every thirty seconds.
 
 ## Stray vxlan reaping
 

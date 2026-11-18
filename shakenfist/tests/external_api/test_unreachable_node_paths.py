@@ -173,6 +173,28 @@ class BlobDataPeerUnreachableTestCase(base.ShakenFistTestCase):
         self.assertEqual(logging.WARNING, records[0].levelno)
         self.assertEqual('sf-5', records[0].extra_fields['host'])
 
+    def test_a_finished_transfer_releases_the_peer_connection(self):
+        response = mock.MagicMock()
+        response.iter_content.return_value = iter([b'blob', b'data'])
+
+        list(api_blob._stream_remote(response, 'sf-5', self.BLOB_UUID))
+
+        response.close.assert_called_once_with()
+
+    def test_a_caller_which_disconnects_releases_the_peer_connection(self):
+        # The WSGI server closes the generator when the client goes.
+        # Without a close the peer socket waits for garbage collection,
+        # or for the whole read timeout if the peer has stalled.
+        response = mock.MagicMock()
+        response.iter_content.return_value = iter([b'blob', b'data'])
+
+        stream = api_blob._stream_remote(response, 'sf-5', self.BLOB_UUID)
+        next(stream)
+        response.close.assert_not_called()
+        stream.close()
+
+        response.close.assert_called_once_with()
+
     def test_a_reachable_holder_still_streams(self):
         response = mock.MagicMock()
         response.status_code = 200

@@ -70,6 +70,10 @@ NO_REASON_RECORDED = 'no reason recorded, see the node logs'
 # caller worth naming is found by skipping them, not by a fixed offset.
 STATE_PLUMBING_FUNCTIONS = frozenset({'_state_update', 'state'})
 
+# The same for an enter_error_state() call with an empty reason, which
+# passes through each override of it (Network has one) on the way.
+ERROR_STATE_ENTRY_FUNCTIONS = frozenset({'enter_error_state'})
+
 
 def _maintain_version_cache(max_cache_age):
     global VERSION_CACHE_MINIMUM
@@ -847,6 +851,35 @@ class DatabaseBackedObject:
                 f'{self.object_type}/{self.uuid} to MariaDB')
         self._log_attribute_mutation('error', {'message': msg})
 
+    def _reason_for_error_state(self, message, new_value):
+        """The reason to record for entering new_value, never empty.
+
+        A missing reason is a defect in the caller, but it is found at
+        run time -- most often as the text of an exception which turned
+        out to have none -- and on a path which is already handling a
+        failure. Refusing the transition there leaves the object in the
+        state it was failing out of, and raises out of an error handler,
+        which is worse than an error state without a reason. So enter
+        it anyway, record that no reason was given, and name the caller
+        in the log, as the backstop in _state_update() does for a bare
+        assignment. An object already in an error state keeps the reason
+        it already has: that one at least says something.
+        """
+        if message:
+            return message
+
+        current = self.state
+        LOG.with_fields({
+            'uuid': self.uuid,
+            'object_type': self.object_type,
+            'new state': new_value,
+            'caller': util_callstack.get_caller_outside(
+                ERROR_STATE_ENTRY_FUNCTIONS)
+        }).error('Error state entered with no reason recorded')
+        if self._is_error_state_value(current.value) and current.message:
+            return current.message
+        return NO_REASON_RECORDED
+
     def enter_error_state(self, new_value, message,
                           skip_transition_validation=False):
         """Move into an error state and record why, in one write.
@@ -858,10 +891,10 @@ class DatabaseBackedObject:
         between -- which is how an instance was observed in state error
         with a null error_message (issue 3665).
 
-        ``message`` is required and is what ``error`` and the object's
-        ``error_message`` view field will read back. Prefer a reason a
-        reader who was not here can act on: name the thing that was
-        missing or the operation that failed, not just 'failed'.
+        ``message`` is what ``error`` and the object's ``error_message``
+        view field will read back. Prefer a reason a reader who was not
+        here can act on: name the thing that was missing or the
+        operation that failed, not just 'failed'.
         """
         if not self._is_error_state_value(new_value):
             raise exceptions.InvalidStateException(
@@ -869,10 +902,7 @@ class DatabaseBackedObject:
                 'object=%s uuid=%s'
                 % (new_value, self.object_type, self.uuid))
 
-        if not message:
-            raise exceptions.InvalidStateException(
-                'enter_error_state() requires a reason for object=%s '
-                'uuid=%s' % (self.object_type, self.uuid))
+        message = self._reason_for_error_state(message, new_value)
 
         # Already there, and _state_update() would see no change and
         # write nothing -- not even the reason, so a second failure of

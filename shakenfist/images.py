@@ -231,7 +231,7 @@ def _resolve_cirros_checksum(url, vernum):
             }).warning('Published checksum is not a digest we recognise')
         if algorithm:
             return algorithm, checksum
-        return None, None
+        return _no_cirros_checksum(url, vernum)
 
     for algorithm, digest_file in CHECKSUM_FILES:
         checksum_url = template % {
@@ -250,6 +250,16 @@ def _resolve_cirros_checksum(url, vernum):
 
         checksum = checksums.get(filename)
         if not checksum:
+            # A file we could read which does not name our image. The
+            # weaker file may, so carry on, but a parse which never
+            # matches would otherwise turn verification off without a
+            # word.
+            LOG.with_fields({
+                'url': checksum_url,
+                'algorithm': algorithm,
+                'filename': filename,
+                'names': len(checksums)
+            }).warning('Published checksums do not name this image')
             continue
         if _algorithm_for_digest(checksum) != algorithm:
             LOG.with_fields({
@@ -261,6 +271,21 @@ def _resolve_cirros_checksum(url, vernum):
             continue
         return algorithm, checksum
 
+    return _no_cirros_checksum(url, vernum)
+
+
+def _no_cirros_checksum(url, vernum):
+    """Say so, and return the (None, None) which means it.
+
+    Every cirros release we know of publishes a digest for its disk
+    images, so arriving here means the mirror, the template or the
+    parse is wrong, not that there is nothing to check against.
+    """
+    LOG.with_fields({
+        'url': url,
+        'vernum': vernum
+    }).warning('No published checksum found for a cirros image, it will '
+               'be fetched unverified')
     return None, None
 
 
@@ -290,6 +315,11 @@ def _fetch_remote_checksum(checksum_url):
     Returns a dict, or None when the file could not be fetched. An
     empty dict means the file exists and names no files, which is a
     different fact.
+
+    The format is coreutils' sha256sum / md5sum output, which marks a
+    file hashed in binary mode with a `*` before its name. cirros does
+    not, but a mirror regenerating the files might, and a name which
+    does not match is a check which silently does not happen.
     """
     try:
         resp = requests.get(
@@ -306,7 +336,7 @@ def _fetch_remote_checksum(checksum_url):
     for line in resp.text.split('\n'):
         elems = line.split()
         if len(elems) == 2:
-            checksums[elems[1]] = elems[0]
+            checksums[elems[1].removeprefix('*')] = elems[0]
     return checksums
 
 

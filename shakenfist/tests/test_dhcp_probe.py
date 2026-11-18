@@ -36,6 +36,7 @@ import time
 from functools import partial
 from unittest import mock
 
+from shakenfist.daemons.network import maintain
 from shakenfist.exceptions import DHCPProbeFailed
 from shakenfist.exceptions import MissingPrivExecSocket
 from shakenfist.exceptions import ProcessExecutionError
@@ -70,6 +71,7 @@ class _FakeSocket:
         self._replies = list(replies)
         self.sent = []
         self.timeout = None
+        self.source = ('10.0.0.1', 67)
 
     def settimeout(self, timeout):
         self.timeout = timeout
@@ -83,7 +85,7 @@ class _FakeSocket:
         reply = self._replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
-        return reply, ('10.0.0.1', 67)
+        return reply, self.source
 
     def close(self):
         pass
@@ -147,6 +149,18 @@ class ProbeTestCase(base.ShakenFistTestCase):
     def test_a_reply_which_is_not_an_ack_is_not_serving(self):
         result, _ = self._probe([_reply(self.XID, 6)])      # DHCPNAK
         self.assertFalse(result)
+
+    def test_a_reply_from_anywhere_else_is_not_believed(self):
+        # The namespace is bridged to the guests. A guest which got a
+        # packet with our transaction id to our port must not be able
+        # to make a wedged dnsmasq look healthy.
+        sock = _FakeSocket([_reply(self.XID, dhcp_probe.DHCPACK)])
+        sock.source = ('10.0.0.99', 67)
+        with mock.patch.object(
+                dhcp_probe, 'build_inform',
+                lambda *a, **k: (self.XID, b'packet')):
+            self.assertFalse(dhcp_probe.probe(
+                '10.0.0.1', '10.0.0.1', timeout=0.01, sock=sock))
 
     def test_another_clients_reply_is_not_mistaken_for_ours(self):
         # dnsmasq broadcasts, so a guest mid-handshake can land in our
@@ -290,6 +304,21 @@ class ParseTestCase(base.ShakenFistTestCase):
         packet += bytes([dhcp_probe.OPTION_END])
         self.assertEqual(
             dhcp_probe.DHCPACK, dhcp_probe.parse_message_type(packet))
+
+    def test_a_message_type_truncated_mid_option_is_none(self):
+        # [53, 1] and then the end of the packet: the length byte
+        # promises a value which is not there.
+        packet = _reply(1, None)[:-1]
+        packet += bytes([dhcp_probe.OPTION_MESSAGE_TYPE, 1])
+        self.assertIsNone(dhcp_probe.parse_message_type(packet))
+
+    def test_an_option_longer_than_the_packet_is_none(self):
+        # A message type claiming three bytes with one left is a
+        # truncated packet, not an ACK.
+        packet = _reply(1, None)[:-1]
+        packet += bytes([dhcp_probe.OPTION_MESSAGE_TYPE, 3,
+                         dhcp_probe.DHCPACK])
+        self.assertIsNone(dhcp_probe.parse_message_type(packet))
 
 
 class MainTestCase(base.ShakenFistTestCase):
@@ -492,8 +521,16 @@ class NetworkIsOkayTestCase(base.ShakenFistTestCase):
 class IsDnsmasqServingDhcpTestCase(base.ShakenFistTestCase):
     """Network.is_dnsmasq_serving_dhcp(), which turns the probe into events."""
 
+    NETWORK_UUID = 'aaaaaaaa-1111-4222-8333-444444444444'
+
+    def setUp(self):
+        super().setUp()
+        network_module.DHCP_PROBE_FAILURE_REPORTED.clear()
+        self.addCleanup(network_module.DHCP_PROBE_FAILURE_REPORTED.clear)
+
     def _network(self, serving=True, side_effect=None):
         n = mock.MagicMock()
+        n.uuid = self.NETWORK_UUID
         d = n._get_dnsmasq_object.return_value
         d.is_serving_dhcp.return_value = serving
         d.is_serving_dhcp.side_effect = side_effect
@@ -507,8 +544,8 @@ class IsDnsmasqServingDhcpTestCase(base.ShakenFistTestCase):
         self.assertTrue(n.is_dnsmasq_serving_dhcp())
 
     def test_a_probe_which_could_not_run_says_so(self):
-        # ...but it is said, on the network, every time: a readiness
-        # check which can never run is broken and should be visible.
+        # ...but it is said, on the network: a readiness check which
+        # can never run is broken and should be visible.
         n = self._network(side_effect=DHCPProbeFailed('no privexec'))
         n.is_dnsmasq_serving_dhcp()
         messages = [c.args[1] for c in n.add_event.call_args_list]
@@ -516,6 +553,57 @@ class IsDnsmasqServingDhcpTestCase(base.ShakenFistTestCase):
             'could not check whether dnsmasq is answering DHCP', messages)
         self.assertEqual(
             'no privexec', n.add_event.call_args.kwargs['extra']['error'])
+
+    def _messages(self, n):
+        return [c.args[1] for c in n.add_event.call_args_list]
+
+    def test_it_is_said_once_per_episode_not_once_per_pass(self):
+        # The event is a durable row per network. One every thirty
+        # seconds for as long as privexec is unreachable is load on the
+        # event log which tells nobody anything the first did not.
+        n = self._network(side_effect=DHCPProbeFailed('no privexec'))
+        for _ in range(3):
+            n.is_dnsmasq_serving_dhcp()
+        self.assertEqual(
+            ['could not check whether dnsmasq is answering DHCP'],
+            self._messages(n))
+
+    def test_the_log_still_says_it_every_pass(self):
+        n = self._network(side_effect=DHCPProbeFailed('no privexec'))
+        with mock.patch.object(network_module, 'LOG') as mock_log:
+            for _ in range(3):
+                n.is_dnsmasq_serving_dhcp()
+        self.assertEqual(
+            3, mock_log.with_fields.return_value.warning.call_count)
+
+    def test_recovery_is_said_and_a_new_episode_is_reported(self):
+        n = self._network(side_effect=DHCPProbeFailed('no privexec'))
+        n.is_dnsmasq_serving_dhcp()
+
+        d = n._get_dnsmasq_object.return_value
+        d.is_serving_dhcp.side_effect = None
+        n.is_dnsmasq_serving_dhcp()
+        n.is_dnsmasq_serving_dhcp()
+
+        d.is_serving_dhcp.side_effect = DHCPProbeFailed('no privexec')
+        n.is_dnsmasq_serving_dhcp()
+
+        self.assertEqual(
+            ['could not check whether dnsmasq is answering DHCP',
+             'can check whether dnsmasq is answering DHCP again',
+             'could not check whether dnsmasq is answering DHCP'],
+            self._messages(n))
+
+    def test_a_network_no_pass_visits_is_forgotten(self):
+        n = self._network(side_effect=DHCPProbeFailed('no privexec'))
+        n.is_dnsmasq_serving_dhcp()
+        maintain.forget_unvisited_quiesces([self.NETWORK_UUID])
+        self.assertIn(
+            self.NETWORK_UUID, network_module.DHCP_PROBE_FAILURE_REPORTED)
+
+        maintain.forget_unvisited_quiesces(['some-other-network'])
+        self.assertNotIn(
+            self.NETWORK_UUID, network_module.DHCP_PROBE_FAILURE_REPORTED)
 
     def test_a_wedged_dnsmasq_is_reported(self):
         n = self._network(serving=False)

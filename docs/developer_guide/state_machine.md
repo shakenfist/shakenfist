@@ -34,10 +34,19 @@ Two rules follow, both enforced rather than documented:
 
 * A transition from one error state to another keeps the earlier reason, since
   the move to `error` from a `*-error` transition state has nothing new to say.
-* A caller which enters an error state without a reason has the location it was
-  set from recorded in its place, and logs an error naming that location. The
-  `test_error_state_reasons` audit reads the tree and fails on any such caller,
-  so the fallback is a backstop rather than a supported path.
+* A caller which enters an error state without a reason has `no reason
+  recorded, see the node logs` recorded in its place, and an error is logged
+  naming the line which set the state. The location goes to the log rather than
+  the message because the message is visible to anyone who can read the
+  object. The `test_error_state_reasons` audit reads the tree and fails on a
+  bare assignment of an error state, so the fallback is a backstop rather than
+  a supported path.
+* `enter_error_state()` given an empty reason -- usually the text of an
+  exception which had none -- still enters the error state, through the same
+  backstop, and keeps the reason the object already had if it was in an error
+  state already. Refusing the transition left the object in the state it was
+  failing out of, and raised out of the error handler which was dealing with
+  the failure.
 
 ## Agent Operations
 

@@ -18,6 +18,7 @@ from functools import partial
 from unittest import mock
 from uuid import UUID
 
+from shakenfist import baseobject
 from shakenfist.baseobject import State
 from shakenfist.daemons.network import maintain
 from shakenfist.network.network import Network
@@ -159,6 +160,24 @@ class EnterErrorStateTestCase(base.ShakenFistTestCase):
                 Network.STATE_ERROR, 'no floating gateway')
 
         self.assertEqual([], n.signalled)
+
+    def test_a_missing_reason_is_not_passed_on_empty(self):
+        # The instances are told the same reason the network records,
+        # and an empty one tells them nothing.
+        n = self._Network(Network.STATE_CREATED)
+        with mock.patch(
+                'shakenfist.baseobject.DatabaseBackedObject.'
+                'enter_error_state') as mock_super:
+            with mock.patch('shakenfist.baseobject.LOG') as mock_log:
+                n.enter_error_state(Network.STATE_ERROR, '')
+
+        self.assertEqual([baseobject.NO_REASON_RECORDED], n.signalled)
+        mock_super.assert_called_once_with(
+            Network.STATE_ERROR, baseobject.NO_REASON_RECORDED,
+            skip_transition_validation=False)
+        caller = mock_log.with_fields.call_args[0][0]['caller']
+        self.assertIn('test_a_missing_reason_is_not_passed_on_empty()',
+                      caller)
 
     def test_the_write_is_passed_straight_through(self):
         n = self._Network(Network.STATE_CREATED)

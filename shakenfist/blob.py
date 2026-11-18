@@ -1258,7 +1258,14 @@ def http_fetch(
     expected_hash = None
     expected_digest = ''
     if expected_checksum and expected_algorithm:
-        expected_hash = hashlib.new(expected_algorithm)
+        # An integrity check against a published digest, not a security
+        # primitive, which is what usedforsecurity=False says. Without
+        # it a FIPS-restricted OpenSSL refuses md5 -- still the only
+        # digest the pre-0.6.3 cirros releases publish -- and the fetch
+        # fails outright. Only the algorithms images.DIGEST_LENGTHS
+        # names arrive here, and each is available on any host.
+        expected_hash = hashlib.new(
+            expected_algorithm, usedforsecurity=False)
         # Normalised here, beside the hash it will be compared with, so
         # "we have something to check against" is one fact rather than
         # two which can disagree. Mirrors are not consistent about the
@@ -1333,7 +1340,19 @@ def http_fetch(
                     'expected': expected_checksum,
                     'actual': actual
                 })
-            os.unlink(dest_path + '.partial')
+            # The mismatch is the fact the caller needs. Failing to tidy
+            # up after it must not replace it with a filesystem error,
+            # which would skip the caller's bad checksum handling and
+            # the event it records.
+            try:
+                os.unlink(dest_path + '.partial')
+            except OSError as e:
+                LOG.with_fields({
+                    'blob': b.uuid,
+                    'path': dest_path + '.partial',
+                    'error': str(e)
+                }).warning('Could not remove the partial download of an '
+                           'image which failed its checksum')
             raise BadCheckSum(
                 f'{expected_algorithm} of {url} is {actual}, the mirror '
                 f'published {expected_checksum}')

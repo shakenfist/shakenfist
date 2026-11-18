@@ -105,6 +105,12 @@ def _stream_remote(response, target, blob_uuid):
             'error': str(e)
         }).warning('Peer node stopped answering mid blob transfer, '
                    'the caller has received a truncated body')
+    finally:
+        # Also reached when the caller disconnects and the generator is
+        # closed. Without it the peer connection is held until garbage
+        # collection, and a stalled peer can hold it for the whole read
+        # timeout.
+        response.close()
 
 
 def arg_is_blob_uuid(func):

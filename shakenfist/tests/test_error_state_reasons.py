@@ -230,13 +230,34 @@ class EnterErrorStateTestCase(base.ShakenFistTestCase):
             DatabaseBackedObject.STATE_ERROR, 'the disk fell off')
         self.assertEqual(1, self.set_state.call_count)
 
-    def test_a_reason_is_required(self):
-        obj = self._object(DatabaseBackedObject.STATE_CREATED)
+    def test_a_missing_reason_still_enters_the_error_state(self):
+        # A missing reason is usually the text of an exception which had
+        # none, found on a path already handling a failure. Refusing the
+        # transition there left the object in the state it was failing
+        # out of and raised out of the error handler.
         for empty in [None, '']:
-            self.assertRaises(
-                exceptions.InvalidStateException,
-                obj.enter_error_state,
-                DatabaseBackedObject.STATE_ERROR, empty)
+            self.set_state.reset_mock()
+            obj = self._object(DatabaseBackedObject.STATE_CREATED)
+            with mock.patch.object(baseobject, 'LOG') as mock_log:
+                obj.enter_error_state(DatabaseBackedObject.STATE_ERROR, empty)
+
+            self.set_state.assert_called_once()
+            written = self.set_state.call_args[0][2]
+            self.assertEqual(DatabaseBackedObject.STATE_ERROR, written.value)
+            self.assertEqual(baseobject.NO_REASON_RECORDED, written.message)
+            caller = mock_log.with_fields.call_args[0][0]['caller']
+            self.assertIn('test_error_state_reasons.py', caller)
+            self.assertIn(
+                'test_a_missing_reason_still_enters_the_error_state()',
+                caller)
+
+    def test_a_missing_reason_keeps_the_reason_already_recorded(self):
+        # Something said why the object failed the first time; a later
+        # caller with nothing to add must not replace it with nothing.
+        obj = self._object(DatabaseBackedObject.STATE_ERROR,
+                           message='the first failure')
+        with mock.patch.object(baseobject, 'LOG'):
+            obj.enter_error_state(DatabaseBackedObject.STATE_ERROR, '')
         self.set_state.assert_not_called()
 
     def test_a_non_error_state_is_refused(self):

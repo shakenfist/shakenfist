@@ -50,6 +50,14 @@ from shakenfist.util import network as util_network
 
 LOG, _ = logs.setup(__name__)
 
+# Networks which have recorded that their DHCP readiness probe could not
+# be run, so the event is written once per episode rather than once per
+# maintenance pass -- the log line still says it every pass. Dropped
+# when the probe next runs, so a probe which breaks again is reported
+# again, and by the network maintainer for a network its pass no longer
+# visits, so a deleted network does not linger.
+DHCP_PROBE_FAILURE_REPORTED: set[str] = set()
+
 
 class Network(dbowo):
     object_type = ObjectType.NETWORK
@@ -858,6 +866,7 @@ class Network(dbowo):
         # subsequent transition between error states would be noise on
         # an object the owner is already looking at.
         already_errored = self._is_error_state_value(self.state.value)
+        message = self._reason_for_error_state(message, new_value)
         super().enter_error_state(
             new_value, message,
             skip_transition_validation=skip_transition_validation)
@@ -877,18 +886,29 @@ class Network(dbowo):
         except DHCPProbeFailed as e:
             # Not knowing is not the same as dnsmasq being wedged, and
             # only the latter is worth a rebuild. Say so where an
-            # operator will see it, every time: a probe which can never
-            # run is a broken readiness check, and it should be as
-            # loud as the rebuilds it would otherwise have caused.
+            # operator will see it: a probe which can never run is a
+            # broken readiness check, and it should be as loud as the
+            # rebuilds it would otherwise have caused. The log says it
+            # every pass; the event, which is a durable row per network,
+            # says it once per episode.
             LOG.with_fields({
                 'network': self,
                 'error': str(e)
             }).warning('Could not check whether dnsmasq is answering DHCP')
+            if str(self.uuid) not in DHCP_PROBE_FAILURE_REPORTED:
+                DHCP_PROBE_FAILURE_REPORTED.add(str(self.uuid))
+                self.add_event(
+                    EVENT_TYPE_STATUS,
+                    'could not check whether dnsmasq is answering DHCP',
+                    extra={'error': str(e)})
+            return True
+
+        if str(self.uuid) in DHCP_PROBE_FAILURE_REPORTED:
+            DHCP_PROBE_FAILURE_REPORTED.discard(str(self.uuid))
             self.add_event(
                 EVENT_TYPE_STATUS,
-                'could not check whether dnsmasq is answering DHCP',
-                extra={'error': str(e)})
-            return True
+                'can check whether dnsmasq is answering DHCP again')
+
         if not is_serving:
             self.add_event(
                 EVENT_TYPE_STATUS,

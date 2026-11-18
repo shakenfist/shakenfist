@@ -3015,6 +3015,9 @@ class Instance(dbowo):
         if self.state.value == self.STATE_DELETED:
             return
 
+        # enter_error_state() writes the message with the state. Setting
+        # self.error again afterwards would only overwrite the reason it
+        # recorded -- with an empty one, for a caller which had none.
         try:
             self.enter_error_state(f'{self.state.value}-error', error_msg)
         except Exception:
@@ -3022,14 +3025,13 @@ class Instance(dbowo):
             self.enter_error_state(self.STATE_ERROR, error_msg)
 
         try:
-            self.error = error_msg
             self._record_refusal_stage(stage)
         except Exception as e:
-            # The error message and the stage which produced it are
-            # annotations; failing to record them must not prevent the
-            # instance being cleaned up (issue 4112).
+            # The stage which produced the error is an annotation; failing
+            # to record it must not prevent the instance being cleaned up
+            # (issue 4112).
             LOG.with_fields({'instance': self.uuid}).error(
-                f'Failed to record error message before delete: {e}')
+                f'Failed to record refusal stage before delete: {e}')
 
         try:
             self.enqueue_delete()
