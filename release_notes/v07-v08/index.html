@@ -18028,6 +18028,20 @@ for the multi-phase rollout details.</p>
 <li>The per-object <code>/events</code> endpoints accept <code>limit</code> sent as a string, which
   is how the shipped client sends it. Before, every one of them answered 500
   whenever <code>limit</code> was given.</li>
+<li><strong>Cirros images and their digests are fetched over <code>https</code> by default.</strong>
+  <code>DOWNLOAD_URL_CIRROS</code>, <code>CHECKSUM_URL_CIRROS</code> and <code>LISTING_URL_CIRROS</code>
+  previously defaulted to <code>http://download.cirros-cloud.net/...</code>. A Cirros
+  image becomes a bootable guest disk, and the published digest it is
+  checked against arrives from the same place by the same route, so the
+  digest catches corruption and a wrong file being served rather than
+  substitution -- only the transport distinguishes the mirror from
+  whoever is between you and it. The image URL already redirected to
+  <code>https://github.com/cirros-dev/cirros/releases/download/...</code>; it is now
+  TLS for the whole chain, as are the release listing which chooses
+  "latest" and the digest list. This is a behaviour change if you rely on
+  the defaults from a network which intercepts or blocks TLS: set the
+  three options to your own mirror in cluster configuration, which is
+  unaffected by this change and may still be plaintext.</li>
 </ul>
 <h2 id="event-logging-migrated-to-mariadb">Event logging migrated to MariaDB<a class="headerlink" href="#event-logging-migrated-to-mariadb" title="Permanent link">&para;</a></h2>
 <p>Events previously lived in per-object SQLite files managed by a dedicated
