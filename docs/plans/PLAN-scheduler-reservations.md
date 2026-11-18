@@ -358,7 +358,7 @@ table entirely (decision D8).
 | 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete | `c27ad9bf2` (#3930), `a5014b6ba` (#3949) |
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Complete | `c273627a2` (#3952), `948055063` (#4008), `8fc8ba961` (#4139), `2b767a9b1` (#4154) |
 | 5. Caller migration and hard ceiling | [PLAN-scheduler-reservations-phase-05-callers.md](PLAN-scheduler-reservations-phase-05-callers.md) | Complete | `660d4f65e7` (#4800) |
-| 5a. The calibration re-run | [PLAN-scheduler-reservations-phase-05a-hard-ceiling.md](PLAN-scheduler-reservations-phase-05a-hard-ceiling.md) | Complete | — |
+| 5a. The calibration re-run | [PLAN-scheduler-reservations-phase-05a-hard-ceiling.md](PLAN-scheduler-reservations-phase-05a-hard-ceiling.md) | Complete | `3797716023` (#4917) |
 | 5b. The hard ceiling | PLAN-scheduler-reservations-phase-05b-hard-ceiling.md | Blocked | — |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
@@ -378,14 +378,15 @@ beside it, so `<sha>^1..<sha>` is the whole of what that pull
 request put on `develop`. A phase which has not landed reads
 `—`.
 
-Phase 5a is the one row where `Complete` and `—` sit together, and it
-is not a contradiction of that rule but the ordinary consequence of
-it: the pull request which lands a phase cannot record the merge
-commit that lands it, so every phase here was filled in afterwards.
-5a's cell is the next close-out's to write — phase 5b's first commit,
-or phase 9's if 5b has not started by then — and until it is written
-the push audit's range for 5a is its pull request rather than this
-table.
+Phase 5a was for a time the one row where `Complete` and `—` sat
+together, which was not a contradiction of that rule but the
+ordinary consequence of it: the pull request which lands a phase
+cannot record the merge commit that lands it, so every phase here was
+filled in afterwards. Its cell was written on 2026-11-18, out of the
+usual order — a close-out of its own rather than the first commit of
+the next phase — because both remaining phases are gated and neither
+gate had opened. Phase 9's audit may therefore read `3797716023` for
+5a from this table, rather than having to go to the pull request.
 
 Several phases took more than one pull request, because the
 plan's habit is to land the work and then close the phase out in
@@ -604,6 +605,22 @@ is here.
   phase has landed and deployed on `maui`. Recorded as plan-blocker
   b21; nothing in this repository can clear it, and the flip is not
   to be read again against the window phase 5a already spent.
+
+  **That binding has now landed**, traced on 2026-11-18 so a later
+  session need not re-derive the chain. private-ci's phase 3g
+  (`PLAN-claim-coverage-and-sizing-phase-03g-bind-oversized.md`)
+  stopped after its gate, which passed with room — each of the three
+  jobs' own claim exceeds its own largest single instance in every
+  dimension — and its step 3 bound `sf-e2e`, `oVirt 4.5 on Rocky 8`
+  and `OpenStack via Kolla-Ansible master on Debian 13` to their own
+  runners as shakenfist/kerbside#727, merged 2026-11-14 19:48 UTC
+  (2026-11-15 06:48 AEDT). The fresh window therefore runs from that
+  merge and closes **2026-11-22 AEDT**. 3g's own step 5 reads that
+  window for its effect and its step 6 hands the result to this
+  plan; re-reading D2 is explicitly out of 3g's scope and remains
+  5b's first step. Phase 5b may not be planned before 3g has handed
+  over, because a Hold there changes 5b's shape rather than merely
+  delaying it.
 
 - **Phase 6** was executed out of order, ahead of phases 4c and 5,
   and completed on 2026-09-01. It merged as #3972 (the validator
