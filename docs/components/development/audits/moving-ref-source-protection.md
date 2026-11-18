@@ -257,6 +257,12 @@ ruleset. A job that skips satisfies its required check, so a path
 filter that skips a lane is not a problem; a job that never runs at all
 on the pull requests the repository actually sees is.
 
+A pull request opened by `GITHUB_TOKEN`, as the shared
+`export-repo-config` workflow does, starts no workflows: GitHub does
+not run them for events the built-in token causes. Its required checks
+therefore never report, and it cannot merge. Closing it and reopening
+it from a person's account starts CI.
+
 ## Projects
 
 Per-project compliance for this criterion is regenerated

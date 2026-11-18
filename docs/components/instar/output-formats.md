@@ -301,6 +301,22 @@ layer. For file-backed images, this includes:
 This information was previously only available by examining the image file
 directly. The addition improves transparency for debugging and scripting.
 
+An image that is several files on disk has one child per file. A VMDK
+descriptor that resolves to separate extent files -- `monolithicFlat` and the
+`twoGbMaxExtent*` split subformats -- exposes an `/extents.N` child per extent
+ahead of the descriptor's own `/file` child, and qemu-img walks the extents
+from last to first while keeping each one's own index, so the array reads
+`extents.N-1` down to `extents.0` and then `file`. Select a child by its
+`name` rather than its position. The format-specific `extents` array is a
+different thing and stays in descriptor order.
+
+Two disk-size figures are involved and they are not the same number. Each
+child reports the allocation of its own file, while the image's own `disk
+size` line and top-level `actual-size` report the sum over the descriptor and
+every extent. A three-extent flat image holding 512 KiB per extent reports
+1576960 bytes for the image and 524288 for each extent child, not 4096 -- the
+descriptor's own allocation -- for all of them.
+
 ### Compatibility Considerations
 
 When writing scripts that parse qemu-img/instar output:

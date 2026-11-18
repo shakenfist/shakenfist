@@ -3491,6 +3491,52 @@ place or replaced it. Both writers are measured because they take
 different paths: a flat extent is extended to its full declared
 length where a sparse one is written a header.
 
+What a split image costs to store decides which of these can be
+fixtures. A split-sparse image's extents are stored as fixtures; a
+split-flat image's cannot be, because git-LFS stores a sparse file's
+holes as bytes. Measured: `downloaded/qemu-iotests/d2v-zerofilled.vhd`
+is 264,308,224 bytes apparent and 512 KiB allocated in the checkout, but
+its LFS object is 264,314,880 bytes. A `twoGbMaxExtentFlat` extent is a
+full-length 2 GiB sparse file, so a 33 GiB split-flat image would be a
+33 GiB LFS object, where the same image's split-sparse extents are a few
+hundred KiB each. That is why a test that needs a split-flat image makes
+one at run time with `tests/helpers/vmdk_split.py` instead of checking
+one out.
+
+An image that carries `skip_qemu_img` in `tests/manifest.json` gets no
+qemu baselines generated for it, at any version or for any command:
+`scripts/generate-baselines.py` excludes it. Eleven of the VMDK
+fixtures that carry it are malicious or malformed, where it needs no
+explanation; four that the manifest calls safe are a different matter.
+`vmdk-twogb-flat` genuinely cannot be opened, because it names extents
+that deliberately do not exist. `vmdk-multi-extent`,
+`vmdk-flat-parent` and `vmdk-flat-with-parent` carry it for no reason
+anyone can now recover, and qemu-img opens all three. `vmdk-multi-flat`
+had the flag removed, which is what gave the one complete multi-extent
+flat image in the corpus its first baselines, and a shipping output
+divergence on it had gone unnoticed for exactly that long.
+
+A multi-file image's allocation figure is the sum over every file it is
+made of, so a test helper that substitutes a live allocation into a
+stored baseline has to sum the siblings, not resolve the top-level
+object's own filename. Resolving that one name gets the descriptor's few
+blocks and substitutes away the very figure such an image is being
+compared on, which is what hid the divergence in
+[#922](https://github.com/shakenfist/instar/issues/922). Each protocol
+child still resolves to its own file.
+
+Two traps wait when generating those baselines.
+`scripts/generate-baselines.py`'s `find_manifest()` globs sibling
+`instar*` directories when no `--manifest` is given, and the primary
+clone sorts before an `instar-wt-*` worktree, so a run started from a
+worktree whose manifest has new images can silently resolve to the
+primary clone's older manifest, match none of them, generate nothing and
+exit 0. Pass `--manifest` explicitly and check the path in the log.
+And generating raw baselines is only half of it: `make profiles` must
+run afterwards to derive the profile layer, and `make validate-profiles`
+run straight after generation without it exits 2 with a `no-profile`
+problem for every new file.
+
 `tests/test_qemu_create_pins.py` keeps it honest. It fails when a
 build is present that the pin does not list, when 6.0.0, 6.2.0,
 8.2.0, 10.2.0 or the host `qemu-img` no longer produce what the pin
