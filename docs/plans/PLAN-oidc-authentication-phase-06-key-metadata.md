@@ -389,7 +389,7 @@ concurrently with anything else in this repository's worktree. 6d and
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
 | 6a | high | opus | none | Read decisions D1-D8 and survey items 1, 4, 6 and 7 of this plan first. Add a module-level `_key_detail(key, attrs, caller_is_system)` helper in `shakenfist/external_api/auth.py` near `AuthNamespaceKeysEndpoint` (line 637), returning `{'namespace', 'key_name', 'expiry', 'scopes', 'uuid', 'state'}` and adding `'provenance'` **only** when `caller_is_system`. `key_name` not `name` (D3). Never include `attrs.key` or `attrs.nonce`. Add `get` to `AuthNamespaceKeyEndpoint` (line 690) with the decorator stack `delete` uses -- `@requires_namespace_ownership`, `@arg_is_namespace`, `@api_base.log_token_use` -- and **not** the one on `put`, which adds `@api_base.caller_is_admin` and would make the read administrator-only, leaving the projection with nobody to project for. 404 for a name that is not present, the way `put` and `delete` test membership. Add a `detail` boolean argument to `AuthNamespaceKeysEndpoint.get` (line 649): falsy keeps today's exact bare list, truthy returns `_key_detail` per key with `include_expired=True` (D4). Both read `namespace_key.keys_with_attributes(namespace, include_expired=...)` directly — **not** `namespace_from_db.keys`, and **not** `NamespaceKeys`, which does a point read per key (`namespace_key.py:467-472`). Decide `caller_is_system` from `request_namespace() == 'system'`; do not use `caller_is_admin`, which also requires the `cluster-admin` scope and would make the field vanish for an administrator holding a correctly scoped key. Then: move the bare-name listing in `AuthNamespaceKeysEndpoint.get` and in `Namespace.external_view()` (`shakenfist/namespace.py:469-486`) off `.keys` to `keys_with_attributes()` (D8), changing no response; add `'namespace-key-metadata'` to the `auth` family in `shakenfist/external_api/app.py` (the list at line 470) with a comment in the style of the `human-login` entry, saying what D7 says; correct `external_view()`'s docstring (`shakenfist/namespace_key.py:407-408`) so it no longer claims the view is safe for anyone who can see the namespace, naming provenance as the reason and `auth.py`'s minting comment as the rule. Update the `swag_from` blocks for both endpoints. Commit subject: "Serve a namespace key's metadata." |
-| 6b | medium | sonnet | none | Unit tests for 6a, in `shakenfist/tests/external_api/`. Follow the structure of `test_login_mint.py` from phase 4. Required cases: the bare listing is byte-identical to before for a namespace with an expired key and two live ones; the detailed listing includes the expired key and each entry carries its expiry; a `system` caller sees `provenance` and a namespace-owning caller does not, asserted on **the same key** so the pair cannot both pass by accident; a caller in a namespace that the target merely trusts also does not see it; the single-key `GET` 404s for an absent name and for a name in another namespace; no response from either read contains the key hash or the nonce, asserted by searching the serialised body for the known hash and nonce values rather than by checking field names; and a call-count test, with several keys configured, asserting `keys_with_attributes` is called once and `mariadb.get_state` is not called at all (D6). Run `tox -epy3`; totals with `./.tox/shared/bin/stestr last --no-subunit-trace`. Commit subject: "Test the key metadata reads." |
+| 6b | medium | sonnet | none | Unit tests for 6a, in `shakenfist/tests/external_api/`. Follow the structure of `test_login_mint.py` from phase 4. Required cases: the bare listing is byte-identical to before for a namespace with an expired key and two live ones; the detailed listing includes the expired key and each entry carries its expiry; a `system` caller sees `provenance` and a namespace-owning caller does not, asserted on **the same key** so the pair cannot both pass by accident; a caller in a namespace that the target merely trusts also does not see it; the single-key `GET` 404s for an absent name and for a name in another namespace; no response from either read contains the key hash or the nonce, asserted by searching the serialised body for the known hash and nonce values rather than by checking field names; and a call-count test, with several keys configured, asserting `keys_with_attributes` is called once and that no `mariadb.get_state` call is for a namespace key (D6) -- the request decorators read the *namespace's* state on every request, so "not called at all" is not available; assert the total cannot scale with the key count instead. Run `tox -epy3`; totals with `./.tox/shared/bin/stestr last --no-subunit-trace`. Commit subject: "Test the key metadata reads." |
 | 6c | medium | sonnet | none | Mutation-test 6a's guards. Write the mutations as a runnable script under this session's scratchpad, named in your report, and **never mutate the checkout in place** — copy the tree, mutate the copy, run each mutant under `timeout 600`, and count a timeout as killed. Required mutants, each of which must be killed by a named test from 6b: drop the `caller_is_system` condition so `provenance` is always included; invert it; change `caller_is_system` to compare against `caller_is_admin` instead; add `attrs.key` to the projection; make `detail` default to truthy; make the detailed listing pass `include_expired=False`; make the single-key `GET` return a key from any namespace. Record the kill table in this plan's Results section, one row per mutant with the test that caught it and the assertion message. A surviving mutant is a finding, not a note: report it rather than adjusting the mutant. Commit subject: "Mutation test the key metadata disclosure rule." |
 | 6d | medium | sonnet | none | Documentation. Remove the three interim notes listed in survey item 8 — `docs/operator_guide/authentication.md:40-51` (keep the `NAMESPACE_KEY_REAP_GRACE` forensic-window advice, which stands on its own; remove only the clause that the fields are unreadable and the #3672 pointer), `docs/developer_guide/authentication.md:157-161`, and rewrite the three `get_namespace_keynames` examples in `docs/developer_guide/api_reference/authentication.md` (lines 214, 235, 280) against whichever client methods step 6e adds. Document both reads in the API reference, the `detail` parameter, the capability token, and — in the operator guide, in the section that currently carries the limitation — that `provenance` is a `system`-only field and why, cross-referencing rather than restating the provenance paragraph phase 4 added at `docs/operator_guide/authentication.md`. Do not add a settings row: this phase adds no configuration. Leave `docs/developer_guide/ci_api_coverage.md` alone. Commit subject: "Document reading a key's metadata." |
 | 6e | medium | sonnet | `client-python` checkout | **This step runs in `/srv/kasm_profiles/mikal/vscode/src/shakenfist/client-python`, on its own branch and worktree, and produces its own pull request. It must not touch the `shakenfist` repository.** In `shakenfist_client/apiclient.py`, beside `get_namespace_keynames` (line 1616, which stays, unchanged): add `get_namespace_keys(namespace)` calling the collection with `detail=true`, and `get_namespace_key(namespace, key_name)` calling the single-key route. Then `sf-client namespace show` (`shakenfist_client/commandline/namespace.py:66-126`): where it prints the "Key Names:" list from `ns['keys']`, call `get_namespace_keys` when the cluster advertises `namespace-key-metadata` and render a table of name, expiry, scopes — plus provenance when the field is present, which it will be only for a `system` caller. Fall back to the existing bare list when the capability is absent, so the command still works against an older cluster; follow however this client already feature-detects a capability, and if it does not yet, add the check in one place rather than per call site. Keep all three output modes (`json`, `pretty`, and the default machine-readable one) working, and extend `shakenfist_client/tests/test_client_apiclient.py` beside the existing `test_get_namespace_keynames` (line 262). Commit subject: "Read key metadata in namespace show." |
@@ -401,7 +401,7 @@ concurrently with anything else in this repository's worktree. 6d and
 | The detailed listing discloses a person's identity to a namespace owner, which cannot be undone once a client has read it | D2 restricts `provenance` to `system`. 6b asserts both halves on the same key; 6c mutates the condition three ways and requires a named test to catch each. The management session reproduces at least one of those mutants itself rather than trusting the report |
 | `caller_is_system` is derived wrongly and the field vanishes for a real administrator, or appears for a non-administrator | The brief names the predicate to use and the one not to, with the reason. 6c includes a mutant that swaps them |
 | The bare-name response changes by accident, breaking three in-tree consumers and any out-of-tree client | 6b's first test asserts byte-identical output for a namespace with a mix of live and expired keys. D5 keeps `Namespace.external_view()` out of scope entirely |
-| The listing becomes an N+1 on a freely callable path | D6 forbids `NamespaceKeys`; 6b asserts `mariadb.get_state` is never called; 6c mutates the accessor choice |
+| The listing becomes an N+1 on a freely callable path | D6 forbids `NamespaceKeys`; 6b asserts no `mariadb.get_state` call is for a namespace key, and that the total cannot scale with the key count; 6c mutates the accessor choice |
 | Secret material reaches a response | 6b asserts on the serialised body against the known hash and nonce, not on field names, so a renamed field cannot pass |
 | The client half drifts from the server shape because they land in two repositories at different times | D7's single capability token gates the client behaviour, and 6e's fallback path is required to work against a cluster without it. The server PR may land first; the client PR may not land before it |
 | 6c's mutation run collides with a `pre-commit` run in the same worktree, so a killed mutant is silently restored | 6c runs alone, on a copy, as its brief states |
@@ -433,8 +433,12 @@ Run from the phase worktree unless stated.
       `grep -c "'name':" ` over the new projection returns 0.
 * [ ] Neither read performs a point read per key.
       `grep -rn 'NamespaceKeys(' shakenfist/external_api/auth.py`
-      returns nothing, and a test asserts `mariadb.get_state` is not
-      called while listing a namespace with several keys.
+      returns nothing, and a test asserts that no `mariadb.get_state`
+      call is for a namespace key while listing a namespace with several
+      keys, and that the total number of such calls cannot scale with the
+      key count. The namespace's own state is read on every request by
+      `arg_is_namespace` and by token verification, so an assertion that
+      `get_state` is never called would be unsatisfiable.
 * [ ] `namespace_from_db.keys` is no longer read by either listing:
       `grep -n "\.keys\.get('nonced_keys'" shakenfist/external_api/auth.py`
       returns only the two write-path guards, in the key update and
@@ -548,6 +552,71 @@ Two things 6b inherits from this: there is no `state` field to assert
 on, and the bare listing no longer reads the clock through
 `shakenfist.namespace.time.time`, so a test must set real past and
 future expiries rather than mock that attribute.
+
+**Step 6b, 2026-11-18 (AEDT).** 21 tests in
+`shakenfist/tests/external_api/test_namespace_key_metadata.py`, all
+passing, with the full suite green at 7576 tests.
+
+One required assertion was unsatisfiable as written and the plan has been
+corrected at its three mention sites rather than the test weakened to
+match. The row, the risk table and the Definition of done all asked for a
+test proving `mariadb.get_state` is "not called at all" during a listing.
+It is always called: `arg_is_namespace` resolves the namespace through
+`_live_namespace` (`shakenfist/external_api/auth.py:98-102`) and token
+verification reads `ns.state.value`
+(`shakenfist/external_api/base.py:1919-1923`), both to refuse a deleted
+namespace, and both read the *namespace*. What D6 actually forbids is a
+state read *per key*, so that is what the test asserts: no `get_state`
+call carries `ObjectType.NAMESPACE_KEY`, and the total is under four with
+nine keys configured, so it cannot scale with the key count. This is a
+stronger guard than the original wording, which a per-key read on a
+different object type would have satisfied.
+
+The trusted-namespace test incidentally settled a documentation question
+6d got wrong: the trustee receives a 200 with `provenance` withheld, not
+a refusal, which is the proof that the read's audience is wider than the
+namespace's own callers.
+
+**Step 6d, 2026-11-18 (AEDT).** The three interim notes are gone and both
+reads are documented in the operator guide, the developer guide and the
+API reference, which were re-read together and agree on the fields served,
+on expired keys and on who sees `provenance`.
+
+Three corrections were made in review. The step described the reads as
+requiring the caller to "own the namespace", in four places across the
+three guides. `requires_namespace_ownership` tests
+`namespace_is_trusted` (`shakenfist/namespace.py:677-688`), which admits
+the namespace itself, `system`, and every namespace in the target's
+`trust` list -- the audience survey item 4 sized this phase's disclosure
+against, and the reason D2 exists at all. All four now say so, and the
+operator guide says plainly that granting trust hands over key metadata,
+since that is a decision an operator makes. The step also had to rewrite
+the provenance paragraph phase 4 added, which claimed provenance is
+"readable by anyone who can list keys in that namespace"; that is false
+now and the rewrite was kept.
+
+One claim the step reported as unverified is true: `NAMESPACE_KEY_REAP_GRACE`
+set to `0` does retain expired keys forever
+(`shakenfist/daemons/cluster/scheduled_tasks.py:872-874`).
+
+**Step 6e, 2026-11-18 (AEDT).** Landed in `client-python` as its own
+commit on branch `oidc-authentication-phase-06-client`, per D9.
+
+Review took `provenance` out of the default machine-readable output,
+leaving it in the table and the JSON. That output is comma separated and
+a serialised object carries commas of its own, and because the field
+reaches some callers and not others the column count would have depended
+on who was asking. A test holds it out. There is a precedent for a dict
+in such a row -- the events listing prints `extra` that way
+(`shakenfist_client/commandline/namespace.py:338`) -- but it is a wart
+rather than a pattern to extend.
+
+The two halves were checked against each other rather than assumed: the
+client sends `?detail=true` as a URL query string and the server binds
+that argument with `location='json_or_query'`
+(`shakenfist/external_api/auth.py:747`), so a cluster parses it. This was
+the one place both repositories could have passed their own tests and
+still not worked together.
 
 ## Results
 
