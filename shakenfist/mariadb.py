@@ -1924,6 +1924,44 @@ def _ensure_native_enum_columns(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+# The scalar criteria fields, each of which is a column on some
+# per-type table and not on others. ``states`` is not here: it is
+# served from object_states, which every filterable type has a row in,
+# so it is the one field every type can serve.
+_CRITERIA_SCALAR_FIELDS = ('namespace', 'name', 'network_uuid',
+                           'instance_uuid')
+
+
+def _reject_unservable_criteria(
+        table: sa.Table,
+        object_type: ObjectType,
+        criteria: ObjectFilterCriteria) -> None:
+    """Refuse a filter the target table cannot serve.
+
+    Derived from the table rather than from a second list of which
+    fields each type honours, so there is nothing to keep in step: a
+    column added to a type starts being filterable, and a field added
+    to ObjectFilterCriteria is unservable everywhere until some table
+    has a column of that name.
+
+    This replaces a docstring asking each caller to remember to strip
+    the fields its table lacks. Forgetting silently dropped the filter
+    and answered with every row the remaining filters admitted, which
+    for ``namespace`` is every namespace's rows -- how a scoping
+    mistake becomes a disclosure -- or raised AttributeError from
+    ``table.c`` on whichever path first passed the field (issue 4947).
+    """
+    unservable = [
+        field for field in _CRITERIA_SCALAR_FIELDS
+        if getattr(criteria, field) is not None and field not in table.c
+    ]
+    if unservable:
+        raise exceptions.UnservableFilterCriteria(
+            f'{object_type} cannot be filtered on '
+            f'{", ".join(unservable)}: the {table.name} table has no such '
+            f'column')
+
+
 def _build_object_filter_query(
         table: sa.Table,
         object_type: ObjectType,
@@ -1943,10 +1981,13 @@ def _build_object_filter_query(
           AND (optional) <table>.instance_uuid = criteria.instance_uuid
 
     ``criteria.states`` of ``None`` or ``[]`` skips the state filter.
-    Any scalar filter of ``None`` skips that filter. Callers are
-    responsible for stripping fields that do not exist on the target
-    table (e.g. ``name``/``namespace`` on ``network_interfaces``).
+    Any scalar filter of ``None`` skips that filter. A scalar filter
+    which is set but has no column on the target table is refused by
+    _reject_unservable_criteria() rather than dropped, so a caller
+    cannot be answered a query it did not ask.
     """
+    _reject_unservable_criteria(table, object_type, criteria)
+
     states_table = _get_object_states_table()
     # ``object_states.object_uuid`` is a VARCHAR object key, dashed for
     # every type which reaches this query (its width is
@@ -17724,12 +17765,20 @@ def find_artifacts(
         criteria: ObjectFilterCriteria) -> list[ArtifactData]:
     """Find artifacts matching the given filter criteria.
 
+    A criteria field this table has no column for is refused rather
+    than ignored, here as well as in the query builder, so that a
+    caller is told locally instead of being handed a failed database
+    call from the servicer (issue 4947).
+
     Args:
         criteria: Filter criteria (states, namespace, name).
 
     Returns:
         List of matching ArtifactData objects.
     """
+    _reject_unservable_criteria(
+        _get_artifacts_table(), ObjectType.ARTIFACT, criteria)
+
     if _use_database_service():
         return _grpc_find_artifacts(criteria)
     return _direct_find_artifacts(criteria)
@@ -18375,27 +18424,18 @@ def _direct_find_network_interfaces(
     """Find NetworkInterface records matching the given filter criteria.
 
     Joins ``network_interfaces`` to ``object_states`` and applies the
-    optional state filter from ``criteria``. The ``namespace`` and
-    ``name`` filters are silently ignored because the
-    ``network_interfaces`` table has neither column. The
-    ``network_uuid`` and ``instance_uuid`` filters ARE honoured —
-    they correspond to indexed columns on the same table. On
-    ``OperationalError`` logs the full criteria at WARNING level and
-    returns an empty list.
+    optional state filter from ``criteria``. The ``network_uuid`` and
+    ``instance_uuid`` filters are honoured — they correspond to indexed
+    columns on the same table. The ``namespace`` and ``name`` filters
+    are *refused*, because this table has neither column: they used to
+    be stripped here, which answered a namespace-scoped query with
+    every namespace's interfaces (issue 4947). On ``OperationalError``
+    logs the full criteria at WARNING level and returns an empty list.
     """
     engine = _get_engine()
     table = _get_network_interfaces_table()
-    # network_interfaces has no namespace or name column; strip both
-    # before building the query to avoid WHERE clauses that would error.
-    safe_criteria = ObjectFilterCriteria(
-        states=criteria.states,
-        namespace=None,
-        name=None,
-        network_uuid=criteria.network_uuid,
-        instance_uuid=criteria.instance_uuid,
-    )
     stmt = _build_object_filter_query(
-        table, ObjectType.INTERFACE, safe_criteria)
+        table, ObjectType.INTERFACE, criteria)
     # Order by the per-instance interface index so callers iterate
     # interfaces in user-specified order. Without this MariaDB returns
     # rows in an unspecified order, which makes ``Instance.interfaces``
@@ -18982,15 +19022,20 @@ def find_network_interfaces(
         criteria: ObjectFilterCriteria) -> list[NetworkInterfaceData]:
     """Find NetworkInterface records matching the given filter criteria.
 
+    The namespace and name fields exist on the shared criteria shape
+    but not on this table, and are refused rather than ignored: see
+    find_artifacts().
+
     Args:
-        criteria: Filter criteria (states). The namespace and name
-            fields are accepted for proto-shape consistency but are
-            silently ignored because network_interfaces has neither
-            column.
+        criteria: Filter criteria (states, network_uuid,
+            instance_uuid).
 
     Returns:
         List of matching NetworkInterfaceData objects.
     """
+    _reject_unservable_criteria(
+        _get_network_interfaces_table(), ObjectType.INTERFACE, criteria)
+
     if _use_database_service():
         return _grpc_find_network_interfaces(criteria)
     return _direct_find_network_interfaces(criteria)
@@ -20416,12 +20461,18 @@ def find_networks(
         criteria: ObjectFilterCriteria) -> list[NetworkData]:
     """Find networks matching the given filter criteria.
 
+    A criteria field this table has no column for is refused rather
+    than ignored: see find_artifacts().
+
     Args:
         criteria: Filter criteria (states, namespace, name).
 
     Returns:
         List of matching NetworkData objects.
     """
+    _reject_unservable_criteria(
+        _get_networks_table(), ObjectType.NETWORK, criteria)
+
     if _use_database_service():
         return _grpc_find_networks(criteria)
     return _direct_find_networks(criteria)
@@ -22582,12 +22633,18 @@ def find_instances(
         criteria: ObjectFilterCriteria) -> list[InstanceData]:
     """Find instances matching the given filter criteria.
 
+    A criteria field this table has no column for is refused rather
+    than ignored: see find_artifacts().
+
     Args:
         criteria: Filter criteria (states, namespace, name).
 
     Returns:
         List of matching InstanceData objects.
     """
+    _reject_unservable_criteria(
+        _get_instances_table(), ObjectType.INSTANCE, criteria)
+
     if _use_database_service():
         return _grpc_find_instances(criteria)
     return _direct_find_instances(criteria)

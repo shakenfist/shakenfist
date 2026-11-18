@@ -70,6 +70,21 @@ class InvalidObjectPrefilter(ObjectException):
     ...
 
 
+class UnservableFilterCriteria(ObjectException):
+    """Raised when a find asks for a filter its table cannot serve.
+
+    Every ObjectFilterCriteria field is a column on some per-type
+    table and not on others -- ``name`` and ``namespace`` do not exist
+    on ``network_interfaces``, and ``network_uuid`` does not exist on
+    ``artifacts``. Applying only the fields which happen to match
+    would answer the query a caller did not ask, with *more* rows than
+    they asked for, which is how a scoping mistake becomes a
+    disclosure. Refusing is the only safe answer, and it is a caller
+    bug rather than a database condition (issue 4947).
+    """
+    ...
+
+
 # Instance
 class InstanceException(Exception):
     ...

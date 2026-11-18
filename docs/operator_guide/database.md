@@ -229,15 +229,20 @@ Arbitrary-predicate filtering — logic that has no simple SQL equivalent, such 
 should pass a callable to the `filters=` argument of the iterator, or call `.filter([predicate])` on the
 class. These predicates execute in Python after the indexed SQL scan returns its rows.
 
-**NetworkInterface special case.**
-The `network_interfaces` table has no `namespace` or `name` column. `find_network_interfaces` therefore
-strips both fields from the criteria before building the query; they are silently ignored. State pushdown
-still works. The two FK filter fields `network_uuid` and `instance_uuid` *are* honoured — they map to
-indexed columns on the `network_interfaces` table, and they are how `Network.networkinterfaces` and
-`Instance.interfaces` resolve their per-parent NI list (those properties
-return hydrated `NetworkInterface` objects rather than the cached UUID list that used to live on the
-attribute table). The other `find_*` helpers leave the FK fields at their default of `None` because the
-underlying tables have no matching column.
+**A criteria field a table cannot serve is refused.**
+Every scalar field on `ObjectFilterCriteria` is a column on some per-type table and not on others:
+`network_interfaces` has no `namespace` or `name` column, and `artifacts` has no `network_uuid`. Setting a
+field the target table has no column for raises `exceptions.UnservableFilterCriteria`, in the `find_*`
+helper and again in the query builder, rather than dropping the field. Dropping it answered a narrower
+query with more rows than it asked for — a namespace-scoped interface query with every namespace's
+interfaces — which is how a scoping mistake becomes a disclosure (issue 4947). The check is derived from
+the table's own columns, so there is no second list of honoured fields to keep in step.
+
+Only `states` is servable for every filterable type, because it is read from `object_states` rather than
+from the per-type table. The two FK filter fields `network_uuid` and `instance_uuid` are servable for
+`network_interfaces`, and they are how `Network.networkinterfaces` and `Instance.interfaces` resolve their
+per-parent NI list (those properties return hydrated `NetworkInterface` objects rather than the cached UUID
+list that used to live on the attribute table).
 
 Adding a namespace to this type is deferred until a caller needs one, and no production call site filters
 interfaces by namespace today — the dnsmasq DHCP path reaches an interface through its owning network, not
@@ -246,8 +251,9 @@ through a namespace-scoped query. When such a caller appears there are two ways 
 object stays the single source of the answer; a `namespace` column on `network_interfaces` would read the
 same way as the other three types and index as cheaply, but it denormalises an answer the owner already
 holds and goes stale if a network is ever reassigned. The JOIN is the safer default. Either lands as a
-one-line change: `find_network_interfaces` already accepts the field and discards it, so enabling it is a
-matter of building the clause rather than changing the criteria shape.
+one-line change: the criteria shape already carries the field, so enabling it is a matter of giving the
+table the column (or the query the JOIN), after which the refusal above stops firing for it by
+construction.
 
 **Example.**
 

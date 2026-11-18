@@ -213,10 +213,11 @@ Object iteration uses one indexed SQL query per call rather than the older patte
 and filtering them in Python. Every `find_artifacts`, `find_instances`, `find_networks`, and
 `find_network_interfaces` call in `shakenfist/mariadb.py` JOINs the per-type static-values table to
 `object_states` and applies the caller's state, namespace, name and FK predicates directly in the WHERE
-clause. The two FK fields (`network_uuid`, `instance_uuid`) on `ObjectFilterCriteria` are honoured only
+clause. The two FK fields (`network_uuid`, `instance_uuid`) on `ObjectFilterCriteria` are servable only
 by `find_network_interfaces`, which is what makes `Network.networkinterfaces` and `Instance.interfaces`
 query-backed properties returning hydrated `NetworkInterface` objects rather than the cached UUID lists
-they used to be.
+they used to be. A criteria field the target table has no column for is refused rather than dropped --
+see "SQL Filter Pushdown" in [`database.md`](../operator_guide/database.md) for why.
 
 The composite index `idx_object_states_type_state` on `(object_type, state_value)` covers the JOIN condition
 that is present in every query. Per-type `name` and `namespace` single-column indexes on the artifact,

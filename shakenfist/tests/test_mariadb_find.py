@@ -22,6 +22,7 @@ import grpc
 from sqlalchemy.exc import DataError
 from sqlalchemy.exc import OperationalError
 
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.config import BaseSettings
 from shakenfist.schema.object_filter import ObjectFilterCriteria
@@ -778,13 +779,13 @@ class DirectFindNetworkInterfacesTestCase(base.ShakenFistTestCase):
         self.addCleanup(self.config.stop)
 
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_all_filters_returns_match(self, mock_get_engine):
-        """State filter present — matching row returned (namespace/name no-ops)."""
+    def test_the_servable_filters_still_return_a_match(self, mock_get_engine):
         row = _ni_row()
         mock_get_engine.return_value = _make_engine_mock([row])
 
         criteria = ObjectFilterCriteria(
-            states=['created'], namespace='tenant-a', name='eth0')
+            states=['created'], network_uuid=str(NETWORK_UUID),
+            instance_uuid=str(INSTANCE_UUID))
         result = mariadb._direct_find_network_interfaces(criteria)
 
         self.assertEqual(len(result), 1)
@@ -856,7 +857,7 @@ class DirectFindNetworkInterfacesTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         criteria = ObjectFilterCriteria(
-            states=['created'], namespace='tenant-a', name='eth0')
+            states=['created'], network_uuid=str(NETWORK_UUID))
 
         with self.assertLogs('shakenfist.mariadb', level='WARNING') as cm:
             result = mariadb._direct_find_network_interfaces(criteria)
@@ -865,49 +866,44 @@ class DirectFindNetworkInterfacesTestCase(base.ShakenFistTestCase):
         combined = ' '.join(cm.output)
         self.assertIn('network_interfaces', combined)
         self.assertIn("['created']", combined)
-        self.assertIn('tenant-a', combined)
-        self.assertIn('eth0', combined)
+        self.assertIn(str(NETWORK_UUID), combined)
 
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_namespace_in_criteria_is_silently_ignored(self, mock_get_engine):
-        """namespace in criteria is stripped — result equals namespace=None call."""
+    def test_namespace_in_criteria_is_refused(self, mock_get_engine):
+        """Issue 4947: a namespace filter this table cannot serve used
+        to be stripped, which answered a namespace-scoped query with
+        every namespace's interfaces. It is refused instead, and the
+        query is never built."""
         rows = [_ni_row(ni_uuid=uuid.uuid4(), order=i) for i in range(2)]
         mock_get_engine.return_value = _make_engine_mock(rows)
 
-        # Calling with namespace set and without should hit the same SQL path
-        # because the helper strips namespace to None before building the query.
-        # Both calls see the same mock rows, so both results must be equal.
-        result_with_ns = mariadb._direct_find_network_interfaces(
+        self.assertRaises(
+            exceptions.UnservableFilterCriteria,
+            mariadb._direct_find_network_interfaces,
             ObjectFilterCriteria(states=['created'], namespace='tenant-a'))
 
-        mock_get_engine.return_value = _make_engine_mock(rows)
-        result_without_ns = mariadb._direct_find_network_interfaces(
-            ObjectFilterCriteria(states=['created']))
-
-        self.assertEqual(len(result_with_ns), len(result_without_ns))
-        self.assertEqual(
-            [str(r.uuid) for r in result_with_ns],
-            [str(r.uuid) for r in result_without_ns],
-        )
-
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_name_in_criteria_is_silently_ignored(self, mock_get_engine):
-        """name in criteria is stripped — result equals name=None call."""
+    def test_name_in_criteria_is_refused(self, mock_get_engine):
         rows = [_ni_row(ni_uuid=uuid.uuid4(), order=i) for i in range(2)]
         mock_get_engine.return_value = _make_engine_mock(rows)
 
-        result_with_name = mariadb._direct_find_network_interfaces(
+        self.assertRaises(
+            exceptions.UnservableFilterCriteria,
+            mariadb._direct_find_network_interfaces,
             ObjectFilterCriteria(states=['created'], name='eth0'))
 
-        mock_get_engine.return_value = _make_engine_mock(rows)
-        result_without_name = mariadb._direct_find_network_interfaces(
-            ObjectFilterCriteria(states=['created']))
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_the_refusal_names_the_field_and_the_table(self, mock_get_engine):
+        mock_get_engine.return_value = _make_engine_mock([])
 
-        self.assertEqual(len(result_with_name), len(result_without_name))
-        self.assertEqual(
-            [str(r.uuid) for r in result_with_name],
-            [str(r.uuid) for r in result_without_name],
-        )
+        try:
+            mariadb._direct_find_network_interfaces(
+                ObjectFilterCriteria(namespace='tenant-a', name='eth0'))
+            self.fail('expected UnservableFilterCriteria')
+        except exceptions.UnservableFilterCriteria as e:
+            self.assertIn('namespace', str(e))
+            self.assertIn('name', str(e))
+            self.assertIn('network_interfaces', str(e))
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_network_uuid_filter(self, mock_get_engine):
@@ -1008,10 +1004,39 @@ class FindNetworkInterfacesPublicTestCase(base.ShakenFistTestCase):
     def test_routes_to_grpc(self, _mock_uds, mock_grpc):
         """_use_database_service=True → _grpc_find_network_interfaces called."""
         mock_grpc.return_value = []
-        criteria = ObjectFilterCriteria(namespace='tenant-a')
+        criteria = ObjectFilterCriteria(network_uuid=str(NETWORK_UUID))
         result = mariadb.find_network_interfaces(criteria)
         mock_grpc.assert_called_once_with(criteria)
         self.assertEqual(result, [])
+
+    @mock.patch('shakenfist.mariadb._grpc_find_network_interfaces')
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_an_unservable_filter_is_refused_before_the_rpc(
+            self, _mock_uds, mock_grpc):
+        """Issue 4947: the caller is told locally rather than handed a
+        failed database call from the servicer, which is what a refusal
+        raised on the far side of the tier would look like."""
+        self.assertRaises(
+            exceptions.UnservableFilterCriteria,
+            mariadb.find_network_interfaces,
+            ObjectFilterCriteria(namespace='tenant-a'))
+        mock_grpc.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._grpc_find_artifacts')
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_the_rule_is_per_table_not_per_field(
+            self, _mock_uds, mock_grpc):
+        # namespace is servable for artifacts and not for interfaces;
+        # network_uuid is the other way around. Neither field is
+        # special, only the table.
+        mock_grpc.return_value = []
+        mariadb.find_artifacts(ObjectFilterCriteria(namespace='tenant-a'))
+        mock_grpc.assert_called_once()
+
+        self.assertRaises(
+            exceptions.UnservableFilterCriteria,
+            mariadb.find_artifacts,
+            ObjectFilterCriteria(network_uuid=str(NETWORK_UUID)))
 
 
 # ---------------------------------------------------------------------------

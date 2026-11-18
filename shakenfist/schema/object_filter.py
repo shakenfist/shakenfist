@@ -24,11 +24,18 @@ class ObjectFilterCriteria(BaseModel):
         namespace: Namespace to filter by. ``None`` = no namespace filter.
         name: Object name to filter by. ``None`` = no name filter.
         network_uuid: Foreign-key filter for the ``network_interfaces``
-            table. Honoured only by ``find_network_interfaces`` and
-            silently ignored by other ``find_*`` helpers.
+            table. Honoured only by ``find_network_interfaces``; a
+            ``find_*`` helper whose table has no such column refuses
+            the query rather than ignoring the field (issue 4947).
         instance_uuid: Foreign-key filter for the ``network_interfaces``
-            table. Honoured only by ``find_network_interfaces`` and
-            silently ignored by other ``find_*`` helpers.
+            table, with the same rule as ``network_uuid``.
+
+    ``states`` is the one field every filterable type can serve, since
+    it is read from ``object_states`` rather than from the per-type
+    table. Each of the others is a column on some tables and not on
+    others, and asking for one a table cannot serve is refused: the
+    alternative is answering a narrower query with more rows than it
+    asked for, which is how a scoping mistake becomes a disclosure.
     """
 
     states: Optional[list[str]] = None
