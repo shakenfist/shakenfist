@@ -460,12 +460,50 @@ def keys_with_attributes(
     created via zombie_repair_state() rather than deleting it (issue
     3836). Any future soft delete path must revisit that, here and in
     Namespace.lookup_key().
+
+    That construction holds only while include_expired is false. A
+    caller which sets it does see keys the sweep has already soft
+    deleted, and stateless zombies, until the reaper hard deletes
+    them -- NAMESPACE_KEY_REAP_GRACE plus CLEANER_DELAY after the key
+    lapsed, which is the forensic window an audit of lapsed
+    credentials wants. Such a caller must not treat presence here as
+    proof a key is live.
+
+    The rows are not ordered. A caller which presents them to a person
+    should sort them.
     """
     return [
         (NamespaceKey.from_static_data(static_data), attrs)
         for static_data, attrs in mariadb.find_namespace_keys(
             namespace, include_expired=include_expired, now=now)
     ]
+
+
+def key_with_attributes(
+        namespace: str, name: str
+) -> Optional[tuple[NamespaceKey, NamespaceKeyAttributesData]]:
+    """One key of a namespace by name, paired with its attributes.
+
+    The singular form of keys_with_attributes(), reading the unique
+    and indexed (namespace, name) pair instead of scanning the
+    namespace. It is the accessor token validation uses, so a caller
+    which wants one key by name need not pay for every key in the
+    namespace.
+
+    Expired keys are returned, as are keys the expiry sweep has
+    already soft deleted, until the reaper hard deletes them --
+    NAMESPACE_KEY_REAP_GRACE plus CLEANER_DELAY after the key lapsed.
+    A caller must therefore not treat a result here as proof that the
+    key is live.
+
+    Returns None when the namespace has no key of that name.
+    """
+    row = mariadb.get_namespace_key_by_name(namespace, name)
+    if not row:
+        return None
+
+    static_data, attrs = row
+    return (NamespaceKey.from_static_data(static_data), attrs)
 
 
 class NamespaceKeys(dbo_iter):

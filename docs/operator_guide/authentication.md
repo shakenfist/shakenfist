@@ -46,9 +46,17 @@ answers with the same object for a single key. Both detailed reads include
 expired keys, so "which of my keys lapsed, and when" can be answered without
 reading the database. `sf-client namespace show` renders them too, with
 `provenance` in its table and JSON output rather than in its comma separated
-one, where a serialised object would be ambiguous.
+one, where a serialised object would be ambiguous. That comma separated output
+gives the expiry as the raw unix timestamp the cluster sent, so a script can
+compare it with the current time without parsing a date.
 
-The detailed reads never return the key's secret.
+The detailed reads never return the key's secret. A key with no scopes
+recorded reports `scopes` as null, and that means the key is **unrestricted**
+rather than unprivileged: such a key mints wildcard tokens. There is no state
+field, so a key the expiry sweep has already soft deleted still appears, with
+an expiry in the past, until it is hard deleted -- `NAMESPACE_KEY_REAP_GRACE`
+plus `CLEANER_DELAY` after it lapsed, which is the forensic window described
+above.
 
 `provenance`, the record of who or what minted a key, is served only to a
 caller authenticated to the `system` namespace. Every other caller who can read
@@ -60,6 +68,16 @@ of them. Weigh that when you grant trust. A missing `provenance` means the
 caller is not in `system`, not that the key has none. See
 [a minted key records who it was minted for](#human-login-mints-credentials)
 for what provenance contains.
+
+Note that this gate is the namespace alone, not the namespace and a scope.
+**Scoping a `system` credential does not withhold provenance from it**: a key
+minted into `system` and scoped to only what these reads need still sees the
+field, which is deliberate, because an operator administering keys with a
+correctly narrowed credential is exactly who the field is for. The namespace
+event trail carries the same subjects and claims and is served behind the
+stricter test of `system` plus `cluster-admin`, so the two surfaces disagree
+on purpose. If you need a `system` credential which cannot read who logged in,
+there is no scope which arranges that today.
 
 Even so, the forensic window above is worth keeping in mind: setting
 `NAMESPACE_KEY_REAP_GRACE` to `0` while investigating keeps an expired key

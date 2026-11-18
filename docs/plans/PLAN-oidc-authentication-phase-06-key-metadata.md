@@ -217,10 +217,20 @@ should be removed when this is closed". They are:
 | `docs/operator_guide/authentication.md` | 40-51 | The keys endpoint answers with names only; the forensic window matters more because of it; tracked as #3672 |
 | `docs/developer_guide/authentication.md` | 157-161 | "a key's expiry, scopes and provenance are recorded on the object but are not readable through any API" |
 | `docs/developer_guide/api_reference/authentication.md` | 214, 235, 280 | Three worked examples calling `get_namespace_keynames` |
+| `docs/user_guide/authentication.md` | 114-125 | "There is presently no way to ask Shaken Fist what your own key's expiry or scopes are ... there is no API which returns the rest" |
+
+The fourth row was not in the survey as written: it was found by review
+round three, after the phase had merged, because its wording matched
+none of the terms the Definition of done greps for. The grep has been
+widened to the wording it actually used, and the row recorded here so
+the count of interim notes is four rather than three.
 
 `docs/developer_guide/ci_api_coverage.md:199` also carries a
-`get_namespace_keynames` section, which is generated coverage
-bookkeeping rather than a claim about the API.
+`get_namespace_keynames` section. That page is **manually** maintained --
+its own header says so -- so a new client method with no entry makes the
+page understate the API surface rather than report it untested. The two
+new methods get `*Not tested.*` entries, which the page treats as a
+legitimate answer.
 
 ### `file:line` drift in the master plan
 
@@ -455,9 +465,12 @@ Run from the phase worktree unless stated.
 * [ ] All seven mutations in 6c killed, each by a named test recorded
       in this file's Results section. A surviving mutation is a failed
       Definition of done, not a note.
-* [ ] No page says the fields are unreadable. `grep -rn 'not readable
-      through any API\|names\* only\|3672' docs/ --include=*.md`
-      matches nothing outside `docs/plans/`.
+* [ ] No page says the fields are unreadable. `grep -rni 'not readable
+      through any API\|names\* only\|no API which returns\|no way to
+      ask shaken fist\|3672' docs/ --include=*.md` matches nothing
+      outside `docs/plans/`. The last two alternatives were added in
+      review round three, which found a fourth interim note the
+      original three terms could not match.
 * [ ] No fact about these reads is stated differently on two pages: the
       operator guide, the developer guide and the API reference agree
       on which fields each read serves, on whether expired keys appear,
@@ -618,6 +631,37 @@ that argument with `location='json_or_query'`
 the one place both repositories could have passed their own tests and
 still not worked together.
 
+**Review round three, 2026-11-19 (AEDT).** On the follow-up pull
+request, which carried round two. Zero `fix` items; two `document` and
+nine `consider`, of which seven were taken.
+
+The one which mattered was a fourth interim note, in
+`docs/user_guide/authentication.md`, which the survey had not
+enumerated and the Definition of done's grep could not match. Both are
+corrected above. The lesson is narrow and worth stating: a grep written
+from the three pages a survey found will keep finding those three
+pages, so the terms have to come from the claim rather than from the
+prose that was already in hand.
+
+Two further corrections of fact in work this phase wrote. The forensic
+window was attributed to `NAMESPACE_KEY_REAP_GRACE` alone in three
+places; expiry to soft delete is that setting, soft delete to hard
+delete is `CLEANER_DELAY`, and the window these passages describe is
+the sum. And the single-key handler read the database directly while
+the listing beside it went through `namespace_key`, an asymmetry this
+phase introduced; `key_with_attributes()` now sits beside
+`keys_with_attributes()` and the handler has no database vocabulary in
+it.
+
+Declined: sorting in the database's collation rather than Python's
+codepoint order, which changes what the API returns and is its own
+pull request if we want it; and functional CI coverage for the two
+routes, which belongs with this plan's coverage phase and wanted the
+client merged first. The claim about the client's comma separated
+output was verified rather than softened --
+`shakenfist_client/commandline/namespace.py:208` prints `repr()` of the
+raw timestamp -- which is possible now that the client half has merged.
+
 ## Results
 
 ### Mutation testing the disclosure rule (step 6c)
@@ -660,3 +704,43 @@ died for the wrong reason. The faithful version, which chains the
 accessor over every active namespace the way `auth.py` itself iterates
 them, genuinely returns another namespace's key before the test refuses
 it.
+
+### Mutation testing the follow-up reads (review rounds two and three)
+
+Review round two changed the single-key read, both listings' ordering
+and where `detail` is bound; round three added the null `scopes`
+meaning, the soft-delete window and an exact-call assertion on the
+point read. Round three's harness carries round two's four mutants
+forward and adds four, so eight run together, each on a copy of the
+tree with bytecode writing disabled and under `timeout 600`. All eight
+are killed.
+
+| # | Mutation | Killed by |
+|---|----------|-----------|
+| 8 | The single-key read scans the namespace again | `CostTestCase.test_the_single_key_read_is_an_indexed_point_read` |
+| 9 | The detailed listing is no longer sorted | `BareListingTestCase.test_both_listings_are_ordered_by_key_name` |
+| 10 | The bare listing is no longer sorted | `BareListingTestCase.test_both_listings_are_ordered_by_key_name` |
+| 11 | `detail` is bound from the query string alone | `BareListingTestCase.test_detail_arrives_in_a_json_body_too` |
+| 12 | A null `scopes` is rendered as `[]` | `DetailedListingTestCase.test_each_entry_carries_its_expiry_and_scopes` |
+| 13 | The point read hides a soft deleted key | `DetailedListingTestCase.test_a_soft_deleted_key_is_still_readable` |
+| 14 | The listing hides a soft deleted key | `DetailedListingTestCase.test_a_soft_deleted_key_is_still_readable` |
+| 15 | The handler reads its key twice | `CostTestCase.test_the_single_key_read_is_an_indexed_point_read` |
+
+Mutant 10 survived its first run in round two, and the reason is the
+same complaint the review had made: the fixture creates its keys in
+alphabetical order, so an unsorted handler passed a test which asserted
+a sorted result. `test_both_listings_are_ordered_by_key_name` now
+creates a key which sorts first and is made last, after which the
+mutant dies.
+
+Mutant 15 exists to check the direction of round three's change to
+`test_the_single_key_read_is_an_indexed_point_read`. That test asserted
+a ceiling on the accessor's total calls, which the authentication path
+shares; it now counts the calls carrying this key's own arguments
+instead. Both forms kill mutant 15 -- a handler reading its key twice
+makes three calls in total, and the ceiling was three -- so the change
+is not about catching more handler bugs. It is about what the ceiling
+would have done to an innocent future read on the authentication path,
+which would have failed this test while saying nothing about the
+handler. The counted assertion is insensitive to that and still pins
+the handler to exactly one read.
