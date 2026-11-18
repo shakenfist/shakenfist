@@ -946,8 +946,13 @@ def _grpc_call(
     the database-tier rolling restart (#3430).
 
     Once retries are exhausted, raises exceptions.DatabaseUnavailable
-    rather than the underlying RpcError; non-retryable RpcErrors are
-    raised as-is on the first attempt.
+    rather than the underlying RpcError. A non-retryable RpcError fails
+    on the first attempt and raises exceptions.DatabaseCallFailed (a
+    DatabaseUnavailable subclass) for the same reason -- a call which
+    failed must not reach a wrapper that reports it as a missing
+    object. UNIMPLEMENTED is the exception and is raised as-is, because
+    it is a mixed-version answer the wrappers test for rather than a
+    failure.
 
     The method parameter is a bound method on the stub (e.g.
     stub.GetNode). On retry we must re-resolve the method from a
@@ -1042,7 +1047,25 @@ def _grpc_call(
             except grpc.RpcError as e:
                 last_error = e
                 if e.code() not in retryable_codes:
-                    raise
+                    if e.code() == grpc.StatusCode.UNIMPLEMENTED:
+                        # The one non-retryable code the wrappers below
+                        # are entitled to read: it is how an sf-database
+                        # older than an RPC answers, and the wrappers
+                        # with a mixed-version fallback test for it.
+                        raise
+                    # Every other non-retryable code means the call
+                    # failed, not that the object is absent, so it must
+                    # not reach a wrapper which would translate it into
+                    # None/False/[] (issue 3373). RESOURCE_EXHAUSTED is
+                    # the sharpest case: a reply which did not fit the
+                    # message limit would otherwise read as an empty
+                    # list.
+                    failed = (
+                        f'gRPC {method_name or "call"} failed: '
+                        f'{_describe_rpc_error(e)}')
+                    LOG.error(failed)
+                    raise exceptions.DatabaseCallFailed(
+                        failed, code=e.code()) from e
                 if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
                     # Each of these burned the full GRPC_TIMEOUT before failing;
                     # cap them separately so the fast-failing UNAVAILABLE budget
@@ -4951,7 +4974,11 @@ def _grpc_get_state_checked(
             update_time=reply.update_time,
             message=reply.message if reply.message else None
         )
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # Reporting a failed read as (False, None) is this wrapper's
+        # whole purpose, so it catches the DatabaseCallFailed a failed
+        # call now raises as well as the UNIMPLEMENTED which still
+        # arrives as an RpcError (issue 3373).
         LOG.error(
             f'gRPC GetObjectState failed for {object_type}/{object_uuid}: {e}')
         return False, None
@@ -4994,11 +5021,15 @@ def _grpc_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
         return False
 
 
-def _log_failed_read(rpc: str, error: grpc.RpcError, target: str = '') -> None:
+def _log_failed_read(
+        rpc: str, error: BaseException, target: str = '') -> None:
     """Log a list-shaped read which did not happen, naming why when we can.
 
-    The wrappers which use this all collapse an RpcError to a
-    failed-read return of None. That is right for the transient codes
+    The wrappers which use this all collapse a failed call to a
+    failed-read return of None. The error is either a grpc.RpcError
+    (UNIMPLEMENTED, the one code the wrappers still see directly) or
+    the DatabaseCallFailed _grpc_call raises for every other
+    non-retryable code; both answer code(). That is right for the transient codes
     and for RESOURCE_EXHAUSTED -- the oversized reply of #3638 -- but
     it folds INVALID_ARGUMENT in with them, and the servicers now set
     that status when they are handed an object type they cannot
@@ -5040,7 +5071,7 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
         )
         reply = _grpc_call(stub.GetObjectsByState, request)
         return list(reply.object_uuids)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
         _log_failed_read('GetObjectsByState', e, target=str(object_type))
         return None
 
@@ -5080,7 +5111,7 @@ def _grpc_get_objects_by_state_page(object_type: ObjectType,
             return ObjectsByStatePage(uuids=uuids, more_available=False)
         return ObjectsByStatePage(
             uuids=uuids, more_available=bool(reply.more_available))
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
         _log_failed_read('GetObjectsByState', e, target=str(object_type))
         return None
 
@@ -5103,7 +5134,7 @@ def _grpc_count_objects_by_state(object_type: ObjectType,
         )
         reply = _grpc_call(stub.CountObjectsByState, request)
         return int(reply.count)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
         _log_failed_read('CountObjectsByState', e, target=str(object_type))
         return None
 
@@ -6271,7 +6302,9 @@ def _grpc_has_pending_cluster_operation_target(
         reply = _grpc_call(
             stub.HasPendingClusterOperationTarget, request)
         return bool(reply.pending)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # True is the deliberate fail-safe for a read which did not
+        # happen, whatever stopped it (issue 3373).
         LOG.error(
             f'gRPC HasPendingClusterOperationTarget failed for '
             f'{target_object_type}/{target_uuid}: {e}')
@@ -10018,7 +10051,7 @@ def _grpc_get_references_from(
                 last_active=ref.last_active
             ))
         return refs
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
         _log_failed_read('GetReferencesFrom', e, target=str(source_uuid))
         return None
 
@@ -11224,7 +11257,9 @@ def _grpc_delete_blob_transfers_for_blob(blob_uuid: str) -> int:
         )
         reply = _grpc_call(stub.DeleteBlobTransfersForBlob, request)
         return int(reply.count)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # -1 is not a possible count, so this already reports a failed
+        # call rather than faking one (issue 3373).
         LOG.error(f'gRPC DeleteBlobTransfersForBlob failed: {e}')
         return -1
 
@@ -13443,7 +13478,9 @@ def _grpc_get_all_node_daemon_states(
             )
             for d in reply.data
         ]
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # None is "the read failed", distinct from the empty list which
+        # means this node has registered no daemons (issue 3373).
         LOG.error(
             f'gRPC GetAllNodeDaemonStates failed for {node_uuid}: {e}')
         return None
@@ -22468,7 +22505,9 @@ def _grpc_is_vsock_cid_in_use(cid: int) -> bool:
         request = database_pb2.IsVsockCidInUseRequest(cid=cid)
         reply = _grpc_call(stub.IsVsockCidInUse, request)
         return bool(reply.in_use)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # The fail-safe in the docstring is for a read which did not
+        # happen, whatever stopped it (issue 3373).
         LOG.error(
             f'gRPC IsVsockCidInUse failed for CID {cid}: {e} '
             f'(returning in_use=True as fail-safe)')
@@ -23705,7 +23744,9 @@ def _grpc_create_and_enqueue_cluster_operation(
         reply = _grpc_call(
             stub.CreateAndEnqueueClusterOperation, request)
         return bool(reply.success), reply.error
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # This wrapper answers (did not succeed, why), which is exactly
+        # what a failed call is, so it keeps answering it (issue 3373).
         LOG.warning(
             f'gRPC CreateAndEnqueueClusterOperation failed for '
             f'{op_uuid}: {e}')
@@ -26952,7 +26993,7 @@ def _grpc_get_stateless_object_uuids(
         )
         reply = _grpc_call(stub.GetStatelessObjectUuids, request)
         return list(reply.object_uuids)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
         _log_failed_read('GetStatelessObjectUuids', e, target=str(object_type))
         return None
 

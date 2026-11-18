@@ -361,19 +361,32 @@ into `cluster_sweep_work_list_failure_streak`, and is logged as a skipped pass.
 The general form: **silence is not success, and an empty result set is not the
 absence of an answer.**
 
-One trap when handling this deliberately: a failed read from the `mariadb`
-client arrives in *two* shapes. The client wrappers map `grpc.RpcError` to a
-`None`/`False`/`[]` return, but `_grpc_call()` raises
-`exceptions.DatabaseUnavailable` once its retry budget is spent, and that is
-deliberately not an `RpcError` subclass (issue 3373), so it propagates through
-the wrapper untouched. Handling only the return value covers the oversized-reply
-case and misses the tier outage -- which is the more likely reason a read fails,
-and the condition an alert on the streak most needs to see. Cover both, and
-prove it with a test that sets `side_effect = DatabaseUnavailable(...)` rather
-than a `None` return. Code which is meant to ride out an unreachable
-database catches `DatabaseUnavailable` explicitly and says so;
-`Daemon.check_daemon_state()` and `ClusterLock.__enter__` are the
-examples to copy.
+A failed read from the `mariadb` client therefore arrives as an *exception*,
+not as a return value. `_grpc_call()` raises `exceptions.DatabaseUnavailable`
+once its retry budget is spent, and `exceptions.DatabaseCallFailed` (a subclass
+of it) for a non-retryable status code -- `INTERNAL`, `INVALID_ARGUMENT`,
+`RESOURCE_EXHAUSTED` and the rest. Neither is a `grpc.RpcError` subclass
+(issue 3373), so neither can be caught by the wrappers' `except grpc.RpcError`
+clauses and turned into the `None`/`False`/`[]` they use for a missing object.
+Code which is meant to ride out a database that cannot answer catches
+`DatabaseUnavailable` explicitly and says so; `Daemon.check_daemon_state()` and
+`ClusterLock.__enter__` are the examples to copy, and because
+`DatabaseCallFailed` is a subclass they need no second clause.
+
+`UNIMPLEMENTED` is the one status code still handed to the wrappers as an
+`RpcError`, because it is how an sf-database older than an RPC answers and the
+wrappers with a mixed-version fallback test for it.
+
+So a `None`/`False`/`[]` return from a wrapper now means one of two things: a
+genuinely absent object, or a failed read from one of the eleven wrappers which
+report a failed read *distinguishably* and catch `DatabaseCallFailed` to keep
+doing so -- `get_state_checked()`'s `(False, None)`, the `None`-rather-than-`[]`
+list readers behind `_log_failed_read()`, and the documented fail-safes such as
+`_grpc_is_vsock_cid_in_use()`. If you add a wrapper to that set, say in a
+comment why its sentinel cannot be confused with an answer. If you cannot say
+that, let the exception propagate. Prove either shape with a test that sets
+`side_effect = DatabaseUnavailable(...)` or `DatabaseCallFailed(...)` rather
+than a `None` return.
 
 Having covered both, do not then treat them alike inside a loop. The two shapes
 differ in blast radius. A `None` return is per-reply, so the next object type is

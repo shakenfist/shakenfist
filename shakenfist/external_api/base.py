@@ -2783,9 +2783,16 @@ def handle_database_unavailable(func):
         try:
             return func(*args, **kwargs)
         except exceptions.DatabaseUnavailable as e:
+            # The status code is only present on the DatabaseCallFailed
+            # subclass, where the tier answered and refused. Logging it
+            # is what separates "retry, the tier is restarting" from a
+            # 503 for an INVALID_ARGUMENT which will never succeed.
+            code = e.code() if isinstance(
+                e, exceptions.DatabaseCallFailed) else None
             LOG.with_fields({
                 'method': flask.request.method,
                 'path': flask.request.path,
+                'grpc_status_code': code.name if code else None,
                 'error': str(e)}).error(
                 'Database unavailable while handling API request')
             return sf_api.error(503, 'database unavailable, please retry',

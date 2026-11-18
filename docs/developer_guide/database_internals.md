@@ -374,12 +374,17 @@ attempts (`wait_for_ready` is deliberately left at the default of False so
 a wedged subchannel fails fast into this retry path instead of parking the
 caller). Once those retries are exhausted, `_grpc_call()` raises
 `shakenfist.exceptions.DatabaseUnavailable` rather than the underlying
-RpcError. The client wrappers in `mariadb.py` translate non-retryable
-RpcErrors into "object not found" return values (`None`/`False`/`[]`), but
-`DatabaseUnavailable` is deliberately not an RpcError subclass and
-propagates through them: an unreachable database must not be
-indistinguishable from a missing object. The few hot paths that
-intentionally tolerate an unreachable database catch it explicitly --
+RpcError. A non-retryable status code fails on the first attempt and
+raises `exceptions.DatabaseCallFailed`, a subclass of the same
+exception, for the same reason: the client wrappers in `mariadb.py`
+translate an `RpcError` into "object not found" return values
+(`None`/`False`/`[]`), and neither exception is an RpcError subclass, so
+neither can be reported as a missing object. `UNIMPLEMENTED` is the
+exception and still reaches the wrappers as an `RpcError`, because it is
+how an sf-database older than an RPC answers and the wrappers with a
+mixed-version fallback test for it. The few hot paths that
+intentionally tolerate a database which cannot answer catch
+`DatabaseUnavailable` explicitly, which covers both --
 `Daemon.check_daemon_state()` skips the check, `ClusterLock.__enter__`
 keeps retrying inside the caller's timeout, the queues daemon's health
 loop treats it as unhealthy and waits, and (since #3638) the cleaner's
@@ -395,9 +400,9 @@ accessor returns `None`
 timeout, deadlock) they set `UNAVAILABLE` on the status, which
 `_grpc_call` retries and then surfaces as `DatabaseUnavailable`. An
 unexpected exception in the handler sets `INTERNAL`, which is
-non-retryable and so becomes a `None` return client-side. This matters
-because it is the failure mode where sf-database itself is healthy and
-answering, so nothing else in the stack notices.
+non-retryable and so becomes a `DatabaseCallFailed` client-side. This
+matters because it is the failure mode where sf-database itself is
+healthy and answering, so nothing else in the stack notices.
 
 `get_active_blob_uuids()` and `get_node_blob_uuids()` are the exceptions
 to the "wrappers translate to not found" rule: they *raise*
