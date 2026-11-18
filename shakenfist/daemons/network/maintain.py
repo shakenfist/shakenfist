@@ -256,32 +256,34 @@ class Job(util_concurrency.Job):
         callers must treat as "protect".
 
         A bridge which does not exist is an answer, not a failure --
-        ``get_bridge_members()`` returns an empty list for it. That case
-        is the common one rather than the exotic one: hypervisor
-        teardown deletes the bridge before the vxlan interface (see
-        BridgedVXLanNetwork._apply_delete_on_hypervisor), so an interrupted
-        teardown leaves exactly a surviving ``vxlan-<vxid>`` with no
-        bridge, and ``discover_interfaces()`` keys stray detection on
-        that interface. Treating it as unanswerable would protect the
-        residue this reaper exists to remove.
+        ``util_network.foreign_bridge_members()`` returns an empty list
+        for it. That case is the common one rather than the exotic one:
+        hypervisor teardown deletes the bridge before the vxlan interface
+        (see BridgedVXLanNetwork._apply_delete_on_hypervisor), so an
+        interrupted teardown leaves exactly a surviving ``vxlan-<vxid>``
+        with no bridge, and ``discover_interfaces()`` keys stray
+        detection on that interface. Treating it as unanswerable would
+        protect the residue this reaper exists to remove.
+
+        Which devices are ours lives in ``util_network`` rather than
+        here, because the instance delete path applies the same veto
+        before it tears a network off this hypervisor (issue 4958) and
+        the two must not be able to disagree about what counts as
+        evidence.
         """
-        bridge = 'br-vxlan-%06x' % vxid
         try:
-            members = util_network.get_bridge_members(bridge)
+            return util_network.foreign_bridge_members(vxid)
         except Exception as e:
             # A failing bridge query protects the stray, so the stray --
             # and this failure -- persist across passes. Report it once
             # per stray episode like every other message on this path,
             # keyed on the bridge name so a varying exception text does
             # not defeat the suppression.
+            bridge = 'br-vxlan-%06x' % vxid
             if self._first_report(vxid, 'bridge query failure: %s' % bridge):
                 LOG.with_fields({'vxid': vxid, 'bridge': bridge}).warning(
                     'Failed to list stray vxlan bridge members: %s' % e)
             return None
-
-        ours = {'vxlan-%06x' % vxid, 'veth-%06x-o' % vxid,
-                'egr-%06x-o' % vxid}
-        return sorted(set(members) - ours)
 
     def _delete_stray_devices(self, vxid: int) -> tuple[list[str], list[str]]:
         """Delete the host devices Shaken Fist names from a stray vxid.

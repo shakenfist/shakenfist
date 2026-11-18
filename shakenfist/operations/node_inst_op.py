@@ -20,6 +20,7 @@ from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import libvirt as util_libvirt
+from shakenfist.util import network as util_network
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -276,6 +277,66 @@ class NodeInstOp(BaseClusterOperation):
             EVENT_TYPE_AUDIT, 'delete deferred, domain still running',
             extra={'message': str(error)})
 
+    def _network_in_use_on_node(self, n, inst):
+        """Is this network still in use on this hypervisor?
+
+        Asked immediately before the bridge and vxlan device are torn off
+        this node, and never from a snapshot taken earlier.
+        ``_instance_delete`` used to sample the whole set of networks the
+        node's other instances used *before* ``inst.delete()``, which
+        left that delete plus one ``update_dnsmasq()`` enqueue per
+        network between the sample and the teardown. An interface hot
+        plug, or an instance create landing here, attaches to one of
+        those networks inside that window, and the teardown then removed
+        the bridge from underneath a running domain (issue 4958).
+
+        Two questions, in the order they become true during an attach.
+        The records first: both attach paths write an active
+        NetworkInterface row and the instance's placement before they
+        call ``_apply_create_on_hypervisor``, so a read here sees an
+        attach from the moment it is requested. Then the host gets a
+        veto, which is the cross-check the stray vxlan reaper already
+        applies before it mutates (``maintain._foreign_bridge_members``):
+        a guest tap enslaved to the bridge is proof that a domain is
+        attached right now, whatever the records say.
+
+        A host which cannot be asked counts as in use. The two errors are
+        not equal: a bridge left behind is reaped by a later maintain
+        pass, while a bridge removed from a live domain is an outage
+        which looks like the network going missing for no reason.
+        """
+        for i in Instances([this_node_filter], prefilter='active'):
+            if str(i.uuid) == str(inst.uuid):
+                continue
+            for ni in i.interfaces:
+                if str(ni.network_uuid) == str(n.uuid):
+                    self.log.with_fields({
+                        'network': n.uuid,
+                        'instance': i.uuid,
+                    }).debug('Another instance on this node uses this '
+                             'network, leaving it on the hypervisor')
+                    return True
+
+        try:
+            foreign = util_network.foreign_bridge_members(n.vxid)
+        except Exception as e:
+            util_exceptions.ignore_exception('node_inst_op', e)
+            self.log.with_fields({
+                'network': n.uuid,
+            }).warning('Could not list the bridge members for this network, '
+                       'leaving it on the hypervisor')
+            return True
+
+        if foreign:
+            self.log.with_fields({
+                'network': n.uuid,
+                'enslaved': foreign,
+            }).warning('Devices which are not ours are enslaved to the '
+                       'bridge, leaving this network on the hypervisor')
+            return True
+
+        return False
+
     def _instance_delete(self, inst):
         with inst.get_lock(op='Instance delete', global_scope=False):
             # There are two delete state flows:
@@ -326,18 +387,6 @@ class NodeInstOp(BaseClusterOperation):
             for ni in interfaces:
                 ni.delete()
 
-            # Create list of networks used by all other instances
-            host_networks = []
-            for i in Instances([this_node_filter], prefilter='active'):
-                if not i.uuid == inst.uuid:
-                    for ni in i.interfaces:
-                        if ni.network_uuid not in host_networks:
-                            host_networks.append(ni.network_uuid)
-            self.log.with_fields({
-                'instance_networks': instance_networks,
-                'host_networks': host_networks,
-            }).debug('Computed host networks before delete cleanup')
-
             inst.delete()
 
             # Check each network used by the deleted instance. A failure
@@ -366,13 +415,12 @@ class NodeInstOp(BaseClusterOperation):
                     n.update_dnsmasq()
 
                     if (not config.NODE_IS_NETWORK_NODE and
-                            network_uuid not in host_networks):
-                        # We are not the network node and the network not
-                        # used by any other instance on this hypervisor,
-                        # therefore clean it up
+                            not self._network_in_use_on_node(n, inst)):
+                        # We are not the network node and the network is
+                        # not used by any other instance on this
+                        # hypervisor, therefore clean it up
                         self.log.with_fields({
                             'network': network_uuid,
-                            'host_networks': host_networks,
                         }).debug('Last instance on host using this network, '
                                  'deleting on hypervisor')
                         BridgedVXLanNetwork(n)._apply_delete_on_hypervisor()

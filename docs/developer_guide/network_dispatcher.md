@@ -593,6 +593,16 @@ is protected — "could not ask the host" is not "the host says nobody is using
 it". This is one `ip` invocation per candidate vxid, only on the paths which
 are about to mutate.
 
+The instance delete path applies the same veto, for the same reason. When
+`NodeInstOp._instance_delete()` has removed the last instance on this node
+using a network it tears the bridge off the hypervisor, and it decides that
+from the records — which instances on this node have an active interface on
+the network — read at the point of decision rather than sampled before the
+delete (issue 4958). `util_network.foreign_bridge_members()` is then the
+host's answer to the same question, and `util_network.bridge_members_we_own()`
+is the single definition of which devices are not evidence, so the reaper and
+the delete path cannot disagree about what a guest tap looks like.
+
 The line between those two answers is load-bearing, and iproute2 makes it easy
 to get wrong. `_apply_delete_on_hypervisor()` deletes `br-vxlan-<vxid>` before
 `vxlan-<vxid>`, and `discover_interfaces()` keys stray detection on the latter,

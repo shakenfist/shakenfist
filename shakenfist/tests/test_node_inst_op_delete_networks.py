@@ -9,6 +9,13 @@ hypervisor-local teardown at all, leaving its bridge and vxlan
 devices behind as strays (issue 4165). The loop must record a
 failure, continue with the remaining networks, and only then
 re-raise so the operation still lands in the error state.
+
+The second family here is about *whether* a network should be torn
+off this hypervisor at all. That used to be sampled once before
+``inst.delete()`` and then trusted for the rest of the operation, so
+an interface attached in between lost its bridge (issue 4958). The
+question is now asked at the point of decision, of the records and
+then of the host.
 """
 
 from unittest import mock
@@ -48,11 +55,34 @@ class FakeInstance:
         self._state_value = new_value
 
 
-def _make_network(uuid):
+def _make_network(uuid, vxid=0x123):
     n = mock.MagicMock()
     n.uuid = uuid
+    n.vxid = vxid
     n.state = State(value='created', update_time=1.0)
     return n
+
+
+class _RecordingInstanceList(list):
+    """An always empty instance list which records each time it is read."""
+
+    def __init__(self, calls):
+        super().__init__()
+        self._calls = calls
+
+    def __iter__(self):
+        self._calls.append('membership')
+        return super().__iter__()
+
+
+def _make_instance_using(network_uuid):
+    """An unrelated instance on this node with an interface on a network."""
+    i = mock.MagicMock()
+    i.uuid = str(uuid4())
+    ni = mock.MagicMock()
+    ni.network_uuid = network_uuid
+    i.interfaces = [ni]
+    return i
 
 
 class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
@@ -72,18 +102,29 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
             ni.network_uuid = u
             self.interfaces.append(ni)
 
+        # What the node's other instances are, as the point of decision
+        # check reads them. A test which simulates an attach replaces
+        # this list, or appends to it from a side effect.
+        self.other_instances = []
+
         for target, kwargs in [
                 ('shakenfist.operations.node_inst_op.'
                  'interfaces_for_instance',
                  {'side_effect': lambda inst: iter(self.interfaces)}),
                 ('shakenfist.operations.node_inst_op.Instances',
-                 {'return_value': []}),
+                 {'side_effect': lambda *a, **kw: list(self.other_instances)}),
                 ('shakenfist.operations.node_inst_op.Network.from_db',
                  {'side_effect': lambda u: self.networks.get(u)}),
         ]:
             patcher = mock.patch(target, **kwargs)
             patcher.start()
             self.addCleanup(patcher.stop)
+
+        # The host side veto. Nothing we did not put there is enslaved to
+        # the bridge unless a test says otherwise.
+        self.mock_foreign = mock.patch(
+            'shakenfist.operations.node_inst_op.util_network.'
+            'foreign_bridge_members', return_value=[]).start()
 
         config = mock.MagicMock()
         config.NODE_IS_NETWORK_NODE = False
@@ -210,3 +251,115 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
 
         self._assert_deferred(inst)
         self.assertEqual('delete-wait-error', inst.state.value)
+
+    def test_network_used_by_another_instance_is_left_alone(self):
+        # The second network is also used by another instance on this
+        # node, so only the first one is torn off the hypervisor.
+        self.other_instances = [
+            _make_instance_using(self.network_uuids[1])]
+
+        op = self._make_op()
+        op._instance_delete(FakeInstance())
+
+        # Both networks still get their dnsmasq prune: the lease of the
+        # instance which just went away is stale either way.
+        for n in self.networks.values():
+            n.update_dnsmasq.assert_called_once_with()
+        self.mock_bvn.assert_called_once_with(
+            self.networks[self.network_uuids[0]])
+        self.mock_bvn.return_value.\
+            _apply_delete_on_hypervisor.assert_called_once()
+
+    def test_the_instance_being_deleted_does_not_protect_its_own_network(self):
+        # The instance under delete is excluded explicitly, so a delete
+        # whose own record is still readable as active -- a deleted state
+        # which has not landed yet, say -- still cleans up.
+        inst = FakeInstance()
+        self_entry = mock.MagicMock()
+        self_entry.uuid = inst.uuid
+        self_entry.interfaces = self.interfaces
+        self.other_instances = [self_entry]
+
+        op = self._make_op()
+        op._instance_delete(inst)
+
+        self.assertEqual(
+            2, self.mock_bvn.return_value.
+            _apply_delete_on_hypervisor.call_count)
+
+    def test_interface_attached_during_the_delete_keeps_its_bridge(self):
+        # The issue 4958 regression. An interface hot plug, or a create
+        # landing on this node, writes its NetworkInterface row while
+        # this delete is in progress. The membership question used to be
+        # sampled before inst.delete() and the per-network dnsmasq
+        # enqueues, so the attach was invisible to it and the bridge was
+        # removed from underneath the new, running, interface.
+        inst = FakeInstance()
+        inst.delete.side_effect = lambda: self.other_instances.append(
+            _make_instance_using(self.network_uuids[0]))
+
+        op = self._make_op()
+        op._instance_delete(inst)
+
+        self.mock_bvn.assert_called_once_with(
+            self.networks[self.network_uuids[1]])
+        self.mock_bvn.return_value.\
+            _apply_delete_on_hypervisor.assert_called_once()
+
+    def test_membership_is_read_after_the_delete(self):
+        # The ordering the fix depends on, pinned directly: no answer
+        # read before inst.delete() can be trusted by the loop which
+        # runs after it.
+        calls = []
+        inst = FakeInstance()
+        inst.delete.side_effect = lambda: calls.append('delete')
+        self.other_instances = _RecordingInstanceList(calls)
+
+        op = self._make_op()
+        op._instance_delete(inst)
+
+        self.assertEqual(
+            ['delete', 'membership', 'membership'], calls)
+
+    def test_enslaved_guest_tap_vetoes_the_teardown(self):
+        # The records say nobody is using the network and the host says
+        # otherwise. A tap on the bridge is proof that a domain is
+        # attached right now, so the host wins.
+        self.mock_foreign.side_effect = (
+            lambda vxid: ['vnet7'] if vxid == 0x456 else [])
+        self.networks[self.network_uuids[1]].vxid = 0x456
+
+        op = self._make_op()
+        op._instance_delete(FakeInstance())
+
+        self.mock_bvn.assert_called_once_with(
+            self.networks[self.network_uuids[0]])
+        self.mock_bvn.return_value.\
+            _apply_delete_on_hypervisor.assert_called_once()
+
+    def test_an_unanswerable_host_vetoes_the_teardown(self):
+        # "Could not ask the host" is not "the host says nobody is using
+        # it". A leaked bridge is reaped by a later maintain pass; a
+        # bridge taken from a live domain is an outage.
+        self.mock_foreign.side_effect = Exception('ip is having a bad day')
+
+        op = self._make_op()
+        with mock.patch(
+                'shakenfist.operations.node_inst_op.util_exceptions.'
+                'ignore_exception'):
+            op._instance_delete(FakeInstance())
+
+        self.mock_bvn.assert_not_called()
+
+    def test_the_network_node_asks_nothing_and_tears_nothing_down(self):
+        # The network node always carries every network, so it neither
+        # asks the question nor removes the plumbing.
+        config = mock.MagicMock()
+        config.NODE_IS_NETWORK_NODE = True
+        with mock.patch(
+                'shakenfist.operations.node_inst_op.config', config):
+            op = self._make_op()
+            op._instance_delete(FakeInstance())
+
+        self.mock_bvn.assert_not_called()
+        self.mock_foreign.assert_not_called()
