@@ -30,6 +30,7 @@ import sqlalchemy as sa
 from shakenfist import mariadb
 from shakenfist.network.interface import NetworkInterface
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
 from shakenfist.tests import base
 from shakenfist.tests import dbfixture
@@ -124,31 +125,95 @@ class InterfaceOrderConstraintTestCase(dbfixture.MariaDBTableFixture,
             _ni(self.instance, 1, '02:00:00:00:00:01', self.network)))
 
 
-class NextOrderTestCase(base.ShakenFistTestCase):
-    """What NetworkInterface.next_order() asks the database for."""
+class NextOrderTestCase(dbfixture.MariaDBTableFixture,
+                        base.ShakenFistTestCase):
+    """What NetworkInterface.next_order() can see, against real tables.
+
+    The index read only converges on a free slot if it sees every index
+    the UNIQUE constraint is holding. The first version of this fix
+    filtered the read on state, and a row takes its slot in the
+    constraint at INSERT while new() gives it a state only afterwards,
+    so a loser kept re-guessing the index it had just lost until its
+    retry budget ran out. Merge CI's concurrent hot plug test caught it;
+    these tests catch it without a cluster. The object_states table is
+    built so that a state-filtered read has the states it needs to
+    return the stated interfaces, and fails only on the unstated one.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.engine = self.build_engine(
+            [mariadb._get_network_interfaces_table,
+             mariadb._get_object_states_table])
+        self.addCleanup(self.engine.dispose)
+        for target, value in (('shakenfist.mariadb._get_engine', self.engine),
+                              ('shakenfist.mariadb._use_database_service', False)):
+            patcher = mock.patch(target, return_value=value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.table = mariadb._get_network_interfaces_table()
+        self.instance = uuid.uuid4()
+        self.network = uuid.uuid4()
+        self.macs = ('02:00:00:00:00:%02x' % i for i in range(1, 255))
+
+    def _plug(self, order, state='created', instance=None):
+        ni = _ni(instance or self.instance, order, next(self.macs), self.network)
+        self.assertTrue(mariadb._direct_create_network_interface(ni))
+        if state:
+            with self.engine.connect() as conn:
+                conn.execute(sa.insert(mariadb._get_object_states_table()).values(
+                    object_uuid=str(ni.uuid), object_type=ObjectType.INTERFACE,
+                    state_value=state, update_time=0.0))
+                conn.commit()
+        return ni
 
     def test_an_instance_with_no_interfaces_starts_at_zero(self):
-        with mock.patch('shakenfist.mariadb.find_network_interfaces',
-                        return_value=[]):
-            self.assertEqual(0, NetworkInterface.next_order('i'))
+        self.assertEqual(0, NetworkInterface.next_order(self.instance))
 
     def test_the_next_index_is_above_the_highest_in_use(self):
-        instance = uuid.uuid4()
-        network = uuid.uuid4()
-        rows = [_ni(instance, 0, '02:00:00:00:00:01', network),
-                _ni(instance, 3, '02:00:00:00:00:02', network)]
+        self._plug(0)
+        self._plug(3)
+        self.assertEqual(4, NetworkInterface.next_order(self.instance))
 
-        with mock.patch('shakenfist.mariadb.find_network_interfaces',
-                        return_value=rows) as find:
-            self.assertEqual(4, NetworkInterface.next_order(instance))
+    def test_an_index_won_before_its_state_is_written_is_seen(self):
+        # The merge CI failure: a sibling hot plug has inserted its row,
+        # and so holds index 1 in the constraint, but has not yet been
+        # given a state. The next guess must step past it.
+        self._plug(0)
+        self._plug(1, state=None)
+        self.assertEqual(2, NetworkInterface.next_order(self.instance))
 
-        # Scoped to the instance and to interfaces which still exist, in
-        # SQL rather than in Python: a deleted interface's index is free
-        # and another instance's index is none of our business.
-        criteria = find.call_args[0][0]
-        self.assertEqual(str(instance), criteria.instance_uuid)
-        self.assertEqual(set(NetworkInterface.ACTIVE_STATES),
-                         set(criteria.states))
+    def test_the_guess_is_never_one_the_constraint_refuses(self):
+        # The retry loop's contract, end to end against the constraint:
+        # whatever a sibling has claimed, the next guess inserts.
+        self._plug(0)
+        for sibling in (None, 'initial', None):
+            self._plug(NetworkInterface.next_order(self.instance), state=sibling)
+        guess = NetworkInterface.next_order(self.instance)
+        self.assertTrue(mariadb._direct_create_network_interface(
+            _ni(self.instance, guess, next(self.macs), self.network)))
+
+    def test_a_soft_deleted_interface_is_stepped_over(self):
+        # Not reused until the row is reaped. The index has to be
+        # unique, not dense, and the read must not depend on state.
+        self._plug(0)
+        deleted = self._plug(1, state='deleted')
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(self.table)
+                         .where(self.table.c.uuid == deleted.uuid)
+                         .values(active=None))
+            conn.commit()
+        self.assertEqual(2, NetworkInterface.next_order(self.instance))
+
+    def test_another_instance_is_none_of_our_business(self):
+        self._plug(0)
+        self._plug(7, instance=uuid.uuid4())
+        self.assertEqual(1, NetworkInterface.next_order(self.instance))
+
+    def test_a_string_instance_uuid_is_accepted(self):
+        # The hot plug endpoint holds the uuid as a string.
+        self._plug(0)
+        self.assertEqual(1, NetworkInterface.next_order(str(self.instance)))
 
 
 class NewRetriesOnOrderCollisionTestCase(base.ShakenFistTestCase):

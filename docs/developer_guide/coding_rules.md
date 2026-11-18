@@ -207,6 +207,15 @@ soft-delete nuance comes out in the wash either way -- `active` is NULL on a
 deleted row, and NULLs do not collide, so a deleted interface stops holding
 the index it used to have.
 
+The re-read has to see every row the constraint holds, or the retry never
+converges. The first version of this fix read the next index through the
+state-filtered `find_network_interfaces()`, but a row claims its slot at
+INSERT and is given a state only afterwards, so a loser could not see the
+sibling which had just beaten it and offered the same index again until its
+retry budget was gone. Read a superset of the constraint's key -- here every
+row on the instance, whatever its state -- and each lost race moves the next
+guess past the winner.
+
 ## Put the meter above the expensive thing, not below it
 
 `/auth/federated` is unauthenticated, so every step above the rate limit is a

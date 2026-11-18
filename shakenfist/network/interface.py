@@ -15,7 +15,6 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.schema.network_interface_attributes import NetworkInterfaceAttributesData
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
-from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
@@ -143,11 +142,24 @@ class NetworkInterface(dbo):
         is what issue 4946 was: two concurrent hot plugs both saw the
         same highest index and both took the next one. The constraint
         is the arbiter; this is only how a caller finds its next guess.
+
+        The guess only converges if every index the constraint is
+        holding is visible to this read, so the read must be a superset
+        of the constraint's key: every row on the instance, whatever its
+        state. It must not be filtered on state. A row takes its slot
+        in the constraint the moment it is inserted, but new() gives it
+        a state only after the insert loop, so a state-filtered read
+        cannot see a sibling's freshly won index and offers the same
+        losing guess again until the retry budget is gone -- which is
+        what the merge CI run for this fix did, ten guesses in 90ms.
+
+        Soft-deleted rows are counted too. That means an index freed by
+        a delete is not handed out again until the row is reaped, which
+        costs nothing: the index only has to be unique, not dense.
         """
-        criteria = ObjectFilterCriteria(
-            states=list(cls.ACTIVE_STATES),
-            instance_uuid=str(instance_uuid))
-        orders = [d.order for d in mariadb.find_network_interfaces(criteria)]
+        orders = [
+            d.order for d in mariadb.get_network_interfaces_by_instance(
+                UUID(str(instance_uuid)))]
         if not orders:
             return 0
         return max(orders) + 1

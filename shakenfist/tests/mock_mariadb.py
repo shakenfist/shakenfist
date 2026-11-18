@@ -669,6 +669,13 @@ class MockMariaDB():
         self.mariadb_update_network_interface.start()
         self.test_obj.addCleanup(self.mariadb_update_network_interface.stop)
 
+        self.mariadb_get_network_interfaces_by_instance = mock.patch(
+            'shakenfist.mariadb.get_network_interfaces_by_instance',
+            side_effect=self._mariadb_get_network_interfaces_by_instance)
+        self.mariadb_get_network_interfaces_by_instance.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_network_interfaces_by_instance.stop)
+
         self.mariadb_find_network_interfaces = mock.patch(
             'shakenfist.mariadb.find_network_interfaces',
             side_effect=self._mariadb_find_network_interfaces)
@@ -2326,6 +2333,21 @@ class MockMariaDB():
         data = self.network_interface_objects.get(key)
         self._trace(f'MockMariaDB.get_network_interface({key}): {data}')
         return data
+
+    def _mariadb_get_network_interfaces_by_instance(
+            self, instance_uuid) -> list[NetworkInterfaceData]:
+        """Mock implementation of mariadb.get_network_interfaces_by_instance().
+
+        Every row on the instance whatever its state, as the real query
+        does: it does not join object_states.
+        """
+        key = str(instance_uuid)
+        results = [d for d in self.network_interface_objects.values()
+                   if str(d.instance_uuid) == key]
+        self._trace(
+            f'MockMariaDB.get_network_interfaces_by_instance({key}): '
+            f'{len(results)} results')
+        return results
 
     def _mariadb_delete_network_interface(self, ni_uuid) -> bool:
         """Mock implementation of mariadb.delete_network_interface()"""
