@@ -201,7 +201,7 @@ sf-client instance create myinstance 1 2048 -d 8@cirros \
 In this case we have three disks, all of 8gb. The boot disk is imaged with
 cirros. The "cirros" here is shorthand. By default, you specify a URL for the
 image you want, so to boot a cirros instance you might use
-http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img -- that gets
+https://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img -- that gets
 old though, so for common cloud images there is a shorthand format, where
 Shaken Fist knows how to generate the download URL from a short description.
 In this case "cirros" means "the latest release of cirros". You can also specify

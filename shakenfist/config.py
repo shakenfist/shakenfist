@@ -1036,17 +1036,17 @@ class SFConfig(BaseSettings):
     # Image resolver options
     DOWNLOAD_URL_CIRROS: AnyHttpUrl = Field(
         (
-            'http://download.cirros-cloud.net/%(vernum)s/'
+            'https://download.cirros-cloud.net/%(vernum)s/'
             'cirros-%(vernum)s-x86_64-disk.img'
         ),
         description='Default download mirror for Cirros images.'
     )
     CHECKSUM_URL_CIRROS: AnyHttpUrl = Field(
-        'http://download.cirros-cloud.net/%(vernum)s/MD5SUMS',
+        'https://download.cirros-cloud.net/%(vernum)s/MD5SUMS',
         description='Default checksum URL for Cirros images.'
     )
     LISTING_URL_CIRROS: AnyHttpUrl = Field(
-        'http://download.cirros-cloud.net/',
+        'https://download.cirros-cloud.net/',
         description='A URL listing all Cirros releases.'
     )
 

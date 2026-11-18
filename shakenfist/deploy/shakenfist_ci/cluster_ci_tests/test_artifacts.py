@@ -293,6 +293,54 @@ class TestImages(base.BaseNamespacedTestCase):
             self.assertIn(3, lbl['blobs'])
 
 
+class TestCirrosFetchTransport(base.BaseNamespacedTestCase):
+    """The cirros shortcut is fetched over TLS (issue 4970).
+
+    Asserted against a real fetch rather than only against the
+    configuration default, because what matters is the URL the fetch
+    actually used: the shortcut is expanded on the hypervisor from
+    three configuration options, and the published digest the fetch is
+    checked against comes from the same place by the same route, so it
+    cannot tell a substituted image from the real one. Only the
+    transport can.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'cirrostransport'
+        super().__init__(*args, **kwargs)
+
+    def test_the_cirros_shortcut_fetches_over_https(self):
+        img = self.test_client.cache_artifact('cirros')
+        self.assertEqual('cirros', img['source_url'])
+
+        # The fetch event names the expanded URL, and is written before
+        # the bytes move, so this does not wait for the whole image.
+        urls = []
+        start_time = time.time()
+        while time.time() - start_time < 7 * 60:
+            for event in self.system_client.get_artifact_events(img['uuid']):
+                if 'HTTP fetch' not in str(event['message']):
+                    continue
+                url = (event.get('extra') or {}).get('url')
+                if url:
+                    urls.append(url)
+
+            if urls:
+                break
+            time.sleep(5)
+
+        self.addDetail('fetch_urls', content.text_content(json.dumps(
+            urls, indent=4, sort_keys=True)))
+        self.assertNotEqual(
+            [], urls,
+            'The cirros artifact recorded no HTTP fetch within seven '
+            'minutes: %s' % img['uuid'])
+        for url in urls:
+            self.assertTrue(
+                url.startswith('https://'),
+                'The cirros image was fetched over plaintext HTTP: %s' % url)
+
+
 class TestSharedImages(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'sharedimages'
