@@ -17720,6 +17720,15 @@ and warned about instead. If the question cannot be answered at all, the stray
 is protected — "could not ask the host" is not "the host says nobody is using
 it". This is one <code>ip</code> invocation per candidate vxid, only on the paths which
 are about to mutate.</p>
+<p>The instance delete path applies the same veto, for the same reason. When
+<code>NodeInstOp._instance_delete()</code> has removed the last instance on this node
+using a network it tears the bridge off the hypervisor, and it decides that
+from the records — which instances on this node have an active interface on
+the network — read at the point of decision rather than sampled before the
+delete (issue 4958). <code>util_network.foreign_bridge_members()</code> is then the
+host's answer to the same question, and <code>util_network.bridge_members_we_own()</code>
+is the single definition of which devices are not evidence, so the reaper and
+the delete path cannot disagree about what a guest tap looks like.</p>
 <p>The line between those two answers is load-bearing, and iproute2 makes it easy
 to get wrong. <code>_apply_delete_on_hypervisor()</code> deletes <code>br-vxlan-&lt;vxid&gt;</code> before
 <code>vxlan-&lt;vxid&gt;</code>, and <code>discover_interfaces()</code> keys stray detection on the latter,
