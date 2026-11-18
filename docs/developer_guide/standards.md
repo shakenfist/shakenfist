@@ -164,12 +164,14 @@ where that job does not run. See
 ## Secret-carrying fields are `SecretStr`
 
 Fields which hold a credential — `key` and `nonce` on
-`NamespaceKeyAttributesData`, and the `AUTH_SECRET_SEED`,
-`MARIADB_PASSWORD` and `LOKI_AUTH_HEADER` configuration options — are
+`NamespaceKeyAttributesData`, `token` on `BlobTransfer`, and the
+`AUTH_SECRET_SEED`, `MARIADB_PASSWORD` and `LOKI_AUTH_HEADER`
+configuration options — are
 `pydantic.SecretStr`, so stringifying one yields `**********` rather
 than the value. Unwrapping with `.get_secret_value()` happens only at
-named boundaries (the SQL writes, the gRPC encoder, the bcrypt
-compare, the JWT claim), and each of those sites carries a comment
+named boundaries (the SQL writes, the gRPC encoders, the bcrypt
+compare, the JWT claim, and the transfer handshake the transfers daemon
+compares against), and each of those sites carries a comment
 saying what breaks if the unwrap is missed. Do not add an unwrap to
 make an error go away; move the value, or wrap the other side.
 

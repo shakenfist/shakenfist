@@ -726,12 +726,23 @@ comes back only from an explicit `.get_secret_value()` call. That call is the
 point of the design: each one is somewhere a reviewer can stop and ask whether
 the plaintext belongs there, and there are few enough to read in one sitting.
 
-The wrapped fields are `NamespaceKeyAttributesData.key` and `.nonce`, and the
+The wrapped fields are `NamespaceKeyAttributesData.key` and `.nonce`,
+`BlobTransfer.token`, and the
 configuration options `AUTH_SECRET_SEED`, `MARIADB_PASSWORD` and
 `LOKI_AUTH_HEADER`. The unwrap sites are the bcrypt comparison in `/auth`, the
 nonce comparison in `verify_token()`, the JWT claim in `create_token()`, the two
 SQL writes and the gRPC encoder for key attributes, the JWT signing key in
 `external_api/app.py`, the database connection URL, and the Loki push header.
+
+`BlobTransfer.token` is not part of the REST authentication path at all — it
+authorises the inbound TCP connection to a blob transfer's server socket, which
+is a bearer credential by the same argument — and its unwrap sites are the SQL
+write and the gRPC encoder in `mariadb.py`, the proto encoders in the database
+daemon, the handshake the requesting node writes in `blob.py`, and the
+comparison against it in `daemons/transfers/main.py`. That comparison is the
+one to be careful with: because a `SecretStr` never equals a `str`, a missed
+unwrap there refuses every transfer rather than admitting one it should not, so
+it fails closed and loudly.
 
 Three consequences are worth knowing before touching this code.
 

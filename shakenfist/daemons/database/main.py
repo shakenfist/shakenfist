@@ -24,6 +24,7 @@ from grpc_health.v1 import health_pb2_grpc
 from prometheus_client import Counter
 from prometheus_client import Gauge
 from prometheus_client import start_http_server
+from pydantic import SecretStr
 from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs  # noreorder
 
@@ -2023,7 +2024,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 transfer_name=request.transfer.transfer_name,
                 requesting_node=request.transfer.requesting_node,
                 blob_uuid=request.transfer.blob_uuid,
-                token=request.transfer.token,
+                token=SecretStr(request.transfer.token),
                 server_state=request.transfer.server_state,
                 port=request.transfer.port if request.transfer.port else None,
                 percentage=request.transfer.percentage,
@@ -2056,7 +2057,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     transfer_name=transfer.transfer_name,
                     requesting_node=transfer.requesting_node,
                     blob_uuid=transfer.blob_uuid,
-                    token=transfer.token,
+                    # Named unwrap boundary: the proto field is a
+                    # string and protobuf refuses a SecretStr.
+                    token=transfer.token.get_secret_value(),
                     server_state=transfer.server_state,
                     port=transfer.port if transfer.port else 0,
                     percentage=transfer.percentage,
@@ -2086,7 +2089,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     transfer_name=t.transfer_name,
                     requesting_node=t.requesting_node,
                     blob_uuid=t.blob_uuid,
-                    token=t.token,
+                    # Named unwrap boundary, as in GetBlobTransfer.
+                    token=t.token.get_secret_value(),
                     server_state=t.server_state,
                     port=t.port if t.port else 0,
                     percentage=t.percentage,
@@ -2116,7 +2120,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     transfer_name=t.transfer_name,
                     requesting_node=t.requesting_node,
                     blob_uuid=t.blob_uuid,
-                    token=t.token,
+                    # Named unwrap boundary, as in GetBlobTransfer.
+                    token=t.token.get_secret_value(),
                     server_state=t.server_state,
                     port=t.port if t.port else 0,
                     percentage=t.percentage,
