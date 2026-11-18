@@ -89,6 +89,10 @@ Add types to the object model layer:
 - `shakenfist/network/`
 - etc.
 
+The authentication modules are the next candidates outside the object layer,
+because they carry the credential paths: `shakenfist/namespace.py`,
+`shakenfist/namespace_key.py` and `shakenfist/external_api/auth.py`.
+
 ## Guidelines for Adding Types
 
 ### Use Modern Syntax

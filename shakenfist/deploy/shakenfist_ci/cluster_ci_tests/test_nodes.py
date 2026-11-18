@@ -568,7 +568,7 @@ class TestNodes(base.BaseNamespacedTestCase):
 
         # 'created' is set immediately after power_on(), so the poweron
         # event has been emitted once this returns -- but not necessarily
-        # shipped to sf-eventlog yet, which _libvirt_returned_at() waits
+        # shipped to sf-database yet, which _libvirt_returned_at() waits
         # out.
         self._await_instance_create(inst['uuid'])
         started_at = self._libvirt_returned_at(inst['uuid'], 'poweron')
@@ -621,7 +621,7 @@ class TestNodes(base.BaseNamespacedTestCase):
         the field.
 
         The event was emitted before the state change the caller waited
-        on, but events reach sf-eventlog through each daemon's spool and
+        on, but events reach sf-database through each daemon's spool and
         drainer, so it can still be unreadable; reading once failed here
         with an empty list (issue 4919).
         """

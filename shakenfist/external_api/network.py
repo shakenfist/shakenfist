@@ -690,8 +690,9 @@ class NetworkPingEndpoint(api_base.Resource):
     # to a queue-based ping requires op-output infrastructure that does
     # not yet exist -- today the operation queue carries error reports
     # only, not arbitrary command stdout/stderr. See
-    # `docs/plans/PLAN-network-facade.md` future work for the migration
-    # plan; the redirect is kept here as a deliberate tactical exception,
+    # `docs/developer_guide/network_dispatcher.md` for the dispatcher
+    # contract this would have to join; the redirect is kept here as a
+    # deliberate tactical exception,
     # having been removed from the other three sites.
     @api_base.redirect_to_network_node
     @api_base.requires_network_active

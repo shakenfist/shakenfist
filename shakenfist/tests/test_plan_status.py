@@ -408,6 +408,32 @@ class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
             '| 2026-01-02 | [Gone](FIXTURE-gone.md) | Went | Complete | 1 of 1 |\n'))
         self.assertProblem('is listed but is not a master plan')
 
+    def test_a_retired_row_registers_no_plan(self):
+        # Retirement deletes a plan's files and pins the row's link to a
+        # permalink of their final text. The plan name is still in that URL,
+        # as its last path segment, so a parser that takes the basename of
+        # any link reads the row as naming a plan which is not here -- and
+        # reports the retirement it was asked to do as a defect. There is
+        # also nothing left in the tree to recompute the row's arithmetic
+        # against, which is why the row is skipped rather than merely
+        # exempted from the stale check.
+        self._write('index.md', INDEX + (
+            '| 2026-01-02 | [Retired](https://github.com/shakenfist/'
+            'shakenfist/blob/deadbeef/docs/plans/FIXTURE-retired.md)'
+            ' (retired) | Retired | Complete | 3 of 3 |\n'))
+        self.assertEqual([], checker.problems())
+
+    def test_a_relative_row_is_still_checked(self):
+        # The guard above keys on the link being absolute, so a row that
+        # merely *looks* retired -- the marker, a terminal status, numbers
+        # nothing can check -- is still read when its link is relative.
+        # Without this, "(retired)" in the cell would be enough to switch
+        # the checks off.
+        self._write('index.md', INDEX + (
+            '| 2026-01-02 | [Retired](FIXTURE-retired.md) (retired)'
+            ' | Retired | Complete | 3 of 3 |\n'))
+        self.assertProblem('is listed but is not a master plan')
+
     def test_a_fenced_example_table_is_not_a_phase_table(self):
         # Otherwise the example wins on length, its placeholder statuses are
         # validated against the vocabulary, and the plan's arithmetic is

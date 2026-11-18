@@ -93,7 +93,7 @@ class TestConsoleKeys(base.BaseNamespacedTestCase):
         # deliberately does not say what they were: a first boot wizard
         # asks for passwords, and an event is a durable record. Events are
         # eventually consistent -- the 200 above does not mean the audit
-        # event has reached sf-eventlog yet -- so poll for it, as the
+        # event has reached sf-database yet -- so poll for it, as the
         # cluster event tests do, rather than reading once. Filter to audit
         # events so a busy boot's mutate events cannot push it off the
         # default page.

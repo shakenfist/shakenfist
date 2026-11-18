@@ -4,10 +4,9 @@
 #
 # This module is the part of the federated exchange that decides whether
 # to believe a token at all. It is deliberately Flask-free and has no
-# endpoint of its own: the exchange in
-# docs/plans/PLAN-auth-federation-phase-03-exchange.md composes these
-# functions in a specific order, and that order is a security property
-# rather than an implementation detail.
+# endpoint of its own: the exchange composes these functions in a
+# specific order, and that order is a security property rather than an
+# implementation detail.
 #
 # The cheap, local rejections come first. Reading the issuer out of an
 # unverified token costs a base64 decode; fetching a JWKS costs an

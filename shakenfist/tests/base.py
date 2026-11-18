@@ -41,8 +41,7 @@ class ShakenFistTestCase(testtools.TestCase):
         ``str(secret)``: that asserts the literal '**********' is
         absent, which is true of a haystack containing the real secret.
 
-        See docs/developer_guide/authentication.md and
-        docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
+        See docs/developer_guide/authentication.md.
         """
         for operand, side in ((needle, 'needle'), (haystack, 'haystack')):
             if isinstance(operand, SecretStr):

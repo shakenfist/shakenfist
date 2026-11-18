@@ -10,7 +10,7 @@ configured and which daemons are gated on it), the floating
 IP allocation and SNAT programming, the DHCP/DNS state
 managed via dnsmasq, the cluster-lock leasing pattern in
 `shakenfist/locks.py`, and the leader-election pattern that
-`PLAN-remove-primary` phase 5 introduces for `sf-database`.
+[`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 5 introduces for `sf-database`.
 Ground your answers in what the code actually does today.
 
 Where a question touches on external concepts (BGP for VIP
@@ -26,7 +26,8 @@ Consult `ARCHITECTURE.md` for the system architecture
 overview, especially the network subsystem and the existing
 network node role. Consult `CLAUDE.md` for build commands,
 project conventions, the cluster-lock leasing pattern, the
-single-mutator direction in `PLAN-network-facade`, and the
+single-mutator direction in [`PLAN-network-facade`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md)
+(retired), and the
 exec-to-netlink direction in `PLAN-replace-exec-with-netlink`.
 
 This plan is a **placeholder**. It captures intent and the
@@ -45,7 +46,7 @@ single commit.
 ## Situation
 
 Shaken Fist's network node is the last named singleton role
-in the architecture. After `PLAN-remove-primary` phase 5
+in the architecture. After [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) phase 5
 makes `sf-database` electable, every other daemon will
 either run on every node or elect a leader from a pool. The
 network node is the holdout: it is configured (not elected),
@@ -53,7 +54,7 @@ hosts every virtual network's egress floating IP, programs
 every network's SNAT / DHCP / DNS, and is a single failure
 domain for external connectivity across the entire cluster.
 
-The original `PLAN-remove-primary` "future work" stub for
+The original [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) "future work" stub for
 this was "network node failover, with operator-provided
 keepalived / corosync / BGP." That framing is honest about
 the L2-vs-L3 mechanism question but understates the
@@ -266,9 +267,10 @@ has the most open questions. Phase 0 will resolve at least:
     lease-managed." Confirm this case is not pessimised
     (no unnecessary lease churn, no false-failover
     detection in a one-member pool).
-12. **Interaction with `PLAN-network-facade` and
+12. **Interaction with [`PLAN-network-facade`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md) (retired)
+    and
     `PLAN-replace-exec-with-netlink`.** The carrier is
-    exactly the single-mutator that `PLAN-network-facade`
+    exactly the single-mutator that [`PLAN-network-facade`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md)
     is shaping `net-worker` to be — but per-carrier-node,
     not cluster-wide singleton. Phase 0 confirms whether
     `net-worker` remains a cluster-wide singleton with
@@ -339,7 +341,8 @@ finds nothing, that is recorded in one sentence.
   carrier reprograms DNAT'd service ports on lease
   acquire; this plan does not invent its own DNAT
   mechanism.
-- **Tight coherence with `PLAN-network-facade` and
+- **Tight coherence with [`PLAN-network-facade`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md) (retired)
+  and
   `PLAN-replace-exec-with-netlink`.** The carrier is the
   natural home of single-mutator network operations and of
   netlink-driven privileged programming. Either both land
@@ -347,7 +350,7 @@ finds nothing, that is recorded in one sentence.
   carrier renderer is the first non-trivial consumer of
   those plans' interfaces and reviews the interface fit
   during its own phase 0.
-- **Parallel-track to `PLAN-remove-primary`.** Both reduce
+- **Parallel-track to [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md).** Both reduce
   named-singleton roles, but they target different
   singletons (database vs network) with different
   mechanisms (election vs lease-and-render). Either order
@@ -363,7 +366,7 @@ finds nothing, that is recorded in one sentence.
 
 All implementation work is done by sub-agents, never in the
 management session. The workflow mirrors
-`PLAN-remove-primary.md` and the other placeholder plans.
+[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) and the other placeholder plans.
 
 This is a deeply architectural plan touching production
 network state, failover semantics, and live client traffic.
@@ -384,12 +387,12 @@ thread.
 ### Step-level guidance
 
 Each phase plan should include a step table in the same
-format as `PLAN-remove-primary.md`, with effort, model,
+format as [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), with effort, model,
 isolation, and brief columns.
 
 ### Management session review checklist
 
-Standard checklist from `PLAN-remove-primary.md`, plus:
+Standard checklist from [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), plus:
 
 - [ ] Carrier failover is exercised by an end-to-end test
       that kills the current carrier and confirms the new

@@ -256,7 +256,8 @@ finds nothing, that is recorded in one sentence.
   of this plan and phase 0 of scheduler-reservations should
   cross-read each other's decisions documents so the pattern
   stays coherent.
-- **Coherent with `PLAN-replace-last-cluster-operation`**
+- **Coherent with [`PLAN-replace-last-cluster-operation`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-replace-last-cluster-operation.md)
+  (retired)**
   insofar as both are about removing redundant single-
   pointer mechanisms in favour of typed table-driven state.
 
@@ -266,9 +267,10 @@ finds nothing, that is recorded in one sentence.
 
 All implementation work is done by sub-agents, never in the
 management session. The workflow mirrors
-`PLAN-remove-primary.md`, `PLAN-sticky-transfers.md`,
+[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), `PLAN-sticky-transfers.md`,
 `PLAN-scheduler-reservations.md`, and
-`PLAN-eventlog-direct-mariadb.md`: plan in the management
+[`PLAN-eventlog-direct-mariadb.md`](https://github.com/shakenfist/shakenfist/blob/19184fc897cd034c63111ede892afcd58bc19a19/docs/plans/PLAN-eventlog-direct-mariadb.md) (retired): plan in
+  the management
 session, spawn a sub-agent per implementation step, review
 in the management session, fix or retry, commit when
 satisfied.
@@ -291,12 +293,12 @@ small per-phase scope.
 ### Step-level guidance
 
 Each phase plan should include a step table in the same
-format as `PLAN-remove-primary.md`, with effort, model,
+format as [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), with effort, model,
 isolation, and brief columns.
 
 ### Management session review checklist
 
-Standard checklist from `PLAN-remove-primary.md`, plus:
+Standard checklist from [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), plus:
 
 - [ ] Each ported allocator has a test that exercises
       concurrent allocation against the same pool and

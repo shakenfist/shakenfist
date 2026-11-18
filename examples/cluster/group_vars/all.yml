@@ -35,8 +35,8 @@ extra_config: "[]"
 floating_network_ipblock: "10.10.0.0/24"
 
 # Direct MariaDB access for the database tier (sf-1). These must match the
-# MariaDB server you provisioned (see PLAN-byo-mariadb / tools/
-# bootstrap-mariadb.sql). Only database-tier nodes render these into
+# MariaDB server you provisioned (see tools/bootstrap-mariadb.sql and
+# docs/operator_guide/database.md). Only database-tier nodes render these into
 # /etc/sf/config.
 mariadb_host: "10.0.0.1"
 mariadb_port: 3306

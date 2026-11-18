@@ -193,9 +193,10 @@ def resolve_node_uuid():
 # The Root endpoint at '/' is hit on every health probe from
 # sf-queues (see daemons/daemon.py:health_check_api). Each probe
 # would otherwise produce two audit events per worker per cluster
-# every few seconds, which under load saturates the eventlog
-# server and channels every event through the event_dlq MariaDB
-# path -- see GH actions run 26612233454 for the full cascade.
+# every few seconds. When this suppression was added that load
+# saturated the then-separate sf-eventlog server and pushed every
+# event onto the since-removed event_dlq MariaDB path -- see GH
+# actions run 26612233454 for the full cascade.
 def _is_health_probe():
     return flask.request.path in api_base.HEALTH_PROBE_PATHS
 

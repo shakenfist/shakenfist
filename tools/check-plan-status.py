@@ -23,7 +23,10 @@ These things are checked:
 * every master plan in `docs/plans/` is registered in both `index.md` and
   `order.yml`, and neither names a plan that is not there, nor names one
   twice -- a second index row for a plan is never read, so it is free to
-  say anything at all;
+  say anything at all. A row whose link is an absolute URL is a retired
+  plan and registers nothing: the files are deleted and the link is a
+  permalink to their final text, so there is no local plan to check it
+  against;
 * every master plan whose index status is not terminal (`Complete`,
   `Abandoned` or `Superseded`) names `PUSH-AUDIT.md`, because the
   `plan-push-audit-phase` shared block requires every open plan to end with
@@ -298,6 +301,15 @@ def index_rows(path):
     overwrite the first, and the stale one -- the whole point of this
     checker -- would never be looked at. Fenced blocks are skipped here for
     the same reason they are everywhere else in this file.
+
+    A row whose link is an absolute URL registers no plan. That is a
+    retired plan: its files have been deleted and the row's link pinned to
+    a permalink of their final text, so the plan name in that URL names a
+    path in another commit rather than a file here. Reading it as a local
+    plan would report the row as stale and the arithmetic as uncheckable,
+    which is the opposite of what retirement means -- and there is nothing
+    left in the tree to recompute the row against anyway. See
+    docs/plan-retirement.md in shakenfist/development.
     """
     rows = {}
     with open(path, encoding='utf-8') as f:
@@ -311,7 +323,10 @@ def index_rows(path):
         link = LINK_RE.search(row[1])
         if not link:
             continue
-        name = os.path.basename(link.group(1).split('#')[0])
+        target = link.group(1)
+        if ABSOLUTE_RE.match(target):
+            continue
+        name = os.path.basename(target.split('#')[0])
         rows.setdefault(name, []).append((lineno, row[3], row[4]))
     return rows
 

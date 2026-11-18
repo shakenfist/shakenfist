@@ -10,7 +10,8 @@ Definitions describe what the code does *today*. Entries which once carried a
 *(planned)* marker for the workload identity federation work have lost it:
 trusted issuers, mapping rules, identity tokens and scopes all exist now and
 are described here as they behave. See
-[PLAN-auth-federation](plans/PLAN-auth-federation.md) for the design. Should a future entry describe something not yet built, it
+[developer_guide/authentication.md](developer_guide/authentication.md) for
+the design. Should a future entry describe something not yet built, it
 will say so explicitly.
 
 Entries are alphabetical. Each carries a short definition, a "Defined in"

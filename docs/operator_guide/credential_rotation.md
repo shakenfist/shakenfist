@@ -121,6 +121,36 @@ transfer tokens is not necessary in the same way: a transfer token is
 only useful while that transfer's server socket is listening, which is
 seconds to minutes, and every one of them is long dead.
 
+## A namespace key published in the user guide
+
+Separately from the three above, a namespace key secret was committed
+to this repository as the example of a cluster-generated key in
+`docs/user_guide/authentication.md`. It was introduced on 2026-08-09
+and replaced on 2026-08-16 by a deliberately checksum-invalid example,
+so it was readable in the published documentation for seven days, and
+it remains readable in the git history — rewriting history would not
+unpublish it. The finding is accepted in `.gitleaksignore` so the
+secret scanner does not re-raise it.
+
+**The open question, which no one has answered.** The published value
+is checksum-valid, so something implementing the key format produced
+it. Either it came from `credentials.generate()` run at a shell, in
+which case it never authorised anything anywhere, or it was copied from
+a real cluster, in which case that cluster's plaintext has been public
+since 2026-08-09. Nothing in the repository can distinguish those two
+cases; only whoever wrote that documentation can.
+
+Until that is settled, treat it as disclosed: **if any namespace on any
+cluster still holds a key with that secret, delete it.** Deleting a key
+revokes every token derived from it immediately, through the nonce
+check, so there is no window to manage and no reason to wait. A
+namespace's keys are listed with `sf-client namespace show`.
+
+This is recorded here rather than only in `.gitleaksignore` because an
+accepted scanner finding records that a secret is known, not what to do
+about it, and an unanswered question should not live only in a comment
+next to a hash.
+
 ## Rotating `AUTH_SECRET_SEED`
 
 **Blast radius: every outstanding token in the zone stops validating

@@ -10,7 +10,8 @@ current scheduler (`shakenfist/scheduler.py`), its callers
 `shakenfist/operations/node_inst_netdesc_op.py`), the
 `node_metrics` table and how it is populated (the resources
 daemon under `shakenfist/daemons/resources/`), the existing
-SQL-pushdown pattern delivered by `PLAN-sql-pushdown-filtering`,
+SQL-pushdown pattern delivered by
+[`PLAN-sql-pushdown-filtering`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-sql-pushdown-filtering.md) (retired),
 the cluster-lock leasing pattern in `shakenfist/locks.py`, and
 the instance lifecycle states. Ground your answers in what the
 code actually does today rather than guessing.
@@ -111,7 +112,7 @@ This design was chosen in preference to two alternatives:
   post-election**, running serially in a single process so it
   can maintain an in-memory overlay of pending decisions.
   Rejected because it walks back the direction of
-  `PLAN-remove-primary` (reducing critical-path single-point-
+  [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) (reducing critical-path single-point-
   of-failure roles), introduces a throughput ceiling, and
   couples a hot user-request path to a daemon whose other
   duties are background-shaped.
@@ -1346,14 +1347,16 @@ and the client surface it reviews is the final one.
 
 ## Dependencies on other plans
 
-- **`PLAN-sql-pushdown-filtering` is the existing precedent**
+- **[`PLAN-sql-pushdown-filtering`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-sql-pushdown-filtering.md) (retired) is the
+  existing precedent**
   and pattern for SQL-side filtering. The reservations work
   applies that same rule to a new domain (scheduling decisions)
   rather than extending it. No hard ordering dependency, but
   phase 0 should read the pushdown plan's decisions document
   before deciding the conditional-INSERT shape so the two
   approaches stay coherent.
-- **`PLAN-per-host-resource-reservations` (complete) is landed
+- **[`PLAN-per-host-resource-reservations`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-per-host-resource-reservations.md) (complete,
+  retired) is landed
   groundwork.** It generalised phase 00a's cluster-global
   reservation knobs into per-host settings:
   `NODE_RAM_RESERVATION_GB`, `NODE_CPU_RESERVATION_THREADS`
@@ -1367,11 +1370,11 @@ and the client surface it reviews is the final one.
   per-host reservations; conceptually this plan extends the
   same "capacity the scheduler may not use" idea from static
   per-host configuration to dynamic per-claim rows.
-- **`PLAN-remove-primary` does not block this plan** and this
-  plan does not block `PLAN-remove-primary`. They are
+- **[`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) does not block this plan** and this
+  plan does not block [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md). They are
   compatible by design — the reservations-via-DB-atomicity
   shape was chosen specifically to avoid adding a new
-  critical-path role that `PLAN-remove-primary` would then
+  critical-path role that [`PLAN-remove-primary`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) would then
   have to undo.
 - **OpenTelemetry instrumentation (not yet drafted) would
   inform phase 0** by giving real numbers for current
@@ -1391,7 +1394,7 @@ and the client surface it reviews is the final one.
 
 All implementation work is done by sub-agents, never in the
 management session. The workflow mirrors
-`PLAN-remove-primary.md` and `PLAN-sticky-transfers.md`: plan
+[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) and `PLAN-sticky-transfers.md`: plan
 in the management session, spawn a sub-agent per implementation
 step, review in the management session, fix or retry, commit
 when satisfied.
@@ -1415,12 +1418,12 @@ lands.
 ### Step-level guidance
 
 Each phase plan should include a step table in the same format
-as `PLAN-remove-primary.md`, with effort, model, isolation, and
+as [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), with effort, model, isolation, and
 brief columns.
 
 ### Management session review checklist
 
-Standard checklist from `PLAN-remove-primary.md`, plus:
+Standard checklist from [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), plus:
 
 - [ ] The atomicity guarantee is exercised by a concurrent-
       scheduling test, not just asserted in docs. Two
@@ -1548,7 +1551,8 @@ because the following statements will be true:
   weighted selection, CPU topology tracking, and a measured
   overcommit default); the reservation knobs were subsequently
   generalised per host by
-  `PLAN-per-host-resource-reservations` (see Dependencies).
+  [`PLAN-per-host-resource-reservations`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-per-host-resource-reservations.md) (retired; see
+Dependencies).
 - **Demand-based adaptive overcommit (the learning loop).**
   The end-state sketched in open question 13: each node's
   expected demand-per-vCPU is *learned* from observed

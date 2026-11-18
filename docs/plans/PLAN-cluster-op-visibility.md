@@ -83,8 +83,9 @@ the CI bundle established the following sequence:
 
 The underlying defect is the **single-pointer
 `last_cluster_operation` pattern**.
-`PLAN-replace-last-cluster-operation.md` (all phases
-complete) already moved the *internal gating* callers --
+[`PLAN-replace-last-cluster-operation.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-replace-last-cluster-operation.md)
+(all phases complete, now retired -- the plans index links its
+text) already moved the *internal gating* callers --
 `Network.is_okay()` and siblings -- onto the history-aware
 `has_pending_cluster_operation()` query, and its docstring
 (`baseobject.py:685`) names this exact race: "a later
@@ -130,7 +131,7 @@ One endpoint is already history-aware:
 `GET /clusteroperations?target_object_type=&target_uuid=`
 (`external_api/clusteroperation.py`,
 `ClusterOperationsEndpoint`, added in phase 7 of
-`PLAN-network-facade.md`; client wrapper
+[`PLAN-network-facade.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md) (retired); client wrapper
 `list_cluster_operations_for_target()` behind the
 `cluster-operations-by-target` capability). It joins
 `cluster_operation_targets` against `cluster_operations` and

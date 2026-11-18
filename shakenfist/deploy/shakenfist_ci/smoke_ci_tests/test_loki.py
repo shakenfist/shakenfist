@@ -410,8 +410,9 @@ class TestLoki(base.BaseNamespacedTestCase):
         #    has no wrapper for the generate-a-secret-for-me form (its
         #    add_namespace_key() requires a secret, and the sfk_ prefix
         #    is reserved so no supplied secret can have this shape).
-        #    Recorded as Future work on PLAN-auth-federation.md; the
-        #    federation tests reach the API the same way.
+        #    The federation tests reach the API the same way, for the
+        #    same reason: shakenfist/client-python#451 covers the
+        #    missing wrappers.
         key_name = 'leakcheck-%s' % self._uniquifier()
         minted = self.system_client._request_url(
             'POST', '/auth/namespaces/%s/keys' % self.namespace,

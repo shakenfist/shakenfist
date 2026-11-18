@@ -73,7 +73,8 @@ ad-hoc:
    network reconciliation loop. It runs on a thread inside
    `sf-net`, ticking every interval and walking all
    networks. The network-facade plan
-   (`PLAN-network-facade.md`) deliberately keeps it as a
+   ([`PLAN-network-facade.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md), retired) deliberately
+keeps it as a
    thread for now and gates its enqueues per-network,
    noting that the proper landing place for "maintain is a
    recurring CO" is here.
@@ -277,13 +278,15 @@ finds nothing, that is recorded in one sentence.
 
 This plan is currently in stub form. It exists primarily
 to anchor a future-work reference in
-`PLAN-network-facade.md` and to capture the framing for
+[`PLAN-network-facade.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md) (retired) and to capture
+the framing for
 when work begins.
 
 ## Agent guidance
 
 (To be filled in when this plan moves out of stub status.
-The structure will mirror `PLAN-network-facade.md`'s Agent
+The structure will mirror [`PLAN-network-facade.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md)'s
+Agent
 guidance section: execution model, planning effort,
 step-level guidance table, management session review
 checklist.)
@@ -307,7 +310,7 @@ When this plan is successfully implemented:
   have moved to a `network_maintain_pass` CO triggered by
   an internal `RecurringOperation`. The per-network
   gating + cooldown + circuit breaker behaviour from
-  `PLAN-network-facade.md` Q6 is preserved.
+  [`PLAN-network-facade.md`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md) (retired) Q6 is preserved.
 * A user can `POST /recurring_operations` to create
   e.g. "snapshot instance X every 24 hours at 3 am UTC"
   and the snapshot fires on schedule.

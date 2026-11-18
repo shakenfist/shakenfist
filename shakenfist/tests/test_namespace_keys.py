@@ -2,10 +2,10 @@
 #
 # Behaviour-preservation tests for namespace keys, written before the
 # migration of keys from the namespace_attributes JSON column to
-# first-class NamespaceKey objects (see
-# docs/plans/PLAN-auth-federation-phase-02-key-objects.md). Every test here
-# pins the CURRENT semantics of the anonymous-dict-entry implementation so
-# that the later cutover can be proven bit-compatible.
+# first-class NamespaceKey objects. Every test here pinned the semantics
+# of the anonymous-dict-entry implementation so that the cutover could be
+# proven bit-compatible; they are kept because those semantics are still
+# the contract, now served by rows rather than a JSON blob.
 import json
 import time
 from unittest import mock

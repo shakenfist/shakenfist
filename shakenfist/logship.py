@@ -34,9 +34,9 @@ the node via ``journalctl`` for diagnosis.
 Future work (revisit with OpenTelemetry): once SF has OTel-based
 tracing/diagnostics, reconsider shipping DEBUG (or trace-level
 detail) to a central store so deep diagnosis does not require
-on-node access. Tracked in
-``docs/plans/PLAN-remove-syslog-forwarding.md`` (Future work) and
-the OpenTelemetry thread.
+on-node access. See "Log levels: what ships to Loki" in
+``docs/operator_guide/logging.md``, which carries the measured cost of
+shipping DEBUG and what revisiting this takes.
 """
 import logging
 

@@ -32,7 +32,7 @@ and the SPICE-cert path which is the closest existing
 example of cert distribution.
 
 This plan is currently less formed than its sibling
-(`PLAN-remove-primary.md`). The Open Questions section is
+([`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md)). The Open Questions section is
 larger than usual and should be resolved into a Decisions
 section before phase 1 begins. The phase breakdown below
 is provisional and may be re-cut once phase 0 (research and
@@ -68,7 +68,7 @@ platform. An operator with a security review will ask, and
 the answer today is "the mesh is private; trust it." That's
 not a great answer.
 
-Once `PLAN-remove-primary.md` lands, operators will already
+Once [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) lands, operators will already
 be expected to bring their own PKI — that plan establishes
 the operator-provides-CA surface. This plan is then about
 *actually using* that PKI: turning the gRPC channels, the
@@ -220,7 +220,7 @@ Notes on sequencing:
 
 ## Dependencies on other plans
 
-This plan **depends on `PLAN-remove-primary.md` having
+This plan **depends on [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) having
 landed** — specifically, the operator-provides-PKI surface
 that emerges from the BYO-MariaDB / galaxy-role phases.
 Trying to do mTLS-everywhere while the deployer still
@@ -239,7 +239,7 @@ packaging).
 
 All implementation work is done by sub-agents, never in the
 management session. The workflow mirrors
-`PLAN-remove-primary.md`: plan in the management session,
+[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md): plan in the management session,
 spawn a sub-agent per implementation step, review the
 diff in the management session, fix or retry, commit when
 satisfied. See that plan's "Agent guidance" section for the
@@ -266,7 +266,7 @@ medium.
 
 Each phase plan should include a table of steps with effort,
 model, isolation, and brief, in the same format as
-`PLAN-remove-primary.md`. The same effort and model
+[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md). The same effort and model
 guidance applies.
 
 ### Management session review checklist

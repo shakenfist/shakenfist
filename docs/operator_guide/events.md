@@ -63,6 +63,25 @@ previously-dead PIDs. Their rows are migrated into the fresh-pid
 spool so the drainer picks them up automatically. No operator
 action is needed.
 
+### There is no dead-letter queue
+
+An event the drainer cannot write is retried from the spool, not
+moved aside. There used to be an `event_dlq` table for events that
+could not be delivered, and it was removed deliberately: the spool
+is the durability boundary, and a second holding area behind it
+answers no question the spool does not already answer. The case the
+dead-letter queue was built for was the bootstrap one -- events
+generated while `sf-database` is itself starting, with nowhere to
+write them -- and the spool covers that by construction, because
+those events simply sit in it until the drainer's channel comes up.
+
+So the two ways an event is lost are both visible and both counted:
+the spool hitting its high-water mark (`eventlog_spool_dropped_total`),
+and a batch the server rejects permanently or that ages out, which the
+drainer drops rather than letting it wedge the queue. Neither leaves a
+row anywhere to be inspected afterwards, which is why the gauge and
+the counter above are the things to monitor.
+
 ## Read path
 
 Seven REST endpoints return events for each object type:

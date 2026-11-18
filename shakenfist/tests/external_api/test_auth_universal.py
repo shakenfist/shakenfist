@@ -35,7 +35,7 @@ EXPECTED_PUBLIC = {
     # stands in place of authentication is a signature check against a
     # configured issuer's published keys plus a mapping rule the
     # namespace owner wrote; see
-    # docs/plans/PLAN-auth-federation-phase-03-exchange.md.
+    # docs/developer_guide/authentication.md.
     ('AuthFederatedEndpoint', 'post'),
     # Lists the identity providers a person may log in through. Reached
     # by somebody who holds no Shaken Fist credential and is about to

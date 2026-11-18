@@ -1428,7 +1428,7 @@ work directly in the main tree.
     Phases 1, 4 and 6 touch `shakenfist/actions`, which only the
     operator pushes, and which cannot be proven green except by a
     real CI run. Those phases follow the pattern
-    `PLAN-remove-primary-phase-06-step5b-ci-design.md`
+    [`PLAN-remove-primary-phase-06-step5b-ci-design.md`](https://github.com/shakenfist/shakenfist/blob/a2866b9adbd94f1c99a97e05a80ea75beaf719dc/docs/plans/PLAN-remove-primary-phase-06-step5b-ci-design.md)
     established: design and review the change in full here, hand
     the operator a reviewed diff, then verify against a live run
     rather than treating a merged commit as done.

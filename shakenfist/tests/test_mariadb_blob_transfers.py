@@ -305,8 +305,8 @@ class BlobTransferExternalViewTestCase(base.ShakenFistTestCase):
     daemons/transfers/main.py. Events reach MariaDB and the log stream,
     and the log stream ships to Loki, so while the token was included a
     live credential left the cluster on every blob transfer. Found by a
-    sweep for secret-carrying fields; see
-    docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
+    sweep for secret-carrying fields. The field itself is still a plain
+    str rather than a SecretStr; see issue 4961.
     """
 
     def _transfer(self):

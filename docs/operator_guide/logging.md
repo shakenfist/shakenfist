@@ -50,9 +50,18 @@ logged at DEBUG) off the spool/push path, which matters for
 performance on busy nodes. When you need DEBUG to diagnose a
 problem, read it on the node with `journalctl`.
 
-A future iteration may revisit shipping deeper detail centrally
-once Shaken Fist has OpenTelemetry-based tracing (see the
-development plans).
+The performance cost is measured, not assumed: shipping every DEBUG
+line through the per-daemon sqlite spool slowed the multi-node CI
+cluster by about a factor of two. What it costs is that diagnosing a
+past incident on a node which has since been recycled loses that
+node's DEBUG detail.
+
+A future iteration may revisit shipping deeper detail centrally once
+Shaken Fist has OpenTelemetry-based tracing, which is a better-suited
+transport for high-volume sampleable data than a durable spool. The cut
+is one line -- `start()` in `shakenfist/logship.py` sets the Loki
+handler to `INFO` -- so revisiting it means changing that level and
+re-measuring the volume.
 
 ### Loki not configured (the fallback)
 
@@ -462,7 +471,16 @@ the ones you are most likely to look for, and
 [What one API request logs](#what-one-api-request-logs) says what
 replaced them.
 Event **storage** always stays in MariaDB — it is never moved to
-Loki.
+Loki. Consolidating the two by pointing the event REST APIs at Loki's
+`query_range` is a recurring temptation and the answer is no, on four
+counts. Events back billing and audit, so they may not be dropped,
+while a log store is lossy under pressure by design. They are read as
+unbounded-time per-object aggregations, which Loki's label model serves
+either by a cardinality explosion on `instance_uuid` or by a full
+time-window scan. They are kept for months or years, past any sensible
+log retention. And they are namespace-scoped, which Loki has no
+authorisation model for — so routing those reads through it would also
+make the API unavailable whenever Loki was.
 
 If you run with `LOG_EVENTS_TO_LOKI` off but still want a single
 pane, put a Loki logs panel and a MariaDB events panel on one
@@ -475,6 +493,19 @@ Alloy, vector, …), you can leave `LOKI_BASE_URL` unset and have
 your agent scrape each node's journal. Shaken Fist's logs are
 structured JSON there too, so your agent can parse and label them
 however your pipeline prefers.
+
+An agent is the prevailing industry pattern, and Shaken Fist
+deliberately does not *install* one. Doing so would have meant
+deleting rsyslog and installing Alloy or promtail in its place, which
+leaves the deployer owning another daemon's configuration, version,
+failure modes and upgrade story — the thing the bring-your-own turn
+exists to stop. Shaken Fist already owned a crash-safe spool and
+drainer for events, solving the identical problem, so reusing it was
+less new code than shipping and configuring an agent, and it lets the
+structured fields reach Loki as labels directly rather than being
+re-parsed out of journald text. Each node pushes for itself, rather
+than through one collector node, because a collector would rebuild the
+single point of failure the primary node used to be.
 
 ## Log shipping internals
 
@@ -496,6 +527,19 @@ directly on the eventlog spool/drainer:
   into the spool, plus `start()`, which (in Loki mode) attaches the handler to
   the root logger and removes the library's per-module syslog handlers so logs
   go to Loki only.
+
+The split between `shakenfist_utilities` and `shakenfist` is deliberate
+and is a boundary rather than an accident of where someone started
+typing. The **library** owns the *format*: JSON on by default, the
+field-name contract, and the tests for it. **Shaken Fist** owns the
+*transport*: the spool, the drainer, the HTTP push, the config and the
+per-process lifecycle. The transport cannot move into the library
+because it depends on things the library must not know about -- the
+`/srv/shakenfist/spool` root, the Shaken Fist config system, the Shaken
+Fist Prometheus registry, and a lifecycle started from both `daemon.py`
+and gunicorn's `post_fork` -- and the library cannot depend on
+`shakenfist`. Shaken Fist attaches its own handler after calling
+`logs.setup()`, so the library never needs to know Loki exists.
 
 When no Loki endpoint is configured the daemons log to the local systemd
 journal instead. Loki stream labels are bounded to `{job, daemon, host}`; all

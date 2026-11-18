@@ -262,7 +262,7 @@ finds nothing, that is recorded in one sentence.
   network-node behaviour) is a valid degenerate case — but
   the two plans together unlock the full smeared-carrier
   story.
-- **Coherent with `PLAN-network-facade` and
+- **Coherent with [`PLAN-network-facade`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-network-facade.md) (retired) and
   `PLAN-replace-exec-with-netlink`.** DNAT rule programming
   is exactly the kind of single-mutator operation those
   plans are shaping the network daemon around. This plan
@@ -275,7 +275,7 @@ finds nothing, that is recorded in one sentence.
 
 All implementation work is done by sub-agents, never in the
 management session. The workflow mirrors
-`PLAN-remove-primary.md` and the other placeholder plans.
+[`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md) and the other placeholder plans.
 
 The DNAT programming and reconciler phases (3 and 4) touch
 production network state and should be skewed toward
@@ -294,12 +294,12 @@ Subsequent phases will be re-evaluated once phase 0 lands.
 ### Step-level guidance
 
 Each phase plan should include a step table in the same
-format as `PLAN-remove-primary.md`, with effort, model,
+format as [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), with effort, model,
 isolation, and brief columns.
 
 ### Management session review checklist
 
-Standard checklist from `PLAN-remove-primary.md`, plus:
+Standard checklist from [`PLAN-remove-primary.md`](https://github.com/shakenfist/shakenfist/blob/d77df881dc3ecfb2f98c6aa5aae662fc669c5716/docs/plans/PLAN-remove-primary.md), plus:
 
 - [ ] Concurrent allocations against the same network's
       port pool do not collide (exercised by test, not

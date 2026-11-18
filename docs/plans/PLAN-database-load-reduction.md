@@ -659,7 +659,7 @@ because the following statements will be true:
   needed for the current load shape.
 * **Client-side load balancing across the database tier**
   remains the not-yet-landed part of
-  `PLAN-byo-mariadb-phase-03-grpc-tier.md`; the per-caller
+  [`PLAN-byo-mariadb-phase-03-grpc-tier.md`](https://github.com/shakenfist/shakenfist/blob/10aa6467e6fc6fa28024aad0fd2b5e47028e1db9/docs/plans/PLAN-byo-mariadb-phase-03-grpc-tier.md); the per-caller
   attribution from phase 4 will show the current imbalance
   between the two sf-database instances (measured 2026-07-19:
   the split flips per operation, sf-1 serving 96/s of

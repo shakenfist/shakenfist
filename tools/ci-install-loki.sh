@@ -7,7 +7,7 @@
 # SSH from a runner).
 #
 # This is the functional-CI Loki used to prove shakenfist's built-in Loki
-# log shipper end to end (see docs/plans/PLAN-remove-syslog-forwarding.md).
+# log shipper end to end (see docs/operator_guide/logging.md).
 # It is intentionally single-tenant and unauthenticated -- CI only.
 #
 # Usage:

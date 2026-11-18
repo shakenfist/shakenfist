@@ -8,7 +8,7 @@
 # may vouch for identities at all.
 #
 # The chain issuer <- rule <- key <- token is object-modelled end to
-# end. See docs/plans/PLAN-auth-federation-phase-03-exchange.md.
+# end. See docs/developer_guide/authentication.md.
 
 from typing import Any
 from typing import Optional

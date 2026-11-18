@@ -161,7 +161,7 @@ class TestCoalescing(base.BaseNamespacedTestCase):
             [i['uuid'] for i in instances], indent=4, sort_keys=True)))
 
         # Events are eventually consistent: the emitting daemons spool
-        # locally and a per-process drainer ships them to sf-eventlog in
+        # locally and a per-process drainer ships them to sf-database in
         # ~100ms batches, and the operations themselves are still being
         # dispatched while this polls. Poll to a deadline rather than
         # reading once -- the same reason test_events.py does.
@@ -589,7 +589,7 @@ class TestCoalescing(base.BaseNamespacedTestCase):
         # first, and the coalescing events are among the oldest of them.
         #
         # Events are eventually consistent -- each daemon spools locally
-        # and a drainer ships batches to sf-eventlog -- so poll rather
+        # and a drainer ships batches to sf-database -- so poll rather
         # than reading once. The work itself is already done by this
         # point, so this is covering the shipping lag and nothing else.
         #

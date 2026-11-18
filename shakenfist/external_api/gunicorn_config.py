@@ -5,13 +5,16 @@
 each worker -- the only correct moment, because threads don't
 survive the ``--preload`` fork:
 
-- the local eventlog spool drainer. Without it, every API request
-  synchronously gRPC-calls sf-eventlog twice (before_request +
-  after_request audit events), saturating the eventlog server and
-  forcing every event onto the event_dlq MariaDB write path. That
-  positive-feedback loop is what tripped the smoke checks in
-  GH actions run 26612233454. The spool itself is keyed on pid so
-  workers don't collide on the same sqlite file.
+- the local eventlog spool drainer, which ships this worker's
+  spooled events to sf-database. Without a running drainer they are
+  never shipped. The spool and drainer were introduced because every
+  API request used to gRPC-call the then-separate sf-eventlog server
+  synchronously, twice (before_request + after_request audit events),
+  saturating it and forcing every event onto the since-removed
+  event_dlq MariaDB write path. That positive-feedback loop is what
+  tripped the smoke checks in GH actions run 26612233454. The spool
+  itself is keyed on pid so workers don't collide on the same sqlite
+  file.
 - the readiness checker (``shakenfist.external_api.health``), which
   polls sf-database so ``/readyz`` can answer from cached state.
 
@@ -120,7 +123,7 @@ def post_fork(server, worker):
     except Exception as e:
         LOG.with_fields({'error': str(e), 'pid': worker.pid}).warning(
             'Failed to start eventlog drainer in gunicorn worker; '
-            'events will fall through to the direct gRPC + DLQ path')
+            'events from this worker will not be shipped until it restarts')
 
     # Wire up Loki log shipping per worker. Like the drainer above it
     # spawns a thread (when LOKI_BASE_URL is set), so post_fork is the

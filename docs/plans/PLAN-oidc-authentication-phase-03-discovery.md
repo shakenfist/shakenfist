@@ -5,7 +5,8 @@
 This is phase 3 of
 [`PLAN-oidc-authentication.md`](PLAN-oidc-authentication.md), and
 the first phase of that plan to change production code. Phases 1
-and 2 were superseded by `PLAN-auth-federation.md` phase 3, and
+and 2 were superseded by [`PLAN-auth-federation.md`](https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md)
+(retired) phase 3, and
 phase 0 was a decisions phase whose output was documentation.
 
 Phase 0 landed as pull request #4831 (merge commit `2bbe472eff`,

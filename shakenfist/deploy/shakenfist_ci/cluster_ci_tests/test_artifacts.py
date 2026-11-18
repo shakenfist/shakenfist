@@ -652,8 +652,8 @@ class TestArtifactLookupByName(base.BaseNamespacedTestCase):
     """Functional tests for Artifact.from_db_by_ref name-based lookup.
 
     These tests verify name lookups now that they run as one indexed SQL
-    query filtering on state, namespace and name together
-    (PLAN-sql-pushdown-filtering-phase-02-artifact.md):
+    query filtering on state, namespace and name together; see "SQL
+    Filter Pushdown" in docs/operator_guide/database.md.
 
     A) Same-name-different-namespace: each namespace resolves its own artifact.
     B) System-namespace cross-visibility: the system client sees at least one
@@ -661,7 +661,8 @@ class TestArtifactLookupByName(base.BaseNamespacedTestCase):
     C) Same-name-same-namespace: skipped because the REST creation path
        de-duplicates on source_url (which embeds the namespace and name), so
        two live artifacts with the identical (namespace, name) pair cannot be
-       created via the REST API. See open question #1 in the plan.
+       created via the REST API, so the MultipleObjects branch of
+       Artifact.from_db_by_ref is unreachable from here.
     """
 
     def __init__(self, *args, **kwargs):

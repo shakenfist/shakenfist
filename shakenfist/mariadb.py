@@ -553,7 +553,7 @@ CLUSTER_CAPACITY_VERSION = 1
 
 
 # Minimum supported MariaDB version. Originally 10.6.0, to align with Ubuntu
-# 22.04's MariaDB (see docs/plans/PLAN-byo-mariadb-phase-01-statelessness.md),
+# 22.04's MariaDB,
 # but the ipam_reservations.address column uses the native INET4 type, which
 # only exists from MariaDB 10.10 -- so schema creation on 10.6 fails and that
 # floor had silently stopped being real (found by running ensure_schema()
@@ -7040,7 +7040,8 @@ def _direct_get_object_events(
     and ``limit > 1000`` is capped at 1000. The current REST API
     allows negative limit which the legacy ``EventLog.read_events()``
     interprets as "all rows"; this caps that foot-gun. Cursor-style
-    pagination is deferred (see Future work in the master plan).
+    pagination is deferred until a client asks for it; the
+    ``limit``-only shape is what every current caller uses.
 
     Args:
         object_type: One of the constants.OBJECT_NAMES values

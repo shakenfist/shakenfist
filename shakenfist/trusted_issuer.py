@@ -9,7 +9,7 @@
 # Issuers are referenced by name from mapping rules, and a key minted
 # through a rule records that rule in its provenance, so the whole
 # chain issuer <- rule <- key <- token is object-modelled. See
-# docs/plans/PLAN-auth-federation-phase-03-exchange.md.
+# docs/developer_guide/authentication.md.
 
 from typing import Any
 from typing import Optional

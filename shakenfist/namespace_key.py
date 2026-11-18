@@ -6,8 +6,8 @@
 #
 # Keys used to be anonymous entries in the namespace_attributes "keys"
 # JSON column. They are now first-class objects with their own tables,
-# lifecycle, events, expiry and reaping -- see
-# docs/plans/PLAN-auth-federation-phase-02-key-objects.md.
+# lifecycle, events, expiry and reaping. See
+# docs/developer_guide/authentication.md.
 #
 # The secret material (the base64 encoded bcrypt hash and the nonce)
 # lives in the attributes row because rotation mutates it. It is never

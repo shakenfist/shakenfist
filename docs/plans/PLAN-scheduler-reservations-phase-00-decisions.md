@@ -10,7 +10,8 @@ phase 00a load-aware ordering changes, its callers
 `shakenfist/external_api/admin.py`,
 `shakenfist/operations/node_inst_netdesc_op.py`), the
 `node_metrics` table and the resources daemon, the SQL-pushdown
-pattern from `PLAN-sql-pushdown-filtering`, the cluster-lock
+pattern from [`PLAN-sql-pushdown-filtering`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-sql-pushdown-filtering.md)
+(retired), the cluster-lock
 leasing pattern in `shakenfist/locks.py`, namespace handling in
 `shakenfist/namespace.py` and `external_api/auth.py`, and the
 instance lifecycle states. Read the conductor in
