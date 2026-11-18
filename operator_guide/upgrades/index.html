@@ -16871,6 +16871,9 @@ a database-tier node):</p>
 <p><code>sf-database</code> refuses to start if the schema version does not match what
 its build expects, so applying migrations first lets you upgrade the
 database tier without downtime before touching the API or hypervisor nodes.
+If you roll a node before migrating, <code>systemctl status sf-database</code> names
+the refusal in its <code>Status:</code> line -- see
+<a href="../database/#mariadb-compatibility-requirements">the MariaDB compatibility requirements</a>.
 See <a href="#mariadb-schema-migrations">MariaDB schema migrations</a> above and the
 <a href="../database/#administrative-commands">database reference</a> for full details.</p>
 <h3 id="per-node-procedure">Per-node procedure<a class="headerlink" href="#per-node-procedure" title="Permanent link">&para;</a></h3>
