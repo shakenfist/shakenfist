@@ -499,3 +499,83 @@ class ClusterConfigExportFilterTestCase(base.ShakenFistTestCase):
         with mock.patch('shakenfist.mariadb.get_cluster_config_value',
                         return_value=material):
             self.assertEqual(material, vdi_tokens.get_signing_material())
+
+
+class PlaintextUrlDefaultTestCase(base.ShakenFistTestCase):
+    """No shipped default fetches over plaintext HTTP (issue 4970).
+
+    The Cirros defaults were the last ones which did, and a Cirros
+    image becomes a bootable guest disk. The published digest arrives
+    by the same route as the image it describes, so checking it catches
+    corruption and a wrong file being served, not substitution: only
+    the transport distinguishes the mirror from whoever is between us
+    and it.
+
+    The sweep is the point of this test rather than the three
+    assertions below it. A new option whose default names a URL is
+    exactly where this reappears, so the sweep fails that option
+    rather than waiting for somebody to notice it in review.
+    """
+
+    # Nothing legitimately defaults to plaintext today. An option which
+    # genuinely has to -- one naming a link-local endpoint which cannot
+    # hold a certificate, say -- belongs here with the reason, so that
+    # adding it is a deliberate act.
+    PLAINTEXT_ALLOWED: set = set()
+
+    def test_no_url_option_defaults_to_http(self):
+        offenders = []
+        for name, field in SFConfig.model_fields.items():
+            default = field.default
+            if isinstance(default, str):
+                # Which is what a URL default is written as: pydantic
+                # does not validate defaults, so an AnyHttpUrl option's
+                # default is the literal string in config.py.
+                text = default
+            elif hasattr(default, 'scheme') and hasattr(default, 'host'):
+                # A default written as a constructed URL object.
+                text = str(default)
+            else:
+                continue
+
+            if (text.startswith('http://')
+                    and name not in self.PLAINTEXT_ALLOWED):
+                offenders.append('%s = %s' % (name, text))
+
+        self.assertEqual(
+            [], offenders,
+            'these configuration defaults fetch over plaintext HTTP: %s'
+            % ', '.join(offenders))
+
+    @mock.patch.dict('os.environ')
+    def test_the_cirros_defaults_are_https(self):
+        # The overrides are removed first: this asserts the shipped
+        # defaults, and a developer running the suite with one exported
+        # would otherwise be testing their shell.
+        for option in ['DOWNLOAD_URL_CIRROS', 'CHECKSUM_URL_CIRROS',
+                       'LISTING_URL_CIRROS']:
+            os.environ.pop('SHAKENFIST_%s' % option, None)
+
+        config = SFConfig()
+        self.assertEqual(
+            'https://download.cirros-cloud.net/%(vernum)s/'
+            'cirros-%(vernum)s-x86_64-disk.img',
+            str(config.DOWNLOAD_URL_CIRROS))
+        self.assertEqual(
+            'https://download.cirros-cloud.net/%(vernum)s/MD5SUMS',
+            str(config.CHECKSUM_URL_CIRROS))
+        self.assertEqual(
+            'https://download.cirros-cloud.net/',
+            str(config.LISTING_URL_CIRROS))
+
+    @mock.patch.dict(
+        'os.environ',
+        {'SHAKENFIST_DOWNLOAD_URL_CIRROS':
+            'http://mirror.example.com/%(vernum)s/disk.img'})
+    def test_an_operator_override_is_still_honoured(self):
+        # The default moved; the option did not become https only. An
+        # operator with an internal plaintext mirror sets it and keeps
+        # working.
+        self.assertEqual(
+            'http://mirror.example.com/%(vernum)s/disk.img',
+            str(SFConfig().DOWNLOAD_URL_CIRROS))

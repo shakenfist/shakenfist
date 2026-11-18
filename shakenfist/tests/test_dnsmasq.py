@@ -36,7 +36,7 @@ class DnsMasqTestCase(testtools.TestCase):
             ZONE: str = 'shakenfist'
             NODE_EGRESS_IP: IPvAnyAddress = '127.0.0.1'
             DOWNLOAD_URL_CIRROS: AnyHttpUrl = (
-                'http://download.cirros-cloud.net/%(vernum)s/'
+                'https://download.cirros-cloud.net/%(vernum)s/'
                 'cirros-%(vernum)s-x86_64-disk.img')
             DOWNLOAD_URL_UBUNTU: AnyHttpUrl = (
                 'https://cloud-images.ubuntu.com/%(vername)s/current/'

@@ -138,6 +138,80 @@ class FetchableTestCase(base.ShakenFistTestCase):
             self.assertFalse(images.is_fetchable(value), repr(value))
 
 
+class CirrosResolutionTransportTestCase(base.ShakenFistTestCase):
+    """Every request the Cirros resolver makes goes over TLS (issue 4970).
+
+    This is asserted at the resolver rather than only on the
+    configuration defaults, because the resolver makes three requests
+    whose URLs come from three separate options: the release listing
+    picks the version, the digest list is what a fetch is checked
+    against, and the image is the guest disk. A plaintext hop in any of
+    them is a hop where the answer can be chosen by somebody else, and
+    the digest cannot tell the difference because it arrives the same
+    way.
+    """
+
+    LISTING = ('''<html><body>
+    <a href="0.4.0/">0.4.0/</a>
+    <a href="0.6.3/">0.6.3/</a>
+    </body></html>''')
+
+    CHECKSUMS = (
+        'eea5ad2e2e1b59b1c3e74b07f5fe57b0  cirros-0.6.3-x86_64-disk.img\n')
+
+    def _fake_get(self, requested):
+        def _get(url, *args, **kwargs):
+            # The listing URL arrives as pydantic's AnyHttpUrl rather
+            # than a string, which is what requests does with it too.
+            url = str(url)
+            requested.append(url)
+            resp = mock.MagicMock()
+            resp.status_code = 200
+            if url.endswith('MD5SUMS') or url.endswith('SHA256SUMS'):
+                resp.text = self.CHECKSUMS
+            else:
+                resp.text = self.LISTING
+            return resp
+        return _get
+
+    def test_a_pinned_version_resolves_over_https(self):
+        requested = []
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=self._fake_get(requested)):
+            url = images._resolve_image('cirros:0.6.3')
+
+        self.assertEqual(
+            'https://download.cirros-cloud.net/0.6.3/'
+            'cirros-0.6.3-x86_64-disk.img', url)
+        # The digest list, and nothing else: a pinned version does not
+        # need the listing.
+        self.assertEqual(
+            ['https://download.cirros-cloud.net/0.6.3/MD5SUMS'], requested)
+
+    def test_the_latest_version_resolves_over_https(self):
+        requested = []
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=self._fake_get(requested)):
+            url = images._resolve_image('cirros')
+
+        self.assertEqual(
+            'https://download.cirros-cloud.net/0.6.3/'
+            'cirros-0.6.3-x86_64-disk.img', url)
+        self.assertEqual(
+            ['https://download.cirros-cloud.net/',
+             'https://download.cirros-cloud.net/0.6.3/MD5SUMS'], requested)
+
+    def test_nothing_the_resolver_fetches_is_plaintext(self):
+        requested = []
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=self._fake_get(requested)):
+            url = images._resolve_image('cirros')
+
+        for fetched in requested + [url]:
+            self.assertTrue(
+                fetched.startswith('https://'), fetched)
+
+
 @mock.patch('shakenfist.images.add_event_multi')
 class TransferImageTestCase(base.ShakenFistTestCase):
     """The source-unreachable paths of ImageFetchHelper.transfer_image()
