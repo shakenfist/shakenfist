@@ -26,6 +26,8 @@ PRUNE_KEY = 'SCHEDULED_TASK_LAST_RUN_PRUNE_EVENTS'
 RECONCILE_KEY = 'SCHEDULED_TASK_LAST_RUN_RECONCILE_ORPHANED_OBJECTS'
 CAPACITY_KEY = 'SCHEDULED_TASK_LAST_RUN_RECONCILE_SCHEDULER_CAPACITY'
 TRUST_KEY = 'SCHEDULED_TASK_LAST_RUN_RECONCILE_NAMESPACE_TRUST'
+IPAM_KEY = ('SCHEDULED_TASK_LAST_RUN_'
+            'RECONCILE_INSTANCE_ADDRESS_RESERVATIONS')
 
 
 def _make_monitor():
@@ -191,7 +193,7 @@ class RunInnerAnchorWiringTestCase(base.ShakenFistTestCase):
 
         anchored = {key: job for job, key in m._anchored_jobs}
         self.assertEqual(
-            {PRUNE_KEY, RECONCILE_KEY, CAPACITY_KEY, TRUST_KEY},
+            {PRUNE_KEY, RECONCILE_KEY, CAPACITY_KEY, TRUST_KEY, IPAM_KEY},
             set(anchored))
         # schedule 1.2.2 Jobs carry unit and interval, not a period.
         self.assertEqual(
@@ -206,6 +208,9 @@ class RunInnerAnchorWiringTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             ('minutes', 60),
             (anchored[TRUST_KEY].unit, anchored[TRUST_KEY].interval))
+        self.assertEqual(
+            ('minutes', 60),
+            (anchored[IPAM_KEY].unit, anchored[IPAM_KEY].interval))
         for job, _ in m._anchored_jobs:
             self.assertIn(job, schedule.jobs)
 
