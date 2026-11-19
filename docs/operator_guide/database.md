@@ -1083,11 +1083,20 @@ schedule. It re-queues or rejects rows whose claim has gone stale:
 The cluster daemon also runs a deleted-object sweep, every minute, which
 hard deletes objects that have been in a final state (`deleted`,
 `complete`, `abort`) for longer than their grace period (`CLEANER_DELAY`
-for most objects, 30 seconds for completed operations).
+for most objects, `CLUSTER_OPERATION_RETENTION` for completed
+operations).
 
-A finished cluster operation is therefore eligible for hard delete thirty
-seconds after it reaches a final state. The sweep then removes it, along
-with its `cluster_operation_targets` rows. Because the sweep walks a type
+A finished cluster operation is therefore eligible for hard delete
+`CLUSTER_OPERATION_RETENTION` seconds after it reaches a final state, 15
+minutes by default. The sweep then removes it, along with its
+`cluster_operation_targets` rows. That window is what an operator has to
+read why an operation did what it did: a hard delete takes the
+operation's events with it, so its audit events, its queue-wait event and
+its execution duration are unreachable afterwards. Operations are the
+highest volume object type in the cluster, which is why they do not
+simply use `CLEANER_DELAY`, but the window costs resident rows (arrival
+rate times retention) rather than sweep throughput, so raise it on a
+cluster whose operations are being investigated. Because the sweep walks a type
 again only five minutes after its last walk reached the end (see below),
 removal normally comes within about six minutes of the operation
 finishing, and later while the sweep is working through a backlog (the
@@ -1493,9 +1502,10 @@ Cluster operation targets are stored separately because:
   and "all operations on this object in order"
 
 Target rows live only until their operation is hard-deleted. A finished
-operation is eligible for removal thirty seconds after it goes terminal and
-is removed by the [deleted-object sweep](#the-deleted-object-sweep), so the
-table holds in-flight operations plus recently finished ones. As a backstop
+operation is eligible for removal `CLUSTER_OPERATION_RETENTION` seconds
+after it goes terminal and is removed by the
+[deleted-object sweep](#the-deleted-object-sweep), so the table holds
+in-flight operations plus recently finished ones. As a backstop
 for rows that outlive their operation, the table is also bounded by a
 periodic prune in the cluster daemon (alongside the existing
 `delete_stale_transfers` cleanup).
@@ -1543,8 +1553,9 @@ Two query shapes are exposed to the rest of the system:
 
 Rows are written automatically by `enqueue_cluster_operation`; operators
 do not need to manage them. Normally a row is removed when its operation is
-hard-deleted: a finished operation is eligible for removal thirty seconds
-after it goes terminal and is removed by the
+hard-deleted: a finished operation is eligible for removal
+`CLUSTER_OPERATION_RETENTION` seconds after it goes terminal and is removed
+by the
 [deleted-object sweep](#the-deleted-object-sweep). The
 cluster daemon's prune, performed under `ClusterLock` election via
 `_direct_delete_stale_cluster_operation_targets`, is a backstop: rows older

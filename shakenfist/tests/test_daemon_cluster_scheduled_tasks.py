@@ -1897,12 +1897,41 @@ class DeletedObjectSweepBatchTestCase(base.ShakenFistTestCase):
     def test_an_operation_batch_uses_the_operation_delay(self):
         _hold_deleted_object_work('net_op', OP_UUID_1)
 
+        delay = config.CLUSTER_OPERATION_RETENTION
         before = time.time()
         st._drain_deleted_object_work(execution_limit=10)
 
         updated_before = self.mock_batch.call_args.kwargs['updated_before']
-        self.assertLessEqual(before - 30, updated_before)
-        self.assertLessEqual(updated_before, time.time() - 30)
+        self.assertLessEqual(before - delay, updated_before)
+        self.assertLessEqual(updated_before, time.time() - delay)
+
+    def test_the_operation_delay_is_the_configured_retention(self):
+        # Issue 3864: this was a hardcoded 30 seconds, which is less time
+        # than an operator takes to notice an operation finished, and a
+        # hard delete takes the operation's events with it.
+        _hold_deleted_object_work('net_op', OP_UUID_1)
+
+        with mock.patch.object(config, 'CLUSTER_OPERATION_RETENTION', 1800):
+            before = time.time()
+            st._drain_deleted_object_work(execution_limit=10)
+
+        updated_before = self.mock_batch.call_args.kwargs['updated_before']
+        self.assertLessEqual(before - 1800, updated_before)
+        self.assertLessEqual(updated_before, time.time() - 1800)
+
+    def test_a_non_operation_type_keeps_the_cleaner_delay(self):
+        # The operation retention is for the one high volume type family,
+        # not a general shortening of the grace period.
+        _hold_deleted_object_work('network', BLOB_UUID_1)
+
+        with mock.patch.object(config, 'CLUSTER_OPERATION_RETENTION', 1800):
+            before = time.time()
+            st._drain_deleted_object_work(execution_limit=10)
+
+        updated_before = self.mock_batch.call_args.kwargs['updated_before']
+        self.assertLessEqual(before - config.CLEANER_DELAY, updated_before)
+        self.assertLessEqual(
+            updated_before, time.time() - config.CLEANER_DELAY)
 
     def test_a_per_object_type_is_hard_deleted_one_at_a_time(self):
         objs = {u: FakeFinalStateObject() for u in _uuids('instance', 3)}

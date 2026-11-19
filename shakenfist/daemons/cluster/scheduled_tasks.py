@@ -1021,8 +1021,30 @@ def prune_events() -> None:
 
 
 def _deleted_object_delay(objtype):
+    """How long an object of this type stays after reaching a final state.
+
+    Cluster operations get their own, shorter retention because they are
+    the highest volume object type in the cluster: sfcbr sees tens of
+    thousands of operation arrivals a day against a few hundred of
+    everything else.
+
+    It is not as short as it was. A hard delete takes the object's events
+    with it (``DatabaseBackedObject.hard_delete()`` calls
+    ``delete_object_events()``), and the events are the only record of
+    what an operation did -- its audit events, the queue-wait event and
+    the execution duration event. At the 30 seconds this used to return,
+    an operator looking at an operation which finished a minute ago had
+    nothing to read, and the measurement in PLAN-queue-performance had to
+    be taken from the log echo because the events could not be read back
+    out of the database at all (issue 3864).
+
+    Retention sets how many rows are resident (arrival rate times
+    retention), not the rate at which the sweep deletes them, so the
+    window is cheap to widen: the same objects are deleted either way,
+    just later.
+    """
     if objtype.endswith('_op'):
-        return 30
+        return config.CLUSTER_OPERATION_RETENTION
     return config.CLEANER_DELAY
 
 

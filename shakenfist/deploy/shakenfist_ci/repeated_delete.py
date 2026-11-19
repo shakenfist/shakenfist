@@ -74,8 +74,9 @@ class RepeatedDeleteTestsMixin:
 
         self._await_instance_deleted(inst['uuid'])
 
-        # Read promptly: an operation is eligible for hard delete thirty
-        # seconds after it goes terminal, and takes the evidence with it.
+        # Read promptly: an operation is eligible for hard delete
+        # CLUSTER_OPERATION_RETENTION seconds after it goes terminal, and
+        # takes the evidence with it.
         every = self.system_client.list_cluster_operations_for_target(
             'instance', inst['uuid'])
         self.addDetail(

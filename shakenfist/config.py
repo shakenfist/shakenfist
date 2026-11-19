@@ -988,6 +988,26 @@ class SFConfig(BaseSettings):
             'many objects one type can take before another is served.'
         )
     )
+    CLUSTER_OPERATION_RETENTION: int = Field(
+        900,
+        ge=0,
+        description=(
+            'How long (in seconds) a finished cluster operation is kept '
+            'before the deleted-object sweep may hard delete it, which '
+            'takes its events with it. This is the window in which an '
+            'operator can read back why an operation did what it did: its '
+            'audit events, its queue-wait event and its execution '
+            'duration are unreachable once the operation is gone. '
+            'Operations are the highest volume object type in the '
+            'cluster, which is why they do not simply use CLEANER_DELAY, '
+            'but retention sets the number of rows resident (arrival rate '
+            'times retention) rather than the rate at which the sweep '
+            'deletes them, so raising it costs rows and not sweep '
+            'throughput. 0 makes an operation eligible as soon as the '
+            'sweep sees it, which is what the cluster did before this '
+            'was tunable.'
+        )
+    )
     CLUSTER_OPERATION_TARGET_RETENTION: int = Field(
         7 * 24 * 3600,
         description=(

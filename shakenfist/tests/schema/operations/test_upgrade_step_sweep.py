@@ -9,8 +9,9 @@
 # row whose version has no step to the next: it raises
 # ``UpgradeException`` (before issue 3857 it raised ``AttributeError``).
 # So a missing step is a row that fails to load. The window is narrow
-# (cluster operations are eligible for hard delete thirty seconds after
-# going terminal, so only a rolling upgrade can present an old row) but
+# (cluster operations are eligible for hard delete
+# CLUSTER_OPERATION_RETENTION seconds after going terminal, so only a
+# rolling upgrade can present an old row) but
 # real: running the sweep below found exactly one gap this way, NetOp's
 # missing ``_upgrade_step_1_to_2``.
 

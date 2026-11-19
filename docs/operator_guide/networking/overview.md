@@ -849,16 +849,19 @@ is emitted by the enqueuing process, not by the dispatcher:
 
 ### Reading these events back
 
-Neither event survives its operation for long, so plan to read them
-from the log stream rather than from the database.
+Neither event outlives its operation, so there is a window in which to
+read them and then they are gone.
 
-A cluster operation is eligible for hard delete thirty seconds after it
-reaches a final state and is removed by the
+A cluster operation is eligible for hard delete
+`CLUSTER_OPERATION_RETENTION` seconds after it reaches a final state (15
+minutes by default) and is removed by the
 [deleted-object sweep](../database.md#the-deleted-object-sweep), and hard
-deleting an object removes the rows which join its events to it. Soon
-after an operation completes there is nothing left to query: the operation
-is gone, and its events are orphaned rows which the daily prune sweep then
-deletes. The `MAX_USAGE_EVENT_AGE` and `MAX_STATUS_EVENT_AGE` retention
+deleting an object removes the rows which join its events to it. Once that
+has happened there is nothing left to query: the operation is gone, and its
+events are orphaned rows which the daily prune sweep then deletes. Raise
+`CLUSTER_OPERATION_RETENTION` on a cluster whose operations are being
+investigated, or read the events from the log stream, which keeps them for
+as long as the log retention does. The `MAX_USAGE_EVENT_AGE` and `MAX_STATUS_EVENT_AGE` retention
 settings never come into it -- they bound how long an event may live, not how
 long the object it describes does. This is issue #3864.
 

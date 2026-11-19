@@ -2117,10 +2117,10 @@ VISIBLE_ARTIFACT_REF_NAMESPACE_DESCRIPTION = (
 # is the same for instances, networks and artifacts.
 CLUSTER_OPERATIONS_ALL_DESCRIPTION = (
     'Also include finished operations which have not yet been removed. '
-    'Finished operations become eligible for removal thirty seconds '
-    'after they finish, and errored ones are kept for up to seven '
-    'days, so this is not a history. The newest %d operations are '
-    'listed and older ones are not reported.'
+    'Finished operations become eligible for removal '
+    'CLUSTER_OPERATION_RETENTION seconds after they finish (15 minutes '
+    'by default), so this is not a history. The newest %d operations '
+    'are listed and older ones are not reported.'
     % baseobject.MAX_TARGETED_OPERATIONS)
 
 

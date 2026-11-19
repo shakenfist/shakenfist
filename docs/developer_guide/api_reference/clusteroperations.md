@@ -42,11 +42,10 @@ Every entry carries an `observational` boolean, as
 described below. By default only operations which are queued, in preflight or
 executing are listed. With `all=true` the list also includes finished
 operations which have not yet been removed. Finished operations are
-eligible for removal thirty seconds after finishing and are removed by the
+eligible for removal `CLUSTER_OPERATION_RETENTION` seconds after finishing
+(15 minutes by default) and are removed by the
 [deleted-object sweep](../../operator_guide/database.md#the-deleted-object-sweep),
-and errored operations are kept for up to
-`CLUSTER_OPERATION_TARGET_RETENTION`, seven days by default, so `all=true` is
-a bounded window onto recent work and not a history.
+so `all=true` is a bounded window onto recent work and not a history.
 
 The retention window is not a size, though, and an object which errors
 operations repeatedly accumulates them, so a listing reports at most the
