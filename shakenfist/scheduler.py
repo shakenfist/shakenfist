@@ -602,6 +602,20 @@ def _memory_reserved_mb(metrics):
         'memory_reserved_mb', int(config.NODE_RAM_RESERVATION_GB * 1024))
 
 
+def _weighted_order(tier, weights):
+    """Return tier as a weighted shuffle, a heavier node more likely first.
+
+    Weighted sampling without replacement (Efraimidis-Spirakis A-Res):
+    each node draws ``random() ** (1 / weight)`` and the tier is sorted
+    by that key, largest first, so a node leads with probability
+    proportional to its weight and the same holds for each later place
+    among the nodes left. Every weight must be positive.
+    """
+    return sorted(
+        tier, key=lambda c: random.random() ** (1.0 / weights[c]),
+        reverse=True)
+
+
 def _capacity_by_node():
     """The counters keyed by node uuid, and whether the read failed.
 
@@ -1858,10 +1872,7 @@ class Scheduler:
                     0.1,
                     (config.SCHEDULER_TARGET_LOAD * denominators[c] -
                      raw_load)) * ram_headrooms[c]
-            tier.sort(
-                key=lambda c: random.random() ** (1.0 / weights[c]),
-                reverse=True)
-            ordered.extend(tier)
+            ordered.extend(_weighted_order(tier, weights))
         candidates = ordered
         add_event_multi(
             EVENT_TYPE_AUDIT, related_objects,
