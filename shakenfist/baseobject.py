@@ -906,11 +906,10 @@ class TargetedOperation(NamedTuple):
 
 
 # The most operations a cluster operation listing reports. A target row
-# outlives its operation's completion, and an errored operation's rows are
-# retained for seven days (issue 3922), so "every operation which has ever
-# targeted this object" is a reply whose size, and the number of database
-# reads which build it, are decided by how much history the object
-# accumulated. The newest MAX_TARGETED_OPERATIONS are listed and older ones
+# outlives its operation's completion by CLUSTER_OPERATION_RETENTION, so
+# "every operation which has ever targeted this object" is a reply whose
+# size, and the number of database reads which build it, are decided by
+# how much history the object accumulated. The newest MAX_TARGETED_OPERATIONS are listed and older ones
 # are not reported, which is the ceiling MAX_CHAIN_NODES puts on the
 # depends_on walk applied to the other listing.
 #

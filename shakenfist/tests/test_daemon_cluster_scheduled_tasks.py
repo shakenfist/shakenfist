@@ -13,7 +13,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.constants import FINAL_OBJECT_STATES
+from shakenfist.constants import final_object_states
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.constants import get_object_class
 from shakenfist.daemons.cluster import scheduled_tasks as st
@@ -819,7 +819,8 @@ class HardDeleteExpiredNamespaceKeyTestCase(base.ShakenFistTestCase):
         mock_batch.assert_called_once()
         args, kwargs = mock_batch.call_args
         self.assertEqual((ObjectType.NAMESPACE_KEY, [KEY_UUID_1]), args)
-        self.assertEqual(FINAL_OBJECT_STATES, kwargs['state_values'])
+        self.assertEqual(
+            final_object_states('namespace_key'), kwargs['state_values'])
         self.assertLessEqual(before - config.CLEANER_DELAY,
                              kwargs['updated_before'])
         self.assertLessEqual(kwargs['updated_before'],
@@ -1165,6 +1166,28 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(2, processed)
         self.assertFalse(resurrected.hard_deleted)
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    def test_process_hard_deletes_an_errored_operation(self, mock_get_class):
+        # The recheck before a single hard delete is per type too, or an
+        # errored operation taken one at a time -- which is what happens
+        # when a batch is refused -- would be read, found "not final" and
+        # put back every pass forever (issue 3922).
+        errored = FakeFinalStateObject(state_value='error')
+        mock_get_class.return_value.from_db.return_value = errored
+
+        st._hard_delete_deleted_object('net_op', OP_UUID_1)
+
+        self.assertTrue(errored.hard_deleted)
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    def test_process_leaves_an_errored_instance_alone(self, mock_get_class):
+        errored = FakeFinalStateObject(state_value='error')
+        mock_get_class.return_value.from_db.return_value = errored
+
+        st._hard_delete_deleted_object('instance', BLOB_UUID_1)
+
+        self.assertFalse(errored.hard_deleted)
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     def test_process_respects_delay(self, mock_get_class):
@@ -1880,7 +1903,8 @@ class DeletedObjectSweepBatchTestCase(base.ShakenFistTestCase):
         self.assertEqual([('network', uuids[:25]), ('network', uuids[25:])],
                          self._batches())
         for c in self.mock_batch.call_args_list:
-            self.assertEqual(FINAL_OBJECT_STATES, c.kwargs['state_values'])
+            self.assertEqual(
+                final_object_states('network'), c.kwargs['state_values'])
             self.assertLessEqual(before - config.CLEANER_DELAY,
                                  c.kwargs['updated_before'])
             self.assertLessEqual(c.kwargs['updated_before'],
@@ -1918,6 +1942,29 @@ class DeletedObjectSweepBatchTestCase(base.ShakenFistTestCase):
         updated_before = self.mock_batch.call_args.kwargs['updated_before']
         self.assertLessEqual(before - 1800, updated_before)
         self.assertLessEqual(updated_before, time.time() - 1800)
+
+    def test_an_errored_operation_is_swept(self):
+        # Issue 3922: 'error' was absent from the final states for every
+        # type, so an errored operation was kept forever while a
+        # complete, aborted or expired one was swept.
+        _hold_deleted_object_work('net_op', OP_UUID_1)
+
+        st._drain_deleted_object_work(execution_limit=10)
+
+        state_values = self.mock_batch.call_args.kwargs['state_values']
+        self.assertIn('error', state_values)
+
+    def test_an_errored_network_is_not_swept(self):
+        # An operator is expected to look at an errored network, which is
+        # still holding its vxlan, its dnsmasq and its IPAM reservations,
+        # so the error state is not one the sweep may take it in.
+        _hold_deleted_object_work('network', BLOB_UUID_1)
+
+        st._drain_deleted_object_work(execution_limit=10)
+
+        state_values = self.mock_batch.call_args.kwargs['state_values']
+        self.assertNotIn('error', state_values)
+        self.assertIn('deleted', state_values)
 
     def test_a_non_operation_type_keeps_the_cleaner_delay(self):
         # The operation retention is for the one high volume type family,
@@ -2354,7 +2401,10 @@ class DeletedObjectBacklogTestCase(base.ShakenFistTestCase):
         self.assertEqual(len(st.DELETED_OBJECT_SWEEP_TYPES), mock_count.call_count)
         for call in mock_count.call_args_list:
             self.assertIsInstance(call.args[0], ObjectType)
-            self.assertEqual(st.FINAL_OBJECT_STATES, call.args[1])
+            # Per type, so the gauge counts what the sweep will take:
+            # 'error' is final for an operation and not for a network.
+            self.assertEqual(
+                final_object_states(str(call.args[0])), call.args[1])
         self.assertNotIn('deleted_object_backlog', st._SWEEP_RESUME_AFTER)
 
     @mock.patch('shakenfist.mariadb.count_objects_by_state')

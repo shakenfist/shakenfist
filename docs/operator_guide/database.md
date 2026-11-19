@@ -1102,10 +1102,30 @@ removal normally comes within about six minutes of the operation
 finishing, and later while the sweep is working through a backlog (the
 `cluster_deleted_object_backlog` metric, described under
 [Watching for sweeps that silently do nothing](#watching-for-sweeps-that-silently-do-nothing),
-shows how far behind it is). Operations which finished in `error` are
-never hard deleted (#3922), so their target rows stay until the
-`CLUSTER_OPERATION_TARGET_RETENTION` prune removes them, seven days by
-default.
+shows how far behind it is). An operation which finished in `error` is
+swept on the same window as one which completed: `error` is a final
+state for cluster operations, because the failure reason is on the
+operation's state row and the operation is a pure database record.
+
+`error` is **not** a final state for most types, and which types treat
+it as one is a decision per type, recorded in `final_object_states()`
+in `shakenfist/constants.py`. An errored `instance`, `network`,
+`networkinterface` or `node` is an object an operator is expected to
+look at and may recover -- `sf-ctl clear-node-error` returns an errored
+node to service -- and for a node or a network the object is still
+holding real resources, so sweeping it would remove a live object and
+not merely the evidence. An errored `blob` has partial files on disk
+which only a move to `deleted` removes, so hard deleting its row would
+turn a row leak into a disk leak. An errored `artifact` still resolves
+by name, which is how a user sees why their fetch failed. And the
+sidechannel daemon depends on an errored `agentoperation` persisting,
+because it resolves an operation whose executor died as errored rather
+than expired precisely so that case is still readable.
+
+The consequence of those exclusions is that an object of those types
+which reaches `error` and is never deleted keeps its `object_states`
+row indefinitely. That is deliberate, and the way to reclaim one is to
+delete the object.
 
 - **`DELETED_OBJECT_SWEEP_SECONDS`** — the time budget of each pass
   (default `20`). Reading the sweep's work counts against it: no read

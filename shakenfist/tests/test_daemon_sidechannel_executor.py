@@ -1940,19 +1940,22 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
         # rather than on who noticed, and this is an executor
         # which went away -- the same failure the finally block
         # handles, differing only in that the process died first. The
-        # difference is load bearing: expired is in
-        # FINAL_OBJECT_STATES and error is not, so expiring here would
-        # sweep the daemon-restart case for hard deletion while the
-        # finally case persisted.
+        # difference is load bearing: expired is a final state for an
+        # agent operation and error is not, so expiring here would sweep
+        # the daemon-restart case for hard deletion while the finally
+        # case persisted. Asked per type, because 'error' is final for
+        # some types and not for others (issue 3922); the exclusion of
+        # agentoperation is this behaviour's doing and is recorded in
+        # constants.py beside the rule.
         self.assertEqual(AgentOperation.STATE_ERROR, agentop.state.value)
         self.assertEqual(
             'no sidechannel executor was running for this operation, and '
             'the operation cannot be safely retried',
             agentop.failure_reason)
-        self.assertIn(
-            AgentOperation.STATE_EXPIRED, constants.FINAL_OBJECT_STATES)
-        self.assertNotIn(
-            AgentOperation.STATE_ERROR, constants.FINAL_OBJECT_STATES)
+        agentop_final = constants.final_object_states(
+            AgentOperation.object_type)
+        self.assertIn(AgentOperation.STATE_EXPIRED, agentop_final)
+        self.assertNotIn(AgentOperation.STATE_ERROR, agentop_final)
 
     def test_a_retryable_operation_is_requeued_instead(self):
         # The same case for an operation which can be run again: it

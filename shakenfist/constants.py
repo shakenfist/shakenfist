@@ -1,6 +1,9 @@
 import importlib
 from typing import Any
+from typing import Union
 import uuid
+
+from shakenfist.schema.object_types import ObjectType
 
 # Note the most exciting constants ever
 KiB = 1024
@@ -205,26 +208,92 @@ def get_object_class(object_type: str) -> Any:
     return getattr(lib, cls_name)
 
 
-# A list of object states subject to "hard deletion". This is keyed by
-# state value across every object type, so a state only one object type
-# can reach is inert for the rest.
+# The object states subject to "hard deletion" for every object type.
+# This list is keyed by state value across every type, so a state only
+# one object type can reach is inert for the rest.
 #
-# Note that 'error' is absent, and always has been. That is a known
-# defect rather than an intent: errored objects of every type are never
-# swept and leak their object_states rows indefinitely, the same class
-# of leak as issue 3532. It predates the expired state and is tracked
-# separately as issue 3922, which also records why widening this list
-# is not the fix -- the object types do not agree about what 'error'
-# means, so an Instance an operator still has to look at and a Blob
-# which never became usable cannot share one retention rule. The
-# consequence today is that an expired agent operation is reaped and an
-# errored one is not, which is backwards.
+# 'error' is deliberately not in it. Read final_object_states() below
+# rather than this list: 'error' is final for some types and not for
+# others, and which is which is a decision per type rather than one
+# value shared by all of them (issue 3922).
 FINAL_OBJECT_STATES = [
     'deleted',
     'complete',
     'abort',
     'expired'
 ]
+
+
+# The object types for which reaching 'error' means the object is
+# finished with, so the hard-delete sweep takes it like any other
+# finished object.
+#
+# Cluster operations (every type whose name ends in '_op') qualify. An
+# errored operation carries its failure reason on its state row, the
+# caller has either read it or gone away, and the operation is a pure
+# database record with nothing on disk behind it. They are also where
+# the leak actually bites: operations arrive tens of thousands a day on
+# a busy cluster against a few hundred of everything else, and an
+# errored one used to be kept forever while a complete, aborted or
+# expired one was swept. CLUSTER_OPERATION_RETENTION is the window in
+# which an operator can read an errored operation, the same window they
+# get for every other finished one.
+#
+# Every other type is deliberately out, and the reason is specific to
+# the type rather than caution:
+#
+#   instance, network, networkinterface, node -- 'error' is a state an
+#   operator is expected to look at and may recover from, and for a
+#   node and a network the object is still live: it holds its vxlan,
+#   its dnsmasq, its NAT rules and its IPAM reservations, and
+#   sf-ctl clear-node-error returns an errored node to service.
+#   Sweeping these would destroy a running cluster's objects, not just
+#   the evidence.
+#
+#   blob -- an errored blob has partial files on disk (the snapshot
+#   path is what errors one), and nothing moves it to 'deleted', which
+#   is what removes files. Hard deleting the row would strand the
+#   files with no record that they exist, turning a row leak into a
+#   disk leak.
+#
+#   artifact -- Artifact.ACTIVE_STATES includes 'error', so an errored
+#   artifact still resolves by name and a user can still see why their
+#   fetch failed. Changing that is the artifact UX work's to make.
+#
+#   agentoperation -- the sidechannel daemon depends on 'error' not
+#   being swept: it resolves an operation whose executor died as
+#   errored rather than expired specifically so the daemon-restart
+#   case is still there for an operator to read (see
+#   daemons/sidechannel/main.py). Issue 3922 argued the other way; the
+#   code's reason is more specific and is load-bearing, so it wins
+#   until someone changes it deliberately.
+#
+# Adding a type here changes what the sweep deletes, so each addition
+# wants its own reason written down beside the ones above.
+ERROR_IS_FINAL_OBJECT_TYPES: frozenset[str] = frozenset()
+
+_FINAL_OBJECT_STATES_WITH_ERROR = FINAL_OBJECT_STATES + ['error']
+
+
+def error_is_final(object_type: Union[str, ObjectType]) -> bool:
+    """Is 'error' a final state for this object type?
+
+    See ERROR_IS_FINAL_OBJECT_TYPES for which types, and why.
+    """
+    name = str(object_type)
+    return name.endswith('_op') or name in ERROR_IS_FINAL_OBJECT_TYPES
+
+
+def final_object_states(
+        object_type: Union[str, ObjectType]) -> list[str]:
+    """The states the hard-delete sweep may take this type in.
+
+    FINAL_OBJECT_STATES for most types, plus 'error' for the types
+    which treat an error as finished with.
+    """
+    if error_is_final(object_type):
+        return _FINAL_OBJECT_STATES_WITH_ERROR
+    return FINAL_OBJECT_STATES
 
 
 # The refusal stage published when the capacity admission guard, rather
