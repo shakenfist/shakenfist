@@ -17321,12 +17321,22 @@ f-strings and <code>%s</code> formatting of one all yield <code>**********</code
 comes back only from an explicit <code>.get_secret_value()</code> call. That call is the
 point of the design: each one is somewhere a reviewer can stop and ask whether
 the plaintext belongs there, and there are few enough to read in one sitting.</p>
-<p>The wrapped fields are <code>NamespaceKeyAttributesData.key</code> and <code>.nonce</code>, and the
+<p>The wrapped fields are <code>NamespaceKeyAttributesData.key</code> and <code>.nonce</code>,
+<code>BlobTransfer.token</code>, and the
 configuration options <code>AUTH_SECRET_SEED</code>, <code>MARIADB_PASSWORD</code> and
 <code>LOKI_AUTH_HEADER</code>. The unwrap sites are the bcrypt comparison in <code>/auth</code>, the
 nonce comparison in <code>verify_token()</code>, the JWT claim in <code>create_token()</code>, the two
 SQL writes and the gRPC encoder for key attributes, the JWT signing key in
 <code>external_api/app.py</code>, the database connection URL, and the Loki push header.</p>
+<p><code>BlobTransfer.token</code> is not part of the REST authentication path at all — it
+authorises the inbound TCP connection to a blob transfer's server socket, which
+is a bearer credential by the same argument — and its unwrap sites are the SQL
+write and the gRPC encoder in <code>mariadb.py</code>, the proto encoders in the database
+daemon, the handshake the requesting node writes in <code>blob.py</code>, and the
+comparison against it in <code>daemons/transfers/main.py</code>. That comparison is the
+one to be careful with: because a <code>SecretStr</code> never equals a <code>str</code>, a missed
+unwrap there refuses every transfer rather than admitting one it should not, so
+it fails closed and loudly.</p>
 <p>Three consequences are worth knowing before touching this code.</p>
 <p><strong><code>SecretStr</code> never compares equal to a <code>str</code>.</strong> <code>SecretStr('x') == 'x'</code> is
 <code>False</code>, so a comparison against a bare string literal is silently always false

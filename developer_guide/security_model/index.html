@@ -16064,7 +16064,8 @@ up in <a href="../coding_rules/">coding_rules.md</a>.</p>
 <li>Secret-carrying fields are <code>pydantic.SecretStr</code>, so stringifying one
   anywhere yields <code>**********</code> and the plaintext comes back only from an
   explicit <code>.get_secret_value()</code> call. This covers the namespace key hash
-  and nonce plus <code>AUTH_SECRET_SEED</code>, <code>MARIADB_PASSWORD</code> and
+  and nonce, the blob transfer token, and <code>AUTH_SECRET_SEED</code>,
+  <code>MARIADB_PASSWORD</code> and
   <code>LOKI_AUTH_HEADER</code>, and complements rather than replaces the structural
   rules above: the request-body rule catches a credential arriving before
   any model exists, and the <code>sf-queues</code> startup banner redacts by
