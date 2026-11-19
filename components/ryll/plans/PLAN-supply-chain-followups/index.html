@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -13263,6 +13263,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#7-chrono-0445-unmaintained-rustsec-2026-0543" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. chrono 0.4.45 unmaintained (RUSTSEC-2026-0543)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-humantime-240-unmaintained-rustsec-2026-0542" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. humantime 2.4.0 unmaintained (RUSTSEC-2026-0542)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -16245,6 +16267,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#7-chrono-0445-unmaintained-rustsec-2026-0543" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. chrono 0.4.45 unmaintained (RUSTSEC-2026-0543)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-humantime-240-unmaintained-rustsec-2026-0542" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. humantime 2.4.0 unmaintained (RUSTSEC-2026-0542)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -16496,6 +16540,55 @@ below. When an ignore is resolved, delete both the
      <code>async-dnssd</code>. Re-check on each ironrdp bump; renovate
      opens those for us.</li>
 <li><strong>Remove ignore when:</strong> <code>pin-utils</code> no longer appears in
+  <code>cargo tree</code>.</li>
+</ul>
+<h3 id="7-chrono-0445-unmaintained-rustsec-2026-0543">7. <code>chrono</code> 0.4.45 unmaintained (RUSTSEC-2026-0543)<a class="headerlink" href="#7-chrono-0445-unmaintained-rustsec-2026-0543" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Ignore rationale:</strong> the advisory (published 18 November
+  2026, announced in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/chronotope/chrono/issues/1768" title="GitHub Issue: chronotope/chrono #1768">chronotope/chrono#1768</a>) marks every
+  <code>chrono</code> version unmaintained, and <code>cargo deny</code> reports "No
+  safe upgrade is available!". ryll does not use <code>chrono</code>
+  directly; it arrives through <code>dav-server</code> 0.11, the RFC
+  4918 server behind WebDAV folder sharing, which both <code>ryll</code>
+  and <code>shakenfist-spice-renderer</code> depend on. The latest
+  <code>dav-server</code> (0.12.0, 9 November 2026) still requires
+  <code>chrono ^0.4.44</code>, so bumping <code>dav-server</code> does not help.</li>
+<li><strong>Attack surface:</strong> this is in the shipped path: the
+  renderer's <code>webdav</code> feature is default-on. <code>dav-server</code>
+  uses <code>chrono</code> to format and parse WebDAV property and HTTP
+  dates for the guest's requests against a directory the
+  user chose to share. The advisory is about maintenance
+  status, not a known vulnerability. The exposure is that
+  a future bug in that date handling would get no upstream
+  fix.</li>
+<li><strong>Action plan:</strong></li>
+<li>Watch <code>dav-server</code> for a release that moves to <code>jiff</code>
+     or <code>time</code> (the advisory's recommended alternatives).
+     Renovate opens <code>dav-server</code> bumps for us; re-check
+     <code>cargo tree -i chrono</code> on each.</li>
+<li>If upstream does not move, consider offering that
+     migration as a patch to <code>dav-server</code>.</li>
+<li><strong>Remove ignore when:</strong> <code>chrono</code> no longer appears in
+  <code>cargo tree</code>.</li>
+</ul>
+<h3 id="8-humantime-240-unmaintained-rustsec-2026-0542">8. <code>humantime</code> 2.4.0 unmaintained (RUSTSEC-2026-0542)<a class="headerlink" href="#8-humantime-240-unmaintained-rustsec-2026-0542" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Ignore rationale:</strong> published with item 7. The advisory
+  says <code>humantime</code> is unmaintained because <code>chrono</code> is, and
+  covers every version; there is no safe upgrade. It reaches
+  us only through <code>console-subscriber</code> 0.5.0, the latest
+  release, which needs <code>humantime ^2.1.0</code> unconditionally.</li>
+<li><strong>Attack surface:</strong> effectively none. <code>console-subscriber</code>
+  is enabled only by ryll's diagnostic <code>tokio-console</code>
+  feature (<code>make build-tokio-console</code>), which release builds
+  leave out. The ignore exists because both scanners read
+  the whole lockfile rather than a feature resolution.</li>
+<li><strong>Action plan:</strong> the <code>tokio-console</code> feature is due to be
+  removed when the K1 hang investigation closes (see the
+  comment on the feature in <code>ryll/Cargo.toml</code>); that removal
+  retires this ignore. Failing that, a <code>console-subscriber</code>
+  release that drops <code>humantime</code>.</li>
+<li><strong>Remove ignore when:</strong> <code>humantime</code> no longer appears in
   <code>cargo tree</code>.</li>
 </ul>
 <h2 id="also-tracked-duplicate-version-warnings">Also tracked: duplicate-version warnings<a class="headerlink" href="#also-tracked-duplicate-version-warnings" title="Permanent link">&para;</a></h2>
