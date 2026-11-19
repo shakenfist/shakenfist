@@ -16,6 +16,7 @@ from typing import Optional
 from typing import Union
 
 import magic
+from pydantic import SecretStr
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
 
@@ -806,7 +807,11 @@ class Blob(dbo):
 
             random.shuffle(locations)
             transfer_name = sf_random.random_id()
-            token = sf_random.random_id()
+            # The transfer's bearer credential: whoever holds it can read
+            # the blob off the source node's transfer socket. Wrapped as
+            # it is minted so that the only plaintext in this method is
+            # the handshake write below.
+            token = SecretStr(sf_random.random_id())
             now = time.time()
 
             # Create transfer request in MariaDB
@@ -859,7 +864,9 @@ class Blob(dbo):
 
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect((locations[0], transfer.port))
-            client.send(token.encode('utf-8'))
+            # Named unwrap boundary: the handshake the transfers daemon
+            # compares against the token on the row.
+            client.send(token.get_secret_value().encode('utf-8'))
 
             total_bytes_received = 0
             next_percentage = 10

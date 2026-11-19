@@ -10545,7 +10545,12 @@ def _direct_create_blob_transfer(
                 transfer_name=transfer.transfer_name,
                 requesting_node=transfer.requesting_node,
                 blob_uuid=transfer.blob_uuid,
-                token=transfer.token,
+                # The SQL write is a named unwrap boundary for the
+                # transfer's bearer credential: the column is a plain
+                # VARCHAR, so a SecretStr would be stored as
+                # '**********' and no inbound connection would ever
+                # authenticate.
+                token=transfer.token.get_secret_value(),
                 server_state=transfer.server_state,
                 port=transfer.port,
                 percentage=transfer.percentage,
@@ -10596,7 +10601,7 @@ def _direct_get_blob_transfer(
                 transfer_name=row.transfer_name,
                 requesting_node=row.requesting_node,
                 blob_uuid=row.blob_uuid,
-                token=row.token,
+                token=SecretStr(row.token),
                 server_state=row.server_state,
                 port=row.port,
                 percentage=row.percentage,
@@ -10635,7 +10640,7 @@ def _direct_get_blob_transfers_for_node(
                     transfer_name=row.transfer_name,
                     requesting_node=row.requesting_node,
                     blob_uuid=row.blob_uuid,
-                    token=row.token,
+                    token=SecretStr(row.token),
                     server_state=row.server_state,
                     port=row.port,
                     percentage=row.percentage,
@@ -10675,7 +10680,7 @@ def _direct_get_blob_transfers_for_blob(
                     transfer_name=row.transfer_name,
                     requesting_node=row.requesting_node,
                     blob_uuid=row.blob_uuid,
-                    token=row.token,
+                    token=SecretStr(row.token),
                     server_state=row.server_state,
                     port=row.port,
                     percentage=row.percentage,
@@ -10833,7 +10838,9 @@ def _grpc_create_blob_transfer(transfer: 'BlobTransfer') -> bool:
                 transfer_name=transfer.transfer_name,
                 requesting_node=transfer.requesting_node,
                 blob_uuid=transfer.blob_uuid,
-                token=transfer.token,
+                # The gRPC encoder is a named unwrap boundary: the proto
+                # field is a string and protobuf refuses a SecretStr.
+                token=transfer.token.get_secret_value(),
                 server_state=transfer.server_state,
                 port=transfer.port if transfer.port else 0,
                 percentage=transfer.percentage,
@@ -10870,7 +10877,7 @@ def _grpc_get_blob_transfer(
             transfer_name=t.transfer_name,
             requesting_node=t.requesting_node,
             blob_uuid=t.blob_uuid,
-            token=t.token,
+            token=SecretStr(t.token),
             server_state=t.server_state,
             port=t.port if t.port else None,
             percentage=t.percentage,
@@ -10901,7 +10908,7 @@ def _grpc_get_blob_transfers_for_node(
                 transfer_name=t.transfer_name,
                 requesting_node=t.requesting_node,
                 blob_uuid=t.blob_uuid,
-                token=t.token,
+                token=SecretStr(t.token),
                 server_state=t.server_state,
                 port=t.port if t.port else None,
                 percentage=t.percentage,
@@ -10931,7 +10938,7 @@ def _grpc_get_blob_transfers_for_blob(
                 transfer_name=t.transfer_name,
                 requesting_node=t.requesting_node,
                 blob_uuid=t.blob_uuid,
-                token=t.token,
+                token=SecretStr(t.token),
                 server_state=t.server_state,
                 port=t.port if t.port else None,
                 percentage=t.percentage,

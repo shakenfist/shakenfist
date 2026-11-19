@@ -1,10 +1,14 @@
 # Copyright 2026 Michael Still and contributors
 
+import os
+import shutil
 import socket
+import tempfile
 from unittest import mock
 
 from shakenfist.daemons import daemon
 from shakenfist.daemons.transfers import main as transfers_main
+from shakenfist.schema.blob_transfer import BlobTransfer
 from shakenfist.tests import base
 
 
@@ -100,3 +104,72 @@ class TransferJobAcceptTestCase(base.ShakenFistTestCase):
         # after it asked, so a poll has to be a small fraction of the grace.
         self.assertLessEqual(transfers_main.ACCEPT_POLL_SECONDS * 4, daemon.WORKER_STOP_GRACE)
         self.assertLess(transfers_main.ACCEPT_POLL_SECONDS, transfers_main.ACCEPT_TIMEOUT_SECONDS)
+
+
+class TransferJobTokenTestCase(base.ShakenFistTestCase):
+    """The inbound connection is authenticated against the row's token.
+
+    The token is a SecretStr (issue 4961), and a SecretStr never
+    compares equal to a str, so the comparison in execute() has to
+    unwrap. These tests drive a real BlobTransfer rather than a
+    MagicMock so a missing unwrap fails here: without it the matching
+    token is refused as well as the wrong one, and transfers stop
+    working cluster wide.
+    """
+
+    TOKEN = 'the-real-transfer-token'
+
+    def _transfer(self):
+        return BlobTransfer(
+            source_node='sf-2',
+            transfer_name='t1',
+            requesting_node='192.0.2.2',
+            blob_uuid='blob-uuid-456',
+            token=self.TOKEN,
+            server_state='initial',
+            port=None,
+            percentage=0.0,
+            created_at=1234567890.0,
+            updated_at=1234567890.0
+        )
+
+    def _execute(self, presented):
+        """Run execute() with a peer presenting this token, return the bytes."""
+        blob_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, blob_dir)
+        blob_path = os.path.join(blob_dir, 'blob-uuid-456')
+        with open(blob_path, 'wb') as f:
+            f.write(b'x' * 100)
+
+        job = transfers_main.TransferJob.__new__(transfers_main.TransferJob)
+        job.transfer = self._transfer()
+        job.abort_path = os.path.join(blob_dir, '_absent.abort')
+
+        conn = mock.MagicMock()
+        conn.recv.return_value = presented.encode('utf-8')
+        server = mock.MagicMock()
+        server.getsockname.return_value = ('192.0.2.1', 12345)
+        server.accept.return_value = (conn, ('192.0.2.2', 4000))
+
+        with mock.patch(
+                'shakenfist.daemons.transfers.main.socket.socket',
+                return_value=server), \
+                mock.patch('shakenfist.daemons.transfers.main.mariadb'), \
+                mock.patch('shakenfist.daemons.transfers.main.config'), \
+                mock.patch(
+                    'shakenfist.blob.Blob.filepath', return_value=blob_path):
+            job.execute()
+
+        return b''.join(call.args[0] for call in conn.send.call_args_list)
+
+    def test_the_matching_token_is_accepted(self):
+        self.assertEqual(b'x' * 100, self._execute(self.TOKEN))
+
+    def test_a_wrong_token_sends_nothing(self):
+        self.assertEqual(b'', self._execute('not-the-token'))
+
+    def test_the_redacted_rendering_is_not_accepted(self):
+        # str() of a SecretStr is '**********'. A peer presenting that
+        # must not be let in, which is what an unwrap on the wrong side
+        # of the comparison would do.
+        self.assertEqual(b'', self._execute(str(self._transfer().token)))

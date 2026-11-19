@@ -16,6 +16,7 @@ from typing import Optional
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import SecretStr
 
 
 class BlobTransfer(BaseModel):
@@ -36,7 +37,17 @@ class BlobTransfer(BaseModel):
         transfer_name: Unique identifier for this transfer (UUID-like).
         requesting_node: The node IP requesting the transfer (client side).
         blob_uuid: The UUID of the blob being transferred.
-        token: Authentication token for the TCP connection.
+        token: Authentication token for the TCP connection. The
+            transfers daemon compares it against what an inbound
+            connection presents before sending a byte of blob data, so
+            holding it is enough to read the blob being transferred --
+            it is a bearer credential rather than metadata. A
+            SecretStr, so stringifying it anywhere (an f-string, a log
+            line, an event's extra dict) yields asterisks rather than
+            the token. Read the real value with .get_secret_value(),
+            which is deliberately conspicuous: the unwrap sites are the
+            SQL write, the gRPC encoder and the comparison against the
+            inbound connection's greeting, and nowhere else.
         server_state: State of the transfer ('initial' or 'created').
         port: TCP port the server is listening on (None until created).
         percentage: Transfer progress from 0.0 to 100.0.
@@ -67,7 +78,12 @@ class BlobTransfer(BaseModel):
     # Transfer metadata
     requesting_node: Annotated[str, Field(max_length=255)]
     blob_uuid: Annotated[str, Field(max_length=36)]
-    token: Annotated[str, Field(max_length=64)]
+    # The transfer's bearer credential. SecretStr maps to the same
+    # VARCHAR(255) a plain str does (see PYTHON_TO_SQLALCHEMY in
+    # schema/sqlalchemy.py), so this is a Python-side type change with
+    # no schema consequence -- the table is still at its existing
+    # version.
+    token: Annotated[SecretStr, Field(max_length=64)]
 
     # Server-side state
     server_state: Annotated[str, Field(max_length=16)]
@@ -107,6 +123,12 @@ class BlobTransfer(BaseModel):
         Nothing needed it here; the daemon reads ``.token`` from the model
         directly. This mirrors NamespaceKey.external_view(), which omits
         the hash and the nonce for the same reason.
+
+        The field is a ``SecretStr`` as well, so putting it back here
+        would publish ``**********`` rather than the token. The type is
+        the structural protection and this omission is the deliberate
+        one; keep both, because a future caller which serialises the
+        model itself rather than calling this method gets only the type.
 
         Returns:
             A dictionary suitable for JSON serialization containing the

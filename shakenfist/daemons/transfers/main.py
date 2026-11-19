@@ -72,7 +72,11 @@ class TransferJob(util_concurrency.Job):
                 return
 
             auth = conn.recv(64).decode('utf-8')
-            if auth != self.transfer.token:
+            # Named unwrap boundary. The token is a SecretStr, and a
+            # SecretStr never compares equal to a str, so a missing
+            # unwrap here refuses every transfer rather than accepting
+            # one it should not -- it fails closed, and loudly.
+            if auth != self.transfer.token.get_secret_value():
                 log.warning('Connection with incorrect token, aborting')
                 return
 
