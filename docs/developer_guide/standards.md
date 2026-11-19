@@ -367,6 +367,37 @@ A test which genuinely needs a large allocation should release it before
 it returns, rather than holding it on the test instance -- the instance
 is still alive when the sample is taken.
 
+### Test logging is captured per test
+
+`SHAKENFIST_LOG_TO_STDOUT=1` (set in `tox.ini`) makes each module's
+logger write JSON to stdout instead of syslog. That handler is created
+at import, so it holds the worker process's real stdout -- which under
+stestr is the subunit result stream. Until issue #4991 nothing captured
+it: every record of every test went raw down that pipe, through the
+stestr parent and tox into the CI log, 82 MB of it per unit test job.
+A test which logged heavily then ran only as fast as that chain drained
+its output. One scheduler test wrote 13 MB, took 165 seconds on CI
+against 1.5 locally, and the unit test step timed out with every test
+passing.
+
+`ShakenFistTestCase.setUp()` now calls
+`shakenfist/tests/log_capture.py`'s `capture()`, which points each
+handler bound to stdout or stderr at an in-memory buffer for that test
+and puts it back afterwards. Stderr matters too: a module which calls
+`logging.basicConfig()`, such as `client/ctl.py`, gives the root logger
+a stderr handler once a test imports it, and every record propagates
+there as well. The buffer is attached to the result as a `log` detail
+only when the test fails or errors, so `stestr last` shows a failing
+test's own log and nothing else. Two consequences:
+
+- A test class which does not derive from `ShakenFistTestCase` is not
+  captured, and its logging still reaches the pipe.
+- A test's log is held in memory until the test instance is released,
+  so the growth sample above counts it. A test which needs thousands
+  of scheduling decisions or API calls should usually be asking a
+  narrower question -- see `WeightedOrderTestCase` in
+  `shakenfist/tests/test_scheduler.py` for the shape (issue #4992).
+
 ## Pre-commit Hooks
 
 The repository uses pre-commit hooks to validate code before commits:

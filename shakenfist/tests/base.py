@@ -6,6 +6,7 @@ from pydantic import SecretStr
 import testtools
 
 from shakenfist.config import config
+from shakenfist.tests import log_capture
 from shakenfist.tests import memory
 
 
@@ -72,8 +73,11 @@ class ShakenFistTestCase(testtools.TestCase):
         self.addCleanup(self._assert_memory_within_bounds,
                         memory.resident_bytes())
 
-        # Logging is configured in shakenfist/tests/__init__.py to write to
-        # stdout, which stestr captures and only displays for failing tests.
+        # Logging goes to stdout (SHAKENFIST_LOG_TO_STDOUT in tox.ini);
+        # hold it in a buffer for this test and attach it only if the test
+        # fails, rather than letting it stream into the subunit pipe
+        # (issue #4991). See shakenfist/tests/log_capture.py.
+        log_capture.capture(self)
 
         self.mock_add_event_multi = mock.patch(
             'shakenfist.eventlog.add_event_multi')

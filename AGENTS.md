@@ -210,6 +210,12 @@ metrics. The headlines:
   next test inherits. See
   [docs/developer_guide/standards.md](docs/developer_guide/standards.md#a-test-run-is-bounded-and-growth-is-attributed).
 
+- **Derive unit tests from `ShakenFistTestCase`.** Its `setUp()` holds
+  the test's log in a buffer and shows it only on failure; a plain
+  `testtools.TestCase` streams every record into the subunit pipe,
+  which is what made the unit test step time out (issue #4991). See
+  [docs/developer_guide/standards.md](docs/developer_guide/standards.md#test-logging-is-captured-per-test).
+
 - **An unlanded plan may already own the code you are changing.** A fix
   landed across a partially implemented plan has to be unpicked later,
   which is why the automated fixer reads `docs/plans/` before writing
