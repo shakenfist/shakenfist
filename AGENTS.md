@@ -203,6 +203,16 @@ metrics. The headlines:
   directly. See
   [docs/developer_guide/ci.md](docs/developer_guide/ci.md#creating-instances-in-the-functional-suite).
 
+- **A unit test's log output is captured, and a test must not add a
+  second log handler to an already-handled logger.** The handlers
+  `logs.setup()` installs bind the process's stdout at import time, and
+  in a stestr worker that is the subunit result stream: uncaptured, one
+  run wrote 82 MB into it and a test which logged heavily ran at
+  whatever speed the consumer drained it. `ShakenFistTestCase`
+  redirects those handlers per test and reports the capture only for a
+  failing test, and fails the test which duplicates one. See
+  [docs/developer_guide/standards.md](docs/developer_guide/standards.md#a-tests-log-output-is-captured-and-reported-only-if-it-fails).
+
 - **A unit test holds on to what it allocates at its own peril.** The
   suite now bounds a `stestr` run's memory and fails the test which
   grew the worker, so an allocation still referenced from the test

@@ -20,6 +20,7 @@ from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.daemons import daemon
 from shakenfist.tests import base
+from shakenfist.tests import logcapture
 
 
 class FakeRpcError(grpc.RpcError):
@@ -214,6 +215,12 @@ class DaemonDatabaseWaitPetTestCase(base.ShakenFistTestCase):
             self, mock_identity, mock_proctitle, mock_signal, mock_fault,
             mock_clear):
         self.addCleanup(mariadb.set_watchdog_petter, None)
+        # Daemon.__init__ calls logs.setup(), which installs a stdout
+        # handler on a logger shared by the whole process. Nothing
+        # removes it, so it would outlive this test and write every
+        # later test's 'queues' records into the worker's result stream
+        # -- see shakenfist/tests/logcapture.py.
+        self.addCleanup(logcapture.forget_logger, 'queues')
         d = daemon.Daemon('queues')
         self.assertEqual(
             d._pet_watchdog_from_database_wait, mariadb._watchdog_petter)

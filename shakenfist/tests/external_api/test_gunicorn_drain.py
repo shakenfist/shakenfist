@@ -59,6 +59,13 @@ class SFGunicornLoggerTestCase(base.ShakenFistTestCase):
     (stderr -> journald) are left untouched.
     """
 
+    def setUp(self):
+        super().setUp()
+        # Constructing a gunicorn logger attaches stream handlers to
+        # these two process-global loggers, and the mode B test wants
+        # gunicorn's defaults rather than cleared handlers.
+        self.preserve_log_handlers('gunicorn.error', 'gunicorn.access')
+
     def test_mode_a_propagates_and_clears_handlers(self):
         with mock.patch.object(
                 gunicorn_config.sf_config, 'LOKI_BASE_URL',

@@ -13,7 +13,6 @@ import inspect
 import json
 import logging
 import os
-import sys
 
 import flask_restful
 from flask_jwt_extended import decode_token
@@ -300,7 +299,6 @@ class EnforcementTestCase(base.ShakenFistTestCase):
         external_api.TESTING = True
         external_api.app.testing = True
         external_api.app.debug = False
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 

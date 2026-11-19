@@ -10,7 +10,6 @@ write any string the caller sent into the trust list.
 
 import json
 import logging
-import sys
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.external_api import app as external_api
@@ -26,7 +25,6 @@ class NamespaceTrustGrantTestCase(base.ShakenFistTestCase):
         external_api.TESTING = True
         external_api.app.testing = True
         external_api.app.debug = False
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
