@@ -15,6 +15,7 @@ from unittest import mock
 from uuid import UUID
 from uuid import uuid4
 
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist import mariadb_hard_delete
 from shakenfist.config import config
@@ -2320,8 +2321,15 @@ class MockMariaDB():
         """Mock implementation of mariadb.create_network_interface()"""
         key = str(data.uuid)
         if key in self.network_interface_objects:
+            # As the real insert: the same row delivered twice (a retried
+            # RPC whose first delivery committed) is success, and a
+            # different row under this uuid is neither a success nor a
+            # refusal.
             self._trace(f'MockMariaDB.create_network_interface({key}): already exists')
-            return False
+            if self.network_interface_objects[key] == data:
+                return True
+            raise exceptions.DatabaseException(
+                f'network interface {key} already exists as a different interface')
         self.network_interface_objects[key] = data
         self._trace(f'MockMariaDB.create_network_interface({key}): created')
         return True

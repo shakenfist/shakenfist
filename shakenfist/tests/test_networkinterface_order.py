@@ -122,6 +122,30 @@ class InterfaceOrderConstraintTestCase(dbfixture.MariaDBTableFixture,
             self.assertTrue(mariadb._direct_create_network_interface(ni))
             self._soft_delete(ni.uuid)
 
+    def test_a_redelivered_insert_is_not_a_collision(self):
+        # _grpc_call() re-sends a call whose reply was lost, so the
+        # insert can arrive twice. The second delivery fails on the
+        # primary key; read as a collision, the API would release the
+        # address the first delivery's row holds.
+        ni = _ni(self.instance, 0, '02:00:00:00:00:01', self.network)
+        self.assertTrue(mariadb._direct_create_network_interface(ni))
+        self.assertTrue(mariadb._direct_create_network_interface(ni))
+
+        with self.engine.connect() as conn:
+            rows = conn.execute(sa.select(self.table.c.uuid)).fetchall()
+        self.assertEqual([ni.uuid], [row[0] for row in rows])
+
+    def test_another_row_under_the_uuid_is_neither_answer(self):
+        # Not this insert's row, so it was not created -- but nor was it
+        # refused by a constraint, and a refusal releases the address.
+        first = _ni(self.instance, 0, '02:00:00:00:00:01', self.network)
+        self.assertTrue(mariadb._direct_create_network_interface(first))
+
+        other = _ni(self.instance, 1, '02:00:00:00:00:02', self.network,
+                    ni_uuid=first.uuid)
+        self.assertRaises(exceptions.DatabaseException,
+                          mariadb._direct_create_network_interface, other)
+
     def test_the_macaddr_constraint_still_refuses_a_duplicate(self):
         # A floor: the new constraint must not have displaced the old
         # one, which shares the ``active`` column with it.
@@ -152,8 +176,9 @@ class NextOrderTestCase(dbfixture.MariaDBTableFixture,
             [mariadb._get_network_interfaces_table,
              mariadb._get_object_states_table])
         self.addCleanup(self.engine.dispose)
-        for target, value in (('shakenfist.mariadb._get_engine', self.engine),
-                              ('shakenfist.mariadb._use_database_service', False)):
+        for target, value in (
+                ('shakenfist.mariadb._get_engine', self.engine),
+                ('shakenfist.mariadb._use_database_service', False)):
             patcher = mock.patch(target, return_value=value)
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -163,12 +188,15 @@ class NextOrderTestCase(dbfixture.MariaDBTableFixture,
         self.macs = ('02:00:00:00:00:%02x' % i for i in range(1, 255))
 
     def _plug(self, order, state='created', instance=None):
-        ni = _ni(instance or self.instance, order, next(self.macs), self.network)
+        ni = _ni(instance or self.instance, order, next(self.macs),
+                 self.network)
         self.assertTrue(mariadb._direct_create_network_interface(ni))
         if state:
             with self.engine.connect() as conn:
-                conn.execute(sa.insert(mariadb._get_object_states_table()).values(
-                    object_uuid=str(ni.uuid), object_type=ObjectType.INTERFACE,
+                states = mariadb._get_object_states_table()
+                conn.execute(sa.insert(states).values(
+                    object_uuid=str(ni.uuid),
+                    object_type=ObjectType.INTERFACE,
                     state_value=state, update_time=0.0))
                 conn.commit()
         return ni
@@ -194,7 +222,8 @@ class NextOrderTestCase(dbfixture.MariaDBTableFixture,
         # whatever a sibling has claimed, the next guess inserts.
         self._plug(0)
         for sibling in (None, 'initial', None):
-            self._plug(NetworkInterface.next_order(self.instance), state=sibling)
+            self._plug(NetworkInterface.next_order(self.instance),
+                       state=sibling)
         guess = NetworkInterface.next_order(self.instance)
         self.assertTrue(mariadb._direct_create_network_interface(
             _ni(self.instance, guess, next(self.macs), self.network)))
@@ -353,15 +382,33 @@ class CreateFailureIsNotACollisionTestCase(base.ShakenFistTestCase):
                               self._data())
 
     def test_direct_integrity_error_is_a_refusal(self):
-        # The negative control for the test above.
+        # The negative control for the test above: refused, and no row
+        # holds this uuid, so a constraint refused it.
         engine = mock.MagicMock()
         conn = engine.connect.return_value.__enter__.return_value
-        conn.execute.side_effect = IntegrityError(
-            'INSERT', {}, Exception('Duplicate entry'))
+        no_row = mock.MagicMock()
+        no_row.fetchone.return_value = None
+        conn.execute.side_effect = [
+            IntegrityError('INSERT', {}, Exception('Duplicate entry')),
+            no_row]
         with mock.patch('shakenfist.mariadb._get_engine',
                         return_value=engine):
             self.assertFalse(
                 mariadb._direct_create_network_interface(self._data()))
+
+    def test_direct_outage_while_reading_a_refused_row_raises(self):
+        # The refusal is checked against the row with this uuid, and
+        # that read failing is an outage, not the answer "no such row".
+        engine = mock.MagicMock()
+        conn = engine.connect.return_value.__enter__.return_value
+        conn.execute.side_effect = [
+            IntegrityError('INSERT', {}, Exception('Duplicate entry')),
+            OperationalError('SELECT', {}, Exception('lost connection'))]
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=engine):
+            self.assertRaises(exceptions.DatabaseUnavailable,
+                              mariadb._direct_create_network_interface,
+                              self._data())
 
     def test_grpc_failure_raises(self):
         with mock.patch('shakenfist.mariadb._get_database_stub'), \

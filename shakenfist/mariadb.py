@@ -18004,7 +18004,7 @@ def _migrate_duplicate_interface_orders(
         highest = conn.execute(
             sa.select(sa.func.max(table.c.order)).where(sa.and_(
                 table.c.instance_uuid == instance_uuid,
-                table.c.active.is_(True)))).fetchall()[0][0]
+                table.c.active.is_(True)))).scalar()
 
         # The first row keeps the slot; every other claimant is given a
         # fresh one above everything the instance is using. Recomputed
@@ -18073,14 +18073,15 @@ def _direct_create_network_interface(data: NetworkInterfaceData) -> bool:
         data: The NetworkInterfaceData to insert.
 
     Returns:
-        True if the record was created, False if a UNIQUE constraint
-        refused it.
+        True if the record was created, or was already there exactly as
+        asked for; False if a UNIQUE constraint refused it.
 
     Raises:
         DatabaseUnavailable: the insert failed for any other reason. A
             database outage must not read as a collision: the caller
             retries a collision with a fresh device index, and reports
             an exhausted budget as a 409 which names the wrong cause.
+        DatabaseException: a different row already holds this uuid.
     """
     engine = _get_engine()
     table = _get_network_interfaces_table()
@@ -18107,7 +18108,14 @@ def _direct_create_network_interface(data: NetworkInterfaceData) -> bool:
             conn.commit()
             return True
     except IntegrityError:
-        return False
+        # Refused -- unless what refused it is this very row. _grpc_call()
+        # re-sends a call which hit DEADLINE_EXCEEDED or CANCELLED, so an
+        # insert whose commit landed but whose reply was lost arrives a
+        # second time with the same uuid and fails on the primary key.
+        # Read as a collision, that sends new() round its retries and has
+        # the API release the address the committed row holds, which
+        # hands it to a second guest.
+        return _network_interface_already_inserted(engine, table, data)
     except SQLAlchemyError as e:
         LOG.warning(
             f'MariaDB create failed for network_interface '
@@ -18115,6 +18123,50 @@ def _direct_create_network_interface(data: NetworkInterfaceData) -> bool:
         raise exceptions.DatabaseUnavailable(
             f'network interface {data.uuid} could not be created: {e}'
         ) from e
+
+
+def _network_interface_already_inserted(
+        engine: Any, table: sa.Table, data: NetworkInterfaceData) -> bool:
+    """Whether a refused interface insert was refused by its own row.
+
+    Called after an IntegrityError. True means a row with this uuid is
+    already there as asked for -- an earlier delivery of the same insert
+    committed -- which makes the insert idempotent for a retried RPC.
+    False means no row has this uuid, so a UNIQUE constraint on the MAC
+    or the device index refused it: the genuine collision.
+
+    Raises:
+        DatabaseUnavailable: the row could not be read. An unanswered
+            question is not a refusal, and _direct_get_network_interface()
+            is not used because it answers an outage with None.
+        DatabaseException: a row with this uuid exists but is not this
+            insert's. That row holds what it holds, so this insert neither
+            succeeded nor was refused, and neither answer is safe.
+    """
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(
+                sa.select(table).where(table.c.uuid == data.uuid)).fetchone()
+    except SQLAlchemyError as e:
+        LOG.warning(
+            f'MariaDB read failed for refused network_interface '
+            f'{data.uuid}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'network interface {data.uuid} could not be created: {e}'
+        ) from e
+
+    if row is None:
+        return False
+
+    asked = (str(data.instance_uuid), str(data.network_uuid), data.macaddr,
+             data.ipv4, data.order)
+    held = (str(row.instance_uuid), str(row.network_uuid), row.macaddr,
+            row.ipv4, row.order)
+    if held != asked:
+        raise exceptions.DatabaseException(
+            f'network interface {data.uuid} already exists as a different '
+            f'interface: {held} rather than {asked}')
+    return True
 
 
 def _direct_get_network_interface(
@@ -18807,11 +18859,16 @@ def create_network_interface(data: NetworkInterfaceData) -> bool:
         data: The NetworkInterfaceData to insert.
 
     Returns:
-        True if created, False if a UNIQUE constraint refused it.
+        True if created, or already there exactly as asked for (a
+        retried call whose first delivery committed); False if a UNIQUE
+        constraint refused it.
 
     Raises:
         DatabaseUnavailable: the database could not be asked, or failed
             for some other reason. Nothing is known about the row then.
+        DatabaseException: a different row already holds this uuid
+            (direct path only; over gRPC it arrives as
+            DatabaseUnavailable, the servicer answering INTERNAL).
     """
     if _use_database_service():
         return _grpc_create_network_interface(data)

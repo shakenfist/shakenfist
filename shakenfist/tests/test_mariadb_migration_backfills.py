@@ -69,6 +69,7 @@ class _MockConnection:
         self._poisoned = False
         self.calls = []
         self.commits = 0
+        self.rollbacks = 0
 
     def execute(self, stmt, params=None):
         if self._poisoned:
@@ -86,7 +87,7 @@ class _MockConnection:
 
     def rollback(self):
         self._poisoned = False
-        self.rollbacks = getattr(self, 'rollbacks', 0) + 1
+        self.rollbacks += 1
 
     def __enter__(self):
         return self

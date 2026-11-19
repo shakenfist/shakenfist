@@ -609,12 +609,12 @@ def _netdesc_allocate_address(inst, netdesc, order, hot_plug=False):
         # Not a collision, and worth retrying, so not a 409. Whether the
         # row was written is unknown -- a lost reply looks the same as a
         # refused write -- so the address is deliberately not released:
-        # a reservation left behind is a leak, but one released under a
-        # committed row is a duplicate guest address. The create path's
-        # cleanup is itself a database write, so as with a failed
-        # placement write it is best-effort on the outage that got us
-        # here, and the response names the instance so the caller can
-        # delete it once the database returns.
+        # a reservation left behind is a leak (issue 4986), but one
+        # released under a committed row is a duplicate guest address.
+        # The create path's cleanup is itself a database write, so as
+        # with a failed placement write it is best-effort on the outage
+        # that got us here, and the response names the instance so the
+        # caller can delete it once the database returns.
         if not hot_plug:
             try:
                 inst.enqueue_delete_due_error(
@@ -797,10 +797,11 @@ class InstancesEndpoint(api_base.Resource):
             (406, 'Network not ready.', None),
             (409, 'Network address or MAC address in use, or no node '
                 'satisfies a hard affinity constraint.', None),
-            (503, 'The database could not be reached while recording a '
-                'network interface or the placement. The half-built instance is torn down (the error '
-                'body names its uuid) and the request can be retried; the '
-                'response carries a `Retry-After` header.', None),
+            (503, 'The database could not be reached while recording the '
+                'placement or a network interface. The half-built '
+                'instance is torn down (the error body names its uuid) '
+                'and the request can be retried; the response carries a '
+                '`Retry-After` header.', None),
             (507, 'Unable to allocate resources for the instance. A refusal '
                 'from scheduling carries `stage` (the scheduler filter that '
                 'refused, or `capacity_guard`) and a boolean `transient` in '
