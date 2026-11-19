@@ -1030,9 +1030,14 @@ qcow2-luks).
     recorded above), since their probe paths never see the trailer;
     the master-plan future-work bullet stays open. The typed guest-
     side refusal strings (e.g. "dmg: unsupported chunk codec …") are
-    debug output, not user-facing — the failure a caller actually
-    sees is the generic "convert operation failed" wrapper, matching
-    the VDI-precedent posture for adversarial pins.
+    debug output, not user-facing. A caller sees the host's own
+    wrapper, which now reports where the read stopped rather than
+    only that the operation failed: a refused chain read renders as
+    "convert: reading the input image, <path>, failed at offset N
+    (0xN); the image was not converted". The typed reason is still
+    `--verbose`-only, so the posture the VDI precedent set — the
+    refusal's detail is not user-facing — is unchanged; what the
+    caller gains is the offset, and an errno when the host had one.
 
 22. **QED Read-Refusal as Policy** - This resolved the master
     plan's Open question 1 (read support vs. refusal for QED) by
