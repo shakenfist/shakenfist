@@ -2195,6 +2195,36 @@ something Shaken Fist does not manage, so a request to reserve or allocate
 that address is refused rather than granted, and only an explicit
 `DELETE /networks/{network_ref}/addresses/{address}` releases it.
 
+### Reservations a database outage leaves behind
+
+Creating a network interface reserves its address as an `instance`
+reservation and then writes the interface row. If that write fails because
+the database tier is unavailable, the API answers `503` and the reservation
+is deliberately *kept*: whether the row committed is unknown, and releasing
+an address a committed row holds would hand the same address to a second
+guest.
+
+Nothing used to release those reservations afterwards, so each such `503`
+permanently removed one address from the network's pool. The orphan
+reconciliation sweep repairs an interface row with no state row by writing
+`deleted` directly rather than through the interface delete path, which is
+where the release lives, and the addresses API refuses to release anything
+but a `manual` reservation.
+
+The elected cluster node now reconciles this hourly
+(`reconcile_instance_address_reservations()` in the cluster daemon). An
+`instance` reservation older than an hour whose address no attached
+interface on that network holds is released into the deletion halo, and the
+release is recorded as an audit event on both the IPAM and the instance the
+reservation named. `GET /networks/{network_ref}/addresses` shows what a
+network currently holds.
+
+Nothing an operator does is required, and nothing is released while an
+attached interface still holds the address: every reader of an interface
+filters on the active object states, so an address no such interface holds
+can no longer reach a guest. An address is only reclaimed an hour after it
+was reserved, so an in-flight create is never raced.
+
 ## Upload Object Storage
 
 Upload objects (temporary objects that receive streamed data during artifact

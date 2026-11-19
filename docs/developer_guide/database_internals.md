@@ -747,6 +747,18 @@ honours them without a state row. A failed liveness read
 (`DatabaseUnavailable`) writes nothing and ends the pass. Both kinds of
 orphan are otherwise invisible to every state-driven iterator.
 
+Writing that state directly is also why zombie repair of an interface
+cannot release the interface's address: the release lives in
+`NetworkInterface.delete()`, which the repair does not call.
+`reconcile_instance_address_reservations()` (hourly, on the elected node)
+is the companion sweep which does, releasing an `instance` IPAM
+reservation older than `INSTANCE_RESERVATION_MINIMUM_AGE` whose address no
+attached interface on that network holds. That covers both shapes of the
+residue a failed interface write leaves behind -- a committed row with no
+state, and a reservation whose row never committed at all (issue 4986) --
+and is described for operators under
+[reservations a database outage leaves behind](../operator_guide/database.md#reservations-a-database-outage-leaves-behind).
+
 The elected cluster node also runs
 `reconcile_scheduler_capacity()` every five minutes. That cadence is
 anchored to a cluster-wide last-run stamp (the

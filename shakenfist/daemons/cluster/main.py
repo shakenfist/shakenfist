@@ -1304,6 +1304,10 @@ class Monitor(daemon.Daemon):
             schedule.every(60).minutes, 'reconcile_namespace_trust',
             scheduled_tasks.reconcile_namespace_trust)
         self._register_anchored_job(
+            schedule.every(60).minutes,
+            'reconcile_instance_address_reservations',
+            scheduled_tasks.reconcile_instance_address_reservations)
+        self._register_anchored_job(
             schedule.every(1).days, 'prune_events',
             scheduled_tasks.prune_events)
 

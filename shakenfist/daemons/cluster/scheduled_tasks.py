@@ -20,6 +20,7 @@ from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import HardDeleteBatchUnavailable
 from shakenfist.exceptions import InvalidStateException
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.baseobject import DatabaseBackedObject as dbo
@@ -31,10 +32,12 @@ from shakenfist.schema.operations import baseclusteroperation as bco_schema
 from shakenfist.schema.operations import node_blob_op as nbo_schema
 from shakenfist.schema.operations import node_inst_op as nio_schema
 from shakenfist.instance import Instance
+from shakenfist.ipam import IPAMs
 from shakenfist.namespace import Namespaces
 from shakenfist.namespace import revoke_trusts_naming_missing_namespaces
 from shakenfist.namespace_key import keys_with_attributes
 from shakenfist.namespace_key import NamespaceKey
+from shakenfist.network.network import Network
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_general_background_node_queues
@@ -994,6 +997,96 @@ def reconcile_namespace_trust() -> None:
     Runs only on the elected cluster node.
     """
     revoke_trusts_naming_missing_namespaces('stale trust reconciliation')
+
+
+# An instance address reservation is only considered leaked once it is
+# this much older than the interface which should hold it. An interface
+# create reserves the address before it writes the interface row, so a
+# short window would race an in-flight create; this is the same margin
+# ORPHAN_MINIMUM_AGE gives a row whose state has not landed yet.
+INSTANCE_RESERVATION_MINIMUM_AGE = 3600
+
+
+@util_general.recorded_method
+def reconcile_instance_address_reservations() -> None:
+    """Release instance address reservations no interface holds.
+
+    An interface create reserves its address and then writes the
+    interface row, and deliberately keeps the reservation when that
+    write fails with the database unavailable: whether the row
+    committed is unknown, and releasing an address a committed row
+    holds would hand it to a second guest. Nothing released it
+    afterwards, so each of those 503s permanently removed one address
+    from the network's pool (issue 4986). The orphan reconciliation
+    sweep repairs a committed-but-stateless interface row by writing
+    the state directly rather than through NetworkInterface.delete(),
+    which is where the release lives, and the addresses API refuses to
+    release anything but a manual reservation, so an operator had no
+    path either.
+
+    This is what releases them. An instance reservation older than
+    INSTANCE_RESERVATION_MINIMUM_AGE whose address no attached
+    interface on that network holds is unreachable: every consumer of
+    an interface -- Instance.interfaces, Network.networkinterfaces,
+    interfaces_for_instance() -- filters on
+    NetworkInterface.ACTIVE_STATES, so no guest can be given a device
+    for it. It is released into the deletion halo rather than straight
+    to free, which keeps it out of random allocation a while longer.
+
+    Runs only on the elected cluster node.
+    """
+    cutoff = time.time() - INSTANCE_RESERVATION_MINIMUM_AGE
+
+    for ipm in IPAMs([], prefilter='active'):
+        # One read of the whole table per IPAM rather than one per
+        # address (issue 3655).
+        candidates = {
+            addr: res
+            for addr, res in ipm.get_all_reservations().items()
+            if (res.reservation_type == ReservationType.INSTANCE
+                and res.reserved_at < cutoff)
+        }
+        if not candidates:
+            continue
+
+        # The network's own list of what is attached, rather than a
+        # restatement here of which interface states count as attached.
+        n = Network.from_db(ipm.network_uuid, suppress_failure_audit=True)
+        if not n:
+            # The cluster wide cleanup deletes an IPAM whose network has
+            # gone, and its reservation rows go with the IPAM.
+            continue
+        held = {ni.ipv4 for ni in n.networkinterfaces}
+
+        for addr in sorted(candidates):
+            if addr in held:
+                continue
+
+            res = candidates[addr]
+            # expected_type keeps the release atomic with the check that
+            # this is still an instance reservation (issue 4261). An
+            # instance delete which released the same address between
+            # the read above and here has already moved the row to
+            # deletion-halo, and releasing that again would reset the
+            # halo's clock and record a second release event for one
+            # address.
+            if not ipm.release(addr,
+                               expected_type=ReservationType.INSTANCE):
+                continue
+
+            objects: list[Any] = [ipm]
+            if res.user_type and res.user_uuid:
+                objects.append((res.user_type, res.user_uuid))
+            eventlog.add_event_multi(
+                EVENT_TYPE_AUDIT, objects,
+                'released an instance address reservation which no '
+                'interface holds', extra={'address': addr})
+            LOG.with_fields({
+                'ipam': str(ipm.uuid),
+                'network': str(ipm.network_uuid),
+                'address': addr,
+                'instance': str(res.user_uuid)
+            }).info('Released a leaked instance address reservation')
 
 
 def prune_events() -> None:
