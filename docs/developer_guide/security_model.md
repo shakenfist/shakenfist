@@ -32,6 +32,15 @@ up in [coding_rules.md](coding_rules.md).
   [`authentication.md`](authentication.md), which also explains why
   assertions about secrets must compare `.get_secret_value()`: both
   obvious alternatives make a leak guard pass while checking nothing
+- Some cached static values are secret-bearing and are not `SecretStr`: an
+  `instance`'s `ssh_key` and `user_data`, which the API publishes to the
+  owning namespace and cloud-init user data routinely fills with
+  credentials. The static object cache therefore keeps them in every process
+  that reads an instance, which is a secret-lifetime property rather than an
+  access-control one, and is bounded: `mariadb.py`'s expiry reap drops an
+  entry within its TTL plus one reap interval rather than at the end of the
+  process. See the cache section of
+  [`database_internals.md`](database_internals.md) and issue #3944
 - RBAC with admin/user roles
 - Network isolation via VXLAN
 

@@ -252,6 +252,26 @@ _OBJECT_CACHE_LOCK = threading.Lock()
 # inserts rather than on every insert once full.
 OBJECT_CACHE_TRIM_TARGET = 0.9
 
+# How often a process reclaims entries whose TTL has passed, whether or not
+# the cache is anywhere near OBJECT_CACHE_MAX_ENTRIES.
+#
+# Without this, TTL bounds staleness and nothing bounds residency: expiry is
+# lazy, so an expired entry nothing reads again and no capacity pressure
+# reaches stays resident for the life of the process. That matters because
+# some cached static values are secret-bearing -- an instance carries
+# ssh_key and user_data, and cloud-init user data routinely contains
+# credentials -- so an unbounded residency is the difference between a
+# secret being in a process for five minutes after its last read and being
+# there until the process exits, where a core dump, a read of
+# /proc/<pid>/mem, swap or a crash report can still find it (issue 3944).
+#
+# A reap is one pass over the dict under the cache lock, so it is gated to
+# once per interval rather than run per access. 60 seconds is well inside
+# both TTL tiers, which bounds residency at ttl + 60 for any process doing
+# cache work or running a daemon idle loop.
+OBJECT_CACHE_REAP_INTERVAL = 60
+_OBJECT_CACHE_NEXT_REAP = 0.0
+
 
 def _object_cache_key(object_type: str, key: Any) -> tuple[str, str]:
     """Normalise a cache key to (object_type, str(key)).
@@ -283,12 +303,59 @@ OBJECT_CACHE_SIZE = Gauge(
     'database_object_cache_entries',
     'Static-object cache entries currently resident in this process.'
 )
+OBJECT_CACHE_EXPIRED_REAPED = Counter(
+    'database_object_cache_expired_reaped_total',
+    'Static-object cache entries reclaimed because their TTL had passed, '
+    'rather than on a read of their own key or under capacity pressure. '
+    'This is what bounds how long a cached value -- including a '
+    'secret-bearing one -- stays resident in a process.'
+)
 OBJECT_CACHE_CAPACITY_EVICTIONS = Counter(
     'database_object_cache_capacity_evictions_total',
     'Static-object cache entries dropped to stay under '
     'OBJECT_CACHE_MAX_ENTRIES. A sustained rate here means the working set '
     'no longer fits and the hit rate is suffering.'
 )
+
+
+def _reap_expired_object_cache_entries_locked(now: float) -> int:
+    """Drop every entry whose TTL has passed. The cache lock must be held.
+
+    Returns the number dropped. Not gated on time: the callers decide when a
+    reap is due, because one of them is a timer and the other is a daemon
+    going idle.
+    """
+    expired = [k for k, (expiry, _t, _m) in _OBJECT_CACHE.items()
+               if expiry <= now]
+    for cache_key in expired:
+        del _OBJECT_CACHE[cache_key]
+    return len(expired)
+
+
+def reap_expired_object_cache_entries(force: bool = False) -> int:
+    """Reclaim expired cache entries, at most once per reap interval.
+
+    This is what bounds residency rather than staleness: see
+    OBJECT_CACHE_REAP_INTERVAL. Called from the cache's own accessors, so
+    any process still reading or writing objects reaps, and from the daemon
+    idle loop, so a quiet daemon does too. With force, reaps regardless of
+    when the last one ran, which is for tests.
+
+    Returns the number of entries dropped.
+    """
+    global _OBJECT_CACHE_NEXT_REAP
+    now = time.monotonic()
+    with _OBJECT_CACHE_LOCK:
+        if not force and now < _OBJECT_CACHE_NEXT_REAP:
+            return 0
+        _OBJECT_CACHE_NEXT_REAP = now + OBJECT_CACHE_REAP_INTERVAL
+        dropped = _reap_expired_object_cache_entries_locked(now)
+        size = len(_OBJECT_CACHE)
+
+    OBJECT_CACHE_SIZE.set(size)
+    if dropped:
+        OBJECT_CACHE_EXPIRED_REAPED.inc(dropped)
+    return dropped
 
 
 def _object_cache_get(object_type: str, key: Any) -> Any:
@@ -317,6 +384,9 @@ def _object_cache_get(object_type: str, key: Any) -> Any:
                 size = len(_OBJECT_CACHE)
     if size is not None:
         OBJECT_CACHE_SIZE.set(size)
+    # Residency, not staleness: this read reclaimed at most its own key, and
+    # the interval gate makes the whole-cache pass rare.
+    reap_expired_object_cache_entries()
     if hit is not None:
         OBJECT_CACHE_HITS.labels(object_type=object_type).inc()
         return hit
@@ -370,10 +440,7 @@ def _object_cache_put(object_type: str, key: Any, model: Any, ttl: int) -> None:
             # put, which is precisely what the amortisation exists to avoid.
             target = int(cap * OBJECT_CACHE_TRIM_TARGET)
 
-            for cache_key in [k for k, (expiry, _t, _m) in
-                              _OBJECT_CACHE.items() if expiry <= now]:
-                del _OBJECT_CACHE[cache_key]
-                dropped += 1
+            dropped += _reap_expired_object_cache_entries_locked(now)
 
             if len(_OBJECT_CACHE) > target:
                 # ttl is never 0 here: put returns early for ttl <= 0, so
@@ -390,6 +457,7 @@ def _object_cache_put(object_type: str, key: Any, model: Any, ttl: int) -> None:
     OBJECT_CACHE_SIZE.set(size)
     if dropped:
         OBJECT_CACHE_CAPACITY_EVICTIONS.inc(dropped)
+    reap_expired_object_cache_entries()
 
 
 def _object_cache_evict(object_type: str, key: Any) -> None:

@@ -137,12 +137,32 @@ tier. Two of the immutable tier's members do have an `update_<type>`
 (`update_ipam`, `update_network_interface`); both evict, which is what keeps
 the tier correct, so an updater added to a type in this tier must evict too.
 
-TTL bounds staleness, not residency. Expiry is lazy -- an entry is reclaimed
-only when its own key is read again -- so `OBJECT_CACHE_MAX_ENTRIES` (default
-20000) bounds how much a process retains. Without it the cache holds every
-object a process has ever read rather than its working set, because an object
-read once and never read again is never revisited, and a delete in another
-process evicts nothing here. On overflow expired entries go first, then the
+TTL bounds staleness. Residency has two separate bounds, because expiry is
+lazy -- a read reclaims only its own key. `OBJECT_CACHE_MAX_ENTRIES` (default
+20000) bounds how *much* a process retains, and a reap every
+`OBJECT_CACHE_REAP_INTERVAL` (60 s, a module constant in `mariadb.py`) bounds
+how *long*: one pass over the cache under its lock, dropping everything whose
+TTL has passed, counted in `database_object_cache_expired_reaped_total`. It
+runs from the cache's own accessors, so any process still reading or writing
+objects reaps, and from `Daemon.idle()`, so a quiet daemon does too.
+Residency is therefore the entry's TTL plus at most one interval, rather than
+the life of the process.
+
+That bound is load-bearing rather than tidiness, because some cached static
+values are secret-bearing: an `instance` carries `ssh_key` and `user_data`,
+and cloud-init user data routinely contains credentials. This is not an
+access-control question -- the cache is keyed by the object's own identity
+and every caller still authorises the model it gets back -- but a
+secret-lifetime one, for core dumps, `/proc/<pid>/mem`, swap and crash
+reporting. Excluding those two fields from the cached model was the other
+option and is worse: `Instance.external_view()` emits both, so every API
+read of an instance needs them and excluding them would add a database read
+to the hottest path in the API. See issue #3944.
+
+`OBJECT_CACHE_MAX_ENTRIES` is the other half of the bound. Without it the
+cache holds every object a process has ever read rather than its working set,
+because an object read once and never read again is never revisited, and a
+delete in another process evicts nothing here. On overflow expired entries go first, then the
 entries with the least remaining *fraction* of their own TTL.
 
 That fraction, rather than the absolute expiry stamp, is what lets the two
