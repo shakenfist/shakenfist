@@ -1425,6 +1425,13 @@ class MockMariaDB():
         """Mock implementation of mariadb.reserve_address()"""
         key = self._ipam_key(reservation.ipam_uuid, str(reservation.address))
         existing = self.ipam_reservations.get(key)
+        if existing == reservation:
+            # The same reserve arriving twice: a retried RPC whose first
+            # delivery committed. _direct_reserve_address() answers that
+            # with success rather than "in use" (issue #4987), so the mock
+            # does too.
+            self._trace(f'MockMariaDB.reserve_address({key}): redelivered')
+            return True
         if existing and not (
                 evict_halo and
                 existing.reservation_type == ReservationType.DELETION_HALO):
