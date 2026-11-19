@@ -183,6 +183,55 @@ below. When an ignore is resolved, delete both the
 - **Remove ignore when:** `pin-utils` no longer appears in
   `cargo tree`.
 
+### 7. `chrono` 0.4.45 unmaintained (RUSTSEC-2026-0543)
+
+- **Ignore rationale:** the advisory (published 18 November
+  2026, announced in chronotope/chrono#1768) marks every
+  `chrono` version unmaintained, and `cargo deny` reports "No
+  safe upgrade is available!". ryll does not use `chrono`
+  directly; it arrives through `dav-server` 0.11, the RFC
+  4918 server behind WebDAV folder sharing, which both `ryll`
+  and `shakenfist-spice-renderer` depend on. The latest
+  `dav-server` (0.12.0, 9 November 2026) still requires
+  `chrono ^0.4.44`, so bumping `dav-server` does not help.
+- **Attack surface:** this is in the shipped path: the
+  renderer's `webdav` feature is default-on. `dav-server`
+  uses `chrono` to format and parse WebDAV property and HTTP
+  dates for the guest's requests against a directory the
+  user chose to share. The advisory is about maintenance
+  status, not a known vulnerability. The exposure is that
+  a future bug in that date handling would get no upstream
+  fix.
+- **Action plan:**
+  1. Watch `dav-server` for a release that moves to `jiff`
+     or `time` (the advisory's recommended alternatives).
+     Renovate opens `dav-server` bumps for us; re-check
+     `cargo tree -i chrono` on each.
+  2. If upstream does not move, consider offering that
+     migration as a patch to `dav-server`.
+- **Remove ignore when:** `chrono` no longer appears in
+  `cargo tree`.
+
+### 8. `humantime` 2.4.0 unmaintained (RUSTSEC-2026-0542)
+
+- **Ignore rationale:** published with item 7. The advisory
+  says `humantime` is unmaintained because `chrono` is, and
+  covers every version; there is no safe upgrade. It reaches
+  us only through `console-subscriber` 0.5.0, the latest
+  release, which needs `humantime ^2.1.0` unconditionally.
+- **Attack surface:** effectively none. `console-subscriber`
+  is enabled only by ryll's diagnostic `tokio-console`
+  feature (`make build-tokio-console`), which release builds
+  leave out. The ignore exists because both scanners read
+  the whole lockfile rather than a feature resolution.
+- **Action plan:** the `tokio-console` feature is due to be
+  removed when the K1 hang investigation closes (see the
+  comment on the feature in `ryll/Cargo.toml`); that removal
+  retires this ignore. Failing that, a `console-subscriber`
+  release that drops `humantime`.
+- **Remove ignore when:** `humantime` no longer appears in
+  `cargo tree`.
+
 ## Also tracked: duplicate-version warnings
 
 `cargo deny check` currently reports ~45 duplicate-version
