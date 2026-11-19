@@ -1,7 +1,6 @@
 import ipaddress
 import json
 import logging
-import sys
 import time
 from unittest import mock
 from uuid import uuid4
@@ -34,7 +33,6 @@ class NetworksDeleteNoneTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -96,7 +94,6 @@ class NetworksDeleteAllTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -179,7 +176,6 @@ class NetworkDeleteEnqueueTaskTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -313,7 +309,6 @@ class NetworkDeleteAlreadyDeletedTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -379,7 +374,6 @@ class NetworkCreateBooleanDefaultsTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -471,7 +465,6 @@ class NetworkCreateFloatingOverlapTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -702,7 +695,6 @@ class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -904,7 +896,6 @@ class NetworkUnrouteAddressEndpointTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -1022,7 +1013,6 @@ class NetworkAddressEndpointTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 

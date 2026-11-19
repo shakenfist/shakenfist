@@ -367,6 +367,63 @@ A test which genuinely needs a large allocation should release it before
 it returns, rather than holding it on the test instance -- the instance
 is still alive when the sample is taken.
 
+### A test's log output is captured, and reported only if it fails
+
+`tox.ini` sets `SHAKENFIST_LOG_TO_STDOUT=1`, so
+`shakenfist_utilities.logs.setup()` installs a
+`logging.StreamHandler(sys.stdout)` on each module's logger. That runs
+at import time, so the handler holds the process's real stdout -- which
+in a stestr worker is also the subunit result stream. Every record a
+test emitted therefore went into that stream, out through the stestr
+parent's console and tox, and into the CI log: 82 MB for one run, and a
+test which logged heavily ran no faster than that console could be
+drained. One scheduler test took between 37 and 165 seconds on CI for
+1.2 seconds of work, and the `Sanity checks` job's runtime swung between
+6.5 and 10+ minutes with no code change behind it (issue #4991).
+
+`ShakenFistTestCase` now points every such handler -- stdout and
+stderr -- at an in-memory buffer for the duration of each test,
+restores the real stream afterwards, and attaches what was captured as a
+`log` detail only when the test did not pass. Details are transmitted on
+success as well, so attaching it unconditionally would send the same
+volume back the other way. `shakenfist/tests/logcapture.py` owns the
+mechanism.
+
+Three things follow for a test author:
+
+- **A test must not give an already-handled logger a second console
+  handler.** The capture redirects the handlers which existed when the
+  test started, so one added during it bypasses the capture, and one
+  added in a `setUp()` without a matching cleanup is inherited by every
+  test the worker runs after it -- each of which adds another. 45 lines
+  of `app.logger.addHandler(logging.StreamHandler(sys.stdout))` across
+  the API tests were doing exactly that: 104 tests in `test_auth.py`
+  emitted 8,939 copies of a few hundred records. The base class fails
+  the test which adds one. Register a cleanup that removes it:
+  `self.preserve_log_handlers('gunicorn.error')` restores a named
+  logger's handler list, and `logcapture.forget_logger()` drops the
+  handlers something else installed -- `Daemon.__init__()` calls
+  `logs.setup()`, for instance. The root logger is restored for every
+  test already, because the usual way to disturb it is not a deliberate
+  act: importing `shakenfist/client/ctl.py` calls
+  `logging.basicConfig()`, and the suite emitted 33,000 lines of stderr
+  that way. A logger which had *no* handler gaining its first one is not
+  reported: that is a module imported for the first time inside a test
+  calling `logs.setup()`, and failing whichever test the worker happened
+  to import it in would be a guard that depends on the suite's
+  partitioning.
+- **Nothing may hold a reference to the test instance after the test.**
+  testtools keeps a test's `addOnException()` handlers for the life of
+  the test object, so a bound method registered there leaves the
+  instance in a reference cycle and everything it allocated resident
+  until the cycle collector runs -- which the memory bound above then
+  charges to a later test. The capture's own handler is therefore a
+  closure over a list, not a method; see `logcapture.note_failure()`.
+- **Assert on log output with a handler of your own**, not by reading
+  stdout. `shakenfist/tests/external_api/test_request_logging.py` shows
+  the shape: a `logging.Handler` subclass which collects records, added
+  to the logger under test and removed on cleanup.
+
 ## Pre-commit Hooks
 
 The repository uses pre-commit hooks to validate code before commits:

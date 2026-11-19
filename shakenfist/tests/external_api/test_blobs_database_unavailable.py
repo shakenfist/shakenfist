@@ -10,7 +10,6 @@
 
 import json
 import logging
-import sys
 from unittest import mock
 
 from shakenfist.exceptions import DatabaseUnavailable
@@ -27,7 +26,6 @@ class BlobsEndpointDatabaseUnavailableTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 

@@ -1,7 +1,6 @@
 import base64
 import json
 import logging
-import sys
 import time
 from unittest import mock
 from uuid import uuid4
@@ -41,7 +40,6 @@ class AuthTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -194,7 +192,6 @@ class AuthDatabaseUnavailableTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -261,7 +258,6 @@ class AuthWithServiceKeyTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -358,7 +354,6 @@ class AuthWithLingeringInstance(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -460,7 +455,6 @@ class AuthWithLingeringNetwork(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -551,7 +545,6 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -961,7 +954,6 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -1215,7 +1207,6 @@ class AuthExpiredKeyTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -1290,7 +1281,6 @@ class AuthNonceMismatchTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -1338,7 +1328,6 @@ class AuthRejectionLoggingTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -1487,7 +1476,6 @@ class EventSecretsTestCase(base.ShakenFistTestCase):
         external_api.app.testing = True
         external_api.app.debug = False
 
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
@@ -1695,7 +1683,6 @@ class ReservedKeyPrefixTestCase(base.ShakenFistTestCase):
         external_api.TESTING = True
         external_api.app.testing = True
         external_api.app.debug = False
-        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
         external_api.app.logger.setLevel(logging.DEBUG)
         logging.root.setLevel(logging.DEBUG)
 
