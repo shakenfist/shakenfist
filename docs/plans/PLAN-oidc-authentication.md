@@ -1380,7 +1380,7 @@ not land anywhere else.
 | 3. OIDC discovery | shakenfist | [PLAN-oidc-authentication-phase-03-discovery.md](PLAN-oidc-authentication-phase-03-discovery.md) | Complete | `d884dd56c1` (#4891) |
 | 4. Minting the entitled set of credentials at login | shakenfist | [PLAN-oidc-authentication-phase-04-credential-set.md](PLAN-oidc-authentication-phase-04-credential-set.md) | Complete | `666cff3d9a` (#4913) |
 | 5. Admin as a claim | shakenfist | TBD | Abandoned | — |
-| 6. Serving namespace key metadata (#3672) | shakenfist, client-python | [PLAN-oidc-authentication-phase-06-key-metadata.md](PLAN-oidc-authentication-phase-06-key-metadata.md) | In progress | — |
+| 6. Serving namespace key metadata (#3672) | shakenfist, client-python | [PLAN-oidc-authentication-phase-06-key-metadata.md](PLAN-oidc-authentication-phase-06-key-metadata.md) | Complete | shakenfist `e37a8f8931` (#4975), `683b591c6b` (#4979); client-python `1bd5d3c` (#454). The second shakenfist pull request carries review rounds two and three, which arrived while the first was already in the merge queue |
 | 7. Interactive CLI flows, the credential set and the token cache | client-python | TBD | Not started | — |
 | 8. Worked operator examples for Keycloak and Authentik | shakenfist | TBD | Not started | — |
 | 9. Functional coverage against a containerised IdP | shakenfist | TBD | Not started | — |
