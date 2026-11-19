@@ -4949,6 +4949,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-request-the-host-cannot-answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A request the host cannot answer
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6473,6 +6484,34 @@
     
   
     Multi-extent VMDK output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-http-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming image input over HTTP and HTTPS
   
 
     
@@ -16120,6 +16159,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-request-the-host-cannot-answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A request the host cannot answer
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -16461,7 +16511,11 @@ provides a modular architecture with:
  (never <code>static</code>) plus the two executor service sectors (one shared
  RMW bounce — safe because all call-table I/O is synchronous and
  steps execute serially — and a fill-synthesis sector). Barrier
- policy: <code>Ordering</code> is a no-op (issue order is completion order),
+ policy: <code>Ordering</code> is a no-op (issue order is completion order,
+ because the guest waits for each request without a deadline and the
+ host completes every request it can read, with an error status when
+ it cannot serve it — see "A request the host cannot answer" below
+ for the one case that is not completed, which hangs the guest),
  <code>Durability</code> fsyncs where the capability exists and degrades to
  <code>Ordering</code> elsewhere (matching commit/rebase's no-fsync
  output-device reality). Host-unit-tested against a mock <code>DeviceIo</code>
@@ -17025,6 +17079,40 @@ micro-architecture-specific gadgets. Narrowing it is possible: the
 identifying leaves (<code>0x1</code> EAX, and the brand string in <code>0x80000002</code> to
 <code>0x80000004</code>) could be cleared while keeping <code>0x80000001</code> EDX.LM, which
 is the only bit KVM needs here.</p>
+<h2 id="a-request-the-host-cannot-answer">A request the host cannot answer<a class="headerlink" href="#a-request-the-host-cannot-answer" title="Permanent link">&para;</a></h2>
+<p>The guest waits for a virtio request to complete with no deadline of
+its own. That is the right wait -- a bound cannot be derived, because
+the guest cannot tell a host that is slow from one that is stuck, and
+a request cannot be cancelled once it is on the ring, so giving up
+would leave the host writing into the fixed DMA buffers the next
+request reuses. It does mean the host must answer every request,
+including the ones it cannot serve, and in one case it does not.</p>
+<p><strong>A request the host cannot serve is completed with an error status.</strong>
+A backing store that fails a read, a write or a flush -- <code>EIO</code>, a file
+that shrank, a full filesystem -- produces a used-ring entry carrying
+<code>VIRTIO_BLK_S_IOERR</code>. The guest's operation then fails and reports the
+sector it was on, the host adds the errno it recorded, and the process
+exits non-zero. This is the ordinary failure path and it is tested
+both as a unit and end to end with an injected <code>EIO</code>.</p>
+<p><strong>A request the host cannot <em>read</em> is not completed at all.</strong> If the
+descriptor chain is malformed, a descriptor names an address outside
+guest memory, or a guest-memory access fails, the device has no status
+descriptor it can trust and propagates the error instead. On the
+ioeventfd path -- the normal one -- the I/O thread can only log it and
+carry on: nothing reaches the used ring, the guest's wait never ends,
+and the vCPU thread is inside <code>KVM_RUN</code> while the guest spins, so the
+run cannot be failed from either side. It takes a <code>SIGINT</code>. The
+vCPU-exit fallback (<code>process_queue_for_device</code>) propagates to the run
+loop and does fail the run, so the behaviour depends on which path is
+active.</p>
+<p>Every way to reach the second case is an instar bug rather than
+anything a hostile image can ask for: the guest builds its own
+descriptor chains, and the addresses in them come from the guest's own
+fixed DMA pool. Image data cannot steer it. That is why it is recorded
+here rather than fixed -- the fix is to carry the failure out to the
+run loop and terminate the run, which needs shared fatal state and a
+way to kick the vCPU out of <code>KVM_RUN</code>, and that is tracked as its own
+issue.</p>
 
 
 

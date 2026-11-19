@@ -6433,6 +6433,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-http-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming image input over HTTP and HTTPS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16280,6 +16308,13 @@ maintained document, so it may state things a later phase overturned.</p>
 <td>Write VMDK images split across many extent files, matching qemu-img, at any virtual size qemu-img supports, and lift the device-slot ceiling that caps multi-extent <em>reads</em> at 15 extents (about 30 GiB) today. The goals graph calls the prerequisite a multi-output-device call table; measurement says simultaneous output devices cannot reach parity (16 slots, 2 GiB per extent) and would roughly double the virtio statics in the core <code>.bss</code> region that has twice forced <code>OPERATION_LOAD_ADDR</code> to move, so open question 1 proposes sequential extent rotation instead. Closes the last leaf of the 2026 <em>VHD/VMDK writers done</em> goal</td>
 <td>In progress</td>
 <td><a href="/components/instar/plans/PLAN-multi-extent-vmdk-phase-01-pin/">1: pin</a> ✓, <a href="/components/instar/plans/PLAN-multi-extent-vmdk-phase-02-fixtures/">2: fixtures</a>, 3: read ceiling, 4: descriptor, 5: flat create, 6: ABI, 7: core, 8: VMM, 9: grain tables, 10: sparse create, 11: convert, 12: measure, 13: check/resize, 14: baselines, 15: integration, 16: fuzz, 17: docs, 18: push audit (open questions 1 and 2 resolved 2026-11-16 -- sequential extent rotation, and the read-side ceiling fixed here as phase 3; phase 1 extends the existing 80-build qemu sweep rather than starting one, which is what its survey corrected in the master plan; phase 2 stores only split-sparse fixtures, because a split-flat extent is a full-length sparse file and git-LFS stores holes as bytes, and found a 26-extent real-world split-sparse image already in the corpus with 3.96 GiB extents, and fixed three shipping <code>info</code> divergences on multi-file VMDK -- the allocation sum, the child order and the version gate the children array bypassed -- which no fixture could expose until <code>vmdk-multi-flat</code> was un-flagged and given baselines)</td>
+</tr>
+<tr>
+<td>2026-11-18</td>
+<td><a href="/components/instar/plans/PLAN-http-input/">Streaming image input over HTTP and HTTPS</a></td>
+<td>Let read-only operations take an <code>https://</code> input and start work before the transfer finishes, fetching only the bytes the image's own metadata asks for, with every line of network, TLS and URL code in a separate confined <code>instar-fetch</code> process that never holds a <code>/dev/kvm</code> descriptor and speaks a fixed-layout, offset-addressed byte protocol over a Unix socket. Measurement says the buffer is the easy part: the guest's I/O wait is a 100M-iteration spin budget (1.3 s here) that reports a slow read as a hard failure, queue depth is one so 10 GiB at 64 KiB is about 164,000 serialised round trips, and an HTTP client in the VMM would put a TLS stack and a redirect follower in the process holding the invoking user's whole ambient authority. The partition is cheap because instar already assumes its input bytes are hostile, so a confined fetcher's compromise degrades to the baseline assumption. Phase 1 is a bug fix rather than enabling work: measurement on 2026-11-18 reproduced the timeout from one injected slow host read, which already fails a local convert with no network in sight and is now filed as #923 with its reporting half as #924; remote output, authentication and image-supplied URLs are refused by name</td>
+<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-http-input-phase-01-guest-wait/">1: guest wait</a>, 2: protocol, 3: backing, 4: confinement, 5: HTTP, 6: prefetch, 7: scope, 8: failures, 9: tests, 10: docs, 11: push audit (all nine open questions resolved 2026-11-18 -- a plain framed protocol over SEQPACKET rather than a virtqueue over shared memory, which would hand the untrusted fetcher a writable mapping the VMM dereferences; cache and readahead in the fetcher; ureq with rustls so the packages gain no C TLS stack; no credentials and no Range fallback without an explicit --spool. Phase 1 planned 2026-11-18: its survey corrected the master plan's claim that the deadline should move to the host -- nothing in the VMM times a request and neither thread servicing a virtio queue could, since both block inside the synchronous read, so the guest waits indefinitely and there is no host deadline; the phase also found the timeout is the only place a call-table I/O outlives its caller, which docs/guest-architecture.md relies on not happening)</td>
 </tr>
 </tbody>
 </table>

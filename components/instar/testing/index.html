@@ -5173,6 +5173,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#slow-host-read-tests-test_slow_host_readpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slow Host Read Tests (test_slow_host_read.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failed-host-read-tests-test_luks_probe_read_failurepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failed Host Read Tests (test_luks_probe_read_failure.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -6612,6 +6634,34 @@
     
   
     Multi-extent VMDK output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-http-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming image input over HTTP and HTTPS
   
 
     
@@ -16343,6 +16393,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#slow-host-read-tests-test_slow_host_readpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slow Host Read Tests (test_slow_host_read.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failed-host-read-tests-test_luks_probe_read_failurepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failed Host Read Tests (test_luks_probe_read_failure.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -16495,8 +16567,9 @@ selection their module happens to fall in is a requirement waiting to
 go quiet, and moving the class would unset it with nothing red. A
 base-image bump that dropped ZSTD support would otherwise return both
 tests to skipping on every run, which is the state #813 found them in. This is the same bargain <code>INSTAR_REQUIRE_LIBVHDI</code>
-strikes for the libvhdi oracle, and <code>INSTAR_REQUIRE_LIBYAL</code> for the
-fuzzer's.</p>
+strikes for the libvhdi oracle, <code>INSTAR_REQUIRE_LIBYAL</code> for the
+fuzzer's, and <code>INSTAR_REQUIRE_STRACE</code> for the latency injection in
+<code>TestSlowHostRead</code> (below).</p>
 <p><strong>A <code>_run_tool</code> timeout is a hang guard, not a performance
 assertion.</strong> The budget (<code>QEMU_TOOL_TIMEOUT</code>, 300s) exists so a wedged
 <code>qemu-img</code> cannot block a stestr worker forever; it is not a claim
@@ -16797,6 +16870,80 @@ ones that must stay byte-identical to them.</p>
 - Backing file references are detected but not followed
 - External data file references are reported but not read
 - VMDK descriptor extent paths are not accessed</p>
+<h3 id="slow-host-read-tests-test_slow_host_readpy">Slow Host Read Tests (<code>test_slow_host_read.py</code>)<a class="headerlink" href="#slow-host-read-tests-test_slow_host_readpy" title="Permanent link">&para;</a></h3>
+<p>A guest operation reads every byte through the host, and waits on the
+host while it does. A read that takes seconds -- a loaded runner, a
+network filesystem, a backing store that is not a local disk -- must
+therefore make an operation slow and not make it fail. The test
+injects a three second delay into one host read with
+<code>strace -e inject=read:delay_enter=...:when=N</code> and requires the
+conversion to exit 0 with bytes identical to an undelayed run.</p>
+<p>Three things about it are worth knowing before changing it.</p>
+<p><strong>The injection index is derived, never hardcoded.</strong> <code>when=N</code> counts
+a syscall's invocations <em>per thread</em>, so the number names a different
+read as soon as anything changes how many reads the VMM does before
+the guest starts. The test traces the very conversion it is about to
+run, finds the thread servicing the virtio queue (the one reading an
+order of magnitude more than anything else in the process, because it
+reads once per guest request), and picks a data read in the middle of
+that thread's sequence, past the read count of every other thread so
+that no other thread can reach the index.</p>
+<p><strong>The test asserts the delay landed.</strong> Everything else it checks
+passes just as well with no injection at all: an undelayed conversion
+also exits 0 and also produces identical bytes. So it reads strace's
+own per-syscall timing (<code>-T</code>) back and insists that the read at the
+derived index took most of the injected delay, and that it was a data
+read rather than a queue notification. An injection that silently
+stopped working is the most likely way for this test to rot, and that
+assertion is what stops it.</p>
+<p><strong>The capability is probed, not the binary.</strong> strace can be installed
+and unable to inject: <code>-e inject=</code> and its <code>delay_enter</code> are not in
+every build old enough to be packaged somewhere, a container that
+cannot <code>ptrace</code> traces nothing at all, and <code>yama/ptrace_scope</code> of 2 or
+more refuses an unprivileged tracer. So the probe delays a real
+syscall in <code>/bin/true</code> and insists on seeing the delay. A host that
+fails the probe skips, unless <code>INSTAR_REQUIRE_STRACE</code> is set, which
+the <code>integration-core</code> job does because the devcontainer installs
+strace -- dropping the package turns that job red rather than quietly
+green.</p>
+<p>The probe, and the parser that reads an injection back out of a trace,
+live in <code>tests/strace_injection.py</code> because the test below shares
+them.</p>
+<p><strong>Triaging a red from either test.</strong> Both derive the index from a
+baseline run and then inject into a second run, so anything that
+changes the read sequence between the two -- scheduling on a loaded
+runner, a buffering difference, whether an ioeventfd could be
+registered -- moves the read the index names. That is deliberately a
+red rather than a skip: the alternative is a test that stops
+exercising anything and still passes. It is also why the first thing
+to read is <em>which</em> assertion failed. A failure from the
+injection-landed assertion ("strace was asked to...", "the injected
+run read...") is index drift, and re-running is the right response. A
+failure from the behavioural assertion -- a delayed conversion that
+exited non-zero, or a failed probe read that converted anyway -- is
+the defect these tests exist for, and re-running it is not.</p>
+<h3 id="failed-host-read-tests-test_luks_probe_read_failurepy">Failed Host Read Tests (<code>test_luks_probe_read_failure.py</code>)<a class="headerlink" href="#failed-host-read-tests-test_luks_probe_read_failurepy" title="Permanent link">&para;</a></h3>
+<p>The sibling of the test above, and the same machinery pointed the
+other way: <code>strace -e inject=read:error=EIO:when=N</code> fails one host
+read instead of delaying it. What it guards is <code>convert</code>'s choice
+between a LUKS container's two payload shapes, which it makes by
+reading the first payload sector and looking for QCOW2 magic. A read
+failure there must not read as "no inner format", because the
+conversion would then write a decrypted QCOW2 out as a flat payload
+and exit 0.</p>
+<p>Two differences from the slow-read test matter if you change either.</p>
+<p><strong>The index is derived from an offset, not from a thread's busiest
+stretch.</strong> strace is run with <code>-P</code> on the image path, so only reads of
+the image are traced -- and therefore counted by <code>when=</code>, which keeps
+instar's own binaries and the eventfd queue notifications out of the
+numbering. The test reads the payload offset out of the fixture's own
+LUKS v1 header and injects into the first read of that offset, which
+is the probe's.</p>
+<p><strong>One read must fail where the next identical read succeeds.</strong> The
+flat payload path re-reads the sector the probe read, and treats a
+failure there as fatal, so a hard error on every read of that offset
+is reported correctly and proves nothing. <code>when=N</code> failing exactly one
+invocation is what reproduces the transient failure the defect needed.</p>
 <h2 id="running-tests">Running Tests<a class="headerlink" href="#running-tests" title="Permanent link">&para;</a></h2>
 <h3 id="make-targets">Make Targets<a class="headerlink" href="#make-targets" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Create Python virtual environment (first time only). The venv sees</span>
@@ -16901,17 +17048,28 @@ spread is still this narrow; a fresh measurement is being taken on</p>
 <h1 id="543-and-is-not-included-here">543 and is not included here.<a class="headerlink" href="#543-and-is-not-included-here" title="Permanent link">&para;</a></h1>
 <p><strong>Classify before you attribute.</strong> Running two matrix containers at
 once — or any other heavy job on the host — starves the suite, and the
-resulting failures do not look like resource problems. The large
-<code>test_convert</code> re-encodes fail under load with
-<code>Error: "convert operation failed"</code> and, from <code>compare</code>, a read error
-(before #807, <code>Content mismatch at offset 0!</code>), which reads as data
-corruption, and they abort early (~26s) rather than
-timing out at the ~110s they need when passing. Nine such failures
-appeared across the 2026-08-09 matrix inventory and <strong>every one passed
-on an idle host</strong>. A failure counts as a divergence only once it
-reproduces with the host otherwise quiet; <code>--select</code> gives you that
-replay cheaply. Same discipline as the differential-fuzzing
+resulting failures do not look like resource problems. Nine such
+failures appeared across the 2026-08-09 matrix inventory and <strong>every
+one passed on an idle host</strong>. A failure counts as a divergence only
+once it reproduces with the host otherwise quiet; <code>--select</code> gives
+you that replay cheaply. Same discipline as the differential-fuzzing
 spurious-divergence rule.</p>
+<p>The signature that cluster used to carry is gone, and the history
+matters when reading an old log. Large <code>test_convert</code> re-encodes
+failed under load with <code>Error: "convert operation failed"</code>, aborting
+early (~26s) rather than timing out at the ~110s they need when
+passing, and from <code>compare</code> a read error (before #807,
+<code>Content mismatch at offset 0!</code>) that read as data corruption. Both
+came from the guest giving up on a host read it had waited a fixed
+number of spin iterations for — about 1.3 s on a modern host, which
+a loaded runner reaches with nothing wrong. The guest now waits for
+the host however long it takes, so contention alone no longer
+produces either message. In a current tree they mean something else:
+<code>&lt;op&gt; operation failed</code> — <code>convert operation failed</code>,
+<code>dd operation failed</code> — is a guest failure the host captured no
+reason for, and a genuine I/O error names the image and the offset
+it stopped at. Treat either as a real defect rather than replaying
+it for load.</p>
 <p>The design is <strong>tests from the source tree, binary from the package</strong>:
 the whole <code>tests/</code> tree is copied into the container and driven by
 <code>stestr</code>, while the harness is pointed at the installed
@@ -20124,14 +20282,17 @@ commit anything.</p>
 <a id="__codelineno-27-21" name="__codelineno-27-21" href="#__codelineno-27-21"></a><span class="c1"># Clean test artifacts</span>
 <a id="__codelineno-27-22" name="__codelineno-27-22" href="#__codelineno-27-22"></a>make<span class="w"> </span>clean-tests
 </code></pre></div>
-<p><strong>Test structure:</strong>
-- <code>tests/manifest.json</code> - Defines test images and their safety levels
-- <code>tests/test_info_safe.py</code> - Tests against known-safe images
-- <code>tests/test_info_malicious.py</code> - Tests against malicious images using expected overrides
-- <code>tests/test_check_formats.py</code> - Tests for check operation
+<p><strong>Test structure:</strong> a guide to the modules a reader is most likely to
+want, not an inventory -- <code>ls tests/test_*.py</code> lists a good many more,
+and this section has never named all of them.</p>
+<ul>
+<li><code>tests/manifest.json</code> - Defines test images and their safety levels</li>
+<li><code>tests/test_info_safe.py</code> - Tests against known-safe images</li>
+<li><code>tests/test_info_malicious.py</code> - Tests against malicious images using expected overrides</li>
+<li><code>tests/test_check_formats.py</code> - Tests for check operation
   (format detection, corruption, validation, incompatible
-  feature bits, ZSTD compression, extended L2 entries, ZSTD
-  + backing chains, extended L2 + compressed clusters,
+  feature bits, ZSTD compression, extended L2 entries, ZSTD</li>
+<li>backing chains, extended L2 + compressed clusters,
   refcount widths 1-64 bit, compressed cluster leak
   detection, large cluster sizes 256K-2MB, VMDK GD/GT
   validation with overlap/compressed grain marker/RGD checks,
@@ -20139,18 +20300,18 @@ commit anything.</p>
   VHDX file identifier/region table cross-check/fragmentation,
   QCOW2 snapshot detection, TestExtendedL2Subclusters for
   partial subcluster allocation with Normal/Zero/Unallocated
-  states)
-- <code>tests/test_check_repair.py</code> - Tests for <code>check --repair</code>
+  states)</li>
+<li><code>tests/test_check_repair.py</code> - Tests for <code>check --repair</code>
   (leaks/all tiers repair the corrupt-fixture matrix to
   <code>qemu-img check</code>-clean with guest data preserved; the
   snapshot/compression/corrupt-bit refuse paths stay
   byte-identical; the overlapping case is a safe partial repair;
   plus <code>--repair</code>+<code>--chain</code> rejection, clean-image no-op,
-  qcow2-only handling, and idempotence)
-- <code>tests/test_compare.py</code> - Tests for compare operation
+  qcow2-only handling, and idempotence)</li>
+<li><code>tests/test_compare.py</code> - Tests for compare operation
   (raw-vs-raw, QCOW2-vs-raw, QCOW2-vs-QCOW2, compressed
-  QCOW2, backing chains, LUKS-in-QCOW2 decryption)
-- <code>tests/test_convert.py</code> - Tests for convert operation
+  QCOW2, backing chains, LUKS-in-QCOW2 decryption)</li>
+<li><code>tests/test_convert.py</code> - Tests for convert operation
   (QCOW2-to-raw, raw-to-QCOW2, QCOW2 re-encoding,
   compressed output with <code>-c</code> flag, backing chains,
   round-trip validation, errors, large cluster sizes up to
@@ -20160,36 +20321,48 @@ commit anything.</p>
   LUKS v2 with Argon2id KDF and --max-guest-memory,
   LUKS-wrapping-QCOW2 conversion, snapshot extraction,
   extended L2 output with <code>--extended-l2</code>,
-  LUKS-encrypted output with <code>--luks-encrypt-passphrase</code>)
-- <code>tests/test_adversarial.py</code> - Adversarial image tests: compression bombs, circular
+  LUKS-encrypted output with <code>--luks-encrypt-passphrase</code>)</li>
+<li><code>tests/test_adversarial.py</code> - Adversarial image tests: compression bombs, circular
   backing chains, deep chains, integer overflow triggers, refcount order edges,
   oversized virtual sizes, VMDK grain size boundaries, VHDX conflicting dual
   headers, VHD/VHDX BAT beyond EOF, polyglot files (QCOW2+VMDK, QCOW2+ELF),
   truncated headers (QCOW2, VMDK, VHD), VMDK descriptor attacks (null bytes,
   multi-extent, huge size). Uses <code>run_adversarial()</code> helper with timeout/memory/
-  signal enforcement.
-- <code>tests/test_security.py</code> - Security feature detection tests (backing files,
+  signal enforcement.</li>
+<li><code>tests/test_security.py</code> - Security feature detection tests (backing files,
   external data files, VMDK descriptors, raw format validation, backing chain
   security) and CVE reproduction tests (CVE-2024-32498 external data file,
   CVE-2015-5163 backing file traversal, CVE-2022-47951 VMDK descriptor,
   CVE-2015-5162 resource exhaustion, CVE-2014-0223 L1 integer overflow,
   CVE-2024-4467 json:{} format confusion). 19 CVE tests verify all 6 CVEs
-  are mitigated.
-- <code>tests/test_oslo_crossval.py</code> - Cross-validation against oslo.utils
+  are mitigated.</li>
+<li><code>tests/test_oslo_crossval.py</code> - Cross-validation against oslo.utils
   format_inspector (format detection, safety checks, virtual size).
-  Skips if oslo.utils is not installed.
-- <code>tests/test_snapshot.py</code> - Integration tests for the <code>instar snapshot</code>
+  Skips if oslo.utils is not installed.</li>
+<li><code>tests/test_snapshot.py</code> - Integration tests for the <code>instar snapshot</code>
   subcommand: 12-image list matrix vs cross-version baselines,
   12 JSON golden comparisons with structural cross-check, mutation
   round-trips (create/delete/apply) with <code>qemu-img check</code> post-op
   assertions, error paths and qcow2-only enforcement, empty-table
-  behaviour. JSON goldens in <code>tests/golden/snapshot-list/</code>.
-- <code>tests/test_bench.py</code> - Integration tests for the <code>instar bench</code>
+  behaviour. JSON goldens in <code>tests/golden/snapshot-list/</code>.</li>
+<li><code>tests/test_slow_host_read.py</code> - A host read delayed by three
+  seconds must make a conversion slow and not make it fail
+  (<code>strace -e inject=read:delay_enter=</code>); see "Slow Host Read Tests"
+  above</li>
+<li><code>tests/test_luks_probe_read_failure.py</code> - A failed read of the
+  first payload sector must fail the conversion rather than read as
+  "no inner format" (<code>strace -e inject=read:error=EIO</code>); see "Failed
+  Host Read Tests" above</li>
+<li><code>tests/strace_injection.py</code> - The shared syscall-injection rig for
+  the two modules above: the capability probe, the per-thread index
+  derivation and the did-it-land parsers</li>
+<li><code>tests/test_bench.py</code> - Integration tests for the <code>instar bench</code>
   subcommand (62 tests): read/write request scheduling, host-side
   validation matrix, the qcow2 write-envelope gates, <code>--output json</code>
   schema validation, human-output byte-parity with <code>qemu-img bench</code>,
-  and the <code>KNOWN_BENCH_DIVERGENCES</code> registry.
-- <code>tests/expected_outputs/</code> - Expected output files for malicious images</p>
+  and the <code>KNOWN_BENCH_DIVERGENCES</code> registry.</li>
+<li><code>tests/expected_outputs/</code> - Expected output files for malicious images</li>
+</ul>
 <p><strong>Adding new test images:</strong></p>
 <p>Use the <code>/instar-add-test-image</code> skill for guided assistance, or manually:</p>
 <ol>
