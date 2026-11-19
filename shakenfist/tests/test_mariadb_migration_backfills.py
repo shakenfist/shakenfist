@@ -455,17 +455,36 @@ class NetworkInterfacesBackfillIsBatchedTestCase(base.ShakenFistTestCase):
         self.assertIn('LEFT JOIN object_states s', args[3])
         self.assertIn('ni.uuid >= :cursor_from', args[3])
         self.assertIn('ni.uuid <= :cursor_to', args[3])
+        # The "not done yet" predicate, without which a retry rewrites
+        # every row the previous run already did.
+        self.assertIn('ni.active IS NULL', args[3])
+        # ``network_interfaces.uuid`` is undashed CHAR(32) text, so
+        # stripping the dashes off the state row's object key is the
+        # whole of the conversion. HEX() on top of it made the join
+        # match nothing, which is not a shape any other assertion here
+        # can see (issue 4988).
+        self.assertIn("REPLACE(s.object_uuid, '-', '') = ni.uuid", args[3])
+        self.assertNotIn('HEX(', args[3])
+        # object_states.object_type is an ENUM which SQLAlchemy stores
+        # by member name, so the literal is the name.
+        self.assertIn("s.object_type = 'INTERFACE'", args[3])
+        mock_set_version.assert_called_once_with(
+            engine, 'network_interfaces', 3)
 
     @mock.patch('shakenfist.mariadb._set_table_version')
     @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
-    def test_a_failed_backfill_still_lands_the_constraint(
+    def test_a_failed_backfill_does_not_advance_the_version(
             self, mock_get_version, mock_set_version):
-        """Deliberately unchanged: this one warns and carries on.
+        """A constraint over an unfilled ``active`` holds nothing.
 
-        The new UNIQUE constraint is correct whether or not ``active``
-        was filled -- NULLs do not collide -- so the pre-existing
-        behaviour of logging the failure and continuing is kept rather
-        than turned into an aborted migration.
+        NULLs do not collide, so a UNIQUE constraint on (macaddr,
+        active, network_uuid) landed over a column the backfill did not
+        fill is inert for every row which was already there -- and a
+        later step which repairs rows it can see as live does not see
+        them either (issue 4988). So the failure aborts the migration
+        instead: the version stays at 2, the global UNIQUE on macaddr
+        the cluster already had is not dropped, and the next
+        ``ensure-mariadb-schema`` run retries.
         """
         conn = _MockConnection([_MockResult() for _ in range(4)])
         engine = _MockEngine(conn)
@@ -473,12 +492,15 @@ class NetworkInterfacesBackfillIsBatchedTestCase(base.ShakenFistTestCase):
         with mock.patch('shakenfist.mariadb._migration_backfill_batched',
                         side_effect=OperationalError(
                             'UPDATE', {}, Exception('lock wait timeout'))):
-            result = mariadb._ensure_network_interfaces_schema(engine)
+            self.assertRaises(
+                OperationalError,
+                mariadb._ensure_network_interfaces_schema, engine)
 
-        self.assertEqual(3, result['end_version'])
-        self.assertIn(
-            'uq_network_interfaces_macaddr_active_network',
-            ' '.join(sql for sql, _ in conn.calls))
+        mock_set_version.assert_not_called()
+        statements = ' '.join(sql for sql, _ in conn.calls)
+        self.assertNotIn(
+            'uq_network_interfaces_macaddr_active_network', statements)
+        self.assertNotIn('DROP CONSTRAINT', statements)
 
 
 class MigrationBackfillBatchSizeTestCase(base.ShakenFistTestCase):

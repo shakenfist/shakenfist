@@ -482,6 +482,33 @@ though no functional failure. The migration is a single online
 `CREATE INDEX` (MariaDB `ALGORITHM=INPLACE`), so it does not block writes and
 is quick even on a large table.
 
+#### network_interfaces v2 to v3
+
+The v3 migration adds an `active` column, fills it from `object_states`
+(`TRUE` for every interface which is not deleted, `NULL` for the ones
+which are), and replaces the global `UNIQUE (macaddr)` with
+`UNIQUE (macaddr, active, network_uuid)`. The point of the `NULL` is
+that NULLs do not collide in a MariaDB unique index, so a soft-deleted
+interface keeps its row for audit without reserving its MAC until the
+[deleted-object sweep](database.md#the-deleted-object-sweep) reaps it.
+
+That also means a constraint landed over a column the backfill did not
+fill would hold nothing at all, so a backfill which fails stops the
+step rather than logging and carrying on: the table stays at version 2
+with the global `UNIQUE (macaddr)` it already had, which blocks MAC
+reuse for the length of the cleaner delay but is otherwise the
+behaviour of the release you are upgrading from. Re-run `sf-ctl
+ensure-mariadb-schema` to finish it; the backfill only looks at rows
+which are still `NULL`, so a re-run costs the rows the failed run did
+not reach and no more.
+
+A cluster which ran an earlier form of this step has its interfaces
+marked `active` whether they were deleted or not, because the backfill's
+join never matched a state row. Nothing needs to be done about it: the
+affected rows are soft-deleted interfaces, each of which holds its MAC
+until the deleted-object sweep hard-deletes it, which is what the
+release before v3 did with every MAC anyway.
+
 ### Database service architecture
 
 Only the database node has direct access to MariaDB credentials. All other
