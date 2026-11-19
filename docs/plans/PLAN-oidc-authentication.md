@@ -778,6 +778,24 @@ Scope boundaries:
     the life of a credential the server considers dead
     undoes the one thing the nonce buys.
 
+    **Narrowed by phase 7's planning survey (2026-11-19).**
+    Two parts of the question as written no longer describe
+    anything that can happen. There is no OIDC refresh token
+    to cache: phase 0's answer to question 13 means the
+    client caches namespace keys and the access tokens
+    minted from them, and an identity token is spent at the
+    exchange. And `~/.shakenfist/oidc-cache` cannot exist,
+    because `~/.shakenfist` is a file -- one of the client's
+    four configuration sources, which it expands and parses
+    as JSON -- so a directory of that name would collide
+    with the configuration every existing user has. What
+    survives is the substance: the format, the file mode and
+    the invalidation rules, which phase 7's plan decides,
+    along with where the cache sits in the client's
+    credential precedence. That last part was not in the
+    question at all and is the decision most likely to be
+    argued with.
+
 11. **Migration of existing namespace keys.** The
     rename to "service account tokens" is mostly
     cosmetic — keys keep working. But the user-facing
@@ -1381,7 +1399,7 @@ not land anywhere else.
 | 4. Minting the entitled set of credentials at login | shakenfist | [PLAN-oidc-authentication-phase-04-credential-set.md](PLAN-oidc-authentication-phase-04-credential-set.md) | Complete | `666cff3d9a` (#4913) |
 | 5. Admin as a claim | shakenfist | TBD | Abandoned | — |
 | 6. Serving namespace key metadata (#3672) | shakenfist, client-python | [PLAN-oidc-authentication-phase-06-key-metadata.md](PLAN-oidc-authentication-phase-06-key-metadata.md) | Complete | shakenfist `e37a8f8931` (#4975), `683b591c6b` (#4979); client-python `1bd5d3c` (#454). The second shakenfist pull request carries review rounds two and three, which arrived while the first was already in the merge queue |
-| 7. Interactive CLI flows, the credential set and the token cache | client-python | TBD | Not started | — |
+| 7. Interactive CLI flows, the credential set and the token cache | client-python | [PLAN-oidc-authentication-phase-07-client-flows.md](https://github.com/shakenfist/client-python/blob/develop/docs/plans/PLAN-oidc-authentication-phase-07-client-flows.md) (in shakenfist/client-python, on its `develop`) | Proposed | — |
 | 8. Worked operator examples for Keycloak and Authentik | shakenfist | TBD | Not started | — |
 | 9. Functional coverage against a containerised IdP | shakenfist | TBD | Not started | — |
 | 10. Push audit | shakenfist | PLAN-oidc-authentication-phase-10-push-audit.md | Not started | — |
@@ -1578,13 +1596,23 @@ endpoints, and on phase 4, because what the flow returns is
 the set of credentials the person is entitled to.
 
 Open question 14's multiplicity lands here. The client holds
-one namespace key per namespace and presents the right one
-for each request, which is what the CI conductor's
-provisioning automation already does for a machine and what
-a person has no tooling for at all. So the cache holds a set
-rather than a credential, every member of it is a credential
-at rest, and choosing between them is this phase's problem
-rather than the server's.
+one namespace key per namespace, which is what the CI
+conductor's provisioning automation already does for a
+machine and what a person has no tooling for at all. So the
+cache holds a set rather than a credential, every member of
+it is a credential at rest, and choosing between them is
+this phase's problem rather than the server's.
+
+An earlier draft of this paragraph said the client presents
+the right key "for each request". Phase 7's planning survey
+found that it cannot: nothing in a request names the
+namespace it addresses. `Client` is built once with one
+credential (`client-python`'s `shakenfist_client/main.py`),
+and the `namespace=` keyword some verbs accept is an
+administrator's cross-namespace lookup gated on its own
+capability, not credential selection. The multiplicity is
+therefore resolved by an explicit current-namespace
+selection, which that phase's plan decides.
 
 **Phase 8 — worked operator examples.** Care is needed about
 what is genuinely new here. The operator guide already has
