@@ -41,6 +41,7 @@ from shakenfist.daemons.network import maintain
 from shakenfist.exceptions import DHCPProbeFailed
 from shakenfist.exceptions import MissingPrivExecSocket
 from shakenfist.exceptions import ProcessExecutionError
+from shakenfist.exceptions import UnknownPrivExecReplyException
 from shakenfist.managed_executables.dnsmasq import DnsMasq
 from shakenfist.network import network as network_module
 from shakenfist.network.network import Network
@@ -277,13 +278,14 @@ class _Responder:
 class RealSocketProbeTestCase(base.ShakenFistTestCase):
     """probe() over a real loopback socket, not a scripted one."""
 
-    def _probe_against(self, replies, timeout, interval=0.0, ignore=0):
+    def _probe_against(self, replies, timeout, interval=0.0, ignore=0,
+                       attempts=dhcp_probe.DEFAULT_ATTEMPTS):
         responder = _Responder(replies, interval=interval, ignore=ignore)
         self.addCleanup(responder.close)
         start = time.monotonic()
         result = dhcp_probe.probe(
             '127.0.0.1', '127.0.0.1', timeout=timeout,
-            server_port=responder.port)
+            server_port=responder.port, attempts=attempts)
         return result, time.monotonic() - start
 
     def test_an_ack_to_the_source_port_is_heard(self):
@@ -303,23 +305,28 @@ class RealSocketProbeTestCase(base.ShakenFistTestCase):
         self.assertLess(elapsed, 1.5)
 
     def test_silence_times_out(self):
-        result, elapsed = self._probe_against(lambda xid: [], timeout=0.6)
+        result, elapsed = self._probe_against(
+            lambda xid: [], timeout=0.6, attempts=6)
         self.assertFalse(result)
         self.assertGreaterEqual(elapsed, 0.6)
         # The retransmissions share the timeout rather than each
-        # getting one of their own.
-        self.assertLess(elapsed, 1.2)
+        # getting one of their own, which would take 3.6 seconds. The
+        # bound sits midway, so a loaded worker's scheduling delay is
+        # not mistaken for that.
+        self.assertLess(elapsed, 2.1)
 
     def test_the_deadline_is_overall_not_per_packet(self):
         # A busy network delivers other clients' packets to the probe.
         # A per-read timeout would restart with each one, and this
-        # probe would wait for the whole three seconds of chatter
+        # probe would wait for the whole six seconds of chatter
         # rather than give up at its own deadline.
         result, elapsed = self._probe_against(
-            lambda xid: [_reply(xid + 1, dhcp_probe.DHCPACK)] * 60,
+            lambda xid: [_reply(xid + 1, dhcp_probe.DHCPACK)] * 120,
             timeout=0.5, interval=0.05)
         self.assertFalse(result)
-        self.assertLess(elapsed, 1.5)
+        # Six seconds of chatter; the bound only needs to be well clear
+        # of that, not tight against the deadline.
+        self.assertLess(elapsed, 3.0)
 
 
 class ParseTestCase(base.ShakenFistTestCase):
@@ -520,6 +527,32 @@ class IsServingDhcpTestCase(base.ShakenFistTestCase):
                 'execute', side_effect=MissingPrivExecSocket()):
             self.assertRaises(DHCPProbeFailed, d.is_serving_dhcp)
 
+    def test_a_privexec_which_refuses_is_not_a_wedge(self):
+        # A restarting sf-privexec leaves a socket which refuses.
+        d = self._dnsmasq()
+        with mock.patch(
+                'shakenfist.managed_executables.dnsmasq.util_concurrency.'
+                'execute', side_effect=ConnectionRefusedError()):
+            self.assertRaises(DHCPProbeFailed, d.is_serving_dhcp)
+
+    def test_a_programming_error_is_not_could_not_probe(self):
+        # Read as "could not probe", a defect on this path would report
+        # every network as serving DHCP forever, with nothing louder
+        # than a warning. It propagates instead.
+        d = self._dnsmasq()
+        with mock.patch(
+                'shakenfist.managed_executables.dnsmasq.util_concurrency.'
+                'execute', side_effect=TypeError('unexpected keyword')):
+            self.assertRaises(TypeError, d.is_serving_dhcp)
+
+    def test_a_protocol_bug_is_not_could_not_probe(self):
+        d = self._dnsmasq()
+        with mock.patch(
+                'shakenfist.managed_executables.dnsmasq.util_concurrency.'
+                'execute', side_effect=UnknownPrivExecReplyException()):
+            self.assertRaises(
+                UnknownPrivExecReplyException, d.is_serving_dhcp)
+
     def test_the_probe_is_run_by_this_interpreter(self):
         d = self._dnsmasq()
         with mock.patch(
@@ -703,6 +736,39 @@ class IsDnsmasqServingDhcpTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             ['could not check whether dnsmasq is answering DHCP'],
             self._messages(n))
+
+    def test_an_event_which_could_not_be_written_is_tried_again(self):
+        # Marked as reported only once the event is written, or a
+        # database blip loses it for the whole episode.
+        n = self._network(side_effect=DHCPProbeFailed('no privexec'))
+        n.add_event.side_effect = RuntimeError('database went away')
+        self.assertRaises(RuntimeError, n.is_dnsmasq_serving_dhcp)
+        self.assertNotIn(
+            self.NETWORK_UUID, network_module.DHCP_PROBE_FAILURE_REPORTED)
+
+        n.add_event.side_effect = None
+        n.is_dnsmasq_serving_dhcp()
+        self.assertIn(
+            'could not check whether dnsmasq is answering DHCP',
+            self._messages(n))
+        self.assertIn(
+            self.NETWORK_UUID, network_module.DHCP_PROBE_FAILURE_REPORTED)
+
+    def test_a_recovery_which_could_not_be_written_is_tried_again(self):
+        n = self._network(side_effect=DHCPProbeFailed('no privexec'))
+        n.is_dnsmasq_serving_dhcp()
+
+        d = n._get_dnsmasq_object.return_value
+        d.is_serving_dhcp.side_effect = None
+        n.add_event.side_effect = RuntimeError('database went away')
+        self.assertRaises(RuntimeError, n.is_dnsmasq_serving_dhcp)
+        self.assertIn(
+            self.NETWORK_UUID, network_module.DHCP_PROBE_FAILURE_REPORTED)
+
+        n.add_event.side_effect = None
+        n.is_dnsmasq_serving_dhcp()
+        self.assertNotIn(
+            self.NETWORK_UUID, network_module.DHCP_PROBE_FAILURE_REPORTED)
 
     def test_the_log_still_says_it_every_pass(self):
         n = self._network(side_effect=DHCPProbeFailed('no privexec'))

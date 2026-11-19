@@ -39,6 +39,28 @@ from shakenfist.util import general as util_general
 
 LOG, _ = logs.setup(__name__)
 PRIVEXEC_SOCKET_PATH = '/srv/shakenfist/.privexec'
+# The PATH a command run through sf-privexec gets unless it brings its
+# own. It names no virtualenv, so a bare ``python3`` here is the system
+# interpreter, which has no shakenfist installed.
+PRIVEXEC_DEFAULT_PATH = (
+    '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin')
+
+# The failures which mean sf-privexec gave no answer: its socket is
+# missing or refuses the connection (OSError, which covers
+# ConnectionError and FileNotFoundError), or it closed the connection
+# before a whole reply arrived. A caller which must carry on without an
+# answer catches these and nothing broader.
+#
+# UnknownPrivExecReplyException is deliberately not one of them, for the
+# same reason as UnknownNodeLockReplyException below: a reply which
+# parses but carries the wrong field is a bug in this protocol, not an
+# unreachable daemon, and it stays loud.
+PRIVEXEC_TRANSPORT_ERRORS = (
+    OSError,
+    MissingPrivExecSocket,
+    TruncatedPrivExecResponse,
+)
+
 NODELOCK_SOCKET_PATH = '/srv/shakenfist/.nodelock'
 
 # nodelock only unlinks its socket at startup, so while it is restarting (for
@@ -54,12 +76,6 @@ NODELOCK_SOCKET_PATH = '/srv/shakenfist/.nodelock'
 # UnknownNodeLockReplyException is deliberately not one of them: a reply which
 # parses but carries no known field is a bug in this protocol rather than a
 # daemon which is restarting, and it stays loud in every caller.
-# The PATH a command run through sf-privexec gets unless it brings its
-# own. It names no virtualenv, so a bare ``python3`` here is the system
-# interpreter, which has no shakenfist installed.
-PRIVEXEC_DEFAULT_PATH = (
-    '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin')
-
 NODELOCK_TRANSPORT_ERRORS = (
     ConnectionError,
     FileNotFoundError,

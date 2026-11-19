@@ -871,7 +871,15 @@ class Network(dbowo):
             new_value, message,
             skip_transition_validation=skip_transition_validation)
         if not already_errored:
-            self.signal_instances_of_failure(message)
+            # The state, which is what matters, is already written. This
+            # is called from error handlers, so failing to annotate the
+            # instances must not replace the failure being handled with
+            # an exception of its own (as for issue 4112).
+            try:
+                self.signal_instances_of_failure(message)
+            except Exception as e:
+                LOG.with_fields({'network': self}).error(
+                    f'Failed to tell instances their network has failed: {e}')
 
     def is_dnsmasq_serving_dhcp(self):
         """Is this network's dnsmasq answering DHCP?
@@ -895,19 +903,22 @@ class Network(dbowo):
                 'network': self,
                 'error': str(e)
             }).warning('Could not check whether dnsmasq is answering DHCP')
+            # Marked only once the event is written, so that an event
+            # which could not be written is tried again next pass rather
+            # than lost for the whole episode.
             if str(self.uuid) not in DHCP_PROBE_FAILURE_REPORTED:
-                DHCP_PROBE_FAILURE_REPORTED.add(str(self.uuid))
                 self.add_event(
                     EVENT_TYPE_STATUS,
                     'could not check whether dnsmasq is answering DHCP',
                     extra={'error': str(e)})
+                DHCP_PROBE_FAILURE_REPORTED.add(str(self.uuid))
             return True
 
         if str(self.uuid) in DHCP_PROBE_FAILURE_REPORTED:
-            DHCP_PROBE_FAILURE_REPORTED.discard(str(self.uuid))
             self.add_event(
                 EVENT_TYPE_STATUS,
                 'can check whether dnsmasq is answering DHCP again')
+            DHCP_PROBE_FAILURE_REPORTED.discard(str(self.uuid))
 
         if not is_serving:
             self.add_event(

@@ -254,7 +254,12 @@ class DnsMasq(managedexecutable.ManagedExecutable):
             stderr = (e.stderr or '').strip()[-200:]
             raise DHCPProbeFailed(
                 f'the DHCP probe exited {e.exit_code}: {stderr}') from e
-        except Exception as e:
+        except util_concurrency.PRIVEXEC_TRANSPORT_ERRORS as e:
+            # Only a privexec which did not answer. Anything else -- a
+            # renamed subst_dict() key, a protocol bug -- is a defect in
+            # this code, and read as "could not probe" it would report
+            # every network as serving DHCP forever, which is the silent
+            # failure this check exists to remove.
             raise DHCPProbeFailed(
                 f'the DHCP probe could not be run: '
                 f'{e.__class__.__name__}: {e}') from e

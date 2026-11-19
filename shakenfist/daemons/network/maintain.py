@@ -640,11 +640,23 @@ class Job(util_concurrency.Job):
             # seconds for as long as the network stays quiesced, and
             # the point is to tell the owner, not to fill their event
             # log.
+            #
+            # Marked only once the instances have been told: a write
+            # which fails -- a database blip is exactly the kind of
+            # outage that quiesces a network -- is tried again next pass
+            # rather than lost for the episode, and does not end the
+            # pass for every network after this one.
             if str(n.uuid) not in QUIESCE_REPORTED:
+                try:
+                    signalled = n.signal_instances_of_failure(
+                        'reconciliation quiesced after %d consecutive '
+                        'failures, pending operator attention' % circuit_k)
+                except Exception as e:
+                    LOG.with_fields({'network_uuid': str(n.uuid)}).error(
+                        f'Failed to tell instances their network is '
+                        f'quiesced, will retry next pass: {e}')
+                    return True
                 QUIESCE_REPORTED.add(str(n.uuid))
-                signalled = n.signal_instances_of_failure(
-                    'reconciliation quiesced after %d consecutive '
-                    'failures, pending operator attention' % circuit_k)
                 if signalled:
                     LOG.with_fields({
                         'network_uuid': str(n.uuid),

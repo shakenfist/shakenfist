@@ -307,7 +307,7 @@ def add_address_to_interface(interface, namespace, address, netmask):
 
 def create_network_namespace(namespace):
     if not os.path.exists('/var/run/netns/%s' % namespace):
-        command = ['ip', 'netns', 'add', namespace]
+        command = [locate_command('ip'), 'netns', 'add', namespace]
         _, stderr, returncode = command_helper(*command)
         if returncode != 0:
             r = re.compile(

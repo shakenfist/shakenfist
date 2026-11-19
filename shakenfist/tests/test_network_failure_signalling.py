@@ -179,6 +179,26 @@ class EnterErrorStateTestCase(base.ShakenFistTestCase):
         self.assertIn('test_a_missing_reason_is_not_passed_on_empty()',
                       caller)
 
+    def test_a_signal_which_fails_does_not_escape(self):
+        # Called from error handlers: a database blip while telling the
+        # instances must not replace the failure being handled, and the
+        # state is already written by then (issue 4112's shape).
+        n = self._Network(Network.STATE_CREATED)
+        n.signal_instances_of_failure = mock.MagicMock(
+            side_effect=RuntimeError('database went away'))
+        with mock.patch(
+                'shakenfist.baseobject.DatabaseBackedObject.'
+                'enter_error_state') as mock_super:
+            with mock.patch(
+                    'shakenfist.network.network.LOG') as mock_log:
+                n.enter_error_state(Network.STATE_ERROR, 'a reason')
+
+        mock_super.assert_called_once()
+        mock_log.with_fields.return_value.error.assert_called_once()
+        self.assertIn(
+            'database went away',
+            mock_log.with_fields.return_value.error.call_args[0][0])
+
     def test_the_write_is_passed_straight_through(self):
         n = self._Network(Network.STATE_CREATED)
         with mock.patch(
@@ -201,7 +221,7 @@ class QuiesceSignalTestCase(base.ShakenFistTestCase):
         maintain.QUIESCE_REPORTED.clear()
         self.addCleanup(maintain.QUIESCE_REPORTED.clear)
 
-    def _guard(self, history_states):
+    def _guard(self, history_states, signal_error=None):
         m = mock.MagicMock()
         m._reconciliation_guard_fired = partial(
             maintain.Job._reconciliation_guard_fired, m)
@@ -209,6 +229,7 @@ class QuiesceSignalTestCase(base.ShakenFistTestCase):
         n = mock.MagicMock()
         n.uuid = NETWORK_UUID
         n.signal_instances_of_failure.return_value = [INSTANCE_ONE]
+        n.signal_instances_of_failure.side_effect = signal_error
 
         circuit_k = len(history_states)
         history = [('net_op', state, 0.0) for state in history_states]
@@ -241,6 +262,22 @@ class QuiesceSignalTestCase(base.ShakenFistTestCase):
         _, n = self._guard(['error', 'error', 'error'])
 
         n.signal_instances_of_failure.assert_not_called()
+
+    def test_a_signal_which_fails_is_tried_again_next_pass(self):
+        # A database blip is exactly the kind of outage that quiesces a
+        # network. Marking the episode before the write lost the signal
+        # for the whole episode, and the exception ended the pass for
+        # every network after this one.
+        with mock.patch.object(maintain, 'LOG'):
+            fired, n = self._guard(
+                ['error', 'error', 'error'],
+                signal_error=RuntimeError('database went away'))
+        self.assertTrue(fired)
+        self.assertNotIn(NETWORK_UUID, maintain.QUIESCE_REPORTED)
+
+        _, n = self._guard(['error', 'error', 'error'])
+        n.signal_instances_of_failure.assert_called_once()
+        self.assertIn(NETWORK_UUID, maintain.QUIESCE_REPORTED)
 
     def test_a_network_which_recovers_is_reported_again_if_it_breaks(self):
         self._guard(['error', 'error', 'error'])

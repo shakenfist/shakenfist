@@ -219,6 +219,17 @@ class AlgorithmForDigestTestCase(base.ShakenFistTestCase):
         for value in [None, '', 'a' * 40, 'z' * 64]:
             self.assertIsNone(images._algorithm_for_digest(value))
 
+    def test_what_int_accepts_is_not_a_digest(self):
+        # int(x, 16) takes a 0x prefix, underscores and surrounding
+        # whitespace. None of those is a digest, and labelling one
+        # sha256 would fail the fetch as a mismatch.
+        for value in ['0x' + 'a' * 62, 'a' * 31 + '_' + 'a' * 32,
+                      ' ' + 'a' * 63, 'A' * 63 + '\n']:
+            self.assertIsNone(images._algorithm_for_digest(value), value)
+
+    def test_upper_case_is_a_digest(self):
+        self.assertEqual('sha256', images._algorithm_for_digest('A' * 64))
+
 
 class FetchRemoteChecksumTestCase(base.ShakenFistTestCase):
     def test_a_missing_file_is_none_not_empty(self):

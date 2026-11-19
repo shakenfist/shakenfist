@@ -67,6 +67,14 @@ against`. That is a different fact from a fetch which was checked and
 passed, and reading these events back should not require guessing
 which happened.
 
+The check fails open. A digest file which cannot be read — a 404, a
+timeout, a connection failure, or a file which does not name the image
+— lets the fetch go ahead unverified, with that event as the only
+record, and there is currently no setting to require a digest instead.
+So anyone able to stop the digest request arriving turns the check off,
+on an `https://` mirror as much as a plain `http://` one. Watch for the
+`no published checksum` event on a mirror known to publish digests.
+
 What this establishes is integrity, not authenticity. It catches a
 truncated or corrupted download and a mirror serving the wrong file. It
 does not catch a deliberate substitution: the digest is fetched from

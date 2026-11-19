@@ -296,15 +296,15 @@ DIGEST_LENGTHS = {
     64: 'sha256',
     128: 'sha512',
 }
+HEX_DIGEST_RE = re.compile('[0-9a-fA-F]+')
 
 
 def _algorithm_for_digest(checksum):
     """The algorithm which produced a hex digest, or None if unknown."""
-    if not checksum:
-        return None
-    try:
-        int(checksum, 16)
-    except ValueError:
+    # Not int(checksum, 16), which also accepts a 0x prefix and
+    # underscores: a string like that is not a digest, and labelling it
+    # one fails the fetch as a mismatch rather than costing a warning.
+    if not checksum or not HEX_DIGEST_RE.fullmatch(checksum):
         return None
     return DIGEST_LENGTHS.get(len(checksum))
 
