@@ -355,7 +355,8 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
 
     def test_missing_declaration_is_a_noop(self):
         # A model class without target_fields must not crash --
-        # the derived targets list is simply empty.
+        # the derived targets list is simply empty. It is reported,
+        # though; see test_missing_declaration_is_reported.
         util.enqueue_cluster_operation(
             _FakeObjectType('NODE_INST_OP'),
             self._metadata(instance_uuid=INSTANCE_UUID),
@@ -371,6 +372,67 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
             self._metadata(instance_uuid=INSTANCE_UUID))
 
         self.assertEqual([], self._targets_arg())
+
+    def _declaration_log_fields(self, **kwargs):
+        with mock.patch(
+                'shakenfist.schema.operations.util.LOG') as mock_log:
+            util.enqueue_cluster_operation(
+                _FakeObjectType('NODE_INST_OP'),
+                self._metadata(instance_uuid=INSTANCE_UUID),
+                **kwargs)
+
+        calls = [
+            c for c in mock_log.with_fields.return_value.error.call_args_list
+            if 'declares no targets' in c[0][0]]
+        if not calls:
+            return None
+
+        # with_fields returns the same mock for every call, so the
+        # fields are found by the key only this log line carries
+        # rather than by pairing calls up positionally.
+        fields = [
+            c[0][0] for c in mock_log.with_fields.call_args_list
+            if 'model_class' in c[0][0]]
+        self.assertEqual(1, len(fields), fields)
+        return fields[0]
+
+    def test_missing_declaration_is_reported(self):
+        # Issue 4957: an operation enqueued with no target rows is
+        # invisible to has_pending_cluster_operation, Network.is_okay,
+        # the per-object /clusteroperations listing and the CI await
+        # helpers. The schema is pinned by
+        # shakenfist/tests/schema/operations/test_target_fields.py,
+        # but that test only sees the schemas in this tree, so the
+        # enqueue reports an empty declaration rather than recording
+        # nothing silently.
+        fields = self._declaration_log_fields(
+            model_class=_NoDeclarationModel)
+
+        self.assertIsNotNone(fields, 'no empty-declaration log emitted')
+        self.assertEqual(OP_UUID, fields['operation_uuid'])
+        self.assertEqual('node_inst_op', fields['operation_type'])
+        self.assertEqual('_NoDeclarationModel', fields['model_class'])
+
+    def test_no_model_class_argument_is_reported(self):
+        # The other half of the same silent default: no model class
+        # means the declaration is never read at all.
+        fields = self._declaration_log_fields()
+
+        self.assertIsNotNone(fields, 'no empty-declaration log emitted')
+        self.assertEqual(OP_UUID, fields['operation_uuid'])
+        self.assertIsNone(fields['model_class'])
+
+    def test_a_declared_model_is_not_reported(self):
+        # A model which declares its targets must not be reported,
+        # even when every declared field is None on this metadata --
+        # artifact_fetch_op's target fields are all optional, so a
+        # legitimately untargeted operation is normal.
+        self.assertIsNone(
+            self._declaration_log_fields(
+                model_class=_NullableTargetModel))
+        self.assertIsNone(
+            self._declaration_log_fields(
+                model_class=_NetOnlyModel))
 
 
 class EnqueueClusterOperationFamilyTestCase(base.ShakenFistTestCase):

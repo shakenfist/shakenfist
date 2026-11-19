@@ -417,14 +417,27 @@ a target row to point at. `interface_uuid` is a target on the interface
 operations and context elsewhere. Discovering targets by matching `*_uuid`
 would therefore record every operation as targeting the node it runs on,
 which would make `has_pending_cluster_operation()` true for a node for as
-long as anything at all was happening on it. The cost of the explicit form
-is that a new schema which forgets `target_fields` records no targets at
-all, and nothing reports it: `enqueue_cluster_operation` reads the
-declaration with a `getattr` default, so a missing one is indistinguishable
-from an operation that genuinely targets nothing. The `ClassVar` trap below
-is the same failure arriving by a different route. All fourteen schemas
-declare one today, and nothing holds a fifteenth to it — see
-[issue 4957](https://github.com/shakenfist/shakenfist/issues/4957).
+long as anything at all was happening on it.
+
+The cost of the explicit form is that the obligation moved to the schema
+author, who can also forget it: the declaration is read with a silent
+default, so a schema without one enqueues with no target rows at all and
+every by-target reader then answers that nothing is happening to the object
+(`has_pending_cluster_operation()` is False, `Network.is_okay()` lets the
+maintainer run its recreate path, the per-object `/clusteroperations`
+listing is empty, the CI await helpers return immediately). The enqueue
+does not raise, because that would turn a reporting gap into a runtime
+failure on a path which creates work; instead
+`shakenfist/tests/schema/operations/test_target_fields.py` enumerates
+every operation model and fails the build if one does not declare
+`target_fields`, declares it without the `ClassVar` annotation (pydantic
+would make it a field, and the resolved value reads as empty — the same
+trap as `observational_tasks` below), names a field the model does not
+have, or maps one to `NODE`, which is where an operation runs rather than
+what it targets. The same test sweeps the schemas with `ast` to confirm
+every `enqueue_cluster_operation()` call passes its `model_class`, which
+is the other half of the same default. An empty declaration reaching the
+enqueue at runtime is logged at ERROR level.
 
 Each target row also carries an `observational` flag (schema v3), derived
 at enqueue time by `is_observational()` in `schema/operations/util.py`. A
