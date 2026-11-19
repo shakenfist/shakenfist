@@ -73,6 +73,11 @@ images (`crypt_method=2`) and native LUKS containers can be decrypted with
 `--max-guest-memory` (e.g., `--max-guest-memory 1G`). Native LUKS
 containers wrapping QCOW2 images are transparently detected and
 decrypted, with the inner QCOW2 processed as the conversion source.
+That detection reads the first payload sector, and a read that fails
+fails the conversion: an unreadable sector is not evidence that the
+payload is flat, and converting it as though it were would write the
+inner image's encrypted-then-decrypted bytes out under the target
+format's name at exit 0.
 Individual snapshots can be extracted with `--snapshot <name-or-id>`.
 
 By default, convert produces sparse output by skipping zero-filled clusters

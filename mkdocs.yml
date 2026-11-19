@@ -274,6 +274,7 @@ nav:
                 - "VHD and VHDX differencing output": components/instar/plans/PLAN-differencing.md
                 - "Populated BAT output": components/instar/plans/PLAN-bat-population.md
                 - "Multi-extent VMDK output": components/instar/plans/PLAN-multi-extent-vmdk.md
+                - "Streaming image input over HTTP and HTTPS": components/instar/plans/PLAN-http-input.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md

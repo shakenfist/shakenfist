@@ -336,7 +336,11 @@ provides a modular architecture with:
  (never `static`) plus the two executor service sectors (one shared
  RMW bounce — safe because all call-table I/O is synchronous and
  steps execute serially — and a fill-synthesis sector). Barrier
- policy: `Ordering` is a no-op (issue order is completion order),
+ policy: `Ordering` is a no-op (issue order is completion order,
+ because the guest waits for each request without a deadline and the
+ host completes every request it can read, with an error status when
+ it cannot serve it — see "A request the host cannot answer" below
+ for the one case that is not completed, which hangs the guest),
  `Durability` fsyncs where the capability exists and degrades to
  `Ordering` elsewhere (matching commit/rebase's no-fsync
  output-device reality). Host-unit-tested against a mock `DeviceIo`
@@ -913,3 +917,42 @@ micro-architecture-specific gadgets. Narrowing it is possible: the
 identifying leaves (`0x1` EAX, and the brand string in `0x80000002` to
 `0x80000004`) could be cleared while keeping `0x80000001` EDX.LM, which
 is the only bit KVM needs here.
+
+## A request the host cannot answer
+
+The guest waits for a virtio request to complete with no deadline of
+its own. That is the right wait -- a bound cannot be derived, because
+the guest cannot tell a host that is slow from one that is stuck, and
+a request cannot be cancelled once it is on the ring, so giving up
+would leave the host writing into the fixed DMA buffers the next
+request reuses. It does mean the host must answer every request,
+including the ones it cannot serve, and in one case it does not.
+
+**A request the host cannot serve is completed with an error status.**
+A backing store that fails a read, a write or a flush -- `EIO`, a file
+that shrank, a full filesystem -- produces a used-ring entry carrying
+`VIRTIO_BLK_S_IOERR`. The guest's operation then fails and reports the
+sector it was on, the host adds the errno it recorded, and the process
+exits non-zero. This is the ordinary failure path and it is tested
+both as a unit and end to end with an injected `EIO`.
+
+**A request the host cannot *read* is not completed at all.** If the
+descriptor chain is malformed, a descriptor names an address outside
+guest memory, or a guest-memory access fails, the device has no status
+descriptor it can trust and propagates the error instead. On the
+ioeventfd path -- the normal one -- the I/O thread can only log it and
+carry on: nothing reaches the used ring, the guest's wait never ends,
+and the vCPU thread is inside `KVM_RUN` while the guest spins, so the
+run cannot be failed from either side. It takes a `SIGINT`. The
+vCPU-exit fallback (`process_queue_for_device`) propagates to the run
+loop and does fail the run, so the behaviour depends on which path is
+active.
+
+Every way to reach the second case is an instar bug rather than
+anything a hostile image can ask for: the guest builds its own
+descriptor chains, and the addresses in them come from the guest's own
+fixed DMA pool. Image data cannot steer it. That is why it is recorded
+here rather than fixed -- the fix is to carry the failure out to the
+run loop and terminate the run, which needs shared fatal state and a
+way to kick the vCPU out of `KVM_RUN`, and that is tracked as its own
+issue.

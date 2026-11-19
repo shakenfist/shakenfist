@@ -82,8 +82,9 @@ selection their module happens to fall in is a requirement waiting to
 go quiet, and moving the class would unset it with nothing red. A
 base-image bump that dropped ZSTD support would otherwise return both
 tests to skipping on every run, which is the state #813 found them in. This is the same bargain `INSTAR_REQUIRE_LIBVHDI`
-strikes for the libvhdi oracle, and `INSTAR_REQUIRE_LIBYAL` for the
-fuzzer's.
+strikes for the libvhdi oracle, `INSTAR_REQUIRE_LIBYAL` for the
+fuzzer's, and `INSTAR_REQUIRE_STRACE` for the latency injection in
+`TestSlowHostRead` (below).
 
 **A `_run_tool` timeout is a hang guard, not a performance
 assertion.** The budget (`QEMU_TOOL_TIMEOUT`, 300s) exists so a wedged
@@ -438,6 +439,93 @@ Tests verifying instar's security properties:
 - External data file references are reported but not read
 - VMDK descriptor extent paths are not accessed
 
+### Slow Host Read Tests (`test_slow_host_read.py`)
+
+A guest operation reads every byte through the host, and waits on the
+host while it does. A read that takes seconds -- a loaded runner, a
+network filesystem, a backing store that is not a local disk -- must
+therefore make an operation slow and not make it fail. The test
+injects a three second delay into one host read with
+`strace -e inject=read:delay_enter=...:when=N` and requires the
+conversion to exit 0 with bytes identical to an undelayed run.
+
+Three things about it are worth knowing before changing it.
+
+**The injection index is derived, never hardcoded.** `when=N` counts
+a syscall's invocations *per thread*, so the number names a different
+read as soon as anything changes how many reads the VMM does before
+the guest starts. The test traces the very conversion it is about to
+run, finds the thread servicing the virtio queue (the one reading an
+order of magnitude more than anything else in the process, because it
+reads once per guest request), and picks a data read in the middle of
+that thread's sequence, past the read count of every other thread so
+that no other thread can reach the index.
+
+**The test asserts the delay landed.** Everything else it checks
+passes just as well with no injection at all: an undelayed conversion
+also exits 0 and also produces identical bytes. So it reads strace's
+own per-syscall timing (`-T`) back and insists that the read at the
+derived index took most of the injected delay, and that it was a data
+read rather than a queue notification. An injection that silently
+stopped working is the most likely way for this test to rot, and that
+assertion is what stops it.
+
+**The capability is probed, not the binary.** strace can be installed
+and unable to inject: `-e inject=` and its `delay_enter` are not in
+every build old enough to be packaged somewhere, a container that
+cannot `ptrace` traces nothing at all, and `yama/ptrace_scope` of 2 or
+more refuses an unprivileged tracer. So the probe delays a real
+syscall in `/bin/true` and insists on seeing the delay. A host that
+fails the probe skips, unless `INSTAR_REQUIRE_STRACE` is set, which
+the `integration-core` job does because the devcontainer installs
+strace -- dropping the package turns that job red rather than quietly
+green.
+
+The probe, and the parser that reads an injection back out of a trace,
+live in `tests/strace_injection.py` because the test below shares
+them.
+
+**Triaging a red from either test.** Both derive the index from a
+baseline run and then inject into a second run, so anything that
+changes the read sequence between the two -- scheduling on a loaded
+runner, a buffering difference, whether an ioeventfd could be
+registered -- moves the read the index names. That is deliberately a
+red rather than a skip: the alternative is a test that stops
+exercising anything and still passes. It is also why the first thing
+to read is *which* assertion failed. A failure from the
+injection-landed assertion ("strace was asked to...", "the injected
+run read...") is index drift, and re-running is the right response. A
+failure from the behavioural assertion -- a delayed conversion that
+exited non-zero, or a failed probe read that converted anyway -- is
+the defect these tests exist for, and re-running it is not.
+
+### Failed Host Read Tests (`test_luks_probe_read_failure.py`)
+
+The sibling of the test above, and the same machinery pointed the
+other way: `strace -e inject=read:error=EIO:when=N` fails one host
+read instead of delaying it. What it guards is `convert`'s choice
+between a LUKS container's two payload shapes, which it makes by
+reading the first payload sector and looking for QCOW2 magic. A read
+failure there must not read as "no inner format", because the
+conversion would then write a decrypted QCOW2 out as a flat payload
+and exit 0.
+
+Two differences from the slow-read test matter if you change either.
+
+**The index is derived from an offset, not from a thread's busiest
+stretch.** strace is run with `-P` on the image path, so only reads of
+the image are traced -- and therefore counted by `when=`, which keeps
+instar's own binaries and the eventfd queue notifications out of the
+numbering. The test reads the payload offset out of the fixture's own
+LUKS v1 header and injects into the first read of that offset, which
+is the probe's.
+
+**One read must fail where the next identical read succeeds.** The
+flat payload path re-reads the sector the probe read, and treats a
+failure there as fatal, so a hard error on every read of that offset
+is reported correctly and proves nothing. `when=N` failing exactly one
+invocation is what reproduces the transient failure the defect needed.
+
 ## Running Tests
 
 ### Make Targets
@@ -562,17 +650,29 @@ spread is still this narrow; a fresh measurement is being taken on
 
 **Classify before you attribute.** Running two matrix containers at
 once — or any other heavy job on the host — starves the suite, and the
-resulting failures do not look like resource problems. The large
-`test_convert` re-encodes fail under load with
-`Error: "convert operation failed"` and, from `compare`, a read error
-(before #807, `Content mismatch at offset 0!`), which reads as data
-corruption, and they abort early (~26s) rather than
-timing out at the ~110s they need when passing. Nine such failures
-appeared across the 2026-08-09 matrix inventory and **every one passed
-on an idle host**. A failure counts as a divergence only once it
-reproduces with the host otherwise quiet; `--select` gives you that
-replay cheaply. Same discipline as the differential-fuzzing
+resulting failures do not look like resource problems. Nine such
+failures appeared across the 2026-08-09 matrix inventory and **every
+one passed on an idle host**. A failure counts as a divergence only
+once it reproduces with the host otherwise quiet; `--select` gives
+you that replay cheaply. Same discipline as the differential-fuzzing
 spurious-divergence rule.
+
+The signature that cluster used to carry is gone, and the history
+matters when reading an old log. Large `test_convert` re-encodes
+failed under load with `Error: "convert operation failed"`, aborting
+early (~26s) rather than timing out at the ~110s they need when
+passing, and from `compare` a read error (before #807,
+`Content mismatch at offset 0!`) that read as data corruption. Both
+came from the guest giving up on a host read it had waited a fixed
+number of spin iterations for — about 1.3 s on a modern host, which
+a loaded runner reaches with nothing wrong. The guest now waits for
+the host however long it takes, so contention alone no longer
+produces either message. In a current tree they mean something else:
+`<op> operation failed` — `convert operation failed`,
+`dd operation failed` — is a guest failure the host captured no
+reason for, and a genuine I/O error names the image and the offset
+it stopped at. Treat either as a real defect rather than replaying
+it for load.
 
 The design is **tests from the source tree, binary from the package**:
 the whole `tests/` tree is copied into the container and driven by
@@ -3659,7 +3759,10 @@ make test-container-convert-vhd      # VHD/VHDX convert (slowest)
 make clean-tests
 ```
 
-**Test structure:**
+**Test structure:** a guide to the modules a reader is most likely to
+want, not an inventory -- `ls tests/test_*.py` lists a good many more,
+and this section has never named all of them.
+
 - `tests/manifest.json` - Defines test images and their safety levels
 - `tests/test_info_safe.py` - Tests against known-safe images
 - `tests/test_info_malicious.py` - Tests against malicious images using expected overrides
@@ -3719,6 +3822,17 @@ make clean-tests
   round-trips (create/delete/apply) with `qemu-img check` post-op
   assertions, error paths and qcow2-only enforcement, empty-table
   behaviour. JSON goldens in `tests/golden/snapshot-list/`.
+- `tests/test_slow_host_read.py` - A host read delayed by three
+  seconds must make a conversion slow and not make it fail
+  (`strace -e inject=read:delay_enter=`); see "Slow Host Read Tests"
+  above
+- `tests/test_luks_probe_read_failure.py` - A failed read of the
+  first payload sector must fail the conversion rather than read as
+  "no inner format" (`strace -e inject=read:error=EIO`); see "Failed
+  Host Read Tests" above
+- `tests/strace_injection.py` - The shared syscall-injection rig for
+  the two modules above: the capability probe, the per-thread index
+  derivation and the did-it-land parsers
 - `tests/test_bench.py` - Integration tests for the `instar bench`
   subcommand (62 tests): read/write request scheduling, host-side
   validation matrix, the qcow2 write-envelope gates, `--output json`
