@@ -2074,8 +2074,6 @@ class BaseNamespacedTestCase(BaseTestCase):
 
         return aop
 
-
-class TestDistroBoots(BaseNamespacedTestCase):
     def _await_agentop_state(self, instance_uuid, aop, states, timeout,
                              description):
         """Poll one agent operation until it reaches one of states.
@@ -2126,6 +2124,8 @@ class TestDistroBoots(BaseNamespacedTestCase):
 
         return aop
 
+
+class TestDistroBoots(BaseNamespacedTestCase):
     def setUp(self):
         super().setUp()
         self.net = self.test_client.allocate_network(
