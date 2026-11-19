@@ -17693,40 +17693,57 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
                     f'active column already exists on '
                     f'{table_name} or could not be added: {e}')
 
-            # Backfill: rows whose state is ``deleted`` get
-            # active=NULL; everything else gets active=TRUE so the new
-            # UNIQUE constraint is correct from the moment it lands.
-            # ``object_states.object_uuid`` is VARCHAR-with-dashes,
-            # ``network_interfaces.uuid`` is native UUID rendered as
-            # 32-char hex, so the JOIN strips dashes — same trick as
-            # ``_build_object_filter_query``.
-            #
-            # Batched because the cluster is still serving while this
-            # runs, and this statement reads ``object_states`` as well:
-            # unbounded, it next-key locks every row it examines in the
-            # table every daemon's state transitions go through. See
-            # _migration_backfill_batched().
-            try:
-                _migration_backfill_batched(
-                    engine, table_name, 'uuid',
-                    """
-                    UPDATE network_interfaces ni
-                    LEFT JOIN object_states s
-                      ON REPLACE(s.object_uuid, '-', '') = LOWER(HEX(ni.uuid))
-                     AND s.object_type = 'interface'
-                    SET ni.active = CASE
-                        WHEN s.state_value = 'deleted' THEN NULL
-                        ELSE 1
-                    END
-                    WHERE ni.uuid >= :cursor_from
-                      AND ni.uuid <= :cursor_to
-                    """,
-                    f'Backfill of {table_name}.active')
-            except OperationalError as e:
-                LOG.warning(
-                    f'Backfill of active column on {table_name} '
-                    f'failed: {e}')
+        # Backfill: rows whose state is ``deleted`` get active=NULL;
+        # everything else gets active=TRUE so the new UNIQUE constraint
+        # is correct from the moment it lands.
+        #
+        # The join is the one ``_build_object_filter_query`` makes, for
+        # the reason ``_undashed_uuid_expr`` records: ``object_uuid`` is
+        # a dashed object key and ``ni.uuid`` is undashed CHAR(32) hex.
+        # It must not also wrap ``ni.uuid`` in ``HEX()`` — that column
+        # is text, not MariaDB's native UUID type, whatever the
+        # ``SQLNativeUUID`` marker used to claim, so hexing it yields 64
+        # characters which match nothing and every row then took the
+        # CASE's ELSE branch whether it was deleted or not. The
+        # ``object_type`` literal is the ObjectType member *name*,
+        # because that is what SQLAlchemy stores in an ENUM column; the
+        # value matched only by case-insensitive collation (issue 4988).
+        #
+        # Batched because the cluster is still serving while this runs,
+        # and this statement reads ``object_states`` as well: unbounded,
+        # it next-key locks every row it examines in the table every
+        # daemon's state transitions go through. See
+        # _migration_backfill_batched(). ``ni.active IS NULL`` is the
+        # "not done yet" predicate that helper expects, which makes a
+        # batch idempotent and a retry do only the rows left.
+        #
+        # A failure is deliberately not swallowed, so neither the
+        # constraint swap below nor the version stamp happens. NULLs do
+        # not collide, so a UNIQUE constraint over an unfilled
+        # ``active`` is *inert* rather than wrong: it holds none of the
+        # rows which were already there, and a later step which repairs
+        # the rows it can see as live cannot see them either. Aborting
+        # leaves the table at version 2 with the global UNIQUE on
+        # macaddr it already had, which is over-strict rather than
+        # absent, and the next ensure-mariadb-schema run finishes it.
+        _migration_backfill_batched(
+            engine, table_name, 'uuid',
+            """
+            UPDATE network_interfaces ni
+            LEFT JOIN object_states s
+              ON REPLACE(s.object_uuid, '-', '') = ni.uuid
+             AND s.object_type = 'INTERFACE'
+            SET ni.active = CASE
+                WHEN s.state_value = 'deleted' THEN NULL
+                ELSE 1
+            END
+            WHERE ni.uuid >= :cursor_from
+              AND ni.uuid <= :cursor_to
+              AND ni.active IS NULL
+            """,
+            f'Backfill of {table_name}.active')
 
+        with engine.connect() as conn:
             try:
                 conn.execute(sa.text(
                     'ALTER TABLE network_interfaces '
