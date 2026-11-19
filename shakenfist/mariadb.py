@@ -244,7 +244,7 @@ MIGRATION_UNKNOWN_NODE = '__migrated_unknown_node__'
 # mistaken belief that TTL expiry supplied one.
 # See PLAN-database-load-reduction-phase-02-static-cache.md.
 # ---------------------------------------------------------------------------
-_OBJECT_CACHE: dict[tuple[str, str], tuple[float, Any]] = {}
+_OBJECT_CACHE: dict[tuple[str, str], tuple[float, int, Any]] = {}
 _OBJECT_CACHE_LOCK = threading.Lock()
 
 # On overflow, trim to this fraction of OBJECT_CACHE_MAX_ENTRIES rather than
@@ -304,7 +304,7 @@ def _object_cache_get(object_type: str, key: Any) -> Any:
     with _OBJECT_CACHE_LOCK:
         entry = _OBJECT_CACHE.get(cache_key)
         if entry is not None:
-            expiry, model = entry
+            expiry, _ttl, model = entry
             if expiry > now:
                 hit = model
             else:
@@ -335,14 +335,31 @@ def _object_cache_put(object_type: str, key: Any, model: Any, ttl: int) -> None:
     now = time.monotonic()
     dropped = 0
     with _OBJECT_CACHE_LOCK:
-        _OBJECT_CACHE[_object_cache_key(object_type, key)] = (now + ttl, model)
+        # The ttl is kept alongside the expiry because the trim below
+        # needs it: an absolute expiry stamp cannot be compared across two
+        # TTL tiers (issue 3953).
+        _OBJECT_CACHE[_object_cache_key(object_type, key)] = (
+            now + ttl, ttl, model)
 
         # Enforce the residency bound. Expired entries go first because they
         # are free to lose; only if that is not enough do we drop live ones,
-        # nearest-expiry first, since they are the entries a reader is least
-        # likely to want again. Trimming to TRIM_TARGET rather than to the cap
-        # keeps this O(n log n) pass rare instead of once per insert at the
-        # ceiling.
+        # least remaining *fraction* of their own TTL first.
+        #
+        # The fraction, rather than the absolute expiry stamp, is what makes
+        # the two tiers compete on equal terms. Expiry is now + ttl, so a
+        # freshly inserted 30 second mutable entry always sorts ahead of a
+        # 300 second immutable entry inserted up to 270 seconds earlier:
+        # ordering on the stamp sheds essentially the whole mutable tier
+        # before touching one immutable entry, which switches off the tier
+        # sized for the types that number in the thousands (blob, node,
+        # artifact) exactly when the cache is under the pressure that tier
+        # was sized for. Neither
+        # policy is wrong per entry -- expired-soonest is genuinely the least
+        # valuable entry per byte-second -- but one of them lets the tiers
+        # share the pool and the other does not (issue 3953).
+        #
+        # Trimming to TRIM_TARGET rather than to the cap keeps this
+        # O(n log n) pass rare instead of once per insert at the ceiling.
         cap = config.OBJECT_CACHE_MAX_ENTRIES
         if cap > 0 and len(_OBJECT_CACHE) > cap:
             # Both branches trim to target, not to cap. Trimming the expired
@@ -353,15 +370,19 @@ def _object_cache_put(object_type: str, key: Any, model: Any, ttl: int) -> None:
             # put, which is precisely what the amortisation exists to avoid.
             target = int(cap * OBJECT_CACHE_TRIM_TARGET)
 
-            for cache_key in [k for k, (expiry, _) in _OBJECT_CACHE.items()
-                              if expiry <= now]:
+            for cache_key in [k for k, (expiry, _t, _m) in
+                              _OBJECT_CACHE.items() if expiry <= now]:
                 del _OBJECT_CACHE[cache_key]
                 dropped += 1
 
             if len(_OBJECT_CACHE) > target:
-                by_expiry = sorted(_OBJECT_CACHE.items(),
-                                   key=lambda item: item[1][0])
-                for cache_key, _ in by_expiry[:len(_OBJECT_CACHE) - target]:
+                # ttl is never 0 here: put returns early for ttl <= 0, so
+                # every resident entry carries the positive ttl it was
+                # inserted with.
+                by_remaining = sorted(
+                    _OBJECT_CACHE.items(),
+                    key=lambda item: (item[1][0] - now) / item[1][1])
+                for cache_key, _ in by_remaining[:len(_OBJECT_CACHE) - target]:
                     del _OBJECT_CACHE[cache_key]
                     dropped += 1
         size = len(_OBJECT_CACHE)

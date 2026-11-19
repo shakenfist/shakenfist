@@ -143,7 +143,14 @@ only when its own key is read again -- so `OBJECT_CACHE_MAX_ENTRIES` (default
 object a process has ever read rather than its working set, because an object
 read once and never read again is never revisited, and a delete in another
 process evicts nothing here. On overflow expired entries go first, then the
-entries closest to expiry.
+entries with the least remaining *fraction* of their own TTL.
+
+That fraction, rather than the absolute expiry stamp, is what lets the two
+tiers share one pool. Expiry is `now + ttl`, so a freshly inserted 30 s
+mutable entry always sorts ahead of a 300 s immutable entry inserted up to
+270 s earlier: ordering on the stamp shed essentially the whole mutable tier
+before touching one immutable entry, so the tier sized for blobs was the
+first thing switched off under exactly the pressure it was sized for.
 
 Effectiveness is visible in the `database_object_cache_{hits,misses,
 evictions}_total` counters and in reduced `database_get_<type>_total` rates;

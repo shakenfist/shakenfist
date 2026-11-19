@@ -59,8 +59,8 @@ class ObjectCacheCoreTestCase(base.ShakenFistTestCase):
         mariadb._object_cache_put('node', self.key, model, ttl=300)
         # Force the entry to be in the past without sleeping.
         ck = mariadb._object_cache_key('node', self.key)
-        _, m = mariadb._OBJECT_CACHE[ck]
-        mariadb._OBJECT_CACHE[ck] = (time.monotonic() - 1, m)
+        _, ttl, m = mariadb._OBJECT_CACHE[ck]
+        mariadb._OBJECT_CACHE[ck] = (time.monotonic() - 1, ttl, m)
         self.assertIsNone(mariadb._object_cache_get('node', self.key))
         # A miss on an expired entry must also remove it.
         self.assertNotIn(ck, mariadb._OBJECT_CACHE)
@@ -276,24 +276,57 @@ class ObjectCacheResidencyTestCase(base.ShakenFistTestCase):
         self.assertEqual(30, len(live))
 
     @mock.patch('shakenfist.config.config.OBJECT_CACHE_MAX_ENTRIES', 100)
-    def test_the_soonest_to_expire_are_evicted_first(self):
-        # All live, so the trim has to choose between them. Inserted in
-        # increasing order of lifetime, so the survivors should be a suffix:
-        # the entries a reader is least likely to want again go first.
+    def test_the_least_of_its_own_ttl_remaining_is_evicted_first(self):
+        # All live and all the same TTL, so the trim has to choose between
+        # them on how much of that TTL is left. Inserted one second apart, so
+        # the survivors should be a suffix: the entries a reader is least
+        # likely to want again go first.
         clock = [1000.0]
         with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
             for i in range(120):
+                clock[0] = 1000.0 + i
                 mariadb._object_cache_put(
-                    'instance', f'obj-{i}', object(), ttl=100 + i)
+                    'instance', f'obj-{i}', object(), ttl=300)
 
         survivors = sorted(
             int(k[1].split('-')[1]) for k in mariadb._OBJECT_CACHE)
         self.assertLessEqual(len(survivors), 100)
         self.assertGreater(len(survivors), 0)
-        # A contiguous suffix of the insertion order, i.e. the longest-lived.
+        # A contiguous suffix of the insertion order, i.e. the most of their
+        # own lifetime left.
         self.assertEqual(
             list(range(120 - len(survivors), 120)), survivors,
-            'the trim kept entries other than the longest-lived ones')
+            'the trim kept entries other than the freshest ones')
+
+    @mock.patch('shakenfist.config.config.OBJECT_CACHE_MAX_ENTRIES', 100)
+    def test_the_two_ttl_tiers_compete_on_equal_terms(self):
+        # Issue 3953. Ordering on the absolute expiry stamp evicted the whole
+        # mutable tier before any immutable entry, because now + 30 is always
+        # sooner than (now - 200) + 300. The fresh 30 second entries have all
+        # of their life left and the aged 300 second ones have a third of
+        # theirs, so the trim must take the aged ones first.
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            for i in range(90):
+                mariadb._object_cache_put(
+                    'instance', f'aged-{i}', object(), ttl=300)
+
+            # 200 seconds later: the immutable entries are two thirds spent
+            # but still live, and nothing has read them again.
+            clock[0] = 1200.0
+            for i in range(30):
+                mariadb._object_cache_put(
+                    'blob', f'fresh-{i}', object(), ttl=30)
+
+        fresh = [k for k in mariadb._OBJECT_CACHE if k[0] == 'blob']
+        aged = [k for k in mariadb._OBJECT_CACHE if k[0] == 'instance']
+        self.assertEqual(
+            30, len(fresh),
+            'the mutable tier was shed before the two-thirds-spent '
+            'immutable entries it was competing with')
+        # Two trims ran (the cap is 100 and the target 90), so 22 entries
+        # were shed and every one of them was an aged immutable entry.
+        self.assertEqual(68, len(aged))
 
     @mock.patch('shakenfist.config.config.OBJECT_CACHE_MAX_ENTRIES', 0)
     def test_a_zero_cap_disables_the_bound(self):

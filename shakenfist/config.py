@@ -739,7 +739,9 @@ class SFConfig(BaseSettings):
             'key is read again -- so without this bound the cache retains '
             'every object a process has ever read, not its working set. On '
             'overflow, expired entries are dropped first and then the '
-            'entries closest to expiry. 0 disables the bound.'
+            'entries with the least remaining fraction of their own TTL, so '
+            'that the two TTL tiers compete for the space on equal terms. '
+            '0 disables the bound.'
         )
     )
     SCHEDULER_TARGET_LOAD: float = Field(
