@@ -183,52 +183,6 @@ class TestAgentOperationDeadlines(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst['uuid'])
         return inst
 
-    def _await_agentop_state(self, instance_uuid, aop, states, timeout,
-                             description):
-        """Poll one agent operation until it reaches one of states.
-
-        base.BaseNamespacedTestCase._await_agentop_complete() only knows how
-        to wait for success. These tests wait for expired, and for
-        executing, so they need a version which is told which states it is
-        happy with. It lives here rather than in base.py because nothing
-        else in the suite waits for an agent operation to reach a state
-        other than complete, and base.py is where a helper with one caller
-        goes to be copied later.
-
-        Reaching some *other* terminal state fails immediately rather than
-        burning the rest of the window, and every failure routes through
-        _raise_agent_operation_failure() so it prints the operation and the
-        instance's recent events. That matters most for an expiry: the
-        external view's expiry_reason says which budget ran out, but the
-        prose reason lives on the state row's message, which is not part
-        of the view. expire() audits it against the instance, so the
-        events are where "the operation deadline passed while queued" is
-        actually readable.
-        """
-        terminal = tuple(self.AGENT_OPERATION_FAILED_STATES) + ('complete',)
-        wanted = ', '.join(states)
-        start_time = time.time()
-
-        while aop['state'] not in states:
-            if aop['state'] in terminal:
-                self._raise_agent_operation_failure(
-                    instance_uuid, description, aop,
-                    f"agent operation {aop['uuid']} for {description} "
-                    f"finished in state {aop['state']}, but this test "
-                    f'expected it to reach one of {wanted}')
-
-            if time.time() - start_time > timeout:
-                self._raise_agent_operation_failure(
-                    instance_uuid, description, aop,
-                    f"agent operation {aop['uuid']} for {description} was "
-                    f"still in state {aop['state']} after {timeout} seconds "
-                    f'without reaching one of {wanted}')
-
-            time.sleep(5)
-            aop = self.test_client.get_agent_operation(aop['uuid'])
-
-        return aop
-
     def test_queued_operation_expires_on_its_deadline(self):
         inst = self._create_ready_instance('test-aop-deadline-queued')
 
