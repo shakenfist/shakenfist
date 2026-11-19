@@ -7467,18 +7467,20 @@ def _direct_reserve_address(reservation: IPAMReservation,
 
     Uses INSERT with the unique constraint on (ipam_uuid, address) to ensure
     atomicity. If the address is already reserved, IntegrityError is raised
-    and we return False -- unless evict_halo is set and the existing
-    reservation is a deletion-halo, in which case a guarded UPDATE takes the
-    halo over. The UPDATE's WHERE clause requires the row still be a
-    deletion-halo, so a concurrent real reservation is never overwritten.
+    and we return False -- unless the committed row is this very reservation
+    re-sent (see _reservation_already_inserted), or evict_halo is set and the
+    existing reservation is a deletion-halo, in which case a guarded UPDATE
+    takes the halo over. The UPDATE's WHERE clause requires the row still be
+    a deletion-halo, so a concurrent real reservation is never overwritten.
 
     Args:
         reservation: The IPAMReservation to store.
         evict_halo: Allow taking over a deletion-halo reservation.
 
     Returns:
-        True if the reservation was created, False if the address was already
-        reserved.
+        True if the reservation was created, or was already there exactly as
+        asked for (a retried call whose first delivery committed); False if
+        the address was already reserved by something else.
     """
     engine = _get_engine()
     table = _get_ipam_reservations_table()
@@ -7498,7 +7500,17 @@ def _direct_reserve_address(reservation: IPAMReservation,
             conn.commit()
             return True
     except IntegrityError:
-        # Address already reserved - this is expected and not an error
+        # Address already reserved - this is expected and not an error,
+        # unless what refused the insert is this very reservation.
+        # _grpc_call() re-sends a call which hit DEADLINE_EXCEEDED or
+        # CANCELLED, so a reserve whose commit landed but whose reply was
+        # lost arrives a second time and fails on the primary key. Read as
+        # "in use", a random allocation moves on to another address and
+        # leaves this one reserved with nothing holding it, and an explicit
+        # reserve reports a conflict for a reservation the caller owns
+        # (issue #4987).
+        if _reservation_already_inserted(engine, table, reservation):
+            return True
         if not evict_halo:
             return False
     except OperationalError as e:
@@ -7528,6 +7540,53 @@ def _direct_reserve_address(reservation: IPAMReservation,
         LOG.warning(f'MariaDB halo evicting reserve failed for '
                     f'{reservation.ipam_uuid}/{reservation.address}: {e}')
         return False
+
+
+def _reservation_already_inserted(
+        engine: Any, table: sa.Table,
+        reservation: IPAMReservation) -> bool:
+    """Whether a refused reserve was refused by its own committed row.
+
+    Called after an IntegrityError on the (ipam_uuid, address) primary key.
+    True means the row already there is this very reservation -- an earlier
+    delivery of the same insert committed -- which makes the reserve
+    idempotent for a retried RPC. False means the address is held by
+    something else, which is the genuine refusal.
+
+    Every stored column is compared, and reserved_at is what makes the
+    comparison tight: it is the reserving caller's own time.time(), so only
+    another delivery of that same call carries it. Two callers reserving
+    one address for one user are still told apart.
+
+    A read which fails answers False, because that is what this function's
+    caller answers an outage with throughout -- a refusal, leaking the
+    address rather than handing a committed one to a second user. Raising
+    here instead would make the same outage raise or return depending on
+    which statement it landed on.
+    """
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(sa.select(table).where(sa.and_(
+                table.c.ipam_uuid == reservation.ipam_uuid,
+                table.c.address == str(reservation.address)))).fetchone()
+    except OperationalError as e:
+        LOG.warning(f'MariaDB read failed for refused reservation '
+                    f'{reservation.ipam_uuid}/{reservation.address}: {e}')
+        return False
+
+    if row is None:
+        return False
+
+    # The column hands back a uuid.UUID while the model carries a string,
+    # so the comparison is on the undashed hex both spellings reduce to.
+    def _hex(value: Any) -> Optional[str]:
+        return None if value is None else str(value).replace('-', '').lower()
+
+    return (row.reservation_type == reservation.reservation_type
+            and row.user_type == reservation.user_type
+            and _hex(row.user_uuid) == _hex(reservation.user_uuid)
+            and row.reserved_at == reservation.reserved_at
+            and row.comment == reservation.comment)
 
 
 def _direct_release_address(
@@ -7784,7 +7843,9 @@ def reserve_address(reservation: IPAMReservation,
         evict_halo: Allow taking over a deletion-halo reservation.
 
     Returns:
-        True if the reservation was created, False if already reserved.
+        True if the reservation was created, or is already there exactly as
+        asked for (a retried call whose first delivery committed); False if
+        the address is already reserved by something else.
     """
     if _use_database_service():
         return _grpc_reserve_address(reservation, evict_halo=evict_halo)

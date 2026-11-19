@@ -159,6 +159,27 @@ class IPAMTestCase(base.ShakenFistTestCase):
             TEST_USER_UUID,
             str(ipm.get_reservation('192.168.1.10').user_uuid))
 
+    @mock.patch('time.time', return_value=1632261535.027476)
+    def test_reserve_redelivered_is_not_in_use(self, mock_time):
+        # _grpc_call() re-sends a reserve which hit DEADLINE_EXCEEDED or
+        # CANCELLED, so the same reserve can arrive twice. Read as "in
+        # use", reserve_random_free_address() moves on to another address
+        # and leaves this one reserved with nothing holding it (issue
+        # #4987). Only MockMariaDB is exercised here, which is the point:
+        # it has to answer that the way _direct_reserve_address() does, or
+        # every test which reaches IPAM through it proves the wrong thing.
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
+
+        for _ in range(2):
+            self.assertTrue(
+                ipm.reserve('192.168.1.10',
+                            (ObjectType.INSTANCE, TEST_USER_UUID),
+                            ReservationType.INSTANCE, 'nic 0'))
+        self.assertEqual(
+            TEST_USER_UUID,
+            str(ipm.get_reservation('192.168.1.10').user_uuid))
+
     def test_reserve_evict_halo_in_memory(self):
         ipam_uuid = str(uuid.uuid4())
         ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24',

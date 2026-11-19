@@ -2134,6 +2134,14 @@ allocation. This provides:
   only guards against *random* reallocation: a reservation explicitly
   requesting a haloed address (for example an instance create with a static
   `address=`) atomically takes the halo over
+- **Idempotent for a re-sent request**: a database call whose reply is lost is
+  re-sent, so a reserve whose commit landed can arrive a second time and be
+  refused by its own row. That is answered as success rather than as "address
+  in use", because a random allocation which believes an address is in use
+  moves on to another one and leaves this one reserved with nothing holding
+  it. The row has to match the request in every column, including the
+  requesting caller's timestamp, so two genuine requests for one address are
+  still told apart and the second is still refused
 
 ### The ipam_reservations Table
 
