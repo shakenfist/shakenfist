@@ -16,10 +16,10 @@ end.
 """
 
 import ast
+import collections
 import functools
 import os
-
-import testtools
+from unittest import mock
 
 from shakenfist import baseobject
 from shakenfist import exceptions
@@ -27,7 +27,6 @@ from shakenfist.baseobject import DatabaseBackedObject
 from shakenfist.baseobject import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
-from unittest import mock
 
 
 # The audit reads the sources next to baseobject.py, for the reasons
@@ -43,9 +42,12 @@ SKIPPED_DIRECTORIES = ['tests', 'deploy']
 # Writes which may set a state without a reason, each with the reason
 # it is allowed to.
 #
-# An entry is '<path relative to the package>:<function>'. It is not an
-# escape hatch for a new failure path: a failure with nothing to say
-# about itself is the defect this audit exists to stop.
+# An entry is '<path relative to the package>:<function>', and exempts
+# exactly one write in that function: a second bare write added to it,
+# or a same-named method elsewhere in the file, is reported rather than
+# excused along with the first. It is not an escape hatch for a new
+# failure path: a failure with nothing to say about itself is the defect
+# this audit exists to stop.
 BARE_ERROR_STATE_ALLOWED = {
     # The error-to-error normalisation on delete. Both sides are error
     # states, so _state_update() carries the message set when the error
@@ -190,7 +192,7 @@ def find_bare_error_state_writes():
     return tuple(found)
 
 
-class ErrorStateAuditTestCase(testtools.TestCase):
+class ErrorStateAuditTestCase(base.ShakenFistTestCase):
     def test_the_audit_reads_this_checkout(self):
         # If this ever reads an installed copy rather than the tree
         # under test, every assertion below passes vacuously. An
@@ -248,9 +250,13 @@ class ErrorStateAuditTestCase(testtools.TestCase):
                 f'audit wrongly reported {statement}')
 
     def test_no_production_code_enters_an_error_state_bare(self):
+        writes = find_bare_error_state_writes()
+        per_entry = collections.Counter(
+            f'{relative}:{function}' for relative, _, function in writes)
         unexpected = []
-        for relative, lineno, function in find_bare_error_state_writes():
-            if f'{relative}:{function}' in BARE_ERROR_STATE_ALLOWED:
+        for relative, lineno, function in writes:
+            key = f'{relative}:{function}'
+            if key in BARE_ERROR_STATE_ALLOWED and per_entry[key] == 1:
                 continue
             unexpected.append(f'{relative}:{lineno} (in {function})')
 
@@ -260,7 +266,9 @@ class ErrorStateAuditTestCase(testtools.TestCase):
             'recorded, which is the diagnostic dead end of issue 3665. '
             'Call enter_error_state(state, reason) for an error state, '
             'or add an entry to BARE_ERROR_STATE_ALLOWED saying why this '
-            'one cannot be one, or has nothing to say for itself.')
+            'one cannot be one, or has nothing to say for itself. An entry '
+            'exempts one write, so a function listed there which now has '
+            'more than one is reported in full.')
 
     def test_every_allow_list_entry_is_still_real(self):
         # An allow-list entry which no longer matches anything is a

@@ -49,13 +49,15 @@ the probe reads its own undelivered request as a wedged dnsmasq. Every
 DHCP network in CI failed its probe that way. Creating a network now
 brings ``lo`` up, and the probe refuses to call silence an answer when
 it is down, because that silence is about the probe rather than about
-the server (issue 730).
+the server (issue 730). It says so with a status of its own, because a
+namespace built before that change still has ``lo`` down and nothing
+else would ever repair it: the caller brings ``lo`` up and asks again.
 
 The exit status separates "dnsmasq did not answer" from "the probe
 could not be run", because only the first is a reason to rebuild a
-network. Neither may be 1: that is what Python itself exits with for
-an import failure or an uncaught exception, which is exactly the
-failure that has to stay distinguishable from silence.
+network. None may be 1: that is what Python itself exits with for an
+import failure or an uncaught exception, which is exactly the failure
+that has to stay distinguishable from silence.
 """
 
 import random
@@ -107,13 +109,20 @@ IFF_UP = 0x1
 # Exit statuses, see the module docstring. EXIT_COULD_NOT_PROBE is what
 # main() returns for anything it can name; anything else non-zero (1 for
 # an import failure, say) means the same thing to the caller.
+# EXIT_LOOPBACK_DOWN is one such reason, singled out because the caller
+# can repair it.
 EXIT_ANSWERED = 0
 EXIT_COULD_NOT_PROBE = 2
 EXIT_NO_ANSWER = 3
+EXIT_LOOPBACK_DOWN = 4
 
 
 class ProbeImpossible(Exception):
     """The probe cannot say anything about the server either way."""
+
+
+class LoopbackDown(ProbeImpossible):
+    """This namespace's loopback is down, so the request cannot arrive."""
 
 
 def loopback_is_up(path=LOOPBACK_FLAGS_PATH):
@@ -254,7 +263,7 @@ def probe(server_address, client_address, timeout=DEFAULT_TIMEOUT,
     silence that follows is the probe's own.
     """
     if loopback_is_up() is False:
-        raise ProbeImpossible(
+        raise LoopbackDown(
             'the loopback interface is down, so a request to an address '
             'which is local to this network namespace is dropped rather '
             'than delivered')
@@ -290,6 +299,9 @@ def main(argv=None):
     try:
         timeout = float(argv[2]) if len(argv) > 2 else DEFAULT_TIMEOUT
         answered = probe(argv[0], argv[1], timeout=timeout)
+    except LoopbackDown as e:
+        print(f'dhcp_probe: could not probe: {e}', file=sys.stderr)
+        return EXIT_LOOPBACK_DOWN
     except Exception as e:
         print(f'dhcp_probe: could not probe: {e.__class__.__name__}: {e}',
               file=sys.stderr)

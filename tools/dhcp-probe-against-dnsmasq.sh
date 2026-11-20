@@ -87,11 +87,12 @@ CONF
 
     # The loopback as "ip netns add" leaves it. The probe cannot reach
     # dnsmasq, and must say so rather than report silence: exit 3 is read
-    # as a wedged dnsmasq and rebuilds the network.
+    # as a wedged dnsmasq and rebuilds the network. Exit 4 is the probe
+    # naming the down loopback, which the network node then repairs.
     echo "--- loopback as the namespace was born: $(
         ip netns exec ${NS} ip link show lo | head -1)"
-    check 2 "$(probe)" \
-        "a down loopback is reported as a probe which could not run"
+    check 4 "$(probe)" \
+        "a down loopback is reported as such, not as silence"
 
     # What privexec_util.create_network_namespace() now does.
     ip netns exec ${NS} ip link set lo up

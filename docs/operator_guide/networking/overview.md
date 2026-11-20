@@ -669,10 +669,18 @@ network's own router address, so the request is delivered over
 loopback, and a down loopback *drops* a packet rather than refusing to
 send it: the send succeeds and nothing arrives. A namespace created by
 `ip netns add` has its loopback down, which is why creating a network
-now brings it up — on every pass, so that a namespace built by an
-earlier version is repaired without a rebuild. Before that, every DHCP
-network on a node reported its own undelivered request as a wedged
-`dnsmasq` and was queued for a rebuild on every pass.
+now brings it up. Before that, every DHCP network on a node reported
+its own undelivered request as a wedged `dnsmasq` and was queued for a
+rebuild on every pass.
+
+A namespace built by an earlier version still has its loopback down,
+and since a probe which cannot run leaves the network alone, nothing
+would rebuild it. So the probe reports a down loopback with a status of
+its own, and the maintenance pass brings the loopback up and probes
+again, without a rebuild. The network records `brought the network
+namespace loopback interface up` when it does. If the loopback cannot
+be brought up, that is reported like any other probe which could not
+run.
 
 ## Stray vxlan reaping
 

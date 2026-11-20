@@ -109,7 +109,9 @@ def _stream_remote(response, target, blob_uuid):
         # Also reached when the caller disconnects and the generator is
         # closed. Without it the peer connection is held until garbage
         # collection, and a stalled peer can hold it for the whole read
-        # timeout.
+        # timeout. Only once the generator has started, though: see the
+        # call_on_close() where the response is built for the case where
+        # it never does.
         response.close()
 
 
@@ -280,10 +282,18 @@ class BlobDataEndpoint(api_base.Resource):
                 'please retry',
                 suppress_traceback=True)
 
-        return flask.Response(
+        response = flask.Response(
             flask.stream_with_context(
                 _stream_remote(remote, target, blob_uuid)),
             mimetype='text/plain', status=remote.status_code)
+        # Closing a generator which never started does not run its
+        # finally, and some responses never start the body: werkzeug
+        # sends none for a HEAD request, or for a peer which answered
+        # 204 or 304. The WSGI server always closes the response, so
+        # release the peer connection there too. Closing it twice is
+        # harmless.
+        response.call_on_close(remote.close)
+        return response
 
 
 blobs_get_example = """[

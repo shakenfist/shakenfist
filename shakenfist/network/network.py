@@ -38,11 +38,14 @@ from shakenfist.schema.operations.node_net_op \
 from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
 from shakenfist.exceptions import CannotAssignFloatingGateway
+from shakenfist.exceptions import CreateNetworkNamespaceFailed
 from shakenfist.exceptions import DHCPProbeFailed
+from shakenfist.exceptions import DHCPProbeLoopbackDown
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 from shakenfist.util import iptables as util_iptables
 from shakenfist.util import network as util_network
@@ -881,6 +884,31 @@ class Network(dbowo):
                 LOG.with_fields({'network': self}).error(
                     f'Failed to tell instances their network has failed: {e}')
 
+    def _bring_namespace_loopback_up(self):
+        """Repair a namespace whose loopback interface is down.
+
+        Creating a network brings lo up, but only creating it: a
+        namespace built before that, by ``ip netns add``, keeps lo down,
+        and the probe cannot reach the network's own router address
+        through it. Nothing else would repair it, because a probe which
+        cannot run leaves the network looking healthy, so no rebuild
+        comes. Network namespace creation is idempotent and brings lo
+        up whether or not the namespace already existed.
+
+        Raises DHCPProbeFailed if the repair could not be made, which
+        the caller already handles as a probe which could not run.
+        """
+        try:
+            util_concurrency.create_network_namespace(self.uuid)
+        except (CreateNetworkNamespaceFailed,
+                *util_concurrency.PRIVEXEC_TRANSPORT_ERRORS) as e:
+            raise DHCPProbeFailed(
+                f'the namespace loopback is down and could not be brought '
+                f'up: {e.__class__.__name__}: {e}') from e
+        self.add_event(
+            EVENT_TYPE_STATUS,
+            'brought the network namespace loopback interface up')
+
     def is_dnsmasq_serving_dhcp(self):
         """Is this network's dnsmasq answering DHCP?
 
@@ -890,7 +918,11 @@ class Network(dbowo):
         """
         d = self._get_dnsmasq_object()
         try:
-            is_serving = d.is_serving_dhcp()
+            try:
+                is_serving = d.is_serving_dhcp()
+            except DHCPProbeLoopbackDown:
+                self._bring_namespace_loopback_up()
+                is_serving = d.is_serving_dhcp()
         except DHCPProbeFailed as e:
             # Not knowing is not the same as dnsmasq being wedged, and
             # only the latter is worth a rebuild. Say so where an

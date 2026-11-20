@@ -13,6 +13,7 @@ from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.exceptions import DHCPProbeFailed
+from shakenfist.exceptions import DHCPProbeLoopbackDown
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.managed_executables import managedexecutable
@@ -228,7 +229,9 @@ class DnsMasq(managedexecutable.ManagedExecutable):
         which could not be run -- privexec unreachable, the module not
         importable, anything but the probe's own "no answer" status --
         raises DHCPProbeFailed instead, because it says nothing about
-        dnsmasq and must not get a healthy network rebuilt.
+        dnsmasq and must not get a healthy network rebuilt. A down
+        loopback in the namespace raises DHCPProbeLoopbackDown, the
+        subclass for the one such reason the caller can repair.
         """
         if not self.provide_dhcp:
             return True
@@ -257,6 +260,9 @@ class DnsMasq(managedexecutable.ManagedExecutable):
             if e.exit_code == dhcp_probe.EXIT_NO_ANSWER:
                 return False
             stderr = (e.stderr or '').strip()[-200:]
+            if e.exit_code == dhcp_probe.EXIT_LOOPBACK_DOWN:
+                raise DHCPProbeLoopbackDown(
+                    f'the DHCP probe exited {e.exit_code}: {stderr}') from e
             raise DHCPProbeFailed(
                 f'the DHCP probe exited {e.exit_code}: {stderr}') from e
         except util_concurrency.PRIVEXEC_TRANSPORT_ERRORS as e:

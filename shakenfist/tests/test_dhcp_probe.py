@@ -38,7 +38,9 @@ from functools import partial
 from unittest import mock
 
 from shakenfist.daemons.network import maintain
+from shakenfist.exceptions import CreateNetworkNamespaceFailed
 from shakenfist.exceptions import DHCPProbeFailed
+from shakenfist.exceptions import DHCPProbeLoopbackDown
 from shakenfist.exceptions import MissingPrivExecSocket
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.exceptions import UnknownPrivExecReplyException
@@ -155,9 +157,12 @@ class ProbeTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, len(sock.sent))
 
     def test_a_reply_from_anywhere_else_is_not_believed(self):
-        # The namespace is bridged to the guests. A guest which got a
-        # packet with our transaction id to our port must not be able
-        # to make a wedged dnsmasq look healthy.
+        # The namespace is bridged to the guests, so stray DHCP traffic
+        # on the segment reaches the probe's socket and must not be
+        # taken for dnsmasq answering. This is not a defence against a
+        # hostile guest, which can spoof the router's address; that
+        # guest also needs the random transaction id, and could only
+        # hide a failure of its own network.
         sock = _FakeSocket([_reply(self.XID, dhcp_probe.DHCPACK)])
         sock.source = ('10.0.0.99', 67)
         with mock.patch.object(
@@ -456,13 +461,19 @@ class LoopbackTestCase(base.ShakenFistTestCase):
 
     def test_a_down_loopback_is_not_reported_as_no_answer(self):
         # The status which matters: EXIT_NO_ANSWER is read as a wedged
-        # dnsmasq and rebuilds the network, EXIT_COULD_NOT_PROBE is
-        # not.
+        # dnsmasq and rebuilds the network. A down loopback has its own
+        # status, because the caller repairs it.
         with mock.patch.object(dhcp_probe, 'loopback_is_up',
                                return_value=False):
             self.assertEqual(
-                dhcp_probe.EXIT_COULD_NOT_PROBE,
+                dhcp_probe.EXIT_LOOPBACK_DOWN,
                 dhcp_probe.main(['10.0.0.1', '10.0.0.1']))
+
+    def test_the_exit_statuses_are_distinct_and_not_python_s_own(self):
+        statuses = [dhcp_probe.EXIT_ANSWERED, dhcp_probe.EXIT_COULD_NOT_PROBE,
+                    dhcp_probe.EXIT_NO_ANSWER, dhcp_probe.EXIT_LOOPBACK_DOWN]
+        self.assertEqual(len(statuses), len(set(statuses)))
+        self.assertNotIn(1, statuses)
 
     def test_an_unknown_loopback_does_not_stop_the_probe(self):
         xid = 0x22222222
@@ -549,6 +560,17 @@ class IsServingDhcpTestCase(base.ShakenFistTestCase):
                 'shakenfist.managed_executables.dnsmasq.util_concurrency.'
                 'execute', side_effect=TypeError('unexpected keyword')):
             self.assertRaises(TypeError, d.is_serving_dhcp)
+
+    def test_a_down_loopback_is_reported_as_repairable(self):
+        d = self._dnsmasq()
+        with mock.patch(
+                'shakenfist.managed_executables.dnsmasq.util_concurrency.'
+                'execute',
+                side_effect=ProcessExecutionError(
+                    '', 'the loopback interface is down',
+                    dhcp_probe.EXIT_LOOPBACK_DOWN, 'probe')):
+            e = self.assertRaises(DHCPProbeLoopbackDown, d.is_serving_dhcp)
+        self.assertIn('loopback', str(e))
 
     def test_a_protocol_bug_is_not_could_not_probe(self):
         d = self._dnsmasq()
@@ -708,7 +730,61 @@ class IsDnsmasqServingDhcpTestCase(base.ShakenFistTestCase):
         d.is_serving_dhcp.side_effect = side_effect
         n.is_dnsmasq_serving_dhcp = partial(
             Network.is_dnsmasq_serving_dhcp, n)
+        n._bring_namespace_loopback_up = partial(
+            Network._bring_namespace_loopback_up, n)
         return n
+
+    def test_a_down_loopback_is_repaired_without_a_rebuild(self):
+        # A namespace built before networks were created with lo up
+        # keeps it down, and a probe which cannot run leaves the network
+        # looking healthy, so no rebuild ever comes to repair it. The
+        # readiness check repairs it itself, and then asks again.
+        n = self._network(side_effect=[
+            DHCPProbeLoopbackDown('lo is down'), False])
+        with mock.patch.object(
+                network_module.util_concurrency,
+                'create_network_namespace') as mock_create:
+            # The answer after the repair is the answer: here, wedged.
+            self.assertFalse(n.is_dnsmasq_serving_dhcp())
+
+        mock_create.assert_called_once_with(self.NETWORK_UUID)
+        self.assertEqual(
+            2, n._get_dnsmasq_object.return_value.is_serving_dhcp.call_count)
+        messages = self._messages(n)
+        self.assertIn(
+            'brought the network namespace loopback interface up', messages)
+        self.assertNotIn(
+            'could not check whether dnsmasq is answering DHCP', messages)
+
+    def test_a_loopback_which_cannot_be_repaired_could_not_be_probed(self):
+        # Not a reason to rebuild either: it is reported like any other
+        # probe which could not run.
+        n = self._network(side_effect=DHCPProbeLoopbackDown('lo is down'))
+        for error in (CreateNetworkNamespaceFailed(), MissingPrivExecSocket()):
+            network_module.DHCP_PROBE_FAILURE_REPORTED.clear()
+            n.add_event.reset_mock()
+            with mock.patch.object(
+                    network_module.util_concurrency,
+                    'create_network_namespace', side_effect=error):
+                self.assertTrue(n.is_dnsmasq_serving_dhcp())
+            self.assertEqual(
+                ['could not check whether dnsmasq is answering DHCP'],
+                self._messages(n))
+            self.assertIn(
+                'could not be brought up',
+                n.add_event.call_args.kwargs['extra']['error'])
+
+    def test_a_repair_which_does_not_take_is_not_retried_in_a_loop(self):
+        # One repair and one more probe per pass: if lo is still down
+        # the second probe's failure is the answer for this pass.
+        n = self._network(side_effect=DHCPProbeLoopbackDown('lo is down'))
+        with mock.patch.object(
+                network_module.util_concurrency,
+                'create_network_namespace') as mock_create:
+            self.assertTrue(n.is_dnsmasq_serving_dhcp())
+        mock_create.assert_called_once_with(self.NETWORK_UUID)
+        self.assertEqual(
+            2, n._get_dnsmasq_object.return_value.is_serving_dhcp.call_count)
 
     def test_a_probe_which_could_not_run_does_not_rebuild(self):
         # Not knowing is not the same as dnsmasq being wedged.

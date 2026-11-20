@@ -324,9 +324,10 @@ def create_network_namespace(namespace):
     # still answering, so with lo down every healthy DHCP network
     # reported itself wedged and was queued for a rebuild (issue 730).
     #
-    # This runs on every create pass rather than only when the
-    # namespace is added, so that a namespace built before this heals
-    # on the next pass.
+    # This runs whenever this is called, not only when the namespace is
+    # added: a namespace built before this keeps lo down, and the DHCP
+    # readiness check calls this to repair it when the probe reports a
+    # down loopback (Network._bring_namespace_loopback_up()).
     _, _, returncode = command_helper(
         locate_command('ip'), 'netns', 'exec', namespace,
         locate_command('ip'), 'link', 'set', 'lo', 'up')

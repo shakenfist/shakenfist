@@ -195,6 +195,36 @@ class BlobDataPeerUnreachableTestCase(base.ShakenFistTestCase):
 
         response.close.assert_called_once_with()
 
+    def test_a_body_which_is_never_started_releases_the_peer_connection(
+            self):
+        # werkzeug sends no body for a HEAD request, so the generator
+        # never starts and its finally never runs. Without a close on
+        # the response the peer socket waits for garbage collection.
+        remote = mock.MagicMock()
+        remote.status_code = 200
+        remote.iter_content.return_value = iter([b'blob', b'data'])
+
+        with mock.patch('shakenfist.external_api.blob.Blob.from_db',
+                        return_value=self._blob_held_on('sf-5')):
+            with mock.patch(
+                    'shakenfist.external_api.blob.Blob.filepath',
+                    return_value='/nonexistent/blob'):
+                with mock.patch(
+                        'shakenfist.external_api.blob.get_api_token',
+                        return_value='Bearer token'):
+                    with mock.patch(
+                            'shakenfist.external_api.blob.requests.request',
+                            return_value=remote):
+                        resp = self.client.head(
+                            '/blobs/%s/data' % self.BLOB_UUID,
+                            headers=self.auth)
+                        self.assertEqual(200, resp.status_code)
+                        self.assertEqual(b'', resp.get_data())
+                        resp.close()
+
+        remote.iter_content.assert_not_called()
+        remote.close.assert_called_with()
+
     def test_a_reachable_holder_still_streams(self):
         response = mock.MagicMock()
         response.status_code = 200

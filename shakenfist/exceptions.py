@@ -655,6 +655,16 @@ class DHCPProbeFailed(Exception):
     ...
 
 
+class DHCPProbeLoopbackDown(DHCPProbeFailed):
+    """The probe could not be run because the namespace's lo is down.
+
+    The one reason a probe cannot run which the caller can repair, and
+    must: a namespace built before networks were created with lo up
+    keeps it down, and nothing else brings it up without a rebuild.
+    """
+    ...
+
+
 class MissingPrivExecSocket(Exception):
     ...
 

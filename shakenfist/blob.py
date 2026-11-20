@@ -1343,7 +1343,9 @@ def http_fetch(
             # The mismatch is the fact the caller needs. Failing to tidy
             # up after it must not replace it with a filesystem error,
             # which would skip the caller's bad checksum handling and
-            # the event it records.
+            # the event it records. The blob row, never registered and
+            # with no locations, is left for the unreferenced blob
+            # reaper rather than deleted here, for the same reason.
             try:
                 os.unlink(dest_path + '.partial')
             except OSError as e:
