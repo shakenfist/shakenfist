@@ -347,6 +347,27 @@ def _shapes_largest_first(shapes):
                            -shapes[index].disk_gb, index))
 
 
+def _weighted_shuffle(candidates, weights):
+    """Order candidates at random, each weighted by ``weights[candidate]``.
+
+    Efraimidis-Spirakis A-Res: drawing a key of ``random.random() **
+    (1 / weight)`` per candidate and sorting descending is weighted
+    sampling *without* replacement, so this orders the whole list
+    rather than drawing one winner -- the caller walks the tail when a
+    capacity guard refuses the head. A candidate's chance of coming
+    first is its share of the total weight.
+
+    This is arithmetic on ``random`` and nothing else. It lives here,
+    apart from the decision which computes the weights, so that the
+    statistics of the draw can be checked with many cheap draws rather
+    than with many whole scheduling passes (issue 4992).
+    """
+    return sorted(
+        candidates,
+        key=lambda c: random.random() ** (1.0 / weights[c]),
+        reverse=True)
+
+
 def get_network_node():
     global CACHED_NETWORK_NODE
 
@@ -1858,10 +1879,7 @@ class Scheduler:
                     0.1,
                     (config.SCHEDULER_TARGET_LOAD * denominators[c] -
                      raw_load)) * ram_headrooms[c]
-            tier.sort(
-                key=lambda c: random.random() ** (1.0 / weights[c]),
-                reverse=True)
-            ordered.extend(tier)
+            ordered.extend(_weighted_shuffle(tier, weights))
         candidates = ordered
         add_event_multi(
             EVENT_TYPE_AUDIT, related_objects,

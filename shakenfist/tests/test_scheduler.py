@@ -85,6 +85,22 @@ class SchedulerTestCase(base.ShakenFistTestCase):
                 for n in self.mock_mariadb.node_names
                 if n != 'node1_net'}
 
+    def _events(self, aem, name):
+        """Every call which published this event, in the order published."""
+        return [c for c in aem.call_args_list if c.args[2] == name]
+
+    def _final_weights(self, aem):
+        """The selection weights the decision published, by node uuid.
+
+        The ``schedule final candidates`` event carries the weight the
+        ordering gave every candidate, which is the deterministic half
+        of the selection -- read it rather than estimating it from a
+        sample of draws.
+        """
+        final = self._events(aem, 'schedule final candidates')
+        self.assertEqual(1, len(final))
+        return final[0].kwargs['extra']['weights']
+
     def _snapshot(self, s, capacity=None):
         """The two accounts a filter reads, as the decision hands them over.
 
@@ -495,6 +511,96 @@ class ScheduleInputsFreshnessTestCase(SchedulerTestCase):
         self.assertIsNone(extra['oldest_node_metrics_age_seconds'])
 
 
+class WeightedShuffleTestCase(base.ShakenFistTestCase):
+    """The draw itself: that an Efraimidis-Spirakis key honours its weight.
+
+    This is arithmetic on ``random`` -- no scheduler, no metrics rows,
+    no events -- so thousands of draws cost microseconds.
+    LoadAwareOrderingTestCase and RamAwareOrderingTestCase make the
+    other half of the claim, that the decision computes the weights it
+    means to, by reading the weights out of the event which publishes
+    them (issue 4992).
+    """
+
+    DRAWS = 20000
+
+    def _first_places(self, weights):
+        """How often each candidate led, over many draws."""
+        candidates = sorted(weights)
+        wins = collections.Counter()
+        for _ in range(self.DRAWS):
+            ordered = scheduler._weighted_shuffle(candidates, weights)
+            wins[ordered[0]] += 1
+        return wins
+
+    def test_a_double_weight_leads_about_twice_as_often(self):
+        # The load headroom shape from LoadAwareOrderingTestCase: the
+        # weights the decision computes there are 6.1 and 12.1, and a
+        # candidate's share of first places is its share of the total
+        # weight.
+        random.seed(42)
+        wins = self._first_places({'small': 6.1, 'big': 12.1})
+        ratio = wins['big'] / wins['small']
+        self.assertTrue(
+            1.83 <= ratio <= 2.13,
+            f'Expected a 12.1:6.1 weighting to lead {12.1 / 6.1:.3f}x as '
+            f'often, got {ratio} ({wins})')
+
+    def test_a_far_larger_weight_dominates(self):
+        # The RAM commitment shape from RamAwareOrderingTestCase: 0.01
+        # against 0.095, a 9.5x weighting. Small weights mean large key
+        # exponents, which is the arm of this arithmetic the ordering
+        # tests reach.
+        random.seed(42)
+        wins = self._first_places({'committed': 0.01, 'free': 0.095})
+        ratio = wins['free'] / wins['committed']
+        self.assertTrue(
+            8.5 <= ratio <= 10.5,
+            f'Expected a 0.095:0.01 weighting to lead 9.5x as often, got '
+            f'{ratio} ({wins})')
+
+    def test_equal_weights_spread_evenly(self):
+        # Nodes which look alike stay interchangeable, which is what
+        # keeps a burst scheduled against one stale snapshot from
+        # stacking onto a single "best" node.
+        random.seed(42)
+        wins = self._first_places({'a': 4.0, 'b': 4.0, 'c': 4.0})
+        for node in ('a', 'b', 'c'):
+            share = wins[node] / self.DRAWS
+            self.assertTrue(
+                0.31 <= share <= 0.36,
+                f'Expected {node} to lead about a third of the time, got '
+                f'{share} ({wins})')
+
+    def test_the_whole_list_is_ordered_not_one_winner_drawn(self):
+        # Sampling without replacement: the caller walks the tail when a
+        # capacity guard refuses the head, so every candidate has to
+        # still be there, exactly once, however lopsided the weights.
+        random.seed(42)
+        weights = {'a': 0.1, 'b': 12.0, 'c': 0.1, 'd': 3.0}
+        for _ in range(1000):
+            ordered = scheduler._weighted_shuffle(sorted(weights), weights)
+            self.assertEqual(['a', 'b', 'c', 'd'], sorted(ordered))
+            self.assertEqual(4, len(ordered))
+
+    def test_a_tiny_weight_is_ordered_last_far_more_than_first(self):
+        # The tail is weighted too, not merely the head.
+        random.seed(42)
+        firsts = 0
+        lasts = 0
+        weights = {'tiny': 0.1, 'big': 9.0, 'bigger': 12.0}
+        for _ in range(self.DRAWS):
+            ordered = scheduler._weighted_shuffle(sorted(weights), weights)
+            if ordered[0] == 'tiny':
+                firsts += 1
+            if ordered[-1] == 'tiny':
+                lasts += 1
+        self.assertGreater(lasts, 10 * firsts, f'{firsts} vs {lasts}')
+
+    def test_an_empty_candidate_list_orders_to_nothing(self):
+        self.assertEqual([], scheduler._weighted_shuffle([], {}))
+
+
 class LoadAwareOrderingTestCase(SchedulerTestCase):
     """Test load-per-thread bucketing and headroom-weighted selection.
 
@@ -567,9 +673,16 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
 
     def test_selection_is_weighted_by_headroom(self):
         # Two nodes in the same bucket but with roughly 2x different load
-        # headroom: the bigger node should lead the list about twice as
-        # often. Fixed seed makes the draw deterministic; the band is
-        # deliberately loose.
+        # headroom: the bigger node is weighted to lead the list about
+        # twice as often.
+        #
+        # The weights are the deterministic half of the decision, and
+        # the final-candidates event already publishes them, so this
+        # reads the weights the decision computed and asserts the ratio
+        # exactly. That the draw honours a weight ratio is arithmetic on
+        # random, checked over many cheap draws in
+        # WeightedShuffleTestCase rather than by rerunning the whole
+        # scheduling pipeline a thousand times (issue 4992).
         self.mock_mariadb.set_node_metrics_same()
         # weight = 0.75 * 12 - 2.9 = 6.1, normalised load 0.24 (bucket 0)
         self.mock_mariadb.update_node_metrics('node2', {
@@ -583,26 +696,22 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
 
         fake_inst = self.mock_mariadb.create_instance('fake-inst')
         random.seed(42)
-        s = scheduler.Scheduler()
-        wins = {self._node_uuid('node2'): 0, self._node_uuid('node3'): 0}
-        for _ in range(1000):
-            # These draws can take minutes on a loaded CI worker; keep
-            # the mock's metrics rows fresh so the scheduler's periodic
-            # refresh does not discard them as stale mid-test.
-            for row in self.mock_mariadb.node_metrics_store.values():
-                row['timestamp'] = time.time()
-            nodes = s.find_candidates(fake_inst)
-            self.assertSetEqual(
-                self._node_uuids_set('node2', 'node3'), set(nodes[:2]))
-            self.assertEqual(self._node_uuid('node4'), nodes[-1])
-            wins[nodes[0]] += 1
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            nodes = scheduler.Scheduler().find_candidates(fake_inst)
 
-        ratio = (wins[self._node_uuid('node3')] /
-                 wins[self._node_uuid('node2')])
-        self.assertTrue(
-            1.5 <= ratio <= 3.0,
-            f'Expected node3 to win 1.5-3x as often as node2, got {ratio} '
-            f'({wins})')
+        # The ordering claim: the two nodes in the winning bucket lead,
+        # and the busy node is behind them rather than discarded.
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node3'), set(nodes[:2]))
+        self.assertEqual(self._node_uuid('node4'), nodes[-1])
+
+        weights = self._final_weights(aem)
+        self.assertAlmostEqual(6.1, weights[self._node_uuid('node2')])
+        self.assertAlmostEqual(12.1, weights[self._node_uuid('node3')])
+        self.assertAlmostEqual(
+            12.1 / 6.1,
+            weights[self._node_uuid('node3')] /
+            weights[self._node_uuid('node2')])
 
     def test_missing_cpu_schedulable_falls_back_to_synthetic(self):
         # Metrics rows written by an older resources daemon lack the
@@ -1616,9 +1725,13 @@ class RamAwareOrderingTestCase(SchedulerTestCase):
 
     def test_ram_commitment_weights_selection_within_a_band(self):
         # node2 and node3 share the winning band with equal CPU load
-        # headroom; node2 is 90% RAM committed, node3 at 5%. node3 must
-        # draw a clearly larger share of first places. Fixed seed makes
-        # the draw deterministic; the bound is deliberately loose.
+        # headroom; node2 is 90% RAM committed, node3 at 5%. node3 is
+        # therefore weighted to draw a far larger share of first places.
+        #
+        # As with the load headroom case, the weights are read from the
+        # final-candidates event and the ratio asserted exactly; the
+        # draw's own statistics are WeightedShuffleTestCase's
+        # (issue 4992).
         self._seed_metrics()
         for n in ('node2', 'node3'):
             self.mock_mariadb.update_node_metrics(n, {'cpu_load_1': 17.6})
@@ -1632,26 +1745,23 @@ class RamAwareOrderingTestCase(SchedulerTestCase):
 
         fake_inst = self.mock_mariadb.create_instance('fake-inst')
         random.seed(42)
-        s = scheduler.Scheduler()
-        wins = {self._node_uuid('node2'): 0, self._node_uuid('node3'): 0}
-        for _ in range(1000):
-            # These draws can take minutes on a loaded CI worker; keep
-            # the mock's metrics rows fresh so the scheduler's periodic
-            # refresh does not discard them as stale mid-test.
-            for row in self.mock_mariadb.node_metrics_store.values():
-                row['timestamp'] = time.time()
-            nodes = s.find_candidates(fake_inst)
-            self.assertSetEqual(
-                self._node_uuids_set('node2', 'node3'), set(nodes[:2]))
-            self.assertEqual(self._node_uuid('node4'), nodes[-1])
-            wins[nodes[0]] += 1
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            nodes = scheduler.Scheduler().find_candidates(fake_inst)
 
-        ratio = (wins[self._node_uuid('node3')] /
-                 wins[self._node_uuid('node2')])
-        self.assertGreater(
-            ratio, 3.0,
-            f'Expected node3 to lead far more often than node2, got {ratio} '
-            f'({wins})')
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node3'), set(nodes[:2]))
+        self.assertEqual(self._node_uuid('node4'), nodes[-1])
+
+        # Both nodes are above the target load, so the load term floors
+        # at 0.1 for each and the RAM headroom alone separates them:
+        # 0.1 * 0.1 against 0.1 * 0.95.
+        weights = self._final_weights(aem)
+        self.assertAlmostEqual(0.01, weights[self._node_uuid('node2')])
+        self.assertAlmostEqual(0.095, weights[self._node_uuid('node3')])
+        self.assertAlmostEqual(
+            9.5,
+            weights[self._node_uuid('node3')] /
+            weights[self._node_uuid('node2')])
 
     def test_measured_allocation_also_feeds_the_committed_fraction(self):
         # The ranking charges whichever ledger is larger, as the CPU
@@ -3250,10 +3360,6 @@ class MultisetPlacementTestCase(SchedulerTestCase):
             self.mock_mariadb.set_node_capacity(
                 self._node_uuid(node), limit_cpus=64,
                 limit_memory_mb=limit_memory_mb)
-
-    def _events(self, aem, name):
-        """Every call which published this event, in the order published."""
-        return [c for c in aem.call_args_list if c.args[2] == name]
 
     def test_a_set_which_fits_places_every_shape(self):
         self.mock_mariadb.set_node_metrics_same(self._baseline())
