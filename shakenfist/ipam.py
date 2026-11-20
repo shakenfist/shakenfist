@@ -217,6 +217,16 @@ class IPAM(dbo):
         the user explicitly asked for may pass evict_halo=True to atomically
         take over a deletion-halo reservation; a real reservation is never
         taken over.
+
+        A halo which has outlived IP_DELETION_HALO_DURATION is taken over
+        without evict_halo, by the same statement which does the reserving.
+        This used to be done the other way around: every reservation first
+        deleted every expired halo on the IPAM, which cost a write RPC per
+        *attempt* and bought nothing on the second and later attempts of an
+        allocation, since they run microseconds apart and nothing new can
+        have expired (issue #4175). Expired halos are now reaped by the
+        allocation loop in reserve_random_free_address(), once per
+        allocation, which is where the accounting that cares about them is.
         """
         if not address:
             raise exceptions.InvalidIPAMAddress(
@@ -240,13 +250,15 @@ class IPAM(dbo):
             comment=comment or None
         )
 
-        self.release_haloed(config.IP_DELETION_HALO_DURATION)
-
         if self._in_memory_only:
             existing = self.__in_memory_store.get(address)
-            if existing and not (
-                    evict_halo and
-                    existing.reservation_type == ReservationType.DELETION_HALO):
+            # The same two takeovers the reserve statement allows, so an
+            # in-memory IPAM answers a reserve as a stored one would.
+            if existing is not None and not (
+                    (evict_halo and existing.reservation_type ==
+                     ReservationType.DELETION_HALO)
+                    or self._should_free(
+                        existing, config.IP_DELETION_HALO_DURATION)):
                 return False
             self.__in_memory_store[address] = reservation
             return True
@@ -350,6 +362,19 @@ class IPAM(dbo):
     def reserve_random_free_address(self, unique_label_tuple: tuple[ObjectType, str],
                                     address_type: ReservationType,
                                     comment: str) -> str:
+        # Reap expired deletion halos once, here, rather than once per
+        # reservation attempt below. An expired halo is a free address
+        # which still has a row, and a row is what in_use counts, so the
+        # fast path and the linear scan both want them gone -- but they
+        # want it once: successive attempts run microseconds apart, so
+        # attempts 2..N deleted nothing and still paid a round trip, a
+        # transaction and a commit each, up to about 250 of them for one
+        # allocation on a /24 (issue #4175). Doing it before the fast path
+        # rather than inside reserve() also makes the congestion test
+        # truthful, where before it ran against a count which still
+        # included every expired halo.
+        self.release_haloed(config.IP_DELETION_HALO_DURATION)
+
         # Fast path give up for full networks
         if self.in_use_counter == self.num_addresses:
             raise exceptions.CongestedNetwork('No free addresses on network')
