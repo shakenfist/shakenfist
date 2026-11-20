@@ -700,6 +700,20 @@ class BlobDeleteReferencesTestCase(base.ShakenFistTestCase):
 
         self.db.remove_all_references_from.assert_not_called()
 
+    def test_delete_from_error_removes_references_held(self):
+        # The transition the per-blob sweep performs on an errored blob
+        # (issue 5001). Error is not a resting place precisely because
+        # the blob still holds its references while it is in it: a thin
+        # snapshot which failed keeps the blob it was taken from above a
+        # reference count of zero until this transition happens.
+        self.db.get_state.return_value = State(
+            value='error', update_time=1234567890.0)
+
+        self.blob.state = blob.Blob.STATE_DELETED
+
+        self.db.remove_all_references_from.assert_called_once_with(
+            ObjectType.BLOB, self.blob.uuid)
+
     def test_deleting_again_retries_the_removal(self):
         # remove_all_references_from() returns 0 rather than raising on a
         # database error, so a repeated delete is a free, idempotent retry.
