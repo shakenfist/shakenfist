@@ -7,6 +7,7 @@ from unittest import mock
 
 from grpc_health.v1 import health_pb2
 
+from shakenfist import mariadb
 from shakenfist.external_api import health
 from shakenfist.tests import base
 
@@ -142,3 +143,49 @@ class StartCheckerTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(1, len(created))
         self.assertIsNotNone(health._checker_thread)
+
+
+class CheckerReapsObjectCacheTestCase(base.ShakenFistTestCase):
+    """The sf-api worker's residency bound (issue 3944).
+
+    An sf-api worker is not a Daemon and has no idle loop, so the cache's
+    own accessors are the only other reap call sites it reaches -- and a
+    worker which served one instance read and then went quiet makes no
+    more accesses. The readiness checker thread is what bounds how long
+    that instance's ssh_key and user_data stay in the worker.
+    """
+
+    def setUp(self):
+        super().setUp()
+        health._reset_for_test()
+        self.addCleanup(health._reset_for_test)
+        mariadb._OBJECT_CACHE.clear()
+        self.addCleanup(mariadb._OBJECT_CACHE.clear)
+        self.addCleanup(
+            setattr, mariadb, '_OBJECT_CACHE_NEXT_REAP', 0.0)
+
+    def _quiet_worker_with_an_expired_instance(self, clock):
+        mariadb._OBJECT_CACHE_NEXT_REAP = 0.0
+        mariadb._object_cache_put(
+            'instance', 'secret-bearing', object(), ttl=300)
+        # The put reaped too, so the next reap is a full interval away;
+        # move past both it and the entry's TTL with no further access.
+        clock[0] += 300 + mariadb.OBJECT_CACHE_REAP_INTERVAL + 1
+
+    def test_a_checker_pass_reaps_a_quiet_worker(self):
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            self._quiet_worker_with_an_expired_instance(clock)
+            health._checker_iteration(_serving_stub())
+        self.assertEqual({}, mariadb._OBJECT_CACHE)
+
+    def test_a_checker_pass_reaps_when_the_database_is_unreachable(self):
+        # The reap must not depend on the poll succeeding: a worker cut off
+        # from sf-database is still holding what it last read.
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            self._quiet_worker_with_an_expired_instance(clock)
+            with mock.patch.object(
+                    health, '_build_stub', side_effect=RuntimeError('down')):
+                self.assertIsNone(health._checker_iteration(None))
+        self.assertEqual({}, mariadb._OBJECT_CACHE)

@@ -74,11 +74,15 @@ class FinalObjectStatesTestCase(base.ShakenFistTestCase):
             for state in constants.FINAL_OBJECT_STATES:
                 self.assertIn(state, states, str(object_type))
 
-    def test_the_shared_list_is_not_mutated_by_a_lookup(self):
-        # final_object_states() hands out a module-level list, so a
-        # caller which appended to one would widen it for every type.
-        before = list(constants.FINAL_OBJECT_STATES)
-        constants.final_object_states('net_op')
-        constants.final_object_states(ObjectType.INSTANCE)
-        self.assertEqual(before, constants.FINAL_OBJECT_STATES)
+    def test_a_caller_cannot_widen_the_states_for_anyone_else(self):
+        # The result goes straight into a hard delete's state filter, so
+        # a caller which appended to a shared list would widen what the
+        # sweep deletes for every type for the rest of the process.
+        for object_type in ('net_op', ObjectType.INSTANCE):
+            mine = constants.final_object_states(object_type)
+            mine.append('created')
+            self.assertNotIn(
+                'created', constants.final_object_states(object_type),
+                str(object_type))
+        self.assertNotIn('created', constants.FINAL_OBJECT_STATES)
         self.assertNotIn('error', constants.FINAL_OBJECT_STATES)

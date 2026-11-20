@@ -668,12 +668,13 @@ class BaseClusterOperation(BaseOperation):
                 self.coalesce_folded = len(folded)
                 if folded:
                     # Emitted against the coalescing target as well as
-                    # the operation. An operation is hard deleted thirty
-                    # seconds after it reaches a final state and takes
-                    # its event_objects rows with it (#3864), so an
-                    # event recorded only against the survivor is
-                    # unreadable within a minute of the fold happening
-                    # -- which is why nothing noticed this event had
+                    # the operation. An operation is hard deleted
+                    # CLUSTER_OPERATION_RETENTION seconds after it
+                    # reaches a final state and takes its event_objects
+                    # rows with it (#3864), so an event recorded only
+                    # against the survivor is unreadable soon after the
+                    # fold happens -- which, when that window was thirty
+                    # seconds, is why nothing noticed this event had
                     # never fired at all (#3878). The target outlives
                     # the operation, so the same event on the target is
                     # still there to be queried and asserted on. The

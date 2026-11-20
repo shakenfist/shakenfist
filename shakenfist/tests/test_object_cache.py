@@ -36,9 +36,12 @@ class ObjectCacheCoreTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
         # The cache and its reap timer are process-global; isolate each
-        # test.
+        # test, and leave the timer as found rather than holding a stamp
+        # from a mocked clock for whatever test runs next.
         mariadb._OBJECT_CACHE.clear()
         mariadb._OBJECT_CACHE_NEXT_REAP = 0.0
+        self.addCleanup(
+            setattr, mariadb, '_OBJECT_CACHE_NEXT_REAP', 0.0)
         self.addCleanup(mariadb._OBJECT_CACHE.clear)
         self.key = uuid.uuid4()
 
@@ -110,6 +113,8 @@ class ObjectCacheWiringTestCase(base.ShakenFistTestCase):
         super().setUp()
         mariadb._OBJECT_CACHE.clear()
         mariadb._OBJECT_CACHE_NEXT_REAP = 0.0
+        self.addCleanup(
+            setattr, mariadb, '_OBJECT_CACHE_NEXT_REAP', 0.0)
         self.addCleanup(mariadb._OBJECT_CACHE.clear)
         self.uuid = uuid.uuid4()
 
@@ -244,6 +249,8 @@ class ObjectCacheExpiryReapTestCase(base.ShakenFistTestCase):
         super().setUp()
         mariadb._OBJECT_CACHE.clear()
         mariadb._OBJECT_CACHE_NEXT_REAP = 0.0
+        self.addCleanup(
+            setattr, mariadb, '_OBJECT_CACHE_NEXT_REAP', 0.0)
         self.addCleanup(mariadb._OBJECT_CACHE.clear)
 
     def test_an_expired_entry_nothing_reads_again_is_reclaimed(self):
@@ -290,7 +297,11 @@ class ObjectCacheExpiryReapTestCase(base.ShakenFistTestCase):
             self.assertEqual(1, mariadb.reap_expired_object_cache_entries())
         self.assertEqual({}, mariadb._OBJECT_CACHE)
 
-    def test_the_gauge_follows_the_reap(self):
+    def test_the_gauge_and_the_counter_follow_the_reap(self):
+        # The counter is the operator's evidence that the residency bound
+        # is working, so a reap which drops entries without counting them
+        # would hide exactly the thing it exists to show.
+        reaped_before = mariadb.OBJECT_CACHE_EXPIRED_REAPED._value.get()
         clock = [1000.0]
         with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
             for i in range(5):
@@ -298,13 +309,28 @@ class ObjectCacheExpiryReapTestCase(base.ShakenFistTestCase):
             self.assertEqual(5, mariadb.OBJECT_CACHE_SIZE._value.get())
 
             clock[0] = 2000.0
-            mariadb.reap_expired_object_cache_entries(force=True)
+            self.assertEqual(
+                5, mariadb.reap_expired_object_cache_entries(force=True))
         self.assertEqual(0, mariadb.OBJECT_CACHE_SIZE._value.get())
+        self.assertEqual(
+            5,
+            mariadb.OBJECT_CACHE_EXPIRED_REAPED._value.get() - reaped_before)
+
+    def test_a_reap_which_is_not_due_does_not_take_the_lock(self):
+        # The reap call is on every cached read, and is almost never due.
+        # Taking the cache lock only to find that out doubled the lock
+        # traffic on the hottest read path.
+        mariadb._OBJECT_CACHE_NEXT_REAP = time.monotonic() + 3600
+        lock = mock.MagicMock()
+        with mock.patch.object(mariadb, '_OBJECT_CACHE_LOCK', lock):
+            self.assertEqual(0, mariadb.reap_expired_object_cache_entries())
+        lock.__enter__.assert_not_called()
 
     def test_an_access_reaps_the_rest_of_the_cache(self):
-        # The hook that covers a process with no idle loop, such as an
-        # sf-api worker: a read of one key reclaims entries under every
-        # other key too, once per interval.
+        # The hook that covers a process still doing cache work: a read of
+        # one key reclaims entries under every other key too, once per
+        # interval. It does nothing for a process which has gone quiet;
+        # Daemon.idle() and the sf-api readiness checker cover those.
         clock = [1000.0]
         with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
             mariadb.reap_expired_object_cache_entries()
@@ -369,6 +395,36 @@ class ObjectCacheResidencyTestCase(base.ShakenFistTestCase):
         live = [k for k in mariadb._OBJECT_CACHE if k[0] == 'instance']
         self.assertEqual([], stale)
         self.assertEqual(30, len(live))
+
+    @mock.patch('shakenfist.config.config.OBJECT_CACHE_MAX_ENTRIES', 100)
+    def test_expired_entries_a_trim_clears_count_as_expiries(self):
+        # Each counter means one thing. An entry whose TTL had passed is an
+        # expiry however it was found; counting the ones a capacity trim
+        # happens to clear as capacity evictions understated the residency
+        # counter and overstated the pressure one.
+        reaped_before = mariadb.OBJECT_CACHE_EXPIRED_REAPED._value.get()
+        evicted_before = mariadb.OBJECT_CACHE_CAPACITY_EVICTIONS._value.get()
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            for i in range(95):
+                mariadb._object_cache_put(
+                    'blob', f'stale-{i}', object(), ttl=1)
+            clock[0] = 2000.0
+            # The sixth live insert takes the cache over the cap of 100.
+            # Dropping the 95 expired entries is enough on its own, so no
+            # live entry is evicted.
+            for i in range(6):
+                mariadb._object_cache_put(
+                    'instance', f'obj-{i}', object(), ttl=300)
+
+        self.assertEqual(6, len(mariadb._OBJECT_CACHE))
+        self.assertEqual(
+            95,
+            mariadb.OBJECT_CACHE_EXPIRED_REAPED._value.get() - reaped_before)
+        self.assertEqual(
+            0,
+            mariadb.OBJECT_CACHE_CAPACITY_EVICTIONS._value.get()
+            - evicted_before)
 
     @mock.patch('shakenfist.config.config.OBJECT_CACHE_MAX_ENTRIES', 100)
     def test_the_least_of_its_own_ttl_remaining_is_evicted_first(self):

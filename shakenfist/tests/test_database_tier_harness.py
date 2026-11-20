@@ -349,12 +349,45 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
                                 for a in node.names)
             elif isinstance(node, ast.Import):
                 imported.update(a.name for a in node.names)
+        # mariadb is imported for one thing only: the object cache reap,
+        # which bounds how long an sf-api worker holds an instance's
+        # ssh_key and user_data (issue 3944). It touches nothing but the
+        # in-process cache -- the test below proves that -- so the checker
+        # stays harmless as long as that is all it uses.
         self.assertEqual(
-            [], sorted(i for i in imported if 'mariadb' in i),
+            ['shakenfist.mariadb'],
+            sorted(i for i in imported if 'mariadb' in i),
             'external_api/health.py now imports a database client, so the '
             'readiness checker thread can reach the tier through something '
             'other than the health service.')
+        used = {node.attr for node in ast.walk(tree)
+                if isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == 'mariadb'}
+        self.assertEqual(
+            {'reap_expired_object_cache_entries'}, used,
+            'external_api/health.py now uses more of mariadb than the object '
+            'cache reap, so the readiness checker thread can reach the tier '
+            'through something other than the health service.')
         self.assertIn('grpc_health.v1.health_pb2_grpc', imported)
+
+    def test_the_object_cache_reap_reaches_no_database(self):
+        # What makes the readiness checker's one mariadb call harmless.
+        # Every route to the tier or to a direct connection goes through
+        # one of these, so a reap which reached for either would fail here.
+        from shakenfist import mariadb
+        mariadb._OBJECT_CACHE.clear()
+        self.addCleanup(mariadb._OBJECT_CACHE.clear)
+        self.addCleanup(setattr, mariadb, '_OBJECT_CACHE_NEXT_REAP', 0.0)
+        mariadb._OBJECT_CACHE[('instance', 'expired')] = (0.0, 300, object())
+
+        refuse = mock.Mock(side_effect=AssertionError('reached the database'))
+        with mock.patch.object(mariadb, '_use_database_service', refuse), \
+                mock.patch.object(mariadb, '_get_database_stub', refuse), \
+                mock.patch.object(mariadb, '_get_engine', refuse):
+            self.assertEqual(
+                1, mariadb.reap_expired_object_cache_entries(force=True))
+        refuse.assert_not_called()
 
     def test_the_suite_still_polls_an_events_endpoint(self):
         # The whole argument for exempting GetObjectEvents/api is that this

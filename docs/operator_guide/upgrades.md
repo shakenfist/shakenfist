@@ -199,6 +199,32 @@ iptables -m conntrack --help > /dev/null && echo ok
 See the floating IP discussion in [the networking overview](networking/overview.md)
 for what the rule does and why both of its matches are needed.
 
+### Errored cluster operations drain on the first sweep
+
+Earlier releases never hard deleted a cluster operation which finished in
+`error`, so a cluster which has been running for a while holds every one it
+has ever had. This release removes them on the same window as any other
+finished operation, `CLUSTER_OPERATION_RETENTION` (15 minutes by default;
+see [the deleted-object sweep](database.md#the-deleted-object-sweep)), and
+the whole accumulation becomes eligible as soon as the new cluster daemon
+runs.
+
+Expect the `cluster_deleted_object_backlog` gauge for the `*_op` types to
+jump within an hour of the upgrade, by roughly the number of errored
+operations the cluster had kept, and then to fall as the sweep drains them
+within its `DELETED_OBJECT_SWEEP_SECONDS` budget each minute. Do not page on
+that rise for the first few hours. It is a one-time cost: what matters is
+that the gauge falls, and a backlog which is still climbing a day later is a
+sweep that is not keeping up, as described under
+[Watching for sweeps that silently do nothing](database.md#watching-for-sweeps-that-silently-do-nothing).
+To see how large the drain will be before you upgrade, count the rows:
+
+```sql
+SELECT object_type, COUNT(*) FROM object_states
+WHERE state_value = 'error' AND object_type LIKE '%\_op'
+GROUP BY object_type;
+```
+
 ### The SPICE TLS private key is no longer world readable
 
 Earlier releases of the `internal_ca` role installed each node's SPICE TLS

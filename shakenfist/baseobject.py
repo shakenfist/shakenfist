@@ -909,9 +909,10 @@ class TargetedOperation(NamedTuple):
 # outlives its operation's completion by CLUSTER_OPERATION_RETENTION, so
 # "every operation which has ever targeted this object" is a reply whose
 # size, and the number of database reads which build it, are decided by
-# how much history the object accumulated. The newest MAX_TARGETED_OPERATIONS are listed and older ones
-# are not reported, which is the ceiling MAX_CHAIN_NODES puts on the
-# depends_on walk applied to the other listing.
+# how much history the object accumulated. The newest
+# MAX_TARGETED_OPERATIONS are listed and older ones are not reported,
+# which is the ceiling MAX_CHAIN_NODES puts on the depends_on walk
+# applied to the other listing.
 #
 # Only the listings cap. A caller which acts on every outstanding
 # operation, as the instance delete does when it aborts what targets the

@@ -142,11 +142,31 @@ lazy -- a read reclaims only its own key. `OBJECT_CACHE_MAX_ENTRIES` (default
 20000) bounds how *much* a process retains, and a reap every
 `OBJECT_CACHE_REAP_INTERVAL` (60 s, a module constant in `mariadb.py`) bounds
 how *long*: one pass over the cache under its lock, dropping everything whose
-TTL has passed, counted in `database_object_cache_expired_reaped_total`. It
-runs from the cache's own accessors, so any process still reading or writing
-objects reaps, and from `Daemon.idle()`, so a quiet daemon does too.
+TTL has passed, counted in `database_object_cache_expired_reaped_total`.
 Residency is therefore the entry's TTL plus at most one interval, rather than
-the life of the process.
+the life of the process -- but only in a process which reaches a reap call
+site, so the call sites are the bound:
+
+* the cache's own accessors, for any process still reading or writing
+  objects;
+* `Daemon.idle()`, for every `sf-*` daemon, whose workers are threads in the
+  daemon's own process;
+* the readiness checker thread in `external_api/health.py`, for each `sf-api`
+  gunicorn worker, which reads instances, is not a `Daemon` and has no idle
+  loop of its own.
+
+The remaining entry points (`sf-nodelock`, `sf-privexec` and the sentinels)
+never read objects. A new kind of long-lived process which does needs a call
+of its own, or a worker which read one instance and then went quiet keeps it
+until it exits.
+
+The interval is a constant rather than configuration on purpose. The TTL is
+the lever an operator has: lowering `OBJECT_CACHE_TTL_IMMUTABLE` shortens an
+instance's residency by the same amount, whereas lowering the interval only
+trims the minute of slack on top of it, at the price of more frequent
+whole-cache passes under the lock. The gate is read once without the lock
+before it is checked under it, because the reap call is on every cached
+read and is almost never due.
 
 That bound is load-bearing rather than tidiness, because some cached static
 values are secret-bearing: an `instance` carries `ssh_key` and `user_data`,
@@ -162,7 +182,8 @@ to the hottest path in the API. See issue #3944.
 `OBJECT_CACHE_MAX_ENTRIES` is the other half of the bound. Without it the
 cache holds every object a process has ever read rather than its working set,
 because an object read once and never read again is never revisited, and a
-delete in another process evicts nothing here. On overflow expired entries go first, then the
+delete in another process evicts nothing here. On overflow expired entries
+go first, counted as expiries rather than as capacity evictions, then the
 entries with the least remaining *fraction* of their own TTL.
 
 That fraction, rather than the absolute expiry stamp, is what lets the two
@@ -611,7 +632,8 @@ readers deliberately see everything:
   observational.
 
 Rows normally disappear when their operation is hard-deleted (eligible for
-removal thirty seconds after it goes terminal and removed by the
+removal `CLUSTER_OPERATION_RETENTION` seconds after it goes terminal and
+removed by the
 [deleted-object sweep](../operator_guide/database.md#the-deleted-object-sweep)),
 so the prune is a backstop.
 

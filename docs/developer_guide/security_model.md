@@ -39,7 +39,10 @@ up in [coding_rules.md](coding_rules.md).
   that reads an instance, which is a secret-lifetime property rather than an
   access-control one, and is bounded: `mariadb.py`'s expiry reap drops an
   entry within its TTL plus one reap interval rather than at the end of the
-  process. See the cache section of
+  process. That holds only in a process which reaches a reap call site --
+  every `sf-*` daemon through `Daemon.idle()`, and each `sf-api` worker
+  through its readiness checker thread -- so a new long-lived process which
+  reads instances needs one too. See the cache section of
   [`database_internals.md`](database_internals.md) and issue #3944
 - RBAC with admin/user roles
 - Network isolation via VXLAN

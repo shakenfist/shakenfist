@@ -13,13 +13,15 @@ was deferred before it ran (``defer_count``), and the queue it came from. See
 ``shakenfist/daemons/network/workitem.py``, which emit it, and
 ``docs/operator_guide/networking/overview.md``, which documents it.
 
-Those events cannot be read back out of the database after the fact. A cluster
-operation is hard deleted thirty seconds after it reaches a final state, and
-``hard_delete()`` drops the ``event_objects`` rows that join its events to it,
-so within a minute of an operation completing there is nothing left to query.
-What survives is the log stream: ``eventlog.add_event_multi`` echoes every
-event as a log line carrying the whole ``extra`` dict, gated only by
-``LOG_EVENTS_TO_LOKI``, which is on by default. Note that the echo's own
+Those events can be read back out of the database only for a while. A cluster
+operation is hard deleted ``CLUSTER_OPERATION_RETENTION`` seconds (15 minutes
+by default) after it reaches a final state, and ``hard_delete()`` drops the
+``event_objects`` rows that join its events to it, so after that there is
+nothing left to query. This tool reads the log stream instead, because it
+keeps them for as long as log retention does and because a report usually
+wants a span longer than the retention window. ``eventlog.add_event_multi``
+echoes every event as a log line carrying the whole ``extra`` dict, gated
+only by ``LOG_EVENTS_TO_LOKI``, which is on by default. Note that the echo's own
 message, ``Added event``, does not survive into the emitted JSON -- pylogrus
 merges the caller's fields over the record last, and one of those fields is
 ``message``, so the shipped record's ``message`` is the event's message. That

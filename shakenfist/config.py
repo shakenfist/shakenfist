@@ -1003,9 +1003,15 @@ class SFConfig(BaseSettings):
             'but retention sets the number of rows resident (arrival rate '
             'times retention) rather than the rate at which the sweep '
             'deletes them, so raising it costs rows and not sweep '
-            'throughput. 0 makes an operation eligible as soon as the '
-            'sweep sees it, which is what the cluster did before this '
-            'was tunable.'
+            'throughput. Before this was tunable the cluster used a '
+            'fixed 30 seconds, so set 30 to restore that. Values below '
+            'about a minute are for load testing rather than production: '
+            'an errored operation can then be removed while a dependent '
+            'operation is still deferred waiting on it, which then '
+            'cancels for a missing dependency rather than aborting for a '
+            'failed one, or while a client is still polling it, which '
+            'then gets a 404 rather than the error. 0 makes an operation '
+            'eligible as soon as the sweep sees it.'
         )
     )
     CLUSTER_OPERATION_TARGET_RETENTION: int = Field(

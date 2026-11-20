@@ -209,38 +209,32 @@ def get_object_class(object_type: str) -> Any:
 
 
 # The object states subject to "hard deletion" for every object type.
-# This list is keyed by state value across every type, so a state only
-# one object type can reach is inert for the rest.
+# This is keyed by state value across every type, so a state only one
+# object type can reach is inert for the rest. A tuple, because what is
+# in it decides what the sweep deletes: nothing should be able to widen
+# it for the rest of the process by appending to it.
 #
 # 'error' is deliberately not in it. Read final_object_states() below
-# rather than this list: 'error' is final for some types and not for
-# others, and which is which is a decision per type rather than one
-# value shared by all of them (issue 3922).
-FINAL_OBJECT_STATES = [
+# rather than this: 'error' is final for some types and not for others,
+# and which is which is a decision per type rather than one value shared
+# by all of them (issue 3922).
+FINAL_OBJECT_STATES: tuple[str, ...] = (
     'deleted',
     'complete',
     'abort',
-    'expired'
-]
+    'expired',
+)
 
 
-# The object types for which reaching 'error' means the object is
-# finished with, so the hard-delete sweep takes it like any other
-# finished object.
+# The object types other than cluster operations for which reaching
+# 'error' means the object is finished with, so the hard-delete sweep
+# takes it like any other finished object. It is empty: no such type
+# exists today, and cluster operations do not need to be listed because
+# error_is_final() takes every one of them by its '_op' suffix. This set
+# is where a non-operation type would be added.
 #
-# Cluster operations (every type whose name ends in '_op') qualify. An
-# errored operation carries its failure reason on its state row, the
-# caller has either read it or gone away, and the operation is a pure
-# database record with nothing on disk behind it. They are also where
-# the leak actually bites: operations arrive tens of thousands a day on
-# a busy cluster against a few hundred of everything else, and an
-# errored one used to be kept forever while a complete, aborted or
-# expired one was swept. CLUSTER_OPERATION_RETENTION is the window in
-# which an operator can read an errored operation, the same window they
-# get for every other finished one.
-#
-# Every other type is deliberately out, and the reason is specific to
-# the type rather than caution:
+# Every non-operation type is deliberately out, and the reason is
+# specific to the type rather than caution:
 #
 #   instance, network, networkinterface, node -- 'error' is a state an
 #   operator is expected to look at and may recover from, and for a
@@ -272,13 +266,28 @@ FINAL_OBJECT_STATES = [
 # wants its own reason written down beside the ones above.
 ERROR_IS_FINAL_OBJECT_TYPES: frozenset[str] = frozenset()
 
-_FINAL_OBJECT_STATES_WITH_ERROR = FINAL_OBJECT_STATES + ['error']
+_FINAL_OBJECT_STATES_WITH_ERROR: tuple[str, ...] = (
+    FINAL_OBJECT_STATES + ('error',))
 
 
 def error_is_final(object_type: Union[str, ObjectType]) -> bool:
     """Is 'error' a final state for this object type?
 
-    See ERROR_IS_FINAL_OBJECT_TYPES for which types, and why.
+    It is for every cluster operation, which is every type whose name ends
+    in '_op'. An errored operation carries its failure reason on its state
+    row, the caller has either read it or gone away, and the operation is a
+    pure database record with nothing on disk behind it. Operations are
+    also where the leak bit: they arrive tens of thousands a day on a busy
+    cluster against a few hundred of everything else, and an errored one
+    used to be kept forever while a complete, aborted or expired one was
+    swept. CLUSTER_OPERATION_RETENTION is the window in which an operator
+    can read an errored operation, the same window they get for every other
+    finished one. The suffix is the same test _deleted_object_delay() uses
+    to give operations that retention, and a test over ObjectType pins that
+    every '_op' type is a cluster operation.
+
+    It is not for any other type, unless ERROR_IS_FINAL_OBJECT_TYPES names
+    it; that set's comment records why each type is out.
     """
     name = str(object_type)
     return name.endswith('_op') or name in ERROR_IS_FINAL_OBJECT_TYPES
@@ -289,11 +298,12 @@ def final_object_states(
     """The states the hard-delete sweep may take this type in.
 
     FINAL_OBJECT_STATES for most types, plus 'error' for the types
-    which treat an error as finished with.
+    which treat an error as finished with. A new list on every call, so
+    a caller which changes the one it was given changes nothing else.
     """
     if error_is_final(object_type):
-        return _FINAL_OBJECT_STATES_WITH_ERROR
-    return FINAL_OBJECT_STATES
+        return list(_FINAL_OBJECT_STATES_WITH_ERROR)
+    return list(FINAL_OBJECT_STATES)
 
 
 # The refusal stage published when the capacity admission guard, rather
