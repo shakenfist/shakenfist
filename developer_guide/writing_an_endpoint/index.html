@@ -16339,16 +16339,32 @@ exemption path for one at all — so declare it or stop consuming it.</p>
 the signature accepts body keys nothing can enumerate (<code>log_request</code>
 merges the whole JSON body into the handler's kwargs), so the audit
 refuses to proceed rather than reporting a tree it could not check.</p>
-<p><strong>A note on responses:</strong> nothing validates the response list, and one
-response is not declared per endpoint at all. <code>handle_database_unavailable</code>
-sits in <code>Resource.method_decorators</code>, so <strong>every</strong> endpoint can answer
-<code>503</code> when the database tier is unreachable — the published
-specification declares it only on the handful of endpoints where that
-was an observable change of behaviour rather than a new failure mode
-(<code>GET /blobs</code>, which used to answer <code>200</code> with an empty list, and the
-federated token endpoint). Treat <code>503</code> as a global response when
-writing a client; declare it on your endpoint only if you have
-something endpoint-specific to say about it.</p>
+<p><strong>A note on responses:</strong> nothing validates the response list, and some
+responses are not declared per endpoint at all. Two decorators sit in
+<code>Resource.method_decorators</code>, so <strong>every</strong> endpoint can answer <code>503</code>
+without declaring it:</p>
+<ul>
+<li><code>handle_database_unavailable</code>, when the database tier is unreachable.</li>
+<li><code>handle_nodelock_unavailable</code>, when this node's own privileged
+  nodelock daemon does not answer. Worded separately on purpose: no
+  peer node is involved, so borrowing the peer sentence would send
+  diagnosis to the wrong machine (issue 4161).</li>
+</ul>
+<p>The published specification declares <code>503</code> only on the handful of
+endpoints where it was an observable change of behaviour rather than a
+new failure mode (<code>GET /blobs</code>, which used to answer <code>200</code> with an
+empty list, and the federated token endpoint). Treat <code>503</code> as a global
+response when writing a client; declare it on your endpoint only if you
+have something endpoint-specific to say about it.</p>
+<p><strong>Proxying to another node:</strong> call <code>api_base.proxy_request_to_node()</code>
+rather than writing your own <code>requests</code> call. An unreachable peer is an
+infrastructure condition and must answer <code>503</code> naming the peer, not an
+unqualified <code>500</code>, and every hand-rolled copy of the proxy has so far
+been a copy which forgot that. If your endpoint streams its response,
+open the connection <em>before</em> returning the response object: a generator
+body does not run until its first iteration, by which time the <code>200</code> has
+already been sent and the only thing left to give the caller is a
+truncated body.</p>
 <p>Two responses are declared for you. Every authenticated endpoint gets a
 generic <code>401</code>, and <code>requires_admin=True</code> adds the <code>403</code> that
 <code>caller_is_admin</code> answers when a system-namespace token lacks the admin

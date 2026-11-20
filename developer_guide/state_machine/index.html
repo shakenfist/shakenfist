@@ -15137,6 +15137,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#error-states-always-carry-a-reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error states always carry a reason
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#agent-operations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16147,6 +16158,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#error-states-always-carry-a-reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error states always carry a reason
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#agent-operations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16313,6 +16335,38 @@ configured with the CLEANER_DELAY configuration option. Once an object is hard
 deleted it will no longer appear in any API request, as it no longer exists in
 the database. The exception is that it will still appear in relevant events that
 have not yet aged out.</p>
+<h2 id="error-states-always-carry-a-reason">Error states always carry a reason<a class="headerlink" href="#error-states-always-carry-a-reason" title="Permanent link">&para;</a></h2>
+<p>Every object type has at least one error state, and an object in one always
+records why it got there. That reason is published as <code>error_message</code> in the
+object's API view, and it is written at the same moment as the state itself:
+<code>enter_error_state(state, reason)</code> on the object is the supported way in, and
+it takes both.</p>
+<p>This matters because the alternative leaves no record at all. Setting the state
+and then the message as two separate writes leaves a window in which the object
+says it failed and nothing says what failed, and loses the reason entirely if
+the process dies in between. CI observed exactly that -- an instance in <code>error</code>
+with <code>error_message</code> null, and no way to tell what had put it there.</p>
+<p>Three rules follow. The first two are enforced -- by <code>_state_update()</code> and by
+the <code>test_error_state_reasons</code> audit -- and the third says what the backstop
+does when a caller gets it wrong anyway:</p>
+<ul>
+<li>A transition from one error state to another keeps the earlier reason, since
+  the move to <code>error</code> from a <code>*-error</code> transition state has nothing new to say.</li>
+<li>A caller which enters an error state without a reason has <code>no reason
+  recorded, see the node logs</code> recorded in its place, and an error is logged
+  naming the line which set the state. The location goes to the log rather than
+  the message because the message is visible to anyone who can read the
+  object. The <code>test_error_state_reasons</code> audit reads the tree and fails on any
+  write of a state -- an assignment to <code>.state</code>, <code>setattr()</code> or a direct
+  <code>_state_update()</code> -- whose value is not provably a non-error state, so the
+  fallback is a backstop rather than a supported path.</li>
+<li><code>enter_error_state()</code> given an empty reason -- usually the text of an
+  exception which had none -- still enters the error state, through the same
+  backstop, and keeps the reason the object already had if it was in an error
+  state already. Refusing the transition left the object in the state it was
+  failing out of, and raised out of the error handler which was dealing with
+  the failure.</li>
+</ul>
 <h2 id="agent-operations">Agent Operations<a class="headerlink" href="#agent-operations" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>initial</code>: the first state for an agent operation. A UUID has been allocated,

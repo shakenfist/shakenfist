@@ -17422,6 +17422,19 @@
   floating address is held for a device Shaken Fist does not manage; the
   floating IP reaper will not release one. See the
   <a href="/operator_guide/networking/overview/">networking operator guide</a>.</li>
+<li>Reading a blob's data from another node, and finishing an upload
+  (<code>POST /artifacts</code> with an <code>upload_uuid</code>) on the node which received it, now
+  answer <code>503</code> naming that node when it cannot be reached, rather than a
+  truncated <code>200</code> and a bare <code>500</code> respectively. So does a request which needs
+  a lock on a node whose own <code>sf-nodelock</code> daemon does not answer.</li>
+<li>A request relayed to another node -- those two, and the instance, network
+  and upload requests which already answered <code>503</code> for an unreachable node --
+  now gives up after 240 seconds without a reply, below <code>sf-api</code>'s 300 second
+  worker timeout, so a hung node is answered with a <code>503</code> rather than by the
+  worker being killed. On a cluster uploading very large images, finishing an
+  upload which takes the receiving node longer than that to move and verify
+  answers <code>503</code> even though it goes on to complete there: look for the
+  artifact before uploading it again.</li>
 </ul>
 <h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
 <ul>
@@ -17468,6 +17481,24 @@
   K3S orchestration uses to expose services.</li>
 <li>Network orchestration now waits for <code>iptables</code> locks, instead of failing
   commands in high load situations.</li>
+<li>The network node now checks that each network's dnsmasq answers DHCP, not
+  just that its process exists, and rebuilds a network whose dnsmasq is alive
+  but not answering within <code>DHCP_PROBE_TIMEOUT</code> seconds. The probe is sent
+  three times within that window, so one dropped packet is not mistaken for a
+  wedge, but a rebuild is disruptive, and a network node too loaded to answer
+  in time will see rebuilds it did not before. A probe which cannot be run at all is recorded
+  as a <code>could not check whether dnsmasq is answering DHCP</code> event on the
+  network and does not cause a rebuild. See
+  <a href="/operator_guide/networking/overview/">the networking overview</a>.</li>
+<li>Each network namespace now has its loopback interface up. A namespace
+  created by <code>ip netns add</code> does not, which meant anything in the namespace
+  addressing the network's own router address -- the DHCP readiness probe
+  above, for one -- had its packets silently dropped. An existing namespace is
+  repaired the first time the probe finds its loopback down, without a
+  rebuild, and the network records a <code>brought the network namespace loopback
+  interface up</code> event.</li>
+<li>Instances are now told, by an event, when the network they are attached to
+  fails or is quiesced by the maintenance circuit breaker.</li>
 </ul>
 <h3 id="instances">Instances<a class="headerlink" href="#instances" title="Permanent link">&para;</a></h3>
 <ul>
@@ -17494,6 +17525,17 @@
 </ul>
 <h3 id="artifacts">Artifacts<a class="headerlink" href="#artifacts" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Images fetched from a mirror which publishes a digest file (cirros does) are
+  now checked against it, and a download which does not match is refused
+  rather than registered. <code>CHECKSUM_URL_CIRROS</code> now takes <code>%(digest_file)s</code>
+  as well as <code>%(vernum)s</code>; an override written for the old single-file
+  template is still honoured. The check detects corruption and a mirror
+  serving the wrong file, not a deliberate substitution, since the digest
+  comes from the same mirror. A digest which cannot be read lets the fetch go
+  ahead unchecked, recorded as a <code>fetched image had no published checksum to
+  verify against</code> audit event: that event is the one to alert on for
+  a mirror known to publish digests. See
+  <a href="/operator_guide/artifacts/#verifying-a-download-against-the-mirror">verifying a download against the mirror</a>.</li>
 <li>When you refer to an artifact by name, and there is more than one match then
   the match in your local namespace (if any) is now preferred instead of returning
   an error.</li>
