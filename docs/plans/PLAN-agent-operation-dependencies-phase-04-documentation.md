@@ -367,9 +367,13 @@ An item which cannot be checked is reported as such, not ticked.
   does not exist. Check: `grep -niE 'will adopt|rolling update'
   docs/developer_guide/agent_operations.md` finds nothing, or finds
   only a sentence saying rolling work is not a single chain.
-- `pre-commit run --all-files` passes, including the mkdocs build, the
-  documentation link and anchor check, the plan-citation check and
-  `tools/check-plan-status.py`.
+- `pre-commit run --all-files` passes, including the documentation link
+  and anchor check, the plan-citation check and
+  `tools/check-plan-status.py`. **Corrected during execution:** this
+  criterion said `pre-commit` includes the mkdocs build. It does not --
+  there is no such hook in `.pre-commit-config.yaml`, and the build is
+  a separate CI job -- so `tox -e docs` is run as well, and must end in
+  `congratulations` with no line naming a file this phase changed.
 - Phase 3 reads `Complete` in the master plan's Execution table with
   both of its merge commits, and `docs/plans/index.md` agrees. Check:
   `python3 tools/check-plan-status.py`.
@@ -404,6 +408,26 @@ Departures from the plan, recorded as they happened. Dates are AEDT.
    inside a chain.
 4. Steps ran in the planned order, one at a time, for the reason the
    step plan gives: they all edit documentation in one worktree.
+5. **A premise in step 4a's brief was wrong, and the agent repeated it
+   as a finding.** The brief said `pre-commit run --all-files`
+   includes the mkdocs build; there is no such hook, and the build is
+   its own CI job. Step 4a's report echoed the claim, step 4b's agent
+   noticed it was not in the hook list and said so, and every step
+   from 4b on ran `tox -e docs` separately. A done-criterion carried
+   the same error and is corrected above.
+6. **Three of step 4d's cuts were restored during review.** Each had
+   removed a clause its own page needed: that `dependency_failure`'s
+   `state` can hold `missing` or `unreadable`, from the page which
+   documents that field; the reason a chain-awaiting client must treat
+   `expired` as terminal, from the paragraph whose point that is; and
+   why the wait anchor is cleared on retry, from the sentence
+   describing the column. Deduplication is worth a link, not a reader
+   having to follow one to understand the sentence in front of them.
+7. Step 4d found one contradiction rather than a duplicate: the
+   operator guide said the dependency wait contains the dependency's
+   own queue time, so a deep chain can exceed the default, which is
+   true only across instances. It was fixed, and it is the same error
+   note 3 corrects.
 
 ## Future work
 
