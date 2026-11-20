@@ -105,9 +105,9 @@ instance-aware: the dispatcher reads the named operation's state by
 UUID.
 
 An edge may also carry a settle delay, for the case where the guest
-needs a moment after whatever the dependency changed. The delay runs
-from when the dispatcher observed the dependency finish, not from when
-it actually finished, so it is a floor rather than an exact wait.
+needs a moment after whatever the dependency changed. How that delay is
+measured, and how large one may be, are in
+[the `agentdependency` object](api_reference/instances.md#agentdependency).
 
 Two properties of edges are worth knowing before you build on them, and
 both are properties of the design rather than defects: a dependent
@@ -141,7 +141,9 @@ the operation itself failed; see
 A client awaiting a chain has to treat all three as terminal, because
 a dependent's own deadline is enforced before its edges are looked at:
 a dependent which sat too long reaches `expired` with no
-`dependency_failure` at all.
+`dependency_failure` at all. The two bounds are independent, and
+[declaring dependencies between agent operations](api_reference/instances.md#declaring-dependencies-between-agent-operations)
+has the detail.
 
 ## What waiting for a dependency costs
 
@@ -172,12 +174,12 @@ submitted all at once is bounded by one budget for the whole chain,
 rather than one for its own hop.
 
 What happens when the budget runs out is deliberately asymmetric. A
-`depends_on` operation is aborted, with the dependency's state at that
-moment in `dependency_failure` -- which may be `queued`, `executing` or
-even `complete`, so the recorded state does not by itself mean the
-dependency failed. A `runs_after` operation logs a warning and **runs
-anyway**: an edge which only asked for ordering silently stops
-ordering rather than failing.
+`depends_on` operation is aborted, and its `dependency_failure` records
+the dependency which was blocking it -- see
+[declaring dependencies between agent operations](api_reference/instances.md#declaring-dependencies-between-agent-operations)
+for what that field's `state` does and does not tell you. A `runs_after`
+operation logs a warning and **runs anyway**: an edge which only asked
+for ordering silently stops ordering rather than failing.
 
 The practical consequences:
 

@@ -1726,8 +1726,9 @@ otherwise the wall-clock time of the first dispatcher pass which found it
 blocked. It is never moved forward while one attempt is being evaluated,
 because it anchors the `AGENT_OPERATION_DEPENDENCY_WAIT` budget and a second
 write would restart it, but it is cleared back to NULL when a retry requeues
-the operation, so the next attempt is allowed the whole budget. It is not
-part of the API view.
+the operation, so the next attempt is allowed the whole budget -- see
+[retry and attempts](../developer_guide/agent_operations.md#retry-and-attempts).
+It is not part of the API view.
 
 The anchor is written with a single-field mask, and a database tier which has
 not yet reached attributes version 6 does not know the field, so during an

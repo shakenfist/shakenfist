@@ -1019,10 +1019,12 @@ dispatched exactly as one without. Otherwise:
   aborted, expired, was deleted or no longer exists moves the operation to the
   `abort` state without running it, and the operation's `dependency_failure`
   field says which dependency, and in what state, caused that. The operation is
-  also aborted if the wait outlasts `AGENT_OPERATION_DEPENDENCY_WAIT` (300
-  seconds by default) rather than holding its instance's queue for however long
-  the dependency takes. That budget covers the operation's whole wait and not
-  each edge's, so for an operation with several edges the dependency named in
+  also aborted if the wait outlasts the operator's dependency wait budget,
+  `AGENT_OPERATION_DEPENDENCY_WAIT` (see
+  [what to tune, and when](../../operator_guide/agent_operations.md#what-to-tune-and-when)),
+  rather than holding its instance's queue for however long the dependency
+  takes. That budget covers the operation's whole wait and not each edge's, so
+  for an operation with several edges the dependency named in
   `dependency_failure` is whichever one was blocking when the budget ran out,
   which is not necessarily the one which consumed it. A blocked
   operation also remains subject to its own `deadline`, which is
@@ -1099,12 +1101,12 @@ list. It is a JSON dictionary with the following fields:
   this dependency being evicted to make room -- restarts the delay from the next
   observation, and the wait budget is what bounds how far that can go. The delay
   may not be negative, and may not exceed the operator's dependency wait budget,
-  `AGENT_OPERATION_DEPENDENCY_WAIT` (300 seconds by default). Within that
-  ceiling a declared delay can always elapse, because the budget is extended by
-  the delay once the dependency has been seen to finish -- which also means a
-  settle delay can hold an operation at the head of its queue for the budget
-  plus the delay, rather than for the budget alone. A request over the ceiling
-  is refused with a 400.
+  `AGENT_OPERATION_DEPENDENCY_WAIT`. Within that ceiling a declared delay can
+  always elapse, because the budget is extended by the delay once the dependency
+  has been seen to finish; the budget's own value, and what that extension costs
+  the instance's queue, are in
+  [what to tune, and when](../../operator_guide/agent_operations.md#what-to-tune-and-when).
+  A request over the ceiling is refused with a 400.
 
     That extension applies to the edge being settled, and only for as long as
     it is the last thing holding the operation. An operation with a second
