@@ -18,6 +18,15 @@ positive.
 handler: once draining, ``is_ready()`` reports ``False`` so the load
 balancer drops this node on its next probe before the worker actually
 stops serving.
+
+The checker thread has a second job: each pass also runs the static object
+cache's expiry reap. An sf-api worker is not a Daemon and has no idle loop,
+so this thread is what bounds how long an instance's ssh_key and user_data
+stay reachable from the cache in a worker which has gone quiet (issue 3944;
+see OBJECT_CACHE_REAP_INTERVAL in mariadb.py). Anything which replaces this
+thread must keep that call. The reap never leaves the process, which is
+what keeps the thread inside the database tier harness's rule that it makes
+no database calls.
 """
 import threading
 import time

@@ -143,8 +143,9 @@ lazy -- a read reclaims only its own key. `OBJECT_CACHE_MAX_ENTRIES` (default
 `OBJECT_CACHE_REAP_INTERVAL` (60 s, a module constant in `mariadb.py`) bounds
 how *long*: one pass over the cache under its lock, dropping everything whose
 TTL has passed, counted in `database_object_cache_expired_reaped_total`.
-Residency is therefore the entry's TTL plus at most one interval, rather than
-the life of the process -- but only in a process which reaches a reap call
+Residency is therefore the entry's TTL plus at most one interval -- about a
+fifth more than the 300 s immutable default, but up to three times the 30 s
+mutable default -- rather than the life of the process -- but only in a process which reaches a reap call
 site, so the call sites are the bound:
 
 * the cache's own accessors, for any process still reading or writing
@@ -162,9 +163,10 @@ until it exits.
 
 The interval is a constant rather than configuration on purpose. The TTL is
 the lever an operator has: lowering `OBJECT_CACHE_TTL_IMMUTABLE` shortens an
-instance's residency by the same amount, whereas lowering the interval only
-trims the minute of slack on top of it, at the price of more frequent
-whole-cache passes under the lock. The gate is read once without the lock
+instance's residency by the same amount, down to the floor the interval sets
+(300 to 10 takes the worst case from 360 s to 70 s, not to 10 s). Lowering the
+interval would lower that floor at the price of more frequent whole-cache
+passes under the lock. The gate is read once without the lock
 before it is checked under it, because the reap call is on every cached
 read and is almost never due.
 
@@ -173,8 +175,10 @@ values are secret-bearing: an `instance` carries `ssh_key` and `user_data`,
 and cloud-init user data routinely contains credentials. This is not an
 access-control question -- the cache is keyed by the object's own identity
 and every caller still authorises the model it gets back -- but a
-secret-lifetime one, for core dumps, `/proc/<pid>/mem`, swap and crash
-reporting. Excluding those two fields from the cached model was the other
+secret-lifetime one. The reap bounds how long the secret is reachable from
+the cache, not how long its bytes are in memory: CPython does not zero a
+freed string, so a core dump, `/proc/<pid>/mem` or swap can still find it
+after the reap until the heap reuses that memory. Excluding those two fields from the cached model was the other
 option and is worse: `Instance.external_view()` emits both, so every API
 read of an instance needs them and excluding them would add a database read
 to the hottest path in the API. See issue #3944.

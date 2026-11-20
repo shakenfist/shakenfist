@@ -1,9 +1,7 @@
 import importlib
 from typing import Any
-from typing import Union
 import uuid
 
-from shakenfist.schema.object_types import ObjectType
 
 # Note the most exciting constants ever
 KiB = 1024
@@ -270,7 +268,7 @@ _FINAL_OBJECT_STATES_WITH_ERROR: tuple[str, ...] = (
     FINAL_OBJECT_STATES + ('error',))
 
 
-def error_is_final(object_type: Union[str, ObjectType]) -> bool:
+def error_is_final(object_type: str) -> bool:
     """Is 'error' a final state for this object type?
 
     It is for every cluster operation, which is every type whose name ends
@@ -283,8 +281,10 @@ def error_is_final(object_type: Union[str, ObjectType]) -> bool:
     swept. CLUSTER_OPERATION_RETENTION is the window in which an operator
     can read an errored operation, the same window they get for every other
     finished one. The suffix is the same test _deleted_object_delay() uses
-    to give operations that retention, and a test over ObjectType pins that
-    every '_op' type is a cluster operation.
+    to give operations that retention. test_final_object_states.py pins the
+    suffix both ways: every '_op' ObjectType is a BaseClusterOperation which
+    declares no on-disk health_dependencies, and every cluster operation in
+    OPERATION_NAMES_TO_CLASSES has the suffix.
 
     It is not for any other type, unless ERROR_IS_FINAL_OBJECT_TYPES names
     it; that set's comment records why each type is out.
@@ -294,7 +294,7 @@ def error_is_final(object_type: Union[str, ObjectType]) -> bool:
 
 
 def final_object_states(
-        object_type: Union[str, ObjectType]) -> list[str]:
+        object_type: str) -> list[str]:
     """The states the hard-delete sweep may take this type in.
 
     FINAL_OBJECT_STATES for most types, plus 'error' for the types

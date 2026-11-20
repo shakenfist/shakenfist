@@ -261,14 +261,18 @@ OBJECT_CACHE_TRIM_TARGET = 0.9
 # some cached static values are secret-bearing -- an instance carries
 # ssh_key and user_data, and cloud-init user data routinely contains
 # credentials -- so an unbounded residency is the difference between a
-# secret being in a process for five minutes after its last read and being
-# there until the process exits, where a core dump, a read of
-# /proc/<pid>/mem, swap or a crash report can still find it (issue 3944).
+# secret being reachable in a process for five minutes after its last read
+# and being reachable until the process exits (issue 3944). Reachable, not
+# present: dropping the reference does not zero the string, so its bytes
+# stay in the heap until reused, where a core dump, a read of
+# /proc/<pid>/mem or swap can still find them. The reap shortens the window
+# in which a secret is held live; it is not an erasure.
 #
 # A reap is one pass over the dict under the cache lock, so it is gated to
-# once per interval rather than run per access. 60 seconds is well inside
-# both TTL tiers, which bounds residency at ttl + 60 in every process which
-# reaches a reap call site. Those are the cache's own accessors (a process
+# once per interval rather than run per access. That bounds residency at
+# ttl + 60 in every process which reaches a reap call site: about a fifth
+# more than the 300 second immutable default, but up to three times the 30
+# second mutable default. Those are the cache's own accessors (a process
 # still doing cache work), Daemon.idle() (every sf-* daemon, whose workers are
 # threads in the daemon's process) and the readiness checker thread of each
 # sf-api gunicorn worker (external_api/health.py), which is the one
@@ -278,9 +282,10 @@ OBJECT_CACHE_TRIM_TARGET = 0.9
 # This is deliberately a constant rather than configuration. The bound an
 # operator can move is the TTL, which already is configuration: lowering
 # OBJECT_CACHE_TTL_IMMUTABLE shortens how long an instance's user_data is
-# resident by the same amount, whereas lowering this interval only trims the
-# minute of slack on top of it, at the price of a whole-cache pass under the
-# lock more often.
+# resident by the same amount, down to the floor this interval sets. Going
+# from 300 to 10 takes the worst case from 360 seconds to 70, not to 10.
+# Lowering the interval would lower that floor at the price of a whole-cache
+# pass under the lock more often; nothing has asked for less than a minute.
 OBJECT_CACHE_REAP_INTERVAL = 60
 _OBJECT_CACHE_NEXT_REAP = 0.0
 
@@ -346,17 +351,21 @@ def _reap_expired_object_cache_entries_locked(now: float) -> int:
     return len(expired)
 
 
-def reap_expired_object_cache_entries(force: bool = False) -> int:
+def reap_expired_object_cache_entries(
+        force: bool = False, now: Optional[float] = None) -> int:
     """Reclaim expired cache entries, at most once per reap interval.
 
     This is what bounds residency rather than staleness: see
     OBJECT_CACHE_REAP_INTERVAL, which also lists the call sites. With force,
-    reaps regardless of when the last one ran, which is for tests.
+    reaps regardless of when the last one ran, which is for tests. The cache
+    accessors pass the time they already read, so a cached read reads the
+    clock once.
 
     Returns the number of entries dropped.
     """
     global _OBJECT_CACHE_NEXT_REAP
-    now = time.monotonic()
+    if now is None:
+        now = time.monotonic()
     # Checked once without the lock, because this runs on every cached read
     # and is almost never due: taking the lock just to learn that would
     # double the lock traffic on the hottest read path. A float read is
@@ -406,7 +415,7 @@ def _object_cache_get(object_type: str, key: Any) -> Any:
         OBJECT_CACHE_SIZE.set(size)
     # Residency, not staleness: this read reclaimed at most its own key, and
     # the interval gate makes the whole-cache pass rare.
-    reap_expired_object_cache_entries()
+    reap_expired_object_cache_entries(now=now)
     if hit is not None:
         OBJECT_CACHE_HITS.labels(object_type=object_type).inc()
         return hit
@@ -483,7 +492,7 @@ def _object_cache_put(object_type: str, key: Any, model: Any, ttl: int) -> None:
         OBJECT_CACHE_EXPIRED_REAPED.inc(expired)
     if dropped:
         OBJECT_CACHE_CAPACITY_EVICTIONS.inc(dropped)
-    reap_expired_object_cache_entries()
+    reap_expired_object_cache_entries(now=now)
 
 
 def _object_cache_evict(object_type: str, key: Any) -> None:

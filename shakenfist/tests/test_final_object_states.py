@@ -10,7 +10,12 @@ wrongly included has its live objects deleted, and a type wrongly
 excluded leaks an object_states row per errored object forever.
 """
 
+from unittest import mock
+
 from shakenfist import constants
+from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.clusteroperationmapping import \
+    OPERATION_NAMES_TO_CLASSES
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 
@@ -26,14 +31,56 @@ class FinalObjectStatesTestCase(base.ShakenFistTestCase):
         self.assertIn(
             'error', constants.final_object_states(ObjectType.NODE_BLOB_OP))
 
-    def test_every_operation_object_type_treats_error_as_final(self):
-        # Derived from the enum rather than a hand-written list, so a new
-        # operation type cannot arrive outside the rule.
-        for object_type in ObjectType:
-            if not str(object_type).endswith('_op'):
-                continue
-            self.assertTrue(
-                constants.error_is_final(object_type), str(object_type))
+    def test_every_op_suffixed_type_is_a_pure_database_cluster_operation(self):
+        # error_is_final() takes every '_op' type on its name alone, so this
+        # is what makes that safe: each one must be a cluster operation, and
+        # declare no on-disk state, because health_dependencies is how a
+        # type says it has files behind it (as blob, upload and instance
+        # do). A future 'volume_op' with on-disk state fails here rather
+        # than being swept on error. Derived from the enum, so a new type
+        # cannot arrive outside the check.
+        op_types = [t for t in ObjectType if str(t).endswith('_op')]
+        self.assertNotEqual([], op_types)
+        for object_type in op_types:
+            name = str(object_type)
+            self.assertIn(name, OPERATION_NAMES_TO_CLASSES, name)
+            cls = OPERATION_NAMES_TO_CLASSES[name]
+            self.assertTrue(issubclass(cls, BaseClusterOperation), name)
+            self.assertEqual(name, str(cls.object_type), name)
+            self.assertFalse(getattr(cls, 'health_dependencies', None), name)
+
+    def test_every_cluster_operation_has_the_op_suffix(self):
+        # The converse: a cluster operation without the suffix would keep
+        # its errored rows forever, and would not get
+        # CLUSTER_OPERATION_RETENTION either. Walks the class hierarchy as
+        # well as the mapping, so a subclass the mapping omits is caught.
+        def subclasses(cls):
+            for sub in cls.__subclasses__():
+                yield sub
+                yield from subclasses(sub)
+
+        # Other test modules subclass it with stubs, which are not ours to
+        # check and are only present when those modules happen to load.
+        classes = {cls for cls in subclasses(BaseClusterOperation)
+                   if not cls.__module__.startswith('shakenfist.tests.')}
+        self.assertEqual(set(OPERATION_NAMES_TO_CLASSES.values()), classes)
+        for cls in classes:
+            name = str(cls.object_type)
+            self.assertTrue(name.endswith('_op'), cls.__name__)
+            self.assertTrue(constants.error_is_final(cls.object_type), name)
+
+    def test_the_extension_set_makes_error_final_by_type_value(self):
+        # ERROR_IS_FINAL_OBJECT_TYPES is empty today, so prove the branch
+        # works for whoever adds the first type: membership is by the
+        # type's string value, which is what the sweep passes.
+        self.assertFalse(constants.error_is_final(ObjectType.UPLOAD))
+        with mock.patch.object(constants, 'ERROR_IS_FINAL_OBJECT_TYPES',
+                               frozenset({'upload'})):
+            self.assertTrue(constants.error_is_final(ObjectType.UPLOAD))
+            self.assertTrue(constants.error_is_final('upload'))
+            self.assertIn(
+                'error', constants.final_object_states(ObjectType.UPLOAD))
+            self.assertFalse(constants.error_is_final(ObjectType.BLOB))
 
     def test_error_is_not_final_for_an_instance(self):
         # An operator is expected to look at an errored instance and may

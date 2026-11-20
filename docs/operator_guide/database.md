@@ -391,13 +391,20 @@ working set no longer fits and the hit rate is suffering;
 
 How *long* an entry stays in memory is bounded separately. Once a minute
 each process drops every entry whose TTL has passed, whether or not anything
-reads it again, so an object leaves a process's memory at most a minute after
-its TTL runs out rather than when the process exits. That matters because
-an instance's cached record carries its `ssh_key` and `user_data`, and
-cloud-init user data often holds credentials. The interval is fixed in the
-code rather than a setting: the TTL is the lever, and lowering
+reads it again, so the cache lets go of an object at most a minute after its
+TTL runs out rather than when the process exits. That matters because an
+instance's cached record carries its `ssh_key` and `user_data`, and
+cloud-init user data often holds credentials. Letting go is not erasing:
+Python does not zero freed memory, so the bytes can remain in the process
+until reused, and a core dump of an API or daemon process should be treated
+as able to contain any instance secret that process has read.
+
+The interval is fixed in the code rather than a setting: the TTL is the
+lever, and lowering
 `OBJECT_CACHE_TTL_IMMUTABLE` shortens how long an instance's user data stays
-resident by the same amount. Entries reclaimed this way are counted in
+resident by the same amount, down to a floor of about a minute. Lowering it
+from 300 to 10 seconds takes the worst case from six minutes to seventy
+seconds, not to ten. Entries reclaimed this way are counted in
 `database_object_cache_expired_reaped_total`, which also counts the expired
 entries a capacity trim clears first.
 
@@ -1119,11 +1126,14 @@ which is why they do not simply use `CLEANER_DELAY`, but the window costs
 resident rows (arrival rate times retention) rather than sweep throughput,
 so raise it on a cluster whose operations are being investigated. Before
 the setting existed the window was a fixed thirty seconds; setting it to
-30 restores that. Keep it above about a minute in production: an errored
-operation removed sooner can vanish while a dependent operation is still
-waiting on it, which then cancels for a missing dependency rather than
-aborting for a failed one, or while a client is still polling it, which
-then gets a 404 rather than the error.
+30 restores that. Keep it above about a minute in production. What matters
+is the gap between an operation erroring and the next look at it: a
+dependent operation re-checks its dependencies at least every 15 seconds
+while it waits, and a client polls on its own interval. An errored operation
+removed inside that gap makes the dependent cancel for a missing dependency
+rather than abort for a failed one, and gives the client a 404 rather than
+the error. A minute covers both with margin; how long the dependent has
+already been waiting does not matter.
 
 `error` is **not** a final state for most types, and which types treat
 it as one is a decision per type, recorded in `final_object_states()`
