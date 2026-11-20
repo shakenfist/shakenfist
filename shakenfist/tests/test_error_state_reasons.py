@@ -193,7 +193,12 @@ def find_bare_error_state_writes():
 class ErrorStateAuditTestCase(testtools.TestCase):
     def test_the_audit_reads_this_checkout(self):
         # If this ever reads an installed copy rather than the tree
-        # under test, every assertion below passes vacuously.
+        # under test, every assertion below passes vacuously. An
+        # installed copy has a baseobject.py too, so what is checked is
+        # that the package read is the one this test file sits in.
+        self.assertEqual(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            PACKAGE_ROOT)
         self.assertTrue(os.path.exists(
             os.path.join(PACKAGE_ROOT, 'baseobject.py')))
         self.assertTrue(list(_python_sources()))

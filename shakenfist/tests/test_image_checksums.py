@@ -353,18 +353,16 @@ class HttpFetchChecksumTestCase(base.ShakenFistTestCase):
         # A corrupt download must not be left on disk where the next
         # thing along could adopt it.
         unlinked = []
-        try:
-            self._fetch('sha256', '0' * 64, unlinked=unlinked)
-        except exceptions.BadCheckSum:
-            pass
+        self.assertRaises(
+            exceptions.BadCheckSum, self._fetch, 'sha256', '0' * 64,
+            unlinked=unlinked)
         self.assertEqual(['/tmp/x.partial'], unlinked)
 
     def test_a_mismatched_checksum_is_reported_as_an_event(self):
         events = []
-        try:
-            self._fetch('sha256', '0' * 64, events=events)
-        except exceptions.BadCheckSum:
-            pass
+        self.assertRaises(
+            exceptions.BadCheckSum, self._fetch, 'sha256', '0' * 64,
+            events=events)
         self.assertTrue(
             any('does not match its published checksum' in str(call)
                 for call in events),

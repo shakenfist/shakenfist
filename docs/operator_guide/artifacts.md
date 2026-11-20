@@ -80,11 +80,13 @@ truncated or corrupted download and a mirror serving the wrong file. It
 does not catch a deliberate substitution: the digest is fetched from
 the same mirror, by the same route, as the image, so anyone able to
 replace one can replace the other. The default cirros URLs
-(`DOWNLOAD_URL_CIRROS` and `CHECKSUM_URL_CIRROS`) are plain `http://`;
-an operator who wants the stronger property should point both at an
-`https://` mirror they trust. md5 adds nothing against an adversary
-either way, which is one more reason sha256 is preferred when a
-release publishes it.
+(`DOWNLOAD_URL_CIRROS` and `CHECKSUM_URL_CIRROS`) are already
+`https://`, which keeps someone on the path from replacing either, but
+not the mirror itself or whoever controls it: that the two agree only
+says they came from the same place. An override pointing at a plain
+`http://` mirror loses even the protection from someone on the path.
+md5 adds nothing against an adversary either way, which is one more
+reason sha256 is preferred when a release publishes it.
 
 Each digest is labelled by its length (32 hex characters is md5, 64 is
 sha256, 128 is sha512), never by the name of the file it came from, so

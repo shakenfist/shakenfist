@@ -481,8 +481,13 @@ class IsServingDhcpTestCase(base.ShakenFistTestCase):
     def _dnsmasq(self, provide_dhcp=True):
         d = mock.MagicMock()
         d.provide_dhcp = provide_dhcp
-        d.subst_dict.return_value = {
-            'router': '10.0.0.1', 'netns': 'a-netns'}
+        d.network.router = '10.0.0.1'
+        d.network.uuid = 'a-netns'
+        # This runs every pass for every DHCP network, and subst_dict()
+        # reads every instance on the network to build a lease list the
+        # probe has no use for.
+        d.subst_dict.side_effect = AssertionError(
+            'the probe built the whole subst_dict()')
         d.is_serving_dhcp = partial(DnsMasq.is_serving_dhcp, d)
         return d
 
@@ -569,8 +574,7 @@ class IsServingDhcpTestCase(base.ShakenFistTestCase):
         # answers DHCP on, so a probe which ran exits with the no-answer
         # status -- and one which could not import exits 1.
         d = self._dnsmasq()
-        d.subst_dict.return_value = {
-            'router': '127.0.0.1', 'netns': 'a-netns'}
+        d.network.router = '127.0.0.1'
         with mock.patch(
                 'shakenfist.managed_executables.dnsmasq.util_concurrency.'
                 'execute', return_value=('', '')) as mock_execute:
@@ -594,8 +598,7 @@ class IsServingDhcpTestCase(base.ShakenFistTestCase):
         # -m and nothing else, that directory is first on sys.path, so a
         # socket.py planted there would run in place of the real one.
         d = self._dnsmasq()
-        d.subst_dict.return_value = {
-            'router': '127.0.0.1', 'netns': 'a-netns'}
+        d.network.router = '127.0.0.1'
         with mock.patch(
                 'shakenfist.managed_executables.dnsmasq.util_concurrency.'
                 'execute', return_value=('', '')) as mock_execute:

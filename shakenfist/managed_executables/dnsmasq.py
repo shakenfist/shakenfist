@@ -240,14 +240,19 @@ class DnsMasq(managedexecutable.ManagedExecutable):
         # directory off sys.path: this runs as root, and -m would
         # otherwise import a socket.py planted there ahead of the real
         # one.
-        subst = self.subst_dict()
+        #
+        # The router address and namespace are read from the network
+        # directly. subst_dict() would enumerate every lease on the
+        # network -- an interface query and an instance read each --
+        # on every pass, to use none of it.
+        router = self.network.router
         command = shlex.join([
             sys.executable, '-P', '-m', 'shakenfist.util.dhcp_probe',
-            subst['router'], subst['router'],
-            str(config.DHCP_PROBE_TIMEOUT)])
+            router, router, str(config.DHCP_PROBE_TIMEOUT)])
         try:
             util_concurrency.execute(
-                command, netns=subst['netns'], suppress_command_logging=True)
+                command, netns=str(self.network.uuid),
+                suppress_command_logging=True)
         except ProcessExecutionError as e:
             if e.exit_code == dhcp_probe.EXIT_NO_ANSWER:
                 return False
@@ -256,7 +261,7 @@ class DnsMasq(managedexecutable.ManagedExecutable):
                 f'the DHCP probe exited {e.exit_code}: {stderr}') from e
         except util_concurrency.PRIVEXEC_TRANSPORT_ERRORS as e:
             # Only a privexec which did not answer. Anything else -- a
-            # renamed subst_dict() key, a protocol bug -- is a defect in
+            # renamed network attribute, a protocol bug -- is a defect in
             # this code, and read as "could not probe" it would report
             # every network as serving DHCP forever, which is the silent
             # failure this check exists to remove.

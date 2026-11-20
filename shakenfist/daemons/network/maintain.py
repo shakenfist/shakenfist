@@ -826,7 +826,10 @@ class Job(util_concurrency.Job):
                         n, routed_by_network[n.uuid])
 
                 if network_okay and mesh_okay and not missing_routes:
-                    # The only thing which might have drifted had not.
+                    # The only thing which might have drifted had not,
+                    # so this network is as clean as the one above and
+                    # its quiesce episode is over too.
+                    QUIESCE_REPORTED.discard(str(n.uuid))
                     continue
 
                 # Which repair this pass is heading for decides which

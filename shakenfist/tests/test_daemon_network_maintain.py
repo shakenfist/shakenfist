@@ -84,6 +84,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             maintain.EXTRA_VLANS_HISTORY.clear()
             maintain.EXTRA_VLANS_WARNED.clear()
             maintain.STRAY_VXLAN_HANDLING_FAILING = False
+            maintain.QUIESCE_REPORTED.clear()
 
         _clear()
         self.addCleanup(_clear)
@@ -730,6 +731,43 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         active['net_ip_create_and_enqueue'].assert_not_called()
         active['net_create_and_enqueue'].assert_not_called()
         active['nn_create_and_enqueue'].assert_not_called()
+
+    def test_a_clean_network_ends_its_quiesce_episode(self):
+        """A network which is clean on a pass is reported afresh next time.
+
+        Without this a network which quiesced once would never tell its
+        instances about a later quiesce (issue 520).
+        """
+        from shakenfist.daemons.network import maintain
+
+        n = _build_mock_network(is_okay=True, is_mesh_okay=True)
+        maintain.QUIESCE_REPORTED.add(str(n.uuid))
+        self._run_one_iteration(network_node=True, networks=[n])
+
+        self.assertNotIn(str(n.uuid), maintain.QUIESCE_REPORTED)
+
+    def test_a_clean_routed_network_ends_its_quiesce_episode_too(self):
+        """Routed addresses take the pass down a second clean exit.
+
+        A network with routed addresses has its routes read before the
+        pass can call it clean, and that exit once left the episode
+        open, so a healthy routed network which quiesced once was never
+        reported again.
+        """
+        from shakenfist.daemons.network import maintain
+
+        n = _build_mock_network(is_okay=True, is_mesh_okay=True)
+        maintain.QUIESCE_REPORTED.add(str(n.uuid))
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            floating_network=self._routed_floating_network(n, '10.10.10.1'),
+            namespace_routes=['10.10.10.1'],
+        )
+
+        # This is the clean exit, not a route repair.
+        active['net_ip_create_and_enqueue'].assert_not_called()
+        self.assertNotIn(str(n.uuid), maintain.QUIESCE_REPORTED)
 
     def test_a_missing_root_route_is_restored_too(self):
         """The root namespace route is audited alongside the namespace one.
