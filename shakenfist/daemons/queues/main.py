@@ -200,8 +200,21 @@ class Monitor(daemon.WorkerPoolDaemon):
                 # Adaptive backoff: poll fast while there is work, back off
                 # towards IDLE_POLL_MAX_SECONDS while idle so an empty cluster
                 # stops issuing ~5 Dequeue/s per node. See issue #3499.
-                if self.dequeue_job(workitem.Job):
+                #
+                # The backoff applies only to an empty queue read. A full
+                # worker pool reads no queue, so sleeping on it saves no
+                # database load and delays the next dispatch until the
+                # backoff interval expires -- which made a burst large
+                # enough to fill the pool drain slower, the opposite of
+                # what the backoff was for (issue #3942). A pool-full pass
+                # retries at the fast interval and leaves the backoff
+                # state alone, so an idle period either side of the burst
+                # is unaffected.
+                outcome = self.dequeue_job(workitem.Job)
+                if outcome == daemon.DequeueOutcome.STARTED:
                     poll_backoff.reset()
+                elif outcome == daemon.DequeueOutcome.POOL_FULL:
+                    self.idle(daemon.IDLE_POLL_FAST_SECONDS)
                 else:
                     self.idle(poll_backoff.next_empty_interval())
 

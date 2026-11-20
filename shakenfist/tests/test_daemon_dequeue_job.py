@@ -35,7 +35,8 @@ class DequeueJobDiskPressureTestCase(base.ShakenFistTestCase):
                 mock.patch.object(daemon.mariadb, 'dequeue_work_items',
                                   return_value=[]) as mock_dequeue:
             mock_config.NODE_UUID = NODE_UUID
-            self.assertFalse(pool.dequeue_job(mock.MagicMock()))
+            self.assertEqual(daemon.DequeueOutcome.NOTHING_ELIGIBLE,
+                             pool.dequeue_job(mock.MagicMock()))
             self.assertEqual(1, mock_dequeue.call_count)
             return mock_dequeue.call_args.args[0]
 
@@ -62,3 +63,35 @@ class DequeueJobDiskPressureTestCase(base.ShakenFistTestCase):
             get_all_user_facing_node_queues(NODE_UUID) +
             get_all_background_node_queues(NODE_UUID),
             queue_names)
+
+
+class DequeueJobPoolFullTestCase(base.ShakenFistTestCase):
+    """A full worker pool is reported as such, and reads no queue.
+
+    dequeue_job() used to answer False both for a full pool and for an
+    empty queue read, so its caller slept the idle backoff on a saturated
+    dispatcher -- a sleep which removes no database load, because this
+    path makes no database call. See issue #3942.
+    """
+
+    def _saturated_daemon(self):
+        pool = daemon.WorkerPoolDaemon.__new__(daemon.WorkerPoolDaemon)
+        pool.usable_cpus = 8
+        # max_workers is max(3, usable_cpus / 2), so five workers is over
+        # the limit for an eight cpu node.
+        pool.workers = {f'worker-{i}': mock.MagicMock() for i in range(5)}
+        pool.metrics = {}
+        pool.metrics_acquired_at = 0
+        return pool
+
+    def test_pool_full_is_distinguishable_from_an_empty_queue(self):
+        pool = self._saturated_daemon()
+        with mock.patch('shakenfist.daemons.daemon.config') as mock_config, \
+                mock.patch.object(daemon.mariadb, 'dequeue_work_items',
+                                  return_value=[]) as mock_dequeue:
+            mock_config.NODE_UUID = NODE_UUID
+            self.assertEqual(daemon.DequeueOutcome.POOL_FULL,
+                             pool.dequeue_job(mock.MagicMock()))
+
+        # And it got there without asking the database anything.
+        self.assertEqual(0, mock_dequeue.call_count)

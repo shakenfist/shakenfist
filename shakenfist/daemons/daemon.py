@@ -1,3 +1,4 @@
+import enum
 import faulthandler
 import logging
 import os
@@ -74,9 +75,38 @@ DAEMON_STATE_POLL_MAX_INTERVAL = 60
 # fast interval the moment any work is found, so a burst is still drained at
 # full speed and only the idle->work transition pays the extra latency. See
 # PLAN-database-load-reduction-phase-05-next-tier.md and issue #3499.
+#
+# That claim held only for the two conditions the dispatcher could tell
+# apart. A burst large enough to fill the worker pool made every further
+# pass report "no work started" without reading a queue, which drove the
+# backoff to its cap and drained the burst *slower* -- see DequeueOutcome
+# and issue #3942.
 IDLE_POLL_FAST_SECONDS = 0.2
 IDLE_POLL_MAX_SECONDS = 2.0
 IDLE_POLL_BACKOFF_FACTOR = 2.0
+
+
+class DequeueOutcome(enum.Enum):
+    """Why a dequeue_job() pass started no work, which is not one question.
+
+    A dispatcher loop which cannot tell these apart treats a saturated
+    worker pool as an idle cluster and applies IdlePollBackoff to it. The
+    backoff exists to remove *database* load, and the pool-full pass
+    issues no database call at all, so the sleep buys nothing and delays
+    the next dispatch by up to IDLE_POLL_MAX_SECONDS (issue #3942).
+    """
+
+    # At least one job was started from the claimed batch.
+    STARTED = 'started'
+
+    # The worker pool had no free slot, so no queue was read. The caller
+    # should retry promptly: the condition clears when a worker finishes,
+    # which this loop does not observe any other way.
+    POOL_FULL = 'pool-full'
+
+    # A queue read happened and claimed nothing. This is the only outcome
+    # an idle-poll backoff should act on.
+    NOTHING_ELIGIBLE = 'nothing-eligible'
 
 
 DAEMON_NAMES = {
@@ -811,14 +841,16 @@ class WorkerPoolDaemon(Daemon):
         exhausted (so a steady stream of user-facing work still
         crowds background out, exactly as before).
 
-        Returns True if at least one job was started, False if the
-        pool is full or there was nothing eligible to claim.
+        Returns a DequeueOutcome saying what happened: work was
+        started, the pool was full (no queue was read), or a read
+        claimed nothing. The caller needs the distinction because only
+        the last of those is an idle cluster -- see DequeueOutcome.
         """
         max_workers = max(3, self.usable_cpus / 2)
         num_workers = len(self.workers)
 
         if num_workers > max_workers:
-            return False
+            return DequeueOutcome.POOL_FULL
 
         # Compose the queue list in caller-supplied priority order.
         # ``get_all_user_facing_node_queues`` always participates;
@@ -862,7 +894,7 @@ class WorkerPoolDaemon(Daemon):
         free_slots = max(1, int(max_workers) - num_workers)
         items = mariadb.dequeue_work_items(queue_names, limit=free_slots)
         if not items:
-            return False
+            return DequeueOutcome.NOTHING_ELIGIBLE
 
         # Pass the batch size to each spawned worker so its op's
         # ``execute()`` can skip the coalescing fold when the dispatcher
@@ -871,4 +903,4 @@ class WorkerPoolDaemon(Daemon):
         for queue_name, jobname, workitem in items:
             args = [queue_name, jobname, workitem, batch_size]
             self.start_job(processing_class, args, jobname)
-        return True
+        return DequeueOutcome.STARTED
