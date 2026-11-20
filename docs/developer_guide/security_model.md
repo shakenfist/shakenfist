@@ -33,6 +33,25 @@ up in [coding_rules.md](coding_rules.md).
   [`authentication.md`](authentication.md), which also explains why
   assertions about secrets must compare `.get_secret_value()`: both
   obvious alternatives make a leak guard pass while checking nothing
+- Some cached static values are secret-bearing and are not `SecretStr`: an
+  `instance`'s `ssh_key` and `user_data`, which the API publishes to the
+  owning namespace and cloud-init user data routinely fills with
+  credentials. The static object cache therefore keeps them in every process
+  that reads an instance, which is a secret-lifetime property rather than an
+  access-control one, and is bounded: `mariadb.py`'s expiry reap drops the
+  cache's reference to an entry within its TTL plus one reap interval rather
+  than at the end of the process. That bounds how long the secret is
+  reachable, not how long its bytes are in memory: CPython does not zero a
+  freed string, so the bytes stay in the process's heap until something
+  reuses that memory, and a core dump, a read of `/proc/<pid>/mem` or swap
+  can still find them after the reap. Anything else still holding the model,
+  such as a response being built from it, keeps it reachable too. Treat a
+  core dump of an `sf-api` or `sf-*` process as able to contain any instance
+  secret the process has read. The reap bound holds only in a process which reaches a reap call site --
+  every `sf-*` daemon through `Daemon.idle()`, and each `sf-api` worker
+  through its readiness checker thread -- so a new long-lived process which
+  reads instances needs one too. See the cache section of
+  [`database_internals.md`](database_internals.md) and issue #3944
 - RBAC with admin/user roles
 - Network isolation via VXLAN
 

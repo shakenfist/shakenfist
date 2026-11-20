@@ -234,23 +234,60 @@ MIGRATION_UNKNOWN_NODE = '__migrated_unknown_node__'
 #   * Every entry is TTL-bounded, which is the only bound on staleness from a
 #     write made by another process (no local eviction hook fires there).
 #
-# TTL bounds staleness, not residency. Expiry is lazy -- an entry is only
-# reclaimed when its own key is read again -- so an object read once and never
-# read again would sit here for the life of the process, and a delete in
-# another process never reclaims anything here at all. The cache would
-# therefore grow to every object uuid the process has ever touched rather than
-# its working set, which is why _object_cache_put enforces
-# OBJECT_CACHE_MAX_ENTRIES. The cache first shipped without that bound, on the
-# mistaken belief that TTL expiry supplied one.
+# TTL bounds staleness, not residency. Expiry is lazy -- a read reclaims only
+# its own key -- and a delete in another process never reclaims anything here
+# at all, so on its own the cache would grow to every object uuid the process
+# has ever touched rather than its working set, and keep each of them for the
+# life of the process. Two separate bounds stop that: _object_cache_put
+# enforces OBJECT_CACHE_MAX_ENTRIES, which bounds how much is resident, and
+# the periodic reap below bounds how long. The cache first shipped with
+# neither, on the mistaken belief that TTL expiry supplied both.
 # See PLAN-database-load-reduction-phase-02-static-cache.md.
 # ---------------------------------------------------------------------------
-_OBJECT_CACHE: dict[tuple[str, str], tuple[float, Any]] = {}
+_OBJECT_CACHE: dict[tuple[str, str], tuple[float, int, Any]] = {}
 _OBJECT_CACHE_LOCK = threading.Lock()
 
 # On overflow, trim to this fraction of OBJECT_CACHE_MAX_ENTRIES rather than
 # to the cap itself, so the sort runs once per (1 - fraction) of the cap of
 # inserts rather than on every insert once full.
 OBJECT_CACHE_TRIM_TARGET = 0.9
+
+# How often a process reclaims entries whose TTL has passed, whether or not
+# the cache is anywhere near OBJECT_CACHE_MAX_ENTRIES.
+#
+# Without this, TTL bounds staleness and nothing bounds residency: expiry is
+# lazy, so an expired entry nothing reads again and no capacity pressure
+# reaches stays resident for the life of the process. That matters because
+# some cached static values are secret-bearing -- an instance carries
+# ssh_key and user_data, and cloud-init user data routinely contains
+# credentials -- so an unbounded residency is the difference between a
+# secret being reachable in a process for five minutes after its last read
+# and being reachable until the process exits (issue 3944). Reachable, not
+# present: dropping the reference does not zero the string, so its bytes
+# stay in the heap until reused, where a core dump, a read of
+# /proc/<pid>/mem or swap can still find them. The reap shortens the window
+# in which a secret is held live; it is not an erasure.
+#
+# A reap is one pass over the dict under the cache lock, so it is gated to
+# once per interval rather than run per access. That bounds residency at
+# ttl + 60 in every process which reaches a reap call site: about a fifth
+# more than the 300 second immutable default, but up to three times the 30
+# second mutable default. Those are the cache's own accessors (a process
+# still doing cache work), Daemon.idle() (every sf-* daemon, whose workers are
+# threads in the daemon's process) and the readiness checker thread of each
+# sf-api gunicorn worker (external_api/health.py), which is the one
+# long-lived process that reads instances and has no idle loop. A new kind of
+# long-lived process which reads objects needs a call of its own.
+#
+# This is deliberately a constant rather than configuration. The bound an
+# operator can move is the TTL, which already is configuration: lowering
+# OBJECT_CACHE_TTL_IMMUTABLE shortens how long an instance's user_data is
+# resident by the same amount, down to the floor this interval sets. Going
+# from 300 to 10 takes the worst case from 360 seconds to 70, not to 10.
+# Lowering the interval would lower that floor at the price of a whole-cache
+# pass under the lock more often; nothing has asked for less than a minute.
+OBJECT_CACHE_REAP_INTERVAL = 60
+_OBJECT_CACHE_NEXT_REAP = 0.0
 
 
 def _object_cache_key(object_type: str, key: Any) -> tuple[str, str]:
@@ -283,12 +320,71 @@ OBJECT_CACHE_SIZE = Gauge(
     'database_object_cache_entries',
     'Static-object cache entries currently resident in this process.'
 )
+OBJECT_CACHE_EXPIRED_REAPED = Counter(
+    'database_object_cache_expired_reaped_total',
+    'Static-object cache entries reclaimed because their TTL had passed, by '
+    'the periodic reap or by a capacity trim which found them expired, '
+    'rather than on a read of their own key. This is what bounds how long a '
+    'cached value -- including a secret-bearing one -- stays resident in a '
+    'process.'
+)
 OBJECT_CACHE_CAPACITY_EVICTIONS = Counter(
     'database_object_cache_capacity_evictions_total',
     'Static-object cache entries dropped to stay under '
     'OBJECT_CACHE_MAX_ENTRIES. A sustained rate here means the working set '
     'no longer fits and the hit rate is suffering.'
 )
+
+
+def _reap_expired_object_cache_entries_locked(now: float) -> int:
+    """Drop every entry whose TTL has passed. The cache lock must be held.
+
+    Returns the number dropped, and does not count them: the callers do,
+    into OBJECT_CACHE_EXPIRED_REAPED, once they have released the lock. Not
+    gated on time either: the callers decide when a reap is due, because
+    one of them is a timer and the other is a capacity trim.
+    """
+    expired = [k for k, (expiry, _t, _m) in _OBJECT_CACHE.items()
+               if expiry <= now]
+    for cache_key in expired:
+        del _OBJECT_CACHE[cache_key]
+    return len(expired)
+
+
+def reap_expired_object_cache_entries(
+        force: bool = False, now: Optional[float] = None) -> int:
+    """Reclaim expired cache entries, at most once per reap interval.
+
+    This is what bounds residency rather than staleness: see
+    OBJECT_CACHE_REAP_INTERVAL, which also lists the call sites. With force,
+    reaps regardless of when the last one ran, which is for tests. The cache
+    accessors pass the time they already read, so a cached read reads the
+    clock once.
+
+    Returns the number of entries dropped.
+    """
+    global _OBJECT_CACHE_NEXT_REAP
+    if now is None:
+        now = time.monotonic()
+    # Checked once without the lock, because this runs on every cached read
+    # and is almost never due: taking the lock just to learn that would
+    # double the lock traffic on the hottest read path. A float read is
+    # atomic under the GIL, and the check is repeated under the lock, so a
+    # stale read here can only delay a reap to the next call or let two
+    # callers race to the lock, where the second finds it no longer due.
+    if not force and now < _OBJECT_CACHE_NEXT_REAP:
+        return 0
+    with _OBJECT_CACHE_LOCK:
+        if not force and now < _OBJECT_CACHE_NEXT_REAP:
+            return 0
+        _OBJECT_CACHE_NEXT_REAP = now + OBJECT_CACHE_REAP_INTERVAL
+        dropped = _reap_expired_object_cache_entries_locked(now)
+        size = len(_OBJECT_CACHE)
+
+    OBJECT_CACHE_SIZE.set(size)
+    if dropped:
+        OBJECT_CACHE_EXPIRED_REAPED.inc(dropped)
+    return dropped
 
 
 def _object_cache_get(object_type: str, key: Any) -> Any:
@@ -304,7 +400,7 @@ def _object_cache_get(object_type: str, key: Any) -> Any:
     with _OBJECT_CACHE_LOCK:
         entry = _OBJECT_CACHE.get(cache_key)
         if entry is not None:
-            expiry, model = entry
+            expiry, _ttl, model = entry
             if expiry > now:
                 hit = model
             else:
@@ -317,6 +413,9 @@ def _object_cache_get(object_type: str, key: Any) -> Any:
                 size = len(_OBJECT_CACHE)
     if size is not None:
         OBJECT_CACHE_SIZE.set(size)
+    # Residency, not staleness: this read reclaimed at most its own key, and
+    # the interval gate makes the whole-cache pass rare.
+    reap_expired_object_cache_entries(now=now)
     if hit is not None:
         OBJECT_CACHE_HITS.labels(object_type=object_type).inc()
         return hit
@@ -333,16 +432,34 @@ def _object_cache_put(object_type: str, key: Any, model: Any, ttl: int) -> None:
     if ttl <= 0 or model is None:
         return
     now = time.monotonic()
+    expired = 0
     dropped = 0
     with _OBJECT_CACHE_LOCK:
-        _OBJECT_CACHE[_object_cache_key(object_type, key)] = (now + ttl, model)
+        # The ttl is kept alongside the expiry because the trim below
+        # needs it: an absolute expiry stamp cannot be compared across two
+        # TTL tiers (issue 3953).
+        _OBJECT_CACHE[_object_cache_key(object_type, key)] = (
+            now + ttl, ttl, model)
 
         # Enforce the residency bound. Expired entries go first because they
         # are free to lose; only if that is not enough do we drop live ones,
-        # nearest-expiry first, since they are the entries a reader is least
-        # likely to want again. Trimming to TRIM_TARGET rather than to the cap
-        # keeps this O(n log n) pass rare instead of once per insert at the
-        # ceiling.
+        # least remaining *fraction* of their own TTL first.
+        #
+        # The fraction, rather than the absolute expiry stamp, is what makes
+        # the two tiers compete on equal terms. Expiry is now + ttl, so a
+        # freshly inserted 30 second mutable entry always sorts ahead of a
+        # 300 second immutable entry inserted up to 270 seconds earlier:
+        # ordering on the stamp sheds essentially the whole mutable tier
+        # before touching one immutable entry, which switches off the tier
+        # sized for the types that number in the thousands (blob, node,
+        # artifact) exactly when the cache is under the pressure that tier
+        # was sized for. Neither policy is wrong per entry -- expired-soonest
+        # is genuinely the least valuable entry per byte-second -- but one of
+        # them lets the tiers share the pool and the other does not (issue
+        # 3953).
+        #
+        # Trimming to TRIM_TARGET rather than to the cap keeps this
+        # O(n log n) pass rare instead of once per insert at the ceiling.
         cap = config.OBJECT_CACHE_MAX_ENTRIES
         if cap > 0 and len(_OBJECT_CACHE) > cap:
             # Both branches trim to target, not to cap. Trimming the expired
@@ -353,22 +470,29 @@ def _object_cache_put(object_type: str, key: Any, model: Any, ttl: int) -> None:
             # put, which is precisely what the amortisation exists to avoid.
             target = int(cap * OBJECT_CACHE_TRIM_TARGET)
 
-            for cache_key in [k for k, (expiry, _) in _OBJECT_CACHE.items()
-                              if expiry <= now]:
-                del _OBJECT_CACHE[cache_key]
-                dropped += 1
+            expired = _reap_expired_object_cache_entries_locked(now)
 
             if len(_OBJECT_CACHE) > target:
-                by_expiry = sorted(_OBJECT_CACHE.items(),
-                                   key=lambda item: item[1][0])
-                for cache_key, _ in by_expiry[:len(_OBJECT_CACHE) - target]:
+                # ttl is never 0 here: put returns early for ttl <= 0, so
+                # every resident entry carries the positive ttl it was
+                # inserted with.
+                by_remaining = sorted(
+                    _OBJECT_CACHE.items(),
+                    key=lambda item: (item[1][0] - now) / item[1][1])
+                for cache_key, _ in by_remaining[:len(_OBJECT_CACHE) - target]:
                     del _OBJECT_CACHE[cache_key]
                     dropped += 1
         size = len(_OBJECT_CACHE)
 
     OBJECT_CACHE_SIZE.set(size)
+    # Each counter means one thing: an entry whose TTL had passed is an
+    # expiry however it was found, and only live entries shed to make room
+    # are capacity evictions.
+    if expired:
+        OBJECT_CACHE_EXPIRED_REAPED.inc(expired)
     if dropped:
         OBJECT_CACHE_CAPACITY_EVICTIONS.inc(dropped)
+    reap_expired_object_cache_entries(now=now)
 
 
 def _object_cache_evict(object_type: str, key: Any) -> None:

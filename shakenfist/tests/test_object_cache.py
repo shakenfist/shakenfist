@@ -35,8 +35,13 @@ from shakenfist.tests import base
 class ObjectCacheCoreTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
-        # The cache is process-global; isolate each test.
+        # The cache and its reap timer are process-global; isolate each
+        # test, and leave the timer as found rather than holding a stamp
+        # from a mocked clock for whatever test runs next.
         mariadb._OBJECT_CACHE.clear()
+        mariadb._OBJECT_CACHE_NEXT_REAP = 0.0
+        self.addCleanup(
+            setattr, mariadb, '_OBJECT_CACHE_NEXT_REAP', 0.0)
         self.addCleanup(mariadb._OBJECT_CACHE.clear)
         self.key = uuid.uuid4()
 
@@ -59,8 +64,8 @@ class ObjectCacheCoreTestCase(base.ShakenFistTestCase):
         mariadb._object_cache_put('node', self.key, model, ttl=300)
         # Force the entry to be in the past without sleeping.
         ck = mariadb._object_cache_key('node', self.key)
-        _, m = mariadb._OBJECT_CACHE[ck]
-        mariadb._OBJECT_CACHE[ck] = (time.monotonic() - 1, m)
+        _, ttl, m = mariadb._OBJECT_CACHE[ck]
+        mariadb._OBJECT_CACHE[ck] = (time.monotonic() - 1, ttl, m)
         self.assertIsNone(mariadb._object_cache_get('node', self.key))
         # A miss on an expired entry must also remove it.
         self.assertNotIn(ck, mariadb._OBJECT_CACHE)
@@ -107,6 +112,9 @@ class ObjectCacheWiringTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
         mariadb._OBJECT_CACHE.clear()
+        mariadb._OBJECT_CACHE_NEXT_REAP = 0.0
+        self.addCleanup(
+            setattr, mariadb, '_OBJECT_CACHE_NEXT_REAP', 0.0)
         self.addCleanup(mariadb._OBJECT_CACHE.clear)
         self.uuid = uuid.uuid4()
 
@@ -228,6 +236,114 @@ class ObjectCacheWiringTestCase(base.ShakenFistTestCase):
         self.assertEqual(2, mock_get.call_count)
 
 
+class ObjectCacheExpiryReapTestCase(base.ShakenFistTestCase):
+    """The bound on how long an entry stays resident in a process.
+
+    TTL bounds staleness. Residency is what these assert: an entry whose
+    TTL has passed must leave the process without waiting for a read of
+    its own key or for capacity pressure, because some cached values are
+    secret-bearing (issue 3944).
+    """
+
+    def setUp(self):
+        super().setUp()
+        mariadb._OBJECT_CACHE.clear()
+        mariadb._OBJECT_CACHE_NEXT_REAP = 0.0
+        self.addCleanup(
+            setattr, mariadb, '_OBJECT_CACHE_NEXT_REAP', 0.0)
+        self.addCleanup(mariadb._OBJECT_CACHE.clear)
+
+    def test_an_expired_entry_nothing_reads_again_is_reclaimed(self):
+        # The defect: lazy expiry plus a cache nowhere near its cap meant an
+        # instance's ssh_key and user_data stayed resident for the life of
+        # the process, not for the 300 seconds its TTL claims.
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            mariadb._object_cache_put(
+                'instance', 'secret-bearing', object(), ttl=300)
+
+            # Well past its TTL, and neither this key nor the cap is ever
+            # touched again.
+            clock[0] = 2000.0
+            self.assertEqual(
+                1, mariadb.reap_expired_object_cache_entries())
+
+        self.assertEqual({}, mariadb._OBJECT_CACHE)
+
+    def test_a_live_entry_is_not_reclaimed(self):
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            mariadb._object_cache_put('instance', 'live', object(), ttl=300)
+            clock[0] = 1100.0
+            self.assertEqual(
+                0, mariadb.reap_expired_object_cache_entries(force=True))
+        self.assertEqual(1, len(mariadb._OBJECT_CACHE))
+
+    def test_the_reap_is_gated_to_one_pass_per_interval(self):
+        # A pass walks the whole cache under the lock, so a read-heavy
+        # process must not pay for one per access.
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            mariadb.reap_expired_object_cache_entries()
+            mariadb._object_cache_put('blob', 'stale', object(), ttl=1)
+            clock[0] = 1002.0
+
+            # Inside the interval: due time has not arrived, so the expired
+            # entry survives this call.
+            self.assertEqual(0, mariadb.reap_expired_object_cache_entries())
+            self.assertEqual(1, len(mariadb._OBJECT_CACHE))
+
+            clock[0] = 1000.0 + mariadb.OBJECT_CACHE_REAP_INTERVAL + 1
+            self.assertEqual(1, mariadb.reap_expired_object_cache_entries())
+        self.assertEqual({}, mariadb._OBJECT_CACHE)
+
+    def test_the_gauge_and_the_counter_follow_the_reap(self):
+        # The counter is the operator's evidence that the residency bound
+        # is working, so a reap which drops entries without counting them
+        # would hide exactly the thing it exists to show.
+        reaped_before = mariadb.OBJECT_CACHE_EXPIRED_REAPED._value.get()
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            for i in range(5):
+                mariadb._object_cache_put('blob', f'obj-{i}', object(), ttl=1)
+            self.assertEqual(5, mariadb.OBJECT_CACHE_SIZE._value.get())
+
+            clock[0] = 2000.0
+            self.assertEqual(
+                5, mariadb.reap_expired_object_cache_entries(force=True))
+        self.assertEqual(0, mariadb.OBJECT_CACHE_SIZE._value.get())
+        self.assertEqual(
+            5,
+            mariadb.OBJECT_CACHE_EXPIRED_REAPED._value.get() - reaped_before)
+
+    def test_a_reap_which_is_not_due_does_not_take_the_lock(self):
+        # The reap call is on every cached read, and is almost never due.
+        # Taking the cache lock only to find that out doubled the lock
+        # traffic on the hottest read path.
+        mariadb._OBJECT_CACHE_NEXT_REAP = time.monotonic() + 3600
+        lock = mock.MagicMock()
+        with mock.patch.object(mariadb, '_OBJECT_CACHE_LOCK', lock):
+            self.assertEqual(0, mariadb.reap_expired_object_cache_entries())
+        lock.__enter__.assert_not_called()
+
+    def test_an_access_reaps_the_rest_of_the_cache(self):
+        # The hook that covers a process still doing cache work: a read of
+        # one key reclaims entries under every other key too, once per
+        # interval. It does nothing for a process which has gone quiet;
+        # Daemon.idle() and the sf-api readiness checker cover those.
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            mariadb.reap_expired_object_cache_entries()
+            for i in range(5):
+                mariadb._object_cache_put(
+                    'instance', f'obj-{i}', object(), ttl=300)
+
+            clock[0] = 1000.0 + mariadb.OBJECT_CACHE_REAP_INTERVAL + 400
+            mariadb._object_cache_get('blob', 'unrelated')
+
+        self.assertEqual({}, mariadb._OBJECT_CACHE)
+
+
 class ObjectCacheResidencyTestCase(base.ShakenFistTestCase):
     """The bound on how much the cache retains, as opposed to for how long.
 
@@ -238,6 +354,11 @@ class ObjectCacheResidencyTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
         mariadb._OBJECT_CACHE.clear()
+        # The capacity trim is what these exercise, so the expiry reap must
+        # not fire part way through and do the trim's work for it.
+        mariadb._OBJECT_CACHE_NEXT_REAP = float('inf')
+        self.addCleanup(
+            setattr, mariadb, '_OBJECT_CACHE_NEXT_REAP', 0.0)
         self.addCleanup(mariadb._OBJECT_CACHE.clear)
 
     def _fill(self, count, ttl=300):
@@ -276,24 +397,87 @@ class ObjectCacheResidencyTestCase(base.ShakenFistTestCase):
         self.assertEqual(30, len(live))
 
     @mock.patch('shakenfist.config.config.OBJECT_CACHE_MAX_ENTRIES', 100)
-    def test_the_soonest_to_expire_are_evicted_first(self):
-        # All live, so the trim has to choose between them. Inserted in
-        # increasing order of lifetime, so the survivors should be a suffix:
-        # the entries a reader is least likely to want again go first.
+    def test_expired_entries_a_trim_clears_count_as_expiries(self):
+        # Each counter means one thing. An entry whose TTL had passed is an
+        # expiry however it was found; counting the ones a capacity trim
+        # happens to clear as capacity evictions understated the residency
+        # counter and overstated the pressure one.
+        reaped_before = mariadb.OBJECT_CACHE_EXPIRED_REAPED._value.get()
+        evicted_before = mariadb.OBJECT_CACHE_CAPACITY_EVICTIONS._value.get()
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            for i in range(95):
+                mariadb._object_cache_put(
+                    'blob', f'stale-{i}', object(), ttl=1)
+            clock[0] = 2000.0
+            # The sixth live insert takes the cache over the cap of 100.
+            # Dropping the 95 expired entries is enough on its own, so no
+            # live entry is evicted.
+            for i in range(6):
+                mariadb._object_cache_put(
+                    'instance', f'obj-{i}', object(), ttl=300)
+
+        self.assertEqual(6, len(mariadb._OBJECT_CACHE))
+        self.assertEqual(
+            95,
+            mariadb.OBJECT_CACHE_EXPIRED_REAPED._value.get() - reaped_before)
+        self.assertEqual(
+            0,
+            mariadb.OBJECT_CACHE_CAPACITY_EVICTIONS._value.get()
+            - evicted_before)
+
+    @mock.patch('shakenfist.config.config.OBJECT_CACHE_MAX_ENTRIES', 100)
+    def test_the_least_of_its_own_ttl_remaining_is_evicted_first(self):
+        # All live and all the same TTL, so the trim has to choose between
+        # them on how much of that TTL is left. Inserted one second apart, so
+        # the survivors should be a suffix: the entries a reader is least
+        # likely to want again go first.
         clock = [1000.0]
         with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
             for i in range(120):
+                clock[0] = 1000.0 + i
                 mariadb._object_cache_put(
-                    'instance', f'obj-{i}', object(), ttl=100 + i)
+                    'instance', f'obj-{i}', object(), ttl=300)
 
         survivors = sorted(
             int(k[1].split('-')[1]) for k in mariadb._OBJECT_CACHE)
         self.assertLessEqual(len(survivors), 100)
         self.assertGreater(len(survivors), 0)
-        # A contiguous suffix of the insertion order, i.e. the longest-lived.
+        # A contiguous suffix of the insertion order, i.e. the most of their
+        # own lifetime left.
         self.assertEqual(
             list(range(120 - len(survivors), 120)), survivors,
-            'the trim kept entries other than the longest-lived ones')
+            'the trim kept entries other than the freshest ones')
+
+    @mock.patch('shakenfist.config.config.OBJECT_CACHE_MAX_ENTRIES', 100)
+    def test_the_two_ttl_tiers_compete_on_equal_terms(self):
+        # Issue 3953. Ordering on the absolute expiry stamp evicted the whole
+        # mutable tier before any immutable entry, because now + 30 is always
+        # sooner than (now - 200) + 300. The fresh 30 second entries have all
+        # of their life left and the aged 300 second ones have a third of
+        # theirs, so the trim must take the aged ones first.
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            for i in range(90):
+                mariadb._object_cache_put(
+                    'instance', f'aged-{i}', object(), ttl=300)
+
+            # 200 seconds later: the immutable entries are two thirds spent
+            # but still live, and nothing has read them again.
+            clock[0] = 1200.0
+            for i in range(30):
+                mariadb._object_cache_put(
+                    'blob', f'fresh-{i}', object(), ttl=30)
+
+        fresh = [k for k in mariadb._OBJECT_CACHE if k[0] == 'blob']
+        aged = [k for k in mariadb._OBJECT_CACHE if k[0] == 'instance']
+        self.assertEqual(
+            30, len(fresh),
+            'the mutable tier was shed before the two-thirds-spent '
+            'immutable entries it was competing with')
+        # Two trims ran (the cap is 100 and the target 90), so 22 entries
+        # were shed and every one of them was an aged immutable entry.
+        self.assertEqual(68, len(aged))
 
     @mock.patch('shakenfist.config.config.OBJECT_CACHE_MAX_ENTRIES', 0)
     def test_a_zero_cap_disables_the_bound(self):

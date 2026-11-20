@@ -616,6 +616,15 @@ class Daemon:
             self.pet_watchdog()
 
     def idle(self, seconds):
+        # A daemon with nothing to do is also a daemon holding whatever its
+        # object cache last read, including an instance's ssh_key and
+        # user_data. The cache's own accessors reap on a timer, but a quiet
+        # daemon makes no accesses, so going idle is where its residency
+        # bound comes from (issue 3944). The call is itself gated to once
+        # per mariadb.OBJECT_CACHE_REAP_INTERVAL, so an idle(0.2) in a tight
+        # poll loop costs a clock read.
+        mariadb.reap_expired_object_cache_entries()
+
         # round(), not int(): the loop sleeps in 0.2s chunks, and truncating
         # dropped fractional chunks (idle(0.8) slept 0.6s) -- harmless for the
         # integer callers but wrong for the adaptive backoff intervals, which

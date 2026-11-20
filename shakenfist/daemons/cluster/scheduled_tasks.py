@@ -13,7 +13,7 @@ from shakenfist_utilities import logs                 # noreorder
 
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
-from shakenfist.constants import FINAL_OBJECT_STATES
+from shakenfist.constants import final_object_states
 from shakenfist.constants import get_object_class
 from shakenfist.constants import NoSuchObject
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
@@ -1122,8 +1122,30 @@ def prune_events() -> None:
 
 
 def _deleted_object_delay(objtype):
+    """How long an object of this type stays after reaching a final state.
+
+    Cluster operations get their own, shorter retention because they are
+    the highest volume object type in the cluster: sfcbr sees tens of
+    thousands of operation arrivals a day against a few hundred of
+    everything else.
+
+    It is not as short as it was. A hard delete takes the object's events
+    with it (``DatabaseBackedObject.hard_delete()`` calls
+    ``delete_object_events()``), and the events are the only record of
+    what an operation did -- its audit events, the queue-wait event and
+    the execution duration event. At the 30 seconds this used to return,
+    an operator looking at an operation which finished a minute ago had
+    nothing to read, and the measurement in PLAN-queue-performance had to
+    be taken from the log echo because the events could not be read back
+    out of the database at all (issue 3864).
+
+    Retention sets how many rows are resident (arrival rate times
+    retention), not the rate at which the sweep deletes them, so the
+    window is cheap to widen: the same objects are deleted either way,
+    just later.
+    """
     if objtype.endswith('_op'):
-        return 30
+        return config.CLUSTER_OPERATION_RETENTION
     return config.CLEANER_DELAY
 
 
@@ -1194,7 +1216,7 @@ def publish_deleted_object_backlog():
         try:
             with mariadb.rpc_timing_scope('deleted_object_backlog', objtype):
                 count = mariadb.count_objects_by_state(
-                    ObjectType(objtype), FINAL_OBJECT_STATES)
+                    ObjectType(objtype), final_object_states(objtype))
         except DatabaseUnavailable as e:
             LOG.with_fields({'object_type': objtype}).warning(
                 f'Stopping deleted object backlog pass, database '
@@ -1291,7 +1313,8 @@ def _fill_deleted_object_work(now: float, deadline: float) -> bool:
         # 3533).
         with mariadb.rpc_timing_scope('per_deleted_object_fill', objtype):
             page = _sweep_work_page(
-                'per_deleted_object', ObjectType(objtype), FINAL_OBJECT_STATES,
+                'per_deleted_object', ObjectType(objtype),
+                final_object_states(objtype),
                 DELETED_OBJECT_PAGE_SIZE, _DELETED_OBJECT_CURSOR.get(objtype, ''),
                 updated_before=(now - _deleted_object_delay(objtype)))
         if page.uuids is None:
@@ -1347,7 +1370,7 @@ def _hard_delete_deleted_object(
 
             # Work entries can be old by the time we get to them, so
             # re-check the state before acting on it.
-            if obj.state.value not in FINAL_OBJECT_STATES:
+            if obj.state.value not in final_object_states(objtype):
                 outcome = 'not_final'
                 return
 
@@ -1386,7 +1409,7 @@ def _hard_delete_deleted_object_batch(
         with mariadb.rpc_timing_scope('per_deleted_object', objtype):
             deleted = mariadb_hard_delete.hard_delete_objects(
                 ObjectType(objtype), obj_uuids,
-                state_values=FINAL_OBJECT_STATES,
+                state_values=final_object_states(objtype),
                 updated_before=time.time() - _deleted_object_delay(objtype))
         CLUSTER_DELETED_OBJECT_BATCH_SECONDS.labels(objtype).observe(
             time.monotonic() - batch_start)

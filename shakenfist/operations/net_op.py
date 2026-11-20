@@ -100,8 +100,9 @@ class NetOp(BaseClusterOperation):
         # before issue 3857 it raised AttributeError instead. Either
         # way, until this method existed a version-1 NetOp row failed
         # to load rather than upgrading -- narrow, because cluster
-        # operations are eligible for hard delete thirty seconds after
-        # going terminal, but real during a rolling upgrade.
+        # operations are eligible for hard delete
+        # CLUSTER_OPERATION_RETENTION seconds after going terminal, but
+        # real during a rolling upgrade.
         pass
 
     @classmethod

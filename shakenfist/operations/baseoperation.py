@@ -262,8 +262,9 @@ class BaseClusterOperation(BaseOperation):
 
         Only the *first* key column is used, deliberately. The event
         this reference is for has to outlive the operation -- which is
-        eligible for hard delete thirty seconds after going terminal
-        (#3864) -- and the object an operator queries afterwards is the
+        eligible for hard delete CLUSTER_OPERATION_RETENTION seconds
+        after going terminal (#3864) -- and the object an operator
+        queries afterwards is the
         network, not the node the work happened to run on.
 
         The object type is resolved through the schema model's
@@ -668,12 +669,13 @@ class BaseClusterOperation(BaseOperation):
                 self.coalesce_folded = len(folded)
                 if folded:
                     # Emitted against the coalescing target as well as
-                    # the operation. An operation is hard deleted thirty
-                    # seconds after it reaches a final state and takes
-                    # its event_objects rows with it (#3864), so an
-                    # event recorded only against the survivor is
-                    # unreadable within a minute of the fold happening
-                    # -- which is why nothing noticed this event had
+                    # the operation. An operation is hard deleted
+                    # CLUSTER_OPERATION_RETENTION seconds after it
+                    # reaches a final state and takes its event_objects
+                    # rows with it (#3864), so an event recorded only
+                    # against the survivor is unreadable soon after the
+                    # fold happens -- which, when that window was thirty
+                    # seconds, is why nothing noticed this event had
                     # never fired at all (#3878). The target outlives
                     # the operation, so the same event on the target is
                     # still there to be queried and asserted on. The
@@ -893,8 +895,9 @@ class BaseClusterOperation(BaseOperation):
         targets (via the schema model's ``target_fields``, the same
         declaration ``enqueue_cluster_operation`` writes
         ``cluster_operation_targets`` rows from). The operation is
-        eligible for hard delete thirty seconds after going terminal and
-        takes its events with it (#3864), so an event recorded only here
+        eligible for hard delete CLUSTER_OPERATION_RETENTION seconds
+        after going terminal and takes its events with it (#3864), so an
+        event recorded only here
         would soon be unreadable -- and it is the target (the instance
         a client is awaiting) that an operator will actually look at.
         """

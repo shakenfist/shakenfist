@@ -701,8 +701,8 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
 
     def test_listing_is_capped(self):
         # The by-target listing was unbounded: it hydrated every
-        # retained target row, and errored operations are kept for seven
-        # days (issue 4667).
+        # retained target row, and errored operations were then kept for
+        # seven days (issue 4667).
         rows = [(str(uuid4()), 'net_op', seq)
                 for seq in range(1, baseobject.MAX_TARGETED_OPERATIONS + 10)]
         self._patch_target_rows(rows)

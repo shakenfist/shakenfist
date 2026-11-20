@@ -237,8 +237,8 @@ class ObjectClusterOperationsTestCase(
 
     def test_limit_caps_the_listing_and_the_reads_it_costs(self):
         # The listing was unbounded: with all=true it hydrated every
-        # retained target row, and an errored operation's rows are kept
-        # for seven days (issue 4667). The cap is applied to the rows
+        # retained target row, and an errored operation's rows were then
+        # kept for seven days (issue 4667). The cap is applied to the rows
         # before they are hydrated, so it bounds the operation reads and
         # not merely the reply.
         ops = [self._enqueue_inst(MUTATING_TASKS) for _ in range(5)]

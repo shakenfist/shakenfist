@@ -18,6 +18,15 @@ positive.
 handler: once draining, ``is_ready()`` reports ``False`` so the load
 balancer drops this node on its next probe before the worker actually
 stops serving.
+
+The checker thread has a second job: each pass also runs the static object
+cache's expiry reap. An sf-api worker is not a Daemon and has no idle loop,
+so this thread is what bounds how long an instance's ssh_key and user_data
+stay reachable from the cache in a worker which has gone quiet (issue 3944;
+see OBJECT_CACHE_REAP_INTERVAL in mariadb.py). Anything which replaces this
+thread must keep that call. The reap never leaves the process, which is
+what keeps the thread inside the database tier harness's rule that it makes
+no database calls.
 """
 import threading
 import time
@@ -26,6 +35,7 @@ from grpc_health.v1 import health_pb2
 from grpc_health.v1 import health_pb2_grpc
 from shakenfist_utilities import logs
 
+from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.util.grpc_channel import make_database_channel
 from shakenfist.util.signals import signal_safe
@@ -109,27 +119,46 @@ def _poll_once(stub):
     last_update = time.time()
 
 
+def _checker_iteration(stub):
+    """One pass of the checker loop. Returns the stub to use next time.
+
+    Factored out of the loop so tests can drive one pass without a thread.
+    """
+    try:
+        if stub is None:
+            stub = _build_stub()
+        _poll_once(stub)
+    except Exception as e:
+        # Defensive: _poll_once swallows its own RPC errors, so an
+        # exception here is something unexpected (e.g. channel build).
+        # Drop the stub so the next iteration rebuilds it.
+        LOG.with_fields({'error': str(e)}).warning(
+            'Readiness checker iteration error')
+        stub = None
+
+    # If the last poll failed, discard the stub so we reconnect on a
+    # fresh channel rather than reusing a potentially dead one.
+    if not ready:
+        stub = None
+
+    # This thread is the only one an sf-api worker runs on a timer, and the
+    # worker is not a Daemon, so it has no idle loop to reap its object
+    # cache from. Without this a worker which served one instance read and
+    # then went quiet would keep that instance's ssh_key and user_data until
+    # the worker exited, because the cache's accessors only reap when
+    # something reads or writes the cache (issue 3944). The call is gated to
+    # once per mariadb.OBJECT_CACHE_REAP_INTERVAL, so it is a clock read on
+    # most polls, and it is outside the try above so that a database tier
+    # which cannot be reached does not also stop the reap.
+    mariadb.reap_expired_object_cache_entries()
+    return stub
+
+
 def _checker_loop():
     """Background loop: rebuild the stub on error and poll forever."""
     stub = None
     while True:
-        try:
-            if stub is None:
-                stub = _build_stub()
-            _poll_once(stub)
-        except Exception as e:
-            # Defensive: _poll_once swallows its own RPC errors, so an
-            # exception here is something unexpected (e.g. channel build).
-            # Drop the stub so the next iteration rebuilds it.
-            LOG.with_fields({'error': str(e)}).warning(
-                'Readiness checker iteration error')
-            stub = None
-
-        # If the last poll failed, discard the stub so we reconnect on a
-        # fresh channel rather than reusing a potentially dead one.
-        if not ready:
-            stub = None
-
+        stub = _checker_iteration(stub)
         time.sleep(READINESS_POLL)
 
 

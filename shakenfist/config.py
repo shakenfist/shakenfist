@@ -739,7 +739,9 @@ class SFConfig(BaseSettings):
             'key is read again -- so without this bound the cache retains '
             'every object a process has ever read, not its working set. On '
             'overflow, expired entries are dropped first and then the '
-            'entries closest to expiry. 0 disables the bound.'
+            'entries with the least remaining fraction of their own TTL, so '
+            'that the two TTL tiers compete for the space on equal terms. '
+            '0 disables the bound.'
         )
     )
     SCHEDULER_TARGET_LOAD: float = Field(
@@ -999,6 +1001,36 @@ class SFConfig(BaseSettings):
             'objects but longer transactions. The sweep moves on to the '
             'next type with work after each batch, so this is also how '
             'many objects one type can take before another is served.'
+        )
+    )
+    CLUSTER_OPERATION_RETENTION: int = Field(
+        900,
+        ge=0,
+        description=(
+            'How long (in seconds) a finished cluster operation is kept '
+            'before the deleted-object sweep may hard delete it, which '
+            'takes its events with it. This is the window in which an '
+            'operator can read back why an operation did what it did: its '
+            'audit events, its queue-wait event and its execution '
+            'duration are unreachable once the operation is gone. '
+            'Operations are the highest volume object type in the '
+            'cluster, which is why they do not simply use CLEANER_DELAY, '
+            'but retention sets the number of rows resident (arrival rate '
+            'times retention) rather than the rate at which the sweep '
+            'deletes them, so raising it costs rows and not sweep '
+            'throughput. Before this was tunable the cluster used a '
+            'fixed 30 seconds, so set 30 to restore that. Values below '
+            'about a minute are for load testing rather than production. '
+            'What matters is the gap between an operation erroring and '
+            'the next look at it: a dependent operation re-checks its '
+            'dependencies at least every 15 seconds while it waits, and a '
+            'client polls on its own interval. An errored operation '
+            'removed inside that gap makes the dependent cancel for a '
+            'missing dependency rather than abort for a failed one, and '
+            'gives the client a 404 rather than the error. A minute '
+            'covers both with margin; how long the dependent has already '
+            'been waiting does not matter. 0 makes an operation eligible '
+            'as soon as the sweep sees it.'
         )
     )
     CLUSTER_OPERATION_TARGET_RETENTION: int = Field(

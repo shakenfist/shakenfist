@@ -382,22 +382,38 @@ Three settings control it:
 | `OBJECT_CACHE_MAX_ENTRIES` | 20000 | how many entries a process retains, across both tiers |
 
 The first two are in seconds. The third is a count, and it exists because a
-TTL bounds how *stale* an entry may be, not how many entries are kept: expiry
-only happens when that same object is looked up again, so an object read once
-and never read again would otherwise sit in memory for the life of the
-process. If you see `database_object_cache_capacity_evictions_total` climbing
-steadily, the working set no longer fits and the hit rate is suffering;
+TTL bounds how *stale* an entry may be, not how many entries are kept: a
+lookup only reclaims the entry it was for, so a process which reads many
+distinct objects would otherwise keep all of them. If you see
+`database_object_cache_capacity_evictions_total` climbing steadily, the
+working set no longer fits and the hit rate is suffering;
 `database_object_cache_entries` reports current occupancy.
 
+How *long* an entry stays in memory is bounded separately. Once a minute
+each process drops every entry whose TTL has passed, whether or not anything
+reads it again, so the cache lets go of an object at most a minute after its
+TTL runs out rather than when the process exits. That matters because an
+instance's cached record carries its `ssh_key` and `user_data`, and
+cloud-init user data often holds credentials. Letting go is not erasing:
+Python does not zero freed memory, so the bytes can remain in the process
+until reused, and a core dump of an API or daemon process should be treated
+as able to contain any instance secret that process has read.
+
+The interval is fixed in the code rather than a setting: the TTL is the
+lever, and lowering
+`OBJECT_CACHE_TTL_IMMUTABLE` shortens how long an instance's user data stays
+resident by the same amount, down to a floor of about a minute. Lowering it
+from 300 to 10 seconds takes the worst case from six minutes to seventy
+seconds, not to ten. Entries reclaimed this way are counted in
+`database_object_cache_expired_reaped_total`, which also counts the expired
+entries a capacity trim clears first.
+
 When the cap is reached the cache drops expired entries first and then, if
-that is not enough, live entries nearest to their expiry. Be aware of what
-that means with two TTL tiers in one pool: a 30 second mutable entry is
-always nearer its expiry than a 300 second immutable one inserted up to 270
-seconds earlier, so sustained capacity pressure sheds essentially the whole
-mutable tier — blob, node, artifact, namespace, upload, dnsmasq — before it
-touches a single instance, network or ipam entry. If blob caching in
-particular matters to your workload, raise the cap rather than relying on
-the tiers competing for the space.
+that is not enough, the live entries with the least of their own TTL left,
+as a fraction of that TTL. A 30 second mutable entry with 10 seconds left
+and a 300 second immutable entry with 100 seconds left are therefore equally
+close to going, so sustained capacity pressure shares the space between the
+two tiers rather than shedding one of them first.
 
 Setting a TTL to `0` disables caching for that tier — a fast rollback to
 pure read-through that needs only a config change and a restart, no code
@@ -405,7 +421,9 @@ change. The `database_object_cache_hits_total`,
 `database_object_cache_misses_total` and `database_object_cache_evictions_total`
 Prometheus counters (labelled by `object_type`) report cache behaviour, and a
 working cache shows up as reduced `database_get_<type>_total` rates on the
-`sf-database` tier.
+`sf-database` tier. `database_object_cache_entries`,
+`database_object_cache_capacity_evictions_total` and
+`database_object_cache_expired_reaped_total` are unlabelled.
 
 These counters only reach Prometheus from the daemons which serve a metrics
 endpoint — `sf-cluster`, `sf-resources` and `sf-database`. Every process that
@@ -1082,21 +1100,60 @@ schedule. It re-queues or rejects rows whose claim has gone stale:
 
 The cluster daemon also runs a deleted-object sweep, every minute, which
 hard deletes objects that have been in a final state (`deleted`,
-`complete`, `abort`) for longer than their grace period (`CLEANER_DELAY`
-for most objects, 30 seconds for completed operations).
+`complete`, `abort`, `expired`, and `error` for cluster operations) for
+longer than their grace period (`CLEANER_DELAY` for most objects,
+`CLUSTER_OPERATION_RETENTION` for cluster operations).
 
-A finished cluster operation is therefore eligible for hard delete thirty
-seconds after it reaches a final state. The sweep then removes it, along
-with its `cluster_operation_targets` rows. Because the sweep walks a type
-again only five minutes after its last walk reached the end (see below),
-removal normally comes within about six minutes of the operation
-finishing, and later while the sweep is working through a backlog (the
+A finished cluster operation is therefore eligible for hard delete
+`CLUSTER_OPERATION_RETENTION` seconds after it reaches a final state, 15
+minutes by default. The sweep then removes it, along with its
+`cluster_operation_targets` rows. Because the sweep walks a type again
+only five minutes after its last walk reached the end (see below),
+removal normally comes within about six minutes of the operation becoming
+eligible, and later while the sweep is working through a backlog (the
 `cluster_deleted_object_backlog` metric, described under
 [Watching for sweeps that silently do nothing](#watching-for-sweeps-that-silently-do-nothing),
-shows how far behind it is). Operations which finished in `error` are
-never hard deleted (#3922), so their target rows stay until the
-`CLUSTER_OPERATION_TARGET_RETENTION` prune removes them, seven days by
-default.
+shows how far behind it is). An operation which finished in `error` is
+swept on the same window as one which completed: `error` is a final state
+for cluster operations, because the failure reason is on the operation's
+state row and the operation is a pure database record.
+
+That window is what an operator has to read why an operation did what it
+did: a hard delete takes the operation's events with it, so its audit
+events, its queue-wait event and its execution duration are unreachable
+afterwards. Operations are the highest volume object type in the cluster,
+which is why they do not simply use `CLEANER_DELAY`, but the window costs
+resident rows (arrival rate times retention) rather than sweep throughput,
+so raise it on a cluster whose operations are being investigated. Before
+the setting existed the window was a fixed thirty seconds; setting it to
+30 restores that. Keep it above about a minute in production. What matters
+is the gap between an operation erroring and the next look at it: a
+dependent operation re-checks its dependencies at least every 15 seconds
+while it waits, and a client polls on its own interval. An errored operation
+removed inside that gap makes the dependent cancel for a missing dependency
+rather than abort for a failed one, and gives the client a 404 rather than
+the error. A minute covers both with margin; how long the dependent has
+already been waiting does not matter.
+
+`error` is **not** a final state for most types, and which types treat
+it as one is a decision per type, recorded in `final_object_states()`
+in `shakenfist/constants.py`. An errored `instance`, `network`,
+`networkinterface` or `node` is an object an operator is expected to
+look at and may recover -- `sf-ctl clear-node-error` returns an errored
+node to service -- and for a node or a network the object is still
+holding real resources, so sweeping it would remove a live object and
+not merely the evidence. An errored `blob` has partial files on disk
+which only a move to `deleted` removes, so hard deleting its row would
+turn a row leak into a disk leak. An errored `artifact` still resolves
+by name, which is how a user sees why their fetch failed. And the
+sidechannel daemon depends on an errored `agentoperation` persisting,
+because it resolves an operation whose executor died as errored rather
+than expired precisely so that case is still readable.
+
+The consequence of those exclusions is that an object of those types
+which reaches `error` and is never deleted keeps its `object_states`
+row indefinitely. That is deliberate, and the way to reclaim one is to
+delete the object.
 
 - **`DELETED_OBJECT_SWEEP_SECONDS`** — the time budget of each pass
   (default `20`). Reading the sweep's work counts against it: no read
@@ -1493,9 +1550,10 @@ Cluster operation targets are stored separately because:
   and "all operations on this object in order"
 
 Target rows live only until their operation is hard-deleted. A finished
-operation is eligible for removal thirty seconds after it goes terminal and
-is removed by the [deleted-object sweep](#the-deleted-object-sweep), so the
-table holds in-flight operations plus recently finished ones. As a backstop
+operation is eligible for removal `CLUSTER_OPERATION_RETENTION` seconds
+after it goes terminal and is removed by the
+[deleted-object sweep](#the-deleted-object-sweep), so the table holds
+in-flight operations plus recently finished ones. As a backstop
 for rows that outlive their operation, the table is also bounded by a
 periodic prune in the cluster daemon (alongside the existing
 `delete_stale_transfers` cleanup).
@@ -1543,8 +1601,9 @@ Two query shapes are exposed to the rest of the system:
 
 Rows are written automatically by `enqueue_cluster_operation`; operators
 do not need to manage them. Normally a row is removed when its operation is
-hard-deleted: a finished operation is eligible for removal thirty seconds
-after it goes terminal and is removed by the
+hard-deleted: a finished operation is eligible for removal
+`CLUSTER_OPERATION_RETENTION` seconds after it goes terminal and is removed
+by the
 [deleted-object sweep](#the-deleted-object-sweep). The
 cluster daemon's prune, performed under `ClusterLock` election via
 `_direct_delete_stale_cluster_operation_targets`, is a backstop: rows older

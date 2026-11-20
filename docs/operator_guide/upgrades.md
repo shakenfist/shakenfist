@@ -199,6 +199,50 @@ iptables -m conntrack --help > /dev/null && echo ok
 See the floating IP discussion in [the networking overview](networking/overview.md)
 for what the rule does and why both of its matches are needed.
 
+### Errored cluster operations drain on the first sweep
+
+Earlier releases never hard deleted a cluster operation which finished in
+`error`, so a cluster which has been running for a while holds every one it
+has ever had. This release removes them on the same window as any other
+finished operation, `CLUSTER_OPERATION_RETENTION` (15 minutes by default;
+see [the deleted-object sweep](database.md#the-deleted-object-sweep)), and
+the whole accumulation becomes eligible as soon as the new cluster daemon
+runs.
+
+Expect the `cluster_deleted_object_backlog` gauge for the `*_op` types to
+jump within an hour of the upgrade, by roughly the number of errored
+operations the cluster had kept, and then to fall as the sweep drains them
+within its `DELETED_OBJECT_SWEEP_SECONDS` budget each minute. Do not page on
+that rise for the first few hours. It is a one-time cost: what matters is
+that the gauge falls, and a backlog which is still climbing a day later is a
+sweep that is not keeping up, as described under
+[Watching for sweeps that silently do nothing](database.md#watching-for-sweeps-that-silently-do-nothing).
+The gauge counts operations, but most of the work is in their events. A hard
+delete removes an operation's `object_states`, `object_metadata`,
+`cluster_operations`, target and error rows, and also its `event_objects`
+rows, after which the orphaned-events sweep removes the `events` rows
+themselves (counted in `database_orphan_events_pruned_total`, which will
+rise too). That includes each errored operation's audit, queue-wait and
+duration events. If you want any of those kept, export them before you
+upgrade; after the first sweeps they are gone.
+
+To see how large the drain will be before you upgrade, count both:
+
+```sql
+SELECT object_type, COUNT(*) FROM object_states
+WHERE state_value = 'error' AND object_type LIKE '%\_op'
+GROUP BY object_type;
+
+SELECT s.object_type, COUNT(*) FROM object_states s
+JOIN event_objects e
+  ON e.object_type = s.object_type AND e.object_uuid = s.object_uuid
+WHERE s.state_value = 'error' AND s.object_type LIKE '%\_op'
+GROUP BY s.object_type;
+```
+
+The second number, not the first, is what sizes the delete, binlog and lock
+load of the drain.
+
 ### The SPICE TLS private key is no longer world readable
 
 Earlier releases of the `internal_ca` role installed each node's SPICE TLS
@@ -443,8 +487,8 @@ they reach the table only through a gateway.
 
 The migration is online. Adding the column is an instant metadata change,
 and the index is rebuilt in place over a small table, because finished
-operations are eligible for removal thirty seconds after going terminal and
-are removed, with their target rows, by the
+operations are eligible for removal `CLUSTER_OPERATION_RETENTION` seconds
+after going terminal and are removed, with their target rows, by the
 [deleted-object sweep](database.md#the-deleted-object-sweep). It took
 under half a second for 50,000 rows in testing. The migration is a single
 `ALTER TABLE` and is safe to re-run if interrupted: the re-run just rebuilds

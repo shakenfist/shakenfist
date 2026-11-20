@@ -65,6 +65,23 @@ class IdleRoundingTestCase(base.ShakenFistTestCase):
         d.idle(0.2)
         self.assertEqual(1, mock_sleep.call_count)
 
+    @mock.patch('shakenfist.daemons.daemon.os.path.exists', return_value=False)
+    @mock.patch('shakenfist.daemons.daemon.Daemon.pet_watchdog')
+    @mock.patch('shakenfist.daemons.daemon.Daemon.check_daemon_state')
+    @mock.patch('shakenfist.daemons.daemon.time.sleep')
+    def test_going_idle_reaps_the_expired_object_cache(
+            self, _sleep, _state, _watchdog, _exists):
+        # A daemon with nothing to do still holds whatever its object cache
+        # last read, which for an instance includes ssh_key and user_data.
+        # The cache reaps from its own accessors, and a quiet daemon makes
+        # none, so this is where its residency bound comes from (#3944).
+        d = self._make_daemon()
+        with mock.patch(
+                'shakenfist.daemons.daemon.mariadb.'
+                'reap_expired_object_cache_entries') as mock_reap:
+            d.idle(0.2)
+        mock_reap.assert_called_once_with()
+
     @mock.patch('shakenfist.daemons.daemon.Daemon.pet_watchdog')
     @mock.patch('shakenfist.daemons.daemon.Daemon.check_daemon_state')
     @mock.patch('shakenfist.daemons.daemon.time.sleep')
