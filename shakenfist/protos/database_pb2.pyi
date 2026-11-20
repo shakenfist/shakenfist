@@ -3607,6 +3607,54 @@ class GetStaleTranscodedBlobUuidsReply(_message.Message):
 Global___GetStaleTranscodedBlobUuidsReply: _TypeAlias = GetStaleTranscodedBlobUuidsReply  # noqa: Y015
 
 @_typing.final
+class GetBlobUuidsWithInfoRequest(_message.Message):
+    """The blobs whose attributes row already carries "qemu-img info".
+    observe_local_blobs() asks this once per pass instead of hydrating a
+    blob per local file to find out, which made the cleaner's GetBlob rate
+    a function of how many blobs a node stores (issue 4965).
+
+    The reply is one uuid per blob with info, so it is unbounded in the
+    same way GetObjectsByState is -- and the same pass already asks for
+    that one. It is a positive list rather than the (much shorter) list of
+    blobs *missing* info so that a blob with no attributes row at all is
+    absent from it, and is therefore hydrated and backfilled exactly as
+    before. See docs/plans/PLAN-grpc-bounded-replies.md.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetBlobUuidsWithInfoRequest: _TypeAlias = GetBlobUuidsWithInfoRequest  # noqa: Y015
+
+@_typing.final
+class GetBlobUuidsWithInfoReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUIDS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def uuids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        uuids: _abc.Iterable[_builtins.str] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["uuids", b"uuids"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetBlobUuidsWithInfoReply: _TypeAlias = GetBlobUuidsWithInfoReply  # noqa: Y015
+
+@_typing.final
 class NodeStaticData(_message.Message):
     """Node Operations (MariaDB)
     These manage node static values in MariaDB. Nodes represent physical or
@@ -9916,18 +9964,28 @@ class AdmitInstancePlacementReply(_message.Message):
     admission's allocation, limit is the claim's ceiling.
     """
     claim_uuid: _builtins.str
-    """The claim this admission was actually charged against, so an audit
-    event recorded on the *namespace* can name which claim it was. A
-    namespace holds one active claim at a time, but an operator who
-    grows a claim by delete-and-create leaves a namespace trail whose
-    events span several claims, and the namespace name alone cannot
-    then say which one an exceedance was against.
+    """Which claim this placement was weighed against, so an audit event
+    or a refusal recorded on the *namespace* can name which claim it
+    was. A namespace holds one active claim at a time, but an operator
+    who grows a claim by delete-and-create leaves a namespace trail
+    whose events span several claims, and the namespace name alone
+    cannot then say which one an exceedance was against.
 
-    Empty -- never a zero uuid -- when no claim was drawn down: an
+    On an admission this is the claim the drawdown was charged to. On a
+    denial with failing_stage 'claim' it is the claim that refused,
+    which charges nothing -- the transaction rolled back -- but is
+    still the claim that has to grow.
+
+    Empty -- never a zero uuid -- when no claim is named. An
     unclaimed namespace charges the cluster singleton instead, and a
-    move charges nothing on the namespace side at all. Read the name
-    for absence, so a reply from an sf-database predating this field
-    reads as "not reported" rather than as a real value.
+    move charges nothing on the namespace side at all. A denial at the
+    'node' or 'cluster' stage names no claim for a different reason: a
+    claimed namespace's claim is drawn down first, and that drawdown
+    rolls back with the rest of the transaction, so the claim was
+    consulted and simply was not the constraint -- naming it would
+    tell an operator to grow the wrong thing. Read the name for
+    absence, so a reply from an sf-database predating this field reads
+    as "not reported" rather than as a real value.
     Dashed uuid form, or empty
     """
     unguarded_reason: _builtins.str

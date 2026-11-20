@@ -11681,6 +11681,33 @@ def _direct_get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
         return []
 
 
+def _direct_get_blob_uuids_with_info() -> Optional[list[str]]:
+    """Get the UUIDs of blobs whose attributes already carry image info.
+
+    An attributes row is created with an empty info dict and filled in
+    the first time the blob is observed, so JSON_LENGTH tells the two
+    apart. A row which does not exist at all is absent from the result,
+    which is what the caller needs: absence means "hydrate it", and a
+    blob with no attributes row has no info either.
+
+    Returns:
+        List of blob UUID strings which have image info, or None if the
+        query failed (distinct from [] which means no blob has any).
+    """
+    engine = _get_engine()
+    table = _get_blob_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table.c.uuid).where(
+                sa.func.json_length(table.c.info) > 0)
+            result = conn.execute(stmt)
+            return [str(row.uuid) for row in result]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query for blobs with image info failed: {e}')
+        return None
+
+
 # =============================================================================
 # Blob Attributes gRPC Client Functions
 # These call the database microservice for blob attribute operations.
@@ -11815,6 +11842,21 @@ def _grpc_get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
         return []
 
 
+def _grpc_get_blob_uuids_with_info() -> Optional[list[str]]:
+    """Get the UUIDs of blobs which have image info via the microservice.
+
+    Returns None on error (distinct from [] for no matches).
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetBlobUuidsWithInfoRequest()
+        reply = _grpc_call(stub.GetBlobUuidsWithInfo, request)
+        return list(reply.uuids)
+    except grpc.RpcError as e:
+        _log_failed_read('GetBlobUuidsWithInfo', e)
+        return None
+
+
 # =============================================================================
 # Blob Attributes Public API Functions
 # =============================================================================
@@ -11935,6 +11977,24 @@ def get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
     if _use_database_service():
         return _grpc_get_stale_transcoded_blob_uuids(idle_seconds)
     return _direct_get_stale_transcoded_blob_uuids(idle_seconds)
+
+
+def get_blob_uuids_with_info() -> Optional[list[str]]:
+    """Get the UUIDs of blobs whose attributes already carry image info.
+
+    observe_local_blobs() asks this once per pass rather than hydrating
+    a blob per local file to find out whether it still needs a
+    ``qemu-img info`` backfill (issue 4965).
+
+    Returns:
+        List of blob UUID strings which have image info, or None if the
+        query failed (distinct from [] which means no blob has any). The
+        caller decides what a failed read means; it must not be
+        flattened here.
+    """
+    if _use_database_service():
+        return _grpc_get_blob_uuids_with_info()
+    return _direct_get_blob_uuids_with_info()
 
 
 # =============================================================================

@@ -139,6 +139,7 @@ service DatabaseService {
   rpc DeleteBlobAttributes (DeleteBlobAttributesRequest) returns (StatusReply) {}
   rpc GetExpiredBlobUuids (GetExpiredBlobUuidsRequest) returns (GetExpiredBlobUuidsReply) {}
   rpc GetStaleTranscodedBlobUuids (GetStaleTranscodedBlobUuidsRequest) returns (GetStaleTranscodedBlobUuidsReply) {}
+  rpc GetBlobUuidsWithInfo (GetBlobUuidsWithInfoRequest) returns (GetBlobUuidsWithInfoReply) {}
 
   // Node Operations (MariaDB)
   // These manage node static values (uuid, fqdn, ip) in MariaDB.
@@ -1364,6 +1365,24 @@ message GetStaleTranscodedBlobUuidsRequest {
 }
 
 message GetStaleTranscodedBlobUuidsReply {
+  repeated string uuids = 1;
+}
+
+// The blobs whose attributes row already carries "qemu-img info".
+// observe_local_blobs() asks this once per pass instead of hydrating a
+// blob per local file to find out, which made the cleaner's GetBlob rate
+// a function of how many blobs a node stores (issue 4965).
+//
+// The reply is one uuid per blob with info, so it is unbounded in the
+// same way GetObjectsByState is -- and the same pass already asks for
+// that one. It is a positive list rather than the (much shorter) list of
+// blobs *missing* info so that a blob with no attributes row at all is
+// absent from it, and is therefore hydrated and backfilled exactly as
+// before. See docs/plans/PLAN-grpc-bounded-replies.md.
+message GetBlobUuidsWithInfoRequest {
+}
+
+message GetBlobUuidsWithInfoReply {
   repeated string uuids = 1;
 }
 

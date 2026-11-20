@@ -464,6 +464,11 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.GetStaleTranscodedBlobUuidsRequest.SerializeToString,
                 response_deserializer=database__pb2.GetStaleTranscodedBlobUuidsReply.FromString,
                 _registered_method=True)
+        self.GetBlobUuidsWithInfo = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/GetBlobUuidsWithInfo',
+                request_serializer=database__pb2.GetBlobUuidsWithInfoRequest.SerializeToString,
+                response_deserializer=database__pb2.GetBlobUuidsWithInfoReply.FromString,
+                _registered_method=True)
         self.CreateNode = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/CreateNode',
                 request_serializer=database__pb2.CreateNodeRequest.SerializeToString,
@@ -1776,6 +1781,12 @@ class DatabaseServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def GetStaleTranscodedBlobUuids(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBlobUuidsWithInfo(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -3245,6 +3256,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetStaleTranscodedBlobUuids,
                     request_deserializer=database__pb2.GetStaleTranscodedBlobUuidsRequest.FromString,
                     response_serializer=database__pb2.GetStaleTranscodedBlobUuidsReply.SerializeToString,
+            ),
+            'GetBlobUuidsWithInfo': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBlobUuidsWithInfo,
+                    request_deserializer=database__pb2.GetBlobUuidsWithInfoRequest.FromString,
+                    response_serializer=database__pb2.GetBlobUuidsWithInfoReply.SerializeToString,
             ),
             'CreateNode': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateNode,
@@ -6329,6 +6345,33 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/GetStaleTranscodedBlobUuids',
             database__pb2.GetStaleTranscodedBlobUuidsRequest.SerializeToString,
             database__pb2.GetStaleTranscodedBlobUuidsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetBlobUuidsWithInfo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/GetBlobUuidsWithInfo',
+            database__pb2.GetBlobUuidsWithInfoRequest.SerializeToString,
+            database__pb2.GetBlobUuidsWithInfoReply.FromString,
             options,
             channel_credentials,
             insecure,
