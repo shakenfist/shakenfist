@@ -14,7 +14,6 @@ import uuid
 from functools import partial
 
 import flask
-import requests
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
@@ -605,25 +604,16 @@ class ArtifactUploadEndpoint(api_base.Resource):
                 return sf_api.error(404, 'upload not found')
 
             if u.node != config.NODE_NAME:
+                # Via the shared helper, so an unreachable upload node is
+                # a 503 naming it rather than an unqualified 500 (issue
+                # 4161).
                 path = flask.request.environ['PATH_INFO']
                 url = f'http://{u.node}:13000{path}'
                 api_token = get_api_token(
                     f'http://{u.node}:13000', namespace=request_namespace())
-                r = requests.request(
-                    flask.request.environ['REQUEST_METHOD'], url,
-                    data=json.dumps(sf_api.flask_get_post_body()),
-                    headers={
-                        'Authorization': api_token,
-                        'User-Agent': util_general.get_user_agent(),
-                        'X-Request-ID': flask.request.headers.get('X-Request-ID')
-                    })
-
-                LOG.info('Proxied %s %s returns: %d, %s' % (
-                        flask.request.environ['REQUEST_METHOD'], url,
-                        r.status_code, r.text))
-                resp = flask.Response(r.text,  mimetype='application/json')
-                resp.status_code = r.status_code
-                return resp
+                return api_base.proxy_request_to_node(
+                    url, api_token,
+                    json.dumps(sf_api.flask_get_post_body()), u.node)
 
         if not source_url:
             source_url = ('%s%s/%s'

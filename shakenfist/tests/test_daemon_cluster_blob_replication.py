@@ -223,7 +223,11 @@ class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
             mock_mariadb, mock_ipam, mock_network, mock_artifact,
             mock_instance, mock_blob, mock_low_disk, mock_nodes, b,
             low_disk_nodes=[])
-        self.assertEqual(dbo.STATE_ERROR, b.state)
+        b.enter_error_state.assert_called_once()
+        self.assertEqual(
+            dbo.STATE_ERROR, b.enter_error_state.call_args[0][0])
+        self.assertIn(
+            'no remaining locations', b.enter_error_state.call_args[0][1])
         self.assertTrue(b.add_event.called)
         b.request_replication.assert_not_called()
 
@@ -239,7 +243,7 @@ class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
             mock_mariadb, mock_ipam, mock_network, mock_artifact,
             mock_instance, mock_blob, mock_low_disk, mock_nodes, b,
             low_disk_nodes=[])
-        self.assertNotEqual(dbo.STATE_ERROR, b.state)
+        b.enter_error_state.assert_not_called()
 
     @_pass_mocks
     def test_underreplicated_blob_requests_replication(
@@ -254,7 +258,7 @@ class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
             mock_instance, mock_blob, mock_low_disk, mock_nodes, b,
             low_disk_nodes=[])
         b.request_replication.assert_called_once_with(allow_excess=0)
-        self.assertNotEqual(dbo.STATE_ERROR, b.state)
+        b.enter_error_state.assert_not_called()
 
     @_pass_mocks
     def test_full_node_rebalance_still_requests_extra_copy(
@@ -291,7 +295,7 @@ class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
             mock_instance, mock_blob, mock_low_disk, mock_nodes, b,
             low_disk_nodes=[], active_nodes=['sf-1'])
         b.request_replication.assert_not_called()
-        self.assertNotEqual(dbo.STATE_ERROR, b.state)
+        b.enter_error_state.assert_not_called()
 
     @_pass_mocks
     def test_single_node_cluster_does_not_request_a_rebalance_copy(
@@ -341,7 +345,11 @@ class ClusterBlobReplicationTestCase(base.ShakenFistTestCase):
             mock_mariadb, mock_ipam, mock_network, mock_artifact,
             mock_instance, mock_blob, mock_low_disk, mock_nodes, b,
             low_disk_nodes=[], active_nodes=['sf-1'])
-        self.assertEqual(dbo.STATE_ERROR, b.state)
+        b.enter_error_state.assert_called_once()
+        self.assertEqual(
+            dbo.STATE_ERROR, b.enter_error_state.call_args[0][0])
+        self.assertIn(
+            'no remaining locations', b.enter_error_state.call_args[0][1])
         b.request_replication.assert_not_called()
 
     @_pass_mocks

@@ -30,6 +30,11 @@ class _FakeInstance:
     def state(self, value):
         self._state = value
 
+    def enter_error_state(self, value, message,
+                          skip_transition_validation=False):
+        self._state = value
+        self.error = message
+
     def add_event(self, eventtype, message, extra=None, **kwargs):
         self.events.append((eventtype, message, extra))
 

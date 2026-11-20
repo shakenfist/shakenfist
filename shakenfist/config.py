@@ -898,6 +898,21 @@ class SFConfig(BaseSettings):
             'reconciliation requests on top of an already backed-up queue.'
         )
     )
+    DHCP_PROBE_TIMEOUT: float = Field(
+        2.0,
+        description=(
+            'How long the dnsmasq readiness probe waits for a DHCPACK '
+            'before reporting that dnsmasq is not answering DHCP. The '
+            'probe is a DHCPINFORM sent inside the network namespace, '
+            'so the round trip is local and a healthy server answers '
+            'in milliseconds. It is sent three times within this '
+            'window, so one dropped datagram is not mistaken for a '
+            'wedge. This is a wedge detector, not a latency '
+            'budget. Raising it delays detection of a wedged dnsmasq; '
+            'lowering it risks reporting a loaded network node as '
+            'broken, which rebuilds the network.'
+        )
+    )
     MAINTAIN_RECONCILE_COOLDOWN_SECONDS: int = Field(
         60,
         description=(
@@ -1042,8 +1057,15 @@ class SFConfig(BaseSettings):
         description='Default download mirror for Cirros images.'
     )
     CHECKSUM_URL_CIRROS: AnyHttpUrl = Field(
-        'https://download.cirros-cloud.net/%(vernum)s/MD5SUMS',
-        description='Default checksum URL for Cirros images.'
+        'https://download.cirros-cloud.net/%(vernum)s/%(digest_file)s',
+        description=(
+            'Default checksum URL for Cirros images. Takes both the '
+            'release version and the name of the digest file, because '
+            'which digest files a release publishes varies: cirros '
+            'publishes SHA256SUMS only from 0.6.3 onwards, and older '
+            'releases have MD5SUMS and nothing else. The strongest '
+            'digest a release actually publishes is used.'
+        )
     )
     LISTING_URL_CIRROS: AnyHttpUrl = Field(
         'https://download.cirros-cloud.net/',

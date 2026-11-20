@@ -724,8 +724,13 @@ class DependencyFailedTestCase(base.ShakenFistTestCase):
                     'reason': f'dependency net_op {DEP_UUID} does not exist',
                 })],
             self.mock_add_event.call_args_list)
+        # The reason is written with the state. Without it the
+        # operation read back as 'no reason recorded', though the
+        # reason was in hand.
         self.mock_state_update.assert_called_once_with(
-            BaseClusterOperation.STATE_ERROR)
+            BaseClusterOperation.STATE_ERROR,
+            message=f'dependency net_op {DEP_UUID} does not exist',
+            skip_transition_validation=False)
         self.mock_failed.assert_called_once_with(
             f'dependency net_op {DEP_UUID} does not exist')
 
@@ -740,6 +745,20 @@ class DependencyFailedTestCase(base.ShakenFistTestCase):
         self.mock_add_event.assert_called_with(
             EVENT_TYPE_AUDIT, 'failed to mark operation as errored')
         self.mock_failed.assert_called_once()
+
+    def test_an_errored_operation_keeps_its_own_reason(self):
+        # Re-dispatched after it failed for a reason of its own, then
+        # found its dependency gone. The bare setter this replaced was
+        # a no-op here; enter_error_state() records the newer reason,
+        # which would have replaced the real one with the dependency's.
+        self.mock_get_state.return_value = State(
+            value=BaseClusterOperation.STATE_ERROR, update_time=0,
+            message='its own failure')
+        with mock.patch('shakenfist.mariadb.set_state') as set_state:
+            self._make_op().cancel_for_missing_dependency(
+                {'op_type': 'net_op', 'op_uuid': DEP_UUID})
+        self.mock_state_update.assert_not_called()
+        set_state.assert_not_called()
 
     def test_started_operation_does_not_tell_targets(self):
         """A COMPLETE instance_create re-dispatched after a failed

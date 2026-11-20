@@ -59,6 +59,21 @@ VERSION_CACHE_MINIMUM = None
 VERSION_CACHE_MAXIMUM = None
 VERSION_CACHE_AGE = 0
 
+# What an object entering an error state with no reason records as its
+# error_message. Where the transition came from is logged alongside it,
+# not written here; see _state_update().
+NO_REASON_RECORDED = 'no reason recorded, see the node logs'
+
+# The functions a bare ``obj.state = <error>`` passes through before it
+# reaches the no-reason backstop in _state_update(). Their number
+# varies -- Blob overrides _state_update() and adds a frame -- so the
+# caller worth naming is found by skipping them, not by a fixed offset.
+STATE_PLUMBING_FUNCTIONS = frozenset({'_state_update', 'state'})
+
+# The same for an enter_error_state() call with an empty reason, which
+# passes through each override of it (Network has one) on the way.
+ERROR_STATE_ENTRY_FUNCTIONS = frozenset({'enter_error_state'})
+
 
 def _maintain_version_cache(max_cache_age):
     global VERSION_CACHE_MINIMUM
@@ -739,6 +754,35 @@ class DatabaseBackedObject:
                 self._is_error_state_value(new_value)):
             message = orig.message
 
+        # Entering an error state with no reason at all is a diagnostic
+        # dead end: the object says it failed, and nothing anywhere says
+        # what failed. That is how CI found an instance in state error
+        # with error_message null and no way to tell what had put it
+        # there (issue 3665). Callers enter an error state through
+        # enter_error_state(), which takes the reason and writes it with
+        # the state in a single write. This is the backstop for a caller
+        # which did not: record where the transition came from, so the
+        # next occurrence names a line of code rather than nothing.
+        # test_error_state_reasons asserts that no production call site
+        # relies on it.
+        #
+        # The calling line goes to the log, not into the message: the
+        # message is the object's error_message, which any caller who
+        # can read the object sees, and a source path and line number
+        # are not theirs to read.
+        if (message is None and state_attribute_name == 'state' and
+                self._is_error_state_value(new_value)):
+            caller = util_callstack.get_caller_outside(
+                STATE_PLUMBING_FUNCTIONS)
+            LOG.with_fields({
+                'uuid': self.uuid,
+                'object_type': self.object_type,
+                'original state': orig.value,
+                'new state': new_value,
+                'caller': caller
+            }).error('Error state entered with no reason recorded')
+            message = NO_REASON_RECORDED
+
         new_state = State(value=new_value, update_time=time.time(), message=message)
 
         # Primary state is stored in MariaDB, except for in-memory only
@@ -806,6 +850,72 @@ class DatabaseBackedObject:
                 f'Failed to write error message for '
                 f'{self.object_type}/{self.uuid} to MariaDB')
         self._log_attribute_mutation('error', {'message': msg})
+
+    def _reason_for_error_state(self, message, new_value):
+        """The reason to record for entering new_value, never empty.
+
+        A missing reason is a defect in the caller, but it is found at
+        run time -- most often as the text of an exception which turned
+        out to have none -- and on a path which is already handling a
+        failure. Refusing the transition there leaves the object in the
+        state it was failing out of, and raises out of an error handler,
+        which is worse than an error state without a reason. So enter
+        it anyway, record that no reason was given, and name the caller
+        in the log, as the backstop in _state_update() does for a bare
+        assignment. An object already in an error state keeps the reason
+        it already has: that one at least says something.
+        """
+        if message:
+            return message
+
+        current = self.state
+        LOG.with_fields({
+            'uuid': self.uuid,
+            'object_type': self.object_type,
+            'new state': new_value,
+            'caller': util_callstack.get_caller_outside(
+                ERROR_STATE_ENTRY_FUNCTIONS)
+        }).error('Error state entered with no reason recorded')
+        if self._is_error_state_value(current.value) and current.message:
+            return current.message
+        return NO_REASON_RECORDED
+
+    def enter_error_state(self, new_value, message,
+                          skip_transition_validation=False):
+        """Move into an error state and record why, in one write.
+
+        The reason an object failed is only useful if it is still there
+        when somebody looks. Setting the state and then the message as
+        two writes leaves a window in which the object is in error with
+        no reason, and loses the reason entirely if the process dies in
+        between -- which is how an instance was observed in state error
+        with a null error_message (issue 3665).
+
+        ``message`` is what ``error`` and the object's ``error_message``
+        view field will read back. Prefer a reason a reader who was not
+        here can act on: name the thing that was missing or the
+        operation that failed, not just 'failed'.
+        """
+        if not self._is_error_state_value(new_value):
+            raise exceptions.InvalidStateException(
+                'enter_error_state() called with non-error state %s for '
+                'object=%s uuid=%s'
+                % (new_value, self.object_type, self.uuid))
+
+        message = self._reason_for_error_state(message, new_value)
+
+        # Already there, and _state_update() would see no change and
+        # write nothing -- not even the reason, so a second failure of
+        # an object which had already failed was reported as recorded
+        # and silently dropped. Record the newer reason, as the two
+        # writes this method replaced did.
+        if self.state.value == new_value:
+            self.error = message
+            return
+
+        self._state_update(
+            new_value, message=message,
+            skip_transition_validation=skip_transition_validation)
 
     @property
     def metadata(self):

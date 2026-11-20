@@ -23,6 +23,7 @@ from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist import mariadb
 from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
+from shakenfist.exceptions import NodeLockUnavailable
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_user_facing_node_queues
@@ -285,7 +286,8 @@ def health_check_nodelock():
     try:
         with util_concurrency.NodeLock('_health_check'):
             ...
-    except util_concurrency.NODELOCK_TRANSPORT_ERRORS as e:
+    except (util_concurrency.NODELOCK_TRANSPORT_ERRORS
+            + (NodeLockUnavailable,)) as e:
         # The set of transient failures a nodelock client sees while the
         # daemon restarts is enumerated once, next to the socket path in
         # util/concurrency.py. They all mean the same thing here, and any
@@ -294,6 +296,11 @@ def health_check_nodelock():
         # not raise a transport error any more (issue 4902), so a daemon
         # which dies between acquire and release is caught by the next
         # probe a second later rather than by this one.
+        #
+        # NodeLock.__enter__ retries a transport failure a few times and
+        # then raises NodeLockUnavailable in its place, so that is what
+        # an unreachable daemon looks like from here; the transport
+        # errors themselves are still caught for the __exit__ path.
         LOG.warning(f'nodelock daemon is unhealthy ({e.__class__.__name__})!')
         return False
 

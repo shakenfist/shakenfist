@@ -16,6 +16,41 @@ deleted it will no longer appear in any API request, as it no longer exists in
 the database. The exception is that it will still appear in relevant events that
 have not yet aged out.
 
+## Error states always carry a reason
+
+Every object type has at least one error state, and an object in one always
+records why it got there. That reason is published as `error_message` in the
+object's API view, and it is written at the same moment as the state itself:
+`enter_error_state(state, reason)` on the object is the supported way in, and
+it takes both.
+
+This matters because the alternative leaves no record at all. Setting the state
+and then the message as two separate writes leaves a window in which the object
+says it failed and nothing says what failed, and loses the reason entirely if
+the process dies in between. CI observed exactly that -- an instance in `error`
+with `error_message` null, and no way to tell what had put it there.
+
+Three rules follow. The first two are enforced -- by `_state_update()` and by
+the `test_error_state_reasons` audit -- and the third says what the backstop
+does when a caller gets it wrong anyway:
+
+* A transition from one error state to another keeps the earlier reason, since
+  the move to `error` from a `*-error` transition state has nothing new to say.
+* A caller which enters an error state without a reason has `no reason
+  recorded, see the node logs` recorded in its place, and an error is logged
+  naming the line which set the state. The location goes to the log rather than
+  the message because the message is visible to anyone who can read the
+  object. The `test_error_state_reasons` audit reads the tree and fails on any
+  write of a state -- an assignment to `.state`, `setattr()` or a direct
+  `_state_update()` -- whose value is not provably a non-error state, so the
+  fallback is a backstop rather than a supported path.
+* `enter_error_state()` given an empty reason -- usually the text of an
+  exception which had none -- still enters the error state, through the same
+  backstop, and keeps the reason the object already had if it was in an error
+  state already. Refusing the transition left the object in the state it was
+  failing out of, and raised out of the error handler which was dealing with
+  the failure.
+
 ## Agent Operations
 
 * `initial`: the first state for an agent operation. A UUID has been allocated,

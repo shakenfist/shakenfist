@@ -175,10 +175,20 @@ def _instance_lock(inst, pet):
             stack.enter_context(inst.get_lock(
                 op='Cleaner power state update', global_scope=False,
                 node_timeout=2))
-        except (exceptions.NodeLockTimeout,
-                exceptions.MissingNodeLockSocket) as e:
+        except exceptions.NodeLockTimeout as e:
             LOG.with_fields({'instance': inst.uuid}).debug(
                 f'Instance is busy, skipping it this pass: {e}')
+            yield False
+            return
+        except exceptions.NodeLockUnavailable as e:
+            # This node's nodelock daemon is not answering, which is no
+            # more a reason to abandon the rest of the pass than a busy
+            # instance is. NodeLock has already logged it at WARNING.
+            # Every nodelock transport error (a missing socket, a
+            # truncated reply) arrives here: NodeLock.__enter__ turns
+            # them all into this one.
+            LOG.with_fields({'instance': inst.uuid}).debug(
+                f'Cannot lock instance, skipping it this pass: {e}')
             yield False
             return
         yield True
@@ -226,7 +236,9 @@ def _update_active_domain(lc, inst, instance_uuid, domain, log_ctx):
                 f'virsh undefine --nvram "sf:{instance_uuid}"')
             inst.state = dbo.STATE_DELETED
         else:
-            inst.state = inst.state.value + '-error'
+            inst.enter_error_state(
+                inst.state.value + '-error',
+                'libvirt reports the guest has crashed')
 
     elif state == 'paused':
         # A pause this loop is the first to see was not made by pause(),
@@ -283,11 +295,8 @@ def _update_active_domain(lc, inst, instance_uuid, domain, log_ctx):
                     {'disk_errors': disk_errors}).warning(
                     'Instance paused by disk I/O error, '
                     'marking errored')
-                # State must move to the error state before error
-                # is set: the error setter rejects a message
-                # unless the instance is already errored.
-                inst.state = inst.state.value + '-error'
-                inst.error = (
+                inst.enter_error_state(
+                    inst.state.value + '-error',
                     'instance paused by disk I/O error' +
                     (f' ({errors})' if errors else ''))
 
@@ -563,11 +572,8 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
                 return
 
             log_ctx.warning('Instance files missing, marking errored')
-            # State must move to the error state before error is set: the
-            # error setter rejects a message unless the instance is
-            # already errored.
-            inst.state = db_state.value + '-error'
-            inst.error = 'instance files missing'
+            inst.enter_error_state(
+                db_state.value + '-error', 'instance files missing')
             inst.add_event(EVENT_TYPE_AUDIT, 'instance files missing')
         return
 
@@ -663,9 +669,13 @@ def _per_domain_errors(lc):
     transient, must not end the pass for the domains listed after it:
     a libvirt call on that domain, the virsh fallback for undefining or
     destroying it (which raises ProcessExecutionError on a non-zero exit),
-    privexec and node lock transport errors, a database outage, and
-    errors from the filesystem or a socket. A programming error is not
-    among them, and still ends the pass loudly.
+    privexec transport errors, a nodelock reply this node cannot parse, a
+    database outage, and errors from the filesystem or a socket. A
+    programming error is not among them, and still ends the pass loudly.
+
+    Nodelock transport errors are not here because they cannot arrive:
+    NodeLock.__enter__ turns them into NodeLockUnavailable, which
+    _instance_lock() handles, and __exit__ swallows them.
     """
     return (
         lc.libvirt.libvirtError,
@@ -674,7 +684,6 @@ def _per_domain_errors(lc):
         exceptions.MissingPrivExecSocket,
         exceptions.TruncatedPrivExecResponse,
         exceptions.UnknownPrivExecReplyException,
-        exceptions.TruncatedNodeLockResponse,
         exceptions.UnknownNodeLockReplyException,
         OSError,
     )

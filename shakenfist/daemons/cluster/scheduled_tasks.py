@@ -685,7 +685,9 @@ def _process_per_instance_queue(execution_limit=10):
                 EVENT_TYPE_AUDIT,
                 ('instance in created state with no node placement, '
                  'transitioning to error state'))
-            inst.state = Instance.STATE_ERROR
+            inst.enter_error_state(
+                Instance.STATE_ERROR,
+                'instance is in state created with no node placement')
             continue
 
         nio_schema.create_and_enqueue(
@@ -786,7 +788,10 @@ def reap_stuck_cluster_operation_jobs():
             if op is None:
                 continue
             try:
-                op.state = BaseClusterOperation.STATE_ERROR
+                op.enter_error_state(
+                    BaseClusterOperation.STATE_ERROR,
+                    f'rejected by reaper: exceeded {max_attempts} claim '
+                    'attempts')
                 op.add_event(
                     EVENT_TYPE_AUDIT,
                     'rejected by reaper: exceeded '
@@ -835,7 +840,10 @@ def reap_stuck_cluster_operation_jobs():
         if op is None:
             continue
         try:
-            op.state = BaseClusterOperation.STATE_ERROR
+            op.enter_error_state(
+                BaseClusterOperation.STATE_ERROR,
+                'rejected by reaper: no work queue row references this '
+                'operation')
             op.add_event(
                 EVENT_TYPE_AUDIT,
                 'rejected by reaper: no work queue row references '

@@ -173,7 +173,9 @@ class NodeInstNetdescOp(BaseClusterOperation):
             util_exceptions.ignore_exception('node_inst_netdesc_op', e)
             inst.enqueue_delete_due_error(f'Unhandled error: {e}')
             try:
-                self.state = NodeInstNetdescOp.STATE_ERROR
+                self.enter_error_state(
+                    NodeInstNetdescOp.STATE_ERROR,
+                    f'{task.name} task raised {e.__class__.__name__}: {e}')
             except InvalidStateException:
                 # The operation may already be in a terminal state (for
                 # example abort, if a previous execution of this work item

@@ -84,6 +84,12 @@ class PreflightDeadlineTestCase(base.ShakenFistTestCase):
 
         def __init__(self):
             self.state = None
+            self.error_reasons = []
+
+        def enter_error_state(self, new_value, message,
+                              skip_transition_validation=False):
+            self.state = new_value
+            self.error_reasons.append(message)
 
     def _preflight(self, aop):
         op = self._FakeClusterOp()
@@ -161,5 +167,7 @@ class PreflightDeadlineTestCase(base.ShakenFistTestCase):
             op = self._preflight(aop)
 
         self.assertEqual(node_aop_op.NodeAgentopOp.STATE_ERROR, op.state)
+        self.assertEqual(
+            ['preflight failure, blob missing: b1'], op.error_reasons)
         self.assertEqual(
             'preflight failure, blob missing: b1', aop.failure_reason)

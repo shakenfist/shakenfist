@@ -57,7 +57,18 @@ def _read_file(filename, offset, limit=0):
             remaining -= len(d)
 
 
-def _read_remote(target, blob_uuid, offset=0, limit=0):
+def _open_remote(target, blob_uuid, offset=0, limit=0):
+    """Start a proxied blob read on the node holding the blob.
+
+    Deliberately not a generator. A generator body does not run until
+    its first iteration, and by then flask has sent the 200 -- so a peer
+    which is simply down produced a truncated body rather than an error
+    (issue 4161). Opening the connection here means an unreachable peer
+    is still a status code the caller can read.
+
+    Returns the streaming response, or raises requests.RequestException
+    for the caller to answer.
+    """
     api_token = get_api_token(
         f'http://{target}:13000', namespace=request_namespace())
     url = (f'http://{target}:13000/blobs/{blob_uuid}/'
@@ -68,14 +79,40 @@ def _read_remote(target, blob_uuid, offset=0, limit=0):
         'offset': offset,
         'host': target
     }).info('Requesting blob from remote host')
-    r = requests.request(
-        'GET', url, stream=True,
+    return requests.request(
+        'GET', url, stream=True, timeout=api_base.PEER_REQUEST_TIMEOUT,
         headers={
             'Authorization': api_token,
             'User-Agent': util_general.get_user_agent(),
             'X-Request-ID': flask.request.headers.get('X-Request-ID')
         })
-    yield from r.iter_content(chunk_size=CHUNK_SIZE)
+
+
+def _stream_remote(response, target, blob_uuid):
+    """Relay an already-open proxied blob read.
+
+    The status line is committed by the time this runs, so a peer which
+    dies mid-transfer cannot be answered with a status code. Log it as
+    the truncated body it is, rather than letting the exception escape
+    into the WSGI server with nothing recorded.
+    """
+    try:
+        yield from response.iter_content(chunk_size=CHUNK_SIZE)
+    except requests.exceptions.RequestException as e:
+        LOG.with_fields({
+            'blob': blob_uuid,
+            'host': target,
+            'error': str(e)
+        }).warning('Peer node stopped answering mid blob transfer, '
+                   'the caller has received a truncated body')
+    finally:
+        # Also reached when the caller disconnects and the generator is
+        # closed. Without it the peer connection is held until garbage
+        # collection, and a stalled peer can hold it for the whole read
+        # timeout. Only once the generator has started, though: see the
+        # call_on_close() where the response is built for the case where
+        # it never does.
+        response.close()
 
 
 def arg_is_blob_uuid(func):
@@ -229,9 +266,34 @@ class BlobDataEndpoint(api_base.Resource):
             return sf_api.error(404, 'blob missing')
 
         random.shuffle(locations)
-        return flask.Response(flask.stream_with_context(
-            _read_remote(locations[0], blob_uuid, offset=offset, limit=limit)),
-            mimetype='text/plain', status=200)
+        target = locations[0]
+        try:
+            remote = _open_remote(
+                target, blob_uuid, offset=offset, limit=limit)
+        except requests.exceptions.RequestException as e:
+            LOG.with_fields({
+                'blob': blob_uuid,
+                'host': target,
+                'error': str(e)
+            }).warning('Peer node API unreachable while reading a blob')
+            return sf_api.error(
+                503,
+                f'peer node {target} did not answer the proxied request, '
+                'please retry',
+                suppress_traceback=True)
+
+        response = flask.Response(
+            flask.stream_with_context(
+                _stream_remote(remote, target, blob_uuid)),
+            mimetype='text/plain', status=remote.status_code)
+        # Closing a generator which never started does not run its
+        # finally, and some responses never start the body: werkzeug
+        # sends none for a HEAD request, or for a peer which answered
+        # 204 or 304. The WSGI server always closes the response, so
+        # release the peer connection there too. Closing it twice is
+        # harmless.
+        response.call_on_close(remote.close)
+        return response
 
 
 blobs_get_example = """[

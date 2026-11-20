@@ -1,5 +1,7 @@
 import os
+import shlex
 import signal
+import sys
 import time
 from typing import Any
 from typing import Optional
@@ -10,6 +12,8 @@ from shakenfist import instance
 from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.exceptions import DHCPProbeFailed
+from shakenfist.exceptions import DHCPProbeLoopbackDown
 from shakenfist.exceptions import NatOnlyNetworksShouldNotHaveDnsMasq
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.managed_executables import managedexecutable
@@ -17,6 +21,7 @@ from shakenfist.schema.dnsmasq import DnsMasqData
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import dhcp_probe
 from shakenfist.util import network as util_network
 
 
@@ -200,6 +205,76 @@ class DnsMasq(managedexecutable.ManagedExecutable):
         })
         d.update(self.network.subst_dict())
         return d
+
+    def is_serving_dhcp(self) -> bool:
+        """Is this dnsmasq still answering DHCP, not merely alive?
+
+        ``is_running()`` reads the pid file and asks whether that
+        process exists, so a dnsmasq which is alive but wedged passes
+        it and the network looks healthy while its guests cannot get a
+        lease (issue 730).
+
+        Sends a DHCPINFORM from inside the network's namespace, which
+        is where the server's address exists. A DHCPINFORM is answered
+        for a client the server has never heard of and allocates
+        nothing, which is what makes it safe to run on every
+        maintenance pass -- see shakenfist/util/dhcp_probe.py for the
+        measurements behind both claims.
+
+        Answers True when this dnsmasq does not serve DHCP at all:
+        there is no readiness to check, and reporting a DNS-only
+        network as unhealthy would have it rebuilt on every pass.
+
+        False only when the probe ran and nothing answered. A probe
+        which could not be run -- privexec unreachable, the module not
+        importable, anything but the probe's own "no answer" status --
+        raises DHCPProbeFailed instead, because it says nothing about
+        dnsmasq and must not get a healthy network rebuilt. A down
+        loopback in the namespace raises DHCPProbeLoopbackDown, the
+        subclass for the one such reason the caller can repair.
+        """
+        if not self.provide_dhcp:
+            return True
+
+        # Run by this process's own interpreter. privexec runs commands
+        # with a system PATH, on which python3 has no shakenfist to
+        # import, and that import failure was read as "no answer" for
+        # every network on every pass. -P keeps the inherited working
+        # directory off sys.path: this runs as root, and -m would
+        # otherwise import a socket.py planted there ahead of the real
+        # one.
+        #
+        # The router address and namespace are read from the network
+        # directly. subst_dict() would enumerate every lease on the
+        # network -- an interface query and an instance read each --
+        # on every pass, to use none of it.
+        router = self.network.router
+        command = shlex.join([
+            sys.executable, '-P', '-m', 'shakenfist.util.dhcp_probe',
+            router, router, str(config.DHCP_PROBE_TIMEOUT)])
+        try:
+            util_concurrency.execute(
+                command, netns=str(self.network.uuid),
+                suppress_command_logging=True)
+        except ProcessExecutionError as e:
+            if e.exit_code == dhcp_probe.EXIT_NO_ANSWER:
+                return False
+            stderr = (e.stderr or '').strip()[-200:]
+            if e.exit_code == dhcp_probe.EXIT_LOOPBACK_DOWN:
+                raise DHCPProbeLoopbackDown(
+                    f'the DHCP probe exited {e.exit_code}: {stderr}') from e
+            raise DHCPProbeFailed(
+                f'the DHCP probe exited {e.exit_code}: {stderr}') from e
+        except util_concurrency.PRIVEXEC_TRANSPORT_ERRORS as e:
+            # Only a privexec which did not answer. Anything else -- a
+            # renamed network attribute, a protocol bug -- is a defect in
+            # this code, and read as "could not probe" it would report
+            # every network as serving DHCP forever, which is the silent
+            # failure this check exists to remove.
+            raise DHCPProbeFailed(
+                f'the DHCP probe could not be run: '
+                f'{e.__class__.__name__}: {e}') from e
+        return True
 
     def _read_templates(self) -> None:
         if not self._templates_initialized:

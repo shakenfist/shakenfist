@@ -555,8 +555,9 @@ class BridgedVXLanNetwork:
                     'floating_netmask': fn.netmask
                 })
             except CongestedNetwork:
-                self.network.state = self.network.STATE_ERROR
-                self.network.error = 'Unable to allocate floating gateway IP'
+                self.network.enter_error_state(
+                    self.network.STATE_ERROR,
+                    'Unable to allocate floating gateway IP')
                 return
 
             addresses = list(util_network.get_interface_addresses(

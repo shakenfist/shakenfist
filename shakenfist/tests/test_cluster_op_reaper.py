@@ -154,7 +154,10 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
         # State transition and audit event fired on the op.
         mock_class.from_db.assert_called_once_with('aaaa')
         self.assertEqual(
-            BaseClusterOperation.STATE_ERROR, mock_op.state)
+            BaseClusterOperation.STATE_ERROR,
+            mock_op.enter_error_state.call_args[0][0])
+        self.assertIn(
+            'exceeded', mock_op.enter_error_state.call_args[0][1])
         mock_op.add_event.assert_called_once()
         event_args = mock_op.add_event.call_args
         self.assertIn('exceeded', event_args[0][1])
@@ -248,7 +251,8 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
             self.assertEqual(
                 0, len(self.mock_mariadb.work_queue_store))
             self.assertEqual(
-                BaseClusterOperation.STATE_ERROR, mock_op.state)
+                BaseClusterOperation.STATE_ERROR,
+                mock_op.enter_error_state.call_args[0][0])
 
     # The orphan pass (issue 4303): operations sitting in a
     # non-terminal state with no work_queue row referencing them at
@@ -271,7 +275,10 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, self._orphaned_delta())
         mock_class.from_db.assert_called_once_with('orphan-uuid')
         self.assertEqual(
-            BaseClusterOperation.STATE_ERROR, mock_op.state)
+            BaseClusterOperation.STATE_ERROR,
+            mock_op.enter_error_state.call_args[0][0])
+        self.assertIn(
+            'no work queue row', mock_op.enter_error_state.call_args[0][1])
         mock_op.add_event.assert_called_once()
         event_args = mock_op.add_event.call_args
         self.assertIn('no work queue row', event_args[0][1])
@@ -292,7 +299,8 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(1, self._orphaned_delta())
         self.assertEqual(
-            BaseClusterOperation.STATE_ERROR, mock_op.state)
+            BaseClusterOperation.STATE_ERROR,
+            mock_op.enter_error_state.call_args[0][0])
 
     @mock.patch(
         'shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
@@ -331,8 +339,8 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
         # An orphan whose state write races a dispatcher's fold (or is
         # otherwise refused) must not abort the tick for the others.
         mock_racing_op = mock.MagicMock()
-        type(mock_racing_op).state = mock.PropertyMock(
-            side_effect=InvalidStateException('already terminal'))
+        mock_racing_op.enter_error_state.side_effect = (
+            InvalidStateException('already terminal'))
         mock_op = mock.MagicMock()
 
         mock_class = mock.MagicMock()
@@ -349,4 +357,5 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
         # Only the op that actually transitioned is counted.
         self.assertEqual(1, self._orphaned_delta())
         self.assertEqual(
-            BaseClusterOperation.STATE_ERROR, mock_op.state)
+            BaseClusterOperation.STATE_ERROR,
+            mock_op.enter_error_state.call_args[0][0])

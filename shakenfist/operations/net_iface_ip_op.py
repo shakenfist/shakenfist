@@ -114,7 +114,9 @@ class NetIfaceIPOp(BaseClusterOperation):
             util_exceptions.ignore_exception('net_iface_ip_op', e)
             mariadb.set_cluster_operation_error(
                 str(self.uuid), ErrorReport.from_exception(e))
-            self.state = NetIfaceIPOp.STATE_ERROR
+            self.enter_error_state(
+                NetIfaceIPOp.STATE_ERROR,
+                f'{task.name} task raised {e.__class__.__name__}: {e}')
 
     def _interface_defloat(self, n, ni):
         # Multi-target audit event preserves the correlation that today's

@@ -107,7 +107,9 @@ class ArtifactFetchOp(BaseClusterOperation):
             # The op might not be in executing if it has been aborted because
             # the instance start request which created it has been aborted.
             if self.state.value == ArtifactFetchOp.STATE_EXECUTING:
-                self.state = ArtifactFetchOp.STATE_ERROR
+                self.enter_error_state(
+                    ArtifactFetchOp.STATE_ERROR,
+                    f'failed to fetch image: {e}')
 
     def _image_fetch(self, inst):
         try:
@@ -161,8 +163,7 @@ class ArtifactFetchOp(BaseClusterOperation):
             # a good version.
             if a.state.value in [Artifact.STATE_INITIAL,
                                  Artifact.STATE_CREATING]:
-                a.state = Artifact.STATE_ERROR
-                a.error = msg
+                a.enter_error_state(Artifact.STATE_ERROR, msg)
 
             if inst:
                 inst.enqueue_delete_due_error(
@@ -172,7 +173,9 @@ class ArtifactFetchOp(BaseClusterOperation):
             # because the instance start request which created it has been
             # aborted.
             if self.state.value == ArtifactFetchOp.STATE_EXECUTING:
-                self.state = ArtifactFetchOp.STATE_ERROR
+                self.enter_error_state(
+                    ArtifactFetchOp.STATE_ERROR,
+                    f'failed to replicate image to target node: {msg}')
 
         except (HTTPError, requests.exceptions.RequestException,
                 requests.exceptions.ConnectionError) as e:
@@ -228,8 +231,7 @@ class ArtifactFetchOp(BaseClusterOperation):
             # source does not make an artifact with a good version bad.
             if a.state.value in [Artifact.STATE_INITIAL,
                                  Artifact.STATE_CREATING]:
-                a.state = Artifact.STATE_ERROR
-                a.error = msg
+                a.enter_error_state(Artifact.STATE_ERROR, msg)
 
             if inst:
                 inst.enqueue_delete_due_error(
@@ -239,4 +241,6 @@ class ArtifactFetchOp(BaseClusterOperation):
             # because the instance start request which created it has been
             # aborted.
             if self.state.value == ArtifactFetchOp.STATE_EXECUTING:
-                self.state = ArtifactFetchOp.STATE_ERROR
+                self.enter_error_state(
+                    ArtifactFetchOp.STATE_ERROR,
+                    f'failed to fetch image: {msg}')

@@ -49,6 +49,7 @@ class FakeOp:
         self.refuse = refuse
         self.RESTARTABLE = restartable
         self.events = []
+        self.error_reasons = []
 
     @property
     def state(self):
@@ -59,6 +60,11 @@ class FakeOp:
         if self.refuse:
             raise InvalidStateException('already terminal')
         self._state = new_state
+
+    def enter_error_state(self, new_state, message,
+                          skip_transition_validation=False):
+        self.state = new_state
+        self.error_reasons.append(message)
 
     def add_event(self, event_type, message, extra=None):
         self.events.append(message)

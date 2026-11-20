@@ -305,16 +305,33 @@ the signature accepts body keys nothing can enumerate (`log_request`
 merges the whole JSON body into the handler's kwargs), so the audit
 refuses to proceed rather than reporting a tree it could not check.
 
-**A note on responses:** nothing validates the response list, and one
-response is not declared per endpoint at all. `handle_database_unavailable`
-sits in `Resource.method_decorators`, so **every** endpoint can answer
-`503` when the database tier is unreachable — the published
-specification declares it only on the handful of endpoints where that
-was an observable change of behaviour rather than a new failure mode
-(`GET /blobs`, which used to answer `200` with an empty list, and the
-federated token endpoint). Treat `503` as a global response when
-writing a client; declare it on your endpoint only if you have
-something endpoint-specific to say about it.
+**A note on responses:** nothing validates the response list, and some
+responses are not declared per endpoint at all. Two decorators sit in
+`Resource.method_decorators`, so **every** endpoint can answer `503`
+without declaring it:
+
+* `handle_database_unavailable`, when the database tier is unreachable.
+* `handle_nodelock_unavailable`, when this node's own privileged
+  nodelock daemon does not answer. Worded separately on purpose: no
+  peer node is involved, so borrowing the peer sentence would send
+  diagnosis to the wrong machine (issue 4161).
+
+The published specification declares `503` only on the handful of
+endpoints where it was an observable change of behaviour rather than a
+new failure mode (`GET /blobs`, which used to answer `200` with an
+empty list, and the federated token endpoint). Treat `503` as a global
+response when writing a client; declare it on your endpoint only if you
+have something endpoint-specific to say about it.
+
+**Proxying to another node:** call `api_base.proxy_request_to_node()`
+rather than writing your own `requests` call. An unreachable peer is an
+infrastructure condition and must answer `503` naming the peer, not an
+unqualified `500`, and every hand-rolled copy of the proxy has so far
+been a copy which forgot that. If your endpoint streams its response,
+open the connection *before* returning the response object: a generator
+body does not run until its first iteration, by which time the `200` has
+already been sent and the only thing left to give the caller is a
+truncated body.
 
 Two responses are declared for you. Every authenticated endpoint gets a
 generic `401`, and `requires_admin=True` adds the `403` that

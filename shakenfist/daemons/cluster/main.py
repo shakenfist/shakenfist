@@ -529,7 +529,10 @@ class Monitor(daemon.Daemon):
                         EVENT_TYPE_AUDIT,
                         'blob has no remaining locations and no possible '
                         'replication source, marking as errored')
-                    b.state = dbo.STATE_ERROR
+                    b.enter_error_state(
+                        dbo.STATE_ERROR,
+                        'blob has no remaining locations and no possible '
+                        'replication source')
                 elif not replication_target_available(
                         locations, replication_candidates):
                     # The blob is short of the replication factor, but
@@ -802,10 +805,7 @@ class Monitor(daemon.Daemon):
                 n.add_event(
                     EVENT_TYPE_AUDIT, reason, extra={'instance_uuid': i.uuid})
                 i.add_event(EVENT_TYPE_AUDIT, reason)
-                # The error setter requires the object already be in an error
-                # state, so move state before setting error.
-                i.state = i.state.value + '-error'
-                i.error = reason
+                i.enter_error_state(i.state.value + '-error', reason)
 
         if ObjectType.BLOB in affected:
             self._drop_blob_locations(

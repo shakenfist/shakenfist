@@ -307,7 +307,7 @@ def add_address_to_interface(interface, namespace, address, netmask):
 
 def create_network_namespace(namespace):
     if not os.path.exists('/var/run/netns/%s' % namespace):
-        command = ['ip', 'netns', 'add', namespace]
+        command = [locate_command('ip'), 'netns', 'add', namespace]
         _, stderr, returncode = command_helper(*command)
         if returncode != 0:
             r = re.compile(
@@ -315,5 +315,23 @@ def create_network_namespace(namespace):
             m = r.match(stderr)
             if not m:
                 return False
+
+    # A namespace from "ip netns add" has its loopback interface down,
+    # and a down loopback drops a packet rather than refusing to send
+    # it: an address which is local to the namespace still routes via
+    # lo, so sendto() succeeds and nothing arrives. The DHCP readiness
+    # probe asks the network's own router address whether dnsmasq is
+    # still answering, so with lo down every healthy DHCP network
+    # reported itself wedged and was queued for a rebuild (issue 730).
+    #
+    # This runs whenever this is called, not only when the namespace is
+    # added: a namespace built before this keeps lo down, and the DHCP
+    # readiness check calls this to repair it when the probe reports a
+    # down loopback (Network._bring_namespace_loopback_up()).
+    _, _, returncode = command_helper(
+        locate_command('ip'), 'netns', 'exec', namespace,
+        locate_command('ip'), 'link', 'set', 'lo', 'up')
+    if returncode != 0:
+        return False
 
     return True

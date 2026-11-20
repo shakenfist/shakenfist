@@ -630,6 +630,41 @@ class UnknownNodeLockReplyException(Exception):
     ...
 
 
+class NodeLockUnavailable(LockException):
+    """This node's nodelock daemon could not be reached.
+
+    Deliberately distinct from a peer node being unreachable: this is
+    the node's own privileged lock daemon, on a local Unix socket, so
+    the caller's request cannot be served here and saying anything
+    about peers would be the wrong sentence (issue 4161).
+
+    A LockException, as NodeLockTimeout is: either way the caller did
+    not get the lock, and a handler which skips an item it cannot lock
+    should skip this one too rather than abort its whole pass.
+    """
+    ...
+
+
+class DHCPProbeFailed(Exception):
+    """The DHCP readiness probe could not be run.
+
+    Not the same fact as dnsmasq not answering, which is the probe
+    running and hearing nothing. Only that one is a reason to rebuild
+    a network; a probe which cannot run says nothing about dnsmasq.
+    """
+    ...
+
+
+class DHCPProbeLoopbackDown(DHCPProbeFailed):
+    """The probe could not be run because the namespace's lo is down.
+
+    The one reason a probe cannot run which the caller can repair, and
+    must: a namespace built before networks were created with lo up
+    keeps it down, and nothing else brings it up without a rebuild.
+    """
+    ...
+
+
 class MissingPrivExecSocket(Exception):
     ...
 

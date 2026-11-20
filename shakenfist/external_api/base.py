@@ -2158,6 +2158,18 @@ def arg_is_instance_ref(func):
     return wrapper
 
 
+# (connect, read) seconds for a request to a peer node's API. Without
+# one, a peer which accepts the connection and then never answers -- a
+# hung node, the condition node_health exists to notice -- held this
+# worker until gunicorn killed it for its silence, with no 503 and
+# nothing logged. The read bound sits below sf-api's gunicorn --timeout
+# (300, in sf-api.service) so a stalled peer is answered as one before
+# that happens, and is long enough not to cut short a peer which is slow
+# but working. For a streamed blob it bounds the wait for each chunk,
+# not the whole transfer.
+PEER_REQUEST_TIMEOUT = (10, 240)
+
+
 def proxy_request_to_node(url, api_token, data, peer):
     """Proxy the current request to a peer node's API and relay its reply.
 
@@ -2177,6 +2189,7 @@ def proxy_request_to_node(url, api_token, data, peer):
         r = requests.request(
             method, url,
             data=data,
+            timeout=PEER_REQUEST_TIMEOUT,
             headers={
                 'Authorization': api_token,
                 'User-Agent': util_general.get_user_agent(),
@@ -2781,6 +2794,34 @@ def handle_database_unavailable(func):
     return wrapper
 
 
+def handle_nodelock_unavailable(func):
+    # The node's own privileged lock daemon not answering is an
+    # infrastructure condition on this node, not a fault in the handler,
+    # so it must not escape as an unqualified 500 (issue 4161, the
+    # local-socket variant of issue 3743). It is deliberately worded
+    # differently from the peer-node case in proxy_request_to_node: no
+    # peer is involved, and saying one was would send diagnosis to the
+    # wrong machine. Logged at WARNING because the commonest cause is
+    # sf-nodelock restarting during a deploy, which is handled and
+    # retryable.
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except exceptions.NodeLockUnavailable as e:
+            LOG.with_fields({
+                'method': flask.request.method,
+                'path': flask.request.path,
+                'error': str(e)}).warning(
+                'Nodelock daemon unavailable while handling API request')
+            return sf_api.error(
+                503,
+                'the lock service on the node handling this request is '
+                'unavailable, please retry',
+                suppress_traceback=True)
+
+    return wrapper
+
+
 # The flask.g key carrying the correlation fields for a recorded
 # exception from the record_exception decorator out to
 # suppress_exceptions_to_client, which sits immediately outside it in
@@ -3143,6 +3184,7 @@ class Resource(flask_restful.Resource):
         log_request,
         handle_authorization_exceptions,
         handle_database_unavailable,
+        handle_nodelock_unavailable,
         record_exception,
         suppress_exceptions_to_client
         ]

@@ -9,27 +9,27 @@ class ImageResolverTestCase(base.ShakenFistTestCase):
     def test_resolve_ubuntu_1604(self):
         self.assertEqual(
             'https://images.shakenfist.com/ubuntu:16.04/latest.qcow2',
-            images._resolve_image('ubuntu:16.04'))
+            images._resolve_image('ubuntu:16.04').url)
 
     def test_resolve_ubuntu_16804(self):
         self.assertEqual(
             'https://images.shakenfist.com/ubuntu:18.04/latest.qcow2',
-            images._resolve_image('ubuntu:18.04'))
+            images._resolve_image('ubuntu:18.04').url)
 
     def test_resolve_ubuntu_2004(self):
         self.assertEqual(
             'https://images.shakenfist.com/ubuntu:20.04/latest.qcow2',
-            images._resolve_image('ubuntu:20.04'))
+            images._resolve_image('ubuntu:20.04').url)
 
     def test_resolve_ubuntu_2204(self):
         self.assertEqual(
             'https://images.shakenfist.com/ubuntu:22.04/latest.qcow2',
-            images._resolve_image('ubuntu:22.04'))
+            images._resolve_image('ubuntu:22.04').url)
 
     def test_resolve_a_url_is_left_alone(self):
         self.assertEqual(
             'https://example.com/an-image.qcow2',
-            images._resolve_image('https://example.com/an-image.qcow2'))
+            images._resolve_image('https://example.com/an-image.qcow2').url)
 
     def test_resolve_an_unknown_bare_name_is_left_alone(self):
         """What makes the fetch fail, rather than the shortcut expand.
@@ -39,7 +39,7 @@ class ImageResolverTestCase(base.ShakenFistTestCase):
         pass-through is_fetchable() exists to refuse before an API
         caller can reach it (issue 4557).
         """
-        self.assertEqual('wombat', images._resolve_image('wombat'))
+        self.assertEqual('wombat', images._resolve_image('wombat').url)
 
 
 class ImageShortcutTestCase(base.ShakenFistTestCase):
@@ -178,36 +178,39 @@ class CirrosResolutionTransportTestCase(base.ShakenFistTestCase):
         requested = []
         with mock.patch('shakenfist.images.requests.get',
                         side_effect=self._fake_get(requested)):
-            url = images._resolve_image('cirros:0.6.3')
+            resolved = images._resolve_image('cirros:0.6.3')
 
         self.assertEqual(
             'https://download.cirros-cloud.net/0.6.3/'
-            'cirros-0.6.3-x86_64-disk.img', url)
-        # The digest list, and nothing else: a pinned version does not
-        # need the listing.
+            'cirros-0.6.3-x86_64-disk.img', resolved.url)
+        # The digest lists, and nothing else: a pinned version does not
+        # need the listing. SHA256SUMS is asked for first and its MD5
+        # digest ignored, so MD5SUMS is read as well.
         self.assertEqual(
-            ['https://download.cirros-cloud.net/0.6.3/MD5SUMS'], requested)
+            ['https://download.cirros-cloud.net/0.6.3/SHA256SUMS',
+             'https://download.cirros-cloud.net/0.6.3/MD5SUMS'], requested)
 
     def test_the_latest_version_resolves_over_https(self):
         requested = []
         with mock.patch('shakenfist.images.requests.get',
                         side_effect=self._fake_get(requested)):
-            url = images._resolve_image('cirros')
+            resolved = images._resolve_image('cirros')
 
         self.assertEqual(
             'https://download.cirros-cloud.net/0.6.3/'
-            'cirros-0.6.3-x86_64-disk.img', url)
+            'cirros-0.6.3-x86_64-disk.img', resolved.url)
         self.assertEqual(
             ['https://download.cirros-cloud.net/',
+             'https://download.cirros-cloud.net/0.6.3/SHA256SUMS',
              'https://download.cirros-cloud.net/0.6.3/MD5SUMS'], requested)
 
     def test_nothing_the_resolver_fetches_is_plaintext(self):
         requested = []
         with mock.patch('shakenfist.images.requests.get',
                         side_effect=self._fake_get(requested)):
-            url = images._resolve_image('cirros')
+            resolved = images._resolve_image('cirros')
 
-        for fetched in requested + [url]:
+        for fetched in requested + [resolved.url]:
             self.assertTrue(
                 fetched.startswith('https://'), fetched)
 
@@ -273,4 +276,4 @@ class TransferImageTestCase(base.ShakenFistTestCase):
                     helper, '_http_get_inner') as mock_http_get:
             helper.transfer_image()
 
-        mock_http_get.assert_called_once_with(self.URL)
+        mock_http_get.assert_called_once_with(images.ResolvedImage(self.URL))

@@ -87,7 +87,9 @@ class NodeNetOp(BaseClusterOperation):
             util_exceptions.ignore_exception('node_net_op', e)
             mariadb.set_cluster_operation_error(
                 str(self.uuid), ErrorReport.from_exception(e))
-            self.state = NodeNetOp.STATE_ERROR
+            self.enter_error_state(
+                NodeNetOp.STATE_ERROR,
+                f'{task.name} task raised {e.__class__.__name__}: {e}')
 
     def _network_destroy(self, n):
         BridgedVXLanNetwork(n)._apply_delete_on_hypervisor()

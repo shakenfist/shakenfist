@@ -95,7 +95,9 @@ class NetMacaddrIPOp(BaseClusterOperation):
             util_exceptions.ignore_exception('net_macaddr_ip_op', e)
             mariadb.set_cluster_operation_error(
                 str(self.uuid), ErrorReport.from_exception(e))
-            self.state = NetMacaddrIPOp.STATE_ERROR
+            self.enter_error_state(
+                NetMacaddrIPOp.STATE_ERROR,
+                f'{task.name} task raised {e.__class__.__name__}: {e}')
 
     def _remove_dhcp_lease(self, n):
         if n.is_dead():

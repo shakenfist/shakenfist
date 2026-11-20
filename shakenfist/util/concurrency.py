@@ -20,6 +20,7 @@ from shakenfist.exceptions import HashFailed
 from shakenfist.exceptions import MissingNodeLockSocket
 from shakenfist.exceptions import MissingPrivExecSocket
 from shakenfist.exceptions import NodeLockTimeout
+from shakenfist.exceptions import NodeLockUnavailable
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.exceptions import RemoveFloatingIPFailed
 from shakenfist.exceptions import TruncatedNodeLockResponse
@@ -38,6 +39,28 @@ from shakenfist.util import general as util_general
 
 LOG, _ = logs.setup(__name__)
 PRIVEXEC_SOCKET_PATH = '/srv/shakenfist/.privexec'
+# The PATH a command run through sf-privexec gets unless it brings its
+# own. It names no virtualenv, so a bare ``python3`` here is the system
+# interpreter, which has no shakenfist installed.
+PRIVEXEC_DEFAULT_PATH = (
+    '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin')
+
+# The failures which mean sf-privexec gave no answer: its socket is
+# missing or refuses the connection (OSError, which covers
+# ConnectionError and FileNotFoundError), or it closed the connection
+# before a whole reply arrived. A caller which must carry on without an
+# answer catches these and nothing broader.
+#
+# UnknownPrivExecReplyException is deliberately not one of them, for the
+# same reason as UnknownNodeLockReplyException below: a reply which
+# parses but carries the wrong field is a bug in this protocol, not an
+# unreachable daemon, and it stays loud.
+PRIVEXEC_TRANSPORT_ERRORS = (
+    OSError,
+    MissingPrivExecSocket,
+    TruncatedPrivExecResponse,
+)
+
 NODELOCK_SOCKET_PATH = '/srv/shakenfist/.nodelock'
 
 # nodelock only unlinks its socket at startup, so while it is restarting (for
@@ -66,6 +89,11 @@ NODELOCK_TRANSPORT_ERRORS = (
 # full listen backlog, not to wait out a daemon restart, which drops the lock
 # anyway.
 NODELOCK_UNLOCK_ATTEMPTS = 3
+
+# How many consecutive transport failures NodeLock.__enter__ tolerates
+# before it gives up and raises NodeLockUnavailable. Same cadence and
+# same reasoning as the unlock attempts above.
+NODELOCK_ACQUIRE_ATTEMPTS = 3
 NODELOCK_UNLOCK_RETRY_INTERVAL = 0.2
 
 
@@ -178,7 +206,7 @@ def execute(
     if 'PATH' not in env_variables:
         ev = request.execute_request.environment_variables.add()
         ev.name = 'PATH'
-        ev.value = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+        ev.value = PRIVEXEC_DEFAULT_PATH
 
     if not suppress_command_logging:
         LOG.with_fields({
@@ -423,7 +451,35 @@ class NodeLock():
                 key=self.name
             )
         )
-        while not _node_lock_request(request):
+        transport_failures = 0
+        while True:
+            # A transport failure is not the same fact as the lock being
+            # held, and it used to escape to an API caller as an
+            # unqualified 500 (issue 4161). Retry it briefly, for the
+            # reason __exit__ gives -- a healthy daemon with a full
+            # listen backlog refuses connections too -- then raise a
+            # named exception the API can answer honestly.
+            #
+            # The retry is bounded by a count rather than by self.timeout,
+            # which may be None. An unbounded wait on a daemon which is
+            # not there would park the caller forever, which is worse
+            # than the 500 this replaces.
+            try:
+                if _node_lock_request(request):
+                    break
+                transport_failures = 0
+            except NODELOCK_TRANSPORT_ERRORS as e:
+                transport_failures += 1
+                if transport_failures >= NODELOCK_ACQUIRE_ATTEMPTS:
+                    self.log.with_fields({
+                        'error': f'{e.__class__.__name__}: {e}',
+                        'attempts': transport_failures,
+                        'lock': self.name
+                    }).warning('Could not reach the nodelock daemon')
+                    raise NodeLockUnavailable(
+                        f'the nodelock daemon on this node did not answer '
+                        f'after {transport_failures} attempts') from e
+
             duration = round(time.time() - start_time, 2)
             if duration > 5 and not slow_warned:
                 self.log.with_fields({

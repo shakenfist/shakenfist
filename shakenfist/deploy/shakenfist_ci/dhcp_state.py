@@ -10,6 +10,7 @@ the merge queue. Subclassing ``DhcpStateTestsMixin`` from both suites
 runs it in PR CI as well, without giving up the multi-node coverage.
 """
 
+import ipaddress
 import json
 import time
 
@@ -27,9 +28,35 @@ DHCP_CONFIG_ROOT = '/srv/shakenfist/dhcp'
 # else the net worker is doing.
 DELETE_TEARDOWN_TIMEOUT = 300
 
+# The interpreter Shaken Fist is installed into on a node. The system
+# python3 has no shakenfist to import, which is the mistake the DHCP
+# probe test below exists to catch.
+SF_VENV_PYTHON = '/srv/shakenfist/venv/bin/python3'
+
+# How long after a network becomes ready its readiness probe has
+# certainly run: sf-net's maintain pass skips a network whose state
+# changed in the last 60 seconds, and passes are 30 seconds apart. A
+# pass may also queue behind the previous one, hence the slack.
+DHCP_PROBE_SETTLE = 60 + 2 * 30 + 15
+
+# The network events which say the DHCP readiness probe did not get a
+# clean answer, either because dnsmasq did not answer or because the
+# probe could not be run at all.
+DHCP_PROBE_FAILURE_EVENTS = (
+    'dnsmasq is running but not answering DHCP',
+    'network not ok, dnsmasq not answering DHCP',
+    'could not check whether dnsmasq is answering DHCP',
+)
+
 
 class DhcpStateTestsMixin:
-    """Deleting a network must remove its dnsmasq state from the network node.
+    """A network's dnsmasq on the network node: it answers, and it is removed.
+
+    The readiness tests check that a DHCP network's dnsmasq answers the
+    probe sf-net uses to decide whether to rebuild it (issue 730); see
+    their own comments. The rest of this docstring is about the delete.
+
+    Deleting a network must remove its dnsmasq state from the network node.
 
     Mix into a ``base.BaseNamespacedTestCase`` subclass in a suite
     directory; this class defines no ``__init__`` so the concrete class
@@ -126,3 +153,58 @@ class DhcpStateTestsMixin:
             'still present on network node %s after %d seconds'
             % (self.net['uuid'], self._dhcp_config_directory(),
                self.network_node.get('name'), DELETE_TEARDOWN_TIMEOUT))
+
+    def _router(self):
+        # A network's router is the first host address of its block,
+        # as Network.router has it (ipam index 1).
+        block = ipaddress.ip_network(self.net['netblock'])
+        return str(block[1])
+
+    def test_dnsmasq_answers_the_readiness_probe(self):
+        # The probe, in the network's namespace, against the real
+        # dnsmasq on the network node. Its unit tests script replies
+        # into a fake socket, so they cannot say whether dnsmasq
+        # answers a DHCPINFORM at all, or at which port. This can. Exit
+        # 0 is an answer; 3 is no answer; anything else means the probe
+        # did not run.
+        router = self._router()
+        out, _ = self._node_exec(
+            self.network_node,
+            ['sh', '-c',
+             'ip netns exec %s %s -m shakenfist.util.dhcp_probe %s %s 5 '
+             '2>&1; echo "exit=$?"'
+             % (self.net['uuid'], SF_VENV_PYTHON, router, router)],
+            sudo=True)
+        self.addDetail('probe', content.text_content(out))
+        self.assertEqual(
+            'exit=0', out.strip().splitlines()[-1],
+            'The dnsmasq for network %s on node %s did not answer the DHCP '
+            'readiness probe: %r' % (self.net['uuid'],
+                                     self.network_node.get('name'), out))
+
+    def test_the_maintenance_pass_finds_dnsmasq_serving(self):
+        # The probe as sf-net actually runs it, through sf-privexec,
+        # with privexec's PATH and whatever interpreter the command
+        # names. Running it by hand (above) cannot catch a command which
+        # only works by hand: the first version ran a bare python3,
+        # which on a node is an interpreter with no shakenfist, so every
+        # network failed its probe on every pass and was rebuilt -- and
+        # nothing in CI looked. This looks.
+        deadline = time.time() + DHCP_PROBE_SETTLE
+        events = []
+        while True:
+            events = self.test_client.get_network_events(
+                self.net['uuid'], event_type='status')
+            failures = [
+                e for e in events
+                if e.get('message') in DHCP_PROBE_FAILURE_EVENTS]
+            if failures:
+                self.addDetail('events', content.text_content(json.dumps(
+                    events, indent=4, sort_keys=True, default=str)))
+                self.fail(
+                    'Network %s recorded a failed DHCP readiness probe: %s'
+                    % (self.net['uuid'],
+                       json.dumps(failures, sort_keys=True, default=str)))
+            if time.time() > deadline:
+                return
+            time.sleep(10)

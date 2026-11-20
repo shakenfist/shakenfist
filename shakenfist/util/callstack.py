@@ -20,6 +20,15 @@ F = TypeVar('F', bound=Callable[..., Any])
 CHECK_CALLERS_ENABLED = os.environ.get('SHAKENFIST_CHECK_CALLERS', '1') != '0'
 
 
+def _format_frame(frame: Any) -> str:
+    """A frame as 'filename:lineno:name()', the one format callers get."""
+    filename = frame.f_code.co_filename
+    f_match = FILENAME_RE.match(filename)
+    if f_match:
+        filename = f_match.group(1)
+    return f'{filename}:{frame.f_lineno}:{frame.f_code.co_name}()'
+
+
 def get_caller(offset: int = -2) -> str:
     """Get the caller's location as 'filename:lineno:name()'.
 
@@ -33,11 +42,24 @@ def get_caller(offset: int = -2) -> str:
     # offset=-2 means 2 levels up from extract_stack, which is 1 level up from here
     depth = abs(offset) - 1
     frame = sys._getframe(depth)
-    filename = frame.f_code.co_filename
-    f_match = FILENAME_RE.match(filename)
-    if f_match:
-        filename = f_match.group(1)
-    return f'{filename}:{frame.f_lineno}:{frame.f_code.co_name}()'
+    return _format_frame(frame)
+
+
+def get_caller_outside(function_names: frozenset[str]) -> str:
+    """The nearest caller not named in function_names, as get_caller() has it.
+
+    For a call which reaches here through a varying number of frames --
+    an overridden method which calls its parent, say -- where a fixed
+    offset would name one of those frames rather than the code which
+    started the call. The function calling this one is always skipped.
+    """
+    frame = sys._getframe(1).f_back
+    while frame is not None and frame.f_code.co_name in function_names:
+        frame = frame.f_back
+    if frame is None:
+        return 'unknown'
+
+    return _format_frame(frame)
 
 
 def generate_traceback(offset: int = -2) -> str:

@@ -98,7 +98,9 @@ class NodeInstOp(BaseClusterOperation):
             self.__getattribute__(f'_{task.name}')(inst)
         except Exception as e:
             util_exceptions.ignore_exception('node_inst_op', e)
-            self.state = NodeInstOp.STATE_ERROR
+            self.enter_error_state(
+                NodeInstOp.STATE_ERROR,
+                f'{task.name} task raised {e.__class__.__name__}: {e}')
 
             # An observational operation only measures the instance, so
             # failing to measure it says nothing about the guest. The cluster
@@ -126,10 +128,15 @@ class NodeInstOp(BaseClusterOperation):
                 # abandoning the instance in its current state. Use the
                 # same suffix-then-fallback pattern as
                 # Instance.enqueue_delete_due_error.
+                instance_reason = (
+                    f'{task.name} failed on this instance: '
+                    f'{e.__class__.__name__}: {e}')
                 try:
-                    inst.state = f'{inst.state.value}-error'
+                    inst.enter_error_state(
+                        f'{inst.state.value}-error', instance_reason)
                 except Exception:
-                    inst.state = Instance.STATE_ERROR
+                    inst.enter_error_state(
+                        Instance.STATE_ERROR, instance_reason)
 
     def _collect_billing_statistics(self, inst):
         # The sweep enqueues this only for created instances, but the

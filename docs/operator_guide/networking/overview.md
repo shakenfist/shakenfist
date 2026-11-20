@@ -560,6 +560,128 @@ end by `TestFloatingIPLifecycle` in the cluster CI suite. If you change
 a name, change it in the add path, the remove path, the tests, this
 page and `docs/components/cloudgood/networking-shakenfist.md` together.
 
+## Telling instances their network has failed
+
+A network which cannot be brought up, or whose reconciliation the
+circuit breaker has quiesced, records that on the network. The
+instances attached to it have no working network, and until recently
+had no way for their owner to find out: they read `created` and
+healthy, and the only trace was on an object the owner may not think
+to look at.
+
+Both paths now record a `network this instance is attached to has
+failed` event on every instance holding an interface on that network,
+carrying the network's uuid and the reason, so an operator reading an
+instance's events can see what happened without first knowing to go
+and read the network.
+
+It is an event, not a state change. The instance has not failed — its
+guest is running and its disks are fine — so erroring it would be a
+lie, and would make it awkward to delete for a condition which may
+clear on its own.
+
+Two paths signal, and they are rate limited differently:
+
+* A network **entering an error state** signals once, on the way in. A
+  network already in an error state has told its instances, and
+  repeating it on every subsequent transition between error states
+  would be noise.
+* A network the maintenance pass **quiesces** signals once per episode.
+  That branch is reached every 30 seconds for as long as the network
+  stays quiesced, so the episode is tracked and cleared when the
+  network next reconciles cleanly. A network which breaks again is
+  reported again.
+
+## Checking that dnsmasq is actually serving
+
+The network node's maintenance pass asks two separate questions about
+each network's `dnsmasq`, and the distinction matters.
+
+The first is **liveness**: is the process still there? That reads the
+pid file and checks the process exists. It catches a `dnsmasq` which
+crashed or was killed, and nothing else — a process which is alive but
+no longer answering passes it, and the network reads as healthy while
+its guests cannot get a lease.
+
+The second is **readiness**: is it still answering DHCP? The pass sends
+a DHCPINFORM from inside the network's namespace and waits for a
+DHCPACK. Three things make that the right request to send, each
+measured against a real `dnsmasq` configured the way Shaken Fist
+configures one rather than assumed:
+
+* It is answered for a client the server has never heard of. A
+  DHCPDISCOVER is not — networks are configured `dhcp-range=...,static`,
+  so `dnsmasq` ignores a client which is not in its hosts file, and a
+  DISCOVER probe would have reported every healthy network as broken.
+* It allocates nothing. The reply carries `yiaddr` 0.0.0.0 and the
+  lease file is untouched, so the probe can run every pass without
+  consuming addresses or disturbing a real client.
+* A wedged `dnsmasq` fails it. With the process stopped but still
+  present — state `T`, which the liveness check reports as healthy —
+  the probe times out.
+
+A fourth was measured because a review doubted it: `dnsmasq` sends its
+answer to a DHCPINFORM back to the address and port the request came
+from, not to the DHCP client port (68), so the probe needs no
+privileged bind. That held on `dnsmasq` 2.90 (Debian 12) and 2.91
+(Ubuntu 24.04 and Debian 13), it is what `dhcp_packet()` in `dnsmasq`'s
+`src/dhcp.c` says it does, and
+`tools/dhcp-probe-against-dnsmasq.sh` repeats the measurement in a
+container. The smoke CI suite also runs the probe against the real
+`dnsmasq` on its network node.
+
+Liveness is asked first, because there is no point sending a packet to
+a process which is not there, and it is far cheaper than a round trip.
+
+A network which fails either check is not okay, and the maintenance
+pass rebuilds it. `DHCP_PROBE_TIMEOUT` (default 2 seconds) is how long
+the probe waits. Within that it sends the DHCPINFORM three times, evenly
+spaced, as a real DHCP client retransmits: a single datagram dropped by
+a busy node must not get a healthy network rebuilt. A healthy server answers in milliseconds over a
+namespace-local round trip, so this is a wedge detector rather than a
+latency budget: raising it delays detection, and lowering it risks
+calling a loaded network node broken and rebuilding its networks.
+
+A network which provides DNS but not DHCP is not probed. There is no
+DHCP readiness to check, and reporting such a network unhealthy would
+rebuild it on every pass.
+
+The events to look for on a network are `network not ok, dnsmasq not
+running` (liveness) and `network not ok, dnsmasq not answering DHCP`
+(readiness). The second is the one which used to be invisible.
+
+A probe which could not be run at all is a third outcome, and is not
+treated as either. If the network node cannot reach `sf-privexec`, or
+the probe exits with anything but its own "no answer" status, the
+network records `could not check whether dnsmasq is answering DHCP`
+with the error and is left alone. A probe which cannot run says nothing
+about `dnsmasq`, and rebuilding every network because the check itself
+was broken would be worse than not checking. The event is recorded
+once when the probe starts failing, and `can check whether dnsmasq is
+answering DHCP again` once when it recovers; in between, the network
+node logs a `Could not check whether dnsmasq is answering DHCP` warning
+on every pass, so a probe which never runs does not go unnoticed
+without writing an event row per network every thirty seconds.
+
+The probe reports that third outcome, rather than "no answer", when the
+namespace's loopback interface is down. The address it asks is the
+network's own router address, so the request is delivered over
+loopback, and a down loopback *drops* a packet rather than refusing to
+send it: the send succeeds and nothing arrives. A namespace created by
+`ip netns add` has its loopback down, which is why creating a network
+now brings it up. Before that, every DHCP network on a node reported
+its own undelivered request as a wedged `dnsmasq` and was queued for a
+rebuild on every pass.
+
+A namespace built by an earlier version still has its loopback down,
+and since a probe which cannot run leaves the network alone, nothing
+would rebuild it. So the probe reports a down loopback with a status of
+its own, and the maintenance pass brings the loopback up and probes
+again, without a rebuild. The network records `brought the network
+namespace loopback interface up` when it does. If the loopback cannot
+be brought up, that is reported like any other probe which could not
+run.
+
 ## Stray vxlan reaping
 
 Every node's network maintainer compares the vxlan devices actually

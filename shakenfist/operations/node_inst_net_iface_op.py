@@ -120,35 +120,47 @@ class NodeInstNetIfaceOp(BaseClusterOperation):
         inst = Instance.from_db(self.instance_uuid)
         if not inst:
             self.log.warning(f'Instance {self.instance_uuid} missing')
-            self.state = NodeInstNetIfaceOp.STATE_ERROR
+            self.enter_error_state(
+                NodeInstNetIfaceOp.STATE_ERROR,
+                f'instance {self.instance_uuid} is missing')
             return
 
         n = Network.from_db(self.network_uuid)
         if not n:
             self.log.warning(f'Network {self.network_uuid} missing')
-            self.state = NodeInstNetIfaceOp.STATE_ERROR
+            self.enter_error_state(
+                NodeInstNetIfaceOp.STATE_ERROR,
+                f'network {self.network_uuid} is missing')
             return
 
         ni = NetworkInterface.from_db(self.interface_uuid)
         if not ni:
             self.log.warning(
                 f'Network interface {self.interface_uuid} missing')
-            self.state = NodeInstNetIfaceOp.STATE_ERROR
+            self.enter_error_state(
+                NodeInstNetIfaceOp.STATE_ERROR,
+                f'network interface {self.interface_uuid} is missing')
             return
 
         try:
             self.__getattribute__(f'_{task.name}')(inst, n, ni)
         except Exception as e:
             util_exceptions.ignore_exception('node_inst_net_iface_op', e)
-            self.state = NodeInstNetIfaceOp.STATE_ERROR
+            reason = (f'{task.name} task raised '
+                      f'{e.__class__.__name__}: {e}')
+            self.enter_error_state(NodeInstNetIfaceOp.STATE_ERROR, reason)
             try:
-                inst.state = Instance.STATE_ERROR
+                inst.enter_error_state(
+                    Instance.STATE_ERROR,
+                    f'network interface operation failed: {reason}')
             except InvalidStateException:
                 self.log.warning(
                     'Could not transition instance to error state, '
                     f'current state is {inst.state}')
             try:
-                ni.state = NetworkInterface.STATE_ERROR
+                ni.enter_error_state(
+                    NetworkInterface.STATE_ERROR,
+                    f'network interface operation failed: {reason}')
             except InvalidStateException:
                 self.log.warning(
                     'Could not transition network interface to '

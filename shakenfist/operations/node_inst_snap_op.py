@@ -151,12 +151,21 @@ class NodeInstSnapOp(BaseClusterOperation):
 
         except Exception as e:
             util_exceptions.ignore_exception('node_inst_snap_op', e)
-            self.state = NodeInstSnapOp.STATE_ERROR
-            inst.state = Instance.STATE_ERROR
+            reason = (f'{task.name} task raised '
+                      f'{e.__class__.__name__}: {e}')
+            self.enter_error_state(NodeInstSnapOp.STATE_ERROR, reason)
+            inst.enter_error_state(
+                Instance.STATE_ERROR, f'snapshot failed: {reason}')
             for a in self.accumulated_artifacts:
-                a.state = Artifact.STATE_ERROR
+                a.enter_error_state(
+                    Artifact.STATE_ERROR,
+                    f'snapshot of instance {self.instance_uuid} failed: '
+                    f'{reason}')
             for b in self.accumulated_blobs:
-                b.state = Blob.STATE_ERROR
+                b.enter_error_state(
+                    Blob.STATE_ERROR,
+                    f'snapshot of instance {self.instance_uuid} failed: '
+                    f'{reason}')
 
     def _instance_snapshot(self, inst):
         for s in self.snapshots:
@@ -198,7 +207,9 @@ class NodeInstSnapOp(BaseClusterOperation):
                 a.state = Artifact.STATE_CREATED
             except BlobDeleted:
                 if a.state.value != Artifact.STATE_DELETED:
-                    a.state = Artifact.STATE_ERROR
+                    a.enter_error_state(
+                        Artifact.STATE_ERROR,
+                        f'blob {b.uuid} was deleted during snapshot')
                 raise AbortSnapshot(self, 'blob was deleted during snapshot')
             except InvalidStateException:
                 # Remove any reference that might have been created during

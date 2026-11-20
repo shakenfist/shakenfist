@@ -38,16 +38,28 @@ from shakenfist.schema.operations.node_net_op \
 from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
 from shakenfist.exceptions import CannotAssignFloatingGateway
+from shakenfist.exceptions import CreateNetworkNamespaceFailed
+from shakenfist.exceptions import DHCPProbeFailed
+from shakenfist.exceptions import DHCPProbeLoopbackDown
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Node
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 from shakenfist.util import iptables as util_iptables
 from shakenfist.util import network as util_network
 
 
 LOG, _ = logs.setup(__name__)
+
+# Networks which have recorded that their DHCP readiness probe could not
+# be run, so the event is written once per episode rather than once per
+# maintenance pass -- the log line still says it every pass. Dropped
+# when the probe next runs, so a probe which breaks again is reported
+# again, and by the network maintainer for a network its pass no longer
+# visits, so a deleted network does not linger.
+DHCP_PROBE_FAILURE_REPORTED: set[str] = set()
 
 
 class Network(dbowo):
@@ -547,6 +559,16 @@ class Network(dbowo):
                     EVENT_TYPE_STATUS, 'network not ok, dnsmasq not running')
                 return False
 
+            # Alive is not the same as serving. Asked second, because
+            # there is no point sending a DHCPINFORM to a process which
+            # is not there, and the liveness check is a great deal
+            # cheaper than a round trip (issue 730).
+            if not self.is_dnsmasq_serving_dhcp():
+                self.add_event(
+                    EVENT_TYPE_STATUS,
+                    'network not ok, dnsmasq not answering DHCP')
+                return False
+
         if self.provide_nat and not self.is_nat_okay():
             return False
 
@@ -801,6 +823,140 @@ class Network(dbowo):
         if not is_running:
             self.add_event(EVENT_TYPE_STATUS, 'dnsmasq is not running')
         return is_running
+
+    def signal_instances_of_failure(self, reason):
+        """Record on every instance using this network that it failed.
+
+        A network which cannot be brought up, or which the maintenance
+        circuit breaker has quiesced, is recorded on the network and
+        nowhere else. The instances attached to it have no working
+        network and no way for their owner to find that out: they read
+        `created` and healthy, and the only trace is on an object the
+        owner may not think to look at (issue 520).
+
+        An event rather than a state change. The instance has not
+        failed -- its guest is running and its disks are fine -- so
+        erroring it would be a lie, and would also make it
+        undeletable-by-the-usual-path for a condition which may clear
+        on its own.
+
+        Returns the instance uuids signalled, for the caller to log.
+        """
+        # self.networkinterfaces pushes the network filter down to the
+        # indexed column; filtering NetworkInterfaces in Python would
+        # read every active interface in the cluster to find these.
+        instance_uuids = set()
+        for ni in self.networkinterfaces:
+            if ni.instance_uuid:
+                instance_uuids.add(str(ni.instance_uuid))
+
+        if not instance_uuids:
+            return []
+
+        ordered = sorted(instance_uuids)
+        add_event_multi(
+            EVENT_TYPE_STATUS,
+            [(ObjectType.INSTANCE, u) for u in ordered],
+            'network this instance is attached to has failed',
+            extra={'network_uuid': str(self.uuid), 'reason': reason})
+        return ordered
+
+    def enter_error_state(self, new_value, message,
+                          skip_transition_validation=False):
+        """Error the network, and tell the instances sitting on it."""
+        # Only on the way in. A network already in an error state has
+        # signalled its instances once; saying it again on every
+        # subsequent transition between error states would be noise on
+        # an object the owner is already looking at.
+        already_errored = self._is_error_state_value(self.state.value)
+        message = self._reason_for_error_state(message, new_value)
+        super().enter_error_state(
+            new_value, message,
+            skip_transition_validation=skip_transition_validation)
+        if not already_errored:
+            # The state, which is what matters, is already written. This
+            # is called from error handlers, so failing to annotate the
+            # instances must not replace the failure being handled with
+            # an exception of its own (as for issue 4112).
+            try:
+                self.signal_instances_of_failure(message)
+            except Exception as e:
+                LOG.with_fields({'network': self}).error(
+                    f'Failed to tell instances their network has failed: {e}')
+
+    def _bring_namespace_loopback_up(self):
+        """Repair a namespace whose loopback interface is down.
+
+        Creating a network brings lo up, but only creating it: a
+        namespace built before that, by ``ip netns add``, keeps lo down,
+        and the probe cannot reach the network's own router address
+        through it. Nothing else would repair it, because a probe which
+        cannot run leaves the network looking healthy, so no rebuild
+        comes. Network namespace creation is idempotent and brings lo
+        up whether or not the namespace already existed.
+
+        Raises DHCPProbeFailed if the repair could not be made, which
+        the caller already handles as a probe which could not run.
+        """
+        try:
+            util_concurrency.create_network_namespace(self.uuid)
+        except (CreateNetworkNamespaceFailed,
+                *util_concurrency.PRIVEXEC_TRANSPORT_ERRORS) as e:
+            raise DHCPProbeFailed(
+                f'the namespace loopback is down and could not be brought '
+                f'up: {e.__class__.__name__}: {e}') from e
+        self.add_event(
+            EVENT_TYPE_STATUS,
+            'brought the network namespace loopback interface up')
+
+    def is_dnsmasq_serving_dhcp(self):
+        """Is this network's dnsmasq answering DHCP?
+
+        Separate from is_dnsmasq_running(), which is a liveness check:
+        a wedged dnsmasq passes that one and leaves guests unable to
+        get a lease (issue 730).
+        """
+        d = self._get_dnsmasq_object()
+        try:
+            try:
+                is_serving = d.is_serving_dhcp()
+            except DHCPProbeLoopbackDown:
+                self._bring_namespace_loopback_up()
+                is_serving = d.is_serving_dhcp()
+        except DHCPProbeFailed as e:
+            # Not knowing is not the same as dnsmasq being wedged, and
+            # only the latter is worth a rebuild. Say so where an
+            # operator will see it: a probe which can never run is a
+            # broken readiness check, and it should be as loud as the
+            # rebuilds it would otherwise have caused. The log says it
+            # every pass; the event, which is a durable row per network,
+            # says it once per episode.
+            LOG.with_fields({
+                'network': self,
+                'error': str(e)
+            }).warning('Could not check whether dnsmasq is answering DHCP')
+            # Marked only once the event is written, so that an event
+            # which could not be written is tried again next pass rather
+            # than lost for the whole episode.
+            if str(self.uuid) not in DHCP_PROBE_FAILURE_REPORTED:
+                self.add_event(
+                    EVENT_TYPE_STATUS,
+                    'could not check whether dnsmasq is answering DHCP',
+                    extra={'error': str(e)})
+                DHCP_PROBE_FAILURE_REPORTED.add(str(self.uuid))
+            return True
+
+        if str(self.uuid) in DHCP_PROBE_FAILURE_REPORTED:
+            self.add_event(
+                EVENT_TYPE_STATUS,
+                'can check whether dnsmasq is answering DHCP again')
+            DHCP_PROBE_FAILURE_REPORTED.discard(str(self.uuid))
+
+        if not is_serving:
+            self.add_event(
+                EVENT_TYPE_STATUS,
+                'dnsmasq is running but not answering DHCP')
+        return is_serving
 
     def remove_dhcp_lease(self, ipv4, macaddr):
         """Enqueue a remove_dhcp_lease NetMacaddrIPOp for this network.
