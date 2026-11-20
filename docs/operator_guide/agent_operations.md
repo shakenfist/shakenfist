@@ -11,7 +11,10 @@ request parameters themselves -- `deadline_seconds`,
 accepts -- see
 [the API reference](../developer_guide/api_reference/instances.md#bounding-how-long-an-agent-operation-may-take).
 This page is about what happens operationally once a request is
-enqueued.
+enqueued. What callers can express -- ordering, and dependencies between
+operations -- is described in
+[the developer guide's agent operations page](../developer_guide/agent_operations.md),
+and is what they will be asking you to tune for.
 
 ## One executor per instance
 

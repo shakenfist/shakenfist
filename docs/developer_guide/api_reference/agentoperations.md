@@ -11,7 +11,9 @@ the dependency's state, the string `missing` if it no longer exists, or the
 string `unreadable` if its state could not be read before the wait budget ran
 out. See
 [declaring dependencies between agent operations](/developer_guide/api_reference/instances/#declaring-dependencies-between-agent-operations)
-for when that happens.
+for when that happens, and
+[the agent operations page of the developer guide](/developer_guide/agent_operations/)
+for how dependencies and their failures behave as a whole.
 
 An operation also carries timing fields: `deadline` and `progress_timeout` are the
 caller's intent, and `last_progress`, `attempts` and `expiry_reason` are the

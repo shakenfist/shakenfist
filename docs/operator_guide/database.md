@@ -1737,7 +1737,9 @@ accruing budget towards an abort, which is the safe direction and clears
 itself once the database tier catches up -- and it is one more reason the
 database tier is upgraded first. See
 [the API reference](../developer_guide/api_reference/instances.md#agentdependency)
-for the shape a caller sends and for what the two columns mean.
+for the shape a caller sends and for what the two columns mean, and
+[the agent operations model](../developer_guide/agent_operations.md) for how
+the stored edges are evaluated.
 
 The edges are written to MariaDB by `sf-database`, while the capability
 token which tells a client the parameters exist is advertised by `sf-api`.

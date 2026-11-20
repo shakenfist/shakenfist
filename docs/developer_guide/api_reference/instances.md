@@ -988,6 +988,10 @@ is meaningful.
 
 ### Declaring dependencies between agent operations
 
+The model these parameters belong to, with worked examples, is in
+[the agent operations page of the developer guide](/developer_guide/agent_operations/);
+what follows is the field-level contract.
+
 All three creating calls also accept optional `depends_on` and `runs_after`
 parameters, each a list of [agentdependency](#agentdependency) objects naming
 agent operations which already exist. `depends_on` declares that the new
