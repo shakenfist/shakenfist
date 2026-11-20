@@ -241,11 +241,20 @@ them. A later step should not redo them.
    what a chain cannot do.** The page's dependency examples are
    short chains of fast steps -- the canonical one being put a file,
    then run it, then fetch the result, where fate-sharing is the point
-   -- and the page says plainly that every link's wait budget starts
-   when that link is submitted and not when its dependency finishes,
-   so the whole chain has to fit inside the budget, and that
-   fleet-wide rolling work therefore stays submit-await-submit unless
-   an operator has deliberately raised it.
+   -- and the page says plainly when a chain is racing the wait
+   budget and when it is not. **Corrected during step 4a's review**,
+   because this text was too general and the page inherited that:
+   edges are evaluated only for the operation at the head of its
+   instance's queue, so a dependent on the *same* instance as its
+   dependency never reaches the head until that dependency is
+   terminal and retired, is never found blocked, and starts no budget
+   at all, however slow the dependency was. The budget bites
+   **across** instances, where the dependent reaches the head of its
+   own queue immediately and spends the budget while the operations
+   upstream of it run. So a cross-instance chain must fit inside one
+   budget and fleet-wide rolling work stays submit-await-submit
+   unless an operator has deliberately raised it, while a
+   same-instance chain needs no arithmetic.
 
    **This is the decision most likely to be argued with**, because the
    obvious response to survey finding 5 is that the budget semantics
@@ -324,11 +333,16 @@ An item which cannot be checked is reported as such, not ticked.
   '300 seconds|3600|CLEANER_DELAY is|five seconds'
   docs/developer_guide/agent_operations.md` finds nothing. The option
   names may appear; their values may not.
-- The page states the budget-starts-at-submission property, which is
-  the one thing a reader could otherwise get wrong from every other
-  page. Check: the page contains a sentence naming both the wait
-  budget and when it starts, read by the management session. Not
-  greppable, so it is read.
+- The page states when the wait budget is spent and when it is not,
+  which is the one thing a reader could otherwise get wrong from every
+  other page. Check: the page names the budget, says it is anchored
+  when the dispatcher first finds an operation blocked, and
+  distinguishes a same-instance edge, which never starts it, from a
+  cross-instance edge, which does. Read by the management session
+  against the single call to `_dependencies_met()` on
+  `agent_operation_next()` in
+  `shakenfist/daemons/sidechannel/main.py`. Not greppable, so it is
+  read.
 - Every client call in every example exists in `client-python` on
   `develop`. Check: for each symbol used, `git -C ../client-python
   grep -n '<symbol>' origin/develop -- shakenfist_client/apiclient.py`
@@ -359,6 +373,37 @@ An item which cannot be checked is reported as such, not ticked.
 - Phase 3 reads `Complete` in the master plan's Execution table with
   both of its merge commits, and `docs/plans/index.md` agrees. Check:
   `python3 tools/check-plan-status.py`.
+
+## Execution notes
+
+Departures from the plan, recorded as they happened. Dates are AEDT.
+
+1. **2026-11-21.** Back brief answered: the phase split is accepted;
+   the wait budget is to be documented rather than changed; the
+   `client-python` release question is to be asked again when phase 5
+   is planned rather than guessed at now; and this session may push
+   and open the pull request.
+2. **Step 4a's brief was corrected before it was sent.** The step row
+   asks for an example index naming "the other sibling client
+   repositories which use agent operations". There are none:
+   `client-python-ova`, `andris`, `clingwrap` and `cloudgood` contain
+   no non-test module which creates an agent operation, and only
+   `client-python-k3s` does, in two. The index therefore has one
+   entry, which is what shipped.
+3. **Decision 4 and one done-criterion were corrected at source**
+   during step 4a's review, and the page with them. Both said that a
+   link's wait budget starts when that link is submitted, which is
+   true only across instances. `_dependencies_met()` is called on the
+   operation `agent_operation_next()` returns and on no other, so a
+   dependent queued behind its own dependency on one instance is not
+   evaluated until that dependency is terminal and retired, by which
+   time its edge is satisfied: no anchor is written and no budget is
+   spent. As written, the page told a reader that the canonical
+   same-instance chain was racing a clock it never races, and it
+   contradicted its own fleet example, which puts a package upgrade
+   inside a chain.
+4. Steps ran in the planned order, one at a time, for the reason the
+   step plan gives: they all edit documentation in one worktree.
 
 ## Future work
 
