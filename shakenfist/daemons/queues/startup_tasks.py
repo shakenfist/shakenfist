@@ -18,7 +18,6 @@ from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import InvalidStateException
-from shakenfist.network.interface import interfaces_for_instance
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import get_general_background_node_queues
@@ -112,10 +111,10 @@ def restore_instances():
     for inst in instance.Instances([instance.this_node_filter], prefilter='healthy'):
         instance_problems = []
 
-        # ``inst.interfaces`` queries network_interfaces live, so the
-        # cache-sync block that used to maintain a denormalised list
-        # here is no longer needed.
-        for ni in interfaces_for_instance(inst):
+        # ``inst.interfaces`` queries network_interfaces live, scoped to
+        # this instance, so the cache-sync block that used to maintain a
+        # denormalised list here is no longer needed.
+        for ni in inst.interfaces:
             if ni.network_uuid not in networks:
                 networks.append(ni.network_uuid)
 

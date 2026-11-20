@@ -35,9 +35,13 @@ from shakenfist.tests.mock_mariadb import MockMariaDB
 class FakeInstance:
     """An instance double for driving _instance_delete directly."""
 
-    def __init__(self, state_value='created'):
+    def __init__(self, state_value='created', interfaces=None):
         self._state_value = state_value
         self.uuid = str(uuid4())
+        # The delete reads the interfaces from the instance itself, which
+        # is one indexed query scoped to the instance rather than a scan
+        # of every interface in the cluster.
+        self.interfaces = list(interfaces or [])
         self.power_off = mock.Mock()
         self.delete = mock.Mock()
         self.add_event = mock.Mock()
@@ -108,9 +112,6 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
         self.other_instances = []
 
         for target, kwargs in [
-                ('shakenfist.operations.node_inst_op.'
-                 'interfaces_for_instance',
-                 {'side_effect': lambda inst: iter(self.interfaces)}),
                 ('shakenfist.operations.node_inst_op.Instances',
                  {'side_effect': lambda *a, **kw: list(self.other_instances)}),
                 ('shakenfist.operations.node_inst_op.Network.from_db',
@@ -137,6 +138,10 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
             'shakenfist.operations.node_inst_op.BridgedVXLanNetwork').start()
         self.addCleanup(mock.patch.stopall)
 
+    def _instance(self, state_value='created'):
+        """An instance double carrying this test's interfaces."""
+        return FakeInstance(state_value, self.interfaces)
+
     def _make_op(self):
         _, op_uuid = create_and_enqueue(
             node_uuid=str(uuid4()),
@@ -150,7 +155,7 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
 
     def test_all_networks_torn_down(self):
         op = self._make_op()
-        op._instance_delete(FakeInstance())
+        op._instance_delete(self._instance())
 
         # Both networks get a dnsmasq prune and a hypervisor teardown.
         for n in self.networks.values():
@@ -175,7 +180,7 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
                 'shakenfist.operations.node_inst_op.util_exceptions.'
                 'ignore_exception'):
             self.assertRaises(
-                ProcessExecutionError, op._instance_delete, FakeInstance())
+                ProcessExecutionError, op._instance_delete, self._instance())
 
         # Both networks were still processed.
         for n in self.networks.values():
@@ -195,7 +200,7 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
                 'shakenfist.operations.node_inst_op.util_exceptions.'
                 'ignore_exception'):
             self.assertRaises(
-                RuntimeError, op._instance_delete, FakeInstance())
+                RuntimeError, op._instance_delete, self._instance())
 
         second = self.networks[self.network_uuids[1]]
         second.update_dnsmasq.assert_called_once_with()
@@ -204,7 +209,7 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
 
     def _delete_whose_power_off_fails(self, state_value):
         """Run a delete whose power off leaves the domain running."""
-        inst = FakeInstance(state_value)
+        inst = self._instance(state_value)
         inst.power_off.side_effect = InstancePowerOffFailed(
             'internal error: something else entirely')
 
@@ -259,7 +264,7 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
             _make_instance_using(self.network_uuids[1])]
 
         op = self._make_op()
-        op._instance_delete(FakeInstance())
+        op._instance_delete(self._instance())
 
         # Both networks still get their dnsmasq prune: the lease of the
         # instance which just went away is stale either way.
@@ -274,7 +279,7 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
         # The instance under delete is excluded explicitly, so a delete
         # whose own record is still readable as active -- a deleted state
         # which has not landed yet, say -- still cleans up.
-        inst = FakeInstance()
+        inst = self._instance()
         self_entry = mock.MagicMock()
         self_entry.uuid = inst.uuid
         self_entry.interfaces = self.interfaces
@@ -294,7 +299,7 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
         # sampled before inst.delete() and the per-network dnsmasq
         # enqueues, so the attach was invisible to it and the bridge was
         # removed from underneath the new, running, interface.
-        inst = FakeInstance()
+        inst = self._instance()
         inst.delete.side_effect = lambda: self.other_instances.append(
             _make_instance_using(self.network_uuids[0]))
 
@@ -311,7 +316,7 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
         # read before inst.delete() can be trusted by the loop which
         # runs after it.
         calls = []
-        inst = FakeInstance()
+        inst = self._instance()
         inst.delete.side_effect = lambda: calls.append('delete')
         self.other_instances = _RecordingInstanceList(calls)
 
@@ -330,7 +335,7 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
         self.networks[self.network_uuids[1]].vxid = 0x456
 
         op = self._make_op()
-        op._instance_delete(FakeInstance())
+        op._instance_delete(self._instance())
 
         self.mock_bvn.assert_called_once_with(
             self.networks[self.network_uuids[0]])
@@ -347,7 +352,7 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
         with mock.patch(
                 'shakenfist.operations.node_inst_op.util_exceptions.'
                 'ignore_exception'):
-            op._instance_delete(FakeInstance())
+            op._instance_delete(self._instance())
 
         self.mock_bvn.assert_not_called()
 
@@ -359,7 +364,7 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
         with mock.patch(
                 'shakenfist.operations.node_inst_op.config', config):
             op = self._make_op()
-            op._instance_delete(FakeInstance())
+            op._instance_delete(self._instance())
 
         self.mock_bvn.assert_not_called()
         self.mock_foreign.assert_not_called()

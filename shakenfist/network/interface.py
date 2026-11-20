@@ -1,5 +1,4 @@
 # Copyright 2020 Michael Still
-from functools import partial
 from typing import Any
 from typing import Optional
 from uuid import UUID
@@ -329,26 +328,9 @@ class NetworkInterfaces(dbo_iter):
                 yield filtered
 
 
-def instance_filter(inst, ni):
-    return str(inst.uuid) == str(ni.instance_uuid)
-
-
 def network_filter(network, ni):
     return str(network.uuid) == str(ni.network_uuid)
 
 
 def network_uuid_filter(network_uuid, ni):
     return str(network_uuid) == str(ni.network_uuid)
-
-
-# Convenience helpers
-def interfaces_for_instance(instance):
-    nis = {}
-    loggable_nis = {}
-    for ni in NetworkInterfaces([partial(instance_filter, instance)],
-                                prefilter='active'):
-        nis[ni.order] = ni
-        loggable_nis[ni.order] = str(ni)
-
-    for order in sorted(nis.keys()):
-        yield nis[order]
