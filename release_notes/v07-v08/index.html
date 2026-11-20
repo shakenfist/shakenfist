@@ -14482,6 +14482,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finished-operations-are-kept-for-fifteen-minutes-errored-ones-included" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finished operations are kept for fifteen minutes, errored ones included
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -16766,6 +16777,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finished-operations-are-kept-for-fifteen-minutes-errored-ones-included" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finished operations are kept for fifteen minutes, errored ones included
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -18729,11 +18751,12 @@ observational only if all of its tasks are. The tasks classified this way are
 <ul>
 <li>An instance's <code>last_cluster_operation</code> no longer names the billing and
   health sweep. It names the newest mutating operation, and because finished
-  operations are eligible for removal thirty seconds after finishing and are
-  removed by the
+  operations are eligible for removal <code>CLUSTER_OPERATION_RETENTION</code> seconds
+  after finishing and are removed by the
   <a href="../../operator_guide/database/#the-deleted-object-sweep">deleted-object sweep</a>,
-  it is usually <code>null</code> for an instance at rest. Clients should already treat
-  it as optional.</li>
+  it is usually <code>null</code> for an instance which has had no user-requested
+  change for longer than that, 15 minutes by default. Clients should
+  already treat it as optional.</li>
 <li><code>runs_after</code> chains built from an instance's <code>last_cluster_operation</code>
   serialise behind the last user-requested change rather than behind the
   last sweep. Those chains have since been replaced -- see
@@ -18795,13 +18818,14 @@ object, each with an <code>observational</code> key, are advertised by the new
   now reports the key on every entry, <code>false</code> where the flag is unknown, as
   the per-object listings always have.</li>
 <li>Both listings report at most the newest 256 operations for an object.
-  Neither was bounded before, and an object which has errored operations
-  repeatedly keeps their target rows for seven days.</li>
+  Neither was bounded before, and an object which had errored operations
+  repeatedly kept their target rows for seven days.</li>
 <li>By default only queued, preflight and executing operations are listed.
-  <code>all=true</code> adds finished operations which have not yet been removed
-  (eligible for removal thirty seconds after finishing and removed by the
-  <a href="../../operator_guide/database/#the-deleted-object-sweep">deleted-object sweep</a>),
-  and errored ones for up to seven days. It is not a history.</li>
+  <code>all=true</code> adds finished operations, errored ones included, which have
+  not yet been removed (eligible for removal <code>CLUSTER_OPERATION_RETENTION</code>
+  seconds after finishing and removed by the
+  <a href="../../operator_guide/database/#the-deleted-object-sweep">deleted-object sweep</a>).
+  It is not a history.</li>
 <li>Deleting an instance cancels every outstanding operation which targets it,
   billing and health sweeps included, except snapshots. It no longer cancels
   network reconcile work which an instance operation depended on, because
@@ -18867,6 +18891,51 @@ rather than holding the new operation forever.</p>
   server-generated uuid, so nothing else could have targeted them, and the
   create's own ordering already came from <code>depends_on</code>. Neither request's
   behaviour changes.</li>
+</ul>
+<h2 id="finished-operations-are-kept-for-fifteen-minutes-errored-ones-included">Finished operations are kept for fifteen minutes, errored ones included<a class="headerlink" href="#finished-operations-are-kept-for-fifteen-minutes-errored-ones-included" title="Permanent link">&para;</a></h2>
+<p>A finished cluster operation used to become eligible for removal thirty
+seconds after it finished, and removing it takes its events with it, so an
+operation's audit events, its queue-wait event and its execution duration
+were gone from the database almost as soon as it completed. That window is
+now the <code>CLUSTER_OPERATION_RETENTION</code> setting, 900 seconds by default. It
+costs resident rows -- the cluster's operation arrival rate times the
+window -- and not sweep throughput. Set it to 30 to restore the old
+behaviour.</p>
+<p>Operations which finished in <code>error</code> are now removed on that same window.
+They were never removed before and accumulated without bound, along with
+their target rows until the seven day prune. <code>error</code> remains a state which
+is kept for every other object type: an errored instance, network, node,
+blob, artifact or agent operation is still there until it is deleted. See
+<a href="../../operator_guide/database/#the-deleted-object-sweep">the deleted-object sweep</a>
+for why each type is treated as it is.</p>
+<p>What you will see:</p>
+<ul>
+<li>An errored operation, and its events, become eligible for removal from
+  the database <code>CLUSTER_OPERATION_RETENTION</code> seconds after it errored, as a
+  completed one does, and the sweep removes them within a few minutes of
+  that. A client polling one, such as a network delete's 202, should read
+  the error within that window.</li>
+<li>The <code>cluster_deleted_object_backlog</code> gauge rises once after the upgrade,
+  by the number of errored operations the cluster had kept, and then falls
+  as the sweep drains them. See
+  <a href="../../operator_guide/upgrades/#errored-cluster-operations-drain-on-the-first-sweep">Errored cluster operations drain on the first sweep</a>
+  before you alert on it.</li>
+<li>Each process's static object cache now drops entries whose TTL has passed
+  once a minute, rather than keeping them until the object is read again or
+  the cache fills, so the cache lets go of an instance's <code>ssh_key</code> and
+  <code>user_data</code> at most a minute after their TTL runs out. That bounds how long
+  they are reachable, not how long their bytes are in memory: Python does
+  not zero what it frees. Reclaimed entries are counted in the new
+  <code>database_object_cache_expired_reaped_total</code> counter.</li>
+<li><code>database_object_cache_capacity_evictions_total</code> now counts only live
+  entries shed to make room. Expired entries a full cache clears first used
+  to be counted there too and are now counted in
+  <code>database_object_cache_expired_reaped_total</code>, so the capacity counter's
+  rate drops after the upgrade without any change in cache pressure. Rebase
+  any dashboard or threshold on it.</li>
+<li>When the cache is full it now sheds the entries with the least of their
+  own TTL left, so the 30 second and 300 second tiers share the space rather
+  than the shorter tier being emptied first.</li>
 </ul>
 
 

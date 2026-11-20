@@ -16346,13 +16346,61 @@ blob, artifact, upload, dnsmasq, namespace). Setting either to 0 disables that
 tier. Two of the immutable tier's members do have an <code>update_&lt;type&gt;</code>
 (<code>update_ipam</code>, <code>update_network_interface</code>); both evict, which is what keeps
 the tier correct, so an updater added to a type in this tier must evict too.</p>
-<p>TTL bounds staleness, not residency. Expiry is lazy -- an entry is reclaimed
-only when its own key is read again -- so <code>OBJECT_CACHE_MAX_ENTRIES</code> (default
-20000) bounds how much a process retains. Without it the cache holds every
-object a process has ever read rather than its working set, because an object
-read once and never read again is never revisited, and a delete in another
-process evicts nothing here. On overflow expired entries go first, then the
-entries closest to expiry.</p>
+<p>TTL bounds staleness. Residency has two separate bounds, because expiry is
+lazy -- a read reclaims only its own key. <code>OBJECT_CACHE_MAX_ENTRIES</code> (default
+20000) bounds how <em>much</em> a process retains, and a reap every
+<code>OBJECT_CACHE_REAP_INTERVAL</code> (60 s, a module constant in <code>mariadb.py</code>) bounds
+how <em>long</em>: one pass over the cache under its lock, dropping everything whose
+TTL has passed, counted in <code>database_object_cache_expired_reaped_total</code>.
+Residency is therefore the entry's TTL plus at most one interval -- about a
+fifth more than the 300 s immutable default, but up to three times the 30 s
+mutable default -- rather than the life of the process -- but only in a process which reaches a reap call
+site, so the call sites are the bound:</p>
+<ul>
+<li>the cache's own accessors, for any process still reading or writing
+  objects;</li>
+<li><code>Daemon.idle()</code>, for every <code>sf-*</code> daemon, whose workers are threads in the
+  daemon's own process;</li>
+<li>the readiness checker thread in <code>external_api/health.py</code>, for each <code>sf-api</code>
+  gunicorn worker, which reads instances, is not a <code>Daemon</code> and has no idle
+  loop of its own.</li>
+</ul>
+<p>The remaining entry points (<code>sf-nodelock</code>, <code>sf-privexec</code> and the sentinels)
+never read objects. A new kind of long-lived process which does needs a call
+of its own, or a worker which read one instance and then went quiet keeps it
+until it exits.</p>
+<p>The interval is a constant rather than configuration on purpose. The TTL is
+the lever an operator has: lowering <code>OBJECT_CACHE_TTL_IMMUTABLE</code> shortens an
+instance's residency by the same amount, down to the floor the interval sets
+(300 to 10 takes the worst case from 360 s to 70 s, not to 10 s). Lowering the
+interval would lower that floor at the price of more frequent whole-cache
+passes under the lock. The gate is read once without the lock
+before it is checked under it, because the reap call is on every cached
+read and is almost never due.</p>
+<p>That bound is load-bearing rather than tidiness, because some cached static
+values are secret-bearing: an <code>instance</code> carries <code>ssh_key</code> and <code>user_data</code>,
+and cloud-init user data routinely contains credentials. This is not an
+access-control question -- the cache is keyed by the object's own identity
+and every caller still authorises the model it gets back -- but a
+secret-lifetime one. The reap bounds how long the secret is reachable from
+the cache, not how long its bytes are in memory: CPython does not zero a
+freed string, so a core dump, <code>/proc/&lt;pid&gt;/mem</code> or swap can still find it
+after the reap until the heap reuses that memory. Excluding those two fields from the cached model was the other
+option and is worse: <code>Instance.external_view()</code> emits both, so every API
+read of an instance needs them and excluding them would add a database read
+to the hottest path in the API. See issue #3944.</p>
+<p><code>OBJECT_CACHE_MAX_ENTRIES</code> is the other half of the bound. Without it the
+cache holds every object a process has ever read rather than its working set,
+because an object read once and never read again is never revisited, and a
+delete in another process evicts nothing here. On overflow expired entries
+go first, counted as expiries rather than as capacity evictions, then the
+entries with the least remaining <em>fraction</em> of their own TTL.</p>
+<p>That fraction, rather than the absolute expiry stamp, is what lets the two
+tiers share one pool. Expiry is <code>now + ttl</code>, so a freshly inserted 30 s
+mutable entry always sorts ahead of a 300 s immutable entry inserted up to
+270 s earlier: ordering on the stamp shed essentially the whole mutable tier
+before touching one immutable entry, so the tier sized for blobs was the
+first thing switched off under exactly the pressure it was sized for.</p>
 <p>Effectiveness is visible in the <code>database_object_cache_{hits,misses,
 evictions}_total</code> counters and in reduced <code>database_get_&lt;type&gt;_total</code> rates;
 <code>database_object_cache_entries</code> reports occupancy and
@@ -16760,7 +16808,8 @@ readers deliberately see everything:</p>
   observational.</li>
 </ul>
 <p>Rows normally disappear when their operation is hard-deleted (eligible for
-removal thirty seconds after it goes terminal and removed by the
+removal <code>CLUSTER_OPERATION_RETENTION</code> seconds after it goes terminal and
+removed by the
 <a href="../../operator_guide/database/#the-deleted-object-sweep">deleted-object sweep</a>),
 so the prune is a backstop.</p>
 <h2 id="cluster-operation-storage-and-work-queues">Cluster Operation Storage and Work Queues<a class="headerlink" href="#cluster-operation-storage-and-work-queues" title="Permanent link">&para;</a></h2>

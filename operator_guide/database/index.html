@@ -18017,28 +18017,44 @@ clients until the TTL runs out.</p>
 </tbody>
 </table>
 <p>The first two are in seconds. The third is a count, and it exists because a
-TTL bounds how <em>stale</em> an entry may be, not how many entries are kept: expiry
-only happens when that same object is looked up again, so an object read once
-and never read again would otherwise sit in memory for the life of the
-process. If you see <code>database_object_cache_capacity_evictions_total</code> climbing
-steadily, the working set no longer fits and the hit rate is suffering;
+TTL bounds how <em>stale</em> an entry may be, not how many entries are kept: a
+lookup only reclaims the entry it was for, so a process which reads many
+distinct objects would otherwise keep all of them. If you see
+<code>database_object_cache_capacity_evictions_total</code> climbing steadily, the
+working set no longer fits and the hit rate is suffering;
 <code>database_object_cache_entries</code> reports current occupancy.</p>
+<p>How <em>long</em> an entry stays in memory is bounded separately. Once a minute
+each process drops every entry whose TTL has passed, whether or not anything
+reads it again, so the cache lets go of an object at most a minute after its
+TTL runs out rather than when the process exits. That matters because an
+instance's cached record carries its <code>ssh_key</code> and <code>user_data</code>, and
+cloud-init user data often holds credentials. Letting go is not erasing:
+Python does not zero freed memory, so the bytes can remain in the process
+until reused, and a core dump of an API or daemon process should be treated
+as able to contain any instance secret that process has read.</p>
+<p>The interval is fixed in the code rather than a setting: the TTL is the
+lever, and lowering
+<code>OBJECT_CACHE_TTL_IMMUTABLE</code> shortens how long an instance's user data stays
+resident by the same amount, down to a floor of about a minute. Lowering it
+from 300 to 10 seconds takes the worst case from six minutes to seventy
+seconds, not to ten. Entries reclaimed this way are counted in
+<code>database_object_cache_expired_reaped_total</code>, which also counts the expired
+entries a capacity trim clears first.</p>
 <p>When the cap is reached the cache drops expired entries first and then, if
-that is not enough, live entries nearest to their expiry. Be aware of what
-that means with two TTL tiers in one pool: a 30 second mutable entry is
-always nearer its expiry than a 300 second immutable one inserted up to 270
-seconds earlier, so sustained capacity pressure sheds essentially the whole
-mutable tier — blob, node, artifact, namespace, upload, dnsmasq — before it
-touches a single instance, network or ipam entry. If blob caching in
-particular matters to your workload, raise the cap rather than relying on
-the tiers competing for the space.</p>
+that is not enough, the live entries with the least of their own TTL left,
+as a fraction of that TTL. A 30 second mutable entry with 10 seconds left
+and a 300 second immutable entry with 100 seconds left are therefore equally
+close to going, so sustained capacity pressure shares the space between the
+two tiers rather than shedding one of them first.</p>
 <p>Setting a TTL to <code>0</code> disables caching for that tier — a fast rollback to
 pure read-through that needs only a config change and a restart, no code
 change. The <code>database_object_cache_hits_total</code>,
 <code>database_object_cache_misses_total</code> and <code>database_object_cache_evictions_total</code>
 Prometheus counters (labelled by <code>object_type</code>) report cache behaviour, and a
 working cache shows up as reduced <code>database_get_&lt;type&gt;_total</code> rates on the
-<code>sf-database</code> tier.</p>
+<code>sf-database</code> tier. <code>database_object_cache_entries</code>,
+<code>database_object_cache_capacity_evictions_total</code> and
+<code>database_object_cache_expired_reaped_total</code> are unlabelled.</p>
 <p>These counters only reach Prometheus from the daemons which serve a metrics
 endpoint — <code>sf-cluster</code>, <code>sf-resources</code> and <code>sf-database</code>. Every process that
 talks to the database has its own cache, so the numbers you can scrape are a
@@ -18668,20 +18684,56 @@ schedule. It re-queues or rejects rows whose claim has gone stale:</p>
 <h4 id="the-deleted-object-sweep">The deleted-object sweep<a class="headerlink" href="#the-deleted-object-sweep" title="Permanent link">&para;</a></h4>
 <p>The cluster daemon also runs a deleted-object sweep, every minute, which
 hard deletes objects that have been in a final state (<code>deleted</code>,
-<code>complete</code>, <code>abort</code>) for longer than their grace period (<code>CLEANER_DELAY</code>
-for most objects, 30 seconds for completed operations).</p>
-<p>A finished cluster operation is therefore eligible for hard delete thirty
-seconds after it reaches a final state. The sweep then removes it, along
-with its <code>cluster_operation_targets</code> rows. Because the sweep walks a type
-again only five minutes after its last walk reached the end (see below),
-removal normally comes within about six minutes of the operation
-finishing, and later while the sweep is working through a backlog (the
+<code>complete</code>, <code>abort</code>, <code>expired</code>, and <code>error</code> for cluster operations) for
+longer than their grace period (<code>CLEANER_DELAY</code> for most objects,
+<code>CLUSTER_OPERATION_RETENTION</code> for cluster operations).</p>
+<p>A finished cluster operation is therefore eligible for hard delete
+<code>CLUSTER_OPERATION_RETENTION</code> seconds after it reaches a final state, 15
+minutes by default. The sweep then removes it, along with its
+<code>cluster_operation_targets</code> rows. Because the sweep walks a type again
+only five minutes after its last walk reached the end (see below),
+removal normally comes within about six minutes of the operation becoming
+eligible, and later while the sweep is working through a backlog (the
 <code>cluster_deleted_object_backlog</code> metric, described under
 <a href="#watching-for-sweeps-that-silently-do-nothing">Watching for sweeps that silently do nothing</a>,
-shows how far behind it is). Operations which finished in <code>error</code> are
-never hard deleted (#3922), so their target rows stay until the
-<code>CLUSTER_OPERATION_TARGET_RETENTION</code> prune removes them, seven days by
-default.</p>
+shows how far behind it is). An operation which finished in <code>error</code> is
+swept on the same window as one which completed: <code>error</code> is a final state
+for cluster operations, because the failure reason is on the operation's
+state row and the operation is a pure database record.</p>
+<p>That window is what an operator has to read why an operation did what it
+did: a hard delete takes the operation's events with it, so its audit
+events, its queue-wait event and its execution duration are unreachable
+afterwards. Operations are the highest volume object type in the cluster,
+which is why they do not simply use <code>CLEANER_DELAY</code>, but the window costs
+resident rows (arrival rate times retention) rather than sweep throughput,
+so raise it on a cluster whose operations are being investigated. Before
+the setting existed the window was a fixed thirty seconds; setting it to
+30 restores that. Keep it above about a minute in production. What matters
+is the gap between an operation erroring and the next look at it: a
+dependent operation re-checks its dependencies at least every 15 seconds
+while it waits, and a client polls on its own interval. An errored operation
+removed inside that gap makes the dependent cancel for a missing dependency
+rather than abort for a failed one, and gives the client a 404 rather than
+the error. A minute covers both with margin; how long the dependent has
+already been waiting does not matter.</p>
+<p><code>error</code> is <strong>not</strong> a final state for most types, and which types treat
+it as one is a decision per type, recorded in <code>final_object_states()</code>
+in <code>shakenfist/constants.py</code>. An errored <code>instance</code>, <code>network</code>,
+<code>networkinterface</code> or <code>node</code> is an object an operator is expected to
+look at and may recover -- <code>sf-ctl clear-node-error</code> returns an errored
+node to service -- and for a node or a network the object is still
+holding real resources, so sweeping it would remove a live object and
+not merely the evidence. An errored <code>blob</code> has partial files on disk
+which only a move to <code>deleted</code> removes, so hard deleting its row would
+turn a row leak into a disk leak. An errored <code>artifact</code> still resolves
+by name, which is how a user sees why their fetch failed. And the
+sidechannel daemon depends on an errored <code>agentoperation</code> persisting,
+because it resolves an operation whose executor died as errored rather
+than expired precisely so that case is still readable.</p>
+<p>The consequence of those exclusions is that an object of those types
+which reaches <code>error</code> and is never deleted keeps its <code>object_states</code>
+row indefinitely. That is deliberate, and the way to reclaim one is to
+delete the object.</p>
 <ul>
 <li><strong><code>DELETED_OBJECT_SWEEP_SECONDS</code></strong> — the time budget of each pass
   (default <code>20</code>). Reading the sweep's work counts against it: no read
@@ -19028,9 +19080,10 @@ repaired to.</p>
   and "all operations on this object in order"</li>
 </ul>
 <p>Target rows live only until their operation is hard-deleted. A finished
-operation is eligible for removal thirty seconds after it goes terminal and
-is removed by the <a href="#the-deleted-object-sweep">deleted-object sweep</a>, so the
-table holds in-flight operations plus recently finished ones. As a backstop
+operation is eligible for removal <code>CLUSTER_OPERATION_RETENTION</code> seconds
+after it goes terminal and is removed by the
+<a href="#the-deleted-object-sweep">deleted-object sweep</a>, so the table holds
+in-flight operations plus recently finished ones. As a backstop
 for rows that outlive their operation, the table is also bounded by a
 periodic prune in the cluster daemon (alongside the existing
 <code>delete_stale_transfers</code> cleanup).
@@ -19074,8 +19127,9 @@ columns still serve readers that do not filter on the flag.</p>
 </ul>
 <p>Rows are written automatically by <code>enqueue_cluster_operation</code>; operators
 do not need to manage them. Normally a row is removed when its operation is
-hard-deleted: a finished operation is eligible for removal thirty seconds
-after it goes terminal and is removed by the
+hard-deleted: a finished operation is eligible for removal
+<code>CLUSTER_OPERATION_RETENTION</code> seconds after it goes terminal and is removed
+by the
 <a href="#the-deleted-object-sweep">deleted-object sweep</a>. The
 cluster daemon's prune, performed under <code>ClusterLock</code> election via
 <code>_direct_delete_stale_cluster_operation_targets</code>, is a backstop: rows older

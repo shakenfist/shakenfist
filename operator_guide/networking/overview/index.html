@@ -17206,17 +17206,21 @@ is emitted by the enqueuing process, not by the dispatcher:</p>
   argument rests on does not hold. See
   #3884.</p>
 <h3 id="reading-these-events-back">Reading these events back<a class="headerlink" href="#reading-these-events-back" title="Permanent link">&para;</a></h3>
-<p>Neither event survives its operation for long, so plan to read them
-from the log stream rather than from the database.</p>
-<p>A cluster operation is eligible for hard delete thirty seconds after it
-reaches a final state and is removed by the
+<p>Neither event outlives its operation, so there is a window in which to
+read them and then they are gone.</p>
+<p>A cluster operation is eligible for hard delete
+<code>CLUSTER_OPERATION_RETENTION</code> seconds after it reaches a final state (15
+minutes by default) and is removed by the
 <a href="../../database/#the-deleted-object-sweep">deleted-object sweep</a>, and hard
-deleting an object removes the rows which join its events to it. Soon
-after an operation completes there is nothing left to query: the operation
-is gone, and its events are orphaned rows which the daily prune sweep then
-deletes. The <code>MAX_USAGE_EVENT_AGE</code> and <code>MAX_STATUS_EVENT_AGE</code> retention
-settings never come into it -- they bound how long an event may live, not how
-long the object it describes does. This is issue #3864.</p>
+deleting an object removes the rows which join its events to it. Once that
+has happened there is nothing left to query: the operation is gone, and its
+events are orphaned rows which the daily prune sweep then deletes. Raise
+<code>CLUSTER_OPERATION_RETENTION</code> on a cluster whose operations are being
+investigated, or read the events from the log stream, which keeps them for
+as long as the log retention does. The <code>MAX_USAGE_EVENT_AGE</code> and
+<code>MAX_STATUS_EVENT_AGE</code> retention settings never come into it -- they bound
+how long an event may live, not how long the object it describes does. This
+is issue #3864.</p>
 <p>What does persist is the log stream. Every event is echoed as a log
 line carrying the whole <code>extra</code> dict, unless <code>LOG_EVENTS_TO_LOKI</code> has
 been turned off, so wherever the cluster's logs are shipped is where
