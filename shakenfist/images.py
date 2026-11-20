@@ -42,15 +42,15 @@ FETCHABLE_SCHEMES = ['http', 'https']
 
 
 def is_image_shortcut(url):
-    """Is this one of the shortcut forms _resolve_image() expands?
+    """Is this one of the shortcut forms _expand_image_url() expands?
 
     A shortcut names an image on config.IMAGE_DOWNLOAD_URL (or a cirros
     release) rather than a URL: 'debian', 'debian:11', 'cirros:0.4.0'.
     Shortcuts have no subdirectory, which is how they are told apart
     from a URL.
 
-    _resolve_image() is the only consumer of this distinction and calls
-    it rather than restating it, because this is also what decides
+    _expand_image_url() is the only consumer of this distinction and
+    calls it rather than restating it, because this is also what decides
     whether a scheme-less base is fetchable at all (see is_fetchable).
     """
     if url.find('/') != -1:
@@ -73,7 +73,7 @@ def is_fetchable(url):
     which raises MissingSchema or InvalidSchema for anything which is
     not http or https -- on a hypervisor, long after the API accepted
     it, and the artifact is retried and then errored (issue 4557). A
-    shortcut is fetchable because _resolve_image() turns it into an
+    shortcut is fetchable because _expand_image_url() turns it into an
     http(s) URL before requests sees it.
 
     This says nothing about whether the URL resolves, responds, or
@@ -120,6 +120,25 @@ class ResolvedImage(NamedTuple):
     checksum: 'str | None' = None
 
 
+class ExpandedImage(NamedTuple):
+    """A fetchable URL, before any digest has been fetched for it.
+
+    Reading the published digest costs up to one fetch per entry in
+    CHECKSUM_FILES, each bounded by CHECKSUM_FETCH_TIMEOUT, so it is a
+    separate step taken only by a caller which is about to fetch the
+    image from the mirror. A caller which can serve the image from the
+    cluster, or which is forbidden to consult the mirror at all, pays
+    for none of it (issue 4976).
+
+    ``vernum`` is the cirros release the URL names, which is how the
+    digest files are addressed. It is None for everything else, which
+    is also how "there is no digest to go looking for" is said.
+    """
+
+    url: str
+    vernum: 'str | None' = None
+
+
 # The digest files a mirror may publish beside its images, strongest
 # first. A resolver takes the first one which exists.
 #
@@ -141,25 +160,53 @@ CHECKSUM_FILES = [
 CHECKSUM_FETCH_TIMEOUT = (10, 30)
 
 
-def _resolve_image(url):
+def _expand_image_url(url):
+    """Expand a source URL into something requests could fetch.
+
+    No digest is read here -- see ExpandedImage for why that is a
+    separate step.
+    """
+    # Short cut URLs do not have subdirectories
+    if not is_image_shortcut(url):
+        return ExpandedImage(url)
+
+    if url.startswith('cirros'):
+        # cirros is a special case as we can't rebuild the images yet
+        return _expand_cirros_url(url)
+
+    return ExpandedImage(f'{config.IMAGE_DOWNLOAD_URL}{url}/latest.qcow2')
+
+
+def _resolve_image(url, expanded=None):
     """Expand a source URL, with any digest the mirror publishes.
 
     Always a ResolvedImage. A plain URL resolves to one with no
     checksum, which is the honest answer: we have nothing to check it
     against, which is a different thing from having checked it.
+
+    `expanded` is an ExpandedImage the caller has already paid for, so
+    that a caller which expanded the URL to ask the mirror about its
+    cached copy does not expand it a second time.
     """
-    # Short cut URLs do not have subdirectories
-    if not is_image_shortcut(url):
-        return ResolvedImage(url)
+    if expanded is None:
+        expanded = _expand_image_url(url)
 
-    if url.startswith('cirros'):
-        # cirros is a special case as we can't rebuild the images yet
-        return _resolve_cirros(url)
+    if expanded.vernum is None:
+        return ResolvedImage(expanded.url)
 
-    return ResolvedImage(f'{config.IMAGE_DOWNLOAD_URL}{url}/latest.qcow2')
+    algorithm, checksum = _resolve_cirros_checksum(
+        expanded.url, expanded.vernum)
+    LOG.with_fields({
+        'name': url,
+        'url': expanded.url,
+        'algorithm': algorithm,
+        'checksum': checksum
+    }).info('Image resolved')
+
+    return ResolvedImage(expanded.url, algorithm, checksum)
 
 
-def _resolve_cirros(name):
+def _expand_cirros_url(name):
     # Name is assumed to be in the form cirros or cirros:0.4.0
     if name == 'cirros':
         resp = requests.get(config.LISTING_URL_CIRROS,
@@ -185,17 +232,8 @@ def _resolve_cirros(name):
             raise exceptions.VersionSpecificationError(
                 'Cannot parse version: %s' % name)
 
-    url = str(config.DOWNLOAD_URL_CIRROS) % {'vernum': vernum}
-
-    algorithm, checksum = _resolve_cirros_checksum(url, vernum)
-    LOG.with_fields({
-        'name': name,
-        'url': url,
-        'algorithm': algorithm,
-        'checksum': checksum
-    }).info('Image resolved')
-
-    return ResolvedImage(url, algorithm, checksum)
+    return ExpandedImage(
+        str(config.DOWNLOAD_URL_CIRROS) % {'vernum': vernum}, vernum)
 
 
 def _resolve_cirros_checksum(url, vernum):
@@ -389,13 +427,20 @@ class ImageFetchHelper:
         BlobMissing is raised if there is no usable cached version. This
         is the fallback for a source which cannot be reached but whose
         image has previously been fetched (issue 3603).
+
+        The source URL is expanded, and its digest resolved, only on
+        the branch about to go to the mirror: doing either up front
+        made this degraded path pay for round trips it threw away
+        (issue 4976). A shortcut is never a BLOB_URL, so deciding
+        whether the cluster can serve the image needs neither.
         """
-        resolved = _resolve_image(self.artifact.source_url)
-        url = resolved.url
+        source_url = self.artifact.source_url
+        expanded = None
+        resolved = None
 
         # If this is a request for a URL, do we have the most recent version
         # somewhere in the cluster?
-        if not url.startswith(BLOB_URL):
+        if not source_url.startswith(BLOB_URL):
             most_recent = self.artifact.most_recent_index
             most_recent_blob = None
             dirty = False
@@ -416,8 +461,9 @@ class ImageFetchHelper:
                     dirty = True
 
             if not dirty and not cached_only:
+                expanded = _expand_image_url(source_url)
                 try:
-                    resp = self._open_connection(url)
+                    resp = self._open_connection(expanded.url)
                 except exceptions.HTTPError as e:
                     self.artifact.add_event(
                         EVENT_TYPE_AUDIT,
@@ -472,6 +518,13 @@ class ImageFetchHelper:
                 raise exceptions.BlobMissing(
                     f'Artifact {self.artifact.uuid} has no cached version '
                     'to fall back to')
+
+        if resolved is None:
+            # A mirror fetch is what happens next, so the digest is now
+            # worth its round trips. Any expansion the staleness check
+            # already paid for is handed back, so a bare `cirros` reads
+            # the version listing at most once.
+            resolved = _resolve_image(source_url, expanded=expanded)
 
         # Ensure that we have the blob in the local store. This blob is in the
         # "original format" if downloaded from an HTTP source.

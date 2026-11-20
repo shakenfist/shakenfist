@@ -51,6 +51,15 @@ become a usable image, and the artifact fetch fails with the
 `fetched image does not match its published checksum` event carrying
 both the expected and the actual digest.
 
+The digest is only read when the image is about to be fetched from the
+mirror. An image the cluster can already serve from a cached blob is
+not re-verified against the mirror's digest -- that digest describes
+the mirror's copy, and the cached copy was checked when it was fetched
+-- so no digest file is requested on that path. Nor is one requested
+when a fetch falls back to the cached copy because the source could
+not be reached at all: that path is the one which exists for a broken
+mirror, and it no longer asks the broken mirror anything.
+
 Which digest is used is whatever the mirror actually publishes,
 strongest first. For cirros that is `SHA256SUMS` where it exists and
 `MD5SUMS` otherwise: cirros publishes SHA256SUMS only from 0.6.3
