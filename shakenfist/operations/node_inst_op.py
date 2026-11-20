@@ -148,7 +148,12 @@ class NodeInstOp(BaseClusterOperation):
         if inst.state.value != Instance.STATE_CREATED:
             return
 
-        with util_libvirt.LibvirtConnection() as lc:
+        # The pass reads block_devices and kvm_pid, which live in one
+        # instance_attributes row: inside the memo that row is fetched
+        # once rather than once per attribute (issue #3695). This runs for
+        # every created instance on every billing sweep, so the saving is
+        # per instance per pass.
+        with util_libvirt.LibvirtConnection() as lc, inst.attribute_memo():
             try:
                 # The basic structure
                 statistics: dict[str, Any] = {

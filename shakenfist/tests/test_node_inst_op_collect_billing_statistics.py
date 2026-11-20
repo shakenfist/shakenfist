@@ -11,6 +11,7 @@ operation.
 """
 import os
 import tempfile
+from contextlib import contextmanager
 from unittest import mock
 from uuid import uuid4
 
@@ -70,15 +71,56 @@ class FakeDomain:
 
 
 class FakeInstance:
-    """An instance double for driving _collect_billing_statistics directly."""
+    """An instance double for driving _collect_billing_statistics directly.
 
-    def __init__(self, instance_path, disk_path, state=Instance.STATE_CREATED):
+    The two MariaDB-backed attributes this task reads are modelled the way
+    Instance models them, because that is what the test below measures:
+    both live in one instance_attributes row, a read fetches that row, and
+    a read inside attribute_memo() reuses the fetch (issue #3695).
+    ``row_fetches`` counts what would have been GetInstanceAttributes RPCs.
+    """
+
+    def __init__(self, instance_path, disk_path, state=Instance.STATE_CREATED,
+                 kvm_pid=None):
         self.uuid = str(uuid4())
         self.state = mock.Mock(value=state)
         self.instance_path = instance_path
-        self.block_devices = {'devices': [{'path': disk_path, 'device': 'vda'}]}
-        self.kvm_pid = None
+        self._row = {
+            'block_devices': {
+                'devices': [{'path': disk_path, 'device': 'vda'}]},
+            'kvm_pid': kvm_pid,
+        }
+        self.row_fetches = 0
+        self._memo = None
+        self._memo_depth = 0
         self.add_event = mock.Mock()
+
+    @contextmanager
+    def attribute_memo(self):
+        self._memo_depth += 1
+        try:
+            yield
+        finally:
+            self._memo_depth = max(0, self._memo_depth - 1)
+            if not self._memo_depth:
+                self._memo = None
+
+    def _read(self, name):
+        row = self._memo
+        if row is None:
+            self.row_fetches += 1
+            row = dict(self._row)
+            if self._memo_depth:
+                self._memo = row
+        return row[name]
+
+    @property
+    def block_devices(self):
+        return self._read('block_devices')
+
+    @property
+    def kvm_pid(self):
+        return self._read('kvm_pid')
 
 
 class _BillingStatisticsTestBase(base.ShakenFistTestCase):
@@ -130,6 +172,16 @@ class CollectBillingStatisticsTestCase(_BillingStatisticsTestBase):
         self.assertEqual(
             1024, statistics['disk usage']['vda']['actual bytes on disk'])
         self.assertEqual(len('console'), statistics['console_log_size'])
+
+    def test_both_attributes_come_from_one_row_fetch(self):
+        # block_devices and kvm_pid live in the same row, and this task
+        # runs for every created instance on every billing sweep, so it
+        # reads them inside one memo rather than paying a fetch each
+        # (issue #3695).
+        inst = FakeInstance(self.instance_path, self.disk_path)
+        self._make_op()._collect_billing_statistics(inst)
+
+        self.assertEqual(1, inst.row_fetches)
 
     def test_instance_no_longer_created_is_skipped(self):
         for state in [Instance.STATE_DELETE_WAIT, Instance.STATE_DELETED,

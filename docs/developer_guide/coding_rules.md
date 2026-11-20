@@ -742,6 +742,44 @@ The same shape of trap exists wherever a property hides a query.
 `get_references_from` while the caller had already read the same rows
 unfiltered; that was the other half of #3876.
 
+## Two attributes of one row are read inside one memo
+
+Every MariaDB-backed `Instance` attribute -- the set in
+`Instance.MARIADB_ATTRIBUTES` -- lives in one `instance_attributes`
+row, and reading one of them fetches that row. Reading two therefore
+fetches it twice, for no reason at all:
+
+```python
+# Wrong: two GetInstanceAttributes RPCs for one row.
+block_devices = inst.block_devices
+ports = inst.ports
+
+# Right: one.
+with inst.attribute_memo():
+    block_devices = inst.block_devices
+    ports = inst.ports
+```
+
+The memo is per call, not a cache: it is discarded when the block
+exits, including on an exception, and any attribute write inside the
+block invalidates it so the write's own read-modify-write starts from
+fresh data. Nothing outside the block sees different staleness.
+
+The counter-rule matters just as much. A re-read whose *purpose* is to
+see a change -- the power state read again after taking the instance
+lock, so a power off which finished while we waited is noticed, or the
+one `record_observed_agent_state()` does after its write -- must not be
+memoized, because the memo would answer with the value from before.
+Those methods are named in `MUST_NOT_MEMOIZE` in
+`shakenfist/tests/test_instance_attribute_memo_sweep.py`, which fails
+if one of them grows a memo block.
+
+That same test is the sweep: a method reading two of these attributes
+outside a memo either gets one or gets an entry in `EXEMPT` saying why
+it cannot. It is lexical, so it does not follow calls -- a method whose
+memo its caller entered, or whose second read happens inside a helper,
+has to say so there.
+
 ## A `no_log` default is a cluster-wide redaction
 
 An option declared `no_log: true` in a role's `meta/argument_specs.yml` is not

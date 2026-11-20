@@ -2424,8 +2424,11 @@ class Instance(dbowo):
         # NOTE(mikal): the database stores memory allocations in MB, but the
         # domain XML takes them in KB. That wouldn't be worth a comment here if
         # I hadn't spent _ages_ finding a bug related to it.
-        block_devices = self.block_devices
-        ports = self.ports
+        # One row fetch for the two attributes, rather than one each
+        # (issue #3695).
+        with self.attribute_memo():
+            block_devices = self.block_devices
+            ports = self.ports
         vdi_type = self.video['vdi']
 
         x = t.render(

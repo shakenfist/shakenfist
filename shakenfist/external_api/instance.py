@@ -2198,14 +2198,19 @@ class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
     @api_base.redirect_instance_request
     @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
-        p = instance_from_db.ports
+        # Both attributes live in one instance_attributes row, so they are
+        # read together inside the memo rather than a row fetch each
+        # (issue #3695).
+        with instance_from_db.attribute_memo():
+            p = instance_from_db.ports
+            placement_node = instance_from_db.placement.get('node')
 
         # placement['node'] holds a node UUID, which is not a connectable
         # address. Emit the node's egress IP (see _vdi_console_address): a
         # node name is not resolvable from outside the cluster either, and
         # the TLS identity check travels in host-subject below rather than
         # in the hostname.
-        n = Node.from_db(instance_from_db.placement.get('node'))
+        n = Node.from_db(placement_node)
         if not n:
             return sf_api.error(404, 'placement node not found')
 
