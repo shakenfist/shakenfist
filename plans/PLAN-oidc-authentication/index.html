@@ -16789,6 +16789,23 @@ must respect its <code>exp</code> and must not survive a logout the
 client itself initiated. A cache that quietly extends
 the life of a credential the server considers dead
 undoes the one thing the nonce buys.</p>
+<p><strong>Narrowed by phase 7's planning survey (2026-11-19).</strong>
+Two parts of the question as written no longer describe
+anything that can happen. There is no OIDC refresh token
+to cache: phase 0's answer to question 13 means the
+client caches namespace keys and the access tokens
+minted from them, and an identity token is spent at the
+exchange. And <code>~/.shakenfist/oidc-cache</code> cannot exist,
+because <code>~/.shakenfist</code> is a file -- one of the client's
+four configuration sources, which it expands and parses
+as JSON -- so a directory of that name would collide
+with the configuration every existing user has. What
+survives is the substance: the format, the file mode and
+the invalidation rules, which phase 7's plan decides,
+along with where the cache sits in the client's
+credential precedence. That last part was not in the
+question at all and is the decision most likely to be
+argued with.</p>
 </li>
 <li>
 <p><strong>Migration of existing namespace keys.</strong> The
@@ -17408,14 +17425,14 @@ not land anywhere else.</p>
 <td>6. Serving namespace key metadata (#3672)</td>
 <td>shakenfist, client-python</td>
 <td><a href="../PLAN-oidc-authentication-phase-06-key-metadata/">PLAN-oidc-authentication-phase-06-key-metadata.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td>shakenfist <code>e37a8f8931</code> (#4975), <code>683b591c6b</code> (#4979); client-python <code>1bd5d3c</code> (#454). The second shakenfist pull request carries review rounds two and three, which arrived while the first was already in the merge queue</td>
 </tr>
 <tr>
 <td>7. Interactive CLI flows, the credential set and the token cache</td>
 <td>client-python</td>
-<td>TBD</td>
-<td>Not started</td>
+<td><a href="https://github.com/shakenfist/client-python/blob/develop/docs/plans/PLAN-oidc-authentication-phase-07-client-flows.md">PLAN-oidc-authentication-phase-07-client-flows.md</a> (in shakenfist/client-python, on its <code>develop</code>)</td>
+<td>Proposed</td>
 <td>—</td>
 </tr>
 <tr>
@@ -17618,13 +17635,22 @@ because neither flow can begin without the issuer's
 endpoints, and on phase 4, because what the flow returns is
 the set of credentials the person is entitled to.</p>
 <p>Open question 14's multiplicity lands here. The client holds
-one namespace key per namespace and presents the right one
-for each request, which is what the CI conductor's
-provisioning automation already does for a machine and what
-a person has no tooling for at all. So the cache holds a set
-rather than a credential, every member of it is a credential
-at rest, and choosing between them is this phase's problem
-rather than the server's.</p>
+one namespace key per namespace, which is what the CI
+conductor's provisioning automation already does for a
+machine and what a person has no tooling for at all. So the
+cache holds a set rather than a credential, every member of
+it is a credential at rest, and choosing between them is
+this phase's problem rather than the server's.</p>
+<p>An earlier draft of this paragraph said the client presents
+the right key "for each request". Phase 7's planning survey
+found that it cannot: nothing in a request names the
+namespace it addresses. <code>Client</code> is built once with one
+credential (<code>client-python</code>'s <code>shakenfist_client/main.py</code>),
+and the <code>namespace=</code> keyword some verbs accept is an
+administrator's cross-namespace lookup gated on its own
+capability, not credential selection. The multiplicity is
+therefore resolved by an explicit current-namespace
+selection, which that phase's plan decides.</p>
 <p><strong>Phase 8 — worked operator examples.</strong> Care is needed about
 what is genuinely new here. The operator guide already has
 an issuer-configuration section and a worked GitHub Actions
