@@ -16291,6 +16291,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#reservations-a-database-outage-leaves-behind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reservations a database outage leaves behind
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -17513,6 +17524,17 @@
     <span class="md-ellipsis">
       
         Reservation Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reservations-a-database-outage-leaves-behind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reservations a database outage leaves behind
       
     </span>
   </a>
@@ -19806,6 +19828,31 @@ allocation for a while. A <code>manual</code> reservation is not: it is held for
 something Shaken Fist does not manage, so a request to reserve or allocate
 that address is refused rather than granted, and only an explicit
 <code>DELETE /networks/{network_ref}/addresses/{address}</code> releases it.</p>
+<h3 id="reservations-a-database-outage-leaves-behind">Reservations a database outage leaves behind<a class="headerlink" href="#reservations-a-database-outage-leaves-behind" title="Permanent link">&para;</a></h3>
+<p>Creating a network interface reserves its address as an <code>instance</code>
+reservation and then writes the interface row. If that write fails because
+the database tier is unavailable, the API answers <code>503</code> and the reservation
+is deliberately <em>kept</em>: whether the row committed is unknown, and releasing
+an address a committed row holds would hand the same address to a second
+guest.</p>
+<p>Nothing used to release those reservations afterwards, so each such <code>503</code>
+permanently removed one address from the network's pool. The orphan
+reconciliation sweep repairs an interface row with no state row by writing
+<code>deleted</code> directly rather than through the interface delete path, which is
+where the release lives, and the addresses API refuses to release anything
+but a <code>manual</code> reservation.</p>
+<p>The elected cluster node now reconciles this hourly
+(<code>reconcile_instance_address_reservations()</code> in the cluster daemon). An
+<code>instance</code> reservation older than an hour whose address no attached
+interface on that network holds is released into the deletion halo, and the
+release is recorded as an audit event on both the IPAM and the instance the
+reservation named. <code>GET /networks/{network_ref}/addresses</code> shows what a
+network currently holds.</p>
+<p>Nothing an operator does is required, and nothing is released while an
+attached interface still holds the address: every reader of an interface
+filters on the active object states, so an address no such interface holds
+can no longer reach a guest. An address is only reclaimed an hour after it
+was reserved, so an in-flight create is never raced.</p>
 <h2 id="upload-object-storage">Upload Object Storage<a class="headerlink" href="#upload-object-storage" title="Permanent link">&para;</a></h2>
 <p>Upload objects (temporary objects that receive streamed data during artifact
 creation) are stored in MariaDB. This provides:</p>
