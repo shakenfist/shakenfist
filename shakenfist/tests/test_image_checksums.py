@@ -24,6 +24,8 @@ import requests
 from shakenfist import blob
 from shakenfist import exceptions
 from shakenfist import images
+from shakenfist.config import SFConfig
+from shakenfist.config import config
 from shakenfist.tests import base
 
 
@@ -764,3 +766,149 @@ class FetchedImageEventTestCase(base.ShakenFistTestCase):
         self.assertIn(
             'fetched image had no published checksum to verify against',
             messages)
+
+
+class VerifiableTestCase(base.ShakenFistTestCase):
+    """The one predicate which says whether a check can happen.
+
+    http_fetch() only verifies when it has both halves, so the audit
+    event, the REQUIRE_IMAGE_CHECKSUM refusal and the fetch itself all
+    read this rather than restating it.
+    """
+
+    def test_both_halves_are_verifiable(self):
+        self.assertTrue(images.ResolvedImage(
+            'http://example.com/i.qcow2', 'sha256', '1' * 64).verifiable)
+
+    def test_neither_half_is_not_verifiable(self):
+        self.assertFalse(images.ResolvedImage(
+            'http://example.com/i.qcow2').verifiable)
+
+    def test_a_checksum_without_an_algorithm_is_not_verifiable(self):
+        self.assertFalse(images.ResolvedImage(
+            'http://example.com/i.qcow2', None, '1' * 64).verifiable)
+
+    def test_an_algorithm_without_a_checksum_is_not_verifiable(self):
+        self.assertFalse(images.ResolvedImage(
+            'http://example.com/i.qcow2', 'sha256', None).verifiable)
+
+
+class RequireImageChecksumTestCase(base.ShakenFistTestCase):
+    """Fail closed when the operator asks for it (issue 4999).
+
+    The default is to fetch unverified when no digest could be read,
+    which is right for a fleet whose mirrors publish nothing but means
+    anyone able to stop the digest request arriving turns the check
+    off. REQUIRE_IMAGE_CHECKSUM makes that a refusal instead.
+    """
+
+    def _fetch(self, resolved, require):
+        helper = images.ImageFetchHelper.__new__(images.ImageFetchHelper)
+        helper.objects = []
+        helper.instance = None
+        with mock.patch.object(config, 'REQUIRE_IMAGE_CHECKSUM', require):
+            with mock.patch.object(helper, '_open_connection') as connection:
+                with mock.patch.object(images.blob.Blob, 'new'):
+                    with mock.patch.object(images.blob, 'http_fetch') as fetch:
+                        with mock.patch(
+                                'shakenfist.images.add_event_multi') as events:
+                            with mock.patch(
+                                    'shakenfist.images.util_general.'
+                                    'RecordedOperation'):
+                                try:
+                                    helper._http_get_inner(resolved)
+                                    raised = None
+                                except Exception as e:
+                                    raised = e
+        messages = [c[0][2] for c in events.call_args_list]
+        return raised, connection, fetch, messages
+
+    def test_no_digest_is_refused_when_required(self):
+        raised, _, _, _ = self._fetch(
+            images.ResolvedImage('http://example.com/i.qcow2'), True)
+        self.assertIsInstance(raised, exceptions.NoPublishedCheckSum)
+
+    def test_the_refusal_happens_before_the_download(self):
+        # A refusal after the download has started has already spent
+        # the image, so the guard sits above _open_connection().
+        _, connection, fetch, _ = self._fetch(
+            images.ResolvedImage('http://example.com/i.qcow2'), True)
+        connection.assert_not_called()
+        fetch.assert_not_called()
+
+    def test_the_refusal_is_an_audit_event(self):
+        _, _, _, messages = self._fetch(
+            images.ResolvedImage('http://example.com/i.qcow2'), True)
+        self.assertIn(
+            'refusing image fetch with no published checksum', messages)
+        # And does not also claim an unverified fetch happened.
+        self.assertNotIn(
+            'fetched image had no published checksum to verify against',
+            messages)
+
+    def test_a_partial_digest_is_refused_too(self):
+        # A checksum with no algorithm is not checkable, so it must not
+        # satisfy a requirement for a published digest.
+        raised, connection, _, _ = self._fetch(
+            images.ResolvedImage(
+                'http://example.com/i.qcow2', None, '1' * 64), True)
+        self.assertIsInstance(raised, exceptions.NoPublishedCheckSum)
+        connection.assert_not_called()
+
+    def test_a_published_digest_still_fetches_when_required(self):
+        raised, connection, fetch, messages = self._fetch(
+            images.ResolvedImage(
+                'http://example.com/i.qcow2', 'sha256', '1' * 64), True)
+        self.assertIsNone(raised)
+        connection.assert_called_once()
+        fetch.assert_called_once()
+        self.assertIn(
+            'fetched image matched its published checksum', messages)
+
+    def test_the_default_still_fails_open(self):
+        # The floor this must not quietly move: an existing fleet points
+        # much of itself at mirrors which publish nothing.
+        raised, connection, fetch, messages = self._fetch(
+            images.ResolvedImage('http://example.com/i.qcow2'), False)
+        self.assertIsNone(raised)
+        connection.assert_called_once()
+        fetch.assert_called_once()
+        self.assertIn(
+            'fetched image had no published checksum to verify against',
+            messages)
+
+    def test_the_shipped_default_is_off(self):
+        # The declared default rather than SFConfig(), so a developer
+        # running the suite with the option exported is not testing
+        # their shell.
+        self.assertFalse(
+            SFConfig.model_fields['REQUIRE_IMAGE_CHECKSUM'].default)
+
+    def test_a_copy_from_the_cluster_is_not_a_mirror_fetch(self):
+        # _http_get_inner() is deliberately not mocked here, so the real
+        # guard is on the path and would refuse if the fetch branch were
+        # taken. Serving a blob the cluster already holds must not be
+        # affected by a setting about mirrors.
+        helper = images.ImageFetchHelper.__new__(images.ImageFetchHelper)
+        helper.objects = []
+        helper.instance = None
+        helper.artifact = mock.MagicMock()
+        helper.artifact.source_url = 'http://example.com/i.qcow2'
+        helper.artifact.most_recent_index = {
+            'index': 1, 'blob_uuid': 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'}
+
+        with mock.patch.object(config, 'REQUIRE_IMAGE_CHECKSUM', True):
+            with mock.patch.object(images.blob.Blob, 'from_db',
+                                   return_value=mock.MagicMock()):
+                with mock.patch.object(
+                        helper, '_open_connection',
+                        side_effect=exceptions.HTTPError('404')):
+                    with mock.patch.object(
+                            helper, '_blob_get') as mock_blob_get:
+                        with mock.patch(
+                                'shakenfist.images.add_event_multi'):
+                            helper.transfer_image()
+
+        mock_blob_get.assert_called_once()
+        self.assertTrue(
+            mock_blob_get.call_args[0][0].startswith(images.BLOB_URL))

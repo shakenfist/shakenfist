@@ -566,6 +566,16 @@ class BadCheckSum(BlobException):
     ...
 
 
+class NoPublishedCheckSum(BlobException):
+    """A fetch was refused because nothing could verify it.
+
+    Distinct from BadCheckSum, which means a digest was read and the
+    download did not match it. This means no digest could be read at
+    all, and config.REQUIRE_IMAGE_CHECKSUM says that is a refusal
+    rather than an unverified fetch.
+    """
+
+
 class BlobSizeCannotChange(BlobException):
     ...
 
