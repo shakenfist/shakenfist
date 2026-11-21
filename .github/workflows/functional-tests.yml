@@ -147,10 +147,13 @@ jobs:
       # What it covers is the subject of
       # shakenfist/tests/test_mariadb_*_live.py: the migration machinery and
       # EXPECTED_SCHEMA_VERSIONS in shakenfist/mariadb.py, the table shapes
-      # under shakenfist/schema/, the live modules themselves, and the three
-      # tools files the job runs. shakenfist/tests/test_schema_enum_widening_seams.py
-      # holds the list to that set, so a new live module cannot land outside
-      # the filter.
+      # under shakenfist/schema/, the live modules themselves, the
+      # test-support modules they import (hard_delete_cases.py decides what
+      # the hard delete live test asserts), and the three tools files the
+      # job runs. shakenfist/tests/test_schema_enum_widening_seams.py holds
+      # the list to that set -- including every in-repo module a live module
+      # imports, bar a short named list of deliberate exclusions -- so a new
+      # live module or shared helper cannot land outside the filter.
       - uses: dorny/paths-filter@v4
         id: live_filter
         if: github.event_name != 'workflow_dispatch'
@@ -162,6 +165,7 @@ jobs:
               - 'shakenfist/mariadb_*.py'
               - 'shakenfist/schema/**'
               - 'shakenfist/tests/test_mariadb_*_live.py'
+              - 'shakenfist/tests/hard_delete_cases.py'
               - 'tools/ci-enum-widening-test.sh'
               - 'tools/ci-install-mariadb.sh'
               - 'tools/bootstrap-mariadb.sql'
@@ -719,6 +723,12 @@ jobs:
       - check_paths
       - credential_scan
       - issue_link_check
+      # Skipped on a pull request which does not touch what the live
+      # MariaDB tests cover, and the outcome check below counts skipped as
+      # success. Without it here the job's pull request run could go red
+      # and still be enqueued, and the merge group would eject it -- the
+      # outcome that run exists to prevent (issue #5005).
+      - schema_enum_widening
     if: always() && github.event_name != 'merge_group'
     permissions:
       actions: read

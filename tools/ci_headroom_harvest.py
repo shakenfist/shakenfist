@@ -756,6 +756,11 @@ def bundle_record(github, run, artifact, kind, jobs, cache_dir, report,
     # which cannot tell those apart has to count a structurally
     # unmeasurable bundle as an unknown (#4403, #4438), and the exclusion
     # then has to be made by hand outside the tool.
+    #
+    # The artifact name is the key for both: classify_artifact() resolved
+    # kind from that same name, so the reason looked up here describes the
+    # same bundle kind.wait_capable does. The tests hold the two tables to
+    # each other in both directions.
     record['wait_capable'] = kind.wait_capable
     record['wait_incapable_reason'] = WAIT_INCAPABLE_BUNDLES.get(
         artifact.get('name'))

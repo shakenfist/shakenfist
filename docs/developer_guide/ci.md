@@ -87,7 +87,7 @@ name, and the seam test reads it from there.
 
 Two of its steps reach the cluster's nodes over ssh: the cached-image
 upload, which deliberately targets a hypervisor rather than the primary,
-and `tools/ci-restart-cluster-nodes.sh`, which power cycles every node
+and `tools/ci-restart-cluster-nodes.sh`, which power cycles the nodes
 once the test has killed some. Both ask `tools/ci-cluster-nodes.sh` which
 nodes exist. They used to carry the same hand-written list of five
 addresses, indexed positionally against `sf1_uuid`..`sf5_uuid` — and
@@ -99,15 +99,23 @@ nothing about topology, and an *added* node was never chosen, because
 `RANDOM % 5` keeps picking from the first five, so the coverage the
 upload step exists to provide narrowed without anything noticing.
 
-The helper enumerates the `sf<N>_uuid` variables `ci-environment.sh`
-exports — the same ones both callers already needed, so it adds no new
-coupling — and asks the under-cloud for each of those instances'
-address, which removes the `sf<N>` to `10.0.0.(19+N)` convention that
-was the real link to the other repository. It exits non-zero rather than
-printing a short or guessed list, since a caller which silently got
-fewer nodes than the cluster has is the failure being replaced.
+The helper reads the list the cluster build already writes:
+`ci-environment.sh` (from `shakenfist/actions`'
+`ci-include-common-localhost.yml`) exports `nodes`, and for each node its
+address as `<node>` and its under-cloud instance as `<node>_uuid`, all from
+one loop over the topology — the same contract `tools/ci-jwks-ca.sh` reads.
+So no naming or numbering convention stands between the topology and this
+repository: a node added there appears on the next run whatever it is
+called. The helper leaves out the node named `primary` (the name
+`build-smoke-cluster` exports the primary's address under), because the
+lifecycle test runs there and the upload exists to exercise a non-primary
+node. It refuses, printing nothing, rather than print a short or guessed
+list, and its output is buffered so a caller cannot act on the first few
+nodes of a list that then failed; `ci-restart-cluster-nodes.sh` checks its
+exit status before reading a line.
 `shakenfist/tests/test_ci_cluster_nodes_seams.py` holds the node set out
-of both callers and out of the helper.
+of both callers, and runs the helper and the restart script against a
+constructed environment for each refusal path.
 
 A weekly run now deploys all five weekly lanes at once: twenty-two nested
 instances (six each for the three `slim-primary` lanes, three for
@@ -189,8 +197,11 @@ and only runs of the default branch are reported.
 than the sqlite engine the unit suite uses, so they run in one place: the
 `Schema ENUM widening` job in `functional-tests.yml`, which apt-installs
 MariaDB and then runs every one of those modules
-(`tools/ci-enum-widening-test.sh`). The job and the script keep the ENUM
-widening name because it is a required status check; rename both together.
+(`tools/ci-enum-widening-test.sh`). It is not itself a protected context:
+the ruleset requires `Can see status`, `Can enqueue` and `Can merge`, and this
+job is required through their `needs`. The job and the script keep the ENUM
+widening name because the script, the job, the gate jobs and the seam tests
+name each other, not because branch protection does; rename them together.
 
 That job ran on `merge_group` and `workflow_dispatch` only, so a change to a
 schema migration met a real server for the first time *after* review and
@@ -207,12 +218,17 @@ DDL, and sqlite neither runs `ALTER TABLE ... ADD CONSTRAINT` nor has the
 
 So the job also runs on a `pull_request` whose diff touches what those
 modules cover — `shakenfist/mariadb*.py`, `shakenfist/schema/**`, the live
-modules themselves, and the job's own three tools files — through the
+modules themselves, the test-support modules they import
+(`shakenfist/tests/hard_delete_cases.py` decides what the hard delete live
+test asserts), and the job's own three tools files — through the
 `live_mariadb` output of a second `dorny/paths-filter` step in
 `check_paths`. It is a second step and not another filter in the first
 because `predicate-quantifier` is a step-level input: the first step needs
 `every` for its "everything except docs" filter, and under `every` a
-multi-pattern filter matches nothing at all.
+multi-pattern filter matches nothing at all. `can_enqueue` needs the job,
+so a red pull request run blocks enqueue rather than only being visible;
+on a pull request which does not touch those paths the job is skipped, and
+`can_enqueue` counts a skip as success.
 
 Two asymmetries are deliberate. The pull request arm is narrower than a code
 change, because installing a database server on every pull request is not
@@ -221,9 +237,11 @@ the trade. The `merge_group` arm is not narrowed at all and stays on
 `check_paths` found no code, so a narrower merge arm would fail every
 code-changing merge group that did not touch the schema.
 `shakenfist/tests/test_schema_enum_widening_seams.py` holds the filter to
-the files the job runs and holds those two arms apart, because a live module
-the filter does not match is one whose pull request CI has quietly stopped
-running it.
+the files the job runs and to every in-repo module the live modules import
+(bar a short named list of deliberate exclusions: the generic test harness,
+constants and exceptions), holds `can_enqueue` to consuming the job, and
+holds those two arms apart, because a live module the filter does not match
+is one whose pull request CI has quietly stopped running it.
 
 ## Where the functional jobs get their code
 

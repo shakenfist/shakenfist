@@ -36,8 +36,15 @@ SF_VENV_PYTHON = '/srv/shakenfist/venv/bin/python3'
 # How long after a network becomes ready its readiness probe has
 # certainly run: sf-net's maintain pass skips a network whose state
 # changed in the last 60 seconds, and passes are 30 seconds apart. A
-# pass may also queue behind the previous one, hence the slack.
-DHCP_PROBE_SETTLE = 60 + 2 * 30 + 15
+# pass may also queue behind the previous one, or overrun its cadence on
+# a loaded CI cluster with many networks to walk, hence the slack.
+#
+# This is a failure deadline, not a settle wait: the probe test returns
+# as soon as the positive event appears, so a healthy cluster never
+# spends it, and running out of it fails the lane. That is why it
+# carries a whole extra pass of slack -- widening it costs nothing on the
+# happy path.
+DHCP_PROBE_SETTLE = 60 + 3 * 30 + 15
 
 # The network events which say the DHCP readiness probe did not get a
 # clean answer, either because dnsmasq did not answer or because the

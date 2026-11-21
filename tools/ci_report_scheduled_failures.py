@@ -291,7 +291,11 @@ def main(argv=None):
                         help='The workflow file, used to find earlier runs.')
     parser.add_argument('--caller', required=True,
                         help='The name of the job which calls functional-lanes.yml.')
+    # choices, so a mis-expanded expression or a result this tool does not
+    # know (an empty string, 'skipped') fails the step loudly rather than
+    # being read as a failure and filing the unattributed issue.
     parser.add_argument('--lanes-result', default=RESULT_FAILURE,
+                        choices=(RESULT_FAILURE, RESULT_CANCELLED),
                         help='The caller job\'s result, which decides what a run with no '
                              'failed job means. Defaults to %s.' % RESULT_FAILURE)
     parser.add_argument('--dry-run', action='store_true')
