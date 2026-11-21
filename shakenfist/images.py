@@ -119,6 +119,17 @@ class ResolvedImage(NamedTuple):
     algorithm: 'str | None' = None
     checksum: 'str | None' = None
 
+    @property
+    def verifiable(self):
+        """Is there a digest a fetch of this URL can be checked against?
+
+        This is the predicate blob.http_fetch() actually verifies on,
+        named once rather than restated: the audit event, the
+        REQUIRE_IMAGE_CHECKSUM refusal and the fetch itself must not be
+        able to disagree about whether a check can happen.
+        """
+        return bool(self.algorithm and self.checksum)
+
 
 # The digest files a mirror may publish beside its images, strongest
 # first. A resolver takes the first one which exists.
@@ -614,6 +625,23 @@ class ImageFetchHelper:
         """Fetch image if not downloaded and return image path."""
         url = resolved.url
 
+        # An operator who has pointed us at mirrors which publish
+        # digests can ask for the stronger property: no digest means no
+        # fetch, rather than a fetch nobody checked. The guard sits
+        # here because this is the only place a mirror fetch happens --
+        # a copy served from within the cluster goes to _blob_get() and
+        # is unaffected -- and above _open_connection(), because a
+        # refusal after the download has started has already spent the
+        # image.
+        if config.REQUIRE_IMAGE_CHECKSUM and not resolved.verifiable:
+            add_event_multi(
+                EVENT_TYPE_AUDIT, self.objects,
+                'refusing image fetch with no published checksum',
+                extra={'url': url, 'algorithm': resolved.algorithm})
+            raise exceptions.NoPublishedCheckSum(
+                f'No published checksum could be read for {url}, and '
+                'REQUIRE_IMAGE_CHECKSUM requires one')
+
         with util_general.RecordedOperation('fetch image', self.instance):
             resp = self._open_connection(url)
             blob_uuid = str(uuid.uuid4())
@@ -641,7 +669,7 @@ class ImageFetchHelper:
 
             # The same predicate http_fetch() verifies on, so this
             # event can never claim a check which did not run.
-            if resolved.algorithm and resolved.checksum:
+            if resolved.verifiable:
                 add_event_multi(
                     EVENT_TYPE_AUDIT, objects_including_blob,
                     'fetched image matched its published checksum',

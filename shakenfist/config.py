@@ -1108,6 +1108,20 @@ class SFConfig(BaseSettings):
         'https://images.shakenfist.com',
         description='Default download server for Shaken Fist images.'
     )
+    REQUIRE_IMAGE_CHECKSUM: bool = Field(
+        False,
+        description=(
+            'Refuse an image fetch from a mirror when no published digest '
+            'could be read for it. The default fails open: a digest file '
+            'which 404s, times out, or does not name the image lets the '
+            'fetch go ahead unverified and records an audit event saying '
+            'so. That is right for a fleet whose mirrors publish nothing, '
+            'but it means anyone able to stop the digest request arriving '
+            'turns the check off. Set this where the configured mirrors '
+            'are known to publish digests. A copy served from elsewhere '
+            'in the cluster is not a mirror fetch and is unaffected.'
+        )
+    )
 
     MAX_IMAGE_TRANSFER_SECONDS: int = Field(
         1800,

@@ -67,13 +67,33 @@ against`. That is a different fact from a fetch which was checked and
 passed, and reading these events back should not require guessing
 which happened.
 
-The check fails open. A digest file which cannot be read — a 404, a
-timeout, a connection failure, or a file which does not name the image
-— lets the fetch go ahead unverified, with that event as the only
-record, and there is currently no setting to require a digest instead.
-So anyone able to stop the digest request arriving turns the check off,
-on an `https://` mirror as much as a plain `http://` one. Watch for the
-`no published checksum` event on a mirror known to publish digests.
+The check fails open by default. A digest file which cannot be read — a
+404, a timeout, a connection failure, or a file which does not name the
+image — lets the fetch go ahead unverified, with that event as the only
+record. So by default anyone able to stop the digest request arriving
+turns the check off, on an `https://` mirror as much as a plain
+`http://` one. Watch for the `no published checksum` event on a mirror
+known to publish digests.
+
+Set `REQUIRE_IMAGE_CHECKSUM` to `True` to ask for the stronger property
+instead: a mirror fetch for which no digest could be read is refused
+before the download starts, with a `refusing image fetch with no
+published checksum` audit event, and the artifact (and any instance
+waiting on it) goes to `error`. The default is `False` because much of
+an existing fleet points at mirrors which publish nothing at all, and
+turning this on there would refuse every fetch. Turn it on when the
+mirrors you have configured — `DOWNLOAD_URL_CIRROS` and
+`CHECKSUM_URL_CIRROS`, or an `IMAGE_DOWNLOAD_URL` of your own — are
+known to publish digests you trust.
+
+Note that "no digest could be read" includes an artifact whose source
+URL is an arbitrary one, because nothing publishes a digest beside it
+for us to find: with `REQUIRE_IMAGE_CHECKSUM` set, those fetches are
+refused too. The rule is simply that wherever the fail-open event above
+would have been recorded, the fetch is refused instead. A copy served
+from elsewhere in the cluster is not a mirror fetch, so it is
+unaffected — including the fallback to an already cached version when
+the source cannot be reached.
 
 What this establishes is integrity, not authenticity. It catches a
 truncated or corrupted download and a mirror serving the wrong file. It
