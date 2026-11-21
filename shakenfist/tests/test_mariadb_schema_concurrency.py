@@ -199,6 +199,7 @@ EXPECTED_TABLE_NAMES = sorted([
     'scheduler_node_capacity',
     'namespace_claims',
     'cluster_capacity',
+    'namespace_claim_holds',
 ])
 
 

@@ -672,9 +672,15 @@ EVENT_OBJECTS_VERSION = 3
 # docs/developer_guide/subsystem_internals.md, "The peak high-water
 # mark"; designed in PLAN-claim-coverage-and-sizing-phase-02b-peak-
 # measurement.md, D2, in the shakenfist/private-ci repository).
-SCHEDULER_NODE_CAPACITY_VERSION = 1
+#
+# scheduler_node_capacity v2 adds the held_* counters: room a capacity
+# claim has booked on a node and no instance has consumed yet.
+SCHEDULER_NODE_CAPACITY_VERSION = 2
 NAMESPACE_CLAIMS_VERSION = 2
 CLUSTER_CAPACITY_VERSION = 1
+# One row per booked shape, the ground truth the held_* counters above
+# are recomputed from. v1: schema creation.
+NAMESPACE_CLAIM_HOLDS_VERSION = 1
 
 
 # Minimum supported MariaDB version. Originally 10.6.0, to align with Ubuntu
@@ -749,6 +755,7 @@ EXPECTED_SCHEMA_VERSIONS: dict[str, int] = {
     'scheduler_node_capacity': SCHEDULER_NODE_CAPACITY_VERSION,
     'namespace_claims': NAMESPACE_CLAIMS_VERSION,
     'cluster_capacity': CLUSTER_CAPACITY_VERSION,
+    'namespace_claim_holds': NAMESPACE_CLAIM_HOLDS_VERSION,
 }
 
 
@@ -4271,6 +4278,7 @@ def _ensure_artifact_indexes_schema(engine: sa.Engine) -> dict[str, Any]:
 _scheduler_node_capacity_table: Optional[sa.Table] = None
 _namespace_claims_table: Optional[sa.Table] = None
 _cluster_capacity_table: Optional[sa.Table] = None
+_namespace_claim_holds_table: Optional[sa.Table] = None
 
 
 def _get_scheduler_node_capacity_table() -> sa.Table:
@@ -4317,11 +4325,39 @@ def _get_scheduler_node_capacity_table() -> sa.Table:
                           server_default='0'),
                 sa.Column('used_disk_gb', sa.BigInteger(), nullable=False,
                           server_default='0'),
+                # Room booked on this node by a capacity claim which no
+                # instance has consumed yet. These sit beside used_*
+                # because the admission guard tests used + held +
+                # request against the limit in one WHERE clause, so
+                # both terms have to be on the row the guard already
+                # locks. They are materialised from the hold rows in
+                # namespace_claim_holds, which are the ground truth,
+                # exactly as used_* is materialised from the placement
+                # reference rows -- so the reconciler recomputes them
+                # from those rows rather than adjusting them.
+                sa.Column('held_cpus', sa.BigInteger(), nullable=False,
+                          server_default='0'),
+                sa.Column('held_memory_mb', sa.BigInteger(), nullable=False,
+                          server_default='0'),
+                sa.Column('held_disk_gb', sa.BigInteger(), nullable=False,
+                          server_default='0'),
                 sa.Column('expected_demand', sa.Double(), nullable=False,
                           server_default='0'),
                 sa.Column('updated_at', sa.DateTime(), nullable=False),
             )
     return _scheduler_node_capacity_table
+
+
+# The booked-room columns scheduler_node_capacity v2 adds. Named once so
+# the v1-to-2 migration (_add_missing_scheduler_node_capacity_columns(),
+# which takes each column's DDL from the table definition) walks exactly
+# the columns the table defines. test_scheduler_node_capacity_types in
+# test_mariadb_capacity_schema.py is the guard: it checks every name here
+# is a BigInteger NOT NULL column with a server default, and that the
+# table has no held_* column this tuple omits, which the migration would
+# otherwise silently skip on an upgraded database.
+SCHEDULER_NODE_CAPACITY_HELD_COLUMNS = (
+    'held_cpus', 'held_memory_mb', 'held_disk_gb')
 
 
 # The high-water mark columns namespace_claims v2 adds. Named once so
@@ -4409,6 +4445,85 @@ def _get_namespace_claims_table() -> sa.Table:
     return _namespace_claims_table
 
 
+def _get_namespace_claim_holds_table() -> sa.Table:
+    """Get or create the namespace_claim_holds table definition.
+
+    One row per hold: a shape a capacity claim has booked on one node,
+    the claim and namespace it belongs to, and the instance consuming
+    it once one does. These rows are the ground truth for booked room.
+    ``scheduler_node_capacity.held_*`` is a per-node materialisation of
+    them and stands in the same relation to them as ``used_*`` does to
+    the placement reference rows, which is what lets the reconciler
+    recompute the counters from here rather than adjust them in place
+    -- a counter cannot be recomputed from itself.
+
+    ``node_uuid`` is nullable because a hold outlives the node it was
+    booked on. When a hypervisor leaves service the room is still owed
+    to the claim, and a NULL node is how a hold says it is owed but
+    currently unplaced; such a hold contributes to no node's counters.
+
+    ``instance_uuid`` is the whole of the consumption state. A separate
+    boolean beside it would be a second ledger that agrees with the
+    uuid only until the next write, and it would buy nothing: what a
+    consumed hold still contributes is its size less the consuming
+    instance's own request, which cannot be computed without the
+    instance anyway.
+
+    ``namespace`` is carried although the claim row already has it,
+    because every read of this table filters or groups by it and a join
+    to namespace_claims is the cost the per-node counters exist to keep
+    off the admission path. It is a denormalisation, and the reconciler
+    is its authority, as it is for every other counter in this family.
+
+    ``created_at`` and ``updated_at`` follow the cluster_locks
+    TIMESTAMP idiom: server-side timestamps, so the order in which
+    bookings were taken and the age of a row are judged against the
+    database's NOW() rather than against whichever node happened to
+    write it.
+
+    There are no foreign keys, because nothing in this schema has any:
+    referential integrity between a hold and its claim, node and
+    instance is the reconciler's job rather than the engine's. The
+    three indexes are the three access paths -- the claim-side sum
+    invariant filters by claim, the per-node fold groups by node, and
+    consumption and release look a hold up by instance.
+    """
+    global _namespace_claim_holds_table
+    if _namespace_claim_holds_table is None:
+        with TABLE_CREATION_LOCK:
+            if _namespace_claim_holds_table is not None:
+                return _namespace_claim_holds_table
+            metadata = _get_metadata()
+            if 'namespace_claim_holds' in metadata.tables:
+                _namespace_claim_holds_table = \
+                    metadata.tables['namespace_claim_holds']
+                return _namespace_claim_holds_table
+            _namespace_claim_holds_table = sa.Table(
+                'namespace_claim_holds',
+                metadata,
+                sa.Column('uuid', uuid_column_type(), primary_key=True),
+                sa.Column('claim_uuid', uuid_column_type(), nullable=False),
+                sa.Column('namespace', sa.String(255), nullable=False),
+                # BIGINT to match the int64 proto fields and the width
+                # of the counters these rows are folded into; see the
+                # scheduler_node_capacity definition.
+                sa.Column('cpus', sa.BigInteger(), nullable=False),
+                sa.Column('memory_mb', sa.BigInteger(), nullable=False),
+                sa.Column('disk_gb', sa.BigInteger(), nullable=False),
+                # Nullable, and NULL means displaced: see the docstring.
+                sa.Column('node_uuid', uuid_column_type(), nullable=True),
+                sa.Column('instance_uuid', uuid_column_type(),
+                          nullable=True),
+                sa.Column('created_at', sa.DateTime(), nullable=False),
+                sa.Column('updated_at', sa.DateTime(), nullable=False),
+                sa.Index('idx_namespace_claim_holds_claim', 'claim_uuid'),
+                sa.Index('idx_namespace_claim_holds_node', 'node_uuid'),
+                sa.Index('idx_namespace_claim_holds_instance',
+                         'instance_uuid'),
+            )
+    return _namespace_claim_holds_table
+
+
 def _get_cluster_capacity_table() -> sa.Table:
     """Get or create the cluster_capacity table definition.
 
@@ -4471,6 +4586,33 @@ def _get_cluster_capacity_table() -> sa.Table:
     return _cluster_capacity_table
 
 
+def _add_missing_scheduler_node_capacity_columns(
+        engine: sa.Engine, table: sa.Table, table_name: str) -> None:
+    """Add any SCHEDULER_NODE_CAPACITY_HELD_COLUMNS column it is missing.
+
+    The same idiom as _add_missing_namespace_claims_columns(): the
+    column type is taken from the table definition so the DDL cannot
+    drift from it, and each ADD COLUMN is guarded by an existence check
+    so a re-run -- or a run from an older schema version -- is a no-op.
+
+    Nothing is backfilled. These counters are derived from the hold
+    rows, an upgraded database has none, and the next reconcile pass is
+    the authority on them regardless -- so zero is both the right
+    starting value and the right value until a hold exists.
+    """
+    mysql_dialect = sa.dialects.mysql.dialect()
+    with engine.begin() as conn:
+        cols = get_table_columns(engine, table_name)
+        for column_name in SCHEDULER_NODE_CAPACITY_HELD_COLUMNS:
+            if column_name in cols:
+                continue
+            column_type = table.c[column_name].type.compile(
+                dialect=mysql_dialect)
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} ADD COLUMN '
+                f'{column_name} {column_type} NOT NULL DEFAULT 0'))
+
+
 def _ensure_scheduler_node_capacity_schema(
         engine: sa.Engine) -> dict[str, Any]:
     """Ensure the scheduler_node_capacity table schema is up to date."""
@@ -4487,6 +4629,17 @@ def _ensure_scheduler_node_capacity_schema(
                  f'(version {SCHEDULER_NODE_CAPACITY_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
         current_ver = SCHEDULER_NODE_CAPACITY_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 2:
+        # v2 adds the held_* booked-room counters. Spec-driven,
+        # existence-guarded ADD COLUMNs, so a re-run is a no-op and the
+        # end state does not depend on which step introduced a column.
+        LOG.info(f'Adding held room columns to {table_name} table '
+                 f'(version 2)')
+        _add_missing_scheduler_node_capacity_columns(
+            engine, table, table_name)
+        current_ver = 2
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -4591,6 +4744,34 @@ def _ensure_cluster_capacity_schema(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+def _ensure_namespace_claim_holds_schema(engine: sa.Engine) -> dict[str, Any]:
+    """Ensure the namespace_claim_holds table schema is up to date."""
+    table_name = 'namespace_claim_holds'
+    current_ver = _get_table_version(engine, table_name)
+    start_ver = current_ver
+    table = _get_namespace_claim_holds_table()
+
+    # Version 0 or -1 means the table doesn't exist yet - create it at
+    # the current schema version. A table that does not exist has no
+    # prior shape to migrate, and at version 1 there is no prior shape
+    # to migrate from either: the three indexes are part of the table
+    # definition and are created by create_all alongside the table.
+    if current_ver <= 0:
+        LOG.info(f'Creating {table_name} table '
+                 f'(version {NAMESPACE_CLAIM_HOLDS_VERSION})')
+        table.metadata.create_all(engine, tables=[table], checkfirst=True)
+        current_ver = NAMESPACE_CLAIM_HOLDS_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    return {
+        'table': table_name,
+        'start_version': start_ver,
+        'end_version': current_ver,
+        'target_version': NAMESPACE_CLAIM_HOLDS_VERSION,
+        'migrated': start_ver != current_ver
+    }
+
+
 def ensure_schema() -> list[dict[str, Any]]:
     """Ensure all MariaDB tables exist with current schema versions.
 
@@ -4667,6 +4848,7 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_scheduler_node_capacity_schema(engine))
     results.append(_ensure_namespace_claims_schema(engine))
     results.append(_ensure_cluster_capacity_schema(engine))
+    results.append(_ensure_namespace_claim_holds_schema(engine))
 
     # Widen any native ENUM column whose Python enum has grown since the
     # table was created. This runs after the per-table ensures so every
@@ -4750,6 +4932,7 @@ def register_all_tables() -> None:
     _get_scheduler_node_capacity_table()
     _get_namespace_claims_table()
     _get_cluster_capacity_table()
+    _get_namespace_claim_holds_table()
     LOG.info('Registered %d MariaDB Table objects in metadata',
              len(_get_metadata().tables))
 
