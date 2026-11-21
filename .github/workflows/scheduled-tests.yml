@@ -46,6 +46,35 @@ on:
     # found the headroom concentrated overnight and at weekends.
     - cron: '00 15 * * 5'        # utc, fridays
 
+# Queue rather than cancel, as ci-headroom-health.yml does and for the same
+# reason. Every lane this workflow calls carries a job-level concurrency
+# group with cancel-in-progress true, keyed outside a merge group on
+# github.ref -- through smoke-cluster.yml for the lanes which use it, and in
+# its own job for Node lifecycle. Two runs of this workflow on develop share
+# that ref, so a second dispatch used to cancel the first run's lanes. The
+# weekly run then concluded cancelled rather than failure, and a cancelled
+# run neither reaches report_failures nor sends a GitHub failure
+# notification, so nobody heard (issue #4869). That is not hypothetical for
+# long: the periodic CI plan at
+# https://github.com/shakenfist/private-ci/blob/master/docs/plans/PLAN-periodic-ci.md
+# has the conductor dispatching this workflow into gaps in sfcbr's load,
+# which can overlap the cron or a manual run.
+#
+# A workflow-level group is the whole fix rather than half of it, because a
+# queued run starts no jobs at all: the lane-level groups never see two runs
+# of this workflow concurrently, so there is nothing left for them to cancel
+# and they need no edit (theirs lives in shakenfist/actions anyway).
+#
+# The residue, stated because it is a real one: GitHub holds at most one
+# pending run per concurrency group, so a third dispatch arriving while one
+# run is in flight and one is already pending displaces the pending run,
+# which concludes cancelled. That run tested nothing and lost nothing, which
+# is why it is acceptable, but it is a silent cancellation and it is this
+# one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   weekly_lanes:
     # tools/ci_report_scheduled_failures.py identifies a lane by this name,
@@ -61,9 +90,18 @@ jobs:
   report_failures:
     name: "Report failures"
     needs: [weekly_lanes]
-    # Not on cancelled: a cancelled run tested nothing and has nothing to
-    # report.
-    if: always() && needs.weekly_lanes.result == 'failure'
+    # Also on cancelled. A cancelled run is usually one which tested nothing,
+    # but it can also be one cancelled mid-flight after a lane had already
+    # failed, and skipping those buried a real failure: the run concludes
+    # cancelled, so neither this job nor a GitHub notification ran. Reporting
+    # a cancellation costs no noise, because FAILED_CONCLUSIONS in the
+    # reporter does not count a cancelled job as a failure -- a cancelled run
+    # with no failed lane reports nothing. --lanes-result is what tells the
+    # reporter which of the two it is looking at; see its comment on the
+    # unattributed fallback.
+    if: >-
+      always() && (needs.weekly_lanes.result == 'failure'
+      || needs.weekly_lanes.result == 'cancelled')
     runs-on: [self-hosted, static]
     # A handful of GitHub API calls.
     timeout-minutes: 10
@@ -90,3 +128,4 @@ jobs:
           --run-attempt "${{ github.run_attempt }}"
           --workflow scheduled-tests.yml
           --caller "Weekly lanes"
+          --lanes-result "${{ needs.weekly_lanes.result }}"
