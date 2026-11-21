@@ -26,7 +26,14 @@ can never come back without an issue.
 Usage:
     tools/ci_report_scheduled_failures.py --repo OWNER/REPO --run-id ID \\
         --run-attempt N --workflow scheduled-tests.yml --caller 'Weekly lanes' \\
-        [--dry-run]
+        [--lanes-result RESULT] [--dry-run]
+
+--lanes-result is the caller job's own result, and decides what a run with no
+failed job means. The caller runs this on a failed lanes job and on a
+cancelled one (issue #4869): a failure with nothing attributable is itself
+worth an issue, while a cancellation with nothing attributable lost nothing
+and must stay quiet, or every displaced dispatch files one. Omitting it keeps
+the original behaviour, which is to assume a failure.
 
 --dry-run reads the run from GitHub but prints the issues it would file or
 comment on instead of writing anything. A run of any branch but the default
@@ -43,7 +50,16 @@ import tempfile
 
 
 LABEL = 'ci-failure'
+# A cancelled job is deliberately not here. Reporting one as a failure would
+# file an issue for work which was stopped rather than broken, and it is what
+# lets the caller hand a cancelled run to this tool at all: a cancellation
+# which lost no lane reports nothing.
 FAILED_CONCLUSIONS = ('failure', 'timed_out')
+
+# The caller job results this tool is run on. A run which concluded anything
+# else never reaches it.
+RESULT_FAILURE = 'failure'
+RESULT_CANCELLED = 'cancelled'
 
 # Not a lane: the key for failed jobs which are not under the caller job.
 UNATTRIBUTED = 'the scheduled run itself'
@@ -216,7 +232,8 @@ def existing_issue(issues, lane):
     return None
 
 
-def report(github, workflow, run_id, run_attempt, caller, dry_run=False, out=sys.stdout):
+def report(github, workflow, run_id, run_attempt, caller, lanes_result=RESULT_FAILURE,
+           dry_run=False, out=sys.stdout):
     """File or comment on one issue per failed lane. Returns how many it reported."""
     run = github.run(run_id)
     default_branch = github.default_branch()
@@ -228,8 +245,17 @@ def report(github, workflow, run_id, run_attempt, caller, dry_run=False, out=sys
 
     failed = failed_lanes(github.jobs(run_id, run_attempt), caller)
     if not failed:
-        # The caller only runs this when the lanes job failed, so a run with
-        # no failed job is itself worth an issue rather than a quiet exit.
+        if lanes_result == RESULT_CANCELLED:
+            # A cancelled lanes job with no failed lane is a run which was
+            # stopped, not one which broke: the displaced pending run a
+            # third overlapping dispatch leaves behind, or a hand cancel.
+            # There is nothing to tell anyone, and filing the unattributed
+            # issue below would turn every one of those into an issue.
+            out.write('The lanes job was cancelled and no lane failed, so '
+                      'there is nothing to report.\n')
+            return 0
+        # Otherwise the lanes job failed, so a run with no failed job is
+        # itself worth an issue rather than a quiet exit.
         failed = {UNATTRIBUTED: []}
 
     issues = github.open_issues()
@@ -265,11 +291,14 @@ def main(argv=None):
                         help='The workflow file, used to find earlier runs.')
     parser.add_argument('--caller', required=True,
                         help='The name of the job which calls functional-lanes.yml.')
+    parser.add_argument('--lanes-result', default=RESULT_FAILURE,
+                        help='The caller job\'s result, which decides what a run with no '
+                             'failed job means. Defaults to %s.' % RESULT_FAILURE)
     parser.add_argument('--dry-run', action='store_true')
     args = parser.parse_args(argv)
 
     report(GitHubCLI(args.repo), args.workflow, args.run_id, args.run_attempt, args.caller,
-           dry_run=args.dry_run)
+           lanes_result=args.lanes_result, dry_run=args.dry_run)
     return 0
 
 

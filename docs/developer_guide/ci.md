@@ -105,6 +105,30 @@ by the lane's display name (its `name:` in `functional-lanes.yml`), so
 renaming a lane files a fresh issue and leaves the old one to be closed
 by hand.
 
+Two things make that reporting reachable, both of them about cancellation.
+The workflow carries a workflow-level `concurrency` group with
+`cancel-in-progress: false`, so a second dispatch *queues* behind a run in
+flight instead of cancelling it. Without that it did cancel it: every lane
+this workflow calls carries a job-level group keyed outside a merge group on
+`github.ref`, two runs on `develop` share that ref, and the superseded run
+concluded `cancelled` rather than `failure` — which neither reaches
+`report_failures` nor sends a GitHub failure notification, so a lost weekly
+run was silent. A workflow-level group is the whole fix rather than half of
+it, because a queued run starts no jobs at all, so the lane-level groups
+never see two runs of this workflow at once and need no edit. One residue
+remains by construction: GitHub holds at most one *pending* run per group,
+so a third dispatch arriving while one run is in flight and one is already
+pending displaces the pending one. That run tested nothing and lost nothing.
+
+`report_failures` therefore also runs when `weekly_lanes` concludes
+`cancelled`, not only `failure`. A run cancelled mid-flight after a lane had
+already failed used to bury that failure completely, and reporting a
+cancellation adds no noise because `FAILED_CONCLUSIONS` in the reporter does
+not count a cancelled job as a failure. The `--lanes-result` argument is what
+separates the two cases: with no failed job a `failure` still files the
+unattributed issue, which is the guarantee that a red run never comes back
+silent, while a `cancelled` exits quietly because it lost nothing.
+
 GitHub runs a `schedule:` trigger only from the copy of the workflow on
 the repository's default branch, and with that branch checked out. The
 default branch is `develop`, which is what makes the weekly run test
